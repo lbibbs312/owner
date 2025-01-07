@@ -42,7 +42,7 @@ import pytz
 # 1) APP & CONFIG
 ##################################################
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "fallback_secret_key")
+app.config["SECRET_KEY"] = "admin123"
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
     "SQLALCHEMY_DATABASE_URI",
     "sqlite:///lacksdrivers.db"
