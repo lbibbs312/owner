@@ -18,14 +18,14 @@
                 <br>
                 Arrive:
                 {% if log.arrive_time %}
-                  {{ log.arrive_time.strftime("%I:%M %p") }}
+                  {{ log.arrive_time }}
                 {% else %}
                   --
                 {% endif %}
                 &nbsp;|&nbsp;
                 Depart:
                 {% if log.depart_time %}
-                  {{ log.depart_time.strftime("%I:%M %p") }}
+                  {{ log.depart_time }}
                 {% else %}
                   --
                 {% endif %}
