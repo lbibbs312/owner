@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Makes the page scale properly on phones -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>LacksDrivers Example</title>
+
+  <!-- Bootstrap CSS for easy, responsive styling -->
+  <link 
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+  >
+</head>
+<body>
+
+  <!-- NAVBAR: includes Login and Register links -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">LacksDrivers</a>
+      <button 
+        class="navbar-toggler" 
+        type="button" 
+        data-bs-toggle="collapse" 
+        data-bs-target="#navbarContent" 
+        aria-controls="navbarContent" 
+        aria-expanded="false" 
+        aria-label="Toggle navigation"
+      >
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarContent">
+        <ul class="navbar-nav ms-auto">
+          <!-- Login link (replace /login with your actual route) -->
+          <li class="nav-item">
+            <a class="nav-link" href="/login">Login</a>
+          </li>
+
+          <!-- Register link (jumps down to the register form) -->
+          <li class="nav-item">
+            <a class="nav-link" href="#register-section">Register</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT: big heading and a big 'Register' button -->
+  <div class="container my-4">
+    <h1 class="mb-3">Welcome to LacksDrivers</h1>
+    <p>This page is fully mobile-friendly. Check it on your phone!</p>
+
+    <!-- Big register button that scrolls to the form below -->
+    <a href="#register-section" class="btn btn-primary btn-lg">
+      Register
+    </a>
+  </div>
+
+  <!-- REGISTER FORM SECTION -->
+  <div class="container mb-5" id="register-section">
+    <h2 class="mb-4">Register</h2>
+    <form action="/register" method="POST">
+      <!-- Larger text fields using Bootstrap's .form-control-lg -->
+      <div class="mb-3">
+        <label for="username" class="form-label fs-5">Username</label>
+        <input 
+          type="text" 
+          class="form-control form-control-lg" 
+          id="username" 
+          name="username" 
+          required
+        >
+      </div>
+      <div class="mb-3">
+        <label for="password" class="form-label fs-5">Password</label>
+        <input 
+          type="password" 
+          class="form-control form-control-lg" 
+          id="password" 
+          name="password" 
+          required
+        >
+      </div>
+      <!-- Big Sign Up button -->
+      <button type="submit" class="btn btn-success btn-lg">
+        Sign Up
+      </button>
+    </form>
+  </div>
+
+  <!-- Bootstrap JS (for navbar toggle, etc.) -->
+  <script 
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">
+  </script>
+</body>
+</html>

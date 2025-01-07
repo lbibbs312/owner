@@ -1,8 +1,8 @@
-"""Initial create tables
+"""Initial migration
 
-Revision ID: 01bcb08b9e6a
-Revises: 5e96c810fe42
-Create Date: 2025-01-05 18:06:42.861208
+Revision ID: 4bd88e409a97
+Revises: 
+Create Date: 2025-01-07 03:08:46.438494
 
 """
 from alembic import op
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '01bcb08b9e6a'
-down_revision = '5e96c810fe42'
+revision = '4bd88e409a97'
+down_revision = None
 branch_labels = None
 depends_on = None
 
@@ -65,6 +65,9 @@ def upgrade():
     sa.Column('downtime_reason', sa.String(length=200), nullable=True),
     sa.Column('load_size', sa.String(length=10), nullable=False),
     sa.Column('plant_name', sa.String(length=20), nullable=False),
+    sa.Column('maintenance', sa.Boolean(), nullable=True),
+    sa.Column('fuel', sa.Boolean(), nullable=True),
+    sa.Column('meeting', sa.Boolean(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['driver_id'], ['user.id'], ),
