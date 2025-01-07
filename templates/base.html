@@ -3,12 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <title>LacksDrivers</title>
+
+  <!-- REQUIRED for mobile responsiveness -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <!-- Bootstrap 5 CSS -->
   <link
     rel="stylesheet"
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"
   >
+
   <style>
+    /* SIDEBAR + LAYOUT STYLES */
     .sidebar-container {
       display: flex;
       flex-wrap: nowrap;
@@ -23,9 +29,11 @@
       width: 200px;
       transition: transform 0.3s ease;
     }
+    /* The class that slides the sidebar off-screen */
     .sidebar-closed {
       transform: translateX(-210px);
     }
+
     header {
       width: 100%;
       background-color: #0d6efd; /* Blue header */
@@ -41,18 +49,24 @@
       text-decoration: none;
       color: #fff;
     }
+
+    /* Hamburger button styling */
     .sidebar-toggle-btn {
       background: transparent;
       border: none;
       color: #fff;
       font-size: 1.3rem;
       cursor: pointer;
+      /* position or z-index if needed to ensure visibility */
+      z-index: 2000; 
     }
+
     .main-content {
       flex: 1;
       padding: 1rem;
       transition: all 0.3s ease;
     }
+
     @media (max-width: 768px) {
       .sidebar {
         position: fixed;
@@ -62,9 +76,10 @@
         z-index: 999;
       }
       .main-content {
-        margin-top: 56px;
+        margin-top: 56px; /* so content isn't hidden behind header on small screens */
       }
     }
+
     .bell-icon {
       color: #fff;
       margin-right: 1rem;
@@ -86,6 +101,7 @@
       {% else %}
         <a href="{{ url_for('login') }}" class="btn btn-sm btn-light me-2">Login</a>
       {% endif %}
+      <!-- HAMBURGER TOGGLE BUTTON -->
       <button
         class="sidebar-toggle-btn"
         onclick="toggleSidebar()"
@@ -98,7 +114,8 @@
 
   <!-- SIDEBAR + CONTENT -->
   <div class="sidebar-container">
-    <nav id="sidebarMenu" class="sidebar">
+    <!-- Start the sidebar in the collapsed state -->
+    <nav id="sidebarMenu" class="sidebar sidebar-closed">
       {% if current_user.is_authenticated %}
         <ul class="nav flex-column mt-3">
           <li class="nav-item">
@@ -147,8 +164,10 @@
     </main>
   </div>
 
-  <!-- Bootstrap JS -->
+  <!-- Bootstrap 5 JS (for modals, dropdowns, etc.) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- SIDEBAR TOGGLE SCRIPT -->
   <script>
     function toggleSidebar() {
       const sidebar = document.getElementById("sidebarMenu");
