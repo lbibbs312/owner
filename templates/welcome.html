@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h1 class="my-4">Welcome to LacksDrivers</h1>
+  <p>Use the sidebar to navigate.</p>
+
+  <hr>
+  <h3>Recent Announcements:</h3>
+  {% if bulletins %}
+    <ul>
+      {% for b in bulletins %}
+        <li><strong>{{ b.title }}</strong> - {{ b.body }} (Posted on {{ b.created_at }})</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No announcements to display.</p>
+  {% endif %}
+</div>
+{% endblock %}

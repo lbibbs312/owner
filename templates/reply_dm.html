@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2 class="mt-3">Reply to Message</h2>
+  <p><strong>Original from:</strong> {{ original_dm.sender.username }}</p>
+  <p>{{ original_dm.content }}</p>
+
+  <form method="POST" action="">
+    {{ reply_form.hidden_tag() }}
+    <!-- We can display the receiver (sender of original) read-only or hidden. -->
+    <div class="mb-3">
+      {{ reply_form.receiver_id.label }}
+      {{ reply_form.receiver_id(class="form-select", readonly=True) }}
+    </div>
+    <div class="mb-3">
+      {{ reply_form.content.label }}
+      {{ reply_form.content(class="form-control") }}
+    </div>
+    {{ reply_form.submit(class="btn btn-primary") }}
+  </form>
+</div>
+{% endblock %}

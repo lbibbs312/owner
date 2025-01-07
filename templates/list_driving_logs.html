@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>My Driving Logs</h2>
+  <hr>
+  <a class="btn btn-primary mb-3" href="{{ url_for('new_driving_log') }}">
+    Add New Log
+  </a>
+
+  {% if logs %}
+    <table class="table table-bordered table-striped">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Shift</th>
+          <th>Plant</th>
+          <th>Arrive</th>
+          <th>Depart</th>
+          <th>Downtime Reason</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for log in logs %}
+        <tr>
+          <td>{{ log.date }}</td>
+          <td>{{ log.shift }}</td>
+          <td>{{ log.plant }}</td>
+          <td>{{ log.arrive_time }}</td>
+          <td>{{ log.depart_time }}</td>
+          <td>{{ log.downtime_reason }}</td>
+          <td>
+            <!-- If you want an edit or delete button, add them here -->
+            <!-- Example:
+            <a href="{{ url_for('edit_driving_log', log_id=log.id) }}" class="btn btn-sm btn-info">Edit</a>
+            -->
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No driving logs found.</p>
+  {% endif %}
+</div>
+{% endblock %}

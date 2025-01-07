@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2 class="mt-3">View Driver Log</h2>
+  <p><strong>ID:</strong> {{ log.id }}</p>
+  <p><strong>Date:</strong> {{ log.date }}</p>
+  <p><strong>Plant Name:</strong> {{ log.plant_name }}</p>
+  <p><strong>Load Size:</strong> {{ log.load_size }}</p>
+  <p><strong>Maintenance:</strong> {{ "Yes" if log.maintenance else "No" }}</p>
+  <p><strong>Fuel:</strong> {{ "Yes" if log.fuel else "No" }}</p>
+  <p><strong>Meeting:</strong> {{ "Yes" if log.meeting else "No" }}</p>
+  <p><strong>Arrive Time:</strong> 
+    {% if log.arrive_time %}
+      {{ log.arrive_time.strftime("%I:%M %p") }}
+    {% else %}
+      --
+    {% endif %}
+  </p>
+  <p><strong>Depart Time:</strong> 
+    {% if log.depart_time %}
+      {{ log.depart_time.strftime("%I:%M %p") }}
+    {% else %}
+      --
+    {% endif %}
+  </p>
+  <p><strong>Downtime Reason:</strong> {{ log.downtime_reason or "N/A" }}</p>
+</div>
+{% endblock %}

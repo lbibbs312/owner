@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Complete PostTrip{% endblock %}
+
+{% block content %}
+<h2>PostTrip for PreTrip #{{ pretrip.id }}</h2>
+<form method="POST" class="row g-3">
+  {{ form.hidden_tag() }}
+
+  <div class="col-md-6">
+    <label for="end_mileage" class="form-label">{{ form.end_mileage.label }}</label>
+    {{ form.end_mileage(class="form-control", id="end_mileage") }}
+  </div>
+
+  <div class="col-12">
+    <label for="remarks" class="form-label">{{ form.remarks.label }}</label>
+    {{ form.remarks(class="form-control", id="remarks", rows="3") }}
+  </div>
+
+  <div class="col-12">
+    {{ form.submit(class="btn btn-primary") }}
+  </div>
+</form>
+{% endblock %}

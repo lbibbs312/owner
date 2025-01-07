@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2 class="mt-3">Manager Dashboard</h2>
+  <p>Hello, {{ current_user.username }}! Manage tasks, drivers, and pretrips here.</p>
+
+  <hr>
+  <h4>All Tasks</h4>
+  <a href="{{ url_for('create_task') }}" class="btn btn-sm btn-success mb-2">Create New Task</a>
+  {% if tasks %}
+    <ul>
+      {% for t in tasks %}
+        <li>
+          <strong>ID:</strong> {{ t.id }} - {{ t.title }} ({{ t.status }})
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No tasks found.</p>
+  {% endif %}
+
+  <hr>
+  <h4>All Drivers</h4>
+  <ul>
+    {% for d in drivers %}
+      <li>{{ d.username }} - {{ d.email }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

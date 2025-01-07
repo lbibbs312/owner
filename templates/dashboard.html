@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2 class="mt-3">Dashboard</h2>
+
+  <!-- Example recent logs & pretrips -->
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card mb-3">
+        <div class="card-header bg-primary text-white">
+          Recent Logs
+        </div>
+        <div class="card-body">
+          {% if logs %}
+            <ul>
+              {% for log in logs[:5] %}
+                <li>
+                  <strong>Log #{{ log.id }}</strong> - {{ log.plant_name }} ({{ log.load_size }})
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p>No logs found.</p>
+          {% endif %}
+          <a href="{{ url_for('driver_logs') }}" class="btn btn-sm btn-outline-light">All Logs</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card mb-3">
+        <div class="card-header bg-primary text-white">
+          Recent PreTrips
+        </div>
+        <div class="card-body">
+          {% if pretrips %}
+            <ul>
+              {% for pt in pretrips[:5] %}
+                <li>
+                  <strong>PreTrip #{{ pt.id }}</strong> - {{ pt.truck_name }}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p>No PreTrips yet.</p>
+          {% endif %}
+          <a href="{{ url_for('list_pretrips') }}" class="btn btn-sm btn-outline-light">All PreTrips</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Direct Message Form -->
+  <div class="card mb-3">
+    <div class="card-header bg-info text-white">
+      Send a Direct Message
+    </div>
+    <div class="card-body">
+      <form method="POST" action="">
+        {{ dm_form.hidden_tag() }}
+        <div class="mb-2">
+          {{ dm_form.receiver_id.label }}:
+          {{ dm_form.receiver_id(class="form-select") }}
+        </div>
+        <div class="mb-2">
+          {{ dm_form.content.label }}:
+          {{ dm_form.content(class="form-control") }}
+        </div>
+        {{ dm_form.submit(class="btn btn-success") }}
+      </form>
+    </div>
+  </div>
+
+  <!-- Inbox / Outbox -->
+  <div class="row">
+    <div class="col-md-6">
+      <h5>Inbox</h5>
+      {% if inbox %}
+        <ul>
+          {% for msg in inbox %}
+            <li>
+              <strong>From:</strong> {{ msg.sender.username }}<br>
+              {{ msg.content }} <br>
+              <small class="text-muted">{{ msg.timestamp }}</small> <br>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>No incoming messages.</p>
+      {% endif %}
+    </div>
+    <div class="col-md-6">
+      <h5>Outbox</h5>
+      {% if outbox %}
+        <ul>
+          {% for msg in outbox %}
+            <li>
+              <strong>To:</strong> {{ msg.receiver.username }} <br>
+              {{ msg.content }} <br>
+              <small class="text-muted">{{ msg.timestamp }}</small> <br>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>No outgoing messages.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

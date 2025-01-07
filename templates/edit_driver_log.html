@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2 class="mt-3">Edit Driver Log (ID: {{ log.id }})</h2>
+  <form method="POST" action="">
+    {{ form.hidden_tag() }}
+    
+    <div class="mb-3 form-check">
+      {{ form.maintenance(class="form-check-input") }}
+      {{ form.maintenance.label(class="form-check-label") }}
+    </div>
+    <div class="mb-3 form-check">
+      {{ form.fuel(class="form-check-input") }}
+      {{ form.fuel.label(class="form-check-label") }}
+    </div>
+    <div class="mb-3 form-check">
+      {{ form.meeting(class="form-check-input") }}
+      {{ form.meeting.label(class="form-check-label") }}
+    </div>
+    
+    <div class="mb-3">
+      {{ form.plant_name.label }}
+      {{ form.plant_name(class="form-select") }}
+    </div>
+    <div class="mb-3">
+      {{ form.load_size.label }}
+      {{ form.load_size(class="form-select") }}
+    </div>
+    <div class="mb-3">
+      {{ form.downtime_reason.label }}
+      {{ form.downtime_reason(class="form-control") }}
+    </div>
+    
+    {{ form.submit(class="btn btn-primary") }}
+  </form>
+</div>
+{% endblock %}

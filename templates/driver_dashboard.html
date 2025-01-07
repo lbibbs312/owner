@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Driver Dashboard{% endblock %}
+{% block content %}
+<h2>Driver Dashboard</h2>
+<div class="row mt-4">
+  <div class="col-md-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">My Tasks</h5>
+        <p>View tasks assigned to you or relevant to your shift.</p>
+        <a href="{{ url_for('list_tasks') }}" class="btn btn-primary">View Tasks</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">My PreTrips</h5>
+        <p>Create & manage your PreTrip records, then complete PostTrips.</p>
+        <a href="{{ url_for('list_pretrips') }}" class="btn btn-primary">View PreTrips</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Driver Logs</h5>
+        <p>Create and view your driver logs (load size, arrival time, etc.).</p>
+        <a href="{{ url_for('driver_logs') }}" class="btn btn-primary">View Logs</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

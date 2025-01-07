@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>LacksDrivers</title>
+  <!-- OneSignal SDK snippet (if you want web push) -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: "4803303a-e352-4571-9664-dc7241798efa",
+      });
+    });
+  </script>
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="{{ url_for('main_bp.home') }}">Home</a> |
+      {% if current_user.is_authenticated %}
+        Logged in as {{ current_user.username }} ({{ current_user.role }})
+        <a href="{{ url_for('auth_bp.logout') }}">Logout</a>
+      {% else %}
+        <a href="{{ url_for('auth_bp.login') }}">Login</a>
+        <a href="{{ url_for('auth_bp.register') }}">Register</a>
+      {% endif %}
+      {% if current_user.is_authenticated and current_user.role == 'admin' %}
+        | <a href="{{ url_for('admin_bp.dashboard') }}">Admin Dashboard</a>
+      {% endif %}
+    </nav>
+    <hr>
+  </header>
+
+  {% block content %}{% endblock %}
+
+  <footer>
+    <hr>
+    <p>Copyright © 2025 LacksDrivers</p>
+  </footer>
+</body>
+</html>

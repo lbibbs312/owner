@@ -1,0 +1,98 @@
+/* BRAND COLORS */
+:root {
+  --bs-primary: #1F3A93;  /* Dark Blue */
+  --bs-secondary: #2ECC71; /* Teal (secondary accent) */
+  --bs-danger: #E74C3C; /* Red for hot tasks */
+  --bs-success: #27AE60; /* Another green */
+  --bs-warning: #F39C12;
+  --bs-info: #3498DB;
+  --bs-light: #f8f9fa;
+  --bs-dark: #2C3E50;
+}
+
+/* NAVBAR brand styling */
+.navbar-brand img {
+  height: 50px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.navbar-brand span {
+  font-weight: 600;
+  font-size: 1.2rem;
+}
+
+/* FOOTER */
+.custom-footer {
+  background-color: var(--bs-dark);
+  color: #fff;
+  padding: 1rem 0;
+  text-align: center;
+  margin-top: 2rem;
+}
+
+/* FLASH MESSAGES */
+.flash-messages {
+  list-style-type: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+.flash-messages li {
+  margin: 0.5rem 0;
+  padding: 0.75rem;
+  border-radius: 4px;
+}
+.flash-messages li strong {
+  margin-right: 0.5rem;
+}
+/* Example color-coding by category (optional) */
+.flash-messages li:has(strong:contains("Success:")) {
+  background-color: #d1e7dd;
+  color: #0f5132;
+}
+.flash-messages li:has(strong:contains("Danger:")) {
+  background-color: #f8d7da;
+  color: #842029;
+}
+.flash-messages li:has(strong:contains("Info:")) {
+  background-color: #cff4fc;
+  color: #055160;
+}
+.flash-messages li:has(strong:contains("Warning:")) {
+  background-color: #fff3cd;
+  color: #664d03;
+}
+
+/* TABLES */
+table tr th,
+table tr td {
+  vertical-align: middle;
+}
+
+/* FORMS */
+.form-check-input {
+  margin-top: 0.3rem;
+}
+
+/* HOVER/TRANSITION EXAMPLES */
+.card:hover {
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  transition: box-shadow 0.3s ease-in-out;
+}
+
+/* Color-coded status badges (extra flair) */
+.badge-hot {
+  background-color: var(--bs-danger);
+  color: #fff;
+}
+.badge-in-progress {
+  background-color: var(--bs-primary);
+  color: #fff;
+}
+.badge-completed {
+  background-color: var(--bs-success);
+  color: #fff;
+}
+.badge-pending {
+  background-color: var(--bs-warning);
+  color: #fff;
+}

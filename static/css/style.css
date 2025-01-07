@@ -1,0 +1,71 @@
+/************************************************
+  style.css - your custom overrides & brand color
+*************************************************/
+
+/* BRAND COLORS (override some Bootstrap vars) */
+:root {
+  --bs-primary: #1F3A93;     /* Dark Blue */
+  --bs-secondary: #2ECC71;   /* Teal (secondary) */
+  --bs-danger: #E74C3C;      /* Red for hot tasks */
+  --bs-success: #27AE60;     /* Another green */
+  --bs-warning: #F39C12;
+  --bs-info: #3498DB;
+  --bs-light: #f8f9fa;
+  --bs-dark: #2C3E50;
+}
+
+/* FLASH MESSAGES styling */
+.flash-messages {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+.flash-messages li {
+  margin: 0.5rem 0;
+  padding: 0.75rem;
+  border-radius: 4px;
+}
+.flash-messages li strong {
+  margin-right: 0.3rem;
+}
+.flash-messages li:has(strong:contains("Success:")) {
+  background-color: #d1e7dd; /* success */
+  color: #0f5132;
+}
+.flash-messages li:has(strong:contains("Danger:")) {
+  background-color: #f8d7da; /* danger */
+  color: #842029;
+}
+.flash-messages li:has(strong:contains("Info:")) {
+  background-color: #cff4fc; /* info */
+  color: #055160;
+}
+.flash-messages li:has(strong:contains("Warning:")) {
+  background-color: #fff3cd; /* warning */
+  color: #664d03;
+}
+
+/* CARD HOVER SHADOW */
+.card:hover {
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  transition: box-shadow 0.3s ease-in-out;
+}
+
+/* FOOTER */
+.custom-footer {
+  background-color: var(--bs-dark);
+  color: #fff;
+  padding: 1rem 0;
+  text-align: center;
+}
+
+/* TABLES */
+table tr th,
+table tr td {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.navbar-brand img {
+  max-height: 40px; /* or 50px, whatever size you want */
+  width: auto;
+}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Edit Task #{{ task_id }}{% endblock %}
+{% block content %}
+<h2>Edit Task #{{ task_id }}</h2>
+<form method="POST" class="row g-3">
+  {{ form.hidden_tag() }}
+
+  <div class="col-md-6">
+    <label for="title" class="form-label">{{ form.title.label }}</label>
+    {{ form.title(class="form-control", id="title") }}
+    <div class="text-danger">{{ form.title.errors }}</div>
+  </div>
+
+  <div class="col-md-6">
+    <label for="shift" class="form-label">{{ form.shift.label }}</label>
+    {{ form.shift(class="form-select", id="shift") }}
+    <div class="text-danger">{{ form.shift.errors }}</div>
+  </div>
+
+  <div class="col-12">
+    <label for="details" class="form-label">{{ form.details.label }}</label>
+    {{ form.details(class="form-control", id="details", rows="3") }}
+    <div class="text-danger">{{ form.details.errors }}</div>
+  </div>
+
+  <div class="col-md-4 form-check">
+    {{ form.is_hot(class="form-check-input", id="is_hot") }}
+    <label for="is_hot" class="form-check-label">{{ form.is_hot.label }}</label>
+    <div class="text-danger">{{ form.is_hot.errors }}</div>
+  </div>
+
+  <div class="col-md-4">
+    <label for="status" class="form-label">{{ form.status.label }}</label>
+    {{ form.status(class="form-select", id="status") }}
+    <div class="text-danger">{{ form.status.errors }}</div>
+  </div>
+
+  <div class="col-md-4">
+    <label for="assigned_to" class="form-label">{{ form.assigned_to.label }}</label>
+    {{ form.assigned_to(class="form-control", id="assigned_to") }}
+    <div class="text-danger">{{ form.assigned_to.errors }}</div>
+  </div>
+
+  <div class="col-12">
+    {{ form.submit(class="btn btn-custom") }}
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2 class="mt-3">Announcements (kept for 1 day)</h2>
+
+  {% if current_user.role == 'management' %}
+  <form method="POST" action="">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+      {{ form.title.label }}
+      {{ form.title(class="form-control") }}
+    </div>
+    <div class="mb-3">
+      {{ form.body.label }}
+      {{ form.body(class="form-control") }}
+    </div>
+    {{ form.submit(class="btn btn-primary") }}
+  </form>
+  <hr>
+  {% endif %}
+
+  <h4>Current Announcements</h4>
+  {% if announcements %}
+    <ul>
+      {% for ann in announcements %}
+        <li>
+          <strong>{{ ann.title }}</strong> - {{ ann.body }}<br>
+          <small class="text-muted">{{ ann.created_at }}</small>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No active announcements.</p>
+  {% endif %}
+</div>
+{% endblock %}

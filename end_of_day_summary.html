@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2 class="mt-3">End of Day Summary for {{ the_date }}</h2>
+
+  {% for driver_name, log_list in drivers_logs.items() %}
+    <div class="card mb-3">
+      <div class="card-header bg-primary text-white">
+        Logs for {{ driver_name }}
+      </div>
+      <div class="card-body">
+        {% if log_list %}
+          <ul>
+            {% for log in log_list %}
+              <li>
+                <strong>Log #{{ log.id }}</strong>: 
+                {{ log.plant_name }} ({{ log.load_size }})
+                <br>
+                Arrive:
+                {% if log.arrive_time %}
+                  {{ log.arrive_time.strftime("%I:%M %p") }}
+                {% else %}
+                  --
+                {% endif %}
+                <br>
+                Depart:
+                {% if log.depart_time %}
+                  {{ log.depart_time.strftime("%I:%M %p") }}
+                {% else %}
+                  --
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p>No logs for this driver today.</p>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

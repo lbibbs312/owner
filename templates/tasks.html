@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Tasks</h3>
+
+{% if current_user.role == "management" %}
+  <a href="{{ url_for('create_task') }}" class="btn btn-success mb-3">Create Task</a>
+{% endif %}
+
+{% if tasks %}
+  <div class="list-group">
+    {% for t in tasks %}
+    <div class="list-group-item mb-2">
+      <strong>{{ t.title }}</strong> ({{ t.status }})
+      {% if t.is_hot %}
+        <span class="badge bg-danger">HOT</span>
+      {% endif %}
+      <br>Shift: {{ t.shift or "N/A" }} | Assigned to:
+      {{ t.assigned_user.username if t.assigned_user else "None" }}
+
+      <p>{{ t.details }}</p>
+
+      <!-- If manager, show Edit button -->
+      {% if current_user.role == "management" %}
+        <a href="{{ url_for('edit_task', task_id=t.id) }}"
+           class="btn btn-warning btn-sm">
+          Edit
+        </a>
+      {% else %}
+        {% if t.status == "pending" %}
+          <form action="{{ url_for('accept_task', task_id=t.id) }}"
+                method="POST" style="display:inline;">
+            <button type="submit" class="btn btn-primary btn-sm">Accept</button>
+          </form>
+
+        {% elif t.status == "in-progress" and t.assigned_to == current_user.id %}
+          <form action="{{ url_for('decline_task', task_id=t.id) }}"
+                method="POST" style="display:inline;">
+            <button type="submit" class="btn btn-secondary btn-sm">Decline</button>
+          </form>
+        {% endif %}
+      {% endif %}
+
+      <!-- Mark complete if not done yet -->
+      {% if t.status != "completed"
+            and (current_user.role == "management" or
+                 t.assigned_to == current_user.id) %}
+        <form action="{{ url_for('mark_complete', task_id=t.id) }}"
+              method="POST" style="display:inline;">
+          <button type="submit" class="btn btn-success btn-sm">Mark Complete</button>
+        </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p>No tasks found.</p>
+{% endif %}
+{% endblock %}

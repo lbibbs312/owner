@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Tasks{% endblock %}
+{% block content %}
+<h2 class="mb-4">My Tasks</h2>
+{% if tasks %}
+<table class="table table-bordered align-middle">
+  <thead class="table-dark">
+    <tr>
+      <th>ID</th>
+      <th>Title</th>
+      <th>Status</th>
+      <th>Hot?</th>
+      <th>Shift</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in tasks %}
+    <tr>
+      <td>{{ t.id }}</td>
+      <td>{{ t.title }}</td>
+      <td>
+        {% if t.status == 'completed' %}
+          <span class="badge badge-completed">Completed</span>
+        {% elif t.status == 'in-progress' %}
+          <span class="badge badge-in-progress">In Progress</span>
+        {% elif t.status == 'pending' %}
+          <span class="badge badge-pending">Pending</span>
+        {% else %}
+          <span class="badge bg-secondary text-white">{{ t.status }}</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if t.is_hot %}
+          <span class="badge badge-hot">HOT</span>
+        {% else %}
+          <span class="badge bg-secondary text-white">No</span>
+        {% endif %}
+      </td>
+      <td>{{ t.shift }}</td>
+      <td>
+        {% if current_user.role == 'management' %}
+          <a href="{{ url_for('edit_task', task_id=t.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+        {% else %}
+          <!-- Driver side actions -->
+          {% if t.status == 'pending' %}
+            <form action="{{ url_for('accept_task', task_id=t.id) }}" method="POST" style="display:inline;">
+              <button type="submit" class="btn btn-sm btn-outline-success">Accept</button>
+            </form>
+          {% elif t.status == 'in-progress' and t.assigned_to == current_user.id %}
+            <form action="{{ url_for('decline_task', task_id=t.id) }}" method="POST" style="display:inline;">
+              <button type="submit" class="btn btn-sm btn-outline-warning">Decline</button>
+            </form>
+            <form action="{{ url_for('mark_complete', task_id=t.id) }}" method="POST" style="display:inline;">
+              <button type="submit" class="btn btn-sm btn-outline-info">Complete</button>
+            </form>
+          {% endif %}
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No tasks found.</p>
+{% endif %}
+
+{% if current_user.role == 'management' %}
+  <a href="{{ url_for('create_task') }}" class="btn btn-secondary mt-3">Create New Task</a>
+{% endif %}
+{% endblock %}

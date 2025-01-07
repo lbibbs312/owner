@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Add New Pre-Trip Entry</h2>
+  <hr>
+
+  <form method="POST" action="">
+    {{ form.hidden_tag() }}
+
+
+    <div class="mb-3">
+      {{ form.mileage.label(class="form-label") }}
+      {{ form.mileage(class="form-control") }}
+    </div>
+
+    <div class="form-check">
+      {{ form.oil_leak(class="form-check-input") }}
+      {{ form.oil_leak.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.coolant_leak(class="form-check-input") }}
+      {{ form.coolant_leak.label(class="form-check-label") }}
+    </div>
+    <div class="form-check mb-3">
+      {{ form.fuel_leak(class="form-check-input") }}
+      {{ form.fuel_leak.label(class="form-check-label") }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.remarks.label(class="form-label") }}
+      {{ form.remarks(class="form-control") }}
+    </div>
+
+    <button type="submit" class="btn btn-success">
+      {{ form.submit.label }}
+    </button>
+  </form>
+</div>
+{% endblock %}

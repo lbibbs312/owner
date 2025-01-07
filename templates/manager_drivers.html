@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}All Drivers{% endblock %}
+{% block content %}
+<h2>All Drivers</h2>
+{% if users %}
+<table class="table table-striped">
+  <thead class="table-dark">
+    <tr>
+      <th>ID</th>
+      <th>Username</th>
+      <th>Email</th>
+      <th>Role</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in users %}
+    <tr>
+      <td>{{ u.id }}</td>
+      <td>{{ u.username }}</td>
+      <td>{{ u.email }}</td>
+      <td>{{ u.role }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No drivers found.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2 class="mt-3">Reply to Message</h2>
+  <p><strong>Original From:</strong> {{ original_dm.sender.username }}<br>
+     {{ original_dm.content }}<br>
+     <small class="text-muted">{{ original_dm.timestamp }}</small></p>
+  <hr>
+
+  <form method="POST" action="">
+    {{ reply_form.hidden_tag() }}
+    <div class="mb-3">
+      {{ reply_form.receiver_id.label }}:
+      {{ reply_form.receiver_id(class="form-select") }}
+    </div>
+    <div class="mb-3">
+      {{ reply_form.content.label }}:
+      {{ reply_form.content(class="form-control") }}
+    </div>
+    {{ reply_form.submit(class="btn btn-primary") }}
+  </form>
+</div>
+{% endblock %}

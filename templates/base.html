@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>LacksDrivers</title>
+  <!-- Bootstrap 5 CSS -->
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"
+  >
+  <style>
+    .sidebar-container {
+      display: flex;
+      flex-wrap: nowrap;
+      width: 100%;
+      margin: 0 auto;
+      transition: margin-left 0.3s ease;
+    }
+    .sidebar {
+      background-color: #343a40;
+      color: #fff;
+      min-height: 100vh;
+      width: 200px;
+      transition: transform 0.3s ease;
+    }
+    .sidebar-closed {
+      transform: translateX(-210px);
+    }
+    header {
+      width: 100%;
+      background-color: #0d6efd; /* Blue header */
+      color: #fff;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header-brand {
+      font-size: 1.2rem;
+      font-weight: bold;
+      text-decoration: none;
+      color: #fff;
+    }
+    .sidebar-toggle-btn {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 1.3rem;
+      cursor: pointer;
+    }
+    .main-content {
+      flex: 1;
+      padding: 1rem;
+      transition: all 0.3s ease;
+    }
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        z-index: 999;
+      }
+      .main-content {
+        margin-top: 56px;
+      }
+    }
+    .bell-icon {
+      color: #fff;
+      margin-right: 1rem;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- HEADER -->
+  <header>
+    <a href="{{ url_for('dashboard') }}" class="header-brand">LacksDrivers</a>
+    <div>
+      {% if current_user.is_authenticated %}
+        <!-- Bell icon for recent activity route -->
+        <a href="{{ url_for('recent_activity') }}" class="bell-icon">
+          <span class="me-2">&#128276;</span> <!-- Simple bell character or your own icon -->
+        </a>
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-danger me-2">Logout</a>
+      {% else %}
+        <a href="{{ url_for('login') }}" class="btn btn-sm btn-light me-2">Login</a>
+      {% endif %}
+      <button
+        class="sidebar-toggle-btn"
+        onclick="toggleSidebar()"
+        aria-label="Toggle Menu"
+      >
+        &#9776;
+      </button>
+    </div>
+  </header>
+
+  <!-- SIDEBAR + CONTENT -->
+  <div class="sidebar-container">
+    <nav id="sidebarMenu" class="sidebar">
+      {% if current_user.is_authenticated %}
+        <ul class="nav flex-column mt-3">
+          <li class="nav-item">
+            <a class="nav-link text-white" href="{{ url_for('dashboard') }}">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white" href="{{ url_for('list_tasks') }}">Tasks</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white" href="{{ url_for('pretrip_page') }}">Pre-Trip</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white" href="{{ url_for('driver_logs') }}">Driver Logs</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white" href="{{ url_for('announcements') }}">Announcements</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white" href="{{ url_for('end_of_day_summary') }}">
+              End of Day Summary
+            </a>
+          </li>
+        </ul>
+      {% else %}
+        <div class="p-3">
+          <p>Please <a href="{{ url_for('login') }}">Login</a> to see the menu.</p>
+        </div>
+      {% endif %}
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}
+      {% endblock %}
+    </main>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById("sidebarMenu");
+      sidebar.classList.toggle("sidebar-closed");
+    }
+  </script>
+</body>
+</html>

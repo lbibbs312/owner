@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container slide-in">
+  <h2 class="mt-3">Driver Logs</h2>
+
+  <!-- If a driver is logged in, show a "Create New Log" button -->
+  {% if current_user.role == 'driver' %}
+    <a href="{{ url_for('new_driving_log') }}" class="btn btn-primary mb-3">
+      Create New Log
+    </a>
+  {% endif %}
+
+  <!-- Manager filter by driver -->
+  {% if current_user.role == 'management' %}
+    <form method="GET" action="{{ url_for('driver_logs') }}" class="mb-4">
+      <div class="row g-2 align-items-center">
+        <div class="col-auto">
+          <label for="driverFilter" class="col-form-label fw-bold">Filter by Driver:</label>
+        </div>
+        <div class="col-auto">
+          <select name="driver_id" id="driverFilter" class="form-select">
+            <option value="">-- All Drivers --</option>
+            {% for d in all_drivers %}
+              <option value="{{ d.id }}"
+                {% if d.id == selected_driver_id %}selected{% endif %}
+              >
+                {{ d.username }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-primary">Filter</button>
+        </div>
+      </div>
+    </form>
+  {% endif %}
+
+  {% if logs %}
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>Driver</th>
+          <th>Date</th>
+          <th>Plant</th>
+          <th>Load</th>
+          <th>Maintenance</th>
+          <th>Fuel</th>
+          <th>Meeting</th>
+          <th>Arrive</th>
+          <th>Depart</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+          <tr>
+            <td>{{ log.driver.username }}</td>
+            <td>{{ log.date }}</td>
+            <td>{{ log.plant_name }}</td>
+            <td>{{ log.load_size }}</td>
+            <td>{{ "Yes" if log.maintenance else "No" }}</td>
+            <td>{{ "Yes" if log.fuel else "No" }}</td>
+            <td>{{ "Yes" if log.meeting else "No" }}</td>
+            <td>
+              {% if log.arrive_time %}
+                {{ log.arrive_time.strftime("%I:%M %p") }}
+              {% else %}
+                --
+              {% endif %}
+            </td>
+            <td>
+              {% if log.depart_time %}
+                {{ log.depart_time.strftime("%I:%M %p") }}
+              {% else %}
+                --
+              {% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('view_driver_log', log_id=log.id) }}" class="btn btn-sm btn-info">View</a>
+              {% if current_user.role == 'management' or log.driver_id == current_user.id %}
+                <a href="{{ url_for('edit_driver_log', log_id=log.id) }}" class="btn btn-sm btn-warning">Edit</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No logs found.</p>
+  {% endif %}
+</div>
+{% endblock %}

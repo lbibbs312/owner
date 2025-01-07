@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}All PreTrips (Management){% endblock %}
+{% block content %}
+<h2>All PreTrips (Management View)</h2>
+{% if pretrips %}
+<table class="table table-hover align-middle">
+  <thead class="table-dark">
+    <tr>
+      <th>ID</th>
+      <th>User</th>
+      <th>Date</th>
+      <th>Truck</th>
+      <th>Start Mileage</th>
+      <th>PostTrip?</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in pretrips %}
+    <tr>
+      <td>{{ p.id }}</td>
+      <td>{{ p.user_id }}</td>
+      <td>{{ p.pretrip_date }}</td>
+      <td>{{ p.truck_name }} ({{ p.truck_type }})</td>
+      <td>{{ p.start_mileage }}</td>
+      <td>{% if p.posttrip %}Yes{% else %}No{% endif %}</td>
+      <td>
+        <a href="{{ url_for('view_pretrip', pretrip_id=p.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No PreTrips found.</p>
+{% endif %}
+{% endblock %}
