@@ -62,20 +62,8 @@
             <td>{{ "Yes" if log.maintenance else "No" }}</td>
             <td>{{ "Yes" if log.fuel else "No" }}</td>
             <td>{{ "Yes" if log.meeting else "No" }}</td>
-            <td>
-              {% if log.arrive_time %}
-                {{ log.arrive_time.strftime("%I:%M %p") }}
-              {% else %}
-                --
-              {% endif %}
-            </td>
-            <td>
-              {% if log.depart_time %}
-                {{ log.depart_time.strftime("%I:%M %p") }}
-              {% else %}
-                --
-              {% endif %}
-            </td>
+            <td>{{ log.arrive_time or "--" }}</td>  <!-- just display the string -->
+            <td>{{ log.depart_time or "--" }}</td>  <!-- just display the string -->
             <td>
               <a href="{{ url_for('view_driver_log', log_id=log.id) }}" class="btn btn-sm btn-info">View</a>
               {% if current_user.role == 'management' or log.driver_id == current_user.id %}

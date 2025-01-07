@@ -9,20 +9,23 @@
   <p><strong>Maintenance:</strong> {{ "Yes" if log.maintenance else "No" }}</p>
   <p><strong>Fuel:</strong> {{ "Yes" if log.fuel else "No" }}</p>
   <p><strong>Meeting:</strong> {{ "Yes" if log.meeting else "No" }}</p>
+
   <p><strong>Arrive Time:</strong> 
     {% if log.arrive_time %}
-      {{ log.arrive_time.strftime("%I:%M %p") }}
+      {{ log.arrive_time }}
     {% else %}
       --
     {% endif %}
   </p>
+
   <p><strong>Depart Time:</strong> 
     {% if log.depart_time %}
-      {{ log.depart_time.strftime("%I:%M %p") }}
+      {{ log.depart_time }}
     {% else %}
       --
     {% endif %}
   </p>
+
   <p><strong>Downtime Reason:</strong> {{ log.downtime_reason or "N/A" }}</p>
 </div>
 {% endblock %}

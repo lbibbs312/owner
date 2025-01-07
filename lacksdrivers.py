@@ -2,6 +2,8 @@
 # lacksdrivers.py - Updated version with posttrip button,
 # manager create task link, 1-day announcements, bell icon,
 # and direct message reply button
+#
+# NOW ALSO RECORDS ARRIVE/DEPART TIME IN 12-HR FORMAT AUTOMATICALLY
 ##########################################################
 
 import os
@@ -126,6 +128,7 @@ class PostTrip(db.Model):
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
 
 
+# CHANGED: arrive_time and depart_time are now stored as 12-hr format strings.
 class DriverLog(db.Model):
     __tablename__ = "driver_log"
     id = db.Column(db.Integer, primary_key=True)
@@ -133,8 +136,8 @@ class DriverLog(db.Model):
     driver = db.relationship("User", backref="driver_logs", lazy="joined")
 
     date = db.Column(db.Date, default=date.today)
-    arrive_time = db.Column(db.DateTime)
-    depart_time = db.Column(db.DateTime)
+    arrive_time = db.Column(db.String(20))   # storing 12-hr string
+    depart_time = db.Column(db.String(20))   # storing 12-hr string
     downtime_reason = db.Column(db.String(200), nullable=True)
     load_size = db.Column(db.String(10), nullable=False)
     plant_name = db.Column(db.String(20), nullable=False)
@@ -729,16 +732,19 @@ def new_driving_log():
 
         gr_tz = pytz.timezone("America/Detroit")
         now_gr = datetime.now(gr_tz)
+        # AUTOMATICALLY set arrive_time in 12-hr format
+        arrive_12hr = now_gr.strftime("%I:%M %p")
 
         newlog = DriverLog(
             driver_id=current_user.id,
             plant_name=form.plant_name.data,
             load_size=form.load_size.data,
             downtime_reason=form.downtime_reason.data,
-            arrive_time=now_gr,
+            arrive_time=arrive_12hr,  # store as 12-hr string
             maintenance=form.maintenance.data,
             fuel=form.fuel.data,
             meeting=form.meeting.data,
+            # We'll still store date as a real Date
             date=now_gr.date()
         )
         db.session.add(newlog)
@@ -768,6 +774,12 @@ def edit_driver_log(log_id):
         log.maintenance = form.maintenance.data
         log.fuel = form.fuel.data
         log.meeting = form.meeting.data
+
+        # AUTOMATICALLY set depart_time in 12-hr format
+        gr_tz = pytz.timezone("America/Detroit")
+        now_gr = datetime.now(gr_tz)
+        log.depart_time = now_gr.strftime("%I:%M %p")
+
         db.session.commit()
         flash(f"Driving log updated (ID: {log.id})", "success")
         return redirect(url_for("driver_logs"))
@@ -1055,6 +1067,7 @@ def end_of_day_summary():
         logs = DriverLog.query.filter_by(date=today_date)\
                               .order_by(DriverLog.created_at.asc()).all()
 
+        from collections import defaultdict
         drivers_logs = defaultdict(list)
         for log in logs:
             dname = log.driver.username
