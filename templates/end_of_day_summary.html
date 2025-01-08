@@ -1,46 +1,69 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container">
-  <h2 class="mt-3">End of Day Summary for {{ the_date }}</h2>
 
+<div class="container fade-in" style="overflow-x: auto;">
+  <h2 class="mt-4 mb-3">End of Day Summary - {{ the_date }}</h2>
+
+  <!-- If driver: show logs for that driver. If manager: show all logs by driver, etc. -->
   {% for driver_name, log_list in drivers_logs.items() %}
-    <div class="card mb-3">
-      <div class="card-header bg-info text-white">
-        Logs for {{ driver_name }}
-      </div>
-      <div class="card-body">
-        {% if log_list %}
-          <ul>
-            {% for log in log_list %}
-              <li>
-                <strong>Log #{{ log.id }}</strong>:
-                {{ log.plant_name }} ({{ log.load_size }})
-                <br>
-                Arrive:
-                {% if log.arrive_time %}
-                  {{ log.arrive_time }}
-                {% else %}
-                  --
-                {% endif %}
-                &nbsp;|&nbsp;
-                Depart:
-                {% if log.depart_time %}
-                  {{ log.depart_time }}
-                {% else %}
-                  --
-                {% endif %}
-                <br>
-                Maintenance: {{ "Yes" if log.maintenance else "No" }}, 
-                Fuel: {{ "Yes" if log.fuel else "No" }}, 
-                Meeting: {{ "Yes" if log.meeting else "No" }}
-              </li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <p>No logs for this driver today.</p>
-        {% endif %}
-      </div>
+  <div class="card mb-3">
+    <div class="card-header bg-info text-white">
+      {{ driver_name }}'s Logs for {{ the_date }}
     </div>
+    <div class="card-body">
+      {% if log_list %}
+        <table class="table table-bordered table-sm">
+          <thead>
+            <tr>
+              <th>Plant</th>
+              <th>Load</th>
+              <th>Arrive</th>
+              <th>Depart</th>
+              <th>Maintenance</th>
+              <th>Fuel</th>
+              <th>Meeting</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in log_list %}
+            <tr>
+              <td>{{ log.plant_name }}</td>
+              <td>{{ log.load_size }}</td>
+              <td>{{ log.arrive_time or '--' }}</td>
+              <td>{{ log.depart_time or '--' }}</td>
+              <td>{{ 'Yes' if log.maintenance else 'No' }}</td>
+              <td>{{ 'Yes' if log.fuel else 'No' }}</td>
+              <td>{{ 'Yes' if log.meeting else 'No' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p>No logs for {{ driver_name }} today.</p>
+      {% endif %}
+    </div>
+  </div>
   {% endfor %}
+
+  <!-- Summaries like total miles if you track posttrip miles -->
+  {% if total_miles is defined %}
+    <p><strong>Total Miles Driven Today:</strong> {{ total_miles }}</p>
+  {% endif %}
+
+  <!-- A "Review & Submit" button for drivers. Maybe it calls a JS or route to finalize. -->
+  {% if current_user.role == 'driver' %}
+    <button class="btn btn-primary hover-btn" onclick="reviewEOD()">
+      Review & Submit
+    </button>
+  {% endif %}
 </div>
+
+<script>
+  function reviewEOD() {
+    // Possibly show a modal or redirect
+    alert("Reviewing and submitting End of Day Summary... (placeholder logic)");
+    // Could do an AJAX call or redirect to a finalize EOD route
+  }
+</script>
+
 {% endblock %}

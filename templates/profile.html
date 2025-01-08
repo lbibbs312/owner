@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container fade-in" style="overflow-x: auto;">
+  <h2 class="mt-4 mb-3">Profile Page</h2>
+
+  <form method="POST" action="">
+    {{ profile_form.hidden_tag() }}
+
+    <!-- Username -->
+    <div class="mb-3">
+      {{ profile_form.username.label }}:
+      {{ profile_form.username(class="form-control") }}
+    </div>
+
+    <!-- Email -->
+    <div class="mb-3">
+      {{ profile_form.email.label }}:
+      {{ profile_form.email(class="form-control") }}
+    </div>
+
+    <!-- Role (if you allow user to change it) -->
+    <div class="mb-3">
+      {{ profile_form.role.label }}:
+      {{ profile_form.role(class="form-select") }}
+      <small class="text-muted">Driver or Management</small>
+    </div>
+
+    <!-- Optional password change -->
+    <div class="mb-3">
+      {{ profile_form.new_password.label }}:
+      {{ profile_form.new_password(class="form-control") }}
+    </div>
+    <div class="mb-3">
+      {{ profile_form.confirm_password.label }}:
+      {{ profile_form.confirm_password(class="form-control") }}
+    </div>
+
+    {{ profile_form.submit(class="btn btn-primary hover-btn") }}
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+<!-- file: templates/driver_weekly_performance.html -->
+{% extends 'base.html' %}
+{% block content %}
+<div class="container">
+  <h2>My Weekly Hours</h2>
+  <p>From <strong>{{ start }}</strong> to <strong>{{ end }}</strong>.</p>
+
+  <div class="alert alert-info">
+    You have logged <strong>{{ "%.2f"|format(weekly_hours or 0) }}</strong> hours this week.
+  </div>
+</div>
+{% endblock %}

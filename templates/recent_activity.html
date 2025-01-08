@@ -1,37 +1,46 @@
-{% extends "base.html" %}
+<!-- file: templates/recent_activity.html -->
+{% extends 'base.html' %}
 {% block content %}
 <div class="container">
-  <h2 class="mt-3">Recent Activity (Last 24h)</h2>
+  <h2>Recent Activity</h2>
+  <p>Last 24 hours</p>
 
-  <hr>
-  <h4>Recent Announcements</h4>
-  {% if new_announcements %}
-    <ul>
-      {% for ann in new_announcements %}
-        <li>
-          <strong>{{ ann.title }}</strong> - {{ ann.body }}<br>
-          <small class="text-muted">{{ ann.created_at }}</small>
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>No new announcements.</p>
-  {% endif %}
+  <div class="mt-4">
+    <h4>Recent Announcements ({{ new_announcements|length }})</h4>
+    {% if new_announcements %}
+      <ul class="list-group mb-3">
+        {% for ann in new_announcements %}
+          <li class="list-group-item">
+            <strong>{{ ann.title }}</strong> -
+            {{ ann.body }}
+            <br>
+            <small class="text-muted">
+              Posted {{ ann.created_at.strftime('%Y-%m-%d %H:%M') }}
+            </small>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-muted">No new announcements in the last 24 hours.</p>
+    {% endif %}
+  </div>
 
-  <hr>
-  <h4>New Direct Messages</h4>
-  {% if new_messages %}
-    <ul>
-      {% for m in new_messages %}
-        <li>
-          <strong>From:</strong> {{ m.sender.username }}<br>
-          {{ m.content }}<br>
-          <small class="text-muted">{{ m.timestamp }}</small>
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>No new messages.</p>
-  {% endif %}
+  <div class="mt-4">
+    <h4>New Direct Messages ({{ new_messages|length }})</h4>
+    {% if new_messages %}
+      <ul class="list-group">
+        {% for dm in new_messages %}
+          <li class="list-group-item">
+            <strong>From {{ dm.sender.username }}:</strong>
+            {{ dm.content }}
+            <br>
+            <small class="text-muted">{{ dm.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-muted">No new direct messages in the last 24 hours.</p>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

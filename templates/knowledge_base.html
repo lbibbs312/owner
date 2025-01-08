@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container fade-in" style="overflow-x: auto;">
+  <h2 class="mt-4 mb-3">Knowledge Base</h2>
+  <p>Driver-friendly tips, reminders, and notes to share with the team.</p>
+
+  <!-- If user is a driver or manager (choose your logic), show add form: -->
+  {% if current_user.role in ['driver', 'management'] %}
+    <div class="card hover-card mb-4" data-bs-toggle="collapse" data-bs-target="#addTipCollapse">
+      <div class="card-header bg-success text-white">
+        Add a New Tip
+      </div>
+      <div class="card-body">
+        <p>Click to expand and add a new knowledge base tip.</p>
+      </div>
+    </div>
+    <div class="collapse mb-3" id="addTipCollapse">
+      <div class="card card-body">
+        <form method="POST" action="">
+          {{ form.hidden_tag() }}
+          <div class="mb-2">
+            {{ form.title.label }}:
+            {{ form.title(class="form-control") }}
+          </div>
+          <div class="mb-2">
+            {{ form.body.label }}:
+            {{ form.body(class="form-control") }}
+          </div>
+          {{ form.submit(class="btn btn-primary hover-btn") }}
+        </form>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Display the existing tips -->
+  <div class="row">
+    {% for t in tips %}
+      <div class="col-12 col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <h5 class="card-title">{{ t.title }}</h5>
+            <p class="card-text">{{ t.body }}</p>
+            <p class="text-muted small mb-0">
+              Posted by <strong>{{ t.user.username }}</strong>
+              on {{ t.created_at.strftime('%Y-%m-%d %H:%M') }}
+            </p>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

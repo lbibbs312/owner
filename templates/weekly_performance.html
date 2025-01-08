@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container fade-in">
+
+  <h2 class="mt-4 mb-3">Weekly Performance</h2>
+
+  <!-- Example date range (passed from route) -->
+  <p>Showing shift hours from <strong>{{ start_date }}</strong> to <strong>{{ end_date }}</strong>.</p>
+
+  <!-- TABLE: Hours worked by day or total? -->
+  <div class="row mb-4">
+    <div class="col">
+      <h5>Total Hours Worked</h5>
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Driver</th>
+            <th>Hours (Week)</th>
+            <th>Hours (Today)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for driver_name, data in driver_hours.items() %}
+          <tr>
+            <td>{{ driver_name }}</td>
+            <td>{{ "%.2f"|format(data.week_hours or 0) }}</td>
+            <td>{{ "%.2f"|format(data.day_hours or 0) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TIME SPENT AT PLANTS (If you track each driver’s total time at each plant) -->
+  <div class="row mb-4">
+    <div class="col">
+      <h5>Time Spent at Plants</h5>
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Driver</th>
+            <th>Plant Name</th>
+            <th>Total Time (hrs)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for plant_data in plants_times %}
+          <tr>
+            <td>{{ plant_data.driver_name }}</td>
+            <td>{{ plant_data.plant_name }}</td>
+            <td>{{ "%.2f"|format(plant_data.hours or 0) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TASK COMPLETION RATE -->
+  <div class="row mb-4">
+    <div class="col">
+      <h5>Task Completion Rate</h5>
+      <table class="table table-bordered table-sm">
+        <thead>
+          <tr>
+            <th>Driver</th>
+            <th>Tasks Assigned</th>
+            <th>Tasks Completed</th>
+            <th>Completion %</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for driver_name, info in tasks_completion.items() %}
+          <tr>
+            <td>{{ driver_name }}</td>
+            <td>{{ info.assigned }}</td>
+            <td>{{ info.completed }}</td>
+            <td>
+              {% set ratio = (info.completed / info.assigned) * 100 if info.assigned else 0 %}
+              {{ "%.1f"|format(ratio) }}%
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

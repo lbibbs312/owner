@@ -1,0 +1,21 @@
+<!-- file: templates/new_tip.html -->
+{% extends 'base.html' %}
+{% block content %}
+<div class="container">
+  <h2>Add New Tip</h2>
+  <form method="POST">
+    <!-- Since we’re not using a FlaskForm for this in the example,
+         just do normal form fields. Adjust as needed. -->
+    <div class="mb-3">
+      <label for="title" class="form-label">Tip Title:</label>
+      <input type="text" class="form-control" id="title" name="title" required>
+    </div>
+    <div class="mb-3">
+      <label for="content" class="form-label">Tip Content:</label>
+      <textarea class="form-control" id="content" name="content" rows="5" required></textarea>
+    </div>
+    <button type="submit" class="btn btn-success">Save Tip</button>
+    <a href="{{ url_for('knowledge_base') }}" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}
