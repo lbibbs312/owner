@@ -1,28 +1,36 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container fade-in" style="overflow-x: auto;">
+<div class="container slide-in" style="overflow-x: auto;">
   <h2 class="mt-4 mb-3">Knowledge Base</h2>
-  <p>Driver-friendly tips, reminders, and notes to share with the team.</p>
+  <p>Tips, best practices, and reminders shared by drivers and management.</p>
 
-  <!-- If user is a driver or manager (choose your logic), show add form: -->
-  {% if current_user.role in ['driver', 'management'] %}
-    <div class="card hover-card mb-4" data-bs-toggle="collapse" data-bs-target="#addTipCollapse">
+  <!-- Add new tip collapsible card -->
+  {% if current_user.role in ['driver','management'] %}
+    <!-- Outer Card to toggle collapse -->
+    <div 
+      class="card hover-card mb-3" 
+      data-bs-toggle="collapse" 
+      data-bs-target="#addTipCollapse" 
+      style="cursor:pointer;"
+    >
       <div class="card-header bg-success text-white">
         Add a New Tip
       </div>
       <div class="card-body">
-        <p>Click to expand and add a new knowledge base tip.</p>
+        <p class="m-0">Click here to expand/collapse the form.</p>
       </div>
     </div>
-    <div class="collapse mb-3" id="addTipCollapse">
+
+    <!-- Collapsible form -->
+    <div class="collapse" id="addTipCollapse">
       <div class="card card-body">
         <form method="POST" action="">
           {{ form.hidden_tag() }}
-          <div class="mb-2">
+          <div class="mb-3">
             {{ form.title.label }}:
             {{ form.title(class="form-control") }}
           </div>
-          <div class="mb-2">
+          <div class="mb-3">
             {{ form.body.label }}:
             {{ form.body(class="form-control") }}
           </div>
@@ -32,22 +40,33 @@
     </div>
   {% endif %}
 
-  <!-- Display the existing tips -->
-  <div class="row">
-    {% for t in tips %}
-      <div class="col-12 col-md-6 col-lg-4 mb-3">
-        <div class="card h-100">
-          <div class="card-body">
-            <h5 class="card-title">{{ t.title }}</h5>
-            <p class="card-text">{{ t.body }}</p>
-            <p class="text-muted small mb-0">
-              Posted by <strong>{{ t.user.username }}</strong>
-              on {{ t.created_at.strftime('%Y-%m-%d %H:%M') }}
-            </p>
+  <!-- Display existing tips in a responsive grid -->
+  <div class="row mt-4">
+    {% if tips %}
+      {% for t in tips %}
+        <div class="col-12 col-sm-6 col-md-4 col-lg-3 mb-3">
+          <div class="card h-100 hover-card">
+            <div class="card-body d-flex flex-column">
+              <h5 class="card-title">{{ t.title }}</h5>
+              <p class="card-text flex-grow-1">
+                {{ t.body }}
+              </p>
+              <!-- If each tip has a user relationship (e.g., t.user), show who posted it -->
+              {% if t.user_id and t.user %}
+                <p class="text-muted small m-0">
+                  Posted by <strong>{{ t.user.username }}</strong>
+                </p>
+              {% endif %}
+              <p class="text-muted small m-0">
+                {{ t.created_at.strftime('%Y-%m-%d %H:%M') if t.created_at else "" }}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
-    {% endfor %}
+      {% endfor %}
+    {% else %}
+      <p>No tips yet. Be the first to add one!</p>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

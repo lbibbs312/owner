@@ -9,6 +9,14 @@
       Create New Log
     </a>
   {% endif %}
+  {% for log in logs %}
+  <li>
+    Log #{{ log.id }} - {{ log.plant_name }}
+    {% if log.plant_name in PLANT_ADDRESSES %}
+      ({{ PLANT_ADDRESSES[log.plant_name] }})
+    {% endif %}
+  </li>
+{% endfor %}
 
   <!-- Manager filter by driver -->
   {% if current_user.role == 'management' %}

@@ -1,306 +1,196 @@
 {% extends "base.html" %}
 {% block content %}
+<div class="container fade-in" style="overflow-x:auto;">
+  <h2 class="mt-4 mb-3">Driver Dashboard - Dynamic Selections</h2>
 
-<!-- Title / intro -->
-<h2 class="mb-4">Dashboard - Dynamic Selections</h2>
-
-<!-- ROW of collapsible cards with extra selection features -->
-<div class="row">
-
-  <!-- RECENT TASKS with multi-select checkboxes -->
-  <div class="col-md-6 mb-4">
-    <div 
-      class="card hover-card"
-      data-bs-toggle="collapse"
-      data-bs-target="#tasksCollapse"
-      aria-expanded="false"
-      aria-controls="tasksCollapse"
-    >
-      <div class="card-header bg-primary text-white">
-        Recent Tasks
-      </div>
-      <div class="card-body">
-        {% if tasks %}
-          <ul class="list-unstyled">
-            {% for t in tasks %}
-              <li>
-                <!-- A checkbox to select multiple tasks -->
-                <input 
-                  type="checkbox" 
-                  name="task_selection" 
-                  value="{{ t.id }}"
-                  id="taskCheck{{ t.id }}"
-                >
-                <label for="taskCheck{{ t.id }}">
-                  Task #{{ t.id }}: {{ t.title }}
-                </label>
-              </li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <p>No Tasks found.</p>
-        {% endif %}
-      </div>
-    </div>
-    <div class="collapse mt-2" id="tasksCollapse">
-      <div class="card card-body">
-        <h6>Task Options</h6>
-        <p>Select tasks above and choose an action below:</p>
-        <!-- Example actions: complete tasks, mark in-progress, etc. -->
-        <div>
-          <button class="btn btn-success hover-btn" onclick="markSelectedTasks('complete')">
-            Mark Selected as Complete
-          </button>
-          <button class="btn btn-warning hover-btn" onclick="markSelectedTasks('in-progress')">
-            Mark Selected In-Progress
-          </button>
+  <div class="row">
+    <!-- Collapsible "Recent Tasks" card -->
+    <div class="col-12 col-lg-6 mb-4">
+      <div 
+        class="card hover-card" 
+        data-bs-toggle="collapse" 
+        data-bs-target="#recentTasksCollapse"
+        style="cursor: pointer;"
+      >
+        <div class="card-header bg-primary text-white">
+          Recent Tasks
+        </div>
+        <div class="card-body">
+          <p class="m-0">Click here to expand/collapse recent tasks assigned by manager.</p>
         </div>
       </div>
-    </div>
-  </div><!-- /col -->
 
-  <!-- RECENT LOGS with advanced filter selection -->
-  <div class="col-md-6 mb-4">
-    <div 
-      class="card hover-card"
-      data-bs-toggle="collapse"
-      data-bs-target="#logsCollapse"
-      aria-expanded="false"
-      aria-controls="logsCollapse"
-    >
-      <div class="card-header bg-primary text-white">
-        Recent Logs
-      </div>
-      <div class="card-body">
-        {% if logs %}
-          <!-- A simple list of logs -->
-          <ul>
-            {% for log in logs %}
-              <li>
-                Log #{{ log.id }} - {{ log.plant_name }}
-                ({{ log.load_size }})
-              </li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <p>No Logs found.</p>
-        {% endif %}
-      </div>
-    </div>
-    <div class="collapse mt-2" id="logsCollapse">
-      <div class="card card-body">
-        <h6>Filter Logs</h6>
-        <!-- Example: dynamic filter by load_size or plant_name -->
-        <div class="row mb-2">
-          <div class="col">
-            <label for="logFilterPlant" class="form-label">Filter by Plant</label>
-            <select id="logFilterPlant" class="form-select">
-              <option value="">All Plants</option>
-              <option value="BP">Barden Plater (BP)</option>
-              <option value="ALN">Airlane North (ALN)</option>
-              <!-- etc. -->
-            </select>
-          </div>
-          <div class="col">
-            <label for="logFilterLoad" class="form-label">Filter by Load Size</label>
-            <select id="logFilterLoad" class="form-select">
-              <option value="">All</option>
-              <option value="Empty">Empty</option>
-              <option value="Quarter">Quarter</option>
-              <option value="Partial">Partial</option>
-              <option value="Full">Full</option>
-            </select>
-          </div>
-        </div>
-        <button class="btn btn-primary hover-btn" onclick="applyLogFilters()">
-          Apply Filters
-        </button>
-      </div>
-    </div>
-  </div><!-- /col -->
-
-</div><!-- /row -->
-
-
-<!-- Another row: PreTrips with a dropdown to choose an action -->
-<div class="row mb-4">
-
-  <div class="col-md-6">
-    <div 
-      class="card hover-card"
-      data-bs-toggle="collapse"
-      data-bs-target="#pretripCollapse"
-      aria-expanded="false"
-      aria-controls="pretripCollapse"
-    >
-      <div class="card-header bg-primary text-white">
-        Recent PreTrips
-      </div>
-      <div class="card-body">
-        {% if pretrips %}
-          <ul>
-            {% for pt in pretrips %}
-              <li>PreTrip #{{ pt.id }} - {{ pt.truck_name }}</li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <p>No PreTrips found.</p>
-        {% endif %}
-      </div>
-    </div>
-    <div class="collapse mt-2" id="pretripCollapse">
-      <div class="card card-body">
-        <h6>PreTrip Actions</h6>
-        <select id="pretripAction" class="form-select mb-2">
-          <option value="">Select an action...</option>
-          <option value="view">View Details</option>
-          <option value="edit">Edit PreTrip</option>
-        </select>
-        <button class="btn btn-secondary hover-btn" onclick="doPretripAction()">
-          Go
-        </button>
-      </div>
-    </div>
-  </div><!-- /col -->
-
-  <!-- Example: Announcements or more dynamic sections -->
-  <div class="col-md-6">
-    <div 
-      class="card hover-card"
-      data-bs-toggle="collapse"
-      data-bs-target="#announceCollapse"
-      aria-expanded="false"
-      aria-controls="announceCollapse"
-    >
-      <div class="card-header bg-warning text-dark">
-        Announcements
-      </div>
-      <div class="card-body">
-        {% if announcements %}
-          <ul>
-            {% for ann in announcements %}
-              <li><strong>{{ ann.title }}</strong>: {{ ann.body }}</li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <p>No Announcements found.</p>
-        {% endif %}
-      </div>
-    </div>
-    <div class="collapse mt-2" id="announceCollapse">
-      <div class="card card-body">
-        <h6>Announcement Options</h6>
-        {% if current_user.role == 'management' %}
-          <a href="{{ url_for('announcements') }}" class="btn btn-info hover-btn">
-            Create New Announcement
+      <div class="collapse" id="recentTasksCollapse">
+        <div class="card card-body">
+          {% if tasks %}
+            <ul class="list-group">
+              {% for t in tasks %}
+                <li class="list-group-item">
+                  <div class="d-flex flex-column flex-md-row justify-content-between">
+                    <div>
+                      <strong>Task #{{ t.id }}</strong>: 
+                      {{ t.title }} 
+                      <span class="text-muted">({{ t.status }})</span>
+                      <br>
+                      <small class="text-secondary">
+                        Created: {{ t.created_at.strftime('%Y-%m-%d') if t.created_at else '' }}
+                      </small>
+                    </div>
+                    <div class="mt-2 mt-md-0">
+                      <!-- Example live progress or status if you have a numeric progress -->
+                      {% if t.progress is defined %}
+                        <div class="progress" style="width:150px;">
+                          <div 
+                            class="progress-bar" 
+                            role="progressbar" 
+                            style="width: {{ t.progress }}%;" 
+                            aria-valuenow="{{ t.progress }}" 
+                            aria-valuemin="0" 
+                            aria-valuemax="100"
+                          >
+                            {{ t.progress }}%
+                          </div>
+                        </div>
+                      {% endif %}
+                      <!-- If drivers can only 'view' but not 'edit': 
+                           <a href="{{ url_for('view_task', task_id=t.id) }}" 
+                              class="btn btn-info btn-sm">
+                           View
+                           </a>
+                      -->
+                      {% if current_user.role == "driver" %}
+                        <!-- If driver is allowed to mark in-progress or something -->
+                        <a href="{{ url_for('edit_task', task_id=t.id) }}"
+                           class="btn btn-warning btn-sm ms-2">
+                          Update
+                        </a>
+                      {% endif %}
+                    </div>
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p>No tasks found.</p>
+          {% endif %}
+          <!-- If you want to let drivers create tasks, uncomment:
+          <a href="{{ url_for('create_task') }}" class="btn btn-success btn-sm mt-2">
+            Create New Task
           </a>
-        {% else %}
-          <p>Drivers cannot post announcements.</p>
-        {% endif %}
+          -->
+        </div>
       </div>
     </div>
-  </div><!-- /col -->
 
-</div><!-- /row -->
-
-
-<!-- DIRECT MESSAGE area with multiple selection for conversation -->
-<div class="card hover-card mb-3" data-bs-toggle="collapse" data-bs-target="#dmCollapse">
-  <div class="card-header bg-info text-white">
-    Send a Direct Message
-  </div>
-  <div class="card-body">
-    <form method="POST" action="">
-      {{ dm_form.hidden_tag() }}
-      <div class="mb-2">
-        {{ dm_form.receiver_id.label }}:
-        {{ dm_form.receiver_id(class="form-select") }}
+    <!-- Driver Logs card -->
+    <div class="col-12 col-lg-6 mb-4">
+      <div class="card">
+        <div class="card-header bg-info text-white">
+          Driver Logs
+        </div>
+        <div class="card-body">
+          {% if logs %}
+            <ul class="list-group">
+              {% for log in logs %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong>Log #{{ log.id }}</strong> - {{ log.plant_name }}
+                    {% if log.plant_name in PLANT_ADDRESSES %}
+                      <br>
+                      <small class="text-muted">
+                        {{ PLANT_ADDRESSES[log.plant_name] }}
+                      </small>
+                    {% endif %}
+                  </div>
+                  <div>
+                    <a href="{{ url_for('edit_driver_log', log_id=log.id) }}" 
+                       class="btn btn-warning btn-sm me-1">
+                      Edit
+                    </a>
+                    <a href="{{ url_for('view_driver_log', log_id=log.id) }}"
+                       class="btn btn-info btn-sm">
+                      View
+                    </a>
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p>No logs found.</p>
+          {% endif %}
+          <a href="{{ url_for('new_driving_log') }}" class="btn btn-success btn-sm mt-2">
+            Create New Log
+          </a>
+        </div>
       </div>
-      <div class="mb-2">
-        {{ dm_form.content.label }}:
-        {{ dm_form.content(class="form-control") }}
-      </div>
-      {{ dm_form.submit(class="btn btn-success hover-btn") }}
-    </form>
+    </div>
+  </div>
+
+  <!-- My PreTrips -->
+  <div class="card mb-4">
+    <!-- Example "cool" color for the header -->
+    <div class="card-header text-white" style="background-color: #20c997;">
+      My PreTrips
+    </div>
+    <div class="card-body">
+      <a href="{{ url_for('new_pretrip') }}" class="btn btn-success btn-sm mb-2">
+        Create New PreTrip
+      </a>
+      {% if pretrips %}
+        <ul class="list-group">
+          {% for p in pretrips %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+              <span>
+                <strong>PreTrip #{{ p.id }}</strong> - {{ p.truck_name }}
+              </span>
+              <div>
+                <a href="{{ url_for('view_pretrip', pretrip_id=p.id) }}" 
+                   class="btn btn-info btn-sm me-2">
+                  View
+                </a>
+                {% if not p.posttrip %}
+                  <a href="{{ url_for('do_posttrip', pretrip_id=p.id) }}"
+                     class="btn btn-danger btn-sm">
+                    Complete PostTrip
+                  </a>
+                {% endif %}
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>No PreTrips found.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- End of Day Summary (optional) -->
+  <div class="card mb-4">
+    <div class="card-header bg-secondary text-white">
+      End of Day Summary
+    </div>
+    <div class="card-body">
+      {% if shift_start and shift_end %}
+        <p><strong>Shift Start:</strong> {{ shift_start }}</p>
+        <p><strong>Shift End:</strong> {{ shift_end }}</p>
+        <p><strong>Total Hours:</strong> 
+          {{ (shift_end - shift_start).total_seconds() / 3600 | round(2) }} hours
+        </p>
+        <a href="{{ url_for('end_of_day_summary') }}" class="btn btn-primary btn-sm">
+          View Full Summary
+        </a>
+      {% else %}
+        <p>No shift times recorded yet. Start or end a shift below.</p>
+        <div class="mt-2">
+          <a href="{{ url_for('start_shift') }}" class="btn btn-success btn-sm me-1">
+            Start Shift
+          </a>
+          <a href="{{ url_for('end_shift') }}" class="btn btn-danger btn-sm">
+            End Shift
+          </a>
+        </div>
+      {% endif %}
+    </div>
   </div>
 </div>
-<div class="collapse" id="dmCollapse">
-  <div class="card card-body">
-    <p>Extra DM details or sub-options (like file attachments, read receipts, etc.).</p>
-  </div>
-</div>
-
-<!-- Just some placeholders for inbox/outbox if you want selection -->
-{% if inbox or outbox %}
-<div class="row mt-4">
-  <div class="col-md-6">
-    <h5>Inbox</h5>
-    {% if inbox %}
-      <ul>
-        {% for msg in inbox %}
-          <li>
-            <strong>From:</strong> {{ msg.sender.username }} 
-            <br> {{ msg.content }}
-            <br> <small>{{ msg.timestamp }}</small>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>No incoming messages.</p>
-    {% endif %}
-  </div>
-  <div class="col-md-6">
-    <h5>Outbox</h5>
-    {% if outbox %}
-      <ul>
-        {% for msg in outbox %}
-          <li>
-            <strong>To:</strong> {{ msg.receiver.username }}
-            <br> {{ msg.content }}
-            <br> <small>{{ msg.timestamp }}</small>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>No outgoing messages.</p>
-    {% endif %}
-  </div>
-</div>
-{% endif %}
-
-
-<!-- Some inline JavaScript for the “dynamic selection” actions -->
-<script>
-  function markSelectedTasks(actionType) {
-    // Just a placeholder logic: gather checkboxes
-    const checks = document.querySelectorAll('input[name="task_selection"]:checked');
-    if (!checks.length) {
-      alert("No tasks selected.");
-      return;
-    }
-    let taskIDs = [];
-    checks.forEach(ch => taskIDs.push(ch.value));
-    // Example: send an AJAX request or redirect with these IDs
-    alert(`Action: ${actionType}, on tasks: ${taskIDs.join(', ')}`);
-    // Real logic might do fetch(...) or an API call.
-  }
-
-  function applyLogFilters() {
-    const plant = document.getElementById('logFilterPlant').value;
-    const load = document.getElementById('logFilterLoad').value;
-    alert(`Filtering logs by Plant="${plant}" and Load="${load}"...`);
-    // Real logic might do an AJAX call or window.location with query params
-  }
-
-  function doPretripAction() {
-    const sel = document.getElementById('pretripAction').value;
-    if (!sel) {
-      alert("Please select a PreTrip action first.");
-      return;
-    }
-    alert(`Performing PreTrip action: ${sel}`);
-    // Real logic might redirect or show a modal
-  }
-</script>
-
 {% endblock %}
