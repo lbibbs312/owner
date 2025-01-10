@@ -1,15 +1,10 @@
 #########################################################
-# lacksdrivers.py - Full script with all your new features:
-#   - Manager handoff tasks, create_task_from_dashboard, etc.
-#   - "Helios"/"Hazmat"/"Other" plants
-#   - "Half" load option
-#   - PLANT_ADDRESSES dictionary
-#   - Nothing else removed or changed
+# lacksdrivers.py - Refined Full Script
+# Includes a new /end_of_day_print route for paper logs
 #########################################################
 
 import os
 from datetime import datetime, date, timedelta
-from io import BytesIO
 from collections import defaultdict
 
 from flask import (
@@ -22,23 +17,38 @@ from flask_login import (
     login_required, login_user, logout_user
 )
 from werkzeug.security import generate_password_hash, check_password_hash
-# For forms/validators
 from flask_wtf import FlaskForm
 from wtforms import (
     StringField, PasswordField, SubmitField, BooleanField,
-    TextAreaField, SelectField, IntegerField, DateField
+    TextAreaField, SelectField, IntegerField, DateField, HiddenField
 )
 from wtforms.validators import DataRequired, Email, EqualTo, Length
-# Flask-SocketIO for chat & notifications
 from flask_socketio import SocketIO, join_room, leave_room, emit
-# For migrations (Alembic/Flask-Migrate)
 from flask_migrate import Migrate
 import pytz
-# For optional enum usage
 from sqlalchemy import Enum
 
 ##################################################
-# PLANT ADDRESSES DICTIONARY
+# Initialize app & config
+##################################################
+app = Flask(__name__)
+app.config["SECRET_KEY"] = "admin123"
+# Replace with your actual database URI or keep SQLite
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
+    "SQLALCHEMY_DATABASE_URI",
+    "sqlite:///lacksdrivers.db"
+)
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db = SQLAlchemy(app)
+socketio = SocketIO(app)
+migrate = Migrate(app, db)
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
+
+##################################################
+# PLANT ADDRESSES + Context Processor
 ##################################################
 PLANT_ADDRESSES = {
     "BP": "4080 Barden Dr SE",
@@ -64,30 +74,18 @@ PLANT_ADDRESSES = {
     "Hazmat": "No fixed address - Hazmat facility",
     "Other": "Unspecified location",
     "Helios": "123 Helios Way NE",
-    # Added to match form choices below:
-    "PC": "Paint Central (placeholder address)",
-    "Lab": "Corporate Lab (placeholder address)",
-    "DC": "Plastic Plate DC (placeholder address)",
-    "PPM": "Monroe (placeholder address)"
+    "PC": "Paint Central (placeholder)",
+    "Lab": "Corporate Lab (placeholder)",
+    "DC": "Plastic Plate DC (placeholder)",
+    "PPM": "Monroe (placeholder)"
 }
 
-app = Flask(__name__)
-app.config["SECRET_KEY"] = "admin123"
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
-    "SQLALCHEMY_DATABASE_URI",
-    "sqlite:///lacksdrivers.db"
-)
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-db = SQLAlchemy(app)
-socketio = SocketIO(app)
-migrate = Migrate(app, db)
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = "login"
+@app.context_processor
+def inject_plant_addresses():
+    return dict(PLANT_ADDRESSES=PLANT_ADDRESSES)
 
 ##################################################
-# MODELS
+# Models
 ##################################################
 ITEM_STATUSES = ("operational", "damaged", "missing", "leaking")
 
@@ -107,7 +105,6 @@ class User(db.Model, UserMixin):
     def check_password(self, pwd):
         return check_password_hash(self.password_hash, pwd)
 
-
 class Task(db.Model):
     __tablename__ = "task"
     id = db.Column(db.Integer, primary_key=True)
@@ -119,12 +116,10 @@ class Task(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     assigned_to = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
-
 class PreTrip(db.Model):
     __tablename__ = "pretrip"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"))
-
     pretrip_date = db.Column(db.Date, default=date.today)
     shift = db.Column(db.String(10), default="1st")
     truck_type = db.Column(db.String(20), default="Semi")
@@ -149,7 +144,6 @@ class PreTrip(db.Model):
 
     posttrip = db.relationship("PostTrip", uselist=False, backref="pretrip")
 
-
 class PostTrip(db.Model):
     __tablename__ = "posttrip"
     id = db.Column(db.Integer, primary_key=True)
@@ -160,14 +154,13 @@ class PostTrip(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
 
-
 class DriverLog(db.Model):
     __tablename__ = "driver_log"
     id = db.Column(db.Integer, primary_key=True)
     driver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     driver = db.relationship("User", backref="driver_logs", lazy="joined")
     date = db.Column(db.Date, default=date.today)
-    arrive_time = db.Column(db.String(20))  # storing 12-hr string
+    arrive_time = db.Column(db.String(20))
     depart_time = db.Column(db.String(20))
     downtime_reason = db.Column(db.String(200), nullable=True)
     load_size = db.Column(db.String(10), nullable=False)
@@ -175,9 +168,9 @@ class DriverLog(db.Model):
     maintenance = db.Column(db.Boolean, default=False)
     fuel = db.Column(db.Boolean, default=False)
     meeting = db.Column(db.Boolean, default=False)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
-
 
 class ChatMessage(db.Model):
     __tablename__ = "chat_message"
@@ -188,7 +181,6 @@ class ChatMessage(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     user = db.relationship("User", backref="chat_messages")
 
-
 class Announcement(db.Model):
     __tablename__ = "announcement"
     id = db.Column(db.Integer, primary_key=True)
@@ -196,7 +188,6 @@ class Announcement(db.Model):
     body = db.Column(db.Text, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey("user.id"))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
 
 class DirectMessage(db.Model):
     __tablename__ = "direct_message"
@@ -208,12 +199,13 @@ class DirectMessage(db.Model):
     sender = db.relationship("User", foreign_keys=[sender_id], backref="sent_messages")
     receiver = db.relationship("User", foreign_keys=[receiver_id], backref="received_messages")
 
-
 class ShiftRecord(db.Model):
     __tablename__ = "shift_record"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    pretrip_id = db.Column(db.Integer, db.ForeignKey("pretrip.id"), nullable=False)
+    # Now set pretrip_id as nullable so we can start a shift with no pretrip
+    pretrip_id = db.Column(db.Integer, db.ForeignKey("pretrip.id"), nullable=True)
+
     start_time = db.Column(db.DateTime, nullable=False)
     end_time = db.Column(db.DateTime, nullable=True)
     total_hours = db.Column(db.Float, nullable=True)
@@ -221,7 +213,6 @@ class ShiftRecord(db.Model):
 
     user = db.relationship("User", backref="shift_records")
     pretrip = db.relationship("PreTrip", backref="shift_record")
-
 
 class KnowledgeBaseEntry(db.Model):
     __tablename__ = "knowledge_base"
@@ -231,7 +222,13 @@ class KnowledgeBaseEntry(db.Model):
     body = db.Column(db.Text)
 
 ##################################################
-# FORMS
+# Extra Form for End of Day
+##################################################
+class EndOfDayForm(FlaskForm):
+    hidden_example = HiddenField()
+
+##################################################
+# Forms
 ##################################################
 class RegistrationForm(FlaskForm):
     username = StringField("Username", validators=[DataRequired(), Length(min=3, max=64)])
@@ -242,13 +239,11 @@ class RegistrationForm(FlaskForm):
     manager_pin = PasswordField("Manager PIN (if Management)")
     submit = SubmitField("Register")
 
-
 class LoginForm(FlaskForm):
     login_name = StringField("Username or Email", validators=[DataRequired()])
     password = PasswordField("Password", validators=[DataRequired()])
     remember = BooleanField("Remember Me")
     submit = SubmitField("Login")
-
 
 class TaskForm(FlaskForm):
     title = StringField("Title", validators=[DataRequired()])
@@ -257,7 +252,6 @@ class TaskForm(FlaskForm):
     shift = SelectField("Shift", choices=[("1st","1st"),("2nd","2nd"),("3rd","3rd")])
     assigned_to = SelectField("Assign To (Driver)", coerce=int, default=None)
     submit = SubmitField("Create Task")
-
 
 class UpdateTaskForm(FlaskForm):
     title = StringField("Title", validators=[DataRequired()])
@@ -272,7 +266,6 @@ class UpdateTaskForm(FlaskForm):
     ])
     assigned_to = SelectField("Assigned To (Driver)", coerce=int)
     submit = SubmitField("Update Task")
-
 
 class PreTripForm(FlaskForm):
     pretrip_date = DateField("PreTrip Date", format="%Y-%m-%d", default=date.today)
@@ -289,127 +282,90 @@ class PreTripForm(FlaskForm):
     fuel_leak = BooleanField("Fuel Leak")
     lights_working = BooleanField("Lights Working")
     tires_ok = BooleanField("Tires in Good Condition")
-    damage_report = TextAreaField("Damage Report (Describe if any)")
+    damage_report = TextAreaField("Damage Report")
 
     oil_system_status = SelectField(
         "Oil System Status",
-        choices=[
-            ("operational", "Operational"),
-            ("damaged", "Damaged"),
-            ("missing", "Missing"),
-            ("leaking", "Leaking"),
-        ],
+        choices=[("operational","Operational"),("damaged","Damaged"),("missing","Missing"),("leaking","Leaking")],
         default="operational"
     )
     tires_status = SelectField(
         "Tires Status",
-        choices=[
-            ("operational", "Operational"),
-            ("damaged", "Damaged"),
-            ("missing", "Missing"),
-            ("leaking", "Leaking"),
-        ],
+        choices=[("operational","Operational"),("damaged","Damaged"),("missing","Missing"),("leaking","Leaking")],
         default="operational"
     )
 
     submit = SubmitField("Save PreTrip")
-
 
 class PostTripForm(FlaskForm):
     end_mileage = IntegerField("End Mileage", validators=[DataRequired()])
     remarks = TextAreaField("PostTrip Remarks")
     submit = SubmitField("Complete PostTrip")
 
-
 class DriverLogForm(FlaskForm):
     maintenance = BooleanField("Maintenance")
     fuel = BooleanField("Fuel")
     meeting = BooleanField("Meeting")
-    # ADDED Helios, Hazmat, Other, plus PC, DC, Lab, PPM to match dictionary
     plant_name = SelectField(
         "Plant Name",
         choices=[
-            ("", "Select Plant..."),
-            ("BP", "Barden Plater (BP)"),
-            ("52L", "52 Logistics (52L)"),
-            ("ALN", "Airlane North (ALN)"),
-            ("52DC", "Trim DC (52DC)"),
-            ("PE", "Paint East (PE)"),
-            ("PC", "Paint Central (PC)"),
-            ("RW", "Raleigh West (RW)"),
-            ("RE", "Raleigh East (RE)"),
-            ("AWE", "Airwest Eng (AWE)"),
-            ("Lab", "Corporate Lab (Lab)"),
-            ("PPL", "Plastic Plate Logistics (PPL)"),
-            ("DC", "Plastic Plate DC (DC)"),
-            ("KM", "Kraft Mold (KM)"),
-            ("KP", "Kraft Plater (KP)"),
-            ("Hazmat", "Hazmat"),
-            ("Other", "Other"),
-            ("Helios", "Helios"),
-            ("PPM", "Monroe (PPM)"),
+            ("","Select Plant..."),
+            ("BP","Barden Plater (BP)"),
+            ("52L","52 Logistics (52L)"),
+            ("ALN","Airlane North (ALN)"),
+            ("52DC","Trim DC (52DC)"),
+            ("PE","Paint East (PE)"),
+            ("PC","Paint Central (PC)"),
+            ("RW","Raleigh West (RW)"),
+            ("RE","Raleigh East (RE)"),
+            ("AWE","Airwest Eng (AWE)"),
+            ("Lab","Corporate Lab (Lab)"),
+            ("PPL","Plastic Plate Logistics (PPL)"),
+            ("DC","Plastic Plate DC (DC)"),
+            ("KM","Kraft Mold (KM)"),
+            ("KP","Kraft Plater (KP)"),
+            ("Hazmat","Hazmat"),
+            ("Other","Other"),
+            ("Helios","Helios"),
+            ("PPM","Monroe (PPM)"),
         ],
         validators=[DataRequired()]
     )
-    # ADDED "Half"
     load_size = SelectField(
         "Load Size",
         choices=[
-            ("", "Select Load Size..."),
-            ("Empty", "Empty"),
-            ("Quarter", "Quarter"),
-            ("Half", "Half"),
-            ("Partial", "Partial"),
-            ("Full", "Full"),
+            ("","Select Load Size..."),
+            ("Empty","Empty"),
+            ("Quarter","Quarter"),
+            ("Half","Half"),
+            ("Partial","Partial"),
+            ("Full","Full"),
         ],
         validators=[DataRequired()]
     )
     downtime_reason = StringField("Downtime Reason (optional)")
     submit = SubmitField("Submit Log Entry")
 
-
 class AnnouncementForm(FlaskForm):
     title = StringField("Announcement Title", validators=[DataRequired()])
     body = TextAreaField("Announcement Body", validators=[DataRequired()])
     submit = SubmitField("Post Announcement")
-
 
 class DirectMessageForm(FlaskForm):
     receiver_id = SelectField("Send To", coerce=int)
     content = TextAreaField("Message", validators=[DataRequired()])
     submit = SubmitField("Send")
 
-
 class KnowledgeBaseForm(FlaskForm):
     title = StringField("Tip Title", validators=[DataRequired()])
     body = TextAreaField("Tip Body", validators=[DataRequired()])
     submit = SubmitField("Add Tip")
 
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
-
-##################################################
-# BASIC ROUTES
-##################################################
-@app.route("/")
-def welcome():
-    bulletins = Announcement.query.order_by(Announcement.created_at.desc()).limit(5).all()
-    return render_template("welcome.html", bulletins=bulletins)
-
-# Example ProfileForm
-from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, SelectField
 from wtforms.validators import DataRequired, Email, EqualTo
-
 class ProfileForm(FlaskForm):
     username = StringField("Username", validators=[DataRequired()])
     email = StringField("Email", validators=[DataRequired(), Email()])
-    role = SelectField(
-        "Role",
-        choices=[("driver", "Driver"), ("management", "Management")]
-    )
+    role = SelectField("Role", choices=[("driver","Driver"),("management","Management")])
     new_password = PasswordField("New Password")
     confirm_password = PasswordField(
         "Confirm New Password",
@@ -417,84 +373,21 @@ class ProfileForm(FlaskForm):
     )
     submit = SubmitField("Update Profile")
 
-
-@app.route("/profile", methods=["GET", "POST"])
-@login_required
-def profile():
-    form = ProfileForm(obj=current_user)  # Pre-fill with current_user's data
-    if form.validate_on_submit():
-        current_user.username = form.username.data
-        current_user.email = form.email.data
-        if form.new_password.data:
-            current_user.set_password(form.new_password.data)
-        db.session.commit()
-        flash("Profile updated!", "success")
-        return redirect(url_for("profile"))
-    return render_template("profile.html", profile_form=form)
-
-
-@app.route("/weekly_performance")
-@login_required
-def weekly_performance():
-    start_date = "2023-08-01"
-    end_date = "2023-08-07"
-    driver_hours = {
-        "John": {"week_hours": 39.5, "day_hours": 8.0},
-        "Jane": {"week_hours": 42.0, "day_hours": 8.5},
-    }
-    plants_times = [
-        {"driver_name": "John", "plant_name": "BP", "hours": 12.0},
-        {"driver_name": "Jane", "plant_name": "ALN", "hours": 5.5},
-    ]
-    tasks_completion = {
-        "John": {"assigned": 10, "completed": 8},
-        "Jane": {"assigned": 12, "completed": 10},
-    }
-    return render_template("weekly_performance.html",
-                           start_date=start_date,
-                           end_date=end_date,
-                           driver_hours=driver_hours,
-                           plants_times=plants_times,
-                           tasks_completion=tasks_completion)
-
-@app.route("/handoff_task", methods=["POST"])
-@login_required
-def handoff_task():
-    if current_user.role != "management":
-        return jsonify({"error": "Forbidden"}), 403
-
-    task_id = request.json.get("task_id")
-    mode = request.json.get("mode")
-    t = Task.query.get(task_id)
-    if not t:
-        return jsonify({"error": "Task not found"}), 404
-
-    if mode == "next_shift":
-        if t.shift == "1st":
-            t.shift = "2nd"
-        elif t.shift == "2nd":
-            t.shift = "3rd"
-        else:
-            t.shift = "1st"
-        db.session.commit()
-        return jsonify({"status": "Shift changed"}), 200
-    elif mode == "assign_driver":
-        new_driver_id = request.json.get("new_driver_id")
-        t.assigned_to = new_driver_id
-        db.session.commit()
-        return jsonify({"status": "Reassigned driver"}), 200
-
-    return jsonify({"status": "No valid mode selected"}), 200
-
-
-@app.route('/OneSignalSDKWorker.js')
-def onesignal_sw():
-    return send_from_directory('static', 'OneSignalSDKWorker.js')
-
+##################################################
+# User Loader for Flask-Login
+##################################################
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
 ##################################################
-# AUTH ROUTES
+# Routes
 ##################################################
+@app.route("/")
+def welcome():
+    bulletins = Announcement.query.order_by(Announcement.created_at.desc()).limit(5).all()
+    return render_template("welcome.html", bulletins=bulletins)
+
 @app.route("/register", methods=["GET","POST"])
 def register():
     form = RegistrationForm()
@@ -521,7 +414,6 @@ def register():
             return redirect(url_for("login"))
     return render_template("register.html", form=form)
 
-
 @app.route("/login", methods=["GET","POST"])
 def login():
     form = LoginForm()
@@ -538,7 +430,6 @@ def login():
             flash("Invalid credentials.", "danger")
     return render_template("login.html", form=form)
 
-
 @app.route("/logout")
 @login_required
 def logout():
@@ -547,116 +438,18 @@ def logout():
     return redirect(url_for("welcome"))
 
 ##################################################
-# DIRECT MESSAGES & CHAT
-##################################################
-@app.route("/direct_messages", methods=["GET","POST"])
-@login_required
-def direct_messages():
-    dm_form = DirectMessageForm()
-    all_users = User.query.filter(User.id != current_user.id).all()
-    dm_form.receiver_id.choices = [(u.id, u.username) for u in all_users]
-
-    if dm_form.validate_on_submit():
-        dm = DirectMessage(
-            sender_id=current_user.id,
-            receiver_id=dm_form.receiver_id.data,
-            content=dm_form.content.data
-        )
-        db.session.add(dm)
-        db.session.commit()
-        socketio.emit("new_direct_message", {
-            "sender": current_user.username,
-            "receiver_id": dm_form.receiver_id.data,
-            "content": dm_form.content.data
-        })
-        flash("Message sent!", "success")
-        return redirect(url_for("direct_messages"))
-
-    inbox = DirectMessage.query.filter_by(receiver_id=current_user.id)\
-        .order_by(DirectMessage.timestamp.desc()).all()
-    outbox = DirectMessage.query.filter_by(sender_id=current_user.id)\
-        .order_by(DirectMessage.timestamp.desc()).all()
-    return render_template("direct_messages.html", dm_form=dm_form, inbox=inbox, outbox=outbox)
-
-@app.route("/reply_dm/<int:dm_id>", methods=["GET","POST"])
-@login_required
-def reply_dm(dm_id):
-    original_dm = DirectMessage.query.get_or_404(dm_id)
-    if original_dm.receiver_id != current_user.id:
-        flash("Not authorized to reply to that message.", "danger")
-        return redirect(url_for("direct_messages"))
-
-    reply_form = DirectMessageForm()
-    reply_form.receiver_id.choices = [(original_dm.sender.id, original_dm.sender.username)]
-
-    if reply_form.validate_on_submit():
-        new_reply = DirectMessage(
-            sender_id=current_user.id,
-            receiver_id=original_dm.sender_id,
-            content=reply_form.content.data
-        )
-        db.session.add(new_reply)
-        db.session.commit()
-        socketio.emit("new_direct_message", {
-            "sender": current_user.username,
-            "receiver_id": original_dm.sender_id,
-            "content": reply_form.content.data
-        })
-        flash("Reply sent!", "success")
-        return redirect(url_for("direct_messages"))
-
-    return render_template("reply_dm.html", reply_form=reply_form, original_dm=original_dm)
-
-
-@app.route("/chat")
-@login_required
-def chat_page():
-    messages = ChatMessage.query.filter_by(room="global").order_by(ChatMessage.timestamp.asc()).all()
-    return render_template("chat.html", messages=messages)
-
-@socketio.on("connect")
-def on_connect():
-    join_room("global")
-    emit("status", {"msg": f"{current_user.username} joined global chat."}, to="global")
-
-@socketio.on("join")
-def handle_join(data):
-    room = data.get("room","global")
-    join_room(room)
-    emit("status", {"msg": f'{current_user.username} joined {room}.'}, to=room)
-
-@socketio.on("leave")
-def handle_leave(data):
-    room = data.get("room","global")
-    leave_room(room)
-    emit("status", {"msg": f'{current_user.username} left {room}.'}, to=room)
-
-@socketio.on("chat_message")
-def handle_chat_message(data):
-    room = data.get("room","global")
-    content = data.get("content","").strip()
-    if content:
-        msg = ChatMessage(user_id=current_user.id, content=content, room=room)
-        db.session.add(msg)
-        db.session.commit()
-        emit("chat_message", {
-            "username": current_user.username,
-            "content": content
-        }, to=room)
-
-##################################################
-# DASHBOARD
+# Dashboard
 ##################################################
 @app.route("/dashboard", methods=["GET", "POST"])
 @login_required
 def dashboard():
     if current_user.role == "driver":
         logs = DriverLog.query.filter_by(driver_id=current_user.id)\
-            .order_by(DriverLog.created_at.desc()).limit(5).all()
+                              .order_by(DriverLog.created_at.desc()).limit(5).all()
         pretrips = PreTrip.query.filter_by(user_id=current_user.id)\
-            .order_by(PreTrip.created_at.desc()).limit(5).all()
+                                .order_by(PreTrip.created_at.desc()).limit(5).all()
         tasks = Task.query.filter_by(assigned_to=current_user.id)\
-            .order_by(Task.created_at.desc()).limit(5).all()
+                          .order_by(Task.created_at.desc()).limit(5).all()
     else:
         logs = DriverLog.query.order_by(DriverLog.created_at.desc()).limit(5).all()
         pretrips = PreTrip.query.order_by(PreTrip.created_at.desc()).limit(5).all()
@@ -682,8 +475,10 @@ def dashboard():
         flash("Message sent!", "success")
         return redirect(url_for("dashboard"))
 
-    inbox = DirectMessage.query.filter_by(receiver_id=current_user.id).order_by(DirectMessage.timestamp.desc()).all()
-    outbox = DirectMessage.query.filter_by(sender_id=current_user.id).order_by(DirectMessage.timestamp.desc()).all()
+    inbox = DirectMessage.query.filter_by(receiver_id=current_user.id)\
+                               .order_by(DirectMessage.timestamp.desc()).all()
+    outbox = DirectMessage.query.filter_by(sender_id=current_user.id)\
+                                .order_by(DirectMessage.timestamp.desc()).all()
 
     return render_template(
         "dashboard.html",
@@ -695,59 +490,8 @@ def dashboard():
         outbox=outbox
     )
 
-
 ##################################################
-# ANNOUNCEMENTS
-##################################################
-@app.route("/announcements", methods=["GET","POST"])
-@login_required
-def announcements():
-    one_day_ago = datetime.now() - timedelta(days=1)
-    Announcement.query.filter(Announcement.created_at < one_day_ago).delete()
-    db.session.commit()
-
-    all_ann = Announcement.query.order_by(Announcement.created_at.desc()).all()
-    form = AnnouncementForm()
-
-    if request.method == "POST":
-        if current_user.role != "management":
-            flash("Management only can post announcements.", "danger")
-            return redirect(url_for("announcements"))
-        if form.validate_on_submit():
-            ann = Announcement(
-                title=form.title.data,
-                body=form.body.data,
-                created_by=current_user.id
-            )
-            db.session.add(ann)
-            db.session.commit()
-            flash("Announcement posted!", "success")
-            return redirect(url_for("announcements"))
-
-    return render_template("announcements.html", announcements=all_ann, form=form)
-
-@app.route("/logout2")
-@login_required
-def real_logout():
-    logout_user()
-    flash("Logged out (real_logout).", "info")
-    return redirect(url_for("welcome"))
-
-##################################################
-# MANAGER VIEWS
-##################################################
-@app.route("/manager/drivers")
-@login_required
-def manager_view_drivers():
-    if current_user.role != "management":
-        flash("Management only.", "danger")
-        return redirect(url_for("dashboard"))
-    users = User.query.all()
-    return render_template("manager_drivers.html", users=users)
-
-
-##################################################
-# TASK-RELATED
+# Manager-Only: Task Creation
 ##################################################
 @app.route("/create_task", methods=["GET","POST"])
 @login_required
@@ -780,9 +524,61 @@ def list_tasks():
         tasks = Task.query.order_by(Task.created_at.desc()).all()
     else:
         tasks = Task.query.filter_by(assigned_to=current_user.id)\
-            .order_by(Task.created_at.desc()).all()
+                          .order_by(Task.created_at.desc()).all()
     return render_template("list_tasks.html", tasks=tasks)
 
+@app.route("/edit_task/<int:task_id>", methods=["GET","POST"])
+@login_required
+def edit_task(task_id):
+    task = Task.query.get_or_404(task_id)
+    if current_user.role != "management":
+        flash("Only managers can edit tasks.", "danger")
+        return redirect(url_for("list_tasks"))
+
+    form = UpdateTaskForm(obj=task)
+    drivers = User.query.filter_by(role="driver").all()
+    form.assigned_to.choices = [(d.id, d.username) for d in drivers]
+
+    if form.validate_on_submit():
+        task.title = form.title.data
+        task.details = form.details.data
+        task.is_hot = form.is_hot.data
+        task.shift = form.shift.data
+        task.status = form.status.data
+        task.assigned_to = form.assigned_to.data
+        db.session.commit()
+        flash("Task updated successfully!", "success")
+        return redirect(url_for("list_tasks"))
+    return render_template("edit_task.html", form=form, task=task)
+
+@app.route("/handoff_task", methods=["POST"])
+@login_required
+def handoff_task():
+    if current_user.role != "management":
+        return jsonify({"error": "Forbidden"}), 403
+
+    task_id = request.json.get("task_id")
+    mode = request.json.get("mode")
+    t = Task.query.get(task_id)
+    if not t:
+        return jsonify({"error": "Task not found"}), 404
+
+    if mode == "next_shift":
+        if t.shift == "1st":
+            t.shift = "2nd"
+        elif t.shift == "2nd":
+            t.shift = "3rd"
+        else:
+            t.shift = "1st"
+        db.session.commit()
+        return jsonify({"status": "Shift changed"}), 200
+    elif mode == "assign_driver":
+        new_driver_id = request.json.get("new_driver_id")
+        t.assigned_to = new_driver_id
+        db.session.commit()
+        return jsonify({"status": "Reassigned driver"}), 200
+
+    return jsonify({"status": "No valid mode selected"}), 200
 
 @app.route("/create_task_from_dashboard", methods=["POST"])
 @login_required
@@ -806,155 +602,14 @@ def create_task_from_dashboard():
         db.session.add(new_task)
         db.session.commit()
         flash("Task created from dashboard!", "success")
-    # FIX #2: Provide manager_dashboard or redirect somewhere valid
     return redirect(url_for("manager_dashboard"))
 
-
 ##################################################
-# PRETRIP-RELATED
-##################################################
-@app.route("/list_pretrips")
-@login_required
-def list_pretrips():
-    if current_user.role == "management":
-        pretrips = PreTrip.query.order_by(PreTrip.created_at.desc()).all()
-    else:
-        pretrips = PreTrip.query.filter_by(user_id=current_user.id)\
-                   .order_by(PreTrip.created_at.desc()).all()
-    return render_template("list_pretrips.html", pretrips=pretrips)
-
-@app.route("/new_pretrip", methods=["GET","POST"])
-@login_required
-def new_pretrip():
-    form = PreTripForm()
-    if form.validate_on_submit():
-        new_pt = PreTrip(
-            user_id=current_user.id,
-            pretrip_date=form.pretrip_date.data,
-            shift=form.shift.data,
-            truck_type=form.truck_type.data,
-            truck_name=form.truck_name.data,
-            start_mileage=form.start_mileage.data,
-            cab_doors_windows=form.cab_doors_windows.data,
-            body_doors=form.body_doors.data,
-            oil_leak=form.oil_leak.data,
-            grease_leak=form.grease_leak.data,
-            coolant_leak=form.coolant_leak.data,
-            fuel_leak=form.fuel_leak.data,
-            lights_working=form.lights_working.data,
-            tires_ok=form.tires_ok.data,
-            damage_report=form.damage_report.data,
-            oil_system_status=form.oil_system_status.data,
-            tires_status=form.tires_status.data,
-        )
-        db.session.add(new_pt)
-        db.session.commit()
-
-        shift_rec = ShiftRecord(
-            user_id=current_user.id,
-            pretrip_id=new_pt.id,
-            start_time=datetime.utcnow(),
-            week_ending=get_friday_of_current_week()
-        )
-        db.session.add(shift_rec)
-        db.session.commit()
-
-        flash("New PreTrip created successfully and shift clock started!", "success")
-        return redirect(url_for("list_pretrips"))
-    return render_template("new_pretrip.html", form=form)
-
-@app.route("/start_shift", methods=["GET","POST"])
-@login_required
-def start_shift():
-    # 1) Check if the user already has an open shift (no end_time yet)
-    existing_open_shift = ShiftRecord.query.filter_by(
-        user_id=current_user.id,
-        end_time=None  # means the shift is still open
-    ).first()
-
-    if existing_open_shift:
-        flash("You already have a shift in progress!", "warning")
-        return redirect(url_for("dashboard"))
-
-    # 2) If not, create a new ShiftRecord with a start_time
-    new_shift = ShiftRecord(
-        user_id=current_user.id,
-        pretrip_id=None,  # or link it to a PreTrip if appropriate
-        start_time=datetime.utcnow(),
-        week_ending=get_friday_of_current_week()  # example helper
-    )
-    db.session.add(new_shift)
-    db.session.commit()
-
-    flash("Shift started!", "success")
-    return redirect(url_for("dashboard"))
-
-
-@app.route("/submit_pretrip", methods=["GET","POST"])
-@login_required
-def submit_pretrip():
-    form = PreTripForm()
-    if form.validate_on_submit():
-        new_pt = PreTrip(
-            user_id=current_user.id,
-            pretrip_date=form.pretrip_date.data,
-            shift=form.shift.data,
-            truck_type=form.truck_type.data,
-            truck_name=form.truck_name.data,
-            start_mileage=form.start_mileage.data,
-            cab_doors_windows=form.cab_doors_windows.data,
-            body_doors=form.body_doors.data,
-            oil_leak=form.oil_leak.data,
-            grease_leak=form.grease_leak.data,
-            coolant_leak=form.coolant_leak.data,
-            fuel_leak=form.fuel_leak.data,
-            lights_working=form.lights_working.data,
-            tires_ok=form.tires_ok.data,
-            damage_report=form.damage_report.data,
-            oil_system_status=form.oil_system_status.data,
-            tires_status=form.tires_status.data,
-        )
-        db.session.add(new_pt)
-        db.session.commit()
-
-        shift_rec = ShiftRecord(
-            user_id=current_user.id,
-            pretrip_id=new_pt.id,
-            start_time=datetime.utcnow(),
-            week_ending=get_friday_of_current_week()
-        )
-        db.session.add(shift_rec)
-        db.session.commit()
-@app.route("/end_shift", methods=["GET","POST"])
-@login_required
-def end_shift():
-    # Example logic: find the open shift record, set end_time, calculate total hours, etc.
-    open_shift = ShiftRecord.query.filter_by(
-        user_id=current_user.id,
-        end_time=None
-    ).first()
-    if not open_shift:
-        flash("No open shift found!", "warning")
-        return redirect(url_for("dashboard"))
-
-    open_shift.end_time = datetime.utcnow()
-    open_shift.total_hours = (open_shift.end_time - open_shift.start_time).total_seconds() / 3600
-    db.session.commit()
-
-    flash("Shift ended!", "success")
-    return redirect(url_for("dashboard"))
-
-    flash("New PreTrip created (submit_pretrip) and shift clock started!", "success")
-    return redirect(url_for("list_pretrips"))
-    return render_template("new_pretrip.html", form=form)
-
-##################################################
-# DRIVER LOGS
+# Driver Logs
 ##################################################
 @app.route("/driver_logs", methods=["GET"])
 @login_required
 def driver_logs():
-    # pass PLANT_ADDRESSES so we can show them if desired
     if current_user.role == "management":
         all_drivers = User.query.filter_by(role="driver").all()
         selected_driver_id = request.args.get("driver_id", type=int)
@@ -966,13 +621,12 @@ def driver_logs():
             "driver_logs.html",
             logs=logs,
             all_drivers=all_drivers,
-            selected_driver_id=selected_driver_id,
-            PLANT_ADDRESSES=PLANT_ADDRESSES
+            selected_driver_id=selected_driver_id
         )
     else:
         logs = DriverLog.query.filter_by(driver_id=current_user.id)\
-               .order_by(DriverLog.created_at.desc()).all()
-        return render_template("driver_logs.html", logs=logs, PLANT_ADDRESSES=PLANT_ADDRESSES)
+                              .order_by(DriverLog.created_at.desc()).all()
+        return render_template("driver_logs.html", logs=logs)
 
 @app.route("/new_driving_log", methods=["GET","POST"])
 @login_required
@@ -1040,10 +694,98 @@ def view_driver_log(log_id):
         return redirect(url_for("driver_logs"))
     return render_template("view_driver_log.html", log=single_log)
 
+##################################################
+# PreTrip/PostTrip
+##################################################
+@app.route("/list_pretrips")
+@login_required
+def list_pretrips():
+    if current_user.role == "management":
+        pretrips = PreTrip.query.order_by(PreTrip.created_at.desc()).all()
+    else:
+        pretrips = PreTrip.query.filter_by(user_id=current_user.id)\
+                                .order_by(PreTrip.created_at.desc()).all()
+    return render_template("list_pretrips.html", pretrips=pretrips)
 
-##################################################
-# EDIT/UPDATE PRETRIP
-##################################################
+@app.route("/new_pretrip", methods=["GET","POST"])
+@login_required
+def new_pretrip():
+    form = PreTripForm()
+    if form.validate_on_submit():
+        new_pt = PreTrip(
+            user_id=current_user.id,
+            pretrip_date=form.pretrip_date.data,
+            shift=form.shift.data,
+            truck_type=form.truck_type.data,
+            truck_name=form.truck_name.data,
+            start_mileage=form.start_mileage.data,
+            cab_doors_windows=form.cab_doors_windows.data,
+            body_doors=form.body_doors.data,
+            oil_leak=form.oil_leak.data,
+            grease_leak=form.grease_leak.data,
+            coolant_leak=form.coolant_leak.data,
+            fuel_leak=form.fuel_leak.data,
+            lights_working=form.lights_working.data,
+            tires_ok=form.tires_ok.data,
+            damage_report=form.damage_report.data,
+            oil_system_status=form.oil_system_status.data,
+            tires_status=form.tires_status.data,
+        )
+        db.session.add(new_pt)
+        db.session.commit()
+
+        # Create a shift record (nullable pretrip_id is allowed)
+        shift_rec = ShiftRecord(
+            user_id=current_user.id,
+            pretrip_id=new_pt.id,
+            start_time=datetime.utcnow(),
+            week_ending=get_friday_of_current_week()
+        )
+        db.session.add(shift_rec)
+        db.session.commit()
+
+        flash("New PreTrip created successfully and shift clock started!", "success")
+        return redirect(url_for("list_pretrips"))
+    return render_template("new_pretrip.html", form=form)
+
+@app.route("/do_posttrip/<int:pretrip_id>", methods=["GET","POST"])
+@login_required
+def do_posttrip(pretrip_id):
+    pt = PreTrip.query.get_or_404(pretrip_id)
+    if current_user.role == "driver" and pt.user_id != current_user.id:
+        flash("Not authorized to complete a PostTrip for someone else's PreTrip.", "danger")
+        return redirect(url_for("list_pretrips"))
+
+    form = PostTripForm()
+    if form.validate_on_submit():
+        end_mileage_val = form.end_mileage.data
+        if pt.start_mileage is not None:
+            miles_val = end_mileage_val - pt.start_mileage
+        else:
+            miles_val = None
+
+        new_posttrip = PostTrip(
+            pretrip_id=pretrip_id,
+            end_mileage=end_mileage_val,
+            remarks=form.remarks.data,
+            miles_driven=miles_val
+        )
+        db.session.add(new_posttrip)
+        db.session.commit()
+
+        # If shift record is still open, end it
+        shift = ShiftRecord.query.filter_by(pretrip_id=pretrip_id).first()
+        if shift and shift.end_time is None:
+            shift.end_time = datetime.utcnow()
+            shift.total_hours = (
+                shift.end_time - shift.start_time
+            ).total_seconds() / 3600.0
+            db.session.commit()
+
+        flash("PostTrip completed successfully and shift clock ended!", "success")
+        return redirect(url_for("view_pretrip", pretrip_id=pretrip_id))
+    return render_template("posttrip.html", form=form, pretrip=pt)
+
 @app.route("/view_pretrip/<int:pretrip_id>")
 @login_required
 def view_pretrip(pretrip_id):
@@ -1087,232 +829,189 @@ def edit_pretrip_entry(pretrip_id):
         return redirect(url_for("view_pretrip", pretrip_id=pt.id))
     return render_template("edit_pretrip_entry.html", form=form, pretrip=pt)
 
-
 ##################################################
-# EDIT/UPDATE TASK
+# Shift Start/End
 ##################################################
-@app.route("/edit_task/<int:task_id>", methods=["GET","POST"])
+@app.route("/start_shift", methods=["GET","POST"])
 @login_required
-def edit_task(task_id):
-    task = Task.query.get_or_404(task_id)
-    if current_user.role != "management":
-        flash("Only managers can edit tasks.", "danger")
-        return redirect(url_for("list_tasks"))
-
-    form = UpdateTaskForm(obj=task)
-    drivers = User.query.filter_by(role="driver").all()
-    form.assigned_to.choices = [(d.id, d.username) for d in drivers]
-
-    if form.validate_on_submit():
-        task.title = form.title.data
-        task.details = form.details.data
-        task.is_hot = form.is_hot.data
-        task.shift = form.shift.data
-        task.status = form.status.data
-        task.assigned_to = form.assigned_to.data
-        db.session.commit()
-        flash("Task updated successfully!", "success")
-        return redirect(url_for("list_tasks"))
-    return render_template("edit_task.html", form=form, task=task)
-
-
-##################################################
-# MISC ROUTES
-##################################################
-@app.route("/all_in_one_dashboard")
-@login_required
-def all_in_one_dashboard():
-    if current_user.role == "management":
-        tasks = Task.query.order_by(Task.created_at.desc()).all()
-        pretrips = PreTrip.query.order_by(PreTrip.created_at.desc()).all()
-        logs = DriverLog.query.order_by(DriverLog.created_at.desc()).all()
-    else:
-        tasks = Task.query.filter_by(assigned_to=current_user.id).all()
-        pretrips = PreTrip.query.filter_by(user_id=current_user.id).all()
-        logs = DriverLog.query.filter_by(driver_id=current_user.id).all()
-    return render_template("all_in_one_dashboard.html", tasks=tasks, pretrips=pretrips, logs=logs)
-
-@app.route("/driver_dashboard")
-@login_required
-def driver_dashboard():
-    if current_user.role != "driver":
-        flash("Drivers only!", "danger")
+def start_shift():
+    existing_open_shift = ShiftRecord.query.filter_by(
+        user_id=current_user.id,
+        end_time=None
+    ).first()
+    if existing_open_shift:
+        flash("You already have a shift in progress!", "warning")
         return redirect(url_for("dashboard"))
-    tasks = Task.query.filter_by(assigned_to=current_user.id).all()
-    logs = DriverLog.query.filter_by(driver_id=current_user.id).all()
-    pretrips = PreTrip.query.filter_by(user_id=current_user.id).all()
-    return render_template("driver_dashboard.html", tasks=tasks, logs=logs, pretrips=pretrips)
 
-@app.route("/manager_all_pretrips")
+    new_shift = ShiftRecord(
+        user_id=current_user.id,
+        pretrip_id=None,
+        start_time=datetime.utcnow(),
+        week_ending=get_friday_of_current_week()
+    )
+    db.session.add(new_shift)
+    db.session.commit()
+
+    flash("Shift started!", "success")
+    return redirect(url_for("dashboard"))
+
+@app.route("/end_shift", methods=["GET","POST"])
 @login_required
-def manager_all_pretrips():
-    if current_user.role != "management":
-        flash("Management only.", "danger")
+def end_shift():
+    open_shift = ShiftRecord.query.filter_by(
+        user_id=current_user.id,
+        end_time=None
+    ).first()
+    if not open_shift:
+        flash("No open shift found!", "warning")
         return redirect(url_for("dashboard"))
-    all_pretrips = PreTrip.query.order_by(PreTrip.created_at.desc()).all()
-    return render_template("manager_all_pretrips.html", pretrips=all_pretrips)
 
-@app.route("/manager_tasks")
-@login_required
-def manager_tasks():
-    if current_user.role != "management":
-        flash("Management only.", "danger")
-        return redirect(url_for("dashboard"))
-    all_tasks = Task.query.order_by(Task.created_at.desc()).all()
-    return render_template("manager_tasks.html", tasks=all_tasks)
+    open_shift.end_time = datetime.utcnow()
+    open_shift.total_hours = (
+        open_shift.end_time - open_shift.start_time
+    ).total_seconds() / 3600
+    db.session.commit()
 
-@app.route("/list_driving_logs")
-@login_required
-def list_driving_logs():
-    if current_user.role == "management":
-        logs = DriverLog.query.order_by(DriverLog.created_at.desc()).all()
-    else:
-        logs = DriverLog.query.filter_by(driver_id=current_user.id).all()
-    return render_template("list_driving_logs.html", logs=logs)
-
-
-@app.route("/reply_message")
-@login_required
-def reply_message():
-    return render_template("reply_message.html")
-
-@app.route("/task")
-@login_required
-def task_page():
-    return render_template("task.html")
-
-@app.route("/posttrip", methods=["GET","POST"])
-@login_required
-def posttrip_page():
-    form = PostTripForm()
-    if form.validate_on_submit():
-        flash("PostTrip completed (placeholder logic)!", "success")
-        return redirect(url_for("dashboard"))
-    return render_template("posttrip.html", form=form)
-
-@app.route("/do_posttrip/<int:pretrip_id>", methods=["GET","POST"])
-@login_required
-def do_posttrip(pretrip_id):
-    pt = PreTrip.query.get_or_404(pretrip_id)
-    if current_user.role == "driver" and pt.user_id != current_user.id:
-        flash("Not authorized to complete a PostTrip for someone else's PreTrip.", "danger")
-        return redirect(url_for("list_pretrips"))
-    form = PostTripForm()
-    if form.validate_on_submit():
-        end_mileage_val = form.end_mileage.data
-        if pt.start_mileage is not None:
-            miles_val = end_mileage_val - pt.start_mileage
-        else:
-            miles_val = None
-
-        new_posttrip = PostTrip(
-            pretrip_id=pretrip_id,
-            end_mileage=end_mileage_val,
-            remarks=form.remarks.data,
-            miles_driven=miles_val
-        )
-        db.session.add(new_posttrip)
-        db.session.commit()
-
-        shift = ShiftRecord.query.filter_by(pretrip_id=pretrip_id).first()
-        if shift and shift.end_time is None:
-            shift.end_time = datetime.utcnow()
-            shift.total_hours = (shift.end_time - shift.start_time).total_seconds() / 3600.0
-            db.session.commit()
-
-        flash("PostTrip completed successfully and shift clock ended!", "success")
-        return redirect(url_for("view_pretrip", pretrip_id=pretrip_id))
-    return render_template("posttrip.html", form=form, pretrip=pt)
-
-
-@app.route("/pretrip", methods=["GET","POST"])
-@login_required
-def pretrip_page():
-    form = PreTripForm()
-    if form.validate_on_submit():
-        new_pt = PreTrip(
-            user_id=current_user.id,
-            truck_name=form.truck_name.data
-        )
-        db.session.add(new_pt)
-        db.session.commit()
-        flash("PreTrip saved quickly!", "success")
-        return redirect(url_for("list_pretrips"))
-    return render_template("pretrip.html", form=form)
-
-@app.route("/editing_task")
-@login_required
-def editing_task():
-    return render_template("editing_task.html")
-
-@app.route("/add_pretrip_entry", methods=["GET","POST"])
-@login_required
-def add_pretrip_entry():
-    form = PreTripForm()
-    if form.validate_on_submit():
-        pt = PreTrip(
-            user_id=current_user.id,
-            truck_name=form.truck_name.data
-        )
-        db.session.add(pt)
-        db.session.commit()
-        flash("Added a new PreTrip entry!", "success")
-        return redirect(url_for("list_pretrips"))
-    return render_template("add_pretrip_entry.html", form=form)
-
-@app.route("/unified_dashboard")
-@login_required
-def unified_dashboard():
-    if current_user.role == "management":
-        tasks = Task.query.order_by(Task.created_at.desc()).all()
-        logs = DriverLog.query.order_by(DriverLog.created_at.desc()).all()
-        pretrips = PreTrip.query.order_by(PreTrip.created_at.desc()).all()
-    else:
-        tasks = Task.query.filter_by(assigned_to=current_user.id).all()
-        logs = DriverLog.query.filter_by(driver_id=current_user.id).all()
-        pretrips = PreTrip.query.filter_by(user_id=current_user.id).all()
-    return render_template("unified_dashboard.html", tasks=tasks, logs=logs, pretrips=pretrips)
-
-@app.route("/layout")
-def layout_page():
-    return render_template("layout.html")
-
-@app.route("/base")
-def base_page():
-    return render_template("base.html")
-
+    flash("Shift ended!", "success")
+    return redirect(url_for("dashboard"))
 
 ##################################################
-# END-OF-DAY SUMMARY
+# End of Day Summary
 ##################################################
-@app.route("/end_of_day_summary")
+@app.route('/end_of_day_summary', methods=['GET','POST'])
 @login_required
 def end_of_day_summary():
+    form = EndOfDayForm()
+
+    if form.validate_on_submit():
+        # handle final submission
+        flash("Submitted End of Day Summary (interactive)!", "success")
+        return redirect(url_for("dashboard"))
+
     today_date = date.today()
-    if current_user.role == "driver":
-        logs = DriverLog.query.filter_by(driver_id=current_user.id, date=today_date).all()
-        drivers_logs = { current_user.username: logs }
-        total_miles = 0
-        pretrips_today = PreTrip.query.filter_by(user_id=current_user.id, pretrip_date=today_date).all()
-        for pt in pretrips_today:
-            if pt.posttrip and pt.posttrip.miles_driven:
-                total_miles += pt.posttrip.miles_driven
-    else:
-        logs = DriverLog.query.filter_by(date=today_date).all()
-        drivers_logs = defaultdict(list)
-        for lg in logs:
-            dname = lg.driver.username
-            drivers_logs[dname].append(lg)
-        total_miles = 0
+    logs = DriverLog.query.filter_by(driver_id=current_user.id, date=today_date).all()
+    drivers_logs = { current_user.username: logs }
 
-    return render_template("end_of_day_summary.html",
-                           drivers_logs=drivers_logs,
-                           the_date=today_date,
-                           total_miles=total_miles)
+    return render_template(
+        "end_of_day_summary.html",
+        form=form,
+        the_date=today_date,
+        drivers_logs=drivers_logs
+    )
 
+@app.route('/end_of_day_print')
+@login_required
+def end_of_day_print():
+    """
+    Renders a print-friendly template with "X in boxes".
+    For example, "Z" if load_size == "Empty",
+    "Q" if load_size == "Quarter", etc.
+    """
+    today_date = date.today()
+    logs = DriverLog.query.filter_by(
+        driver_id=current_user.id,
+        date=today_date
+    ).all()
+    drivers_logs = { current_user.username: logs }
+
+    return render_template(
+        "end_of_day_print.html",
+        the_date=today_date,
+        drivers_logs=drivers_logs
+    )
+
+@app.route('/submit_end_of_day', methods=['POST'])
+@login_required
+def submit_end_of_day():
+    flash("Submitted End of Day Summary via separate route!", "success")
+    return redirect(url_for("dashboard"))
 
 ##################################################
-# RECENT ACTIVITY (BELL ICON)
+# Announcements
+##################################################
+@app.route("/announcements", methods=["GET","POST"])
+@login_required
+def announcements():
+    one_day_ago = datetime.now() - timedelta(days=1)
+    Announcement.query.filter(Announcement.created_at < one_day_ago).delete()
+    db.session.commit()
+
+    all_ann = Announcement.query.order_by(Announcement.created_at.desc()).all()
+    form = AnnouncementForm()
+
+    if request.method == "POST":
+        if current_user.role != "management":
+            flash("Management only can post announcements.", "danger")
+            return redirect(url_for("announcements"))
+        if form.validate_on_submit():
+            ann = Announcement(
+                title=form.title.data,
+                body=form.body.data,
+                created_by=current_user.id
+            )
+            db.session.add(ann)
+            db.session.commit()
+            flash("Announcement posted!", "success")
+            return redirect(url_for("announcements"))
+
+    return render_template("announcements.html", announcements=all_ann, form=form)
+
+##################################################
+# Knowledge Base
+##################################################
+@app.route("/knowledge_base", methods=["GET","POST"])
+@login_required
+def knowledge_base():
+    form = KnowledgeBaseForm()
+    if form.validate_on_submit():
+        kb = KnowledgeBaseEntry(
+            user_id=current_user.id,
+            title=form.title.data,
+            body=form.body.data
+        )
+        db.session.add(kb)
+        db.session.commit()
+        flash("New tip added to the Knowledge Base!", "success")
+        return redirect(url_for("knowledge_base"))
+    tips = KnowledgeBaseEntry.query.order_by(KnowledgeBaseEntry.id.desc()).all()
+    return render_template("knowledge_base.html", form=form, tips=tips)
+
+@app.route("/new_tip", methods=["GET","POST"])
+@login_required
+def new_tip():
+    ...
+
+##################################################
+# Profile
+##################################################
+@app.route("/profile", methods=["GET","POST"])
+@login_required
+def profile():
+    form = ProfileForm(obj=current_user)
+    if form.validate_on_submit():
+        current_user.username = form.username.data
+        current_user.email = form.email.data
+        if form.new_password.data:
+            current_user.set_password(form.new_password.data)
+        db.session.commit()
+        flash("Profile updated!", "success")
+        return redirect(url_for("profile"))
+    return render_template("profile.html", profile_form=form)
+
+##################################################
+# Manager Dashboard
+##################################################
+@app.route("/manager_dashboard")
+@login_required
+def manager_dashboard():
+    if current_user.role != "management":
+        flash("Management only!", "danger")
+        return redirect(url_for("dashboard"))
+    tasks = Task.query.order_by(Task.created_at.desc()).all()
+    return render_template("manager_dashboard.html", tasks=tasks)
+
+##################################################
+# Extra / Utility Routes
 ##################################################
 @app.route("/recent_activity")
 @login_required
@@ -1337,59 +1036,122 @@ def count_unread():
     ).count()
     return jsonify({"unread_count": unread_count})
 
-
-##################################################
-# KNOWLEDGE BASE
-##################################################
-@app.route("/knowledge_base", methods=["GET", "POST"])
+@app.route("/direct_messages", methods=["GET","POST"])
 @login_required
-def knowledge_base():
-    form = KnowledgeBaseForm()
-    if form.validate_on_submit():
-        kb = KnowledgeBaseEntry(
-            user_id=current_user.id,
-            title=form.title.data,
-            body=form.body.data
+def direct_messages():
+    dm_form = DirectMessageForm()
+    all_users = User.query.filter(User.id != current_user.id).all()
+    dm_form.receiver_id.choices = [(u.id, u.username) for u in all_users]
+
+    if dm_form.validate_on_submit():
+        dm = DirectMessage(
+            sender_id=current_user.id,
+            receiver_id=dm_form.receiver_id.data,
+            content=dm_form.content.data
         )
-        db.session.add(kb)
+        db.session.add(dm)
         db.session.commit()
-        flash("New tip added to the Knowledge Base!", "success")
-        return redirect(url_for("knowledge_base"))
-    tips = KnowledgeBaseEntry.query.order_by(KnowledgeBaseEntry.id.desc()).all()
-    return render_template("knowledge_base.html", form=form, tips=tips)
+        socketio.emit("new_direct_message", {
+            "sender": current_user.username,
+            "receiver_id": dm_form.receiver_id.data,
+            "content": dm_form.content.data
+        })
+        flash("Message sent!", "success")
+        return redirect(url_for("direct_messages"))
 
-@app.route("/new_tip", methods=["GET","POST"])
-@login_required
-def new_tip():
-    # logic to handle adding a knowledge base tip
-    ...
-
+    inbox = DirectMessage.query.filter_by(receiver_id=current_user.id)\
+        .order_by(DirectMessage.timestamp.desc()).all()
+    outbox = DirectMessage.query.filter_by(sender_id=current_user.id)\
+        .order_by(DirectMessage.timestamp.desc()).all()
+    return render_template("direct_messages.html", dm_form=dm_form, inbox=inbox, outbox=outbox)
 
 ##################################################
-# UTILS
+# Chat (global)
+##################################################
+@app.route("/chat")
+@login_required
+def chat_page():
+    messages = ChatMessage.query.filter_by(room="global")\
+                                .order_by(ChatMessage.timestamp.asc()).all()
+    return render_template("chat.html", messages=messages)
+
+@socketio.on("connect")
+def on_connect():
+    join_room("global")
+    emit("status", {"msg": f"{current_user.username} joined global chat."}, to="global")
+
+@socketio.on("join")
+def handle_join(data):
+    room = data.get("room","global")
+    join_room(room)
+    emit("status", {"msg": f'{current_user.username} joined {room}.'}, to=room)
+
+@socketio.on("leave")
+def handle_leave(data):
+    room = data.get("room","global")
+    leave_room(room)
+    emit("status", {"msg": f'{current_user.username} left {room}.'}, to=room)
+
+@socketio.on("chat_message")
+def handle_chat_message(data):
+    room = data.get("room","global")
+    content = data.get("content","").strip()
+    if content:
+        msg = ChatMessage(user_id=current_user.id, content=content, room=room)
+        db.session.add(msg)
+        db.session.commit()
+        emit("chat_message", {
+            "username": current_user.username,
+            "content": content
+        }, to=room)
+
+##################################################
+# Google Maps API Example
+##################################################
+@app.route("/map")
+@login_required
+def show_map():
+    # Replace with your real Google Maps API Key
+    return render_template("map.html", google_api_key="YOUR_GOOGLE_MAPS_API_KEY")
+
+##################################################
+# Weekly Performance (Placeholder)
+##################################################
+@app.route("/weekly_performance")
+@login_required
+def weekly_performance():
+    start_date = date.today()
+    end_date = start_date + timedelta(days=7)
+    driver_hours = {}
+    plants_times = []
+    tasks_completion = {}
+
+    return render_template(
+        "weekly_performance.html",
+        start_date=start_date,
+        end_date=end_date,
+        driver_hours=driver_hours,
+        plants_times=plants_times,
+        tasks_completion=tasks_completion
+    )
+
+##################################################
+# OneSignal SW (if needed)
+##################################################
+@app.route('/OneSignalSDKWorker.js')
+def onesignal_sw():
+    return send_from_directory('static', 'OneSignalSDKWorker.js')
+
+##################################################
+# Helper: Get Friday of Current Week
 ##################################################
 def get_friday_of_current_week():
     today = datetime.utcnow().date()
     offset = (4 - today.weekday()) % 7
     return today + timedelta(days=offset)
 
-
 ##################################################
-# MANAGER DASHBOARD (FIX FOR create_task_from_dashboard REDIRECT)
-##################################################
-@app.route("/manager_dashboard")
-@login_required
-def manager_dashboard():
-    if current_user.role != "management":
-        flash("Management only!", "danger")
-        return redirect(url_for("dashboard"))
-    # Put anything you want managers to see here
-    tasks = Task.query.order_by(Task.created_at.desc()).all()
-    return render_template("manager_dashboard.html", tasks=tasks)
-
-
-##################################################
-# MAIN
+# Main
 ##################################################
 if __name__ == "__main__":
     print("Starting SocketIO server on http://127.0.0.1:5000/dashboard ...")
