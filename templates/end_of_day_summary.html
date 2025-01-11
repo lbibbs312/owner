@@ -1,69 +1,87 @@
 {% extends "base.html" %}
 {% block content %}
+<div class="container fade-in">
+  <h2 class="mt-4 mb-3">End of Day Summary (Interactive)</h2>
 
-<div class="container fade-in" style="overflow-x: auto;">
-  <h2 class="mt-4 mb-3">End of Day Summary - {{ the_date }}</h2>
+  <form method="POST" action="{{ url_for('end_of_day_summary') }}">
+    {{ form.csrf_token() }}
 
-  <!-- If driver: show logs for that driver. If manager: show all logs by driver, etc. -->
-  {% for driver_name, log_list in drivers_logs.items() %}
-  <div class="card mb-3">
-    <div class="card-header bg-info text-white">
-      {{ driver_name }}'s Logs for {{ the_date }}
-    </div>
-    <div class="card-body">
-      {% if log_list %}
-        <table class="table table-bordered table-sm">
-          <thead>
-            <tr>
-              <th>Plant</th>
-              <th>Load</th>
-              <th>Arrive</th>
-              <th>Depart</th>
-              <th>Maintenance</th>
-              <th>Fuel</th>
-              <th>Meeting</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for log in log_list %}
-            <tr>
-              <td>{{ log.plant_name }}</td>
-              <td>{{ log.load_size }}</td>
-              <td>{{ log.arrive_time or '--' }}</td>
-              <td>{{ log.depart_time or '--' }}</td>
-              <td>{{ 'Yes' if log.maintenance else 'No' }}</td>
-              <td>{{ 'Yes' if log.fuel else 'No' }}</td>
-              <td>{{ 'Yes' if log.meeting else 'No' }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      {% else %}
-        <p>No logs for {{ driver_name }} today.</p>
-      {% endif %}
-    </div>
-  </div>
-  {% endfor %}
+    <h4>Today's PreTrip(s)</h4>
+    {% if drivers_pretrips[current_user.username] %}
+      <table class="table table-bordered table-sm mb-4">
+        <thead>
+          <tr>
+            <th>Truck</th>
+            <th>Date</th>
+            <th>Leaks?</th>
+            <th>Tires?</th>
+            <th>Damage?</th>
+            <th>Print DVIR</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pt in drivers_pretrips[current_user.username] %}
+          <tr>
+            <td>{{ pt.truck_name }}</td>
+            <td>{{ pt.pretrip_date }}</td>
+            <td>
+              {% if pt.oil_leak or pt.fuel_leak or pt.coolant_leak %}
+                Yes
+              {% else %}
+                No
+              {% endif %}
+            </td>
+            <td>{{ "OK" if pt.tires_ok else "PROBLEM" }}</td>
+            <td>{{ pt.damage_report or "" }}</td>
+            <td>
+              <a 
+                href="{{ url_for('pretrip_printable', pretrip_id=pt.id) }}"
+                class="btn btn-sm btn-secondary"
+              >
+                Print DVIR
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No PreTrips for today.</p>
+    {% endif %}
 
-  <!-- Summaries like total miles if you track posttrip miles -->
-  {% if total_miles is defined %}
-    <p><strong>Total Miles Driven Today:</strong> {{ total_miles }}</p>
-  {% endif %}
+    <h4>Today's Driver Logs</h4>
+    {% if drivers_logs[current_user.username] %}
+      <table class="table table-bordered table-sm">
+        <thead>
+          <tr>
+            <th>Plant</th>
+            <th>Arrive</th>
+            <th>Depart</th>
+            <th>Load</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in drivers_logs[current_user.username] %}
+          <tr>
+            <td>{{ log.plant_name }}</td>
+            <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
+            <td>{{ log.depart_time|to_local_time if log.depart_time else '--' }}</td>
+            <td>{{ log.load_size }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No logs found for today.</p>
+    {% endif %}
 
-  <!-- A "Review & Submit" button for drivers. Maybe it calls a JS or route to finalize. -->
-  {% if current_user.role == 'driver' %}
-    <button class="btn btn-primary hover-btn" onclick="reviewEOD()">
-      Review & Submit
+    <a href="{{ url_for('driver_logs_print') }}" class="btn btn-secondary">
+      Print / PDF Logs
+    </a>
+    
+    <button type="submit" class="btn btn-primary mt-3">
+      Finalize EOD
     </button>
-  {% endif %}
+  </form>
 </div>
-
-<script>
-  function reviewEOD() {
-    // Possibly show a modal or redirect
-    alert("Reviewing and submitting End of Day Summary... (placeholder logic)");
-    // Could do an AJAX call or redirect to a finalize EOD route
-  }
-</script>
-
 {% endblock %}

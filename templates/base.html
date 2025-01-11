@@ -4,26 +4,22 @@
   <meta charset="UTF-8">
   <title>LacksDrivers - Dynamic</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link 
-  rel="stylesheet" 
-  href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"
->
-<script 
-  src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js">
-</script>
-
-  <!-- Google Fonts (just an example) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link 
-    href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" 
-    rel="stylesheet"
-  >
-
+  
   <!-- Bootstrap 5 CSS -->
   <link 
     rel="stylesheet" 
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"
+  >
+  <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js">
+  </script>
+
+  <!-- Google Fonts (just an example) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap"
+    rel="stylesheet"
   >
 
   <style>
@@ -86,7 +82,7 @@
     }
     .navbar-toggler:focus {
       outline: none;
-      box-shadow: none; 
+      box-shadow: none;
     }
   
     /*******************************************
@@ -114,7 +110,7 @@
      *******************************************/
     .slide-panel {
       position: fixed;
-      top: 0; 
+      top: 0;
       left: -280px; /* hidden off-screen by default */
       width: 280px;
       height: 100vh;
@@ -159,9 +155,10 @@
       </a>
 
       <!-- BELL ICON outside the menu on mobile -->
-      <a class="nav-link text-white d-md-none" 
+      <a class="nav-link text-white d-md-none"
          href="{{ url_for('recent_activity') }}"
-         style="font-size: 1.25rem; margin-right: 1rem;">
+         style="font-size: 1.25rem; margin-right: 1rem;"
+      >
         &#128276;
       </a>
 
@@ -302,9 +299,52 @@
     });
   </script>
 
-  <!-- Bootstrap 5 JS -->
+  <!-- SweetAlert for success/danger flash animations -->
+  <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+
+  <!-- Bootstrap 5 JS (already included above, but let's be sure) -->
   <script
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js">
   </script>
+
+  <!-- Flash handling with SweetAlert -->
+  {% with messages = get_flashed_messages(with_categories=True) %}
+    {% if messages %}
+      <script>
+        {% for category, message in messages %}
+          {% if category == 'success' %}
+            swal({
+              title: "Success!",
+              text: "{{ message|safe }}",
+              icon: "success",
+              button: "OK"
+            });
+          {% elif category == 'danger' %}
+            swal({
+              title: "Error!",
+              text: "{{ message|safe }}",
+              icon: "error",
+              button: "OK"
+            });
+          {% elif category == 'warning' %}
+            swal({
+              title: "Warning",
+              text: "{{ message|safe }}",
+              icon: "warning",
+              button: "OK"
+            });
+          {% else %}
+            swal({
+              title: "Notice",
+              text: "{{ message|safe }}",
+              icon: "info",
+              button: "OK"
+            });
+          {% endif %}
+        {% endfor %}
+      </script>
+    {% endif %}
+  {% endwith %}
+
 </body>
 </html>

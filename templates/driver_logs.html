@@ -3,22 +3,14 @@
 <div class="container slide-in">
   <h2 class="mt-3">Driver Logs</h2>
 
-  <!-- If a driver is logged in, show a "Create New Log" button -->
+  <!-- If a driver is logged in, show "Create New Log" button -->
   {% if current_user.role == 'driver' %}
-    <a href="{{ url_for('new_driving_log') }}" class="btn btn-primary mb-3">
+    <a href="{{ url_for('new_driving_log') }}" class="btn btn-primary mb-3 hover-btn">
       Create New Log
     </a>
   {% endif %}
-  {% for log in logs %}
-  <li>
-    Log #{{ log.id }} - {{ log.plant_name }}
-    {% if log.plant_name in PLANT_ADDRESSES %}
-      ({{ PLANT_ADDRESSES[log.plant_name] }})
-    {% endif %}
-  </li>
-{% endfor %}
 
-  <!-- Manager filter by driver -->
+  <!-- Manager filter by driver (only shows if management) -->
   {% if current_user.role == 'management' %}
     <form method="GET" action="{{ url_for('driver_logs') }}" class="mb-4">
       <div class="row g-2 align-items-center">
@@ -38,7 +30,9 @@
           </select>
         </div>
         <div class="col-auto">
-          <button type="submit" class="btn btn-primary">Filter</button>
+          <button type="submit" class="btn btn-primary hover-btn">
+            Filter
+          </button>
         </div>
       </div>
     </form>
@@ -65,17 +59,36 @@
           <tr>
             <td>{{ log.driver.username }}</td>
             <td>{{ log.date }}</td>
-            <td>{{ log.plant_name }}</td>
+            <td>
+              {{ log.plant_name }}
+              {% if log.plant_name in PLANT_ADDRESSES %}
+                <br>
+                <small class="text-muted">
+                  {{ PLANT_ADDRESSES[log.plant_name] }}
+                </small>
+              {% endif %}
+            </td>
             <td>{{ log.load_size }}</td>
             <td>{{ "Yes" if log.maintenance else "No" }}</td>
             <td>{{ "Yes" if log.fuel else "No" }}</td>
             <td>{{ "Yes" if log.meeting else "No" }}</td>
-            <td>{{ log.arrive_time or "--" }}</td>  <!-- just display the string -->
-            <td>{{ log.depart_time or "--" }}</td>  <!-- just display the string -->
+            <!-- Use the filter here -->
+            <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
+            <td>{{ log.depart_time|to_local_time if log.depart_time else '--' }}</td>
             <td>
-              <a href="{{ url_for('view_driver_log', log_id=log.id) }}" class="btn btn-sm btn-info">View</a>
+              <a 
+                href="{{ url_for('view_driver_log', log_id=log.id) }}" 
+                class="btn btn-sm btn-info hover-btn"
+              >
+                View
+              </a>
               {% if current_user.role == 'management' or log.driver_id == current_user.id %}
-                <a href="{{ url_for('edit_driver_log', log_id=log.id) }}" class="btn btn-sm btn-warning">Edit</a>
+                <a 
+                  href="{{ url_for('edit_driver_log', log_id=log.id) }}" 
+                  class="btn btn-sm btn-warning hover-btn"
+                >
+                  Edit
+                </a>
               {% endif %}
             </td>
           </tr>

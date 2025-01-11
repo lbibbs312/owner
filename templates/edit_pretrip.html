@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2 class="mt-3">Edit PreTrip Entry (ID: {{ pretrip.id }})</h2>
+  <form method="POST" action="">
+    {{ form.hidden_tag() }}
+
+    ...
+    <!-- existing mileage, booleans, etc. -->
+
+    <!-- Add 2 ephemeral fields: driver + date -->
+    <div class="mb-3">
+      <label for="reviewing_driver">Reviewing Driver:</label>
+      <input
+        type="text"
+        id="reviewing_driver"
+        name="reviewing_driver"
+        class="form-control"
+        value="{{ current_user.username if current_user else '' }}"
+      >
+    </div>
+    <div class="mb-3">
+      <label for="reviewing_date">Review Date:</label>
+      <input
+        type="text"
+        id="reviewing_date"
+        name="reviewing_date"
+        class="form-control"
+        value="{{ date.today()|string if date else '' }}"
+      >
+    </div>
+
+    {{ form.submit(class="btn btn-primary") }}
+  </form>
+</div>
+{% endblock %}

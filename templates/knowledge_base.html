@@ -1,72 +1,318 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="container slide-in" style="overflow-x: auto;">
-  <h2 class="mt-4 mb-3">Knowledge Base</h2>
-  <p>Tips, best practices, and reminders shared by drivers and management.</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>LacksDrivers - Dynamic</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Add new tip collapsible card -->
-  {% if current_user.role in ['driver','management'] %}
-    <!-- Outer Card to toggle collapse -->
-    <div 
-      class="card hover-card mb-3" 
-      data-bs-toggle="collapse" 
-      data-bs-target="#addTipCollapse" 
-      style="cursor:pointer;"
-    >
-      <div class="card-header bg-success text-white">
-        Add a New Tip
-      </div>
-      <div class="card-body">
-        <p class="m-0">Click here to expand/collapse the form.</p>
+  <!-- Bootstrap 5 CSS -->
+  <link 
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"
+  >
+  <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js">
+  </script>
+
+  <!-- Google Fonts (just an example) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link 
+    href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <style>
+    /*******************************************
+     * 1) Font + Basic Body
+     *******************************************/
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background-color: #f9f9f9;
+      margin: 0;
+      padding: 0;
+    }
+
+    /*******************************************
+     * 2) Glow-text brand (animated)
+     *******************************************/
+    .glow-text {
+      font-weight: 700;
+      color: #fff; /* fallback if animation hasn't run yet */
+      position: relative;
+    }
+    .glow-text span {
+      display: inline-block;
+      color: transparent;
+      text-shadow: 0 0 5px rgba(255,255,255,0.1);
+      opacity: 0;
+      animation: glow 1s ease-in-out forwards;
+    }
+    @keyframes glow {
+      0% {
+        color: transparent;
+        opacity: 0;
+      }
+      50% {
+        color: #fff;
+        opacity: 1;
+        text-shadow: 0 0 10px rgba(255,255,255,0.8),
+                     0 0 20px rgba(255,255,255,0.6);
+      }
+      100% {
+        color: #fff;
+        opacity: 1;
+        text-shadow: 0 0 5px rgba(255,255,255,0.5),
+                     0 0 10px rgba(255,255,255,0.4);
+      }
+    }
+
+    /*******************************************
+     * 3) Navbar & Hamburger custom styling
+     *******************************************/
+    .navbar {
+      transition: background-color 0.3s ease;
+    }
+    .navbar-nav .nav-link {
+      transition: color 0.2s ease;
+    }
+    .navbar-nav .nav-link:hover {
+      color: #ffeb3b !important; /* a bright highlight color */
+    }
+    .navbar-toggler {
+      border: none; /* remove default border */
+    }
+    .navbar-toggler:focus {
+      outline: none;
+      box-shadow: none; 
+    }
+  
+    /*******************************************
+     * 4) Hover transitions for Cards & Buttons
+     *******************************************/
+    .hover-card {
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      cursor: pointer;
+    }
+    .hover-card:hover {
+      transform: scale(1.03);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    }
+    .hover-btn {
+      transition: transform 0.2s ease, background-color 0.2s ease;
+    }
+    .hover-btn:hover {
+      transform: scale(1.04);
+      background-color: #0b5ed7; /* slightly darker or lighter */
+      color: #fff;
+    }
+
+    /*******************************************
+     * 5) Slide-in from left (sidePanel)
+     *******************************************/
+    .slide-panel {
+      position: fixed;
+      top: 0;
+      left: -280px; /* hidden off-screen by default */
+      width: 280px;
+      height: 100vh;
+      background: #ffffff;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.2);
+      transition: left 0.4s ease;
+      overflow-y: auto;
+      z-index: 2000;
+      padding: 1rem;
+    }
+    .slide-panel-open {
+      left: 0;
+    }
+    .close-panel-btn {
+      float: right;
+      cursor: pointer;
+      font-size: 1.4rem;
+      color: #444;
+      font-weight: 700;
+    }
+
+    /*******************************************
+     * 6) Fade-in for main container
+     *******************************************/
+    .fade-in {
+      opacity: 0;
+      animation: fadeInAnimation 0.6s forwards;
+    }
+    @keyframes fadeInAnimation {
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <!-- =======================
+       NAVBAR with Glow-text brand & Bell icon
+       ======================= -->
+  <nav class="navbar navbar-expand-md navbar-dark bg-primary py-2">
+    <div class="container-fluid">
+      <!-- Glow-text brand linking to dashboard -->
+      <a class="navbar-brand glow-text" href="{{ url_for('dashboard') }}">
+        LacksDrivers
+      </a>
+
+      <!-- Bell icon outside the menu (mobile view) -->
+      <a
+        class="nav-link text-white d-md-none"
+        href="{{ url_for('recent_activity') }}"
+        style="font-size: 1.25rem; margin-right: 1rem;"
+      >
+        &#128276;
+      </a>
+
+      <!-- Hamburger toggler for mobile -->
+      <button
+        class="navbar-toggler"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#mainNavbar"
+        aria-controls="mainNavbar"
+        aria-expanded="false"
+        aria-label="Toggle navigation"
+      >
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <!-- Collapsible nav items -->
+      <div class="collapse navbar-collapse" id="mainNavbar">
+        <ul class="navbar-nav ms-auto">
+          <!-- Bell icon for larger screens -->
+          <li class="nav-item d-none d-md-block me-3">
+            <a class="nav-link" href="{{ url_for('recent_activity') }}">
+              &#128276;
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('driver_logs') }}">Driver Logs</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('new_pretrip') }}">New PreTrip</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('list_pretrips') }}">List PreTrips</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('announcements') }}">Announcements</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('knowledge_base') }}">Knowledge Base</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('end_of_day_summary') }}">End of Day</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('weekly_performance') }}">Weekly Perf</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('profile') }}">Profile</a>
+          </li>
+          <!-- Optional link to open side panel -->
+          <li class="nav-item">
+            <a class="nav-link" href="#" id="openPanelBtn">Side Menu</a>
+          </li>
+        </ul>
       </div>
     </div>
+  </nav>
 
-    <!-- Collapsible form -->
-    <div class="collapse" id="addTipCollapse">
-      <div class="card card-body">
-        <form method="POST" action="">
-          {{ form.hidden_tag() }}
-          <div class="mb-3">
-            {{ form.title.label }}:
-            {{ form.title(class="form-control") }}
-          </div>
-          <div class="mb-3">
-            {{ form.body.label }}:
-            {{ form.body(class="form-control") }}
-          </div>
-          {{ form.submit(class="btn btn-primary hover-btn") }}
-        </form>
-      </div>
-    </div>
-  {% endif %}
-
-  <!-- Display existing tips in a responsive grid -->
-  <div class="row mt-4">
-    {% if tips %}
-      {% for t in tips %}
-        <div class="col-12 col-sm-6 col-md-4 col-lg-3 mb-3">
-          <div class="card h-100 hover-card">
-            <div class="card-body d-flex flex-column">
-              <h5 class="card-title">{{ t.title }}</h5>
-              <p class="card-text flex-grow-1">
-                {{ t.body }}
-              </p>
-              <!-- If each tip has a user relationship (e.g., t.user), show who posted it -->
-              {% if t.user_id and t.user %}
-                <p class="text-muted small m-0">
-                  Posted by <strong>{{ t.user.username }}</strong>
-                </p>
-              {% endif %}
-              <p class="text-muted small m-0">
-                {{ t.created_at.strftime('%Y-%m-%d %H:%M') if t.created_at else "" }}
-              </p>
-            </div>
-          </div>
-        </div>
+  <!-- =======================
+       Slide-out side panel for quick links & plant addresses
+       ======================= -->
+  <div id="sidePanel" class="slide-panel">
+    <span class="close-panel-btn" id="closePanelBtn">&times;</span>
+    <h5>Extra Links</h5>
+    <ul class="list-unstyled mb-3">
+      <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+      <li><a href="{{ url_for('new_pretrip') }}">New PreTrip</a></li>
+      <li><a href="{{ url_for('list_pretrips') }}">List PreTrips</a></li>
+      <li><a href="{{ url_for('driver_logs') }}">Driver Logs</a></li>
+      <li><a href="{{ url_for('knowledge_base') }}">Knowledge Base</a></li>
+      <li><a href="{{ url_for('announcements') }}">Announcements</a></li>
+      <li><a href="{{ url_for('end_of_day_summary') }}">End of Day</a></li>
+      <li><a href="{{ url_for('logout') }}">Logout</a></li>
+    </ul>
+    <h5>Plant Addresses</h5>
+    <ul class="list-unstyled">
+      {% for code, addr in PLANT_ADDRESSES.items() %}
+        <li>
+          <strong>{{ code }}:</strong><br>
+          <small>{{ addr }}</small>
+          <hr class="my-1">
+        </li>
       {% endfor %}
-    {% else %}
-      <p>No tips yet. Be the first to add one!</p>
-    {% endif %}
+    </ul>
   </div>
-</div>
-{% endblock %}
+
+  <!-- MAIN CONTENT BLOCK with fade-in animation -->
+  <div class="container mt-4 fade-in">
+    {% block content %}
+    <!-- Child template content goes here -->
+    {% endblock %}
+  </div>
+
+  <!-- Glow-text + side panel scripts -->
+  <script>
+    function animateGlowText() {
+      const elems = document.querySelectorAll('.glow-text');
+      elems.forEach(elem => {
+        const text = elem.textContent.trim();
+        elem.textContent = '';
+        [...text].forEach((char, i) => {
+          const span = document.createElement('span');
+          span.textContent = char;
+          span.style.animationDelay = (i * 0.05) + 's';
+          elem.appendChild(span);
+        });
+      });
+    }
+
+    function initSlidePanel() {
+      const openBtn = document.getElementById('openPanelBtn');
+      const closeBtn = document.getElementById('closePanelBtn');
+      const sidePanel = document.getElementById('sidePanel');
+
+      if (openBtn && closeBtn && sidePanel) {
+        openBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          sidePanel.classList.add('slide-panel-open');
+        });
+        closeBtn.addEventListener('click', () => {
+          sidePanel.classList.remove('slide-panel-open');
+        });
+      }
+    }
+
+    window.addEventListener('load', () => {
+      animateGlowText();
+      initSlidePanel();
+    });
+  </script>
+
+  <!-- OneSignal SDK (if you use it) -->
+  <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async></script>
+  <script>
+    window.OneSignal = window.OneSignal || [];
+    OneSignal.push(function() {
+      OneSignal.init({
+        appId: "dc8940a9-65af-445c-af15-304182ce34ed", // Your App ID
+        safari_web_id: "YOUR_SAFARI_WEB_ID_IF_ANY",
+        notifyButton: {
+          enable: true
+        }
+      });
+    });
+  </script>
+</body>
+</html>

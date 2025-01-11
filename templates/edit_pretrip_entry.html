@@ -26,7 +26,7 @@
       {{ form.start_mileage(class="form-control") }}
     </div>
 
-    <!-- All the booleans (doors, leaks, lights, tires, etc.) -->
+    <!-- Booleans -->
     <div class="form-check">
       {{ form.cab_doors_windows(class="form-check-input") }}
       {{ form.cab_doors_windows.label(class="form-check-label") }}
@@ -63,6 +63,28 @@
     <div class="mb-3">
       {{ form.damage_report.label }}
       {{ form.damage_report(class="form-control") }}
+    </div>
+
+    <!-- EPHEMERAL FIELDS: "Reviewing Driver" + "Reviewing Date" -->
+    <div class="mb-3">
+      <label for="reviewing_driver">Reviewing Driver:</label>
+      <input 
+        type="text"
+        id="reviewing_driver"
+        name="reviewing_driver"
+        class="form-control"
+        value="{{ current_user.username if current_user else '' }}"
+      >
+    </div>
+    <div class="mb-3">
+      <label for="reviewing_date">Review Date:</label>
+      <input
+        type="text"
+        id="reviewing_date"
+        name="reviewing_date"
+        class="form-control"
+        value="{{ today_date|default('') }}"
+      >
     </div>
 
     {{ form.submit(class="btn btn-primary") }}

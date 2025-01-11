@@ -1,0 +1,80 @@
+<!-- templates/driver_logs_print.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Driver Logs - Print View</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 1rem;
+    }
+    .print-container {
+      max-width: 900px;
+      margin: 0 auto;
+      border: 1px solid #000;
+      padding: 1rem;
+    }
+    .print-btn {
+      margin-bottom: 1rem;
+      padding: 8px 16px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+    @media print {
+      .print-btn { display: none; }
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #000;
+      padding: 6px;
+      text-align: center;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+    <h2>Driver Logs for {{ the_date }}</h2>
+
+    {% if logs %}
+      <table>
+        <thead>
+          <tr>
+            <th>Plant</th>
+            <th>Arrive</th>
+            <th>Depart</th>
+            <th>Load</th>
+            <th>Maintenance</th>
+            <th>Fuel</th>
+            <th>Meeting</th>
+            <th>Downtime</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td>{{ log.plant_name }}</td>
+            <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
+            <td>{{ log.depart_time|to_local_time if log.depart_time else '--' }}</td>
+            <td>{{ log.load_size }}</td>
+            <td>{{ "Yes" if log.maintenance else "No" }}</td>
+            <td>{{ "Yes" if log.fuel else "No" }}</td>
+            <td>{{ "Yes" if log.meeting else "No" }}</td>
+            <td>{{ log.downtime_reason or '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No logs found for today.</p>
+    {% endif %}
+  </div>
+</body>
+</html>

@@ -1,24 +1,25 @@
+<!-- templates/view_pretrip.html (example) -->
 {% extends "base.html" %}
 {% block content %}
 <div class="container">
-  <h2 class="mt-3">View PreTrip (ID: {{ pretrip.id }})</h2>
-  <p><strong>Date:</strong> {{ pretrip.pretrip_date }}</p>
-  <p><strong>Shift:</strong> {{ pretrip.shift }}</p>
-  <p><strong>Truck Type:</strong> {{ pretrip.truck_type }}</p>
-  <p><strong>Truck Name:</strong> {{ pretrip.truck_name }}</p>
-  <p><strong>Start Mileage:</strong> {{ pretrip.start_mileage or "N/A" }}</p>
-  <p><strong>Cab/Doors/Windows:</strong> {{ "Yes" if pretrip.cab_doors_windows else "No" }}</p>
-  <!-- etc... show each boolean and the damage_report -->
-  <p><strong>Damage Report:</strong> {{ pretrip.damage_report or "None" }}</p>
+  <h2>View PreTrip (ID: {{ pretrip.id }})</h2>
   
-  {% if pretrip.posttrip %}
-    <hr>
-    <h4>PostTrip Info</h4>
-    <p><strong>End Mileage:</strong> {{ pretrip.posttrip.end_mileage }}</p>
-    <p><strong>Miles Driven:</strong> {{ pretrip.posttrip.miles_driven }}</p>
-    <p><strong>Remarks:</strong> {{ pretrip.posttrip.remarks }}</p>
-  {% else %}
-    <p>No PostTrip completed yet.</p>
-  {% endif %}
+  <p><strong>Date:</strong> {{ pretrip.pretrip_date }}</p>
+  <p><strong>Truck:</strong> {{ pretrip.truck_name }}</p>
+  <p><strong>Mileage:</strong> {{ pretrip.start_mileage or '' }}</p>
+  <p><strong>Oil Leak?</strong> {{ "Yes" if pretrip.oil_leak else "No" }}</p>
+  <p><strong>Tires Status:</strong> {{ pretrip.tires_status }}</p>
+  
+  <!-- or you can do a table with operational/damaged/missing/leaking, etc. -->
+  
+  <p><strong>Damage Report:</strong> {{ pretrip.damage_report or '' }}</p>
+  <p><strong>Oil System Status:</strong> {{ pretrip.oil_system_status }}</p>
+  
+  <!-- A link to the printable version: -->
+  <a href="{{ url_for('pretrip_printable', pretrip_id=pretrip.id) }}"
+     class="btn btn-secondary"
+  >
+    Print DVIR
+  </a>
 </div>
 {% endblock %}

@@ -4,7 +4,9 @@
   <h2 class="mt-4 mb-3">Driver Dashboard - Dynamic Selections</h2>
 
   <div class="row">
-    <!-- Collapsible "Recent Tasks" card -->
+    <!-- =======================
+         Collapsible: Recent Tasks
+         ======================= -->
     <div class="col-12 col-lg-6 mb-4">
       <div 
         class="card hover-card" 
@@ -16,7 +18,7 @@
           Recent Tasks
         </div>
         <div class="card-body">
-          <p class="m-0">Click here to expand/collapse recent tasks assigned by manager.</p>
+          <p class="m-0">Click here to expand/collapse recent tasks assigned by your manager.</p>
         </div>
       </div>
 
@@ -26,10 +28,10 @@
             <ul class="list-group">
               {% for t in tasks %}
                 <li class="list-group-item">
-                  <div class="d-flex flex-column flex-md-row justify-content-between">
+                  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start">
                     <div>
-                      <strong>Task #{{ t.id }}</strong>: 
-                      {{ t.title }} 
+                      <strong>Task #{{ t.id }}</strong>:
+                      {{ t.title }}
                       <span class="text-muted">({{ t.status }})</span>
                       <br>
                       <small class="text-secondary">
@@ -37,9 +39,9 @@
                       </small>
                     </div>
                     <div class="mt-2 mt-md-0">
-                      <!-- Example live progress or status if you have a numeric progress -->
+                      <!-- Optional numeric progress (if t.progress is defined) -->
                       {% if t.progress is defined %}
-                        <div class="progress" style="width:150px;">
+                        <div class="progress" style="width: 150px;">
                           <div 
                             class="progress-bar" 
                             role="progressbar" 
@@ -52,17 +54,19 @@
                           </div>
                         </div>
                       {% endif %}
-                      <!-- If drivers can only 'view' but not 'edit': 
-                           <a href="{{ url_for('view_task', task_id=t.id) }}" 
-                              class="btn btn-info btn-sm">
-                           View
-                           </a>
-                      -->
                       {% if current_user.role == "driver" %}
-                        <!-- If driver is allowed to mark in-progress or something -->
-                        <a href="{{ url_for('edit_task', task_id=t.id) }}"
-                           class="btn btn-warning btn-sm ms-2">
+                        <a 
+                          href="{{ url_for('edit_task', task_id=t.id) }}"
+                          class="btn btn-warning btn-sm ms-2 hover-btn"
+                        >
                           Update
+                        </a>
+                      {% elif current_user.role == "management" %}
+                        <a 
+                          href="{{ url_for('edit_task', task_id=t.id) }}"
+                          class="btn btn-warning btn-sm ms-2 hover-btn"
+                        >
+                          Manage
                         </a>
                       {% endif %}
                     </div>
@@ -73,22 +77,29 @@
           {% else %}
             <p>No tasks found.</p>
           {% endif %}
-          <!-- If you want to let drivers create tasks, uncomment:
-          <a href="{{ url_for('create_task') }}" class="btn btn-success btn-sm mt-2">
-            Create New Task
-          </a>
-          -->
         </div>
       </div>
     </div>
 
-    <!-- Driver Logs card -->
+    <!-- =======================
+         Collapsible: Driver Logs
+         ======================= -->
     <div class="col-12 col-lg-6 mb-4">
-      <div class="card">
+      <div 
+        class="card hover-card"
+        data-bs-toggle="collapse"
+        data-bs-target="#driverLogsCollapse"
+        style="cursor: pointer;"
+      >
         <div class="card-header bg-info text-white">
           Driver Logs
         </div>
         <div class="card-body">
+          <p class="m-0">Click here to expand/collapse your recent driver logs.</p>
+        </div>
+      </div>
+      <div class="collapse" id="driverLogsCollapse">
+        <div class="card card-body">
           {% if logs %}
             <ul class="list-group">
               {% for log in logs %}
@@ -96,19 +107,23 @@
                   <div>
                     <strong>Log #{{ log.id }}</strong> - {{ log.plant_name }}
                     {% if log.plant_name in PLANT_ADDRESSES %}
-                      <br>
-                      <small class="text-muted">
-                        {{ PLANT_ADDRESSES[log.plant_name] }}
-                      </small>
+                      <br><small class="text-muted">{{ PLANT_ADDRESSES[log.plant_name] }}</small>
+                    {% endif %}
+                    {% if log.eta %}
+                      <br><small><strong>ETA:</strong> {{ log.eta }}</small>
                     {% endif %}
                   </div>
                   <div>
-                    <a href="{{ url_for('edit_driver_log', log_id=log.id) }}" 
-                       class="btn btn-warning btn-sm me-1">
+                    <a 
+                      href="{{ url_for('edit_driver_log', log_id=log.id) }}" 
+                      class="btn btn-warning btn-sm me-1 hover-btn"
+                    >
                       Edit
                     </a>
-                    <a href="{{ url_for('view_driver_log', log_id=log.id) }}"
-                       class="btn btn-info btn-sm">
+                    <a 
+                      href="{{ url_for('view_driver_log', log_id=log.id) }}"
+                      class="btn btn-info btn-sm hover-btn"
+                    >
                       View
                     </a>
                   </div>
@@ -118,7 +133,10 @@
           {% else %}
             <p>No logs found.</p>
           {% endif %}
-          <a href="{{ url_for('new_driving_log') }}" class="btn btn-success btn-sm mt-2">
+          <a 
+            href="{{ url_for('new_driving_log') }}"
+            class="btn btn-success btn-sm mt-2 hover-btn"
+          >
             Create New Log
           </a>
         </div>
@@ -126,70 +144,126 @@
     </div>
   </div>
 
-  <!-- My PreTrips -->
-  <div class="card mb-4">
-    <!-- Example "cool" color for the header -->
-    <div class="card-header text-white" style="background-color: #20c997;">
-      My PreTrips
+  <!-- =======================
+       Collapsible: My PreTrips
+       ======================= -->
+  <div class="mb-4">
+    <div 
+      class="card hover-card"
+      data-bs-toggle="collapse"
+      data-bs-target="#myPreTripsCollapse"
+      style="cursor:pointer;"
+    >
+      <div 
+        class="card-header text-white"
+        style="background-color: #20c997;"
+      >
+        My PreTrips
+      </div>
+      <div class="card-body">
+        <p class="m-0">Tap here to expand/collapse your recent PreTrips.</p>
+      </div>
     </div>
-    <div class="card-body">
-      <a href="{{ url_for('new_pretrip') }}" class="btn btn-success btn-sm mb-2">
-        Create New PreTrip
-      </a>
-      {% if pretrips %}
-        <ul class="list-group">
-          {% for p in pretrips %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              <span>
-                <strong>PreTrip #{{ p.id }}</strong> - {{ p.truck_name }}
-              </span>
-              <div>
-                <a href="{{ url_for('view_pretrip', pretrip_id=p.id) }}" 
-                   class="btn btn-info btn-sm me-2">
-                  View
-                </a>
-                {% if not p.posttrip %}
-                  <a href="{{ url_for('do_posttrip', pretrip_id=p.id) }}"
-                     class="btn btn-danger btn-sm">
-                    Complete PostTrip
+    <div class="collapse" id="myPreTripsCollapse">
+      <div class="card card-body">
+        <a 
+          href="{{ url_for('new_pretrip') }}"
+          class="btn btn-success btn-sm mb-2 hover-btn"
+        >
+          Create New PreTrip
+        </a>
+        {% if pretrips %}
+          <ul class="list-group">
+            {% for p in pretrips %} 
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>
+                  <strong>PreTrip #{{ p.id }}</strong> - {{ p.truck_name }}
+                  {% if p.shift %}
+                    <br><small class="text-secondary">Shift: {{ p.shift }}</small>
+                  {% endif %}
+                </span>
+                <div>
+                  <a 
+                    href="{{ url_for('view_pretrip', pretrip_id=p.id) }}"
+                    class="btn btn-info btn-sm me-2 hover-btn"
+                  >
+                    View
                   </a>
-                {% endif %}
-              </div>
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p>No PreTrips found.</p>
-      {% endif %}
+                  {% if not p.posttrip %}
+                    <a 
+                      href="{{ url_for('do_posttrip', pretrip_id=p.id) }}"
+                      class="btn btn-danger btn-sm hover-btn"
+                    >
+                      Complete PostTrip
+                    </a>
+                  {% endif %}
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p>No PreTrips found.</p>
+        {% endif %}
+      </div>
     </div>
   </div>
 
-  <!-- End of Day Summary (optional) -->
-  <div class="card mb-4">
-    <div class="card-header bg-secondary text-white">
-      End of Day Summary
-    </div>
-    <div class="card-body">
-      {% if shift_start and shift_end %}
-        <p><strong>Shift Start:</strong> {{ shift_start }}</p>
-        <p><strong>Shift End:</strong> {{ shift_end }}</p>
-        <p><strong>Total Hours:</strong> 
-          {{ (shift_end - shift_start).total_seconds() / 3600 | round(2) }} hours
+  <!-- =======================
+       Collapsible: End of Day Summary
+       ======================= -->
+  <div class="mb-4">
+    <div 
+      class="card hover-card"
+      data-bs-toggle="collapse"
+      data-bs-target="#endOfDayCollapse"
+      style="cursor:pointer;"
+    >
+      <div class="card-header bg-secondary text-white">
+        End of Day Summary
+      </div>
+      <div class="card-body">
+        <p class="m-0">
+          Click here to preview/submit both Logs &amp; PreTrips for the day.
         </p>
-        <a href="{{ url_for('end_of_day_summary') }}" class="btn btn-primary btn-sm">
-          View Full Summary
-        </a>
-      {% else %}
-        <p>No shift times recorded yet. Start or end a shift below.</p>
-        <div class="mt-2">
-          <a href="{{ url_for('start_shift') }}" class="btn btn-success btn-sm me-1">
-            Start Shift
+      </div>
+    </div>
+    <div class="collapse" id="endOfDayCollapse">
+      <div class="card card-body">
+        {% if shift_start and shift_end %}
+          <p><strong>Shift Start:</strong> {{ shift_start }}</p>
+          <p><strong>Shift End:</strong> {{ shift_end }}</p>
+          <p><strong>Total Hours:</strong> 
+            {{ (shift_end - shift_start).total_seconds() / 3600 | round(2) }} hours
+          </p>
+          <p>
+            You can now finalize or review your logs and PreTrips below, or
+            <a href="{{ url_for('end_of_day_summary') }}">click here</a> 
+            for the full summary.
+          </p>
+          <a 
+            href="{{ url_for('end_of_day_summary') }}"
+            class="btn btn-primary btn-sm hover-btn"
+          >
+            Full Day Summary
           </a>
-          <a href="{{ url_for('end_shift') }}" class="btn btn-danger btn-sm">
-            End Shift
-          </a>
-        </div>
-      {% endif %}
+        {% else %}
+          <p>No shift times recorded yet. Start or end a shift below.</p>
+          <div class="mt-2">
+            <a 
+              href="{{ url_for('start_shift') }}"
+              class="btn btn-success btn-sm me-1 hover-btn"
+            >
+              Start Shift
+            </a>
+            <a 
+              href="{{ url_for('end_shift') }}"
+              class="btn btn-danger btn-sm hover-btn"
+            >
+              End Shift
+            </a>
+          </div>
+        {% endif %}
+      </div>
     </div>
   </div>
 </div>

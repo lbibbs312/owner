@@ -1,0 +1,124 @@
+<!-- templates/end_of_day_print.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>End of Day - Print</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 1rem;
+      color: #000;
+    }
+    .print-container {
+      width: 900px;
+      margin: 0 auto;
+      border: 1px solid #000;
+      padding: 1rem;
+    }
+    .print-btn {
+      margin-bottom: 1rem;
+      padding: 8px 16px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+    @media print {
+      .print-btn {
+        display: none;
+      }
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #000;
+      padding: 6px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .downtime-col {
+      width: 20%;
+    }
+  </style>
+</head>
+<body>
+
+<div class="print-container">
+  <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+
+  <h2>End of Day - {{ the_date }}</h2>
+  
+  {% if drivers_logs[current_user.username] %}
+    <table>
+      <thead>
+        <tr>
+          <th>Plant</th>
+          <th>Arrive</th>
+          <th>Depart</th>
+          <th class="downtime-col">Downtime Reason</th>
+          <!-- Z / Q / H / TQ / F columns -->
+          <th>Z</th>
+          <th>Q</th>
+          <th>H</th>
+          <th>TQ</th>
+          <th>F</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in drivers_logs[current_user.username] %}
+        <tr>
+          <td>{{ log.plant_name }}</td>
+          <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
+          <td>{{ log.depart_time|to_local_time if log.depart_time else '--' }}</td>
+          <td>{{ log.downtime_reason or "" }}</td>
+          <!-- Mark "X" in the correct load column -->
+          <td>
+            {% if log.load_size == "Empty" %}
+              X
+            {% else %}
+              &nbsp;
+            {% endif %}
+          </td>
+          <td>
+            {% if log.load_size == "Quarter" %}
+              X
+            {% else %}
+              &nbsp;
+            {% endif %}
+          </td>
+          <td>
+            {% if log.load_size == "Half" %}
+              X
+            {% else %}
+              &nbsp;
+            {% endif %}
+          </td>
+          <td>
+            {% if log.load_size == "Partial" %}
+              X
+            {% else %}
+              &nbsp;
+            {% endif %}
+          </td>
+          <td>
+            {% if log.load_size == "Full" %}
+              X
+            {% else %}
+              &nbsp;
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No logs found for today.</p>
+  {% endif %}
+</div>
+
+</body>
+</html>

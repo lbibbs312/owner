@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PreTrip Inspection - Full DVIR</title>
+  <style>
+    @media print {
+      @page {
+        size: Letter portrait;
+        margin: 0.5in;
+      }
+    }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #fff;
+      color: #000;
+      font-size: 0.8rem;
+    }
+    .print-container {
+      width: 100%;
+      max-width: 780px;
+      margin: 0 auto;
+      border: 2px solid #000;
+      padding: 1rem;
+      box-sizing: border-box;
+    }
+    .print-btn {
+      margin-bottom: 1rem;
+      padding: 8px 16px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+    @media print {
+      .print-btn {
+        display: none;
+      }
+      .print-container {
+        border: none;
+        width: 100%;
+        max-width: 100%;
+      }
+      body {
+        margin: 0;
+      }
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+    }
+    .section-header {
+      background: #eee;
+      border-bottom: 1px solid #000;
+      font-weight: bold;
+      padding: 4px;
+      margin: 1rem 0 6px 0;
+      text-transform: uppercase;
+    }
+    .flex-row {
+      display: flex;
+      gap: 1rem;
+      justify-content: space-between;
+    }
+    .column {
+      flex: 1;
+      border: 1px solid #000;
+      padding: 0.5rem;
+      box-sizing: border-box;
+      min-height: 320px;
+    }
+    .column h4 {
+      margin-top: 0;
+      text-transform: uppercase;
+      font-size: 1rem;
+      margin-bottom: 4px;
+    }
+    .checkbox-line {
+      margin-bottom: 4px;
+      word-wrap: break-word;
+      max-width: 95%;
+    }
+    .no-defects {
+      margin-top: 6px;
+      font-weight: bold;
+    }
+    .remarks-block {
+      border-top: 2px solid #000;
+      margin-top: 1rem;
+      padding-top: 0.5rem;
+    }
+    .remarks-label {
+      display: inline-block;
+      width: 90px;
+      font-weight: bold;
+    }
+    .remarks-line {
+      display: inline-block;
+      width: 200px;
+      border-bottom: 1px solid #000;
+      margin-right: 1rem;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+
+<div class="print-container">
+  <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+
+  <h2>Daily Vehicle Inspection Report</h2>
+
+  <p>
+    <strong>Truck/Tractor No:</strong> {{ pretrip.truck_name }}<br>
+    <strong>Mileage (No tenths):</strong> {{ pretrip.start_mileage or "" }}<br>
+    <strong>Date:</strong> {{ pretrip.pretrip_date }}<br>
+    <strong>Shift:</strong> {{ pretrip.shift }}
+  </p>
+
+  <!-- POWER UNIT -->
+  <div class="section-header">Power Unit</div>
+  <div class="flex-row">
+    <!-- General Condition -->
+    <div class="column">
+      <h4>General Condition</h4>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.cab_doors_windows else " " }}] Cab/Doors/Windows
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.body_doors else " " }}] Body/Doors
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.oil_leak else " " }}] Oil Leak
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.grease_leak else " " }}] Grease Leak
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.coolant_leak else " " }}] Coolant Leak
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.fuel_leak else " " }}] Fuel Leak
+      </div>
+      <div class="checkbox-line">[ ] Other (Identify)</div>
+      <div class="no-defects">
+        [{{ "X" if pretrip.gc_no_defects else " " }}] No Defects
+      </div>
+    </div>
+
+    <!-- In-Cab -->
+    <div class="column">
+      <h4>In-Cab</h4>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.gauges_ok else " " }}] Gauges/Warning Indicators
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.wipers_ok else " " }}] Windshield Wipers/Washers
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.horn_ok else " " }}] Horn
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.heater_defrost_ok else " " }}] Heater/Defroster
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.mirrors_ok else " " }}] Mirrors
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.seat_belts_ok else " " }}] Seat Belts
+      </div>
+      <!-- You can add more fields if your model has them, e.g. steering, brake checks, etc. -->
+      <div class="no-defects">
+        [{{ "X" if pretrip.in_cab_no_defects else " " }}] No Defects
+      </div>
+    </div>
+
+    <!-- Engine Compartment + Exterior -->
+    <div class="column">
+      <h4>Engine Compartment</h4>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.radiator_ok else " " }}] Radiator
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.belts_ok else " " }}] Belts/Hoses
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.air_filter_ok else " " }}] Air Filter
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.fuel_system_ok else " " }}] Fuel System
+      </div>
+
+      <p style="margin-top:6px; margin-bottom:2px;"><strong>Oil System Status:</strong></p>
+      {% if pretrip.oil_system_status == "operational" %}
+        [X] Operational &nbsp; [ ] Damaged &nbsp; [ ] Missing &nbsp; [ ] Leaking
+      {% elif pretrip.oil_system_status == "damaged" %}
+        [ ] Operational &nbsp; [X] Damaged &nbsp; [ ] Missing &nbsp; [ ] Leaking
+      {% elif pretrip.oil_system_status == "missing" %}
+        [ ] Operational &nbsp; [ ] Damaged &nbsp; [X] Missing &nbsp; [ ] Leaking
+      {% elif pretrip.oil_system_status == "leaking" %}
+        [ ] Operational &nbsp; [ ] Damaged &nbsp; [ ] Missing &nbsp; [X] Leaking
+      {% else %}
+        [ ] Operational &nbsp; [ ] Damaged &nbsp; [ ] Missing &nbsp; [ ] Leaking
+      {% endif %}
+
+      <div class="no-defects" style="margin-top:0.5rem;">
+        [{{ "X" if pretrip.ec_no_defects else " " }}] No Defects
+      </div>
+      <hr style="margin-top:0.5rem; margin-bottom:0.5rem;">
+
+      <h4>Exterior</h4>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.lights_working else " " }}] 34 Lights
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.reflectors_ok else " " }}] 34 Reflectors
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.suspension_ok else " " }}] 16 Suspension
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.tires_ok else " " }}] 17 Tires
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.brakes_ok else " " }}] Brakes
+      </div>
+      <!-- etc. for battery_ok, exhaust_ok, air_lines_ok, etc. -->
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.exterior_no_defects else " " }}] No Defects
+      </div>
+
+      <p style="margin-top:6px; margin-bottom:2px;"><strong>Tires Status:</strong></p>
+      {% if pretrip.tires_status == "operational" %}
+        [X] Operational &nbsp; [ ] Damaged &nbsp; [ ] Missing &nbsp; [ ] Leaking
+      {% elif pretrip.tires_status == "damaged" %}
+        [ ] Operational &nbsp; [X] Damaged &nbsp; [ ] Missing &nbsp; [ ] Leaking
+      {% elif pretrip.tires_status == "missing" %}
+        [ ] Operational &nbsp; [ ] Damaged &nbsp; [X] Missing &nbsp; [ ] Leaking
+      {% elif pretrip.tires_status == "leaking" %}
+        [ ] Operational &nbsp; [ ] Damaged &nbsp; [ ] Missing &nbsp; [X] Leaking
+      {% else %}
+        [ ] Operational &nbsp; [ ] Damaged &nbsp; [ ] Missing &nbsp; [ ] Leaking
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Towed Unit(s) -->
+  <div class="section-header">Towed Unit(s)</div>
+  <div style="border:1px solid #000; padding:0.5rem; margin-bottom:1rem;">
+    <div class="checkbox-line">
+      [{{ "X" if pretrip.towed_bodydoors else " " }}] 71 Body/Doors
+    </div>
+    <div class="checkbox-line">
+      [{{ "X" if pretrip.towed_tiedowns else " " }}] 71 Tie-Downs
+    </div>
+    <div class="checkbox-line">
+      [{{ "X" if pretrip.towed_lights else " " }}] 34 Lights
+    </div>
+    <div class="checkbox-line">
+      [{{ "X" if pretrip.towed_reflectors else " " }}] 34 Reflectors
+    </div>
+    <div class="checkbox-line">
+      [{{ "X" if pretrip.towed_suspension else " " }}] 16 Suspension
+    </div>
+    <div class="checkbox-line">
+      [{{ "X" if pretrip.towed_tires else " " }}] 17 Tires
+    </div>
+    <div class="checkbox-line">
+      [{{ "X" if pretrip.towed_wheels else " " }}] 18 Wheels/Rims/Lugs
+    </div>
+    <div class="checkbox-line">
+      [{{ "X" if pretrip.towed_brakes else " " }}] 13 Brakes
+    </div>
+    <div class="checkbox-line">
+      [{{ "X" if pretrip.towed_landing_gear else " " }}] 77 Landing Gear
+    </div>
+    <div class="checkbox-line">
+      [{{ "X" if pretrip.towed_kingpin else " " }}] 59 King Pin/Upper Plate
+    </div>
+    <div class="checkbox-line">
+      [{{ "X" if pretrip.towed_fifthwheel else " " }}] 59 Fifth-Wheel (Dolly)
+    </div>
+    <div class="checkbox-line">
+      [{{ "X" if pretrip.towed_othercoupling else " " }}] 59 Other Coupling Devices
+    </div>
+    <div class="checkbox-line">
+      [{{ "X" if pretrip.towed_rearend else " " }}] 79 Rear-End Protection
+    </div>
+    <div class="checkbox-line">
+      [ ] Other ?
+    </div>
+
+    <div class="no-defects" style="margin-top:6px;">
+      [{{ "X" if pretrip.towed_no_defects else " " }}] No Defects
+    </div>
+  </div>
+
+  <div class="remarks-block">
+    <strong>Remarks:</strong><br>
+    {{ pretrip.damage_report or "" }}
+  </div>
+
+  <div class="remarks-block">
+    <strong>Shop Remarks:</strong><br>
+    _________________________________________
+  </div>
+
+  <div class="remarks-block">
+    <strong>Maintenance Action:</strong><br>
+    [ ] Repairs Made &nbsp; [ ] No Repairs Needed <br>
+    R.O.#s: ________ &nbsp; Certified By: ________ &nbsp; Location: ________
+  </div>
+
+  <!-- ephemeral_driver and ephemeral_date can be passed in from session or wherever -->
+  <div class="remarks-block">
+    <strong>Reporting Driver:</strong> {{ current_user.username }}<br>
+    <strong>Reviewing Driver:</strong> {{ ephemeral_driver or "________" }}
+    (Emp. No: ____) Date: {{ ephemeral_date or "________" }}
+  </div>
+
+</div>
+</body>
+</html>
