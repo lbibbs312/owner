@@ -1,3 +1,6 @@
+############################################################################
+# lacksdrivers.py
+############################################################################
 import os
 import pytz
 from datetime import datetime, date, timedelta
@@ -820,7 +823,6 @@ def edit_driver_log(log_id):
 
     return render_template("edit_driver_log.html", form=form, log=log)
 
-# ADDED: A simple view_driver_log route to avoid BuildError
 @app.route("/view_driver_log/<int:log_id>")
 @login_required
 def view_driver_log(log_id):
@@ -849,7 +851,6 @@ def new_pretrip():
     today_date = date.today().strftime("%Y-%m-%d")
 
     if form.validate_on_submit():
-        # IMPORTANT: Assign ALL relevant boolean fields, otherwise they remain False
         new_pt = PreTrip(
             user_id=current_user.id,
             pretrip_date=form.pretrip_date.data,
@@ -1414,6 +1415,17 @@ def get_friday_of_current_week():
     today = datetime.utcnow().date()
     offset = (4 - today.weekday()) % 7
     return today + timedelta(days=offset)
+
+############################################################################
+# NEW: Plant Directory Route
+############################################################################
+@app.route("/plant_directory")
+@login_required
+def plant_directory():
+    """
+    A simple page that displays all plant addresses in plain text.
+    """
+    return render_template("plant_directory.html")
 
 ############################################################################
 # Main

@@ -218,26 +218,14 @@
           <li class="nav-item">
             <a class="nav-link" href="#" id="openPanelBtn">Side Menu</a>
           </li>
+          <!-- NEW LINK FOR PLANT DIRECTORY -->
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('plant_directory') }}">Plant Directory</a>
+          </li>
         </ul>
       </div>
     </div>
   </nav>
-
-  <!-- OPTIONAL Slide-out side panel for extra quick links -->
-  <div id="sidePanel" class="slide-panel">
-    <span class="close-panel-btn" id="closePanelBtn">&times;</span>
-    <h5>Extra Links</h5>
-    <ul class="list-unstyled">
-      <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-      <li><a href="{{ url_for('new_pretrip') }}">New PreTrip</a></li>
-      <li><a href="{{ url_for('list_pretrips') }}">List PreTrips</a></li>
-      <li><a href="{{ url_for('driver_logs') }}">Driver Logs</a></li>
-      <li><a href="{{ url_for('knowledge_base') }}">Knowledge Base</a></li>
-      <li><a href="{{ url_for('announcements') }}">Announcements</a></li>
-      <li><a href="{{ url_for('end_of_day_summary') }}">End of Day</a></li>
-      <li><a href="{{ url_for('logout') }}">Logout</a></li>
-    </ul>
-  </div>
 
   <!-- MAIN CONTENT BLOCK with fade-in animation -->
   <div class="container mt-4 fade-in">

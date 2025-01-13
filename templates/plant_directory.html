@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="container mt-4">
+    <h1>Plant Directory</h1>
+    <p class="mb-3">Below are all plant addresses in plain text. You can copy and paste as needed.</p>
+    <ul class="list-group">
+      {% for plant, address in PLANT_ADDRESSES.items() %}
+        <li class="list-group-item">
+          <strong>{{ plant }}:</strong> {{ address }}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endblock %}

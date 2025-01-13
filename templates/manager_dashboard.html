@@ -2,41 +2,53 @@
 {% block content %}
 <div class="container fade-in" style="overflow-x: auto;">
   <h2 class="mt-4 mb-3">Manager Dashboard</h2>
-  <p>Hello, {{ current_user.username }}! Manage tasks, drivers, etc. right here.</p>
+  <p>Hello, {{ current_user.username }}! Manage tasks and drivers here.</p>
 
-  <!-- Inline CREATE TASK form (collapsible) -->
+  <!-- CREATE TASK (collapsible) -->
   <div class="card hover-card mb-4" data-bs-toggle="collapse" data-bs-target="#createTaskCollapse">
     <div class="card-header bg-success text-white">
       Create New Task
     </div>
     <div class="card-body">
-      <p>Click to expand and assign a task to a driver or shift.</p>
+      <p>Click to expand and assign a task to a driver or shift. Mark as HOT if urgent!</p>
     </div>
   </div>
   <div class="collapse" id="createTaskCollapse">
     <div class="card card-body">
       <form method="POST" action="{{ url_for('create_task_from_dashboard') }}">
         {{ create_task_form.hidden_tag() }}
+
+        <!-- Title -->
         <div class="mb-2">
           {{ create_task_form.title.label }}:
           {{ create_task_form.title(class="form-control") }}
         </div>
+
+        <!-- Details -->
         <div class="mb-2">
           {{ create_task_form.details.label }}:
           {{ create_task_form.details(class="form-control") }}
         </div>
+
+        <!-- HOT Task checkbox -->
         <div class="mb-2">
           {{ create_task_form.is_hot.label }}
           {{ create_task_form.is_hot() }}
         </div>
+
+        <!-- Shift dropdown -->
         <div class="mb-2">
           {{ create_task_form.shift.label }}:
           {{ create_task_form.shift(class="form-select") }}
         </div>
+
+        <!-- Assign to driver dropdown -->
         <div class="mb-2">
           {{ create_task_form.assigned_to.label }}:
           {{ create_task_form.assigned_to(class="form-select") }}
         </div>
+
+        <!-- Submit -->
         {{ create_task_form.submit(class="btn btn-primary hover-btn") }}
       </form>
     </div>
@@ -48,7 +60,7 @@
       Task Handoff
     </div>
     <div class="card-body">
-      <p>Handle uncompleted tasks, assign to next shift or driver.</p>
+      <p>Handle uncompleted tasks by assigning them to the next shift or another driver.</p>
     </div>
   </div>
   <div class="collapse" id="handoffCollapse">
@@ -58,10 +70,12 @@
           {% for task in uncompleted_tasks %}
             <li>
               <strong>{{ task.title }}</strong> (Shift: {{ task.shift }})
-              <button class="btn btn-sm btn-info hover-btn" onclick="handoffTask({{ task.id }}, 'next_shift')">
+              <button class="btn btn-sm btn-info hover-btn" 
+                      onclick="handoffTask({{ task.id }}, 'next_shift')">
                 Handoff to Next Shift
               </button>
-              <button class="btn btn-sm btn-secondary hover-btn" onclick="handoffTask({{ task.id }}, 'assign_driver')">
+              <button class="btn btn-sm btn-secondary hover-btn" 
+                      onclick="handoffTask({{ task.id }}, 'assign_driver')">
                 Assign to Another Driver
               </button>
             </li>
@@ -73,13 +87,13 @@
     </div>
   </div>
 
-  <!-- ETA CALCULATIONS -->
+  <!-- ETA CALCULATIONS (placeholder) -->
   <div class="card hover-card mb-4" data-bs-toggle="collapse" data-bs-target="#etaCollapse">
     <div class="card-header bg-primary text-white">
       ETA Calculations
     </div>
     <div class="card-body">
-      <p>Compute arrival times based on addresses, mileage, real-time conditions, etc.</p>
+      <p>Compute arrival times based on addresses, mileage, etc.</p>
     </div>
   </div>
   <div class="collapse" id="etaCollapse">
@@ -87,11 +101,13 @@
       <form>
         <div class="mb-2">
           <label>Origin:</label>
-          <input type="text" id="etaOrigin" class="form-control" placeholder="Enter origin address or code...">
+          <input type="text" id="etaOrigin" class="form-control"
+                 placeholder="Enter origin address or code...">
         </div>
         <div class="mb-2">
           <label>Destination:</label>
-          <input type="text" id="etaDestination" class="form-control" placeholder="Enter destination address or code...">
+          <input type="text" id="etaDestination" class="form-control"
+                 placeholder="Enter destination address or code...">
         </div>
         <button type="button" class="btn btn-info hover-btn" onclick="calculateETA()">
           Calculate ETA
@@ -102,36 +118,21 @@
   </div>
 </div>
 
-<!-- Load your custom JS for handoff tasks -->
+<!-- Custom JS for handing off tasks -->
 <script src="{{ url_for('static', filename='handoffTask.js') }}"></script>
 
 <script>
   function handoffTask(taskId, mode) {
+    // Real logic: AJAX POST to /handoff_task 
     alert(`Handoff task ${taskId} with mode: ${mode} (placeholder).`);
-    // Real logic: AJAX post to /handoff_task or so
   }
 
   function calculateETA() {
     let origin = document.getElementById('etaOrigin').value;
-    let dest = document.getElementById('etaDestination').value;
-    // Placeholder for real logic (call a mapping API, etc.)
+    let dest   = document.getElementById('etaDestination').value;
+    // Placeholder for real logic or mapping API
     document.getElementById('etaResult').innerText =
       `ETA from ${origin} to ${dest} is 35 mins. (fake placeholder)`;
   }
-</script>
-
-<!-- OneSignal snippet for push notifications (service worker is separate) -->
-<script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async></script>
-<script>
-  window.OneSignal = window.OneSignal || [];
-  OneSignal.push(function() {
-    OneSignal.init({
-      appId: "YOUR-ONESIGNAL-APP-ID-HERE",
-      safari_web_id: "YOUR-SAFARI-WEB-ID-IF-ANY",
-      notifyButton: {
-        enable: true,
-      },
-    });
-  });
 </script>
 {% endblock %}
