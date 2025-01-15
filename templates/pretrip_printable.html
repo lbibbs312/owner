@@ -114,13 +114,12 @@
   <h2>Daily Vehicle Inspection Report</h2>
 
   <p>
-    <strong>Truck/Tractor No:</strong> {{ pretrip.truck_name }}<br>
+    <strong>Truck/Tractor No:</strong> {{ pretrip.truck_number or "" }}<br>
     <strong>Mileage (No tenths):</strong> {{ pretrip.start_mileage or "" }}<br>
     <strong>Date:</strong> {{ pretrip.pretrip_date }}<br>
     <strong>Shift:</strong> {{ pretrip.shift }}
   </p>
 
-  <!-- POWER UNIT -->
   <div class="section-header">Power Unit</div>
   <div class="flex-row">
     <!-- General Condition -->
@@ -154,146 +153,161 @@
     <div class="column">
       <h4>In-Cab</h4>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.gauges_ok else " " }}] Gauges/Warning Indicators
+        [{{ "X" if pretrip.gauges_warning else " " }}] Gauges/Warning Indicators
       </div>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.wipers_ok else " " }}] Windshield Wipers/Washers
+        [{{ "X" if pretrip.wipers else " " }}] Windshield Wipers/Washers
       </div>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.horn_ok else " " }}] Horn
+        [{{ "X" if pretrip.horn else " " }}] Horn
       </div>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.heater_defrost_ok else " " }}] Heater/Defroster
+        [{{ "X" if pretrip.heater_defroster else " " }}] Heater/Defroster
       </div>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.mirrors_ok else " " }}] Mirrors
+        [{{ "X" if pretrip.mirrors else " " }}] Mirrors
       </div>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.seat_belts_ok else " " }}] Seat Belts
+        [{{ "X" if pretrip.seat_belts_steering else " " }}] Seat Belts/Steering
       </div>
-      <!-- You can add more fields if your model has them, e.g. steering, brake checks, etc. -->
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.clutch else " " }}] Clutch
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.service_brakes else " " }}] Service Brakes
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.parking_brake else " " }}] Parking Brake
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.emergency_brakes else " " }}] Emergency Brakes
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.triangles else " " }}] Triangles
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.fire_extinguisher else " " }}] Fire Extinguisher
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.safety_equipment else " " }}] Safety Equipment
+      </div>
       <div class="no-defects">
-        [{{ "X" if pretrip.in_cab_no_defects else " " }}] No Defects
+        [{{ "X" if pretrip.incab_no_defects else " " }}] No Defects
       </div>
     </div>
 
-    <!-- Engine Compartment + Exterior -->
+    <!-- Engine Compartment + Exterior, etc. -->
     <div class="column">
       <h4>Engine Compartment</h4>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.radiator_ok else " " }}] Radiator
+        [{{ "X" if pretrip.oil_level else " " }}] Oil Level
       </div>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.belts_ok else " " }}] Belts/Hoses
+        [{{ "X" if pretrip.coolant_level else " " }}] Coolant Level
       </div>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.air_filter_ok else " " }}] Air Filter
+        [{{ "X" if pretrip.belts else " " }}] Belts
       </div>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.fuel_system_ok else " " }}] Fuel System
+        [{{ "X" if pretrip.hoses else " " }}] Hoses
       </div>
-
-      <p style="margin-top:6px; margin-bottom:2px;"><strong>Oil System Status:</strong></p>
-      {% if pretrip.oil_system_status == "operational" %}
-        [X] Operational &nbsp; [ ] Damaged &nbsp; [ ] Missing &nbsp; [ ] Leaking
-      {% elif pretrip.oil_system_status == "damaged" %}
-        [ ] Operational &nbsp; [X] Damaged &nbsp; [ ] Missing &nbsp; [ ] Leaking
-      {% elif pretrip.oil_system_status == "missing" %}
-        [ ] Operational &nbsp; [ ] Damaged &nbsp; [X] Missing &nbsp; [ ] Leaking
-      {% elif pretrip.oil_system_status == "leaking" %}
-        [ ] Operational &nbsp; [ ] Damaged &nbsp; [ ] Missing &nbsp; [X] Leaking
-      {% else %}
-        [ ] Operational &nbsp; [ ] Damaged &nbsp; [ ] Missing &nbsp; [ ] Leaking
-      {% endif %}
-
-      <div class="no-defects" style="margin-top:0.5rem;">
+      <div class="no-defects">
         [{{ "X" if pretrip.ec_no_defects else " " }}] No Defects
       </div>
-      <hr style="margin-top:0.5rem; margin-bottom:0.5rem;">
 
+      <hr style="margin:8px 0;">
       <h4>Exterior</h4>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.lights_working else " " }}] 34 Lights
+        [{{ "X" if pretrip.lights_working else " " }}] Lights Working
       </div>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.reflectors_ok else " " }}] 34 Reflectors
+        [{{ "X" if pretrip.reflectors else " " }}] Reflectors
       </div>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.suspension_ok else " " }}] 16 Suspension
+        [{{ "X" if pretrip.suspension else " " }}] Suspension
       </div>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.tires_ok else " " }}] 17 Tires
+        [{{ "X" if pretrip.tires else " " }}] Tires
       </div>
       <div class="checkbox-line">
-        [{{ "X" if pretrip.brakes_ok else " " }}] Brakes
+        [{{ "X" if pretrip.wheels_rims else " " }}] Wheels/Rims
       </div>
-      <!-- etc. for battery_ok, exhaust_ok, air_lines_ok, etc. -->
       <div class="checkbox-line">
+        [{{ "X" if pretrip.battery else " " }}] Battery
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.exhaust else " " }}] Exhaust
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.brakes else " " }}] Brakes
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.air_lines else " " }}] Air Lines
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.light_line else " " }}] Light Line
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.fifth_wheel else " " }}] Fifth Wheel
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.coupling else " " }}] Coupling
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.tie_downs else " " }}] Tie Downs
+      </div>
+      <div class="checkbox-line">
+        [{{ "X" if pretrip.rear_end_protection else " " }}] Rear End Protection
+      </div>
+      <div class="no-defects">
         [{{ "X" if pretrip.exterior_no_defects else " " }}] No Defects
       </div>
-
-      <p style="margin-top:6px; margin-bottom:2px;"><strong>Tires Status:</strong></p>
-      {% if pretrip.tires_status == "operational" %}
-        [X] Operational &nbsp; [ ] Damaged &nbsp; [ ] Missing &nbsp; [ ] Leaking
-      {% elif pretrip.tires_status == "damaged" %}
-        [ ] Operational &nbsp; [X] Damaged &nbsp; [ ] Missing &nbsp; [ ] Leaking
-      {% elif pretrip.tires_status == "missing" %}
-        [ ] Operational &nbsp; [ ] Damaged &nbsp; [X] Missing &nbsp; [ ] Leaking
-      {% elif pretrip.tires_status == "leaking" %}
-        [ ] Operational &nbsp; [ ] Damaged &nbsp; [ ] Missing &nbsp; [X] Leaking
-      {% else %}
-        [ ] Operational &nbsp; [ ] Damaged &nbsp; [ ] Missing &nbsp; [ ] Leaking
-      {% endif %}
     </div>
   </div>
 
   <!-- Towed Unit(s) -->
   <div class="section-header">Towed Unit(s)</div>
-  <div style="border:1px solid #000; padding:0.5rem; margin-bottom:1rem;">
+  <div style="border:1px solid #000; padding:0.5rem;">
     <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_bodydoors else " " }}] 71 Body/Doors
+      [{{ "X" if pretrip.towed_bodydoors else " " }}] Body/Doors
     </div>
     <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_tiedowns else " " }}] 71 Tie-Downs
+      [{{ "X" if pretrip.towed_tiedowns else " " }}] Tie-Downs
     </div>
     <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_lights else " " }}] 34 Lights
+      [{{ "X" if pretrip.towed_lights else " " }}] Lights
     </div>
     <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_reflectors else " " }}] 34 Reflectors
+      [{{ "X" if pretrip.towed_reflectors else " " }}] Reflectors
     </div>
     <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_suspension else " " }}] 16 Suspension
+      [{{ "X" if pretrip.towed_suspension else " " }}] Suspension
     </div>
     <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_tires else " " }}] 17 Tires
+      [{{ "X" if pretrip.towed_tires else " " }}] Tires
     </div>
     <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_wheels else " " }}] 18 Wheels/Rims/Lugs
+      [{{ "X" if pretrip.towed_wheels else " " }}] Wheels
     </div>
     <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_brakes else " " }}] 13 Brakes
+      [{{ "X" if pretrip.towed_brakes else " " }}] Brakes
     </div>
     <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_landing_gear else " " }}] 77 Landing Gear
+      [{{ "X" if pretrip.towed_landing_gear else " " }}] Landing Gear
     </div>
     <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_kingpin else " " }}] 59 King Pin/Upper Plate
+      [{{ "X" if pretrip.towed_kingpin else " " }}] Kingpin
     </div>
     <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_fifthwheel else " " }}] 59 Fifth-Wheel (Dolly)
+      [{{ "X" if pretrip.towed_fifthwheel else " " }}] Fifth Wheel
     </div>
     <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_othercoupling else " " }}] 59 Other Coupling Devices
+      [{{ "X" if pretrip.towed_othercoupling else " " }}] Other Coupling
     </div>
     <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_rearend else " " }}] 79 Rear-End Protection
+      [{{ "X" if pretrip.towed_rearend else " " }}] Rear End
     </div>
-    <div class="checkbox-line">
-      [ ] Other ?
-    </div>
-
-    <div class="no-defects" style="margin-top:6px;">
+    <div class="no-defects">
       [{{ "X" if pretrip.towed_no_defects else " " }}] No Defects
     </div>
   </div>
@@ -314,13 +328,10 @@
     R.O.#s: ________ &nbsp; Certified By: ________ &nbsp; Location: ________
   </div>
 
-  <!-- ephemeral_driver and ephemeral_date can be passed in from session or wherever -->
   <div class="remarks-block">
-    <strong>Reporting Driver:</strong> {{ current_user.username }}<br>
-    <strong>Reviewing Driver:</strong> {{ ephemeral_driver or "________" }}
-    (Emp. No: ____) Date: {{ ephemeral_date or "________" }}
+    <strong>Reporting Driver:</strong> {{ current_user.username if current_user else "" }}<br>
+    <strong>Reviewing Driver:</strong> ________ (Emp. No: ____) Date: ________
   </div>
-
 </div>
 </body>
 </html>

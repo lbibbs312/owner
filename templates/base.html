@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <title>LacksDrivers - Dynamic</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
   <!-- Bootstrap 5 CSS -->
   <link 
     rel="stylesheet" 
@@ -14,7 +15,7 @@
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js">
   </script>
 
-  <!-- Google Fonts (just an example) -->
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -23,20 +24,19 @@
   >
 
   <style>
-    /*******************************************
-     * 1) Font + Basic Body
-     *******************************************/
     body {
       font-family: 'Montserrat', sans-serif;
       background-color: #f9f9f9;
+      margin: 0;
+      padding: 0;
     }
 
-    /*******************************************
-     * 2) Glow-text brand (animated)
-     *******************************************/
+    /* Removed the .blurred class entirely, since we won't blur #pageContent anymore. */
+    /* .blurred { filter: blur(6px); } */
+
     .glow-text {
       font-weight: 700;
-      color: #fff; /* fallback if animation hasn't run yet */
+      color: #fff;
       position: relative;
     }
     .glow-text span {
@@ -47,27 +47,19 @@
       animation: glow 1s ease-in-out forwards;
     }
     @keyframes glow {
-      0% {
-        color: transparent;
-        opacity: 0;
-      }
+      0% { color: transparent; opacity: 0; }
       50% {
         color: #fff;
         opacity: 1;
-        text-shadow: 0 0 10px rgba(255,255,255,0.8),
-                     0 0 20px rgba(255,255,255,0.6);
+        text-shadow: 0 0 10px rgba(255,255,255,0.8), 0 0 20px rgba(255,255,255,0.6);
       }
       100% {
         color: #fff;
         opacity: 1;
-        text-shadow: 0 0 5px rgba(255,255,255,0.5),
-                     0 0 10px rgba(255,255,255,0.4);
+        text-shadow: 0 0 5px rgba(255,255,255,0.5), 0 0 10px rgba(255,255,255,0.4);
       }
     }
 
-    /*******************************************
-     * 3) Navbar & Hamburger custom styling
-     *******************************************/
     .navbar {
       transition: background-color 0.3s ease;
     }
@@ -75,19 +67,16 @@
       transition: color 0.2s ease;
     }
     .navbar-nav .nav-link:hover {
-      color: #ffeb3b !important; /* a bright highlight color */
+      color: #ffeb3b !important;
     }
     .navbar-toggler {
-      border: none; /* remove default border */
+      border: none;
     }
     .navbar-toggler:focus {
       outline: none;
       box-shadow: none;
     }
-  
-    /*******************************************
-     * 4) Hover transitions for Cards & Buttons
-     *******************************************/
+
     .hover-card {
       transition: transform 0.3s ease, box-shadow 0.3s ease;
       cursor: pointer;
@@ -101,40 +90,10 @@
     }
     .hover-btn:hover {
       transform: scale(1.04);
-      background-color: #0b5ed7; /* slightly darker or lighter */
+      background-color: #0b5ed7;
       color: #fff;
     }
 
-    /*******************************************
-     * 5) Slide-in from left (sidePanel)
-     *******************************************/
-    .slide-panel {
-      position: fixed;
-      top: 0;
-      left: -280px; /* hidden off-screen by default */
-      width: 280px;
-      height: 100vh;
-      background: #ffffff;
-      box-shadow: 2px 0 8px rgba(0,0,0,0.2);
-      transition: left 0.4s ease;
-      overflow-y: auto;
-      z-index: 2000;
-      padding: 1rem;
-    }
-    .slide-panel-open {
-      left: 0;
-    }
-    .close-panel-btn {
-      float: right;
-      cursor: pointer;
-      font-size: 1.4rem;
-      color: #444;
-      font-weight: 700;
-    }
-
-    /*******************************************
-     * 6) Fade-in for main container
-     *******************************************/
     .fade-in {
       opacity: 0;
       animation: fadeInAnimation 0.6s forwards;
@@ -142,99 +101,219 @@
     @keyframes fadeInAnimation {
       to { opacity: 1; }
     }
+
+    /* FULLSCREEN OVERLAY */
+    .fullscreen-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      /* Start invisible & non-interactive */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+      z-index: 3000;
+    }
+    /* When .show is applied:
+       1) Fade it in
+       2) Apply a backdrop-filter that blurs whatever is behind (the entire #pageContent).
+    */
+    .fullscreen-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+      backdrop-filter: blur(6px); /* This is key: only the background is blurred */
+      background: rgba(0,0,0,0.4); /* A semi-transparent overlay */
+    }
+
+    .fullscreen-overlay-content {
+      background: #fff;
+      width: 90%;
+      max-width: 1000px;
+      min-height: 60%;
+      max-height: 80%;
+      overflow-y: auto;
+      border-radius: 8px;
+      padding: 2rem;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+      position: relative;
+      transform: scale(0.8);
+      animation: overlayPop 0.4s forwards;
+    }
+    @keyframes overlayPop {
+      0% {
+        transform: scale(0.8);
+        opacity: 0.6;
+      }
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+    .close-overlay-btn {
+      position: absolute;
+      top: 1rem;
+      right: 1.5rem;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #555;
+      transition: color 0.2s;
+    }
+    .close-overlay-btn:hover {
+      color: #d00;
+    }
   </style>
 </head>
+
 <body>
+  <div id="pageContent">
+    <nav class="navbar navbar-expand-md navbar-dark bg-primary py-2">
+      <div class="container-fluid">
+        {% if current_user.role == "management" %}
+          <a class="navbar-brand glow-text openOverlayLink"
+             data-url="{{ url_for('manager_bp.manager_dashboard') }}"
+             href="#"
+          >
+            LacksDrivers (Manager)
+          </a>
+        {% else %}
+          <a class="navbar-brand glow-text openOverlayLink"
+             data-url="{{ url_for('dashboard') }}"
+             href="#"
+          >
+            LacksDrivers
+          </a>
+          <!-- Driver bell icon (mobile only) -->
+          <a class="nav-link text-white d-md-none openOverlayLink"
+             data-url="{{ url_for('recent_activity') }}"
+             href="#"
+             style="font-size: 1.25rem; margin-right: 1rem;"
+          >
+            &#128276;
+          </a>
+        {% endif %}
 
-  <!-- NAVBAR (Bell icon outside the toggler + Glow-Text brand) -->
-  <nav class="navbar navbar-expand-md navbar-dark bg-primary py-2">
-    <div class="container-fluid">
-      <!-- Glow-text brand linking to dashboard -->
-      <a class="navbar-brand glow-text" href="{{ url_for('dashboard') }}">
-        LacksDrivers
-      </a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#mainNavbar"
+          aria-controls="mainNavbar"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
 
-      <!-- BELL ICON outside the menu on mobile -->
-      <a class="nav-link text-white d-md-none"
-         href="{{ url_for('recent_activity') }}"
-         style="font-size: 1.25rem; margin-right: 1rem;"
-      >
-        &#128276;
-      </a>
+        <div class="collapse navbar-collapse" id="mainNavbar">
+          <ul class="navbar-nav ms-auto">
+            {% if current_user.role == "management" %}
+              <li class="nav-item">
+                <a class="nav-link openOverlayLink"
+                   data-url="{{ url_for('manager_bp.manager_dashboard') }}"
+                   href="#"
+                >Manager Dashboard</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link openOverlayLink"
+                   data-url="{{ url_for('logout') }}"
+                   href="#"
+                >Logout</a>
+              </li>
+            {% else %}
+              <!-- Driver links -->
+              <li class="nav-item d-none d-md-block me-3">
+                <a class="nav-link openOverlayLink"
+                   data-url="{{ url_for('recent_activity') }}"
+                   href="#"
+                >&#128276;</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link openOverlayLink"
+                   data-url="{{ url_for('dashboard') }}"
+                   href="#"
+                >Driver Dashboard</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link openOverlayLink"
+                   data-url="{{ url_for('driver_logs') }}"
+                   href="#"
+                >Driver Logs</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link openOverlayLink"
+                   data-url="{{ url_for('new_pretrip') }}"
+                   href="#"
+                >New PreTrip</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link openOverlayLink"
+                   data-url="{{ url_for('list_pretrips') }}"
+                   href="#"
+                >List PreTrips</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link openOverlayLink"
+                   data-url="{{ url_for('announcements') }}"
+                   href="#"
+                >Announcements</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link openOverlayLink"
+                   data-url="{{ url_for('knowledge_base') }}"
+                   href="#"
+                >Knowledge Base</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link openOverlayLink"
+                   data-url="{{ url_for('end_of_day_summary') }}"
+                   href="#"
+                >End of Day</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link openOverlayLink"
+                   data-url="{{ url_for('logout') }}"
+                   href="#"
+                >Logout</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link openOverlayLink"
+                   data-url="{{ url_for('profile') }}"
+                   href="#"
+                >Profile</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link openOverlayLink"
+                   data-url="{{ url_for('plant_directory') }}"
+                   href="#"
+                >Plant Directory</a>
+              </li>
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+    </nav>
 
-      <!-- Hamburger toggler for mobile -->
-      <button
-        class="navbar-toggler"
-        type="button"
-        data-bs-toggle="collapse"
-        data-bs-target="#mainNavbar"
-        aria-controls="mainNavbar"
-        aria-expanded="false"
-        aria-label="Toggle navigation"
-      >
-        <span class="navbar-toggler-icon"></span>
-      </button>
+    <!-- MAIN CONTENT with fade-in animation -->
+    <div class="container mt-4 fade-in">
+      {% block content %}{% endblock %}
+    </div>
+  </div><!-- #pageContent -->
 
-      <!-- Collapsible nav items -->
-      <div class="collapse navbar-collapse" id="mainNavbar">
-        <ul class="navbar-nav ms-auto">
-          <!-- Bell icon remains for larger screens -->
-          <li class="nav-item d-none d-md-block me-3">
-            <a class="nav-link" href="{{ url_for('recent_activity') }}">
-              &#128276;
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('driver_logs') }}">Driver Logs</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('new_pretrip') }}">New PreTrip</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('list_pretrips') }}">List PreTrips</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('announcements') }}">Announcements</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('knowledge_base') }}">Knowledge Base</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('end_of_day_summary') }}">End of Day</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('weekly_performance') }}">Weekly Perf</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('profile') }}">Profile</a>
-          </li>
-          <!-- Optional link to open side panel -->
-          <li class="nav-item">
-            <a class="nav-link" href="#" id="openPanelBtn">Side Menu</a>
-          </li>
-          <!-- NEW LINK FOR PLANT DIRECTORY -->
-          <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('plant_directory') }}">Plant Directory</a>
-          </li>
-        </ul>
+  <!-- FULLSCREEN OVERLAY -->
+  <div id="fullscreenOverlay" class="fullscreen-overlay">
+    <div class="fullscreen-overlay-content" id="overlayContentBox">
+      <span class="close-overlay-btn" id="closeOverlayBtn">&times;</span>
+      <div id="overlayContentArea">
+        <!-- AJAX-fetched content goes here -->
       </div>
     </div>
-  </nav>
-
-  <!-- MAIN CONTENT BLOCK with fade-in animation -->
-  <div class="container mt-4 fade-in">
-    {% block content %}
-    <!-- Each child template overrides here. -->
-    {% endblock %}
   </div>
 
-  <!-- Glow-text + side panel scripts -->
+  <!-- Glow-text & overlay scripts -->
   <script>
     function animateGlowText() {
       const elems = document.querySelectorAll('.glow-text');
@@ -250,89 +329,86 @@
       });
     }
 
-    function initSlidePanel() {
-      const openBtn = document.getElementById('openPanelBtn');
-      const closeBtn = document.getElementById('closePanelBtn');
-      const sidePanel = document.getElementById('sidePanel');
+    function openOverlay() {
+      const overlay = document.getElementById('fullscreenOverlay');
+      overlay.classList.add('show');
+      // Removed the line that blurred #pageContent
+    }
 
-      if (openBtn && closeBtn && sidePanel) {
-        openBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          sidePanel.classList.add('slide-panel-open');
-        });
-        closeBtn.addEventListener('click', () => {
-          sidePanel.classList.remove('slide-panel-open');
-        });
+    function closeOverlay() {
+      const overlay = document.getElementById('fullscreenOverlay');
+      overlay.classList.remove('show');
+      // Removed the line that unblurred #pageContent
+      document.getElementById('overlayContentArea').innerHTML = '';
+    }
+
+    async function fetchContentAndShow(url) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Network response was not ok');
+        const htmlText = await response.text();
+        document.getElementById('overlayContentArea').innerHTML = htmlText;
+        openOverlay();
+      } catch (err) {
+        console.error('Error fetching content:', err);
       }
+    }
+
+    function initOverlaySystem() {
+      const overlayLinks = document.querySelectorAll('.openOverlayLink');
+      overlayLinks.forEach(link => {
+        link.addEventListener('click', (evt) => {
+          evt.preventDefault();
+          const url = link.dataset.url;
+          if (url) fetchContentAndShow(url);
+        });
+      });
+      document.getElementById('closeOverlayBtn').addEventListener('click', closeOverlay);
+
+      const overlay = document.getElementById('fullscreenOverlay');
+      overlay.addEventListener('click', (evt) => {
+        if (evt.target === overlay) {
+          closeOverlay();
+        }
+      });
     }
 
     window.addEventListener('load', () => {
       animateGlowText();
-      initSlidePanel();
+      initOverlaySystem();
     });
   </script>
 
-  <!-- Load OneSignal's SDK (if you use it) -->
+  <!-- OneSignal, SweetAlert, etc. (if used) -->
   <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async></script>
   <script>
     window.OneSignal = window.OneSignal || [];
     OneSignal.push(function() {
       OneSignal.init({
-        appId: "dc8940a9-65af-445c-af15-304182ce34ed", // Your App ID
+        appId: "dc8940a9-65af-445c-af15-304182ce34ed",
         safari_web_id: "YOUR_SAFARI_WEB_ID_IF_ANY",
-        notifyButton: {
-          enable: true
-        }
+        notifyButton: { enable: true }
       });
     });
   </script>
-
-  <!-- SweetAlert for success/danger flash animations -->
   <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
 
-  <!-- Bootstrap 5 JS (already included above, but let's be sure) -->
-  <script
-    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js">
-  </script>
-
-  <!-- Flash handling with SweetAlert -->
   {% with messages = get_flashed_messages(with_categories=True) %}
     {% if messages %}
       <script>
         {% for category, message in messages %}
           {% if category == 'success' %}
-            swal({
-              title: "Success!",
-              text: "{{ message|safe }}",
-              icon: "success",
-              button: "OK"
-            });
+            swal({ title: "Success!", text: "{{ message|safe }}", icon: "success", button: "OK" });
           {% elif category == 'danger' %}
-            swal({
-              title: "Error!",
-              text: "{{ message|safe }}",
-              icon: "error",
-              button: "OK"
-            });
+            swal({ title: "Error!", text: "{{ message|safe }}", icon: "error", button: "OK" });
           {% elif category == 'warning' %}
-            swal({
-              title: "Warning",
-              text: "{{ message|safe }}",
-              icon: "warning",
-              button: "OK"
-            });
+            swal({ title: "Warning", text: "{{ message|safe }}", icon: "warning", button: "OK" });
           {% else %}
-            swal({
-              title: "Notice",
-              text: "{{ message|safe }}",
-              icon: "info",
-              button: "OK"
-            });
+            swal({ title: "Notice", text: "{{ message|safe }}", icon: "info", button: "OK" });
           {% endif %}
         {% endfor %}
       </script>
     {% endif %}
   {% endwith %}
-
 </body>
 </html>

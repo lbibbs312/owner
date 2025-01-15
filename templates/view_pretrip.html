@@ -5,7 +5,6 @@
   <h2>View PreTrip (ID: {{ pretrip.id }})</h2>
   
   <p><strong>Date:</strong> {{ pretrip.pretrip_date }}</p>
-  <p><strong>Truck:</strong> {{ pretrip.truck_name }}</p>
   <p><strong>Mileage:</strong> {{ pretrip.start_mileage or '' }}</p>
   <p><strong>Oil Leak?</strong> {{ "Yes" if pretrip.oil_leak else "No" }}</p>
   <p><strong>Tires Status:</strong> {{ pretrip.tires_status }}</p>

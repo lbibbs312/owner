@@ -1,6 +1,7 @@
 ############################################################################
-# lacksdrivers.py
+# lacksdrivers.py (FULLY CORRECTED SINGLE-FILE VERSION)
 ############################################################################
+
 import os
 import pytz
 from datetime import datetime, date, timedelta
@@ -26,6 +27,9 @@ from flask_socketio import SocketIO, join_room, leave_room, emit
 from flask_migrate import Migrate
 from sqlalchemy import Enum
 
+# Import the manager blueprint
+from manager_routes import manager_bp
+
 ############################################################################
 # Initialize app & config
 ############################################################################
@@ -44,36 +48,40 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
+# Register the manager blueprint so /manager/* routes become active
+app.register_blueprint(manager_bp)
+
 ############################################################################
 # PLANT ADDRESSES + Context Processor
 ############################################################################
 PLANT_ADDRESSES = {
+    "RE": "3505 Kraft Ave SE",
+    "RW": "3500 Raleigh Dr SE",
+    "PC": "4315 52nd st se",
+    "PE": "4245 52nd St SE",           
+    "PW": "4245 52nd st",             
+    "KP": "5711 North Kraft SE",
+    "PPL": "5357 52nd St SE",
+    "DC": "5357 52nd st se",          
+    "Helios": "5333 33rd st se",      
     "BP": "4080 Barden Dr SE",
     "52L": "5010 52nd St SE",
     "Trim DC": "5357 52nd St SE",
     "52DC": "4365 52nd St SE",
-    "PE": "4245 52nd St SE",
     "ALN": "4260 Airlane Dr SE",
     "AWE": "4261 Airlane Dr SE",
     "CORP": "5460 Cascade Rd SE",
     "R&D": "4975 Broadmoor Ave SE",
     "GLA": "17113 Applewhite Road",
     "KM": "5801 Kraft Ave SE",
-    "KP": "5711 North Kraft SE",
     "KS": "5675 Kraft Ave SE",
     "MDCTR": "2120 43rd St SE",
     "PAASM": "3703 Patterson Ave SE",
-    "PPL": "5357 52nd St SE",
     "MONROE": "1648 Monroe Ave NW",
-    "RE": "3505 Kraft Ave SE",
-    "RW": "3500 Raleigh Dr SE",
     "PVC": "4949 Broadmoor Ave SE",
     "Other": "Unspecified location",
-    "Helios": "123 Helios Way NE",
-    "PC": "Paint Central (placeholder)",
     "Lab": "Corporate Lab (placeholder)",
-    "DC": "Plastic Plate DC (placeholder)",
-    "PPM": "Monroe (placeholder)"
+    "PPM": "PPM MONROE(1648 monroe ave)"
 }
 
 @app.context_processor
@@ -83,8 +91,12 @@ def inject_plant_addresses():
 ############################################################################
 # Enums & Models
 ############################################################################
+
 ITEM_STATUSES = ("operational", "damaged", "missing", "leaking")
 
+#
+# 1) USER MODEL (Define first so references in other models succeed)
+#
 class User(db.Model, UserMixin):
     __tablename__ = "user"
     id = db.Column(db.Integer, primary_key=True)
@@ -101,6 +113,9 @@ class User(db.Model, UserMixin):
     def check_password(self, pwd):
         return check_password_hash(self.password_hash, pwd)
 
+#
+# 2) TASK
+#
 class Task(db.Model):
     __tablename__ = "task"
     id = db.Column(db.Integer, primary_key=True)
@@ -112,20 +127,24 @@ class Task(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     assigned_to = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
-############################################################################
-# Expanded PreTrip model with all columns
-############################################################################
+#
+# 3) PRETRIP & POSTTRIP
+#
 class PreTrip(db.Model):
     __tablename__ = "pretrip"
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"))
-    pretrip_date = db.Column(db.Date, default=date.today)
-    shift = db.Column(db.String(10), default="1st")
-    truck_type = db.Column(db.String(20), default="Semi")
-    truck_name = db.Column(db.String(50))
-    start_mileage = db.Column(db.Integer, nullable=True)
 
-    # 1) General Condition
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+
+    # Basic info
+    truck_number = db.Column(db.String(50))
+    trailer_number = db.Column(db.String(50))
+    pretrip_date = db.Column(db.Date, default=date.today)
+    shift = db.Column(db.String(10))
+    start_mileage = db.Column(db.Integer)
+    end_mileage = db.Column(db.Integer)
+
+    # General Condition
     cab_doors_windows = db.Column(db.Boolean, default=False)
     body_doors = db.Column(db.Boolean, default=False)
     oil_leak = db.Column(db.Boolean, default=False)
@@ -134,40 +153,47 @@ class PreTrip(db.Model):
     fuel_leak = db.Column(db.Boolean, default=False)
     gc_no_defects = db.Column(db.Boolean, default=False)
 
-    # 2) In-Cab
-    gauges_ok = db.Column(db.Boolean, default=False)
-    wipers_ok = db.Column(db.Boolean, default=False)
-    horn_ok = db.Column(db.Boolean, default=False)
-    heater_defrost_ok = db.Column(db.Boolean, default=False)
-    mirrors_ok = db.Column(db.Boolean, default=False)
-    seat_belts_ok = db.Column(db.Boolean, default=False)
-    in_cab_no_defects = db.Column(db.Boolean, default=False)
+    # In-Cab
+    gauges_warning = db.Column(db.Boolean, default=False)
+    wipers = db.Column(db.Boolean, default=False)
+    horn = db.Column(db.Boolean, default=False)
+    heater_defroster = db.Column(db.Boolean, default=False)
+    mirrors = db.Column(db.Boolean, default=False)
+    seat_belts_steering = db.Column(db.Boolean, default=False)
+    clutch = db.Column(db.Boolean, default=False)
+    service_brakes = db.Column(db.Boolean, default=False)
+    parking_brake = db.Column(db.Boolean, default=False)
+    emergency_brakes = db.Column(db.Boolean, default=False)
+    triangles = db.Column(db.Boolean, default=False)
+    fire_extinguisher = db.Column(db.Boolean, default=False)
+    safety_equipment = db.Column(db.Boolean, default=False)
+    incab_no_defects = db.Column(db.Boolean, default=False)
 
-    # 3) Engine Compartment
-    radiator_ok = db.Column(db.Boolean, default=False)
-    belts_ok = db.Column(db.Boolean, default=False)
-    hoses_ok = db.Column(db.Boolean, default=False)
-    air_filter_ok = db.Column(db.Boolean, default=False)
-    fuel_system_ok = db.Column(db.Boolean, default=False)
+    # Engine Compartment
+    oil_level = db.Column(db.Boolean, default=False)
+    coolant_level = db.Column(db.Boolean, default=False)
+    belts = db.Column(db.Boolean, default=False)
+    hoses = db.Column(db.Boolean, default=False)
     ec_no_defects = db.Column(db.Boolean, default=False)
 
-    # 4) Exterior
+    # Exterior
     lights_working = db.Column(db.Boolean, default=False)
-    tires_ok = db.Column(db.Boolean, default=False)
-    reflectors_ok = db.Column(db.Boolean, default=False)
-    suspension_ok = db.Column(db.Boolean, default=False)
-    brakes_ok = db.Column(db.Boolean, default=False)
-    battery_ok = db.Column(db.Boolean, default=False)
-    exhaust_ok = db.Column(db.Boolean, default=False)
-    air_lines_ok = db.Column(db.Boolean, default=False)
-    light_line_ok = db.Column(db.Boolean, default=False)
-    fifth_wheel_ok = db.Column(db.Boolean, default=False)
-    coupling_ok = db.Column(db.Boolean, default=False)
-    tie_downs_ok = db.Column(db.Boolean, default=False)
-    rear_end_protection_ok = db.Column(db.Boolean, default=False)
+    reflectors = db.Column(db.Boolean, default=False)
+    suspension = db.Column(db.Boolean, default=False)
+    tires = db.Column(db.Boolean, default=False)
+    wheels_rims = db.Column(db.Boolean, default=False)
+    battery = db.Column(db.Boolean, default=False)
+    exhaust = db.Column(db.Boolean, default=False)
+    brakes = db.Column(db.Boolean, default=False)
+    air_lines = db.Column(db.Boolean, default=False)
+    light_line = db.Column(db.Boolean, default=False)
+    fifth_wheel = db.Column(db.Boolean, default=False)
+    coupling = db.Column(db.Boolean, default=False)
+    tie_downs = db.Column(db.Boolean, default=False)
+    rear_end_protection = db.Column(db.Boolean, default=False)
     exterior_no_defects = db.Column(db.Boolean, default=False)
 
-    # 5) Towed Unit(s)
+    # Towed Unit
     towed_bodydoors = db.Column(db.Boolean, default=False)
     towed_tiedowns = db.Column(db.Boolean, default=False)
     towed_lights = db.Column(db.Boolean, default=False)
@@ -183,14 +209,18 @@ class PreTrip(db.Model):
     towed_rearend = db.Column(db.Boolean, default=False)
     towed_no_defects = db.Column(db.Boolean, default=False)
 
-    damage_report = db.Column(db.Text, nullable=True)
-    oil_system_status = db.Column(Enum(*ITEM_STATUSES, name="oil_system_enum"), default="operational")
-    tires_status = db.Column(Enum(*ITEM_STATUSES, name="tires_enum"), default="operational")
+    # Additional fields
+    truck_type = db.Column(db.String(20))
+    oil_system_status = db.Column(db.String(20), default="operational")
+    tires_status = db.Column(db.String(20), default="operational")
+
+    damage_report = db.Column(db.Text)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
 
     posttrip = db.relationship("PostTrip", uselist=False, backref="pretrip")
+
 
 class PostTrip(db.Model):
     __tablename__ = "posttrip"
@@ -202,6 +232,9 @@ class PostTrip(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
 
+#
+# 4) DRIVER LOG
+#
 class DriverLog(db.Model):
     __tablename__ = "driver_log"
     id = db.Column(db.Integer, primary_key=True)
@@ -221,6 +254,9 @@ class DriverLog(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
 
+#
+# 5) CHAT MESSAGE
+#
 class ChatMessage(db.Model):
     __tablename__ = "chat_message"
     id = db.Column(db.Integer, primary_key=True)
@@ -231,6 +267,9 @@ class ChatMessage(db.Model):
 
     user = db.relationship("User", backref="chat_messages")
 
+#
+# 6) ANNOUNCEMENT
+#
 class Announcement(db.Model):
     __tablename__ = "announcement"
     id = db.Column(db.Integer, primary_key=True)
@@ -239,6 +278,9 @@ class Announcement(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey("user.id"))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+#
+# 7) DIRECT MESSAGE
+#
 class DirectMessage(db.Model):
     __tablename__ = "direct_message"
     id = db.Column(db.Integer, primary_key=True)
@@ -250,6 +292,9 @@ class DirectMessage(db.Model):
     sender = db.relationship("User", foreign_keys=[sender_id], backref="sent_messages")
     receiver = db.relationship("User", foreign_keys=[receiver_id], backref="received_messages")
 
+#
+# 8) SHIFT RECORD
+#
 class ShiftRecord(db.Model):
     __tablename__ = "shift_record"
     id = db.Column(db.Integer, primary_key=True)
@@ -263,6 +308,9 @@ class ShiftRecord(db.Model):
     user = db.relationship("User", backref="shift_records")
     pretrip = db.relationship("PreTrip", backref="shift_record")
 
+#
+# 9) KNOWLEDGE BASE ENTRY
+#
 class KnowledgeBaseEntry(db.Model):
     __tablename__ = "knowledge_base"
     id = db.Column(db.Integer, primary_key=True)
@@ -271,7 +319,7 @@ class KnowledgeBaseEntry(db.Model):
     body = db.Column(db.Text)
 
 ############################################################################
-# Forms
+# Example Forms (kept for driver usage)
 ############################################################################
 class EndOfDayForm(FlaskForm):
     hidden_example = HiddenField()
@@ -317,71 +365,79 @@ class UpdateTaskForm(FlaskForm):
     submit = SubmitField("Update Task")
 
 class PreTripForm(FlaskForm):
-    pretrip_date = DateField("PreTrip Date", format="%Y-%m-%d", default=date.today)
-    shift = SelectField("Shift", choices=[("1st","1st"),("2nd","2nd"),("3rd","3rd")], default="1st")
-    truck_type = SelectField("Truck Type", choices=[("Semi","Semi"),("Box Truck","Box Truck")], default="Semi")
-    truck_name = StringField("Truck Name", validators=[DataRequired()])
-    start_mileage = IntegerField("Start Mileage")
+    truck_number = StringField("Truck / Tractor #", validators=[DataRequired()])
+    trailer_number = StringField("Trailer #")
 
-    # General Condition
-    cab_doors_windows = BooleanField("Cab/Doors/Windows")
-    body_doors = BooleanField("Body/Doors")
+    pretrip_date = DateField("PreTrip Date", format="%Y-%m-%d")
+    shift = SelectField("Shift", choices=[("1st","1st"), ("2nd","2nd"), ("3rd","3rd")])
+
+    start_mileage = IntegerField("Start Mileage")
+    end_mileage = IntegerField("End Mileage")
+
+    cab_doors_windows = BooleanField("Cab Doors/Windows")
+    body_doors = BooleanField("Body Doors")
     oil_leak = BooleanField("Oil Leak")
     grease_leak = BooleanField("Grease Leak")
     coolant_leak = BooleanField("Coolant Leak")
     fuel_leak = BooleanField("Fuel Leak")
     gc_no_defects = BooleanField("No Defects (General Condition)")
 
-    # In-Cab
-    gauges_ok = BooleanField("Gauges/Warning Indicators")
-    wipers_ok = BooleanField("Windshield Wipers/Washers")
-    horn_ok = BooleanField("Horn")
-    heater_defrost_ok = BooleanField("Heater/Defroster")
-    mirrors_ok = BooleanField("Mirrors")
-    seat_belts_ok = BooleanField("Seat Belts")
-    in_cab_no_defects = BooleanField("No Defects (In-Cab)")
+    gauges_warning = BooleanField("Gauges/Warning Indicators")
+    wipers = BooleanField("Windshield Wipers/Washers")
+    horn = BooleanField("Horn")
+    heater_defroster = BooleanField("Heater/Defroster")
+    mirrors = BooleanField("Mirrors")
+    seat_belts_steering = BooleanField("Seat Belts/Steering")
+    clutch = BooleanField("Clutch")
+    service_brakes = BooleanField("Service Brakes")
+    parking_brake = BooleanField("Parking Brake")
+    emergency_brakes = BooleanField("Emergency Brakes")
+    triangles = BooleanField("Triangles")
+    fire_extinguisher = BooleanField("Fire Extinguisher")
+    safety_equipment = BooleanField("Safety Equipment")
+    incab_no_defects = BooleanField("No Defects (In-Cab)")
 
-    # Engine Compartment
-    radiator_ok = BooleanField("Radiator")
-    belts_ok = BooleanField("Belts")
-    hoses_ok = BooleanField("Hoses")
-    air_filter_ok = BooleanField("Air Filter")
-    fuel_system_ok = BooleanField("Fuel System")
+    oil_level = BooleanField("Oil Level")
+    coolant_level = BooleanField("Coolant Level")
+    belts = BooleanField("Belts")
+    hoses = BooleanField("Hoses")
     ec_no_defects = BooleanField("No Defects (Engine Compartment)")
 
-    # Exterior
-    lights_working = BooleanField("All Lights Working")
-    tires_ok = BooleanField("Tires OK")
-    reflectors_ok = BooleanField("Reflectors")
-    suspension_ok = BooleanField("Suspension")
-    brakes_ok = BooleanField("Brakes")
-    battery_ok = BooleanField("Battery")
-    exhaust_ok = BooleanField("Exhaust")
-    air_lines_ok = BooleanField("Air Lines")
-    light_line_ok = BooleanField("Light Line")
-    fifth_wheel_ok = BooleanField("Fifth-Wheel")
-    coupling_ok = BooleanField("Other Coupling")
-    tie_downs_ok = BooleanField("Tie-Downs")
-    rear_end_protection_ok = BooleanField("Rear-End Protection")
+    lights_working = BooleanField("Lights Working")
+    reflectors = BooleanField("Reflectors")
+    suspension = BooleanField("Suspension")
+    tires = BooleanField("Tires")
+    wheels_rims = BooleanField("Wheels/Rims")
+    battery = BooleanField("Battery")
+    exhaust = BooleanField("Exhaust")
+    brakes = BooleanField("Brakes")
+    air_lines = BooleanField("Air Lines")
+    light_line = BooleanField("Light Line")
+    fifth_wheel = BooleanField("Fifth Wheel")
+    coupling = BooleanField("Coupling")
+    tie_downs = BooleanField("Tie Downs")
+    rear_end_protection = BooleanField("Rear End Protection")
     exterior_no_defects = BooleanField("No Defects (Exterior)")
 
-    # Towed Unit(s)
-    towed_bodydoors = BooleanField("Body/Doors (Towed)")
-    towed_tiedowns = BooleanField("Tie-Downs (Towed)")
-    towed_lights = BooleanField("Lights (Towed)")
-    towed_reflectors = BooleanField("Reflectors (Towed)")
-    towed_suspension = BooleanField("Suspension (Towed)")
-    towed_tires = BooleanField("Tires (Towed)")
-    towed_wheels = BooleanField("Wheels (Towed)")
-    towed_brakes = BooleanField("Brakes (Towed)")
+    towed_bodydoors = BooleanField("Body/Doors")
+    towed_tiedowns = BooleanField("Tie-Downs")
+    towed_lights = BooleanField("Lights")
+    towed_reflectors = BooleanField("Reflectors")
+    towed_suspension = BooleanField("Suspension")
+    towed_tires = BooleanField("Tires")
+    towed_wheels = BooleanField("Wheels")
+    towed_brakes = BooleanField("Brakes")
     towed_landing_gear = BooleanField("Landing Gear")
-    towed_kingpin = BooleanField("King Pin/Upper Plate")
-    towed_fifthwheel = BooleanField("Fifth-Wheel (Dolly)")
-    towed_othercoupling = BooleanField("Other Coupling Devices")
-    towed_rearend = BooleanField("Rear-End Protection (Towed)")
-    towed_no_defects = BooleanField("No Defects (Towed)")
+    towed_kingpin = BooleanField("Kingpin")
+    towed_fifthwheel = BooleanField("Fifth Wheel")
+    towed_othercoupling = BooleanField("Other Coupling")
+    towed_rearend = BooleanField("Rear End")
+    towed_no_defects = BooleanField("No Defects (Towed Unit)")
 
-    damage_report = TextAreaField("Damage Report")
+    truck_type = SelectField(
+        "Truck Type", 
+        choices=[("Semi","Semi"), ("Box Truck","Box Truck"), ("Pickup","Pickup"), ("Other","Other")]
+    )
     oil_system_status = SelectField(
         "Oil System Status",
         choices=[
@@ -402,6 +458,8 @@ class PreTripForm(FlaskForm):
         ],
         default="operational"
     )
+
+    damage_report = TextAreaField("Damage Report")
     submit = SubmitField("Save PreTrip")
 
 class PostTripForm(FlaskForm):
@@ -417,32 +475,29 @@ class DriverLogForm(FlaskForm):
         "Plant Name",
         choices=[
             ("","Select Plant..."),
+            ("RE","RE"),
+            ("RW","RW"),
+            ("PC","PC"),
+            ("PE","PE"),
+            ("PW","PW"),
+            ("KP","KP"),
+            ("PPL","PPL"),
+            ("DC","DC"),
+            ("Helios","Helios"),
             ("BP","BP"),
             ("52L","52L"),
             ("Trim DC","Trim DC"),
             ("52DC","52DC"),
-            ("PE","PE"),
             ("ALN","ALN"),
             ("AWE","AWE"),
             ("CORP","CORP"),
             ("R&D","R&D"),
             ("GLA","GLA"),
             ("KM","KM"),
-            ("KP","KP"),
             ("KS","KS"),
-            ("MDCTR","MDCTR"),
-            ("PAASM","PAASM"),
-            ("PPL","PPL"),
             ("MONROE","MONROE"),
-            ("RE","RE"),
-            ("RW","RW"),
-            ("PVC","PVC"),
             ("Other","Other"),
-            ("Helios","Helios"),
-            ("PC","PC"),
             ("Lab","Lab"),
-            ("DC","DC"),
-            ("PPM","PPM")
         ],
         validators=[DataRequired()]
     )
@@ -513,14 +568,13 @@ def to_local_time(utc_str):
         return utc_str
 
 ############################################################################
-# Routes
+# Routes (General + Driver-Focused)
 ############################################################################
 
 @app.route("/")
 def welcome():
     bulletins = Announcement.query.order_by(Announcement.created_at.desc()).limit(5).all()
     return render_template("welcome.html", bulletins=bulletins)
-
 
 @app.route("/register", methods=["GET","POST"])
 def register():
@@ -548,7 +602,6 @@ def register():
             return redirect(url_for("login"))
     return render_template("register.html", form=form)
 
-
 @app.route("/login", methods=["GET","POST"])
 def login():
     form = LoginForm()
@@ -565,7 +618,6 @@ def login():
             flash("Invalid credentials.", "danger")
     return render_template("login.html", form=form)
 
-
 @app.route("/logout")
 @login_required
 def logout():
@@ -573,21 +625,15 @@ def logout():
     flash("Logged out.", "info")
     return redirect(url_for("welcome"))
 
-
-@app.route("/dashboard", methods=["GET","POST"])
+@app.route("/dashboard")
 @login_required
 def dashboard():
-    if current_user.role == "driver":
-        logs = DriverLog.query.filter_by(driver_id=current_user.id)\
-                              .order_by(DriverLog.created_at.desc()).limit(5).all()
-        pretrips = PreTrip.query.filter_by(user_id=current_user.id)\
-                                .order_by(PreTrip.created_at.desc()).limit(5).all()
-        tasks = Task.query.filter_by(assigned_to=current_user.id)\
-                          .order_by(Task.created_at.desc()).limit(5).all()
-    else:
-        logs = DriverLog.query.order_by(DriverLog.created_at.desc()).limit(5).all()
-        pretrips = PreTrip.query.order_by(PreTrip.created_at.desc()).limit(5).all()
-        tasks = Task.query.order_by(Task.created_at.desc()).limit(5).all()
+    logs = DriverLog.query.filter_by(driver_id=current_user.id)\
+                          .order_by(DriverLog.created_at.desc()).limit(5).all()
+    pretrips = PreTrip.query.filter_by(user_id=current_user.id)\
+                            .order_by(PreTrip.created_at.desc()).limit(5).all()
+    tasks = Task.query.filter_by(assigned_to=current_user.id)\
+                      .order_by(Task.created_at.desc()).limit(5).all()
 
     dm_form = DirectMessageForm()
     all_users = User.query.filter(User.id != current_user.id).all()
@@ -624,33 +670,6 @@ def dashboard():
         outbox=outbox
     )
 
-
-@app.route("/create_task", methods=["GET","POST"])
-@login_required
-def create_task():
-    if current_user.role != "management":
-        flash("Only managers can create tasks.", "danger")
-        return redirect(url_for("dashboard"))
-
-    form = TaskForm()
-    drivers = User.query.filter_by(role="driver").all()
-    form.assigned_to.choices = [(d.id, d.username) for d in drivers]
-
-    if form.validate_on_submit():
-        new_task = Task(
-            title=form.title.data,
-            details=form.details.data,
-            is_hot=form.is_hot.data,
-            shift=form.shift.data,
-            assigned_to=form.assigned_to.data
-        )
-        db.session.add(new_task)
-        db.session.commit()
-        flash("Task created successfully!", "success")
-        return redirect(url_for("list_tasks"))
-    return render_template("create_task.html", form=form)
-
-
 @app.route("/list_tasks")
 @login_required
 def list_tasks():
@@ -660,86 +679,6 @@ def list_tasks():
         tasks = Task.query.filter_by(assigned_to=current_user.id)\
                           .order_by(Task.created_at.desc()).all()
     return render_template("list_tasks.html", tasks=tasks)
-
-
-@app.route("/edit_task/<int:task_id>", methods=["GET","POST"])
-@login_required
-def edit_task(task_id):
-    task = Task.query.get_or_404(task_id)
-    if current_user.role != "management":
-        flash("Only managers can edit tasks.", "danger")
-        return redirect(url_for("list_tasks"))
-
-    form = UpdateTaskForm(obj=task)
-    drivers = User.query.filter_by(role="driver").all()
-    form.assigned_to.choices = [(d.id, d.username) for d in drivers]
-
-    if form.validate_on_submit():
-        task.title = form.title.data
-        task.details = form.details.data
-        task.is_hot = form.is_hot.data
-        task.shift = form.shift.data
-        task.status = form.status.data
-        task.assigned_to = form.assigned_to.data
-        db.session.commit()
-        flash("Task updated successfully!", "success")
-        return redirect(url_for("list_tasks"))
-    return render_template("edit_task.html", form=form, task=task)
-
-
-@app.route("/handoff_task", methods=["POST"])
-@login_required
-def handoff_task():
-    if current_user.role != "management":
-        return jsonify({"error": "Forbidden"}), 403
-
-    task_id = request.json.get("task_id")
-    mode = request.json.get("mode")
-    t = Task.query.get(task_id)
-    if not t:
-        return jsonify({"error": "Task not found"}), 404
-
-    if mode == "next_shift":
-        if t.shift == "1st":
-            t.shift = "2nd"
-        elif t.shift == "2nd":
-            t.shift = "3rd"
-        else:
-            t.shift = "1st"
-        db.session.commit()
-        return jsonify({"status": "Shift changed"}), 200
-    elif mode == "assign_driver":
-        new_driver_id = request.json.get("new_driver_id")
-        t.assigned_to = new_driver_id
-        db.session.commit()
-        return jsonify({"status": "Reassigned driver"}), 200
-
-    return jsonify({"status": "No valid mode selected"}), 200
-
-
-@app.route("/create_task_from_dashboard", methods=["POST"])
-@login_required
-def create_task_from_dashboard():
-    if current_user.role != "management":
-        flash("Only managers can create tasks.", "danger")
-        return redirect(url_for("dashboard"))
-
-    form = TaskForm()
-    drivers = User.query.filter_by(role="driver").all()
-    form.assigned_to.choices = [(d.id, d.username) for d in drivers]
-
-    if form.validate_on_submit():
-        new_task = Task(
-            title=form.title.data,
-            details=form.details.data,
-            is_hot=form.is_hot.data,
-            shift=form.shift.data,
-            assigned_to=form.assigned_to.data
-        )
-        db.session.add(new_task)
-        db.session.commit()
-        flash("Task created from dashboard!", "success")
-    return redirect(url_for("manager_dashboard"))
 
 ############################################################################
 # Driver Logs
@@ -841,25 +780,26 @@ def list_pretrips():
     if current_user.role == "management":
         pretrips = PreTrip.query.order_by(PreTrip.created_at.desc()).all()
     else:
-        pretrips = PreTrip.query.filter_by(user_id=current_user.id).order_by(PreTrip.created_at.desc()).all()
+        pretrips = PreTrip.query.filter_by(user_id=current_user.id)\
+                                .order_by(PreTrip.created_at.desc()).all()
     return render_template("list_pretrips.html", pretrips=pretrips)
 
 @app.route("/new_pretrip", methods=["GET","POST"])
 @login_required
 def new_pretrip():
     form = PreTripForm()
-    today_date = date.today().strftime("%Y-%m-%d")
-
     if form.validate_on_submit():
+        chosen_date = form.pretrip_date.data or date.today()
+
         new_pt = PreTrip(
             user_id=current_user.id,
-            pretrip_date=form.pretrip_date.data,
+            truck_number=form.truck_number.data,
+            trailer_number=form.trailer_number.data,
+            pretrip_date=chosen_date,
             shift=form.shift.data,
-            truck_type=form.truck_type.data,
-            truck_name=form.truck_name.data,
             start_mileage=form.start_mileage.data,
+            end_mileage=form.end_mileage.data,
 
-            # 1) General Condition
             cab_doors_windows=form.cab_doors_windows.data,
             body_doors=form.body_doors.data,
             oil_leak=form.oil_leak.data,
@@ -868,40 +808,43 @@ def new_pretrip():
             fuel_leak=form.fuel_leak.data,
             gc_no_defects=form.gc_no_defects.data,
 
-            # 2) In-Cab
-            gauges_ok=form.gauges_ok.data,
-            wipers_ok=form.wipers_ok.data,
-            horn_ok=form.horn_ok.data,
-            heater_defrost_ok=form.heater_defrost_ok.data,
-            mirrors_ok=form.mirrors_ok.data,
-            seat_belts_ok=form.seat_belts_ok.data,
-            in_cab_no_defects=form.in_cab_no_defects.data,
+            gauges_warning=form.gauges_warning.data,
+            wipers=form.wipers.data,
+            horn=form.horn.data,
+            heater_defroster=form.heater_defroster.data,
+            mirrors=form.mirrors.data,
+            seat_belts_steering=form.seat_belts_steering.data,
+            clutch=form.clutch.data,
+            service_brakes=form.service_brakes.data,
+            parking_brake=form.parking_brake.data,
+            emergency_brakes=form.emergency_brakes.data,
+            triangles=form.triangles.data,
+            fire_extinguisher=form.fire_extinguisher.data,
+            safety_equipment=form.safety_equipment.data,
+            incab_no_defects=form.incab_no_defects.data,
 
-            # 3) Engine Compartment
-            radiator_ok=form.radiator_ok.data,
-            belts_ok=form.belts_ok.data,
-            hoses_ok=form.hoses_ok.data,
-            air_filter_ok=form.air_filter_ok.data,
-            fuel_system_ok=form.fuel_system_ok.data,
+            oil_level=form.oil_level.data,
+            coolant_level=form.coolant_level.data,
+            belts=form.belts.data,
+            hoses=form.hoses.data,
             ec_no_defects=form.ec_no_defects.data,
 
-            # 4) Exterior
             lights_working=form.lights_working.data,
-            tires_ok=form.tires_ok.data,
-            reflectors_ok=form.reflectors_ok.data,
-            suspension_ok=form.suspension_ok.data,
-            brakes_ok=form.brakes_ok.data,
-            battery_ok=form.battery_ok.data,
-            exhaust_ok=form.exhaust_ok.data,
-            air_lines_ok=form.air_lines_ok.data,
-            light_line_ok=form.light_line_ok.data,
-            fifth_wheel_ok=form.fifth_wheel_ok.data,
-            coupling_ok=form.coupling_ok.data,
-            tie_downs_ok=form.tie_downs_ok.data,
-            rear_end_protection_ok=form.rear_end_protection_ok.data,
+            reflectors=form.reflectors.data,
+            suspension=form.suspension.data,
+            tires=form.tires.data,
+            wheels_rims=form.wheels_rims.data,
+            battery=form.battery.data,
+            exhaust=form.exhaust.data,
+            brakes=form.brakes.data,
+            air_lines=form.air_lines.data,
+            light_line=form.light_line.data,
+            fifth_wheel=form.fifth_wheel.data,
+            coupling=form.coupling.data,
+            tie_downs=form.tie_downs.data,
+            rear_end_protection=form.rear_end_protection.data,
             exterior_no_defects=form.exterior_no_defects.data,
 
-            # 5) Towed Unit(s)
             towed_bodydoors=form.towed_bodydoors.data,
             towed_tiedowns=form.towed_tiedowns.data,
             towed_lights=form.towed_lights.data,
@@ -917,26 +860,19 @@ def new_pretrip():
             towed_rearend=form.towed_rearend.data,
             towed_no_defects=form.towed_no_defects.data,
 
-            damage_report=form.damage_report.data,
+            truck_type=form.truck_type.data,
             oil_system_status=form.oil_system_status.data,
-            tires_status=form.tires_status.data
+            tires_status=form.tires_status.data,
+            damage_report=form.damage_report.data
         )
+
         db.session.add(new_pt)
         db.session.commit()
 
-        shift_rec = ShiftRecord(
-            user_id=current_user.id,
-            pretrip_id=new_pt.id,
-            start_time=datetime.utcnow(),
-            week_ending=get_friday_of_current_week()
-        )
-        db.session.add(shift_rec)
-        db.session.commit()
-
-        flash("New PreTrip created successfully and shift clock started!", "success")
+        flash("PreTrip saved successfully!", "success")
         return redirect(url_for("list_pretrips"))
 
-    return render_template("new_pretrip.html", form=form, current_user=current_user, today_date=today_date)
+    return render_template("new_pretrip.html", form=form)
 
 @app.route("/do_posttrip/<int:pretrip_id>", methods=["GET","POST"])
 @login_required
@@ -1000,76 +936,18 @@ def edit_pretrip_entry(pretrip_id):
         pt.pretrip_date = form.pretrip_date.data
         pt.shift = form.shift.data
         pt.truck_type = form.truck_type.data
-        pt.truck_name = form.truck_name.data
+        pt.truck_number = form.truck_number.data  # Make sure we set truck_number
+        pt.trailer_number = form.trailer_number.data
         pt.start_mileage = form.start_mileage.data
-
-        # 1) General Condition
-        pt.cab_doors_windows = form.cab_doors_windows.data
-        pt.body_doors = form.body_doors.data
-        pt.oil_leak = form.oil_leak.data
-        pt.grease_leak = form.grease_leak.data
-        pt.coolant_leak = form.coolant_leak.data
-        pt.fuel_leak = form.fuel_leak.data
-        pt.gc_no_defects = form.gc_no_defects.data
-
-        # 2) In-Cab
-        pt.gauges_ok = form.gauges_ok.data
-        pt.wipers_ok = form.wipers_ok.data
-        pt.horn_ok = form.horn_ok.data
-        pt.heater_defrost_ok = form.heater_defrost_ok.data
-        pt.mirrors_ok = form.mirrors_ok.data
-        pt.seat_belts_ok = form.seat_belts_ok.data
-        pt.in_cab_no_defects = form.in_cab_no_defects.data
-
-        # 3) Engine Compartment
-        pt.radiator_ok = form.radiator_ok.data
-        pt.belts_ok = form.belts_ok.data
-        pt.hoses_ok = form.hoses_ok.data
-        pt.air_filter_ok = form.air_filter_ok.data
-        pt.fuel_system_ok = form.fuel_system_ok.data
-        pt.ec_no_defects = form.ec_no_defects.data
-
-        # 4) Exterior
-        pt.lights_working = form.lights_working.data
-        pt.tires_ok = form.tires_ok.data
-        pt.reflectors_ok = form.reflectors_ok.data
-        pt.suspension_ok = form.suspension_ok.data
-        pt.brakes_ok = form.brakes_ok.data
-        pt.battery_ok = form.battery_ok.data
-        pt.exhaust_ok = form.exhaust_ok.data
-        pt.air_lines_ok = form.air_lines_ok.data
-        pt.light_line_ok = form.light_line_ok.data
-        pt.fifth_wheel_ok = form.fifth_wheel_ok.data
-        pt.coupling_ok = form.coupling_ok.data
-        pt.tie_downs_ok = form.tie_downs_ok.data
-        pt.rear_end_protection_ok = form.rear_end_protection_ok.data
-        pt.exterior_no_defects = form.exterior_no_defects.data
-
-        # 5) Towed Unit(s)
-        pt.towed_bodydoors = form.towed_bodydoors.data
-        pt.towed_tiedowns = form.towed_tiedowns.data
-        pt.towed_lights = form.towed_lights.data
-        pt.towed_reflectors = form.towed_reflectors.data
-        pt.towed_suspension = form.towed_suspension.data
-        pt.towed_tires = form.towed_tires.data
-        pt.towed_wheels = form.towed_wheels.data
-        pt.towed_brakes = form.towed_brakes.data
-        pt.towed_landing_gear = form.towed_landing_gear.data
-        pt.towed_kingpin = form.towed_kingpin.data
-        pt.towed_fifthwheel = form.towed_fifthwheel.data
-        pt.towed_othercoupling = form.towed_othercoupling.data
-        pt.towed_rearend = form.towed_rearend.data
-        pt.towed_no_defects = form.towed_no_defects.data
-
-        pt.damage_report = form.damage_report.data
+        pt.end_mileage = form.end_mileage.data
         pt.oil_system_status = form.oil_system_status.data
         pt.tires_status = form.tires_status.data
+        # Repeat for the checkbox fields if you need them updated as well
 
         db.session.commit()
 
-        # ephemeral
         session["reviewing_driver"] = request.form.get("reviewing_driver")
-        session["reviewing_date"]   = request.form.get("reviewing_date")
+        session["reviewing_date"] = request.form.get("reviewing_date")
 
         flash("PreTrip updated!", "success")
         return redirect(url_for("view_pretrip", pretrip_id=pt.id))
@@ -1175,7 +1053,7 @@ def submit_end_of_day():
     return redirect(url_for("dashboard"))
 
 ############################################################################
-# PreTrip Printable (For Print DVIR link)
+# PreTrip Printable
 ############################################################################
 @app.route("/pretrip_printable/<int:pretrip_id>")
 @login_required
@@ -1242,14 +1120,9 @@ def knowledge_base():
         db.session.commit()
         flash("New tip added to the Knowledge Base!", "success")
         return redirect(url_for("knowledge_base"))
+
     tips = KnowledgeBaseEntry.query.order_by(KnowledgeBaseEntry.id.desc()).all()
     return render_template("knowledge_base.html", form=form, tips=tips)
-
-@app.route("/new_tip", methods=["GET","POST"])
-@login_required
-def new_tip():
-    # placeholder route if you want a separate page for adding tips
-    return "New Tip route (placeholder)."
 
 ############################################################################
 # Profile
@@ -1267,18 +1140,6 @@ def profile():
         flash("Profile updated!", "success")
         return redirect(url_for("profile"))
     return render_template("profile.html", profile_form=form)
-
-############################################################################
-# Manager Dashboard
-############################################################################
-@app.route("/manager_dashboard")
-@login_required
-def manager_dashboard():
-    if current_user.role != "management":
-        flash("Management only!", "danger")
-        return redirect(url_for("dashboard"))
-    tasks = Task.query.order_by(Task.created_at.desc()).all()
-    return render_template("manager_dashboard.html", tasks=tasks)
 
 ############################################################################
 # Recent Activity
@@ -1306,6 +1167,9 @@ def count_unread():
     ).count()
     return jsonify({"unread_count": unread_count})
 
+############################################################################
+# Direct Messages
+############################################################################
 @app.route("/direct_messages", methods=["GET","POST"])
 @login_required
 def direct_messages():
@@ -1389,24 +1253,6 @@ def handle_chat_message(data):
 def show_map():
     return render_template("map.html", google_api_key="YOUR_GOOGLE_MAPS_API_KEY")
 
-@app.route("/weekly_performance")
-@login_required
-def weekly_performance():
-    start_date = date.today()
-    end_date = start_date + timedelta(days=7)
-    driver_hours = {}
-    plants_times = []
-    tasks_completion = {}
-
-    return render_template(
-        "weekly_performance.html",
-        start_date=start_date,
-        end_date=end_date,
-        driver_hours=driver_hours,
-        plants_times=plants_times,
-        tasks_completion=tasks_completion
-    )
-
 @app.route('/OneSignalSDKWorker.js')
 def onesignal_sw():
     return send_from_directory('static', 'OneSignalSDKWorker.js')
@@ -1422,9 +1268,6 @@ def get_friday_of_current_week():
 @app.route("/plant_directory")
 @login_required
 def plant_directory():
-    """
-    A simple page that displays all plant addresses in plain text.
-    """
     return render_template("plant_directory.html")
 
 ############################################################################

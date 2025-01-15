@@ -1,46 +1,70 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="container" style="font-size: 0.7rem;">
-  <h2 class="mt-4 mb-3">New PreTrip Inspection</h2>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>New PreTrip Inspection</title>
+  <!-- Bootstrap 5 (optional, remove if you have your own styling) -->
+  <link 
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" 
+    rel="stylesheet"
+  >
+</head>
+<body>
+<div class="container my-4">
+  <h1 class="mb-3">New PreTrip Inspection</h1>
 
   <form method="POST" action="">
+    <!-- CRITICAL: ensures CSRF token is included -->
     {{ form.hidden_tag() }}
 
-    <!-- Intro instructions -->
-    <p>Please check all items that apply. Fields connected to the actual PreTrip model are saved; 
-       others are purely visual. Decrease your browser zoom or scroll if items overflow.</p>
-
-    <!-- 1) PRETRIP METADATA -->
-    <div class="row mb-2">
+    <!-- 1) BASIC INFO -->
+    <div class="row mb-3">
       <div class="col-md-4">
-        {{ form.pretrip_date.label }}<br>
-        {{ form.pretrip_date(class="form-control form-control-sm") }}
+        {{ form.truck_number.label }}
+        {{ form.truck_number(class="form-control") }}
+        {% for err in form.truck_number.errors %}
+          <div class="text-danger">{{ err }}</div>
+        {% endfor %}
       </div>
-      <div class="col-md-2">
-        {{ form.shift.label }}<br>
-        {{ form.shift(class="form-select form-select-sm") }}
+      <div class="col-md-4">
+        {{ form.trailer_number.label }}
+        {{ form.trailer_number(class="form-control") }}
+        {% for err in form.trailer_number.errors %}
+          <div class="text-danger">{{ err }}</div>
+        {% endfor %}
       </div>
-      <div class="col-md-3">
-        {{ form.truck_type.label }}<br>
-        {{ form.truck_type(class="form-select form-select-sm") }}
-      </div>
-      <div class="col-md-3">
-        {{ form.truck_name.label }}<br>
-        {{ form.truck_name(class="form-control form-control-sm") }}
+      <div class="col-md-4">
+        {{ form.pretrip_date.label }} 
+        <!-- By default, DateField requires YYYY-MM-DD. If you want a date picker, 
+             you can do type="date" with something like:
+             {{ form.pretrip_date(class="form-control", type="date") }} 
+        -->
+        {{ form.pretrip_date(class="form-control") }}
+        {% for err in form.pretrip_date.errors %}
+          <div class="text-danger">{{ err }}</div>
+        {% endfor %}
       </div>
     </div>
 
-    <div class="row mb-2">
-      <div class="col-md-3">
-        {{ form.start_mileage.label }}<br>
-        {{ form.start_mileage(class="form-control form-control-sm") }}
+    <div class="row mb-3">
+      <div class="col-md-4">
+        {{ form.shift.label }}
+        {{ form.shift(class="form-select") }}
+      </div>
+      <div class="col-md-4">
+        {{ form.start_mileage.label }}
+        {{ form.start_mileage(class="form-control") }}
+      </div>
+      <div class="col-md-4">
+        {{ form.end_mileage.label }}
+        {{ form.end_mileage(class="form-control") }}
       </div>
     </div>
 
     <hr>
 
     <!-- 2) GENERAL CONDITION -->
-    <h5>General Condition</h5>
+    <h4>General Condition</h4>
     <div class="form-check">
       {{ form.cab_doors_windows(class="form-check-input") }}
       {{ form.cab_doors_windows.label(class="form-check-label") }}
@@ -65,165 +89,252 @@
       {{ form.fuel_leak(class="form-check-input") }}
       {{ form.fuel_leak.label(class="form-check-label") }}
     </div>
-
-    <!-- These next two checkboxes are purely visual; not in the model -->
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="gc_other" id="gc_other">
-      <label class="form-check-label" for="gc_other">Other (Identify)</label>
-    </div>
-    <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="gc_no_defects" id="gc_no_defects">
-      <label class="form-check-label" for="gc_no_defects">No Defects</label>
+      {{ form.gc_no_defects(class="form-check-input") }}
+      {{ form.gc_no_defects.label(class="form-check-label text-success fw-bold") }}
     </div>
 
     <hr>
 
-    <!-- 3) IN-CAB (EXAMPLE; not in the PreTrip DB) -->
-    <h5>In-Cab</h5>
+    <!-- 3) IN-CAB -->
+    <h4>In-Cab</h4>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="gauges_ok" id="gauges_ok">
-      <label class="form-check-label" for="gauges_ok">Gauges/Warning Indicators</label>
+      {{ form.gauges_warning(class="form-check-input") }}
+      {{ form.gauges_warning.label(class="form-check-label") }}
     </div>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="wipers_ok" id="wipers_ok">
-      <label class="form-check-label" for="wipers_ok">Windshield Wipers/Washers</label>
+      {{ form.wipers(class="form-check-input") }}
+      {{ form.wipers.label(class="form-check-label") }}
     </div>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="horn_ok" id="horn_ok">
-      <label class="form-check-label" for="horn_ok">Horn</label>
+      {{ form.horn(class="form-check-input") }}
+      {{ form.horn.label(class="form-check-label") }}
     </div>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="heater_defrost_ok" id="heater_defrost_ok">
-      <label class="form-check-label" for="heater_defrost_ok">Heater/Defroster</label>
+      {{ form.heater_defroster(class="form-check-input") }}
+      {{ form.heater_defroster.label(class="form-check-label") }}
     </div>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="mirrors_ok" id="mirrors_ok">
-      <label class="form-check-label" for="mirrors_ok">Mirrors</label>
+      {{ form.mirrors(class="form-check-input") }}
+      {{ form.mirrors.label(class="form-check-label") }}
     </div>
-    <!-- etc. (steering, clutch, etc.) -->
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="ic_no_defects" id="ic_no_defects">
-      <label class="form-check-label" for="ic_no_defects">No Defects</label>
+      {{ form.seat_belts_steering(class="form-check-input") }}
+      {{ form.seat_belts_steering.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.clutch(class="form-check-input") }}
+      {{ form.clutch.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.service_brakes(class="form-check-input") }}
+      {{ form.service_brakes.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.parking_brake(class="form-check-input") }}
+      {{ form.parking_brake.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.emergency_brakes(class="form-check-input") }}
+      {{ form.emergency_brakes.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.triangles(class="form-check-input") }}
+      {{ form.triangles.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.fire_extinguisher(class="form-check-input") }}
+      {{ form.fire_extinguisher.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.safety_equipment(class="form-check-input") }}
+      {{ form.safety_equipment.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.incab_no_defects(class="form-check-input") }}
+      {{ form.incab_no_defects.label(class="form-check-label text-success fw-bold") }}
     </div>
 
     <hr>
 
     <!-- 4) ENGINE COMPARTMENT -->
-    <h5>Engine Compartment</h5>
-    <p>These checkboxes are examples; the DB’s actual fields are only oil/coolant/fuel, etc.</p>
+    <h4>Engine Compartment</h4>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="oil_level_ok" id="oil_level_ok">
-      <label class="form-check-label" for="oil_level_ok">Oil Level</label>
+      {{ form.oil_level(class="form-check-input") }}
+      {{ form.oil_level.label(class="form-check-label") }}
     </div>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="coolant_level_ok" id="coolant_level_ok">
-      <label class="form-check-label" for="coolant_level_ok">Coolant Level</label>
+      {{ form.coolant_level(class="form-check-input") }}
+      {{ form.coolant_level.label(class="form-check-label") }}
     </div>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="radiator_ok" id="radiator_ok">
-      <label class="form-check-label" for="radiator_ok">Radiator</label>
-    </div>
-
-    <!-- Oil system stored in DB -->
-    <div class="mb-2 mt-2">
-      {{ form.oil_system_status.label }}<br>
-      {{ form.oil_system_status(class="form-select form-select-sm") }}
+      {{ form.belts(class="form-check-input") }}
+      {{ form.belts.label(class="form-check-label") }}
     </div>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="ec_no_defects" id="ec_no_defects">
-      <label class="form-check-label" for="ec_no_defects">No Defects</label>
+      {{ form.hoses(class="form-check-input") }}
+      {{ form.hoses.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.ec_no_defects(class="form-check-input") }}
+      {{ form.ec_no_defects.label(class="form-check-label text-success fw-bold") }}
     </div>
 
     <hr>
 
     <!-- 5) EXTERIOR -->
-    <h5>Exterior</h5>
-    <!-- 'lights_working' is in the DB; 'reflectors_ok' is just an example -->
+    <h4>Exterior</h4>
     <div class="form-check">
       {{ form.lights_working(class="form-check-input") }}
       {{ form.lights_working.label(class="form-check-label") }}
     </div>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="reflectors_ok" id="reflectors_ok">
-      <label class="form-check-label" for="reflectors_ok">Reflectors</label>
+      {{ form.reflectors(class="form-check-input") }}
+      {{ form.reflectors.label(class="form-check-label") }}
     </div>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="suspension_ok" id="suspension_ok">
-      <label class="form-check-label" for="suspension_ok">Suspension</label>
-    </div>
-    <!-- 'tires_ok' is in the DB -->
-    <div class="form-check">
-      {{ form.tires_ok(class="form-check-input") }}
-      {{ form.tires_ok.label(class="form-check-label") }}
-    </div>
-    <div class="mb-2 mt-2">
-      {{ form.tires_status.label }}<br>
-      {{ form.tires_status(class="form-select form-select-sm") }}
+      {{ form.suspension(class="form-check-input") }}
+      {{ form.suspension.label(class="form-check-label") }}
     </div>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="ext_no_defects" id="ext_no_defects">
-      <label class="form-check-label" for="ext_no_defects">No Defects</label>
+      {{ form.tires(class="form-check-input") }}
+      {{ form.tires.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.wheels_rims(class="form-check-input") }}
+      {{ form.wheels_rims.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.battery(class="form-check-input") }}
+      {{ form.battery.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.exhaust(class="form-check-input") }}
+      {{ form.exhaust.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.brakes(class="form-check-input") }}
+      {{ form.brakes.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.air_lines(class="form-check-input") }}
+      {{ form.air_lines.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.light_line(class="form-check-input") }}
+      {{ form.light_line.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.fifth_wheel(class="form-check-input") }}
+      {{ form.fifth_wheel.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.coupling(class="form-check-input") }}
+      {{ form.coupling.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.tie_downs(class="form-check-input") }}
+      {{ form.tie_downs.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.rear_end_protection(class="form-check-input") }}
+      {{ form.rear_end_protection.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.exterior_no_defects(class="form-check-input") }}
+      {{ form.exterior_no_defects.label(class="form-check-label text-success fw-bold") }}
     </div>
 
     <hr>
 
-    <!-- 6) TOWED UNIT(S) -->
-    <h5>Towed Unit(s)</h5>
-    <p>(Not in DB by default, just for visual checks.)</p>
+    <!-- 6) TOWED UNIT -->
+    <h4>Towed Unit(s)</h4>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="towed_bodydoors" id="towed_bodydoors">
-      <label class="form-check-label" for="towed_bodydoors">Body/Doors</label>
+      {{ form.towed_bodydoors(class="form-check-input") }}
+      {{ form.towed_bodydoors.label(class="form-check-label") }}
     </div>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="towed_tiedowns" id="towed_tiedowns">
-      <label class="form-check-label" for="towed_tiedowns">Tie-Downs</label>
+      {{ form.towed_tiedowns(class="form-check-input") }}
+      {{ form.towed_tiedowns.label(class="form-check-label") }}
     </div>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="towed_lights" id="towed_lights">
-      <label class="form-check-label" for="towed_lights">Lights</label>
+      {{ form.towed_lights(class="form-check-input") }}
+      {{ form.towed_lights.label(class="form-check-label") }}
     </div>
     <div class="form-check">
-      <input type="checkbox" class="form-check-input" name="towed_no_defects" id="towed_no_defects">
-      <label class="form-check-label" for="towed_no_defects">No Defects</label>
+      {{ form.towed_reflectors(class="form-check-input") }}
+      {{ form.towed_reflectors.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_suspension(class="form-check-input") }}
+      {{ form.towed_suspension.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_tires(class="form-check-input") }}
+      {{ form.towed_tires.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_wheels(class="form-check-input") }}
+      {{ form.towed_wheels.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_brakes(class="form-check-input") }}
+      {{ form.towed_brakes.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_landing_gear(class="form-check-input") }}
+      {{ form.towed_landing_gear.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_kingpin(class="form-check-input") }}
+      {{ form.towed_kingpin.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_fifthwheel(class="form-check-input") }}
+      {{ form.towed_fifthwheel.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_othercoupling(class="form-check-input") }}
+      {{ form.towed_othercoupling.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_rearend(class="form-check-input") }}
+      {{ form.towed_rearend.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_no_defects(class="form-check-input") }}
+      {{ form.towed_no_defects.label(class="form-check-label text-success fw-bold") }}
     </div>
 
     <hr>
 
-    <!-- 7) DAMAGE REPORT (in the DB) -->
+    <!-- 7) ADDITIONAL -->
+    <h4>Additional Info</h4>
     <div class="mb-3">
-      {{ form.damage_report.label }}<br>
-      {{ form.damage_report(class="form-control form-control-sm", rows="2") }}
+      {{ form.truck_type.label }}
+      {{ form.truck_type(class="form-select") }}
+    </div>
+    <div class="mb-3">
+      {{ form.oil_system_status.label }}
+      {{ form.oil_system_status(class="form-select") }}
+    </div>
+    <div class="mb-3">
+      {{ form.tires_status.label }}
+      {{ form.tires_status(class="form-select") }}
     </div>
 
-    <!-- 8) SHOP REMARKS (not in DB) -->
+    <!-- 8) DAMAGE REPORT -->
     <div class="mb-3">
-      <label class="form-label">Shop Remarks:</label>
-      <textarea name="shop_remarks" rows="2" class="form-control form-control-sm"></textarea>
+      {{ form.damage_report.label }}
+      {{ form.damage_report(class="form-control", rows="3") }}
     </div>
 
-    <!-- 9) MAINTENANCE ACTION (not in DB) -->
-    <div class="mb-3">
-      <label class="form-label">Maintenance Action:</label><br>
-      <input type="checkbox" name="maint_repairs" id="maint_repairs"> Repairs Made &nbsp;
-      <input type="checkbox" name="maint_none" id="maint_none"> No Repairs Needed
-      <br>
-      R.O.#s: <input type="text" name="ro_nums" size="8">
-      &nbsp; Certified By: <input type="text" name="cert_by" size="8">
-      &nbsp; Location: <input type="text" name="location" size="8">
-    </div>
-
-    <!-- 10) REVIEWING DRIVER & DATE (prefilled) -->
-    <div class="mb-3">
-      <label>Reviewing Driver:</label>
-      <input type="text" name="reviewing_driver" size="14"
-             value="{{ current_user.username if current_user else '' }}">
-      (Emp. No: <input type="text" name="reviewing_empno" size="6">)
-      Date: <input type="text" name="reviewing_date" size="10"
-             value="{{ today_date|default('') }}">
-    </div>
-
-    <!-- 11) SUBMIT -->
-    {{ form.submit(class="btn btn-primary btn-sm mt-3", value="Save PreTrip") }}
+    <!-- 9) SUBMIT -->
+    {{ form.submit(class="btn btn-primary mt-3") }}
   </form>
 </div>
-{% endblock %}
+
+<!-- Optional: Bootstrap 5 JS for collapse/accordion, if needed -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
