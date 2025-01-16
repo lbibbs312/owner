@@ -142,7 +142,6 @@ class PreTrip(db.Model):
     pretrip_date = db.Column(db.Date, default=date.today)
     shift = db.Column(db.String(10))
     start_mileage = db.Column(db.Integer)
-    end_mileage = db.Column(db.Integer)
 
     # General Condition
     cab_doors_windows = db.Column(db.Boolean, default=False)
@@ -798,7 +797,7 @@ def new_pretrip():
             pretrip_date=chosen_date,
             shift=form.shift.data,
             start_mileage=form.start_mileage.data,
-            end_mileage=form.end_mileage.data,
+           
 
             cab_doors_windows=form.cab_doors_windows.data,
             body_doors=form.body_doors.data,

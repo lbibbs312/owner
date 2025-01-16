@@ -16,12 +16,6 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(128))
     role = db.Column(db.String(20), default="driver")  # "driver" or "management"
 
-    # Example relationships
-    # driver_logs = db.relationship("DriverLog", backref="driver", lazy="joined")
-    # chat_messages = db.relationship("ChatMessage", backref="user")
-    # shift_records = db.relationship("ShiftRecord", backref="user")
-    # etc.
-
     def set_password(self, pwd):
         # You can use Werkzeug or other hashing
         pass
@@ -46,7 +40,6 @@ class PreTrip(db.Model):
     pretrip_date = db.Column(db.Date, default=date.today)
     shift = db.Column(db.String(10))
     start_mileage = db.Column(db.Integer)
-    end_mileage = db.Column(db.Integer)
 
     # General Condition
     cab_doors_windows = db.Column(db.Boolean, default=False)
@@ -117,13 +110,12 @@ class PreTrip(db.Model):
     truck_type = db.Column(db.String(20))
     oil_system_status = db.Column(db.String(20), default="operational")
     tires_status = db.Column(db.String(20), default="operational")
-
     damage_report = db.Column(db.Text)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
 
-    # One-to-one to PostTrip
+    # One-to-one relationship to PostTrip
     posttrip = db.relationship("PostTrip", uselist=False, backref="pretrip")
 
 
@@ -131,9 +123,11 @@ class PostTrip(db.Model):
     __tablename__ = "posttrip"
     id = db.Column(db.Integer, primary_key=True)
     pretrip_id = db.Column(db.Integer, db.ForeignKey("pretrip.id"), nullable=False)
+
     end_mileage = db.Column(db.Integer, nullable=True)
     remarks = db.Column(db.Text, nullable=True)
     miles_driven = db.Column(db.Integer, nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
 
@@ -145,9 +139,6 @@ class DriverLog(db.Model):
     __tablename__ = "driver_log"
     id = db.Column(db.Integer, primary_key=True)
     driver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-
-    # Relationship to User
-    # Using a string so it doesn’t matter if 'User' is defined before or after
     driver = db.relationship("User", backref="driver_logs", lazy="joined")
 
     date = db.Column(db.Date, nullable=False)
@@ -204,6 +195,7 @@ class ShiftRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     pretrip_id = db.Column(db.Integer, db.ForeignKey("pretrip.id"), nullable=True)
+
     start_time = db.Column(db.DateTime, nullable=False)
     end_time = db.Column(db.DateTime, nullable=True)
     total_hours = db.Column(db.Float, nullable=True)

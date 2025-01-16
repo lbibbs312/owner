@@ -35,11 +35,8 @@
       </div>
       <div class="col-md-4">
         {{ form.pretrip_date.label }} 
-        <!-- By default, DateField requires YYYY-MM-DD. If you want a date picker, 
-             you can do type="date" with something like:
-             {{ form.pretrip_date(class="form-control", type="date") }} 
-        -->
-        {{ form.pretrip_date(class="form-control") }}
+        <!-- Force HTML date picker to ensure correct format -->
+        {{ form.pretrip_date(class="form-control", type="date") }}
         {% for err in form.pretrip_date.errors %}
           <div class="text-danger">{{ err }}</div>
         {% endfor %}
@@ -54,10 +51,6 @@
       <div class="col-md-4">
         {{ form.start_mileage.label }}
         {{ form.start_mileage(class="form-control") }}
-      </div>
-      <div class="col-md-4">
-        {{ form.end_mileage.label }}
-        {{ form.end_mileage(class="form-control") }}
       </div>
     </div>
 
@@ -195,10 +188,6 @@
     <div class="form-check">
       {{ form.suspension(class="form-check-input") }}
       {{ form.suspension.label(class="form-check-label") }}
-    </div>
-    <div class="form-check">
-      {{ form.tires(class="form-check-input") }}
-      {{ form.tires.label(class="form-check-label") }}
     </div>
     <div class="form-check">
       {{ form.wheels_rims(class="form-check-input") }}

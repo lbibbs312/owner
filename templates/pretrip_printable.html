@@ -115,8 +115,30 @@
 
   <p>
     <strong>Truck/Tractor No:</strong> {{ pretrip.truck_number or "" }}<br>
-    <strong>Mileage (No tenths):</strong> {{ pretrip.start_mileage or "" }}<br>
-    <strong>Date:</strong> {{ pretrip.pretrip_date }}<br>
+
+    <!-- Show start mileage, plus end mileage if PostTrip exists -->
+    <strong>Mileage (No tenths):</strong>
+    {% if pretrip.posttrip and pretrip.posttrip.end_mileage %}
+      {{ pretrip.start_mileage or 0 }} - {{ pretrip.posttrip.end_mileage }}
+      (Total = {{
+         (pretrip.posttrip.end_mileage - pretrip.start_mileage)
+         if (pretrip.start_mileage and pretrip.posttrip.end_mileage)
+         else 0
+      }})
+    {% else %}
+      {{ pretrip.start_mileage or 0 }}
+    {% endif %}
+    <br>
+
+    <!-- Safely show date if it exists, calling strftime -->
+    <strong>Date:</strong>
+    {% if pretrip.pretrip_date %}
+      {{ pretrip.pretrip_date.strftime("%m/%d/%Y") }}
+    {% else %}
+      --
+    {% endif %}
+    <br>
+
     <strong>Shift:</strong> {{ pretrip.shift }}
   </p>
 

@@ -35,7 +35,6 @@ class AnnouncementForm(FlaskForm):
 
 #
 # PRE-TRIP FORM
-# (Fields below match *all* references in your pretrip template.)
 #
 class PreTripForm(FlaskForm):
     # Basic info
@@ -44,21 +43,21 @@ class PreTripForm(FlaskForm):
     pretrip_date = StringField("PreTrip Date")
     shift = SelectField("Shift", choices=[("1st","1st"), ("2nd","2nd"), ("3rd","3rd")])
     start_mileage = StringField("Start Mileage")
-    end_mileage = StringField("End Mileage")
 
     # Additional
-    truck_type = SelectField("Truck Type", 
-                             choices=[("Tractor", "Tractor"), 
-                                      ("Pickup", "Pickup"), 
-                                      ("Other", "Other")])
-    oil_system_status = SelectField("Oil System Status", 
-                                    choices=[("good", "Good"), 
-                                             ("low", "Low"), 
-                                             ("leaking", "Leaking")])
-    tires_ok = BooleanField("Tires OK")
-    tires_status = SelectField("Tires Status", 
-                               choices=[("good", "Good"), 
-                                        ("needs_replacement", "Needs Replacement")])
+    truck_type = SelectField(
+        "Truck Type",
+        choices=[("Tractor", "Tractor"), ("Pickup", "Pickup"), ("Other", "Other")]
+    )
+    oil_system_status = SelectField(
+        "Oil System Status",
+        choices=[("good", "Good"), ("low", "Low"), ("leaking", "Leaking")]
+    )
+    tires_ok = BooleanField("Tires OK")  # <-- ensures `tires_ok` is defined
+    tires_status = SelectField(
+        "Tires Status",
+        choices=[("good", "Good"), ("needs_replacement", "Needs Replacement")]
+    )
 
     # GENERAL CONDITION
     cab_doors_windows = BooleanField("Cab Doors/Windows")
@@ -133,7 +132,7 @@ class PreTripForm(FlaskForm):
 
 
 #
-# POST-TRIP FORM (if needed)
+# POST-TRIP FORM
 #
 class PostTripForm(FlaskForm):
     end_mileage = StringField("Ending Mileage")
