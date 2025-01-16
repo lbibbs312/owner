@@ -65,7 +65,7 @@ PLANT_ADDRESSES = {
     "DC": "5357 52nd st se",          
     "Helios": "5333 33rd st se",      
     "BP": "4080 Barden Dr SE",
-    "52L": "5010 52nd St SE",
+    "52L": "4365 52nd St SE",
     "Trim DC": "5357 52nd St SE",
     "52DC": "4365 52nd St SE",
     "ALN": "4260 Airlane Dr SE",
