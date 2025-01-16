@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <title>LacksDrivers - Dynamic</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- 1) Force mobile-friendly viewport (disables pinch-zoom) -->
+  <meta 
+    name="viewport" 
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  >
+
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
   <!-- Bootstrap 5 CSS -->
@@ -329,16 +335,24 @@
       });
     }
 
+    // 2) Lock body scrolling when overlay is open, so user can't move page out of center.
     function openOverlay() {
       const overlay = document.getElementById('fullscreenOverlay');
       overlay.classList.add('show');
-      // Removed the line that blurred #pageContent
+
+      // Disable background scroll on body & html:
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
     }
 
     function closeOverlay() {
       const overlay = document.getElementById('fullscreenOverlay');
       overlay.classList.remove('show');
-      // Removed the line that unblurred #pageContent
+
+      // Re-enable background scroll:
+      document.body.style.overflow = 'auto';
+      document.documentElement.style.overflow = 'auto';
+
       document.getElementById('overlayContentArea').innerHTML = '';
     }
 
