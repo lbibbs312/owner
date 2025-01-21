@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>New PreTrip Inspection</title>
+  <!-- Bootstrap 5 (optional, remove if you have your own styling) -->
+  <link 
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" 
+    rel="stylesheet"
+  >
+</head>
+<body>
+<div class="container my-4">
+  <h1 class="mb-3">New PreTrip Inspection</h1>
+
+  <form method="POST" action="">
+    <!-- CRITICAL: ensures CSRF token is included -->
+    {{ form.hidden_tag() }}
+
+    <!-- 1) BASIC INFO -->
+    <div class="row mb-3">
+      <div class="col-md-4">
+        {{ form.truck_number.label }}
+        {{ form.truck_number(class="form-control") }}
+        {% for err in form.truck_number.errors %}
+          <div class="text-danger">{{ err }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-md-4">
+        {{ form.trailer_number.label }}
+        {{ form.trailer_number(class="form-control") }}
+        {% for err in form.trailer_number.errors %}
+          <div class="text-danger">{{ err }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-md-4">
+        {{ form.pretrip_date.label }} 
+        <!-- By default, DateField requires YYYY-MM-DD. If you want a date picker, 
+             you can do type="date" with something like:
+             {{ form.pretrip_date(class="form-control", type="date") }} 
+        -->
+        {{ form.pretrip_date(class="form-control") }}
+        {% for err in form.pretrip_date.errors %}
+          <div class="text-danger">{{ err }}</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-md-4">
+        {{ form.shift.label }}
+        {{ form.shift(class="form-select") }}
+      </div>
+      <div class="col-md-4">
+        {{ form.start_mileage.label }}
+        {{ form.start_mileage(class="form-control") }}
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- 2) GENERAL CONDITION -->
+    <h4>General Condition</h4>
+    <div class="form-check">
+      {{ form.cab_doors_windows(class="form-check-input") }}
+      {{ form.cab_doors_windows.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.body_doors(class="form-check-input") }}
+      {{ form.body_doors.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.oil_leak(class="form-check-input") }}
+      {{ form.oil_leak.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.grease_leak(class="form-check-input") }}
+      {{ form.grease_leak.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.coolant_leak(class="form-check-input") }}
+      {{ form.coolant_leak.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.fuel_leak(class="form-check-input") }}
+      {{ form.fuel_leak.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.gc_no_defects(class="form-check-input") }}
+      {{ form.gc_no_defects.label(class="form-check-label text-success fw-bold") }}
+    </div>
+
+    <hr>
+
+    <!-- 3) IN-CAB -->
+    <h4>In-Cab</h4>
+    <div class="form-check">
+      {{ form.gauges_warning(class="form-check-input") }}
+      {{ form.gauges_warning.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.wipers(class="form-check-input") }}
+      {{ form.wipers.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.horn(class="form-check-input") }}
+      {{ form.horn.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.heater_defroster(class="form-check-input") }}
+      {{ form.heater_defroster.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.mirrors(class="form-check-input") }}
+      {{ form.mirrors.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.seat_belts_steering(class="form-check-input") }}
+      {{ form.seat_belts_steering.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.clutch(class="form-check-input") }}
+      {{ form.clutch.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.service_brakes(class="form-check-input") }}
+      {{ form.service_brakes.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.parking_brake(class="form-check-input") }}
+      {{ form.parking_brake.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.emergency_brakes(class="form-check-input") }}
+      {{ form.emergency_brakes.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.triangles(class="form-check-input") }}
+      {{ form.triangles.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.fire_extinguisher(class="form-check-input") }}
+      {{ form.fire_extinguisher.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.safety_equipment(class="form-check-input") }}
+      {{ form.safety_equipment.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.incab_no_defects(class="form-check-input") }}
+      {{ form.incab_no_defects.label(class="form-check-label text-success fw-bold") }}
+    </div>
+
+    <hr>
+
+    <!-- 4) ENGINE COMPARTMENT -->
+    <h4>Engine Compartment</h4>
+    <div class="form-check">
+      {{ form.oil_level(class="form-check-input") }}
+      {{ form.oil_level.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.coolant_level(class="form-check-input") }}
+      {{ form.coolant_level.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.belts(class="form-check-input") }}
+      {{ form.belts.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.hoses(class="form-check-input") }}
+      {{ form.hoses.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.ec_no_defects(class="form-check-input") }}
+      {{ form.ec_no_defects.label(class="form-check-label text-success fw-bold") }}
+    </div>
+
+    <hr>
+
+    <!-- 5) EXTERIOR -->
+    <h4>Exterior</h4>
+    <div class="form-check">
+      {{ form.lights_working(class="form-check-input") }}
+      {{ form.lights_working.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.reflectors(class="form-check-input") }}
+      {{ form.reflectors.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.suspension(class="form-check-input") }}
+      {{ form.suspension.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.tires(class="form-check-input") }}
+      {{ form.tires.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.wheels_rims(class="form-check-input") }}
+      {{ form.wheels_rims.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.battery(class="form-check-input") }}
+      {{ form.battery.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.exhaust(class="form-check-input") }}
+      {{ form.exhaust.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.brakes(class="form-check-input") }}
+      {{ form.brakes.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.air_lines(class="form-check-input") }}
+      {{ form.air_lines.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.light_line(class="form-check-input") }}
+      {{ form.light_line.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.fifth_wheel(class="form-check-input") }}
+      {{ form.fifth_wheel.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.coupling(class="form-check-input") }}
+      {{ form.coupling.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.tie_downs(class="form-check-input") }}
+      {{ form.tie_downs.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.rear_end_protection(class="form-check-input") }}
+      {{ form.rear_end_protection.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.exterior_no_defects(class="form-check-input") }}
+      {{ form.exterior_no_defects.label(class="form-check-label text-success fw-bold") }}
+    </div>
+
+    <hr>
+
+    <!-- 6) TOWED UNIT -->
+    <h4>Towed Unit(s)</h4>
+    <div class="form-check">
+      {{ form.towed_bodydoors(class="form-check-input") }}
+      {{ form.towed_bodydoors.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_tiedowns(class="form-check-input") }}
+      {{ form.towed_tiedowns.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_lights(class="form-check-input") }}
+      {{ form.towed_lights.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_reflectors(class="form-check-input") }}
+      {{ form.towed_reflectors.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_suspension(class="form-check-input") }}
+      {{ form.towed_suspension.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_tires(class="form-check-input") }}
+      {{ form.towed_tires.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_wheels(class="form-check-input") }}
+      {{ form.towed_wheels.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_brakes(class="form-check-input") }}
+      {{ form.towed_brakes.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_landing_gear(class="form-check-input") }}
+      {{ form.towed_landing_gear.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_kingpin(class="form-check-input") }}
+      {{ form.towed_kingpin.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_fifthwheel(class="form-check-input") }}
+      {{ form.towed_fifthwheel.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_othercoupling(class="form-check-input") }}
+      {{ form.towed_othercoupling.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_rearend(class="form-check-input") }}
+      {{ form.towed_rearend.label(class="form-check-label") }}
+    </div>
+    <div class="form-check">
+      {{ form.towed_no_defects(class="form-check-input") }}
+      {{ form.towed_no_defects.label(class="form-check-label text-success fw-bold") }}
+    </div>
+
+    <hr>
+
+    <!-- 7) ADDITIONAL -->
+    <h4>Additional Info</h4>
+    <div class="mb-3">
+      {{ form.truck_type.label }}
+      {{ form.truck_type(class="form-select") }}
+    </div>
+    <div class="mb-3">
+      {{ form.oil_system_status.label }}
+      {{ form.oil_system_status(class="form-select") }}
+    </div>
+    <div class="mb-3">
+      {{ form.tires_status.label }}
+      {{ form.tires_status(class="form-select") }}
+    </div>
+
+    <!-- 8) DAMAGE REPORT -->
+    <div class="mb-3">
+      {{ form.damage_report.label }}
+      {{ form.damage_report(class="form-control", rows="3") }}
+    </div>
+
+    <!-- 9) SUBMIT -->
+    {{ form.submit(class="btn btn-primary mt-3") }}
+  </form>
+</div>
+
+<!-- Optional: Bootstrap 5 JS for collapse/accordion, if needed -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
