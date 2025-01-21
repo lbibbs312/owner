@@ -624,7 +624,7 @@ def logout():
     flash("Logged out.", "info")
     return redirect(url_for("welcome"))
 
-@app.route("/dashboard")
+@app.route("/dashboard", methods=["GET", "POST"])
 @login_required
 def dashboard():
     logs = DriverLog.query.filter_by(driver_id=current_user.id)\
@@ -910,7 +910,7 @@ def do_posttrip(pretrip_id):
         return redirect(url_for("view_pretrip", pretrip_id=pretrip_id))
     return render_template("posttrip.html", form=form, pretrip=pt)
 
-@app.route("/view_pretrip/<int:pretrip_id>")
+@app.route("/view_pretrip/<int:pretrip_id>", methods=["GET","POST"])
 @login_required
 def view_pretrip(pretrip_id):
     pt = PreTrip.query.get_or_404(pretrip_id)
