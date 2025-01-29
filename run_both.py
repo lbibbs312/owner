@@ -5,7 +5,7 @@ import time
 def start_server():
     print("Starting local server...")
     return subprocess.Popen(["python", "local_server.py"])
-
+# Note: Change the port in local_server.py to 3000
 # Start the GUI
 def start_gui():
     print("Starting GUI...")
