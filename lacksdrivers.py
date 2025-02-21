@@ -1,7 +1,3 @@
-############################################################################
-# lacksdrivers.py (FULLY CORRECTED SINGLE-FILE VERSION WITH IMPROVEMENTS)
-############################################################################
-
 import os
 import pytz
 from datetime import datetime, date, timedelta
@@ -27,7 +23,7 @@ from flask_socketio import SocketIO, join_room, leave_room, emit
 from flask_migrate import Migrate
 from sqlalchemy import Enum
 
-# Import the manager blueprint
+# Import the manager blueprint (if you have one)
 from manager_routes import manager_bp
 
 ############################################################################
@@ -52,9 +48,8 @@ login_manager.login_view = "login"
 app.register_blueprint(manager_bp)
 
 ############################################################################
-# Utility Function (NEW)
+# Utility Function (for time parsing)
 ############################################################################
-### CHANGED ###
 def parse_time_no_colon(input_str):
     """
     Allows times with or without a colon. Examples:
@@ -65,29 +60,23 @@ def parse_time_no_colon(input_str):
     '13:05' => '13:05' (already has colon)
     """
     raw = input_str.strip()
-    # If there's a colon, parse as HH:MM
     if ":" in raw:
         dt_obj = datetime.strptime(raw, "%H:%M")
         return dt_obj.strftime("%H:%M")
     else:
-        # No colon. Attempt to interpret digits
         if not raw.isdigit():
             raise ValueError("Not numeric.")
         digits = len(raw)
         if digits == 1:
-            # e.g. '8' => hour=8, minute=0
             hour = int(raw)
             minute = 0
         elif digits == 2:
-            # e.g. '08' => 08:00 or '12' => 12:00
             hour = int(raw)
             minute = 0
         elif digits == 3:
-            # e.g. '545' => hour=5, minute=45
             hour = int(raw[0])
             minute = int(raw[1:])
         elif digits == 4:
-            # e.g. '0830' => hour=08, minute=30
             hour = int(raw[:2])
             minute = int(raw[2:])
         else:
@@ -120,10 +109,7 @@ PLANT_ADDRESSES = {
     "GLA": "17113 Applewhite Road",
     "KM": "5801 Kraft Ave SE",
     "KS": "5675 Kraft Ave SE",
-    "MDCTR": "2120 43rd St SE",
-    "PAASM": "3703 Patterson Ave SE",
     "MONROE": "1648 Monroe Ave NW",
-    "PVC": "4949 Broadmoor Ave SE",
     "Other": "Unspecified location",
     "Lab": "Corporate Lab (placeholder)",
     "PPM": "PPM MONROE(1648 monroe ave)"
@@ -140,7 +126,7 @@ def inject_plant_addresses():
 ITEM_STATUSES = ("operational", "damaged", "missing", "leaking")
 
 #
-# 1) USER MODEL (Define first so references in other models succeed)
+# 1) USER MODEL
 #
 class User(db.Model, UserMixin):
     __tablename__ = "user"
@@ -151,6 +137,9 @@ class User(db.Model, UserMixin):
     role = db.Column(db.String(20), default="driver")  # "driver" or "management"
 
     tasks = db.relationship("Task", backref="assigned_user", lazy="dynamic")
+    driver_logs = db.relationship("DriverLog", backref="driver", lazy="dynamic")
+    pretrips = db.relationship("PreTrip", backref="driver", lazy="dynamic")
+    chat_messages = db.relationship("ChatMessage", backref="user", lazy="dynamic")
 
     def set_password(self, pwd):
         self.password_hash = generate_password_hash(pwd)
@@ -186,7 +175,72 @@ class PreTrip(db.Model):
     pretrip_date = db.Column(db.Date, default=date.today)
     shift = db.Column(db.String(10))
     start_mileage = db.Column(db.Integer)
-    # ... (all your pretrip checkboxes) ...
+    # Additional fields for the PreTrip inspection
+    truck_type = db.Column(db.String(20))
+    oil_system_status = db.Column(db.String(20))
+    tires_ok = db.Column(db.Boolean, default=False)
+    tires_status = db.Column(db.String(50))
+    # GENERAL CONDITION
+    cab_doors_windows = db.Column(db.Boolean, default=False)
+    body_doors = db.Column(db.Boolean, default=False)
+    oil_leak = db.Column(db.Boolean, default=False)
+    grease_leak = db.Column(db.Boolean, default=False)
+    coolant_leak = db.Column(db.Boolean, default=False)
+    fuel_leak = db.Column(db.Boolean, default=False)
+    gc_no_defects = db.Column(db.Boolean, default=False)
+    # IN-CAB
+    gauges_warning = db.Column(db.Boolean, default=False)
+    wipers = db.Column(db.Boolean, default=False)
+    horn = db.Column(db.Boolean, default=False)
+    heater_defroster = db.Column(db.Boolean, default=False)
+    mirrors = db.Column(db.Boolean, default=False)
+    seat_belts_steering = db.Column(db.Boolean, default=False)
+    clutch = db.Column(db.Boolean, default=False)
+    service_brakes = db.Column(db.Boolean, default=False)
+    parking_brake = db.Column(db.Boolean, default=False)
+    emergency_brakes = db.Column(db.Boolean, default=False)
+    triangles = db.Column(db.Boolean, default=False)
+    fire_extinguisher = db.Column(db.Boolean, default=False)
+    safety_equipment = db.Column(db.Boolean, default=False)
+    incab_no_defects = db.Column(db.Boolean, default=False)
+    # ENGINE COMPARTMENT
+    oil_level = db.Column(db.Boolean, default=False)
+    coolant_level = db.Column(db.Boolean, default=False)
+    belts = db.Column(db.Boolean, default=False)
+    hoses = db.Column(db.Boolean, default=False)
+    ec_no_defects = db.Column(db.Boolean, default=False)
+    # EXTERIOR
+    lights_working = db.Column(db.Boolean, default=False)
+    reflectors = db.Column(db.Boolean, default=False)
+    suspension = db.Column(db.Boolean, default=False)
+    tires = db.Column(db.Boolean, default=False)
+    wheels_rims = db.Column(db.Boolean, default=False)
+    battery = db.Column(db.Boolean, default=False)
+    exhaust = db.Column(db.Boolean, default=False)
+    brakes = db.Column(db.Boolean, default=False)
+    air_lines = db.Column(db.Boolean, default=False)
+    light_line = db.Column(db.Boolean, default=False)
+    fifth_wheel = db.Column(db.Boolean, default=False)
+    coupling = db.Column(db.Boolean, default=False)
+    tie_downs = db.Column(db.Boolean, default=False)
+    rear_end_protection = db.Column(db.Boolean, default=False)
+    exterior_no_defects = db.Column(db.Boolean, default=False)
+    # TOWED UNIT
+    towed_bodydoors = db.Column(db.Boolean, default=False)
+    towed_tiedowns = db.Column(db.Boolean, default=False)
+    towed_lights = db.Column(db.Boolean, default=False)
+    towed_reflectors = db.Column(db.Boolean, default=False)
+    towed_suspension = db.Column(db.Boolean, default=False)
+    towed_tires = db.Column(db.Boolean, default=False)
+    towed_wheels = db.Column(db.Boolean, default=False)
+    towed_brakes = db.Column(db.Boolean, default=False)
+    towed_landing_gear = db.Column(db.Boolean, default=False)
+    towed_kingpin = db.Column(db.Boolean, default=False)
+    towed_fifthwheel = db.Column(db.Boolean, default=False)
+    towed_othercoupling = db.Column(db.Boolean, default=False)
+    towed_rearend = db.Column(db.Boolean, default=False)
+    towed_no_defects = db.Column(db.Boolean, default=False)
+    # REMARKS / DAMAGE
     damage_report = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
@@ -211,8 +265,6 @@ class DriverLog(db.Model):
     __tablename__ = "driver_log"
     id = db.Column(db.Integer, primary_key=True)
     driver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    driver = db.relationship("User", backref="driver_logs", lazy="joined")
-
     date = db.Column(db.Date, nullable=False)
     arrive_time = db.Column(db.String(20))
     depart_time = db.Column(db.String(20))
@@ -222,16 +274,11 @@ class DriverLog(db.Model):
     maintenance = db.Column(db.Boolean, default=False)
     fuel = db.Column(db.Boolean, default=False)
     meeting = db.Column(db.Boolean, default=False)
-
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
 
     @property
     def action_label(self):
-        """
-        Returns 'Depart' if no departure time is recorded;
-        otherwise returns 'Edit'
-        """
         return "Depart" if not self.depart_time else "Edit"
 
 #
@@ -244,8 +291,6 @@ class ChatMessage(db.Model):
     content = db.Column(db.Text, nullable=False)
     room = db.Column(db.String(100), default="global")
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-
-    user = db.relationship("User", backref="chat_messages")
 
 #
 # 6) ANNOUNCEMENT
@@ -299,7 +344,7 @@ class KnowledgeBaseEntry(db.Model):
     body = db.Column(db.Text)
 
 ############################################################################
-# Example Forms (kept for driver usage)
+# Forms
 ############################################################################
 
 class EndOfDayForm(FlaskForm):
@@ -310,7 +355,7 @@ class RegistrationForm(FlaskForm):
     email = StringField("Email", validators=[DataRequired(), Email()])
     password = PasswordField("Password", validators=[DataRequired(), Length(min=6)])
     confirm_password = PasswordField("Confirm Password", validators=[DataRequired(), EqualTo("password")])
-    role = SelectField("Role", choices=[("driver","Driver"),("management","Management")], default="driver")
+    role = SelectField("Role", choices=[("driver", "Driver"), ("management", "Management")], default="driver")
     manager_pin = PasswordField("Manager PIN (if Management)")
     submit = SubmitField("Register")
 
@@ -324,7 +369,7 @@ class TaskForm(FlaskForm):
     title = StringField("Title", validators=[DataRequired()])
     details = TextAreaField("Details")
     is_hot = BooleanField("Mark as Hot")
-    shift = SelectField("Shift", choices=[("1st","1st"),("2nd","2nd"),("3rd","3rd")])
+    shift = SelectField("Shift", choices=[("1st", "1st"), ("2nd", "2nd"), ("3rd", "3rd")])
     assigned_to = SelectField("Assign To (Driver)", coerce=int, default=None)
     submit = SubmitField("Create Task")
 
@@ -332,27 +377,92 @@ class UpdateTaskForm(FlaskForm):
     title = StringField("Title", validators=[DataRequired()])
     details = TextAreaField("Details")
     is_hot = BooleanField("Mark as Hot")
-    shift = SelectField("Shift", choices=[("1st","1st"),("2nd","2nd"),("3rd","3rd")])
+    shift = SelectField("Shift", choices=[("1st", "1st"), ("2nd", "2nd"), ("3rd", "3rd")])
     status = SelectField(
         "Status",
         choices=[
-            ("pending","Pending"),
-            ("in-progress","In Progress"),
-            ("completed","Completed"),
-            ("declined","Declined")
+            ("pending", "Pending"),
+            ("in-progress", "In Progress"),
+            ("completed", "Completed"),
+            ("declined", "Declined")
         ]
     )
     assigned_to = SelectField("Assigned To (Driver)", coerce=int)
     submit = SubmitField("Update Task")
 
 class PreTripForm(FlaskForm):
+    # Basic info
     truck_number = StringField("Truck / Tractor #", validators=[DataRequired()])
     trailer_number = StringField("Trailer #")
     pretrip_date = DateField("PreTrip Date", format="%Y-%m-%d")
-    shift = SelectField("Shift", choices=[("1st","1st"), ("2nd","2nd"), ("3rd","3rd")])
+    shift = SelectField("Shift", choices=[("1st", "1st"), ("2nd", "2nd"), ("3rd", "3rd")])
     start_mileage = IntegerField("Start Mileage")
-    end_mileage = IntegerField("End Mileage")
-    # (All your pretrip checkboxes/fields)
+    # Additional info
+    truck_type = SelectField("Truck Type", choices=[("Tractor", "Tractor"), ("Pickup", "Pickup"), ("Other", "Other")])
+    oil_system_status = SelectField("Oil System Status", choices=[("good", "Good"), ("low", "Low"), ("leaking", "Leaking")])
+    tires_ok = BooleanField("Tires OK")
+    tires_status = SelectField("Tires Status", choices=[("good", "Good"), ("needs_replacement", "Needs Replacement")])
+    # GENERAL CONDITION
+    cab_doors_windows = BooleanField("Cab Doors/Windows")
+    body_doors = BooleanField("Body Doors")
+    oil_leak = BooleanField("Oil Leak")
+    grease_leak = BooleanField("Grease Leak")
+    coolant_leak = BooleanField("Coolant Leak")
+    fuel_leak = BooleanField("Fuel Leak")
+    gc_no_defects = BooleanField("No Defects (General Condition)")
+    # IN-CAB
+    gauges_warning = BooleanField("Gauges/Warning Indicators")
+    wipers = BooleanField("Windshield Wipers/Washers")
+    horn = BooleanField("Horn")
+    heater_defroster = BooleanField("Heater/Defroster")
+    mirrors = BooleanField("Mirrors")
+    seat_belts_steering = BooleanField("Seat Belts/Steering")
+    clutch = BooleanField("Clutch")
+    service_brakes = BooleanField("Service Brakes")
+    parking_brake = BooleanField("Parking Brake")
+    emergency_brakes = BooleanField("Emergency Brakes")
+    triangles = BooleanField("Triangles")
+    fire_extinguisher = BooleanField("Fire Extinguisher")
+    safety_equipment = BooleanField("Safety Equipment")
+    incab_no_defects = BooleanField("No Defects (In-Cab)")
+    # ENGINE COMPARTMENT
+    oil_level = BooleanField("Oil Level")
+    coolant_level = BooleanField("Coolant Level")
+    belts = BooleanField("Belts")
+    hoses = BooleanField("Hoses")
+    ec_no_defects = BooleanField("No Defects (Engine Compartment)")
+    # EXTERIOR
+    lights_working = BooleanField("Lights Working")
+    reflectors = BooleanField("Reflectors")
+    suspension = BooleanField("Suspension")
+    tires = BooleanField("Tires")
+    wheels_rims = BooleanField("Wheels/Rims")
+    battery = BooleanField("Battery")
+    exhaust = BooleanField("Exhaust")
+    brakes = BooleanField("Brakes")
+    air_lines = BooleanField("Air Lines")
+    light_line = BooleanField("Light Line")
+    fifth_wheel = BooleanField("Fifth Wheel")
+    coupling = BooleanField("Coupling")
+    tie_downs = BooleanField("Tie Downs")
+    rear_end_protection = BooleanField("Rear End Protection")
+    exterior_no_defects = BooleanField("No Defects (Exterior)")
+    # TOWED UNIT
+    towed_bodydoors = BooleanField("Body/Doors")
+    towed_tiedowns = BooleanField("Tie-Downs")
+    towed_lights = BooleanField("Lights")
+    towed_reflectors = BooleanField("Reflectors")
+    towed_suspension = BooleanField("Suspension")
+    towed_tires = BooleanField("Tires")
+    towed_wheels = BooleanField("Wheels")
+    towed_brakes = BooleanField("Brakes")
+    towed_landing_gear = BooleanField("Landing Gear")
+    towed_kingpin = BooleanField("Kingpin")
+    towed_fifthwheel = BooleanField("Fifth Wheel")
+    towed_othercoupling = BooleanField("Other Coupling")
+    towed_rearend = BooleanField("Rear End")
+    towed_no_defects = BooleanField("No Defects (Towed Unit)")
+    # REMARKS / DAMAGE
     damage_report = TextAreaField("Damage Report")
     submit = SubmitField("Save PreTrip")
 
@@ -365,34 +475,33 @@ class DriverLogForm(FlaskForm):
     maintenance = BooleanField("Maintenance")
     fuel = BooleanField("Fuel")
     meeting = BooleanField("Meeting")
-
     plant_name = SelectField(
         "Plant Name",
         choices=[
             ("", "Select Plant..."),
-            ("RE","RE"),
-            ("RW","RW"),
-            ("PC","PC"),
-            ("PE","PE"),
-            ("PW","PW"),
-            ("KP","KP"),
-            ("PPL","PPL"),
-            ("DC","DC"),
-            ("Helios","Helios"),
-            ("BP","BP"),
-            ("52L","52L"),
-            ("Trim DC","Trim DC"),
-            ("52DC","52DC"),
-            ("ALN","ALN"),
-            ("AWE","AWE"),
-            ("CORP","CORP"),
-            ("R&D","R&D"),
-            ("GLA","GLA"),
-            ("KM","KM"),
-            ("KS","KS"),
-            ("MONROE","MONROE"),
-            ("Other","Other"),
-            ("Lab","Lab")
+            ("RE", "RE"),
+            ("RW", "RW"),
+            ("PC", "PC"),
+            ("PE", "PE"),
+            ("PW", "PW"),
+            ("KP", "KP"),
+            ("PPL", "PPL"),
+            ("DC", "DC"),
+            ("Helios", "Helios"),
+            ("BP", "BP"),
+            ("52L", "52L"),
+            ("Trim DC", "Trim DC"),
+            ("52DC", "52DC"),
+            ("ALN", "ALN"),
+            ("AWE", "AWE"),
+            ("CORP", "CORP"),
+            ("R&D", "R&D"),
+            ("GLA", "GLA"),
+            ("KM", "KM"),
+            ("KS", "KS"),
+            ("MONROE", "MONROE"),
+            ("Other", "Other"),
+            ("Lab", "Lab")
         ],
         validators=[DataRequired()]
     )
@@ -400,24 +509,20 @@ class DriverLogForm(FlaskForm):
         "Load Size",
         choices=[
             ("", "Select Load Size..."),
-            ("Empty","Empty"),
-            ("Quarter","Quarter"),
-            ("Half","Half"),
-            ("Partial","Partial"),
-            ("Full","Full"),
-            ("Hazmat","Hazmat")
+            ("Empty", "Empty"),
+            ("Quarter", "Quarter"),
+            ("Half", "Half"),
+            ("Partial", "Partial"),
+            ("Full", "Full"),
+            ("Hazmat", "Hazmat")
         ],
         validators=[DataRequired()]
     )
     downtime_reason = StringField("Downtime Reason (optional)")
-
-    ### CHANGED ###
-    # Let user type "545" => 05:45 or "930" => 09:30
     depart_time = StringField(
         "Depart Time (optional)",
         description="Enter time like '545' => 05:45 or '13:05' => 13:05"
     )
-
     submit = SubmitField("Submit Log Entry")
 
 class AnnouncementForm(FlaskForm):
@@ -438,7 +543,7 @@ class KnowledgeBaseForm(FlaskForm):
 class ProfileForm(FlaskForm):
     username = StringField("Username", validators=[DataRequired()])
     email = StringField("Email", validators=[DataRequired(), Email()])
-    role = SelectField("Role", choices=[("driver","Driver"),("management","Management")])
+    role = SelectField("Role", choices=[("driver", "Driver"), ("management", "Management")])
     new_password = PasswordField("New Password")
     confirm_password = PasswordField(
         "Confirm New Password",
@@ -454,7 +559,7 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 ############################################################################
-# Jinja filter for UTC -> local
+# Jinja filter for UTC -> local time
 ############################################################################
 @app.template_filter('to_local_time')
 def to_local_time(utc_str):
@@ -479,7 +584,7 @@ def welcome():
     bulletins = Announcement.query.order_by(Announcement.created_at.desc()).limit(5).all()
     return render_template("welcome.html", bulletins=bulletins)
 
-@app.route("/register", methods=["GET","POST"])
+@app.route("/register", methods=["GET", "POST"])
 def register():
     form = RegistrationForm()
     if form.validate_on_submit():
@@ -505,7 +610,7 @@ def register():
             return redirect(url_for("login"))
     return render_template("register.html", form=form)
 
-@app.route("/login", methods=["GET","POST"])
+@app.route("/login", methods=["GET", "POST"])
 def login():
     form = LoginForm()
     if form.validate_on_submit():
@@ -589,7 +694,6 @@ def list_tasks():
 @app.route("/driver_logs", methods=["GET"])
 @login_required
 def driver_logs():
-    # Get the 'date' query parameter; default to today's date if not provided.
     date_str = request.args.get("date")
     try:
         search_date = datetime.strptime(date_str, "%Y-%m-%d").date() if date_str else datetime.now().date()
@@ -617,8 +721,7 @@ def driver_logs():
         ).order_by(DriverLog.created_at.desc()).all()
         return render_template("driver_logs.html", logs=logs, search_date=search_date)
 
-
-@app.route("/new_driving_log", methods=["GET","POST"])
+@app.route("/new_driving_log", methods=["GET", "POST"])
 @login_required
 def new_driving_log():
     form = DriverLogForm()
@@ -651,7 +754,8 @@ def new_driving_log():
         return redirect(url_for("driver_logs"))
 
     return render_template("new_driving_log.html", form=form)
-@app.route("/edit_driver_log/<int:log_id>", methods=["GET","POST"])
+
+@app.route("/edit_driver_log/<int:log_id>", methods=["GET", "POST"])
 @login_required
 def edit_driver_log(log_id):
     log = DriverLog.query.get_or_404(log_id)
@@ -661,12 +765,10 @@ def edit_driver_log(log_id):
 
     form = DriverLogForm(obj=log)
     if form.validate_on_submit():
-        # Basic validations
         if not form.plant_name.data or not form.load_size.data:
             flash("Please select a valid Plant Name and Load Size.", "danger")
             return redirect(url_for("edit_driver_log", log_id=log.id))
         
-        # Update standard fields
         log.plant_name = form.plant_name.data
         log.load_size = form.load_size.data
         log.downtime_reason = form.downtime_reason.data
@@ -674,12 +776,9 @@ def edit_driver_log(log_id):
         log.fuel = form.fuel.data
         log.meeting = form.meeting.data
 
-        # If user typed a depart time, store it directly.
         if form.depart_time.data.strip():
-            # Store exactly what they typed
             log.depart_time = form.depart_time.data.strip()
         else:
-            # If blank => store the current local time
             local_tz = pytz.timezone("America/Detroit")
             now_local = datetime.now(local_tz)
             log.depart_time = now_local.strftime("%H:%M")
@@ -689,24 +788,16 @@ def edit_driver_log(log_id):
         return redirect(url_for("driver_logs"))
 
     return render_template("edit_driver_log.html", form=form, log=log)
+
 @app.template_filter('to_12h_format')
 def to_12h_format(hhmm_str):
-    """
-    Converts a plain "HH:MM" string (e.g. "06:12") to a 12-hour format
-    with am/pm (e.g. "6:12am"). If blank or invalid, returns the original.
-    """
     if not hhmm_str:
         return ""
     try:
         dt = datetime.strptime(hhmm_str, "%H:%M")
-        # e.g. "06:12" -> datetime(1900,1,1,6,12)
-        # Now format as "6:12am"
         return dt.strftime("%I:%M%p").lower().lstrip('0')
     except ValueError:
-        # If parsing fails, just return it as-is
         return hhmm_str
-
-
 
 @app.route("/view_driver_log/<int:log_id>")
 @login_required
@@ -730,7 +821,7 @@ def list_pretrips():
                                 .order_by(PreTrip.created_at.desc()).all()
     return render_template("list_pretrips.html", pretrips=pretrips)
 
-@app.route("/new_pretrip", methods=["GET","POST"])
+@app.route("/new_pretrip", methods=["GET", "POST"])
 @login_required
 def new_pretrip():
     form = PreTripForm()
@@ -744,7 +835,66 @@ def new_pretrip():
             pretrip_date=chosen_date,
             shift=form.shift.data,
             start_mileage=form.start_mileage.data,
-            # (Set all checkboxes from form as needed)
+            truck_type=form.truck_type.data,
+            oil_system_status=form.oil_system_status.data,
+            tires_ok=form.tires_ok.data,
+            tires_status=form.tires_status.data,
+            cab_doors_windows=form.cab_doors_windows.data,
+            body_doors=form.body_doors.data,
+            oil_leak=form.oil_leak.data,
+            grease_leak=form.grease_leak.data,
+            coolant_leak=form.coolant_leak.data,
+            fuel_leak=form.fuel_leak.data,
+            gc_no_defects=form.gc_no_defects.data,
+            gauges_warning=form.gauges_warning.data,
+            wipers=form.wipers.data,
+            horn=form.horn.data,
+            heater_defroster=form.heater_defroster.data,
+            mirrors=form.mirrors.data,
+            seat_belts_steering=form.seat_belts_steering.data,
+            clutch=form.clutch.data,
+            service_brakes=form.service_brakes.data,
+            parking_brake=form.parking_brake.data,
+            emergency_brakes=form.emergency_brakes.data,
+            triangles=form.triangles.data,
+            fire_extinguisher=form.fire_extinguisher.data,
+            safety_equipment=form.safety_equipment.data,
+            incab_no_defects=form.incab_no_defects.data,
+            oil_level=form.oil_level.data,
+            coolant_level=form.coolant_level.data,
+            belts=form.belts.data,
+            hoses=form.hoses.data,
+            ec_no_defects=form.ec_no_defects.data,
+            lights_working=form.lights_working.data,
+            reflectors=form.reflectors.data,
+            suspension=form.suspension.data,
+            tires=form.tires.data,
+            wheels_rims=form.wheels_rims.data,
+            battery=form.battery.data,
+            exhaust=form.exhaust.data,
+            brakes=form.brakes.data,
+            air_lines=form.air_lines.data,
+            light_line=form.light_line.data,
+            fifth_wheel=form.fifth_wheel.data,
+            coupling=form.coupling.data,
+            tie_downs=form.tie_downs.data,
+            rear_end_protection=form.rear_end_protection.data,
+            exterior_no_defects=form.exterior_no_defects.data,
+            towed_bodydoors=form.towed_bodydoors.data,
+            towed_tiedowns=form.towed_tiedowns.data,
+            towed_lights=form.towed_lights.data,
+            towed_reflectors=form.towed_reflectors.data,
+            towed_suspension=form.towed_suspension.data,
+            towed_tires=form.towed_tires.data,
+            towed_wheels=form.towed_wheels.data,
+            towed_brakes=form.towed_brakes.data,
+            towed_landing_gear=form.towed_landing_gear.data,
+            towed_kingpin=form.towed_kingpin.data,
+            towed_fifthwheel=form.towed_fifthwheel.data,
+            towed_othercoupling=form.towed_othercoupling.data,
+            towed_rearend=form.towed_rearend.data,
+            towed_no_defects=form.towed_no_defects.data,
+            damage_report=form.damage_report.data
         )
 
         db.session.add(new_pt)
@@ -755,7 +905,7 @@ def new_pretrip():
 
     return render_template("new_pretrip.html", form=form)
 
-@app.route("/do_posttrip/<int:pretrip_id>", methods=["GET","POST"])
+@app.route("/do_posttrip/<int:pretrip_id>", methods=["GET", "POST"])
 @login_required
 def do_posttrip(pretrip_id):
     pt = PreTrip.query.get_or_404(pretrip_id)
@@ -792,7 +942,7 @@ def do_posttrip(pretrip_id):
         return redirect(url_for("view_pretrip", pretrip_id=pretrip_id))
     return render_template("posttrip.html", form=form, pretrip=pt)
 
-@app.route("/view_pretrip/<int:pretrip_id>", methods=["GET","POST"])
+@app.route("/view_pretrip/<int:pretrip_id>", methods=["GET", "POST"])
 @login_required
 def view_pretrip(pretrip_id):
     pt = PreTrip.query.get_or_404(pretrip_id)
@@ -801,7 +951,7 @@ def view_pretrip(pretrip_id):
         return redirect(url_for("list_pretrips"))
     return render_template("view_pretrip.html", pretrip=pt, readonly=(current_user.role=="management"))
 
-@app.route("/edit_pretrip_entry/<int:pretrip_id>", methods=["GET","POST"])
+@app.route("/edit_pretrip_entry/<int:pretrip_id>", methods=["GET", "POST"])
 @login_required
 def edit_pretrip_entry(pretrip_id):
     pt = PreTrip.query.get_or_404(pretrip_id)
@@ -820,8 +970,66 @@ def edit_pretrip_entry(pretrip_id):
         pt.truck_number = form.truck_number.data
         pt.trailer_number = form.trailer_number.data
         pt.start_mileage = form.start_mileage.data
-        pt.end_mileage = form.end_mileage.data
-        # (Set all checkboxes if needed)
+        # (Update additional fields as needed)
+        pt.oil_system_status = form.oil_system_status.data
+        pt.tires_ok = form.tires_ok.data
+        pt.tires_status = form.tires_status.data
+        pt.cab_doors_windows = form.cab_doors_windows.data
+        pt.body_doors = form.body_doors.data
+        pt.oil_leak = form.oil_leak.data
+        pt.grease_leak = form.grease_leak.data
+        pt.coolant_leak = form.coolant_leak.data
+        pt.fuel_leak = form.fuel_leak.data
+        pt.gc_no_defects = form.gc_no_defects.data
+        pt.gauges_warning = form.gauges_warning.data
+        pt.wipers = form.wipers.data
+        pt.horn = form.horn.data
+        pt.heater_defroster = form.heater_defroster.data
+        pt.mirrors = form.mirrors.data
+        pt.seat_belts_steering = form.seat_belts_steering.data
+        pt.clutch = form.clutch.data
+        pt.service_brakes = form.service_brakes.data
+        pt.parking_brake = form.parking_brake.data
+        pt.emergency_brakes = form.emergency_brakes.data
+        pt.triangles = form.triangles.data
+        pt.fire_extinguisher = form.fire_extinguisher.data
+        pt.safety_equipment = form.safety_equipment.data
+        pt.incab_no_defects = form.incab_no_defects.data
+        pt.oil_level = form.oil_level.data
+        pt.coolant_level = form.coolant_level.data
+        pt.belts = form.belts.data
+        pt.hoses = form.hoses.data
+        pt.ec_no_defects = form.ec_no_defects.data
+        pt.lights_working = form.lights_working.data
+        pt.reflectors = form.reflectors.data
+        pt.suspension = form.suspension.data
+        pt.tires = form.tires.data
+        pt.wheels_rims = form.wheels_rims.data
+        pt.battery = form.battery.data
+        pt.exhaust = form.exhaust.data
+        pt.brakes = form.brakes.data
+        pt.air_lines = form.air_lines.data
+        pt.light_line = form.light_line.data
+        pt.fifth_wheel = form.fifth_wheel.data
+        pt.coupling = form.coupling.data
+        pt.tie_downs = form.tie_downs.data
+        pt.rear_end_protection = form.rear_end_protection.data
+        pt.exterior_no_defects = form.exterior_no_defects.data
+        pt.towed_bodydoors = form.towed_bodydoors.data
+        pt.towed_tiedowns = form.towed_tiedowns.data
+        pt.towed_lights = form.towed_lights.data
+        pt.towed_reflectors = form.towed_reflectors.data
+        pt.towed_suspension = form.towed_suspension.data
+        pt.towed_tires = form.towed_tires.data
+        pt.towed_wheels = form.towed_wheels.data
+        pt.towed_brakes = form.towed_brakes.data
+        pt.towed_landing_gear = form.towed_landing_gear.data
+        pt.towed_kingpin = form.towed_kingpin.data
+        pt.towed_fifthwheel = form.towed_fifthwheel.data
+        pt.towed_othercoupling = form.towed_othercoupling.data
+        pt.towed_rearend = form.towed_rearend.data
+        pt.towed_no_defects = form.towed_no_defects.data
+        pt.damage_report = form.damage_report.data
 
         db.session.commit()
 
@@ -836,7 +1044,7 @@ def edit_pretrip_entry(pretrip_id):
 ############################################################################
 # SHIFT Start/End
 ############################################################################
-@app.route("/start_shift", methods=["GET","POST"])
+@app.route("/start_shift", methods=["GET", "POST"])
 @login_required
 def start_shift():
     existing_open_shift = ShiftRecord.query.filter_by(
@@ -850,7 +1058,7 @@ def start_shift():
         user_id=current_user.id,
         pretrip_id=None,
         start_time=datetime.utcnow(),
-        week_ending=None  # or some function like get_friday_of_current_week()
+        week_ending=None
     )
     db.session.add(new_shift)
     db.session.commit()
@@ -858,7 +1066,7 @@ def start_shift():
     flash("Shift started!", "success")
     return redirect(url_for("dashboard"))
 
-@app.route("/end_shift", methods=["GET","POST"])
+@app.route("/end_shift", methods=["GET", "POST"])
 @login_required
 def end_shift():
     open_shift = ShiftRecord.query.filter_by(
@@ -880,7 +1088,7 @@ def end_shift():
 ############################################################################
 # End of Day Summary
 ############################################################################
-@app.route("/end_of_day_summary", methods=["GET","POST"])
+@app.route("/end_of_day_summary", methods=["GET", "POST"])
 @login_required
 def end_of_day_summary():
     form = EndOfDayForm()
@@ -955,7 +1163,7 @@ def pretrip_printable(pretrip_id):
 ############################################################################
 # Announcements
 ############################################################################
-@app.route("/announcements", methods=["GET","POST"])
+@app.route("/announcements", methods=["GET", "POST"])
 @login_required
 def announcements():
     one_day_ago = datetime.now() - timedelta(days=1)
@@ -985,7 +1193,7 @@ def announcements():
 ############################################################################
 # Knowledge Base
 ############################################################################
-@app.route("/knowledge_base", methods=["GET","POST"])
+@app.route("/knowledge_base", methods=["GET", "POST"])
 @login_required
 def knowledge_base():
     form = KnowledgeBaseForm()
@@ -1006,7 +1214,7 @@ def knowledge_base():
 ############################################################################
 # Profile
 ############################################################################
-@app.route("/profile", methods=["GET","POST"])
+@app.route("/profile", methods=["GET", "POST"])
 @login_required
 def profile():
     form = ProfileForm(obj=current_user)
@@ -1049,7 +1257,7 @@ def count_unread():
 ############################################################################
 # Direct Messages
 ############################################################################
-@app.route("/direct_messages", methods=["GET","POST"])
+@app.route("/direct_messages", methods=["GET", "POST"])
 @login_required
 def direct_messages():
     dm_form = DirectMessageForm()
@@ -1101,20 +1309,20 @@ def on_connect():
 
 @socketio.on("join")
 def handle_join(data):
-    room = data.get("room","global")
+    room = data.get("room", "global")
     join_room(room)
     emit("status", {"msg": f'{current_user.username} joined {room}.'}, to=room)
 
 @socketio.on("leave")
 def handle_leave(data):
-    room = data.get("room","global")
+    room = data.get("room", "global")
     leave_room(room)
     emit("status", {"msg": f'{current_user.username} left {room}.'}, to=room)
 
 @socketio.on("chat_message")
 def handle_chat_message(data):
-    room = data.get("room","global")
-    content = data.get("content","").strip()
+    room = data.get("room", "global")
+    content = data.get("content", "").strip()
     if content:
         msg = ChatMessage(user_id=current_user.id, content=content, room=room)
         db.session.add(msg)
