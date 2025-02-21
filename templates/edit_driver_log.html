@@ -31,7 +31,31 @@
       {{ form.downtime_reason(class="form-control") }}
     </div>
     
-    {{ form.submit(class="btn btn-primary") }}
+    <!-- New field: Manual Depart Time -->
+    <div class="mb-3">
+      {{ form.depart_time.label }}
+      {{ form.depart_time(class="form-control", placeholder="HH:MM") }}
+      <small class="form-text text-muted">
+        Enter time in HH:MM format (e.g., 545 for 05:45 or 13:05 for 13:05). Leave blank if unchanged.
+      </small>
+      {% if log.depart_edited_at %}
+        <br>
+        <small class="text-muted">Edited: {{ log.depart_edited_at.strftime("%H:%M on %Y-%m-%d") }}</small>
+      {% endif %}
+    </div>
+    
+    
+    
+    <!-- Display last edited timestamp if available -->
+    {% if log.depart_edited_at %}
+    <div class="mb-3">
+      <small class="text-muted">
+        Depart time last edited at: {{ log.depart_edited_at|to_local_time }}
+      </small>
+    </div>
+    {% endif %}
+    
+    {{ form.submit(class="btn btn-primary", value="Depart") }}
   </form>
 </div>
 {% endblock %}

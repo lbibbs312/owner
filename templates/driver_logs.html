@@ -2,42 +2,62 @@
 {% block content %}
 <div class="container slide-in">
   <h2 class="mt-3">Driver Logs</h2>
-
-  <!-- If a driver is logged in, show "Create New Log" button -->
-  {% if current_user.role == 'driver' %}
-    <a href="{{ url_for('new_driving_log') }}" class="btn btn-primary mb-3 hover-btn">
-      Create New Log
-    </a>
-  {% endif %}
-
-  <!-- Manager filter by driver (only shows if management) -->
-  {% if current_user.role == 'management' %}
-    <form method="GET" action="{{ url_for('driver_logs') }}" class="mb-4">
-      <div class="row g-2 align-items-center">
+  
+  <!-- Search form: Date filter (and driver filter for management) -->
+  <form method="GET" action="{{ url_for('driver_logs') }}" class="mb-4">
+    <div class="row g-2 align-items-center">
+      <!-- Date Filter -->
+      <div class="col-auto">
+        <label for="dateFilter" class="col-form-label fw-bold">Date:</label>
+      </div>
+      <div class="col-auto">
+        <input
+          type="date"
+          name="date"
+          id="dateFilter"
+          class="form-control"
+          value="{{ search_date.strftime('%Y-%m-%d') }}"
+        >
+      </div>
+      
+      <!-- Driver Filter (Management Only) -->
+      {% if current_user.role == 'management' %}
         <div class="col-auto">
-          <label for="driverFilter" class="col-form-label fw-bold">Filter by Driver:</label>
+          <label for="driverFilter" class="col-form-label fw-bold">Driver:</label>
         </div>
         <div class="col-auto">
           <select name="driver_id" id="driverFilter" class="form-select">
             <option value="">-- All Drivers --</option>
             {% for d in all_drivers %}
-              <option value="{{ d.id }}"
-                {% if d.id == selected_driver_id %}selected{% endif %}
+              <option
+                value="{{ d.id }}"
+                {% if d.id == selected_driver_id %} selected {% endif %}
               >
                 {{ d.username }}
               </option>
             {% endfor %}
           </select>
         </div>
-        <div class="col-auto">
-          <button type="submit" class="btn btn-primary hover-btn">
-            Filter
-          </button>
-        </div>
+      {% endif %}
+      
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary hover-btn">
+          Search
+        </button>
       </div>
-    </form>
+    </div>
+  </form>
+  
+  <!-- "Create New Log" button for drivers -->
+  {% if current_user.role == 'driver' %}
+    <a
+      href="{{ url_for('new_driving_log') }}"
+      class="btn btn-primary mb-3 hover-btn"
+    >
+      Create New Log
+    </a>
   {% endif %}
-
+  
   {% if logs %}
     <table class="table table-striped align-middle">
       <thead>
@@ -59,6 +79,8 @@
           <tr>
             <td>{{ log.driver.username }}</td>
             <td>{{ log.date }}</td>
+            
+            <!-- Plant & Address -->
             <td>
               {{ log.plant_name }}
               {% if log.plant_name in PLANT_ADDRESSES %}
@@ -68,26 +90,50 @@
                 </small>
               {% endif %}
             </td>
+            
             <td>{{ log.load_size }}</td>
             <td>{{ "Yes" if log.maintenance else "No" }}</td>
             <td>{{ "Yes" if log.fuel else "No" }}</td>
             <td>{{ "Yes" if log.meeting else "No" }}</td>
-            <!-- Use the filter here -->
-            <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
-            <td>{{ log.depart_time|to_local_time if log.depart_time else '--' }}</td>
+            
+            <!-- Arrival (assumes it's a full datetime) -->
             <td>
-              <a 
-                href="{{ url_for('view_driver_log', log_id=log.id) }}" 
+              {% if log.arrive_time %}
+                {{ log.arrive_time|to_local_time }}
+              {% else %}
+                --
+              {% endif %}
+            </td>
+            
+            <!-- Departure (assumes it's stored as "HH:MM" or a short string) -->
+            <td>
+              {% if log.depart_time %}
+                {{ log.depart_time|to_12h_format }}
+                {% if log.depart_edited_at %}
+                  <br>
+                  <small class="text-muted">
+                    Edited: {{ log.depart_edited_at|to_local_time }}
+                  </small>
+                {% endif %}
+              {% else %}
+                --
+              {% endif %}
+            </td>
+            
+            <td>
+              <a
+                href="{{ url_for('view_driver_log', log_id=log.id) }}"
                 class="btn btn-sm btn-info hover-btn"
               >
                 View
               </a>
+              
               {% if current_user.role == 'management' or log.driver_id == current_user.id %}
-                <a 
-                  href="{{ url_for('edit_driver_log', log_id=log.id) }}" 
+                <a
+                  href="{{ url_for('edit_driver_log', log_id=log.id) }}"
                   class="btn btn-sm btn-warning hover-btn"
                 >
-                  Edit
+                  {{ log.action_label }}
                 </a>
               {% endif %}
             </td>
@@ -96,7 +142,7 @@
       </tbody>
     </table>
   {% else %}
-    <p>No logs found.</p>
+    <p>No logs found for {{ search_date.strftime('%Y-%m-%d') }}.</p>
   {% endif %}
 </div>
 {% endblock %}

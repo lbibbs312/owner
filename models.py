@@ -133,6 +133,7 @@ class PostTrip(db.Model):
 
 
 #
+#
 # 3) DRIVER LOG
 #
 class DriverLog(db.Model):
@@ -143,7 +144,7 @@ class DriverLog(db.Model):
 
     date = db.Column(db.Date, nullable=False)
     arrive_time = db.Column(db.String(20))
-    depart_time = db.Column(db.String(20))
+    depart_time = db.Column(db.String(20))   # Will store HH:MM format
     downtime_reason = db.Column(db.String(200), nullable=True)
     load_size = db.Column(db.String(10), nullable=False)
     plant_name = db.Column(db.String(20), nullable=False)
@@ -153,6 +154,13 @@ class DriverLog(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
+    
+    # New column for edited depart time stamp
+    depart_edited_at = db.Column(db.DateTime, nullable=True)
+
+    @property
+    def action_label(self):
+        return "Depart" if not self.depart_time else "Edit"
 
 
 #

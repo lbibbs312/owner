@@ -1,17 +1,23 @@
+"""
+forms.py - All WTForms for your LacksDrivers application.
+"""
 from flask_wtf import FlaskForm
 from wtforms import (
-    StringField, 
-    TextAreaField, 
-    BooleanField, 
-    SelectField, 
+    StringField,
+    TextAreaField,
+    BooleanField,
+    SelectField,
     SubmitField
 )
 from wtforms.validators import DataRequired
 
-#
-# Example other forms
-#
+############################################################################
+# 1) TASK FORMS
+############################################################################
 class TaskForm(FlaskForm):
+    """
+    Form for creating a new Task.
+    """
     title = StringField("Title", validators=[DataRequired()])
     details = TextAreaField("Details")
     is_hot = BooleanField("Mark as HOT")
@@ -21,22 +27,97 @@ class TaskForm(FlaskForm):
 
 
 class UpdateTaskForm(FlaskForm):
+    """
+    Form for updating an existing Task.
+    """
     title = StringField("Title", validators=[DataRequired()])
     details = TextAreaField("Details")
     is_hot = BooleanField("Hot Task?")
     shift = SelectField("Shift", choices=[("1st","1st"),("2nd","2nd"),("3rd","3rd")])
-    # Add other fields/submit if needed
+    # Add more fields if you need them (e.g. status, assigned_to, etc.)
+    # Then a SubmitField if you want a dedicated submit button.
 
 
+############################################################################
+# 2) ANNOUNCEMENT FORM
+############################################################################
 class AnnouncementForm(FlaskForm):
+    """
+    Form for creating a new Announcement.
+    """
     title = StringField("Announcement Title", validators=[DataRequired()])
     body = TextAreaField("Announcement Body", validators=[DataRequired()])
+    submit = SubmitField("Post Announcement")
 
 
-#
-# PRE-TRIP FORM
-#
+############################################################################
+# 3) DRIVER LOG FORM
+############################################################################
+class DriverLogForm(FlaskForm):
+    maintenance = BooleanField("Maintenance")
+    fuel = BooleanField("Fuel")
+    meeting = BooleanField("Meeting")
+
+    plant_name = SelectField(
+        "Plant Name",
+        choices=[
+            ("", "Select Plant..."),
+            ("RE","RE"),
+            ("RW","RW"),
+            ("PC","PC"),
+            ("PE","PE"),
+            ("PW","PW"),
+            ("KP","KP"),
+            ("PPL","PPL"),
+            ("DC","DC"),
+            ("Helios","Helios"),
+            ("BP","BP"),
+            ("52L","52L"),
+            ("Trim DC","Trim DC"),
+            ("52DC","52DC"),
+            ("ALN","ALN"),
+            ("AWE","AWE"),
+            ("CORP","CORP"),
+            ("R&D","R&D"),
+            ("GLA","GLA"),
+            ("KM","KM"),
+            ("KS","KS"),
+            ("MONROE","MONROE"),
+            ("Other","Other"),
+            ("Lab","Lab")
+        ],
+        validators=[DataRequired()]
+    )
+    load_size = SelectField(
+        "Load Size",
+        choices=[
+            ("", "Select Load Size..."),
+            ("Empty","Empty"),
+            ("Quarter","Quarter"),
+            ("Half","Half"),
+            ("Partial","Partial"),
+            ("Full","Full"),
+            ("Hazmat","Hazmat")
+        ],
+        validators=[DataRequired()]
+    )
+    downtime_reason = StringField("Downtime Reason (optional)")
+    
+    # Field for manual depart time in HH:MM format.
+    depart_time = StringField(
+        "Depart Time (optional)",
+        description="Enter time like '545' for 05:45 or '13:05' for 13:05"
+    )
+
+    submit = SubmitField("Submit Log Entry")
+
+############################################################################
+# 4) PRE-TRIP & POST-TRIP FORMS
+############################################################################
 class PreTripForm(FlaskForm):
+    """
+    Form for creating/editing a PreTrip record.
+    """
     # Basic info
     truck_number = StringField("Truck / Tractor #", validators=[DataRequired()])
     trailer_number = StringField("Trailer #")
@@ -53,7 +134,7 @@ class PreTripForm(FlaskForm):
         "Oil System Status",
         choices=[("good", "Good"), ("low", "Low"), ("leaking", "Leaking")]
     )
-    tires_ok = BooleanField("Tires OK")  # <-- ensures `tires_ok` is defined
+    tires_ok = BooleanField("Tires OK")
     tires_status = SelectField(
         "Tires Status",
         choices=[("good", "Good"), ("needs_replacement", "Needs Replacement")]
@@ -131,10 +212,10 @@ class PreTripForm(FlaskForm):
     submit = SubmitField("Save PreTrip")
 
 
-#
-# POST-TRIP FORM
-#
 class PostTripForm(FlaskForm):
+    """
+    Form for creating/editing a PostTrip record.
+    """
     end_mileage = StringField("Ending Mileage")
     remarks = TextAreaField("Remarks")
     submit = SubmitField("Complete PostTrip")
