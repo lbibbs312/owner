@@ -30,12 +30,19 @@ from manager_routes import manager_bp
 # Initialize app & config
 ############################################################################
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "admin123"
+app.config["SECRET_KEY"] = os.environ.get(
+    "SECRET_KEY", "dev-only-insecure-do-not-deploy"
+)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
     "SQLALCHEMY_DATABASE_URI",
     "sqlite:///lacksdrivers.db"
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = (
+    os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true"
+)
 
 db = SQLAlchemy(app)
 socketio = SocketIO(app)
@@ -589,7 +596,8 @@ def register():
     form = RegistrationForm()
     if form.validate_on_submit():
         if form.role.data == "management":
-            if form.manager_pin.data != "0000":
+            expected_pin = os.environ.get("MANAGER_REGISTRATION_PIN")
+            if not expected_pin or form.manager_pin.data != expected_pin:
                 flash("Invalid Manager PIN!", "danger")
                 return redirect(url_for("register"))
         existing = User.query.filter(
@@ -1362,4 +1370,5 @@ def plant_directory():
 ############################################################################
 if __name__ == "__main__":
     print("Starting SocketIO server on http://127.0.0.1:5000/dashboard ...")
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+    debug_enabled = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    socketio.run(app, host="0.0.0.0", port=5000, debug=debug_enabled)
