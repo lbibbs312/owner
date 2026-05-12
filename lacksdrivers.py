@@ -21,6 +21,7 @@ from flask_socketio import join_room, leave_room, emit
 
 from app import create_app
 from app.extensions import db, socketio, login_manager
+from app.forms.messaging import DirectMessageForm
 from app.models import (
     User, Task, PreTrip, PostTrip, DriverLog, ShiftRecord,
     ChatMessage, Announcement, DirectMessage, KnowledgeBaseEntry,
@@ -147,26 +148,12 @@ class AnnouncementForm(FlaskForm):
     body = TextAreaField("Announcement Body", validators=[DataRequired()])
     submit = SubmitField("Post Announcement")
 
-class DirectMessageForm(FlaskForm):
-    receiver_id = SelectField("Send To", coerce=int)
-    content = TextAreaField("Message", validators=[DataRequired()])
-    submit = SubmitField("Send")
 
 class KnowledgeBaseForm(FlaskForm):
     title = StringField("Tip Title", validators=[DataRequired()])
     body = TextAreaField("Tip Body", validators=[DataRequired()])
     submit = SubmitField("Add Tip")
 
-class ProfileForm(FlaskForm):
-    username = StringField("Username", validators=[DataRequired()])
-    email = StringField("Email", validators=[DataRequired(), Email()])
-    role = SelectField("Role", choices=[("driver", "Driver"), ("management", "Management")])
-    new_password = PasswordField("New Password")
-    confirm_password = PasswordField(
-        "Confirm New Password",
-        validators=[EqualTo("new_password", message="Passwords must match.")]
-    )
-    submit = SubmitField("Update Profile")
 
 ############################################################################
 # Jinja filter for UTC -> local time
@@ -188,51 +175,6 @@ def to_local_time(utc_str):
 ############################################################################
 # Routes (General + Driver-Focused)
 ############################################################################
-
-@app.route("/dashboard", methods=["GET", "POST"])
-@login_required
-def dashboard():
-    logs = DriverLog.query.filter_by(driver_id=current_user.id)\
-                          .order_by(DriverLog.created_at.desc()).limit(5).all()
-    pretrips = PreTrip.query.filter_by(user_id=current_user.id)\
-                            .order_by(PreTrip.created_at.desc()).limit(5).all()
-    tasks = Task.query.filter_by(assigned_to=current_user.id)\
-                      .order_by(Task.created_at.desc()).limit(5).all()
-
-    dm_form = DirectMessageForm()
-    all_users = User.query.filter(User.id != current_user.id).all()
-    dm_form.receiver_id.choices = [(u.id, u.username) for u in all_users]
-
-    if dm_form.validate_on_submit():
-        new_dm = DirectMessage(
-            sender_id=current_user.id,
-            receiver_id=dm_form.receiver_id.data,
-            content=dm_form.content.data
-        )
-        db.session.add(new_dm)
-        db.session.commit()
-        socketio.emit("new_direct_message", {
-            "sender": current_user.username,
-            "receiver_id": dm_form.receiver_id.data,
-            "content": dm_form.content.data
-        })
-        flash("Message sent!", "success")
-        return redirect(url_for("dashboard"))
-
-    inbox = DirectMessage.query.filter_by(receiver_id=current_user.id)\
-                               .order_by(DirectMessage.timestamp.desc()).all()
-    outbox = DirectMessage.query.filter_by(sender_id=current_user.id)\
-                                .order_by(DirectMessage.timestamp.desc()).all()
-
-    return render_template(
-        "dashboard.html",
-        logs=logs,
-        pretrips=pretrips,
-        tasks=tasks,
-        dm_form=dm_form,
-        inbox=inbox,
-        outbox=outbox
-    )
 
 @app.route("/list_tasks")
 @login_required
@@ -323,20 +265,6 @@ def knowledge_base():
 ############################################################################
 # Profile
 ############################################################################
-@app.route("/profile", methods=["GET", "POST"])
-@login_required
-def profile():
-    form = ProfileForm(obj=current_user)
-    if form.validate_on_submit():
-        current_user.username = form.username.data
-        current_user.email = form.email.data
-        if form.new_password.data:
-            current_user.set_password(form.new_password.data)
-        db.session.commit()
-        flash("Profile updated!", "success")
-        return redirect(url_for("profile"))
-    return render_template("profile.html", profile_form=form)
-
 ############################################################################
 # Recent Activity
 ############################################################################

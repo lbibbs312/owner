@@ -15,7 +15,7 @@ def require_management_role():
         flash("Management only!", "danger")
         # If someone who isn’t a manager tries to access these pages,
         # we send them to the driver (or other) dashboard. Adjust as needed.
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("driver.dashboard"))
 
 @manager_bp.route("/dashboard", methods=["GET","POST"])
 def manager_dashboard():

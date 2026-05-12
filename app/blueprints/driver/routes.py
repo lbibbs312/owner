@@ -13,10 +13,21 @@ from flask_login import current_user, login_required
 
 from app.blueprints.driver import bp
 from app.extensions import db
+from app.extensions import socketio
 from app.forms.log import DriverLogForm
+from app.forms.messaging import DirectMessageForm
 from app.forms.shift import EndOfDayForm
 from app.forms.trip import PostTripForm, PreTripForm
-from app.models import DriverLog, PostTrip, PreTrip, ShiftRecord, User
+from app.forms.user import ProfileForm
+from app.models import (
+    DirectMessage,
+    DriverLog,
+    PostTrip,
+    PreTrip,
+    ShiftRecord,
+    Task,
+    User,
+)
 
 
 @bp.route("/list_pretrips")
@@ -418,7 +429,7 @@ def start_shift():
     ).first()
     if existing_open_shift:
         flash("You already have a shift in progress!", "warning")
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("driver.dashboard"))
 
     new_shift = ShiftRecord(
         user_id=current_user.id,
@@ -430,7 +441,7 @@ def start_shift():
     db.session.commit()
 
     flash("Shift started!", "success")
-    return redirect(url_for("dashboard"))
+    return redirect(url_for("driver.dashboard"))
 
 
 @bp.route("/end_shift", methods=["GET", "POST"])
@@ -441,7 +452,7 @@ def end_shift():
     ).first()
     if not open_shift:
         flash("No open shift found!", "warning")
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("driver.dashboard"))
 
     open_shift.end_time = datetime.utcnow()
     open_shift.total_hours = (
@@ -450,7 +461,7 @@ def end_shift():
     db.session.commit()
 
     flash("Shift ended!", "success")
-    return redirect(url_for("dashboard"))
+    return redirect(url_for("driver.dashboard"))
 
 
 @bp.route("/end_of_day_summary", methods=["GET", "POST"])
@@ -459,7 +470,7 @@ def end_of_day_summary():
     form = EndOfDayForm()
     if form.validate_on_submit():
         flash("Submitted End of Day Summary (interactive)!", "success")
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("driver.dashboard"))
 
     local_tz = pytz.timezone("America/Detroit")
     today_local_date = datetime.now(local_tz).date()
@@ -502,4 +513,86 @@ def end_of_day_print():
 @login_required
 def submit_end_of_day():
     flash("Submitted End of Day Summary via separate route!", "success")
-    return redirect(url_for("dashboard"))
+    return redirect(url_for("driver.dashboard"))
+
+
+@bp.route("/dashboard", methods=["GET", "POST"])
+@login_required
+def dashboard():
+    logs = (
+        DriverLog.query.filter_by(driver_id=current_user.id)
+        .order_by(DriverLog.created_at.desc())
+        .limit(5)
+        .all()
+    )
+    pretrips = (
+        PreTrip.query.filter_by(user_id=current_user.id)
+        .order_by(PreTrip.created_at.desc())
+        .limit(5)
+        .all()
+    )
+    tasks = (
+        Task.query.filter_by(assigned_to=current_user.id)
+        .order_by(Task.created_at.desc())
+        .limit(5)
+        .all()
+    )
+
+    dm_form = DirectMessageForm()
+    all_users = User.query.filter(User.id != current_user.id).all()
+    dm_form.receiver_id.choices = [(u.id, u.username) for u in all_users]
+
+    if dm_form.validate_on_submit():
+        new_dm = DirectMessage(
+            sender_id=current_user.id,
+            receiver_id=dm_form.receiver_id.data,
+            content=dm_form.content.data,
+        )
+        db.session.add(new_dm)
+        db.session.commit()
+        socketio.emit(
+            "new_direct_message",
+            {
+                "sender": current_user.username,
+                "receiver_id": dm_form.receiver_id.data,
+                "content": dm_form.content.data,
+            },
+        )
+        flash("Message sent!", "success")
+        return redirect(url_for("driver.dashboard"))
+
+    inbox = (
+        DirectMessage.query.filter_by(receiver_id=current_user.id)
+        .order_by(DirectMessage.timestamp.desc())
+        .all()
+    )
+    outbox = (
+        DirectMessage.query.filter_by(sender_id=current_user.id)
+        .order_by(DirectMessage.timestamp.desc())
+        .all()
+    )
+
+    return render_template(
+        "dashboard.html",
+        logs=logs,
+        pretrips=pretrips,
+        tasks=tasks,
+        dm_form=dm_form,
+        inbox=inbox,
+        outbox=outbox,
+    )
+
+
+@bp.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    form = ProfileForm(obj=current_user)
+    if form.validate_on_submit():
+        current_user.username = form.username.data
+        current_user.email = form.email.data
+        if form.new_password.data:
+            current_user.set_password(form.new_password.data)
+        db.session.commit()
+        flash("Profile updated!", "success")
+        return redirect(url_for("driver.profile"))
+    return render_template("profile.html", profile_form=form)

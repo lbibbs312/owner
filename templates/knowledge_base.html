@@ -153,7 +153,7 @@
   <nav class="navbar navbar-expand-md navbar-dark bg-primary py-2">
     <div class="container-fluid">
       <!-- Glow-text brand linking to dashboard -->
-      <a class="navbar-brand glow-text" href="{{ url_for('dashboard') }}">
+      <a class="navbar-brand glow-text" href="{{ url_for('driver.dashboard') }}">
         LacksDrivers
       </a>
 
@@ -189,7 +189,7 @@
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+            <a class="nav-link" href="{{ url_for('driver.dashboard') }}">Dashboard</a>
           </li>
           <li class="nav-item">
             <a class="nav-link" href="{{ url_for('driver.driver_logs') }}">Driver Logs</a>
@@ -216,7 +216,7 @@
             <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('profile') }}">Profile</a>
+            <a class="nav-link" href="{{ url_for('driver.profile') }}">Profile</a>
           </li>
           <!-- Optional link to open side panel -->
           <li class="nav-item">
@@ -234,7 +234,7 @@
     <span class="close-panel-btn" id="closePanelBtn">&times;</span>
     <h5>Extra Links</h5>
     <ul class="list-unstyled mb-3">
-      <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+      <li><a href="{{ url_for('driver.dashboard') }}">Dashboard</a></li>
       <li><a href="{{ url_for('driver.new_pretrip') }}">New PreTrip</a></li>
       <li><a href="{{ url_for('driver.list_pretrips') }}">List PreTrips</a></li>
       <li><a href="{{ url_for('driver.driver_logs') }}">Driver Logs</a></li>

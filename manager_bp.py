@@ -24,7 +24,7 @@ def require_management_role():
         flash("Management only!", "danger")
         # Adjust the redirect as needed. 
         # "dashboard" might be your driver dashboard route name:
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("driver.dashboard"))
 
 @manager_bp.route("/dashboard", methods=["GET"])
 def manager_dashboard():

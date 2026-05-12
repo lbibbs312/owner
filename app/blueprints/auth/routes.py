@@ -53,7 +53,7 @@ def login():
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember.data)
             flash("Logged in!", "success")
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("driver.dashboard"))
         else:
             flash("Invalid credentials.", "danger")
     return render_template("login.html", form=form)
