@@ -167,7 +167,7 @@
     <div class="collapse" id="myPreTripsCollapse">
       <div class="card card-body">
         <a 
-          href="{{ url_for('new_pretrip') }}"
+          href="{{ url_for('driver.new_pretrip') }}"
           class="btn btn-success btn-sm mb-2 hover-btn"
         >
           Create New PreTrip
@@ -184,14 +184,14 @@
                 </span>
                 <div>
                   <a 
-                    href="{{ url_for('view_pretrip', pretrip_id=p.id) }}"
+                    href="{{ url_for('driver.view_pretrip', pretrip_id=p.id) }}"
                     class="btn btn-info btn-sm me-2 hover-btn"
                   >
                     View
                   </a>
                   {% if not p.posttrip %}
                     <a 
-                      href="{{ url_for('do_posttrip', pretrip_id=p.id) }}"
+                      href="{{ url_for('driver.do_posttrip', pretrip_id=p.id) }}"
                       class="btn btn-danger btn-sm hover-btn"
                     >
                       Complete PostTrip

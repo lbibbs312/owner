@@ -35,7 +35,7 @@
             <td>{{ pt.damage_report or "" }}</td>
             <td>
               <a 
-                href="{{ url_for('pretrip_printable', pretrip_id=pt.id) }}"
+                href="{{ url_for('driver.pretrip_printable', pretrip_id=pt.id) }}"
                 class="btn btn-sm btn-secondary"
               >
                 Print DVIR

@@ -14,7 +14,7 @@
   <p><strong>Oil System Status:</strong> {{ pretrip.oil_system_status }}</p>
   
   <!-- A link to the printable version: -->
-  <a href="{{ url_for('pretrip_printable', pretrip_id=pretrip.id) }}"
+  <a href="{{ url_for('driver.pretrip_printable', pretrip_id=pretrip.id) }}"
      class="btn btn-secondary"
   >
     Print DVIR

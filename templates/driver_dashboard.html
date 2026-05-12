@@ -80,7 +80,7 @@
       My PreTrips
     </div>
     <div class="card-body">
-      <a href="{{ url_for('new_pretrip') }}" class="btn btn-success btn-sm mb-2">
+      <a href="{{ url_for('driver.new_pretrip') }}" class="btn btn-success btn-sm mb-2">
         Create New PreTrip
       </a>
       {% if pretrips %}
@@ -91,13 +91,13 @@
                 <strong>PreTrip #{{ p.id }}</strong> - {{ p.truck_name }}
               </span>
               <div>
-                <a href="{{ url_for('view_pretrip', pretrip_id=p.id) }}" 
+                <a href="{{ url_for('driver.view_pretrip', pretrip_id=p.id) }}" 
                    class="btn btn-sm btn-info me-2">
                   View
                 </a>
                 {% if not p.posttrip %}
                   <!-- Only show "Complete PostTrip" if posttrip not done yet -->
-                  <a href="{{ url_for('do_posttrip', pretrip_id=p.id) }}" 
+                  <a href="{{ url_for('driver.do_posttrip', pretrip_id=p.id) }}" 
                      class="btn btn-sm btn-danger">
                     Complete PostTrip
                   </a>
