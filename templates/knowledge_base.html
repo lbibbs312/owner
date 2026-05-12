@@ -160,7 +160,7 @@
       <!-- Bell icon outside the menu (mobile view) -->
       <a
         class="nav-link text-white d-md-none"
-        href="{{ url_for('recent_activity') }}"
+        href="{{ url_for('messaging.recent_activity') }}"
         style="font-size: 1.25rem; margin-right: 1rem;"
       >
         &#128276;
@@ -184,7 +184,7 @@
         <ul class="navbar-nav ms-auto">
           <!-- Bell icon for larger screens -->
           <li class="nav-item d-none d-md-block me-3">
-            <a class="nav-link" href="{{ url_for('recent_activity') }}">
+            <a class="nav-link" href="{{ url_for('messaging.recent_activity') }}">
               &#128276;
             </a>
           </li>
@@ -201,10 +201,10 @@
             <a class="nav-link" href="{{ url_for('driver.list_pretrips') }}">List PreTrips</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('announcements') }}">Announcements</a>
+            <a class="nav-link" href="{{ url_for('messaging.announcements') }}">Announcements</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('knowledge_base') }}">Knowledge Base</a>
+            <a class="nav-link" href="{{ url_for('messaging.knowledge_base') }}">Knowledge Base</a>
           </li>
           <li class="nav-item">
             <a class="nav-link" href="{{ url_for('driver.end_of_day_summary') }}">End of Day</a>
@@ -238,8 +238,8 @@
       <li><a href="{{ url_for('driver.new_pretrip') }}">New PreTrip</a></li>
       <li><a href="{{ url_for('driver.list_pretrips') }}">List PreTrips</a></li>
       <li><a href="{{ url_for('driver.driver_logs') }}">Driver Logs</a></li>
-      <li><a href="{{ url_for('knowledge_base') }}">Knowledge Base</a></li>
-      <li><a href="{{ url_for('announcements') }}">Announcements</a></li>
+      <li><a href="{{ url_for('messaging.knowledge_base') }}">Knowledge Base</a></li>
+      <li><a href="{{ url_for('messaging.announcements') }}">Announcements</a></li>
       <li><a href="{{ url_for('driver.end_of_day_summary') }}">End of Day</a></li>
       <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
     </ul>

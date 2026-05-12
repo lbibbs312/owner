@@ -610,3 +610,9 @@ def list_tasks():
             .all()
         )
     return render_template("list_tasks.html", tasks=tasks)
+
+
+@bp.route("/map")
+@login_required
+def show_map():
+    return render_template("map.html", google_api_key="YOUR_GOOGLE_MAPS_API_KEY")
