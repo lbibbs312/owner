@@ -114,8 +114,6 @@ ITEM_STATUSES = ("operational", "damaged", "missing", "leaking")
 # Forms
 ############################################################################
 
-class EndOfDayForm(FlaskForm):
-    hidden_example = HiddenField()
 
 class TaskForm(FlaskForm):
     title = StringField("Title", validators=[DataRequired()])
@@ -265,93 +263,9 @@ def to_12h_format(hhmm_str):
 ############################################################################
 # SHIFT Start/End
 ############################################################################
-@app.route("/start_shift", methods=["GET", "POST"])
-@login_required
-def start_shift():
-    existing_open_shift = ShiftRecord.query.filter_by(
-        user_id=current_user.id, end_time=None
-    ).first()
-    if existing_open_shift:
-        flash("You already have a shift in progress!", "warning")
-        return redirect(url_for("dashboard"))
-
-    new_shift = ShiftRecord(
-        user_id=current_user.id,
-        pretrip_id=None,
-        start_time=datetime.utcnow(),
-        week_ending=None
-    )
-    db.session.add(new_shift)
-    db.session.commit()
-
-    flash("Shift started!", "success")
-    return redirect(url_for("dashboard"))
-
-@app.route("/end_shift", methods=["GET", "POST"])
-@login_required
-def end_shift():
-    open_shift = ShiftRecord.query.filter_by(
-        user_id=current_user.id, end_time=None
-    ).first()
-    if not open_shift:
-        flash("No open shift found!", "warning")
-        return redirect(url_for("dashboard"))
-
-    open_shift.end_time = datetime.utcnow()
-    open_shift.total_hours = (
-        open_shift.end_time - open_shift.start_time
-    ).total_seconds() / 3600
-    db.session.commit()
-
-    flash("Shift ended!", "success")
-    return redirect(url_for("dashboard"))
-
 ############################################################################
 # End of Day Summary
 ############################################################################
-@app.route("/end_of_day_summary", methods=["GET", "POST"])
-@login_required
-def end_of_day_summary():
-    form = EndOfDayForm()
-    if form.validate_on_submit():
-        flash("Submitted End of Day Summary (interactive)!", "success")
-        return redirect(url_for("dashboard"))
-
-    local_tz = pytz.timezone("America/Detroit")
-    today_local_date = datetime.now(local_tz).date()
-
-    logs = DriverLog.query.filter_by(driver_id=current_user.id, date=today_local_date).all()
-    drivers_logs = { current_user.username: logs }
-
-    pretrips_today = PreTrip.query.filter_by(
-        user_id=current_user.id, pretrip_date=today_local_date
-    ).all()
-    drivers_pretrips = { current_user.username: pretrips_today }
-
-    return render_template(
-        "end_of_day_summary.html",
-        form=form,
-        the_date=today_local_date,
-        drivers_logs=drivers_logs,
-        drivers_pretrips=drivers_pretrips
-    )
-
-@app.route("/end_of_day_print")
-@login_required
-def end_of_day_print():
-    local_tz = pytz.timezone("America/Detroit")
-    today_local_date = datetime.now(local_tz).date()
-    logs = DriverLog.query.filter_by(driver_id=current_user.id, date=today_local_date).all()
-    drivers_logs = { current_user.username: logs }
-
-    return render_template("end_of_day_print.html", the_date=today_local_date, drivers_logs=drivers_logs)
-
-@app.route("/submit_end_of_day", methods=["POST"])
-@login_required
-def submit_end_of_day():
-    flash("Submitted End of Day Summary via separate route!", "success")
-    return redirect(url_for("dashboard"))
-
 ############################################################################
 # PreTrip Printable
 ############################################################################
