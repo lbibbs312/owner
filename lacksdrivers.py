@@ -27,10 +27,8 @@ from app.models import (
     ChatMessage, Announcement, DirectMessage, KnowledgeBaseEntry,
 )
 
-from manager_routes import manager_bp
 
 app = create_app()
-app.register_blueprint(manager_bp)
 
 ############################################################################
 # Utility Function (for time parsing)
@@ -116,30 +114,7 @@ ITEM_STATUSES = ("operational", "damaged", "missing", "leaking")
 ############################################################################
 
 
-class TaskForm(FlaskForm):
-    title = StringField("Title", validators=[DataRequired()])
-    details = TextAreaField("Details")
-    is_hot = BooleanField("Mark as Hot")
-    shift = SelectField("Shift", choices=[("1st", "1st"), ("2nd", "2nd"), ("3rd", "3rd")])
-    assigned_to = SelectField("Assign To (Driver)", coerce=int, default=None)
-    submit = SubmitField("Create Task")
 
-class UpdateTaskForm(FlaskForm):
-    title = StringField("Title", validators=[DataRequired()])
-    details = TextAreaField("Details")
-    is_hot = BooleanField("Mark as Hot")
-    shift = SelectField("Shift", choices=[("1st", "1st"), ("2nd", "2nd"), ("3rd", "3rd")])
-    status = SelectField(
-        "Status",
-        choices=[
-            ("pending", "Pending"),
-            ("in-progress", "In Progress"),
-            ("completed", "Completed"),
-            ("declined", "Declined")
-        ]
-    )
-    assigned_to = SelectField("Assigned To (Driver)", coerce=int)
-    submit = SubmitField("Update Task")
 
 
 
@@ -175,16 +150,6 @@ def to_local_time(utc_str):
 ############################################################################
 # Routes (General + Driver-Focused)
 ############################################################################
-
-@app.route("/list_tasks")
-@login_required
-def list_tasks():
-    if current_user.role == "management":
-        tasks = Task.query.order_by(Task.created_at.desc()).all()
-    else:
-        tasks = Task.query.filter_by(assigned_to=current_user.id)\
-                          .order_by(Task.created_at.desc()).all()
-    return render_template("list_tasks.html", tasks=tasks)
 
 ############################################################################
 # Driver Logs

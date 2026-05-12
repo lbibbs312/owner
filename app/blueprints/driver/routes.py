@@ -596,3 +596,17 @@ def profile():
         flash("Profile updated!", "success")
         return redirect(url_for("driver.profile"))
     return render_template("profile.html", profile_form=form)
+
+
+@bp.route("/list_tasks")
+@login_required
+def list_tasks():
+    if current_user.role == "management":
+        tasks = Task.query.order_by(Task.created_at.desc()).all()
+    else:
+        tasks = (
+            Task.query.filter_by(assigned_to=current_user.id)
+            .order_by(Task.created_at.desc())
+            .all()
+        )
+    return render_template("list_tasks.html", tasks=tasks)

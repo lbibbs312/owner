@@ -180,7 +180,7 @@
       <div class="container-fluid">
         {% if current_user.role == "management" %}
           <a class="navbar-brand glow-text openOverlayLink"
-             data-url="{{ url_for('manager_bp.manager_dashboard') }}"
+             data-url="{{ url_for('manager.manager_dashboard') }}"
              href="#"
           >
             LacksDrivers (Manager)
@@ -219,7 +219,7 @@
             {% if current_user.role == "management" %}
               <li class="nav-item">
                 <a class="nav-link openOverlayLink"
-                   data-url="{{ url_for('manager_bp.manager_dashboard') }}"
+                   data-url="{{ url_for('manager.manager_dashboard') }}"
                    href="#"
                 >Manager Dashboard</a>
               </li>
