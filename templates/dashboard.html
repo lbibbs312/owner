@@ -115,13 +115,13 @@
                   </div>
                   <div>
                     <a 
-                      href="{{ url_for('edit_driver_log', log_id=log.id) }}" 
+                      href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}" 
                       class="btn btn-warning btn-sm me-1 hover-btn"
                     >
                       Edit
                     </a>
                     <a 
-                      href="{{ url_for('view_driver_log', log_id=log.id) }}"
+                      href="{{ url_for('driver.view_driver_log', log_id=log.id) }}"
                       class="btn btn-info btn-sm hover-btn"
                     >
                       View
@@ -134,7 +134,7 @@
             <p>No logs found.</p>
           {% endif %}
           <a 
-            href="{{ url_for('new_driving_log') }}"
+            href="{{ url_for('driver.new_driving_log') }}"
             class="btn btn-success btn-sm mt-2 hover-btn"
           >
             Create New Log

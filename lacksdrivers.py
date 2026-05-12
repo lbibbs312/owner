@@ -143,59 +143,6 @@ class UpdateTaskForm(FlaskForm):
     submit = SubmitField("Update Task")
 
 
-class DriverLogForm(FlaskForm):
-    maintenance = BooleanField("Maintenance")
-    fuel = BooleanField("Fuel")
-    meeting = BooleanField("Meeting")
-    plant_name = SelectField(
-        "Plant Name",
-        choices=[
-            ("", "Select Plant..."),
-            ("RE", "RE"),
-            ("RW", "RW"),
-            ("PC", "PC"),
-            ("PE", "PE"),
-            ("PW", "PW"),
-            ("KP", "KP"),
-            ("PPL", "PPL"),
-            ("DC", "DC"),
-            ("Helios", "Helios"),
-            ("BP", "BP"),
-            ("52L", "52L"),
-            ("Trim DC", "Trim DC"),
-            ("52DC", "52DC"),
-            ("ALN", "ALN"),
-            ("AWE", "AWE"),
-            ("CORP", "CORP"),
-            ("R&D", "R&D"),
-            ("GLA", "GLA"),
-            ("KM", "KM"),
-            ("KS", "KS"),
-            ("MONROE", "MONROE"),
-            ("Other", "Other"),
-            ("Lab", "Lab")
-        ],
-        validators=[DataRequired()]
-    )
-    load_size = SelectField(
-        "Load Size",
-        choices=[
-            ("", "Select Load Size..."),
-            ("Empty", "Empty"),
-            ("Quarter", "Quarter"),
-            ("Half", "Half"),
-            ("Partial", "Partial"),
-            ("Full", "Full"),
-            ("Hazmat", "Hazmat")
-        ],
-        validators=[DataRequired()]
-    )
-    downtime_reason = StringField("Downtime Reason (optional)")
-    depart_time = StringField(
-        "Depart Time (optional)",
-        description="Enter time like '545' => 05:45 or '13:05' => 13:05"
-    )
-    submit = SubmitField("Submit Log Entry")
 
 class AnnouncementForm(FlaskForm):
     title = StringField("Announcement Title", validators=[DataRequired()])
@@ -302,104 +249,6 @@ def list_tasks():
 ############################################################################
 # Driver Logs
 ############################################################################
-@app.route("/driver_logs", methods=["GET"])
-@login_required
-def driver_logs():
-    date_str = request.args.get("date")
-    try:
-        search_date = datetime.strptime(date_str, "%Y-%m-%d").date() if date_str else datetime.now().date()
-    except ValueError:
-        search_date = datetime.now().date()
-
-    if current_user.role == "management":
-        all_drivers = User.query.filter_by(role="driver").all()
-        selected_driver_id = request.args.get("driver_id", type=int)
-        query = DriverLog.query.filter(DriverLog.date == search_date).order_by(DriverLog.created_at.desc())
-        if selected_driver_id:
-            query = query.filter_by(driver_id=selected_driver_id)
-        logs = query.all()
-        return render_template(
-            "driver_logs.html",
-            logs=logs,
-            all_drivers=all_drivers,
-            selected_driver_id=selected_driver_id,
-            search_date=search_date
-        )
-    else:
-        logs = DriverLog.query.filter_by(
-            driver_id=current_user.id,
-            date=search_date
-        ).order_by(DriverLog.created_at.desc()).all()
-        return render_template("driver_logs.html", logs=logs, search_date=search_date)
-
-@app.route("/new_driving_log", methods=["GET", "POST"])
-@login_required
-def new_driving_log():
-    form = DriverLogForm()
-    if form.validate_on_submit():
-        if not form.plant_name.data or not form.load_size.data:
-            flash("Please select a valid Plant Name and Load Size.", "danger")
-            return redirect(url_for("new_driving_log"))
-
-        local_tz = pytz.timezone("America/Detroit")
-        now_local = datetime.now(local_tz)
-        local_date = now_local.date()
-
-        now_utc = datetime.utcnow()
-        arrive_time_str = now_utc.strftime("%Y-%m-%d %H:%M:%S")
-
-        newlog = DriverLog(
-            driver_id=current_user.id,
-            plant_name=form.plant_name.data,
-            load_size=form.load_size.data,
-            downtime_reason=form.downtime_reason.data,
-            arrive_time=arrive_time_str,
-            maintenance=form.maintenance.data,
-            fuel=form.fuel.data,
-            meeting=form.meeting.data,
-            date=local_date
-        )
-        db.session.add(newlog)
-        db.session.commit()
-        flash("New driving log added (local date, UTC arrival time)!", "success")
-        return redirect(url_for("driver_logs"))
-
-    return render_template("new_driving_log.html", form=form)
-
-@app.route("/edit_driver_log/<int:log_id>", methods=["GET", "POST"])
-@login_required
-def edit_driver_log(log_id):
-    log = DriverLog.query.get_or_404(log_id)
-    if current_user.role == "driver" and log.driver_id != current_user.id:
-        flash("Not authorized to edit someone else's log!", "danger")
-        return redirect(url_for("driver_logs"))
-
-    form = DriverLogForm(obj=log)
-    if form.validate_on_submit():
-        if not form.plant_name.data or not form.load_size.data:
-            flash("Please select a valid Plant Name and Load Size.", "danger")
-            return redirect(url_for("edit_driver_log", log_id=log.id))
-        
-        log.plant_name = form.plant_name.data
-        log.load_size = form.load_size.data
-        log.downtime_reason = form.downtime_reason.data
-        log.maintenance = form.maintenance.data
-        log.fuel = form.fuel.data
-        log.meeting = form.meeting.data
-
-        if form.depart_time.data.strip():
-            log.depart_time = form.depart_time.data.strip()
-        else:
-            local_tz = pytz.timezone("America/Detroit")
-            now_local = datetime.now(local_tz)
-            log.depart_time = now_local.strftime("%H:%M")
-        
-        db.session.commit()
-        flash(f"Driving log updated (ID: {log.id}).", "success")
-        return redirect(url_for("driver_logs"))
-
-    return render_template("edit_driver_log.html", form=form, log=log)
-
 @app.template_filter('to_12h_format')
 def to_12h_format(hhmm_str):
     if not hhmm_str:
@@ -409,15 +258,6 @@ def to_12h_format(hhmm_str):
         return dt.strftime("%I:%M%p").lower().lstrip('0')
     except ValueError:
         return hhmm_str
-
-@app.route("/view_driver_log/<int:log_id>")
-@login_required
-def view_driver_log(log_id):
-    log = DriverLog.query.get_or_404(log_id)
-    if current_user.role == "driver" and log.driver_id != current_user.id:
-        flash("Not authorized to view someone else's log!", "danger")
-        return redirect(url_for("driver_logs"))
-    return render_template("view_driver_log.html", log=log)
 
 ############################################################################
 # PreTrip/PostTrip
@@ -505,14 +345,6 @@ def end_of_day_print():
     drivers_logs = { current_user.username: logs }
 
     return render_template("end_of_day_print.html", the_date=today_local_date, drivers_logs=drivers_logs)
-
-@app.route("/driver_logs_print")
-@login_required
-def driver_logs_print():
-    local_tz = pytz.timezone("America/Detroit")
-    today_local_date = datetime.now(local_tz).date()
-    logs = DriverLog.query.filter_by(driver_id=current_user.id, date=today_local_date).all()
-    return render_template("driver_logs_print.html", logs=logs, the_date=today_local_date)
 
 @app.route("/submit_end_of_day", methods=["POST"])
 @login_required

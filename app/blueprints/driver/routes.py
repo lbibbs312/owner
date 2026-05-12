@@ -7,13 +7,15 @@ PRs of PR-5c.
 """
 from datetime import datetime, date
 
+import pytz
 from flask import flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 
 from app.blueprints.driver import bp
 from app.extensions import db
+from app.forms.log import DriverLogForm
 from app.forms.trip import PostTripForm, PreTripForm
-from app.models import PostTrip, PreTrip, ShiftRecord
+from app.models import DriverLog, PostTrip, PreTrip, ShiftRecord, User
 
 
 @bp.route("/list_pretrips")
@@ -273,4 +275,135 @@ def pretrip_printable(pretrip_id):
         pretrip=pt,
         ephemeral_driver=ephemeral_driver,
         ephemeral_date=ephemeral_date,
+    )
+
+
+@bp.route("/driver_logs", methods=["GET"])
+@login_required
+def driver_logs():
+    date_str = request.args.get("date")
+    try:
+        search_date = (
+            datetime.strptime(date_str, "%Y-%m-%d").date()
+            if date_str
+            else datetime.now().date()
+        )
+    except ValueError:
+        search_date = datetime.now().date()
+
+    if current_user.role == "management":
+        all_drivers = User.query.filter_by(role="driver").all()
+        selected_driver_id = request.args.get("driver_id", type=int)
+        query = DriverLog.query.filter(DriverLog.date == search_date).order_by(
+            DriverLog.created_at.desc()
+        )
+        if selected_driver_id:
+            query = query.filter_by(driver_id=selected_driver_id)
+        logs = query.all()
+        return render_template(
+            "driver_logs.html",
+            logs=logs,
+            all_drivers=all_drivers,
+            selected_driver_id=selected_driver_id,
+            search_date=search_date,
+        )
+    else:
+        logs = (
+            DriverLog.query.filter_by(driver_id=current_user.id, date=search_date)
+            .order_by(DriverLog.created_at.desc())
+            .all()
+        )
+        return render_template("driver_logs.html", logs=logs, search_date=search_date)
+
+
+@bp.route("/new_driving_log", methods=["GET", "POST"])
+@login_required
+def new_driving_log():
+    form = DriverLogForm()
+    if form.validate_on_submit():
+        if not form.plant_name.data or not form.load_size.data:
+            flash("Please select a valid Plant Name and Load Size.", "danger")
+            return redirect(url_for("driver.new_driving_log"))
+
+        local_tz = pytz.timezone("America/Detroit")
+        now_local = datetime.now(local_tz)
+        local_date = now_local.date()
+
+        now_utc = datetime.utcnow()
+        arrive_time_str = now_utc.strftime("%Y-%m-%d %H:%M:%S")
+
+        newlog = DriverLog(
+            driver_id=current_user.id,
+            plant_name=form.plant_name.data,
+            load_size=form.load_size.data,
+            downtime_reason=form.downtime_reason.data,
+            arrive_time=arrive_time_str,
+            maintenance=form.maintenance.data,
+            fuel=form.fuel.data,
+            meeting=form.meeting.data,
+            date=local_date,
+        )
+        db.session.add(newlog)
+        db.session.commit()
+        flash("New driving log added (local date, UTC arrival time)!", "success")
+        return redirect(url_for("driver.driver_logs"))
+
+    return render_template("new_driving_log.html", form=form)
+
+
+@bp.route("/edit_driver_log/<int:log_id>", methods=["GET", "POST"])
+@login_required
+def edit_driver_log(log_id):
+    log = DriverLog.query.get_or_404(log_id)
+    if current_user.role == "driver" and log.driver_id != current_user.id:
+        flash("Not authorized to edit someone else's log!", "danger")
+        return redirect(url_for("driver.driver_logs"))
+
+    form = DriverLogForm(obj=log)
+    if form.validate_on_submit():
+        if not form.plant_name.data or not form.load_size.data:
+            flash("Please select a valid Plant Name and Load Size.", "danger")
+            return redirect(url_for("driver.edit_driver_log", log_id=log.id))
+
+        log.plant_name = form.plant_name.data
+        log.load_size = form.load_size.data
+        log.downtime_reason = form.downtime_reason.data
+        log.maintenance = form.maintenance.data
+        log.fuel = form.fuel.data
+        log.meeting = form.meeting.data
+
+        if form.depart_time.data.strip():
+            log.depart_time = form.depart_time.data.strip()
+        else:
+            local_tz = pytz.timezone("America/Detroit")
+            now_local = datetime.now(local_tz)
+            log.depart_time = now_local.strftime("%H:%M")
+
+        db.session.commit()
+        flash(f"Driving log updated (ID: {log.id}).", "success")
+        return redirect(url_for("driver.driver_logs"))
+
+    return render_template("edit_driver_log.html", form=form, log=log)
+
+
+@bp.route("/view_driver_log/<int:log_id>")
+@login_required
+def view_driver_log(log_id):
+    log = DriverLog.query.get_or_404(log_id)
+    if current_user.role == "driver" and log.driver_id != current_user.id:
+        flash("Not authorized to view someone else's log!", "danger")
+        return redirect(url_for("driver.driver_logs"))
+    return render_template("view_driver_log.html", log=log)
+
+
+@bp.route("/driver_logs_print")
+@login_required
+def driver_logs_print():
+    local_tz = pytz.timezone("America/Detroit")
+    today_local_date = datetime.now(local_tz).date()
+    logs = DriverLog.query.filter_by(
+        driver_id=current_user.id, date=today_local_date
+    ).all()
+    return render_template(
+        "driver_logs_print.html", logs=logs, the_date=today_local_date
     )
