@@ -346,11 +346,6 @@ def to_local_time(utc_str):
 # Routes (General + Driver-Focused)
 ############################################################################
 
-@app.route("/")
-def welcome():
-    bulletins = Announcement.query.order_by(Announcement.created_at.desc()).limit(5).all()
-    return render_template("welcome.html", bulletins=bulletins)
-
 @app.route("/register", methods=["GET", "POST"])
 def register():
     form = RegistrationForm()
@@ -399,7 +394,7 @@ def login():
 def logout():
     logout_user()
     flash("Logged out.", "info")
-    return redirect(url_for("welcome"))
+    return redirect(url_for("public.welcome"))
 
 @app.route("/dashboard", methods=["GET", "POST"])
 @login_required
@@ -1108,22 +1103,11 @@ def handle_chat_message(data):
 def show_map():
     return render_template("map.html", google_api_key="YOUR_GOOGLE_MAPS_API_KEY")
 
-@app.route('/OneSignalSDKWorker.js')
-def onesignal_sw():
-    return send_from_directory('static', 'OneSignalSDKWorker.js')
-
 def get_friday_of_current_week():
     today = datetime.utcnow().date()
     offset = (4 - today.weekday()) % 7
     return today + timedelta(days=offset)
 
-############################################################################
-# NEW: Plant Directory Route
-############################################################################
-@app.route("/plant_directory")
-@login_required
-def plant_directory():
-    return render_template("plant_directory.html")
 
 ############################################################################
 # Main

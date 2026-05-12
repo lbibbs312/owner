@@ -28,4 +28,11 @@ def create_app(config_class=None):
     )
     app.config.from_object(config_class or get_config())
     init_extensions(app)
+    _register_blueprints(app)
     return app
+
+
+def _register_blueprints(app):
+    from app.blueprints.public import bp as public_bp
+
+    app.register_blueprint(public_bp)
