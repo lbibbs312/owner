@@ -11,7 +11,6 @@ from flask_login import (
     UserMixin, current_user,
     login_required, login_user, logout_user
 )
-from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf import FlaskForm
 from wtforms import (
     StringField, PasswordField, SubmitField, BooleanField,
@@ -19,10 +18,13 @@ from wtforms import (
 )
 from wtforms.validators import DataRequired, Email, EqualTo, Length
 from flask_socketio import join_room, leave_room, emit
-from sqlalchemy import Enum
 
 from app import create_app
 from app.extensions import db, socketio, login_manager
+from app.models import (
+    User, Task, PreTrip, PostTrip, DriverLog, ShiftRecord,
+    ChatMessage, Announcement, DirectMessage, KnowledgeBaseEntry,
+)
 
 from manager_routes import manager_bp
 
@@ -107,223 +109,6 @@ def inject_plant_addresses():
 
 ITEM_STATUSES = ("operational", "damaged", "missing", "leaking")
 
-#
-# 1) USER MODEL
-#
-class User(db.Model, UserMixin):
-    __tablename__ = "user"
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(64), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128))
-    role = db.Column(db.String(20), default="driver")  # "driver" or "management"
-
-    tasks = db.relationship("Task", backref="assigned_user", lazy="dynamic")
-    driver_logs = db.relationship("DriverLog", backref="driver", lazy="dynamic")
-    pretrips = db.relationship("PreTrip", backref="driver", lazy="dynamic")
-    chat_messages = db.relationship("ChatMessage", backref="user", lazy="dynamic")
-
-    def set_password(self, pwd):
-        self.password_hash = generate_password_hash(pwd)
-
-    def check_password(self, pwd):
-        return check_password_hash(self.password_hash, pwd)
-
-
-#
-# 2) TASK
-#
-class Task(db.Model):
-    __tablename__ = "task"
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(150), nullable=False)
-    details = db.Column(db.Text)
-    is_hot = db.Column(db.Boolean, default=False)
-    status = db.Column(db.String(20), default="pending")
-    shift = db.Column(db.String(10), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    assigned_to = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
-
-#
-# 3) PRETRIP & POSTTRIP
-#
-class PreTrip(db.Model):
-    __tablename__ = "pretrip"
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    truck_number = db.Column(db.String(50))
-    trailer_number = db.Column(db.String(50))
-    pretrip_date = db.Column(db.Date, default=date.today)
-    shift = db.Column(db.String(10))
-    start_mileage = db.Column(db.Integer)
-    # Additional fields for the PreTrip inspection
-    truck_type = db.Column(db.String(20))
-    oil_system_status = db.Column(db.String(20))
-    tires_ok = db.Column(db.Boolean, default=False)
-    tires_status = db.Column(db.String(50))
-    # GENERAL CONDITION
-    cab_doors_windows = db.Column(db.Boolean, default=False)
-    body_doors = db.Column(db.Boolean, default=False)
-    oil_leak = db.Column(db.Boolean, default=False)
-    grease_leak = db.Column(db.Boolean, default=False)
-    coolant_leak = db.Column(db.Boolean, default=False)
-    fuel_leak = db.Column(db.Boolean, default=False)
-    gc_no_defects = db.Column(db.Boolean, default=False)
-    # IN-CAB
-    gauges_warning = db.Column(db.Boolean, default=False)
-    wipers = db.Column(db.Boolean, default=False)
-    horn = db.Column(db.Boolean, default=False)
-    heater_defroster = db.Column(db.Boolean, default=False)
-    mirrors = db.Column(db.Boolean, default=False)
-    seat_belts_steering = db.Column(db.Boolean, default=False)
-    clutch = db.Column(db.Boolean, default=False)
-    service_brakes = db.Column(db.Boolean, default=False)
-    parking_brake = db.Column(db.Boolean, default=False)
-    emergency_brakes = db.Column(db.Boolean, default=False)
-    triangles = db.Column(db.Boolean, default=False)
-    fire_extinguisher = db.Column(db.Boolean, default=False)
-    safety_equipment = db.Column(db.Boolean, default=False)
-    incab_no_defects = db.Column(db.Boolean, default=False)
-    # ENGINE COMPARTMENT
-    oil_level = db.Column(db.Boolean, default=False)
-    coolant_level = db.Column(db.Boolean, default=False)
-    belts = db.Column(db.Boolean, default=False)
-    hoses = db.Column(db.Boolean, default=False)
-    ec_no_defects = db.Column(db.Boolean, default=False)
-    # EXTERIOR
-    lights_working = db.Column(db.Boolean, default=False)
-    reflectors = db.Column(db.Boolean, default=False)
-    suspension = db.Column(db.Boolean, default=False)
-    tires = db.Column(db.Boolean, default=False)
-    wheels_rims = db.Column(db.Boolean, default=False)
-    battery = db.Column(db.Boolean, default=False)
-    exhaust = db.Column(db.Boolean, default=False)
-    brakes = db.Column(db.Boolean, default=False)
-    air_lines = db.Column(db.Boolean, default=False)
-    light_line = db.Column(db.Boolean, default=False)
-    fifth_wheel = db.Column(db.Boolean, default=False)
-    coupling = db.Column(db.Boolean, default=False)
-    tie_downs = db.Column(db.Boolean, default=False)
-    rear_end_protection = db.Column(db.Boolean, default=False)
-    exterior_no_defects = db.Column(db.Boolean, default=False)
-    # TOWED UNIT
-    towed_bodydoors = db.Column(db.Boolean, default=False)
-    towed_tiedowns = db.Column(db.Boolean, default=False)
-    towed_lights = db.Column(db.Boolean, default=False)
-    towed_reflectors = db.Column(db.Boolean, default=False)
-    towed_suspension = db.Column(db.Boolean, default=False)
-    towed_tires = db.Column(db.Boolean, default=False)
-    towed_wheels = db.Column(db.Boolean, default=False)
-    towed_brakes = db.Column(db.Boolean, default=False)
-    towed_landing_gear = db.Column(db.Boolean, default=False)
-    towed_kingpin = db.Column(db.Boolean, default=False)
-    towed_fifthwheel = db.Column(db.Boolean, default=False)
-    towed_othercoupling = db.Column(db.Boolean, default=False)
-    towed_rearend = db.Column(db.Boolean, default=False)
-    towed_no_defects = db.Column(db.Boolean, default=False)
-    # REMARKS / DAMAGE
-    damage_report = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
-
-    posttrip = db.relationship("PostTrip", uselist=False, backref="pretrip")
-
-
-class PostTrip(db.Model):
-    __tablename__ = "posttrip"
-    id = db.Column(db.Integer, primary_key=True)
-    pretrip_id = db.Column(db.Integer, db.ForeignKey("pretrip.id"), nullable=False)
-    end_mileage = db.Column(db.Integer, nullable=True)
-    remarks = db.Column(db.Text, nullable=True)
-    miles_driven = db.Column(db.Integer, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
-
-#
-# 4) DRIVER LOG
-#
-class DriverLog(db.Model):
-    __tablename__ = "driver_log"
-    id = db.Column(db.Integer, primary_key=True)
-    driver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    arrive_time = db.Column(db.String(20))
-    depart_time = db.Column(db.String(20))
-    downtime_reason = db.Column(db.String(200), nullable=True)
-    load_size = db.Column(db.String(10), nullable=False)
-    plant_name = db.Column(db.String(20), nullable=False)
-    maintenance = db.Column(db.Boolean, default=False)
-    fuel = db.Column(db.Boolean, default=False)
-    meeting = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
-
-    @property
-    def action_label(self):
-        return "Depart" if not self.depart_time else "Edit"
-
-#
-# 5) CHAT MESSAGE
-#
-class ChatMessage(db.Model):
-    __tablename__ = "chat_message"
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    room = db.Column(db.String(100), default="global")
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-
-#
-# 6) ANNOUNCEMENT
-#
-class Announcement(db.Model):
-    __tablename__ = "announcement"
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
-    body = db.Column(db.Text, nullable=False)
-    created_by = db.Column(db.Integer, db.ForeignKey("user.id"))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-#
-# 7) DIRECT MESSAGE
-#
-class DirectMessage(db.Model):
-    __tablename__ = "direct_message"
-    id = db.Column(db.Integer, primary_key=True)
-    sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-
-    sender = db.relationship("User", foreign_keys=[sender_id], backref="sent_messages")
-    receiver = db.relationship("User", foreign_keys=[receiver_id], backref="received_messages")
-
-#
-# 8) SHIFT RECORD
-#
-class ShiftRecord(db.Model):
-    __tablename__ = "shift_record"
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    pretrip_id = db.Column(db.Integer, db.ForeignKey("pretrip.id"), nullable=True)
-    start_time = db.Column(db.DateTime, nullable=False)
-    end_time = db.Column(db.DateTime, nullable=True)
-    total_hours = db.Column(db.Float, nullable=True)
-    week_ending = db.Column(db.Date, nullable=True)
-
-    user = db.relationship("User", backref="shift_records")
-    pretrip = db.relationship("PreTrip", backref="shift_record")
-
-#
-# 9) KNOWLEDGE BASE ENTRY
-#
-class KnowledgeBaseEntry(db.Model):
-    __tablename__ = "knowledge_base"
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
-    title = db.Column(db.String(100))
-    body = db.Column(db.Text)
 
 ############################################################################
 # Forms
