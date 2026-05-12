@@ -178,27 +178,33 @@
   <div id="pageContent">
     <nav class="navbar navbar-expand-md navbar-dark bg-primary py-2">
       <div class="container-fluid">
-        {% if current_user.role == "management" %}
-          <a class="navbar-brand glow-text openOverlayLink"
-             data-url="{{ url_for('manager.manager_dashboard') }}"
-             href="#"
-          >
-            LacksDrivers (Manager)
-          </a>
+        {% if current_user.is_authenticated %}
+          {% if current_user.role == "management" %}
+            <a class="navbar-brand glow-text openOverlayLink"
+               data-url="{{ url_for('manager.manager_dashboard') }}"
+               href="#"
+            >
+              LacksDrivers (Manager)
+            </a>
+          {% else %}
+            <a class="navbar-brand glow-text openOverlayLink"
+               data-url="{{ url_for('driver.dashboard') }}"
+               href="#"
+            >
+              LacksDrivers
+            </a>
+            <!-- Driver bell icon (mobile only) -->
+            <a class="nav-link text-white d-md-none openOverlayLink"
+               data-url="{{ url_for('messaging.recent_activity') }}"
+               href="#"
+               style="font-size: 1.25rem; margin-right: 1rem;"
+            >
+              &#128276;
+            </a>
+          {% endif %}
         {% else %}
-          <a class="navbar-brand glow-text openOverlayLink"
-             data-url="{{ url_for('driver.dashboard') }}"
-             href="#"
-          >
+          <a class="navbar-brand glow-text" href="{{ url_for('public.welcome') }}">
             LacksDrivers
-          </a>
-          <!-- Driver bell icon (mobile only) -->
-          <a class="nav-link text-white d-md-none openOverlayLink"
-             data-url="{{ url_for('messaging.recent_activity') }}"
-             href="#"
-             style="font-size: 1.25rem; margin-right: 1rem;"
-          >
-            &#128276;
           </a>
         {% endif %}
 
@@ -216,86 +222,95 @@
 
         <div class="collapse navbar-collapse" id="mainNavbar">
           <ul class="navbar-nav ms-auto">
-            {% if current_user.role == "management" %}
-              <li class="nav-item">
-                <a class="nav-link openOverlayLink"
-                   data-url="{{ url_for('manager.manager_dashboard') }}"
-                   href="#"
-                >Manager Dashboard</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link openOverlayLink"
-                   data-url="{{ url_for('auth.logout') }}"
-                   href="#"
-                >Logout</a>
-              </li>
+            {% if current_user.is_authenticated %}
+              {% if current_user.role == "management" %}
+                <li class="nav-item">
+                  <a class="nav-link openOverlayLink"
+                     data-url="{{ url_for('manager.manager_dashboard') }}"
+                     href="#"
+                  >Manager Dashboard</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link openOverlayLink"
+                     data-url="{{ url_for('auth.logout') }}"
+                     href="#"
+                  >Logout</a>
+                </li>
+              {% else %}
+                <!-- Driver links -->
+                <li class="nav-item d-none d-md-block me-3">
+                  <a class="nav-link openOverlayLink"
+                     data-url="{{ url_for('messaging.recent_activity') }}"
+                     href="#"
+                  >&#128276;</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link openOverlayLink"
+                     data-url="{{ url_for('driver.dashboard') }}"
+                     href="#"
+                  >Driver Dashboard</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link openOverlayLink"
+                     data-url="{{ url_for('driver.driver_logs') }}"
+                     href="#"
+                  >Driver Logs</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link openOverlayLink"
+                     data-url="{{ url_for('driver.new_pretrip') }}"
+                     href="#"
+                  >New PreTrip</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link openOverlayLink"
+                     data-url="{{ url_for('driver.list_pretrips') }}"
+                     href="#"
+                  >List PreTrips</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link openOverlayLink"
+                     data-url="{{ url_for('messaging.announcements') }}"
+                     href="#"
+                  >Announcements</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link openOverlayLink"
+                     data-url="{{ url_for('messaging.knowledge_base') }}"
+                     href="#"
+                  >Knowledge Base</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link openOverlayLink"
+                     data-url="{{ url_for('driver.end_of_day_summary') }}"
+                     href="#"
+                  >End of Day</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link openOverlayLink"
+                     data-url="{{ url_for('auth.logout') }}"
+                     href="#"
+                  >Logout</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link openOverlayLink"
+                     data-url="{{ url_for('driver.profile') }}"
+                     href="#"
+                  >Profile</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link openOverlayLink"
+                     data-url="{{ url_for('public.plant_directory') }}"
+                     href="#"
+                  >Plant Directory</a>
+                </li>
+              {% endif %}
             {% else %}
-              <!-- Driver links -->
-              <li class="nav-item d-none d-md-block me-3">
-                <a class="nav-link openOverlayLink"
-                   data-url="{{ url_for('messaging.recent_activity') }}"
-                   href="#"
-                >&#128276;</a>
+              <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('auth.login') }}">Login</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link openOverlayLink"
-                   data-url="{{ url_for('driver.dashboard') }}"
-                   href="#"
-                >Driver Dashboard</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link openOverlayLink"
-                   data-url="{{ url_for('driver.driver_logs') }}"
-                   href="#"
-                >Driver Logs</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link openOverlayLink"
-                   data-url="{{ url_for('driver.new_pretrip') }}"
-                   href="#"
-                >New PreTrip</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link openOverlayLink"
-                   data-url="{{ url_for('driver.list_pretrips') }}"
-                   href="#"
-                >List PreTrips</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link openOverlayLink"
-                   data-url="{{ url_for('messaging.announcements') }}"
-                   href="#"
-                >Announcements</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link openOverlayLink"
-                   data-url="{{ url_for('messaging.knowledge_base') }}"
-                   href="#"
-                >Knowledge Base</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link openOverlayLink"
-                   data-url="{{ url_for('driver.end_of_day_summary') }}"
-                   href="#"
-                >End of Day</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link openOverlayLink"
-                   data-url="{{ url_for('auth.logout') }}"
-                   href="#"
-                >Logout</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link openOverlayLink"
-                   data-url="{{ url_for('driver.profile') }}"
-                   href="#"
-                >Profile</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link openOverlayLink"
-                   data-url="{{ url_for('public.plant_directory') }}"
-                   href="#"
-                >Plant Directory</a>
+                <a class="nav-link" href="{{ url_for('auth.register') }}">Register</a>
               </li>
             {% endif %}
           </ul>
