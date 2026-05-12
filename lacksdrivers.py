@@ -4,12 +4,11 @@ from datetime import datetime, date, timedelta
 from collections import defaultdict
 
 from flask import (
-    Flask, request, redirect, url_for, flash,
+    request, redirect, url_for, flash,
     render_template, session, jsonify, send_file, send_from_directory
 )
-from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
-    LoginManager, UserMixin, current_user,
+    UserMixin, current_user,
     login_required, login_user, logout_user
 )
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -19,39 +18,15 @@ from wtforms import (
     TextAreaField, SelectField, IntegerField, DateField, HiddenField
 )
 from wtforms.validators import DataRequired, Email, EqualTo, Length
-from flask_socketio import SocketIO, join_room, leave_room, emit
-from flask_migrate import Migrate
+from flask_socketio import join_room, leave_room, emit
 from sqlalchemy import Enum
 
-# Import the manager blueprint (if you have one)
+from app import create_app
+from app.extensions import db, socketio, login_manager
+
 from manager_routes import manager_bp
 
-############################################################################
-# Initialize app & config
-############################################################################
-app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get(
-    "SECRET_KEY", "dev-only-insecure-do-not-deploy"
-)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
-    "SQLALCHEMY_DATABASE_URI",
-    "sqlite:///lacksdrivers.db"
-)
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = (
-    os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true"
-)
-
-db = SQLAlchemy(app)
-socketio = SocketIO(app)
-migrate = Migrate(app, db)
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = "login"
-
-# Register the manager blueprint so /manager/* routes become active
+app = create_app()
 app.register_blueprint(manager_bp)
 
 ############################################################################
