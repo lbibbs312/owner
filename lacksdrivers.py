@@ -117,21 +117,6 @@ ITEM_STATUSES = ("operational", "damaged", "missing", "leaking")
 class EndOfDayForm(FlaskForm):
     hidden_example = HiddenField()
 
-class RegistrationForm(FlaskForm):
-    username = StringField("Username", validators=[DataRequired(), Length(min=3, max=64)])
-    email = StringField("Email", validators=[DataRequired(), Email()])
-    password = PasswordField("Password", validators=[DataRequired(), Length(min=6)])
-    confirm_password = PasswordField("Confirm Password", validators=[DataRequired(), EqualTo("password")])
-    role = SelectField("Role", choices=[("driver", "Driver"), ("management", "Management")], default="driver")
-    manager_pin = PasswordField("Manager PIN (if Management)")
-    submit = SubmitField("Register")
-
-class LoginForm(FlaskForm):
-    login_name = StringField("Username or Email", validators=[DataRequired()])
-    password = PasswordField("Password", validators=[DataRequired()])
-    remember = BooleanField("Remember Me")
-    submit = SubmitField("Login")
-
 class TaskForm(FlaskForm):
     title = StringField("Title", validators=[DataRequired()])
     details = TextAreaField("Details")
@@ -319,13 +304,6 @@ class ProfileForm(FlaskForm):
     submit = SubmitField("Update Profile")
 
 ############################################################################
-# LOGIN Manager
-############################################################################
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
-
-############################################################################
 # Jinja filter for UTC -> local time
 ############################################################################
 @app.template_filter('to_local_time')
@@ -345,56 +323,6 @@ def to_local_time(utc_str):
 ############################################################################
 # Routes (General + Driver-Focused)
 ############################################################################
-
-@app.route("/register", methods=["GET", "POST"])
-def register():
-    form = RegistrationForm()
-    if form.validate_on_submit():
-        if form.role.data == "management":
-            expected_pin = os.environ.get("MANAGER_REGISTRATION_PIN")
-            if not expected_pin or form.manager_pin.data != expected_pin:
-                flash("Invalid Manager PIN!", "danger")
-                return redirect(url_for("register"))
-        existing = User.query.filter(
-            (User.email == form.email.data) | (User.username == form.username.data)
-        ).first()
-        if existing:
-            flash("User already exists with that email or username.", "danger")
-        else:
-            user = User(
-                username=form.username.data,
-                email=form.email.data,
-                role=form.role.data
-            )
-            user.set_password(form.password.data)
-            db.session.add(user)
-            db.session.commit()
-            flash("Registration successful! Please log in.", "success")
-            return redirect(url_for("login"))
-    return render_template("register.html", form=form)
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    form = LoginForm()
-    if form.validate_on_submit():
-        name_or_email = form.login_name.data
-        user = User.query.filter(
-            (User.username == name_or_email) | (User.email == name_or_email)
-        ).first()
-        if user and user.check_password(form.password.data):
-            login_user(user, remember=form.remember.data)
-            flash("Logged in!", "success")
-            return redirect(url_for("dashboard"))
-        else:
-            flash("Invalid credentials.", "danger")
-    return render_template("login.html", form=form)
-
-@app.route("/logout")
-@login_required
-def logout():
-    logout_user()
-    flash("Logged out.", "info")
-    return redirect(url_for("public.welcome"))
 
 @app.route("/dashboard", methods=["GET", "POST"])
 @login_required

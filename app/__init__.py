@@ -33,6 +33,8 @@ def create_app(config_class=None):
 
 
 def _register_blueprints(app):
+    from app.blueprints.auth import bp as auth_bp
     from app.blueprints.public import bp as public_bp
 
     app.register_blueprint(public_bp)
+    app.register_blueprint(auth_bp)
