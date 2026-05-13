@@ -3,7 +3,33 @@
 {% block content %}
 <div class="container">
   <h2>Recent Activity</h2>
-  <p>Last 24 hours</p>
+  <p class="text-muted">Action history, announcements, and recent messages.</p>
+
+  <div class="mt-4">
+    <h4>Action History ({{ action_history|length }})</h4>
+    {% if action_history %}
+      <ul class="list-group mb-3">
+        {% for event in action_history %}
+          <li class="list-group-item">
+            <div class="d-flex justify-content-between gap-3">
+              <div>
+                <span class="badge text-bg-secondary me-2">{{ event.category|upper }}</span>
+                <strong>{{ event.title }}</strong>
+                {% if event.details %}
+                  <div class="text-muted small mt-1">{{ event.details }}</div>
+                {% endif %}
+              </div>
+              <small class="text-muted text-nowrap">
+                {{ event.created_at|to_detroit_datetime }}
+              </small>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-muted">No action history yet.</p>
+    {% endif %}
+  </div>
 
   <div class="mt-4">
     <h4>Recent Announcements ({{ new_announcements|length }})</h4>
@@ -15,7 +41,7 @@
             {{ ann.body }}
             <br>
             <small class="text-muted">
-              Posted {{ ann.created_at.strftime('%Y-%m-%d %H:%M') }}
+              Posted {{ ann.created_at|to_detroit_datetime }}
             </small>
           </li>
         {% endfor %}
@@ -34,7 +60,7 @@
             <strong>From {{ dm.sender.username }}:</strong>
             {{ dm.content }}
             <br>
-            <small class="text-muted">{{ dm.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+            <small class="text-muted">{{ dm.timestamp|to_detroit_datetime }}</small>
           </li>
         {% endfor %}
       </ul>

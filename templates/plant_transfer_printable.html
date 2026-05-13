@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Plant Transfer - Print</title>
+  <style>
+    @page { size: Letter landscape; margin: 0.35in; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0.2in; font-family: Arial, sans-serif; font-size: 9pt; color: #000; background: #fff; }
+    .screen-actions { display: flex; flex-wrap: wrap; gap: 0.08in; margin-bottom: 0.15in; align-items: center; }
+    .screen-actions a, .screen-actions button { border: 0; padding: 8px 14px; color: #fff; text-decoration: none; cursor: pointer; font-size: 10pt; }
+    .edit-btn { background: #8b1538; }
+    .print-btn { background: #0069d9; }
+    .back-btn { background: #333; }
+    .email-btn { background: #198754; }
+    .copy-choice { color: #111 !important; border: 1px solid #999 !important; background: #fff; }
+    .copy-choice.active { outline: 3px solid #8b1538; font-weight: bold; }
+    .copy-page { width: 10.3in; min-height: 7.35in; margin: 0 auto 0.25in; padding: 0.1in; border: 1px solid #000; page-break-after: always; }
+    .copy-white { background: #fff; }
+    .copy-canary { background: #fff8b8; }
+    .copy-pink { background: #ffd7e8; }
+    .copy-blue { background: #dceeff; }
+    .copy-label { float: right; border: 1px solid #000; padding: 2px 6px; font-weight: bold; }
+    .title { text-align: center; line-height: 1.05; margin-bottom: 0.08in; }
+    .title .company { font-size: 8pt; font-weight: bold; }
+    .title h1 { margin: 0; font-size: 17pt; letter-spacing: 1px; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.08in; margin-bottom: 0.08in; }
+    .line-field { border-bottom: 1px solid #000; min-height: 0.22in; padding: 2px 4px; }
+    .line-field strong { font-size: 8pt; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border: 1px solid #000; height: 0.28in; padding: 2px 3px; overflow-wrap: anywhere; vertical-align: top; }
+    th { font-size: 7.5pt; text-transform: uppercase; text-align: center; }
+    .part-col { width: 17%; }
+    .qty-col, .skid-col { width: 7%; text-align: center; }
+    .remarks-col { width: 19%; }
+    .footer-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.08in; margin-top: 0.08in; }
+    .retention { text-align: center; font-size: 7.5pt; margin-top: 0.08in; }
+    @media print {
+      body { padding: 0; }
+      .screen-actions { display: none; }
+      .copy-page { width: 100%; min-height: auto; margin: 0; border: none; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+
+  </style>
+</head>
+<body>
+{% set transfer_attachment_endpoint = 'manager.plant_transfer_attachment' if current_user.role == 'management' else 'driver.plant_transfer_attachment' %}
+{% set transfer_view_endpoint = 'manager.view_plant_transfer' if current_user.role == 'management' else 'driver.view_plant_transfer' %}
+{% set transfer_print_endpoint = 'manager.plant_transfer_printable' if current_user.role == 'management' else 'driver.plant_transfer_printable' %}
+{% set transfer_mark_endpoint = 'manager.mark_plant_transfer_printed' if current_user.role == 'management' else 'driver.mark_plant_transfer_printed' %}
+<div class="screen-actions">
+    {% if current_user.role == 'driver' and transfer.user_id == current_user.id %}
+      <a class="edit-btn" href="{{ url_for('driver.edit_plant_transfer', transfer_id=transfer.id) }}">Edit Before Printing</a>
+    {% endif %}
+    <button class="print-btn" type="button" onclick="markPrintedAndPrint()">Print {{ 'All Copies' if requested_copy == 'all' else 'Selected Copy' }}</button>
+    <a class="email-btn" href="{{ url_for(transfer_attachment_endpoint, transfer_id=transfer.id, copy=requested_copy) }}">Download PDF Attachment</a>
+    <a class="back-btn" href="{{ url_for(transfer_view_endpoint, transfer_id=transfer.id) }}">Back</a>
+    <div class="w-100"></div>
+    <span><strong>Copy needed:</strong></span>
+    {% for option in all_copy_sets %}
+      <a class="copy-choice {{ 'active' if requested_copy == option.key else '' }} {{ option.class }}"
+         href="{{ url_for(transfer_print_endpoint, transfer_id=transfer.id, copy=option.key) }}">
+        {{ option.label }}
+      </a>
+    {% endfor %}
+    <a class="copy-choice {{ 'active' if requested_copy == 'all' else '' }}"
+       href="{{ url_for(transfer_print_endpoint, transfer_id=transfer.id, copy='all') }}">
+      All Copies
+    </a>
+  </div>
+
+  {% for copy in copy_sets %}
+    <section class="copy-page {{ copy.class }}">
+      <div class="copy-label">{{ copy.label }}</div>
+      <div class="title">
+        <div class="company">LACKS INDUSTRIES INC.</div>
+        <h1>PLANT TRANSFER</h1>
+        <div>No. {{ transfer.transfer_number or transfer.id }}</div>
+      </div>
+      <div class="meta-grid">
+        <div class="line-field"><strong>SHIP TO:</strong> {{ transfer.ship_to }}</div>
+        <div class="line-field"><strong>SHIP FROM:</strong> {{ transfer.ship_from }}</div>
+        <div class="line-field"><strong>DATE:</strong> {{ transfer.transfer_date.strftime('%m/%d/%Y') if transfer.transfer_date else '' }}</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="part-col">Part Number</th><th class="qty-col">Quantity</th><th class="skid-col">Skids</th><th class="remarks-col">Remarks</th>
+            <th class="part-col">Part Number</th><th class="qty-col">Quantity</th><th class="skid-col">Skids</th><th class="remarks-col">Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for left, right in print_rows %}
+            <tr>
+              <td>{{ left.part_number if left else '' }}</td>
+              <td>{{ left.quantity if left else '' }}</td>
+              <td>{{ left.skids if left else '' }}</td>
+              <td>{{ left.remarks if left else '' }}</td>
+              <td>{{ right.part_number if right else '' }}</td>
+              <td>{{ right.quantity if right else '' }}</td>
+              <td>{{ right.skids if right else '' }}</td>
+              <td>{{ right.remarks if right else '' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="footer-grid">
+        <div class="line-field"><strong>TRAILER NO.:</strong> {{ transfer.trailer_number or '' }}</div>
+        <div class="line-field"><strong>DRIVER:</strong> {{ transfer.driver_name or transfer.driver.display_name }}</div>
+        <div class="line-field"><strong>TIME:</strong> {{ transfer.transfer_time|display_time if transfer.transfer_time else '' }}</div>
+        <div class="line-field"><strong>LOADED BY:</strong> {{ transfer.loaded_by or '' }}</div>
+      </div>
+      <div class="retention">MAT-C - Plant Transfer &nbsp; | &nbsp; Ret: 1 mo. after the mo. of creation &nbsp; | &nbsp; Effective Date: 1/1/10</div>
+    </section>
+  {% endfor %}
+
+<script>
+  async function markPrintedAndPrint() {
+    try {
+      await fetch("{{ url_for(transfer_mark_endpoint, transfer_id=transfer.id, copy=requested_copy) }}", {
+        method: "POST",
+        credentials: "same-origin"
+      });
+    } catch (err) {
+      console.error('Could not record print activity:', err);
+    }
+    window.print();
+  }
+</script>
+</body>
+</html>

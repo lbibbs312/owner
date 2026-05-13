@@ -3,7 +3,7 @@
 <h3>Tasks</h3>
 
 {% if current_user.role == "management" %}
-  <a href="{{ url_for('create_task') }}" class="btn btn-success mb-3">Create Task</a>
+  <a href="{{ url_for('manager.manager_dashboard') }}" class="btn btn-success mb-3">Create Task</a>
 {% endif %}
 
 {% if tasks %}
@@ -21,19 +21,20 @@
 
       <!-- If manager, show Edit button -->
       {% if current_user.role == "management" %}
-        <a href="{{ url_for('edit_task', task_id=t.id) }}"
+        <a href="{{ url_for('driver.list_tasks') }}"
            class="btn btn-warning btn-sm">
           Edit
         </a>
       {% else %}
+        <a href="{{ url_for('driver.view_task', task_id=t.id) }}" class="btn btn-info btn-sm">Details</a>
         {% if t.status == "pending" %}
-          <form action="{{ url_for('accept_task', task_id=t.id) }}"
+          <form action="{{ url_for('driver.accept_task', task_id=t.id) }}"
                 method="POST" style="display:inline;">
             <button type="submit" class="btn btn-primary btn-sm">Accept</button>
           </form>
 
         {% elif t.status == "in-progress" and t.assigned_to == current_user.id %}
-          <form action="{{ url_for('decline_task', task_id=t.id) }}"
+          <form action="{{ url_for('driver.decline_task', task_id=t.id) }}"
                 method="POST" style="display:inline;">
             <button type="submit" class="btn btn-secondary btn-sm">Decline</button>
           </form>
@@ -44,7 +45,7 @@
       {% if t.status != "completed"
             and (current_user.role == "management" or
                  t.assigned_to == current_user.id) %}
-        <form action="{{ url_for('mark_complete', task_id=t.id) }}"
+        <form action="{{ url_for('driver.complete_task', task_id=t.id) }}"
               method="POST" style="display:inline;">
           <button type="submit" class="btn btn-success btn-sm">Mark Complete</button>
         </form>

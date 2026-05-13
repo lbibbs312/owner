@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2 class="mt-3">{{ 'Edit' if transfer else 'New' }} Plant Transfer</h2>
+  <p class="text-muted">Fill this like the paper plant-transfer sheet: ship-to/from, date, part lines, trailer, driver, time, and loaded-by.</p>
+
+  <form method="POST" action="">
+    {{ form.hidden_tag() }}
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        {{ form.transfer_number.label(class="form-label") }}
+        {{ form.transfer_number(class="form-control", placeholder="Optional") }}
+      </div>
+      <div class="col-md-3">
+        {{ form.transfer_date.label(class="form-label") }}
+        {{ form.transfer_date(class="form-control") }}
+      </div>
+      <div class="col-md-3">
+        {{ form.ship_to.label(class="form-label") }}
+        {{ form.ship_to(class="form-select") }}
+      </div>
+      <div class="col-md-3">
+        {{ form.ship_from.label(class="form-label") }}
+        {{ form.ship_from(class="form-select") }}
+      </div>
+    </div>
+
+    <div class="table-responsive mb-3">
+      <table class="table table-bordered table-sm align-middle plant-transfer-entry">
+        <thead>
+          <tr>
+            <th>Part Number</th>
+            <th>Quantity</th>
+            <th>Skids</th>
+            <th>Remarks</th>
+            <th>Part Number</th>
+            <th>Quantity</th>
+            <th>Skids</th>
+            <th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in range(10) %}
+            {% set left = lines[row] %}
+            {% set right = lines[row + 10] %}
+            <tr>
+              <td><input name="part_number_{{ left.index }}" class="form-control form-control-sm" value="{{ left.part_number }}"></td>
+              <td><input name="quantity_{{ left.index }}" class="form-control form-control-sm" value="{{ left.quantity }}"></td>
+              <td><input name="skids_{{ left.index }}" class="form-control form-control-sm" value="{{ left.skids }}"></td>
+              <td><input name="remarks_{{ left.index }}" class="form-control form-control-sm" value="{{ left.remarks }}"></td>
+              <td><input name="part_number_{{ right.index }}" class="form-control form-control-sm" value="{{ right.part_number }}"></td>
+              <td><input name="quantity_{{ right.index }}" class="form-control form-control-sm" value="{{ right.quantity }}"></td>
+              <td><input name="skids_{{ right.index }}" class="form-control form-control-sm" value="{{ right.skids }}"></td>
+              <td><input name="remarks_{{ right.index }}" class="form-control form-control-sm" value="{{ right.remarks }}"></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        {{ form.trailer_number.label(class="form-label") }}
+        {{ form.trailer_number(class="form-control") }}
+      </div>
+      <div class="col-md-3">
+        {{ form.driver_name.label(class="form-label") }}
+        {{ form.driver_name(class="form-control") }}
+      </div>
+      <div class="col-md-3">
+        {{ form.transfer_time.label(class="form-label") }}
+        {{ form.transfer_time(class="form-control", placeholder="Example: 1:30pm") }}
+      </div>
+      <div class="col-md-3">
+        {{ form.loaded_by.label(class="form-label") }}
+        {{ form.loaded_by(class="form-control") }}
+      </div>
+    </div>
+
+    <div class="alert alert-secondary py-2">
+      Printed copies are labeled: White - Data Input, Canary - Receiving Plant, Pink - Driver, Blue - Shipping Plant.
+    </div>
+
+    {{ form.submit(class="btn btn-primary") }}
+    <a href="{{ url_for('driver.plant_transfers') }}" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}

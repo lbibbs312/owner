@@ -1,18 +1,98 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container">
-  <h2 class="mt-3">View Driver Log</h2>
+  {% set logs_endpoint = 'manager.driver_logs' if current_user.role == 'management' else 'driver.driver_logs' %}
+  <style>
+    .log-detail-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:18px 0; }
+    .log-detail-card { border:1px solid #e2e8f0; border-radius:12px; padding:14px; background:#fff; }
+    .log-detail-card .label { margin:0 0 4px; color:#64748b; font-size:.72rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+    .log-detail-card .value { margin:0; color:#0f172a; font-size:1rem; font-weight:900; }
+    .log-detail-card .meta { margin:4px 0 0; color:#64748b; font-size:.82rem; font-weight:700; }
+    .status-chip { display:inline-flex; padding:4px 9px; border-radius:8px; background:#f1f5f9; color:#334155; font-weight:900; font-size:.78rem; }
+    .status-chip.open { background:#fff1f2; color:#be123c; }
+    .status-chip.done { background:#dcfce7; color:#166534; }
+    .print-title { display:none; }
+    @media (max-width:900px) { .log-detail-grid { grid-template-columns:1fr; } }
+    @media print {
+      @page { size: Letter portrait; margin:.35in; }
+      body { background:#fff !important; font-size:9.5pt; }
+      .navbar, #fullscreenOverlay, .btn, .header-actions, .no-print { display:none !important; }
+      .container { width:100% !important; max-width:none !important; margin:0 !important; padding:0 !important; }
+      .print-title { display:block; border-bottom:2px solid #111; margin:0 0 .18in; padding-bottom:.08in; }
+      .print-title h1 { margin:0; font-size:15pt; letter-spacing:.03em; }
+      .print-title p { margin:2px 0 0; font-size:8.5pt; color:#333; }
+      h2.mt-3 { display:none; }
+      .log-detail-grid { grid-template-columns:repeat(3,1fr); gap:.08in; margin:.1in 0 .16in; }
+      .log-detail-card { border:1px solid #222; border-radius:0; padding:.08in; break-inside:avoid; }
+      p { margin:.05in 0; }
+      .status-chip { border:1px solid #111; background:#fff !important; color:#000 !important; }
+    }
+  </style>
+  {% if current_user.role == 'management' %}
+    <div class="print-title">
+      <h1>LACKSDRIVERS MANAGEMENT DRIVER LOG</h1>
+      <p>Driver stop audit | Log ID {{ log.id }} | {{ log.date }}</p>
+    </div>
+  {% endif %}
+  <div class="d-flex justify-content-between align-items-center gap-2 no-print">
+    <h2 class="mt-3 mb-0">View Driver Log</h2>
+    {% if current_user.role == 'management' %}<button type="button" class="btn btn-outline-secondary" onclick="window.print()">Print Management Copy</button>{% endif %}
+  </div>
   <p><strong>ID:</strong> {{ log.id }}</p>
+  {% if current_user.role == 'management' %}
+    <div class="log-detail-grid">
+      <div class="log-detail-card">
+        <p class="label">Driver</p>
+        <p class="value">{{ log.driver.manager_label }}</p>
+        <p class="meta">{{ log.driver.division_label }} | Badge {{ log.driver.badge_label }}</p>
+      </div>
+      <div class="log-detail-card">
+        <p class="label">Truck ID</p>
+        <p class="value">{{ truck_context.truck_id if truck_context else 'Truck not set' }}</p>
+        <p class="meta">{{ truck_context.truck_meta if truck_context else 'No DVIR found' }}</p>
+      </div>
+      <div class="log-detail-card">
+        <p class="label">Move Context</p>
+        {% if related_task %}
+          <p class="value">T-{{ related_task.id }} | {{ related_task.status.replace('-', ' ')|title }}</p>
+          <p class="meta">{{ related_task.part_number or related_task.title }}{% if related_task.accepted_by %} | Accepted by {{ related_task.accepted_by.manager_label }}{% endif %}</p>
+        {% else %}
+          <p class="value">No linked move</p>
+          <p class="meta">No active task matched this stop.</p>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
   <p><strong>Date:</strong> {{ log.date }}</p>
   <p><strong>Plant Name:</strong> {{ log.plant_name }}</p>
+  {% if current_user.role == 'management' and log_route %}
+    <p><strong>Route:</strong>
+      {% if log_route.single %}
+        {{ log_route.origin }} {{ log_route.destination }}
+      {% else %}
+        {{ log_route.origin }} <span style="font-weight:900;color:#7f1d2d;">{{ log_route.arrow }}</span> {{ log_route.destination }}
+      {% endif %}
+      <span class="text-muted">({{ log_route.state }})</span>
+    </p>
+  {% endif %}
   <p><strong>Load Size:</strong> {{ log.load_size }}</p>
+  {% if current_user.role == 'management' %}
+    <p><strong>Stop Status:</strong>
+      {% if log.depart_time %}
+        <span class="status-chip done">Completed stop</span>
+      {% else %}
+        <span class="status-chip open">Open stop - needs departure</span>
+      {% endif %}
+      {% if stop_position and stop_count %}<span class="text-muted">Stop {{ stop_position }} of {{ stop_count }} for this driver/date</span>{% endif %}
+    </p>
+  {% endif %}
   <p><strong>Maintenance:</strong> {{ "Yes" if log.maintenance else "No" }}</p>
   <p><strong>Fuel:</strong> {{ "Yes" if log.fuel else "No" }}</p>
   <p><strong>Meeting:</strong> {{ "Yes" if log.meeting else "No" }}</p>
 
   <p><strong>Arrive Time:</strong> 
     {% if log.arrive_time %}
-      {{ log.arrive_time }}
+      {{ log.arrive_time|to_local_time }}
     {% else %}
       --
     {% endif %}
@@ -20,12 +100,39 @@
 
   <p><strong>Depart Time:</strong> 
     {% if log.depart_time %}
-      {{ log.depart_time }}
+      {{ log.depart_time|to_12h_format }}
     {% else %}
       --
     {% endif %}
   </p>
 
-  <p><strong>Downtime Reason:</strong> {{ log.downtime_reason or "N/A" }}</p>
+  {% if log.no_pickup %}
+    <p><strong>Parts:</strong> <span class="badge bg-dark">No Pickup</span></p>
+  {% else %}
+    <p><strong>Parts:</strong> {% if log.hot_parts %}<span class="badge bg-danger">Hot</span>{% endif %} {{ log.part_number or "N/A" }}</p>
+  {% endif %}
+
+  {% set can_manage_log = current_user.role == 'driver' and log.driver_id == current_user.id %}
+  {% set can_delete_log = can_manage_log and log.date == today_local_date %}
+  <div class="d-flex flex-wrap gap-2 mt-3">
+    <a href="{{ url_for(logs_endpoint) }}" class="btn btn-secondary">Back to Driver Logs</a>
+    {% if can_manage_log %}
+      <a href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}" class="btn btn-warning">Edit</a>
+      {% if not log.depart_time %}
+        <a href="{{ url_for('driver.pickup_driver_log', log_id=log.id) }}" class="btn btn-primary">Pickup</a>
+        <form action="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" method="POST" class="d-inline">
+          <button type="submit" class="btn btn-success">Depart</button>
+        </form>
+        <form action="{{ url_for('driver.no_pickup_driver_log', log_id=log.id) }}" method="POST" class="d-inline">
+          <button type="submit" class="btn btn-outline-dark">No Pickup</button>
+        </form>
+      {% endif %}
+      {% if can_delete_log %}
+        <form action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this driver log?');">
+          <button type="submit" class="btn btn-outline-danger">Delete</button>
+        </form>
+      {% endif %}
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

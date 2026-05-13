@@ -26,21 +26,33 @@
       {{ form.load_size.label }}
       {{ form.load_size(class="form-select") }}
     </div>
+    <div class="mb-3 form-check">
+      {{ form.hot_parts(class="form-check-input") }}
+      {{ form.hot_parts.label(class="form-check-label") }}
+    </div>
     <div class="mb-3">
-      {{ form.downtime_reason.label }}
-      {{ form.downtime_reason(class="form-control") }}
+      {{ form.part_number.label }}
+      {{ form.part_number(class="form-control", placeholder="Part number from dispatch or shipper") }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.arrive_time.label }}
+      {{ form.arrive_time(class="form-control", placeholder="Example: 5:45pm") }}
+      <small class="form-text text-muted">
+Enter Detroit local time, for example 5:45am or 1:05pm.
+      </small>
     </div>
     
     <!-- New field: Manual Depart Time -->
     <div class="mb-3">
       {{ form.depart_time.label }}
-      {{ form.depart_time(class="form-control", placeholder="HH:MM") }}
+      {{ form.depart_time(class="form-control", placeholder="Example: 5:45pm") }}
       <small class="form-text text-muted">
-        Enter time in HH:MM format (e.g., 545 for 05:45 or 13:05 for 13:05). Leave blank if unchanged.
+Enter Detroit local time only if you need to manually set or correct departure. Leave blank to edit the log without departing.
       </small>
       {% if log.depart_edited_at %}
         <br>
-        <small class="text-muted">Edited: {{ log.depart_edited_at.strftime("%H:%M on %Y-%m-%d") }}</small>
+        <small class="text-muted">Edited: {{ log.depart_edited_at|to_detroit_datetime }}</small>
       {% endif %}
     </div>
     
@@ -55,7 +67,18 @@
     </div>
     {% endif %}
     
-    {{ form.submit(class="btn btn-primary", value="Depart") }}
+    <div class="d-flex gap-2 align-items-center">
+      {{ form.submit(class="btn btn-primary", value="Save Changes") }}
+      <a href="{{ url_for('driver.driver_logs') }}" class="btn btn-secondary">Back</a>
+    </div>
   </form>
+  {% if not log.depart_time %}
+    <div class="d-flex gap-2 mt-2">
+      <a href="{{ url_for('driver.pickup_driver_log', log_id=log.id) }}" class="btn btn-primary">Pickup</a>
+      <form action="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" method="POST">
+        <button type="submit" class="btn btn-success">Depart Now</button>
+      </form>
+    </div>
+  {% endif %}
 </div>
 {% endblock %}

@@ -32,10 +32,13 @@
       {{ form.load_size(class="form-select") }}
     </div>
 
-    <!-- Downtime Reason -->
+    <div class="mb-3 form-check">
+      {{ form.hot_parts(class="form-check-input") }}
+      {{ form.hot_parts.label(class="form-check-label") }}
+    </div>
     <div class="mb-3">
-      {{ form.downtime_reason.label }}
-      {{ form.downtime_reason(class="form-control") }}
+      {{ form.part_number.label }}
+      {{ form.part_number(class="form-control", placeholder="Part number from dispatch or shipper") }}
     </div>
 
     <!-- Submit button -->

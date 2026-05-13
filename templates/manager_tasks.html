@@ -2,7 +2,7 @@
 {% block content %}
 <div class="container">
   <h2 class="mt-3">Manager - All Tasks</h2>
-  <a href="{{ url_for('create_task') }}" class="btn btn-sm btn-success mb-2">
+  <a href="{{ url_for('manager.manager_dashboard') }}" class="btn btn-sm btn-success mb-2">
     Create Task
   </a>
   {% if tasks %}
@@ -10,9 +10,6 @@
       {% for t in tasks %}
         <li>
           <strong>{{ t.title }}</strong> - {{ t.status }} (ID: {{ t.id }})
-          <a href="{{ url_for('edit_task', task_id=t.id) }}" class="btn btn-sm btn-warning ms-2">
-            Edit
-          </a>
         </li>
       {% endfor %}
     </ul>

@@ -1,10 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container slide-in">
+<div class="{{ 'container-fluid manager-log-shell' if current_user.role == 'management' else 'container' }} slide-in">
+  {% set logs_endpoint = 'manager.driver_logs' if current_user.role == 'management' else 'driver.driver_logs' %}
+  {% if current_user.role == 'management' %}<script>document.body.classList.add('manager-logs-active');</script>{% endif %}
+  <style>
+    body.manager-logs-active .container.mt-4.fade-in { max-width:none; width:100%; padding-left:0; padding-right:0; }
+    .log-route { display:inline-flex; align-items:center; gap:8px; white-space:nowrap; font-weight:800; }
+    .log-route-arrow { font-size:1.1rem; font-weight:900; color:#7f1d2d; }
+    .log-route.open .log-route-arrow { color:#dc2626; }
+    .log-route-state { display:block; margin-top:3px; font-size:.72rem; color:#64748b; font-weight:700; }
+    .manager-log-shell { width:100%; max-width:none; padding-left:16px; padding-right:16px; }
+    .manager-log-shell .table-responsive { overflow-x:auto; }
+    .manager-log-shell table { width:100%; min-width:0; }
+    .manager-log-shell th, .manager-log-shell td { vertical-align:middle; }
+    .manager-log-shell th, .manager-log-shell td { padding:.72rem .48rem; font-size:.88rem; }
+    .manager-log-shell .route-cell { white-space:nowrap; }
+    @media (min-width:1200px) { .manager-log-shell { padding-left:24px; padding-right:24px; } }
+  </style>
+  {% set log_view_endpoint = 'manager.view_driver_log' if current_user.role == 'management' else 'driver.view_driver_log' %}
   <h2 class="mt-3">Driver Logs</h2>
   
   <!-- Search form: Date filter (and driver filter for management) -->
-  <form method="GET" action="{{ url_for('driver.driver_logs') }}" class="mb-4">
+  <form method="GET" action="{{ url_for(logs_endpoint) }}" class="mb-4">
     <div class="row g-2 align-items-center">
       <!-- Date Filter -->
       <div class="col-auto">
@@ -33,7 +50,7 @@
                 value="{{ d.id }}"
                 {% if d.id == selected_driver_id %} selected {% endif %}
               >
-                {{ d.username }}
+                {{ d.display_name }}
               </option>
             {% endfor %}
           </select>
@@ -59,13 +76,18 @@
   {% endif %}
   
   {% if logs %}
+    <div class="table-responsive">
     <table class="table table-striped align-middle">
       <thead>
         <tr>
           <th>Driver</th>
+          <th>ID Number</th>
+          <th>Department</th>
           <th>Date</th>
           <th>Plant</th>
+          {% if current_user.role == 'management' %}<th>Route</th>{% endif %}
           <th>Load</th>
+          <th>Parts</th>
           <th>Maintenance</th>
           <th>Fuel</th>
           <th>Meeting</th>
@@ -76,8 +98,10 @@
       </thead>
       <tbody>
         {% for log in logs %}
-          <tr>
-            <td>{{ log.driver.username }}</td>
+          <tr class="{% if not log.depart_time %}table-danger{% elif log.maintenance %}table-warning{% endif %}">
+            <td>{{ log.driver.display_name }}</td>
+            <td>{{ log.driver.employee_id or '--' }}</td>
+            <td>{{ log.driver.department or '--' }}</td>
             <td>{{ log.date }}</td>
             
             <!-- Plant & Address -->
@@ -91,17 +115,62 @@
               {% endif %}
             </td>
             
-            <td>{{ log.load_size }}</td>
-            <td>{{ "Yes" if log.maintenance else "No" }}</td>
-            <td>{{ "Yes" if log.fuel else "No" }}</td>
-            <td>{{ "Yes" if log.meeting else "No" }}</td>
+            {% if current_user.role == 'management' %}
+              {% set route = (log_routes or {}).get(log.id) %}
+              <td class="route-cell">
+                {% if route %}
+                  {% if route.single %}
+                    <span class="log-route {{ route.class }}">
+                      <span>{{ route.origin }}</span>
+                      <span>{{ route.destination }}</span>
+                    </span>
+                  {% else %}
+                    <span class="log-route {{ route.class }}">
+                      <span>{{ route.origin }}</span>
+                      <span class="log-route-arrow">{{ route.arrow }}</span>
+                      <span>{{ route.destination }}</span>
+                    </span>
+                  {% endif %}
+                  <span class="log-route-state">{{ route.state }}</span>
+                {% else %}
+                  --
+                {% endif %}
+              </td>
+            {% endif %}
+
+            <td>
+              {% if log.load_size == "Full" %}
+                <span class="badge bg-success">Full</span>
+              {% elif log.load_size == "Partial" %}
+                <span class="badge bg-warning text-dark">Partial</span>
+              {% elif log.load_size == "Half" %}
+                <span class="badge bg-primary">Half</span>
+              {% elif log.load_size == "Quarter" %}
+                <span class="badge bg-info text-dark">Quarter</span>
+              {% elif log.load_size == "Empty" %}
+                <span class="badge bg-secondary">Empty</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ log.load_size }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if log.no_pickup %}
+                <span class="badge bg-dark">No Pickup</span>
+              {% else %}
+                {% if log.hot_parts %}<span class="badge bg-danger">Hot</span>{% endif %}
+                {{ log.part_number or '--' }}
+              {% endif %}
+            </td>
+            <td>{% if log.maintenance %}<span class="badge bg-warning text-dark">Yes</span>{% else %}<span class="badge bg-success">No</span>{% endif %}</td>
+            <td>{% if log.fuel %}<span class="badge bg-info text-dark">Yes</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
+            <td>{% if log.meeting %}<span class="badge bg-info text-dark">Yes</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
             
             <!-- Arrival (assumes it's a full datetime) -->
             <td>
               {% if log.arrive_time %}
                 {{ log.arrive_time|to_local_time }}
               {% else %}
-                --
+                <span class="badge bg-danger">Missing</span>
               {% endif %}
             </td>
             
@@ -121,26 +190,45 @@
             </td>
             
             <td>
-              <a
-                href="{{ url_for('driver.view_driver_log', log_id=log.id) }}"
-                class="btn btn-sm btn-info hover-btn"
-              >
-                View
-              </a>
-              
-              {% if current_user.role == 'management' or log.driver_id == current_user.id %}
+              {% set can_manage_log = current_user.role == 'driver' and log.driver_id == current_user.id %}
+              {% set can_delete_log = can_manage_log and log.date == today_local_date %}
+              <div class="d-flex flex-wrap gap-1">
                 <a
-                  href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}"
-                  class="btn btn-sm btn-warning hover-btn"
+                  href="{{ url_for(log_view_endpoint, log_id=log.id) }}"
+                  class="btn btn-sm btn-info hover-btn"
                 >
-                  {{ log.action_label }}
+                  View
                 </a>
-              {% endif %}
+
+                {% if can_manage_log %}
+                  <a
+                    href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}"
+                    class="btn btn-sm btn-warning hover-btn"
+                  >
+                    Edit
+                  </a>
+                  {% if not log.depart_time %}
+                    <a href="{{ url_for('driver.pickup_driver_log', log_id=log.id) }}" class="btn btn-sm btn-primary hover-btn">Pickup</a>
+                    <form action="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" method="POST" class="d-inline">
+                      <button type="submit" class="btn btn-sm btn-success hover-btn">Depart</button>
+                    </form>
+                    <form action="{{ url_for('driver.no_pickup_driver_log', log_id=log.id) }}" method="POST" class="d-inline">
+                      <button type="submit" class="btn btn-sm btn-outline-dark hover-btn">No Pickup</button>
+                    </form>
+                  {% endif %}
+                  {% if can_delete_log %}
+                    <form action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this driver log?');">
+                      <button type="submit" class="btn btn-sm btn-outline-danger hover-btn">Delete</button>
+                    </form>
+                  {% endif %}
+                {% endif %}
+              </div>
             </td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
   {% else %}
     <p>No logs found for {{ search_date.strftime('%Y-%m-%d') }}.</p>
   {% endif %}

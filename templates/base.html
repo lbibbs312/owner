@@ -2,15 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>LacksDrivers - Dynamic</title>
+  <title>LacksDrivers</title>
 
-  <!-- 1) Force mobile-friendly viewport (disables pinch-zoom) -->
   <meta 
     name="viewport" 
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
   >
-
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
   <!-- Bootstrap 5 CSS -->
   <link 
@@ -172,6 +169,7 @@
       color: #d00;
     }
   </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
 <body>
@@ -180,26 +178,21 @@
       <div class="container-fluid">
         {% if current_user.is_authenticated %}
           {% if current_user.role == "management" %}
-            <a class="navbar-brand glow-text openOverlayLink"
-               data-url="{{ url_for('manager.manager_dashboard') }}"
-               href="#"
-            >
+            <a class="navbar-brand glow-text" href="{{ url_for('manager.manager_dashboard') }}">
               LacksDrivers (Manager)
             </a>
           {% else %}
-            <a class="navbar-brand glow-text openOverlayLink"
-               data-url="{{ url_for('driver.dashboard') }}"
-               href="#"
-            >
+            <a class="navbar-brand glow-text" href="{{ url_for('driver.mobile_dashboard') }}">
               LacksDrivers
             </a>
             <!-- Driver bell icon (mobile only) -->
-            <a class="nav-link text-white d-md-none openOverlayLink"
-               data-url="{{ url_for('messaging.recent_activity') }}"
-               href="#"
+            <a class="nav-link text-white d-md-none position-relative"
+               href="{{ url_for('messaging.recent_activity') }}"
                style="font-size: 1.25rem; margin-right: 1rem;"
+               aria-label="Recent activity"
             >
               &#128276;
+              <span class="activityBellBadge position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
             </a>
           {% endif %}
         {% else %}
@@ -225,84 +218,56 @@
             {% if current_user.is_authenticated %}
               {% if current_user.role == "management" %}
                 <li class="nav-item">
-                  <a class="nav-link openOverlayLink"
-                     data-url="{{ url_for('manager.manager_dashboard') }}"
-                     href="#"
-                  >Manager Dashboard</a>
+                  <a class="nav-link" href="{{ url_for('manager.manager_dashboard') }}">Manager Dashboard</a>
                 </li>
                 <li class="nav-item">
-                  <a class="nav-link openOverlayLink"
-                     data-url="{{ url_for('auth.logout') }}"
-                     href="#"
-                  >Logout</a>
+                  <a class="nav-link" href="{{ url_for('manager.trim_dashboard') }}">Trim Dashboard</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
                 </li>
               {% else %}
                 <!-- Driver links -->
                 <li class="nav-item d-none d-md-block me-3">
-                  <a class="nav-link openOverlayLink"
-                     data-url="{{ url_for('messaging.recent_activity') }}"
-                     href="#"
-                  >&#128276;</a>
+                  <a class="nav-link position-relative"
+                     href="{{ url_for('messaging.recent_activity') }}"
+                     aria-label="Recent activity"
+                  >
+                    &#128276;
+                    <span class="activityBellBadge position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
+                  </a>
                 </li>
                 <li class="nav-item">
-                  <a class="nav-link openOverlayLink"
-                     data-url="{{ url_for('driver.dashboard') }}"
-                     href="#"
-                  >Driver Dashboard</a>
+                  <a class="nav-link" href="{{ url_for('driver.mobile_dashboard') }}">Dashboard</a>
+                </li>
+                <li class="nav-item dropdown">
+                  <a class="nav-link dropdown-toggle" href="#" id="workMenu" role="button"
+                     data-bs-toggle="dropdown" aria-expanded="false">
+                    Work
+                  </a>
+                  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="workMenu">
+                    <li><a class="dropdown-item" href="{{ url_for('driver.driver_logs') }}">Driver Logs</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('driver.plant_transfers') }}">Plant Transfers</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('driver.new_pretrip') }}">New PreTrip</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('driver.list_pretrips') }}">PreTrips</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="{{ url_for('driver.end_of_day_summary') }}">End of Day</a></li>
+                  </ul>
+                </li>
+                <li class="nav-item dropdown">
+                  <a class="nav-link dropdown-toggle" href="#" id="resourcesMenu" role="button"
+                     data-bs-toggle="dropdown" aria-expanded="false">
+                    Resources
+                  </a>
+                  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="resourcesMenu">
+                    <li><a class="dropdown-item" href="{{ url_for('messaging.announcements') }}">Announcements</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('messaging.knowledge_base') }}">Knowledge Base</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('public.plant_directory') }}">Plant Directory</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('driver.profile') }}">Profile</a></li>
+                  </ul>
                 </li>
                 <li class="nav-item">
-                  <a class="nav-link openOverlayLink"
-                     data-url="{{ url_for('driver.driver_logs') }}"
-                     href="#"
-                  >Driver Logs</a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link openOverlayLink"
-                     data-url="{{ url_for('driver.new_pretrip') }}"
-                     href="#"
-                  >New PreTrip</a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link openOverlayLink"
-                     data-url="{{ url_for('driver.list_pretrips') }}"
-                     href="#"
-                  >List PreTrips</a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link openOverlayLink"
-                     data-url="{{ url_for('messaging.announcements') }}"
-                     href="#"
-                  >Announcements</a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link openOverlayLink"
-                     data-url="{{ url_for('messaging.knowledge_base') }}"
-                     href="#"
-                  >Knowledge Base</a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link openOverlayLink"
-                     data-url="{{ url_for('driver.end_of_day_summary') }}"
-                     href="#"
-                  >End of Day</a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link openOverlayLink"
-                     data-url="{{ url_for('auth.logout') }}"
-                     href="#"
-                  >Logout</a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link openOverlayLink"
-                     data-url="{{ url_for('driver.profile') }}"
-                     href="#"
-                  >Profile</a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link openOverlayLink"
-                     data-url="{{ url_for('public.plant_directory') }}"
-                     href="#"
-                  >Plant Directory</a>
+                  <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
                 </li>
               {% endif %}
             {% else %}
@@ -318,12 +283,28 @@
       </div>
     </nav>
 
+    {% if current_user.is_authenticated and current_user.role == "management" %}
+      {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+          <div class="container mt-3 manager-flash-stack">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'danger' if category == 'danger' else category }} alert-dismissible fade show" role="alert">
+                {{ message|safe }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+    {% endif %}
+
     <!-- MAIN CONTENT with fade-in animation -->
     <div class="container mt-4 fade-in">
       {% block content %}{% endblock %}
     </div>
   </div><!-- #pageContent -->
 
+  {% if not (current_user.is_authenticated and current_user.role == "management") %}
   <!-- FULLSCREEN OVERLAY -->
   <div id="fullscreenOverlay" class="fullscreen-overlay">
     <div class="fullscreen-overlay-content" id="overlayContentBox">
@@ -333,6 +314,7 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
   <!-- Glow-text & overlay scripts -->
   <script>
@@ -383,13 +365,40 @@
       }
     }
 
+    async function refreshActivityBellCount() {
+      const badges = document.querySelectorAll('.activityBellBadge');
+      if (!badges.length) return;
+      try {
+        const response = await fetch('{{ url_for('messaging.count_unread') }}');
+        if (!response.ok) return;
+        const payload = await response.json();
+        const count = Number(payload.display_count ?? payload.unread_count ?? 0);
+        const categories = payload.categories || {};
+        const categoryText = Object.keys(categories).length
+          ? Object.entries(categories).map(([name, value]) => `${name}: ${value}`).join(', ')
+          : '';
+        badges.forEach((badge) => {
+          badge.textContent = count > 99 ? '99+' : String(count);
+          badge.title = categoryText ? `Grouped activity: ${categoryText}` : 'No recent activity';
+          badge.classList.toggle('d-none', count <= 0);
+        });
+      } catch (err) {
+        console.error('Error refreshing activity count:', err);
+      }
+    }
+
     function initOverlaySystem() {
       const overlayLinks = document.querySelectorAll('.openOverlayLink');
       overlayLinks.forEach(link => {
         link.addEventListener('click', (evt) => {
           evt.preventDefault();
           const url = link.dataset.url;
-          if (url) fetchContentAndShow(url);
+          if (!url) return;
+          if (window.matchMedia('(max-width: 767.98px)').matches) {
+            window.location.href = url;
+            return;
+          }
+          fetchContentAndShow(url);
         });
       });
       document.getElementById('closeOverlayBtn').addEventListener('click', closeOverlay);
@@ -404,7 +413,12 @@
 
     window.addEventListener('load', () => {
       animateGlowText();
+      {% if not current_user.is_authenticated %}
       initOverlaySystem();
+      {% endif %}
+      {% if current_user.is_authenticated %}
+      refreshActivityBellCount();
+      {% endif %}
     });
   </script>
 
@@ -420,24 +434,26 @@
       });
     });
   </script>
+  {% if not (current_user.is_authenticated and current_user.role == "management") %}
   <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
 
-  {% with messages = get_flashed_messages(with_categories=True) %}
-    {% if messages %}
-      <script>
-        {% for category, message in messages %}
-          {% if category == 'success' %}
-            swal({ title: "Success!", text: "{{ message|safe }}", icon: "success", button: "OK" });
-          {% elif category == 'danger' %}
-            swal({ title: "Error!", text: "{{ message|safe }}", icon: "error", button: "OK" });
-          {% elif category == 'warning' %}
-            swal({ title: "Warning", text: "{{ message|safe }}", icon: "warning", button: "OK" });
-          {% else %}
-            swal({ title: "Notice", text: "{{ message|safe }}", icon: "info", button: "OK" });
-          {% endif %}
-        {% endfor %}
-      </script>
-    {% endif %}
-  {% endwith %}
+    {% with messages = get_flashed_messages(with_categories=True) %}
+      {% if messages %}
+        <script>
+          {% for category, message in messages %}
+            {% if category == 'success' %}
+              swal({ title: "Success!", text: "{{ message|safe }}", icon: "success", button: "OK" });
+            {% elif category == 'danger' %}
+              swal({ title: "Error!", text: "{{ message|safe }}", icon: "error", button: "OK" });
+            {% elif category == 'warning' %}
+              swal({ title: "Warning", text: "{{ message|safe }}", icon: "warning", button: "OK" });
+            {% else %}
+              swal({ title: "Notice", text: "{{ message|safe }}", icon: "info", button: "OK" });
+            {% endif %}
+          {% endfor %}
+        </script>
+      {% endif %}
+    {% endwith %}
+  {% endif %}
 </body>
 </html>

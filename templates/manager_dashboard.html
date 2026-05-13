@@ -1,107 +1,856 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container mt-4 fade-in">
-  <h2 class="mb-3">Manager Dashboard</h2>
+<style>
+  body.mgr-active .navbar,
+  body.mgr-active #fullscreenOverlay { display:none !important; }
+  body.mgr-active .container.mt-4.fade-in { max-width:none; margin:0 !important; padding:0 !important; animation:none; opacity:1; }
 
-  <!-- 1) CREATE TASK FORM -->
-  <div class="card mb-4">
-    <div class="card-header bg-primary text-white">Create a New Task</div>
-    <div class="card-body">
-      <!-- The form posts to create_task_from_dashboard -->
-      <form 
-        method="POST" 
-        action="{{ url_for('manager.create_task_from_dashboard') }}"
-        class="row g-3"
-      >
-        <!-- Must include hidden_tag() for Flask-WTF CSRF -->
-        {{ create_task_form.hidden_tag() }}
+  *, *::before, *::after { box-sizing:border-box; }
 
-        <!-- Title -->
-        <div class="col-md-6">
-          {{ create_task_form.title.label }}
-          {{ create_task_form.title(class="form-control") }}
-          {% for err in create_task_form.title.errors %}
-            <div class="text-danger">{{ err }}</div>
-          {% endfor %}
+  /* ── Layout shell ── */
+  .mc { min-height:100vh; width:100%; display:flex; background:#f8fafc; color:#0f172a;
+        font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; }
+
+  /* ── Sidebar ── */
+  .mc-side { width:256px; flex:0 0 256px; background:#0f172a; color:#cbd5e1;
+             display:flex; flex-direction:column; min-height:100vh; }
+  .mc-brand { padding:22px 20px; border-bottom:1px solid rgba(148,163,184,.1);
+              display:flex; gap:12px; align-items:center; }
+  .mc-brand-icon { width:42px; height:42px; border-radius:12px; background:#2563eb;
+                   display:grid; place-items:center; color:#fff; flex-shrink:0; }
+  .mc-brand h1 { font-size:1.15rem; font-weight:900; color:#fff; margin:0; letter-spacing:-.02em; }
+  .mc-brand p  { font-size:.68rem; font-weight:800; color:#60a5fa; margin:2px 0 0; }
+  .mc-nav { flex:1; padding:14px 10px; display:flex; flex-direction:column; gap:4px; }
+  .mc-nav a { color:#94a3b8; text-decoration:none; padding:11px 14px; border-radius:12px;
+              font-weight:700; font-size:.85rem; display:flex; align-items:center; gap:10px;
+              transition:background .15s,color .15s; }
+  .mc-nav a svg { width:18px; height:18px; flex-shrink:0; opacity:.8; }
+  .mc-nav a.active { background:rgba(37,99,235,.18); color:#60a5fa; }
+  .mc-nav a:hover:not(.active) { background:rgba(148,163,184,.1); color:#e2e8f0; }
+  .mc-user { padding:16px 18px; border-top:1px solid rgba(148,163,184,.1);
+             display:flex; gap:10px; align-items:center; }
+  .mc-avatar { width:38px; height:38px; border-radius:999px; background:#1e293b;
+               color:#e2e8f0; display:grid; place-items:center; font-weight:900;
+               font-size:.88rem; flex-shrink:0; }
+  .u-name { color:#f1f5f9; font-size:.875rem; font-weight:800; margin:0; }
+  .u-role { color:#475569; font-size:.68rem; margin:2px 0 0; }
+
+  /* ── Main ── */
+  .mc-main { flex:1; min-width:0; display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+
+  /* Header */
+  .mc-header { background:#fff; border-bottom:1px solid #e2e8f0; padding:16px 28px;
+               display:flex; align-items:center; justify-content:space-between; gap:14px;
+               z-index:10; box-shadow:0 1px 2px rgba(15,23,42,.04); flex-shrink:0; }
+  .mc-header h2 { font-size:1.5rem; font-weight:900; color:#0f172a; margin:0; letter-spacing:-.02em; }
+  .mc-header-r { display:flex; align-items:center; gap:10px; }
+  .mc-srch-wrap { position:relative; }
+  .mc-srch-wrap svg { position:absolute; left:11px; top:50%; transform:translateY(-50%);
+                      color:#94a3b8; width:16px; height:16px; pointer-events:none; }
+  .mc-srch { background:#f1f5f9; border:none; border-radius:10px; padding:9px 14px 9px 34px;
+             font-size:.85rem; width:250px; outline:none; color:#334155; font-family:inherit; }
+  .mc-srch:focus { background:#e2e8f0; }
+  .btn-create { background:#2563eb; color:#fff; border:none; border-radius:10px;
+                padding:9px 16px; font-size:.85rem; font-weight:800; cursor:pointer;
+                display:flex; align-items:center; gap:6px; transition:background .15s; white-space:nowrap; }
+  .btn-create:hover { background:#1d4ed8; }
+  .btn-create svg { width:15px; height:15px; }
+
+  /* Body scroll area */
+  .mc-body { flex:1; overflow-y:auto; padding:22px 28px; display:flex; flex-direction:column; gap:18px; }
+
+  /* ── KPI cards ── */
+  .kpi-row { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .kpi { background:#fff; border:1px solid #e2e8f0; border-radius:16px;
+         padding:20px 22px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+  .kpi.blue  { background:#eff6ff; border-color:#bfdbfe; }
+  .kpi.green { background:#ecfdf5; border-color:#a7f3d0; }
+  .kpi-lbl { font-size:.67rem; font-weight:900; text-transform:uppercase;
+             letter-spacing:.07em; color:#64748b; margin:0 0 10px; }
+  .kpi.blue  .kpi-lbl { color:#2563eb; }
+  .kpi.green .kpi-lbl { color:#047857; }
+  .kpi-val { display:flex; align-items:flex-end; justify-content:space-between; gap:10px; }
+  .kpi-num { font-size:2.4rem; font-weight:900; line-height:1; color:#0f172a; }
+  .kpi-tag { font-size:.73rem; font-weight:800; padding:4px 9px; border-radius:8px;
+             background:#e2e8f0; color:#334155; white-space:nowrap; }
+  .kpi.blue  .kpi-tag { background:#bfdbfe; color:#1d4ed8; }
+  .kpi.green .kpi-tag { background:#a7f3d0; color:#047857; }
+
+  /* ── Panel ── */
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:18px;
+           box-shadow:0 1px 2px rgba(15,23,42,.04); overflow:hidden; }
+  .panel-top { padding:14px 20px; border-bottom:1px solid #e2e8f0; background:#f8fafc;
+               display:flex; align-items:center; justify-content:space-between;
+               gap:12px; flex-wrap:wrap; }
+  .panel-top h3 { font-size:.95rem; font-weight:900; color:#0f172a; margin:0;
+                  display:flex; align-items:center; gap:8px; }
+  .panel-top h3 svg { width:17px; height:17px; color:#64748b; }
+
+  /* Division tabs */
+  .div-tabs { display:flex; background:rgba(226,232,240,.6); border:1px solid #e2e8f0;
+              border-radius:10px; padding:3px; gap:2px; }
+  .div-tabs a { text-decoration:none; color:#64748b; font-weight:800; font-size:.8rem;
+                padding:6px 14px; border-radius:8px; transition:all .15s; white-space:nowrap; }
+  .div-tabs a.active { background:#fff; color:#1d4ed8; box-shadow:0 1px 3px rgba(15,23,42,.1); }
+  .div-tabs a:hover:not(.active) { color:#334155; }
+
+  /* ── Table ── */
+  .tbl-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  table.dtbl { width:100%; border-collapse:collapse; min-width:720px; }
+  table.dtbl th { padding:11px 14px; text-align:left; font-size:.63rem; font-weight:900;
+                  text-transform:uppercase; letter-spacing:.07em; color:#64748b;
+                  border-bottom:1px solid #e2e8f0; background:#f8fafc; white-space:nowrap; }
+  table.dtbl th:last-child { text-align:right; }
+  table.dtbl td { padding:13px 14px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+  .align-middle { vertical-align:middle !important; }
+  .whitespace-nowrap { white-space:nowrap; }
+  table.dtbl tbody tr:last-child td { border-bottom:none; }
+  table.dtbl tbody tr:hover td { background:rgba(239,246,255,.45); }
+  .cell-id   { font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+               font-size:.84rem; font-weight:800; color:#0f172a; }
+  .cell-sub  { font-size:.72rem; color:#64748b; margin-top:2px; }
+  .part-main { font-size:.9rem; font-weight:900; line-height:1.15; color:#0f172a; }
+  .part-meta { margin-top:3px; }
+  .text-sm { font-size:.72rem; line-height:1.25; }
+  .text-muted { color:#64748b !important; }
+
+  /* Division badge */
+  .div-badge { display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px;
+               font-size:.64rem; font-weight:900; text-transform:uppercase;
+               letter-spacing:.06em; border:1px solid transparent; white-space:nowrap; }
+  .div-badge.trim     { background:#d1fae5; color:#047857; border-color:#a7f3d0; }
+  .div-badge.plastics { background:#dbeafe; color:#1d4ed8; border-color:#bfdbfe; }
+
+  /* Route cell */
+  .route-cell { display:inline-flex; align-items:center; gap:8px; font-size:.84rem;
+                color:#334155; font-weight:800; white-space:nowrap; flex-wrap:nowrap; }
+  .route-arrow { color:#7f1d2d; font-weight:900; }
+
+  /* Driver cell */
+  .driver-cell { display:flex; align-items:center; gap:8px; font-size:.84rem;
+                 font-weight:800; color:#0f172a; }
+  .driver-stack { display:grid; gap:3px; }
+  .driver-meta, .truck-meta { font-size:.72rem; color:#64748b; font-weight:700; line-height:1.25; }
+  .truck-pill { display:inline-flex; align-items:center; gap:5px; margin-top:4px; padding:3px 8px;
+                border-radius:8px; background:#f8fafc; border:1px solid #e2e8f0;
+                color:#334155; font-size:.72rem; font-weight:900; white-space:nowrap; }
+  .truck-pill.missing { color:#b45309; background:#fffbeb; border-color:#fde68a; }
+  .d-av { width:26px; height:26px; border-radius:999px; background:#e2e8f0; color:#475569;
+          display:grid; place-items:center; font-size:.64rem; font-weight:900; flex-shrink:0; }
+  .unassigned-cell { display:inline-flex; align-items:center; gap:5px; font-size:.8rem;
+                     font-weight:900; color:#be123c; background:#fff1f2;
+                     padding:4px 9px; border-radius:8px; }
+  .unassigned-cell svg { width:13px; height:13px; }
+
+  /* Status badge */
+  .sbadge { display:inline-flex; align-items:center; padding:4px 9px; border-radius:8px;
+            font-size:.72rem; font-weight:900; white-space:nowrap; }
+  .sbadge.hot        { background:#ffe4e6; color:#be123c; box-shadow:0 0 0 1px #fecdd3; }
+  .sbadge.in-progress{ background:#fef3c7; color:#92400e; }
+  .sbadge.logged     { background:#dcfce7; color:#166534; }
+  .sbadge.loading    { background:#e0e7ff; color:#3730a3; }
+  .sbadge.pending    { background:#f1f5f9; color:#475569; }
+  .sbadge.completed  { background:#dcfce7; color:#166534; }
+
+  /* Manage button */
+  .btn-manage { background:#fff; border:1px solid #cbd5e1; color:#334155;
+                border-radius:10px; padding:6px 13px; font-size:.8rem; font-weight:800;
+                cursor:pointer; transition:all .15s; white-space:nowrap; }
+  .btn-manage:hover { border-color:#93c5fd; color:#1d4ed8; background:#f8fafc; }
+  .btn-manage:active { transform:scale(.97); }
+
+  /* Empty row */
+  .empty-row td { text-align:center; padding:40px 14px; color:#94a3b8;
+                  font-size:.9rem; font-weight:600; }
+
+  /* ── Modal system ── */
+  .mbdrop { position:fixed; inset:0; background:rgba(15,23,42,.55);
+            backdrop-filter:blur(4px); z-index:300; display:none;
+            align-items:center; justify-content:center; padding:14px; }
+  .mbdrop.open { display:flex; }
+  .mdl { background:#fff; border-radius:20px; width:100%; max-width:500px;
+         box-shadow:0 24px 60px rgba(15,23,42,.22); border:1px solid #e2e8f0;
+         display:flex; flex-direction:column; overflow:hidden; max-height:92vh; }
+  .mdl-head { padding:18px 22px; display:flex; align-items:center;
+              justify-content:space-between; flex-shrink:0; }
+  .mdl-head.dark { background:#0f172a; }
+  .mdl-head.blue { background:#2563eb; }
+  .mdl-head h3 { font-size:1rem; font-weight:900; color:#fff; margin:0;
+                 display:flex; align-items:center; gap:8px; }
+  .mdl-head h3 svg { width:18px; height:18px; flex-shrink:0; }
+  .mdl-x { background:none; border:none; cursor:pointer; padding:4px;
+            border-radius:8px; color:rgba(255,255,255,.55); display:grid; place-items:center; }
+  .mdl-x:hover { color:#fff; }
+  .mdl-x svg { width:20px; height:20px; }
+  .mdl-body { padding:22px; overflow-y:auto; display:flex; flex-direction:column; gap:16px; }
+  .mdl-foot { padding:14px 22px; background:#f8fafc; border-top:1px solid #e2e8f0;
+              display:flex; justify-content:flex-end; gap:10px; flex-shrink:0; }
+
+  /* Modal context row */
+  .mrow-ctx { display:flex; justify-content:space-between; align-items:flex-start;
+              padding-bottom:16px; border-bottom:1px solid #f1f5f9; }
+  .mctx-item p:first-child { font-size:.64rem; font-weight:900; text-transform:uppercase;
+                              letter-spacing:.07em; color:#64748b; margin:0 0 4px; }
+  .mctx-item p:last-child  { font-size:.9rem; font-weight:700; color:#0f172a; margin:0; }
+  .mctx-item.right { text-align:right; }
+
+  /* Form fields */
+  .flbl { display:block; font-size:.78rem; font-weight:800; color:#334155; margin-bottom:6px; }
+  .flbl svg { width:13px; height:13px; vertical-align:-.1em; margin-right:4px; color:#94a3b8; }
+  .fi, .fs, .fta {
+    width:100%; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;
+    padding:9px 13px; font-size:.875rem; color:#334155; outline:none; font-family:inherit;
+    transition:border-color .15s,box-shadow .15s;
+  }
+  .fi:focus, .fs:focus, .fta:focus {
+    border-color:#93c5fd; background:#fff;
+    box-shadow:0 0 0 3px rgba(147,197,253,.2);
+  }
+  .fta { resize:vertical; min-height:62px; }
+  .act-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .btn-amber { background:#fffbeb; border:1px solid #fde68a; color:#b45309; border-radius:12px;
+               padding:11px 14px; font-size:.8rem; font-weight:900; cursor:pointer;
+               display:flex; align-items:center; justify-content:center; gap:7px;
+               transition:background .15s; }
+  .btn-amber:hover { background:#fef3c7; }
+  .btn-amber svg { width:14px; height:14px; }
+  .btn-sl { background:#f1f5f9; border:1px solid #e2e8f0; color:#334155; border-radius:12px;
+            padding:11px 14px; font-size:.8rem; font-weight:900; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; gap:7px;
+            transition:background .15s; }
+  .btn-sl:hover { background:#e2e8f0; }
+  .btn-sl svg { width:14px; height:14px; }
+  .btn-cancel { background:none; border:none; padding:8px 14px; font-size:.875rem;
+                font-weight:700; color:#64748b; cursor:pointer; border-radius:8px; }
+  .btn-cancel:hover { color:#334155; background:#e2e8f0; }
+  .btn-save { background:#2563eb; border:none; color:#fff; padding:9px 20px;
+              font-size:.875rem; font-weight:800; border-radius:10px; cursor:pointer;
+              transition:background .15s; }
+  .btn-save:hover { background:#1d4ed8; }
+  .btn-dispatch { background:#2563eb; border:none; color:#fff; padding:9px 20px;
+                  font-size:.875rem; font-weight:800; border-radius:10px; cursor:pointer;
+                  display:flex; align-items:center; gap:8px; transition:background .15s; }
+  .btn-dispatch:hover { background:#1d4ed8; }
+  .btn-dispatch svg { width:14px; height:14px; }
+
+  /* Create modal specifics */
+  .cr-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .cr-flbl { font-size:.68rem; font-weight:900; text-transform:uppercase;
+             letter-spacing:.07em; color:#64748b; display:block; margin-bottom:5px; }
+  .hot-lbl { display:flex; align-items:center; gap:8px; font-size:.875rem;
+             font-weight:900; color:#be123c; cursor:pointer; padding-top:4px; }
+  .hot-lbl input { width:16px; height:16px; accent-color:#be123c; cursor:pointer; }
+
+  /* Responsive */
+  @media (max-width:960px) {
+    .mc-side { display:none; }
+    .kpi-row  { grid-template-columns:1fr; }
+    .mc-header { padding:13px 16px; flex-wrap:wrap; }
+    .mc-body   { padding:14px 16px; }
+    .mc-srch   { width:160px; }
+    .cr-grid   { grid-template-columns:1fr; }
+  }
+  @media (max-width:560px) {
+    .mc-srch   { width:120px; }
+    .btn-create span { display:none; }
+    .kpi-row   { gap:10px; }
+  }
+</style>
+<script>document.body.classList.add('mgr-active');</script>
+
+{# ── MANAGE MODAL ── #}
+<div class="mbdrop" id="manageModal" onclick="if(event.target===this)closeManage()">
+  <div class="mdl" onclick="event.stopPropagation()">
+    <div class="mdl-head dark">
+      <h3 id="mgTitle">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0
+               00 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0
+               00 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0
+               00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0
+               00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0
+               00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0
+               00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0
+               00 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07
+               2.572-1.065z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <span id="mgTitleText">Manage Move</span>
+        <span id="mgDivBadge" style="margin-left:8px;font-size:.7rem;padding:3px 10px;
+          border-radius:6px;font-weight:900;text-transform:uppercase;"></span>
+      </h3>
+      <button class="mdl-x" onclick="closeManage()">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="mdl-body">
+      <div class="mrow-ctx">
+        <div class="mctx-item">
+          <p>Route</p>
+          <p id="mgRoute">—</p>
         </div>
-
-        <!-- Details -->
-        <div class="col-md-6">
-          {{ create_task_form.details.label }}
-          {{ create_task_form.details(class="form-control", rows="3") }}
-          {% for err in create_task_form.details.errors %}
-            <div class="text-danger">{{ err }}</div>
-          {% endfor %}
+        <div class="mctx-item right">
+          <p>Part / Cargo</p>
+          <p id="mgPart" style="font-family:ui-monospace,Consolas,monospace;font-weight:900;">—</p>
         </div>
-
-        <!-- SHIFT + Assigned to -->
-        <div class="col-md-6">
-          {{ create_task_form.shift.label }}
-          {{ create_task_form.shift(class="form-select") }}
+      </div>
+      <div class="mrow-ctx">
+        <div class="mctx-item">
+          <p>Driver / Audit</p>
+          <p id="mgDriverContext">—</p>
         </div>
-
-        <div class="col-md-6">
-          {{ create_task_form.assigned_to.label }}
-          {{ create_task_form.assigned_to(class="form-select") }}
+        <div class="mctx-item right">
+          <p>Truck ID</p>
+          <p id="mgTruck">—</p>
         </div>
+      </div>
 
-        <!-- is_hot (Mark as HOT) -->
-        <div class="col-md-6">
-          <div class="form-check mt-4">
-            {{ create_task_form.is_hot(class="form-check-input") }}
-            {{ create_task_form.is_hot.label(class="form-check-label") }}
+      {# Task section (editable inline) #}
+      <div id="mgTaskSec" style="display:none;">
+        <form id="mgTaskForm" method="POST" style="display:contents;">
+          <input type="hidden" name="csrf_token" id="mgCSRF">
+
+          <div>
+            <label class="flbl">Assign / Reassign Driver</label>
+            <select name="assigned_to" class="fs" id="mgDriverSel"></select>
           </div>
-        </div>
 
-        <!-- Submit -->
-        <div class="col-md-6 text-end align-self-end">
-          {{ create_task_form.submit(class="btn btn-success") }}
-        </div>
-      </form>
-    </div>
-  </div>
+          <div>
+            <label class="flbl">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8
+                     a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042
+                     3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+              </svg>
+              Dispatch Notes to Driver
+            </label>
+            <textarea name="details" class="fta" id="mgNotes" rows="2"
+              placeholder="e.g., Needs to be at dock 4."></textarea>
+          </div>
 
-  <!-- 2) LIST UNCOMPLETED TASKS -->
-  <div class="card">
-    <div class="card-header bg-secondary text-white">
-      Uncompleted Tasks (Status = 'pending')
+          <div>
+            <label class="flbl">Status</label>
+            <select name="status" class="fs" id="mgStatus">
+              <option value="pending">Pending</option>
+              <option value="in-progress">In Transit</option>
+              <option value="completed">Completed</option>
+              <option value="declined">Declined</option>
+            </select>
+          </div>
+
+          <div class="act-grid">
+            <button type="button" class="btn-amber" onclick="escalateHot()">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667
+                     1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34
+                     16c-.77 1.333.192 3 1.732 3z"/>
+              </svg>
+              Escalate to Hot Move
+            </button>
+            <button type="button" class="btn-sl" onclick="openAuditPrintView()">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0
+                     00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0
+                     00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0
+                     00-2-2H9a2 2 0 00-2 2v4h10z"/>
+              </svg>
+              Print Audit Log
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {# Transfer section (navigate to detail page) #}
+      <div id="mgXferSec" style="display:none;">
+        <p style="color:#64748b;font-size:.875rem;line-height:1.5;">
+          This is a logged plant transfer.
+          Use the transfer detail page to review or edit.
+        </p>
+        <a id="mgXferLink" href="#"
+          style="display:inline-flex;align-items:center;gap:7px;margin-top:10px;
+                 text-decoration:none;background:#2563eb;color:#fff;
+                 padding:9px 18px;border-radius:10px;font-size:.875rem;font-weight:800;">
+          View Transfer Detail
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24"
+               stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+          </svg>
+        </a>
+      </div>
     </div>
-    <div class="card-body">
-      {% if uncompleted_tasks %}
-        <table class="table table-striped">
-          <thead>
-            <tr>
-              <th>Task ID</th>
-              <th>Title</th>
-              <th>Shift</th>
-              <th>Assigned To</th>
-              <th>Created</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for t in uncompleted_tasks %}
-              <tr>
-                <td>{{ t.id }}</td>
-                <td>{{ t.title }}</td>
-                <td>{{ t.shift }}</td>
-                <td>{{ t.assigned_user.username if t.assigned_user else 'N/A' }}</td>
-                <td>
-                  {% if t.created_at %}
-                    {{ t.created_at.strftime('%Y-%m-%d %H:%M') }}
-                  {% else %}
-                    -
-                  {% endif %}
-                </td>
-                <td>{{ t.status }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      {% else %}
-        <p>No uncompleted tasks found.</p>
-      {% endif %}
+
+    <div class="mdl-foot">
+      <button class="btn-cancel" onclick="closeManage()">Cancel</button>
+      <button class="btn-save" id="mgSaveBtn" onclick="document.getElementById('mgTaskForm').submit()">
+        Save Changes
+      </button>
     </div>
   </div>
 </div>
+
+{# ── CREATE MOVE MODAL ── #}
+<div class="mbdrop" id="createModal" onclick="if(event.target===this)closeCreate()">
+  <div class="mdl" onclick="event.stopPropagation()">
+    <div class="mdl-head blue">
+      <h3>
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01"/>
+        </svg>
+        Dispatch New Move
+      </h3>
+      <button class="mdl-x" onclick="closeCreate()">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <form method="POST" action="{{ url_for('manager.create_task_from_dashboard') }}">
+      {{ create_task_form.hidden_tag() }}
+      <div class="mdl-body">
+        <div class="cr-grid">
+          <div>
+            <label class="cr-flbl">{{ create_task_form.shift.label.text }}</label>
+            {{ create_task_form.shift(class="fs") }}
+          </div>
+          <div>
+            <label class="cr-flbl">{{ create_task_form.title.label.text }}</label>
+            {{ create_task_form.title(class="fi", placeholder="Part, trailer, skid, or move note") }}
+          </div>
+        </div>
+        <div class="cr-grid">
+          <div>
+            <label class="cr-flbl">{{ create_task_form.route_from.label.text }}</label>
+            {{ create_task_form.route_from(class="fs") }}
+          </div>
+          <div>
+            <label class="cr-flbl">{{ create_task_form.route_to.label.text }}</label>
+            {{ create_task_form.route_to(class="fs") }}
+          </div>
+        </div>
+        <div>
+          <label class="cr-flbl">{{ create_task_form.part_number.label.text }}</label>
+          {{ create_task_form.part_number(class="fi", list="partSuggestions", placeholder="Search or enter part number") }}
+          <datalist id="partSuggestions">
+            {% for part in part_suggestions %}
+              <option value="{{ part }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
+        <div>
+          <label class="cr-flbl">{{ create_task_form.details.label.text }}</label>
+          {{ create_task_form.details(class="fta", rows="2",
+            placeholder="Dock, trailer, shipper notes, part count, timing") }}
+        </div>
+        <div>
+          <label class="cr-flbl">Assign / Post Open</label>
+          {{ create_task_form.assigned_to(class="fs") }}
+        </div>
+        <div>
+          <label class="hot-lbl">
+            {{ create_task_form.is_hot() }}
+            <span>Mark as HOT MOVE</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="mdl-foot">
+        <button type="button" class="btn-cancel" onclick="closeCreate()">Cancel</button>
+        <button type="submit" class="btn-dispatch">
+          Dispatch to Fleet
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+          </svg>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── APP SHELL ── #}
+<div class="mc">
+
+  {# SIDEBAR #}
+  <aside class="mc-side">
+    <div class="mc-brand">
+      <div class="mc-brand-icon">
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24"
+             stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9
+               0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0
+               011-1h2a1 1 0 011 1v5m-4 0h4"/>
+        </svg>
+      </div>
+      <div>
+        <h1>LacksDrivers</h1>
+        <p>Ops Console</p>
+      </div>
+    </div>
+
+    <nav class="mc-nav">
+      <a class="active" href="{{ url_for('manager.manager_dashboard') }}">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        Live Dispatch
+      </a>
+      <a href="{{ url_for('manager.trim_dashboard') }}">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/>
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 1h6l2-1zM13 16l4-4 3 4"/>
+        </svg>
+        Trim Dashboard
+      </a>
+      <a href="{{ url_for('manager.driver_logs') }}">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0
+               012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0
+               01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        Audit &amp; Logs
+      </a>
+      <a href="{{ url_for('manager.list_pretrips') }}">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0
+               002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0
+               002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+        </svg>
+        Pre-Trip Reports
+      </a>
+      <a href="{{ url_for('auth.logout') }}" style="margin-top:auto;">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0
+               01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+        </svg>
+        Logout
+      </a>
+    </nav>
+
+    <div class="mc-user">
+      <div class="mc-avatar">
+        {{ (current_user.first_name[:1] if current_user.first_name else current_user.username[:1])|upper }}
+      </div>
+      <div>
+        <p class="u-name">{{ current_user.display_name }}</p>
+        <p class="u-role">Logistics Manager</p>
+      </div>
+    </div>
+  </aside>
+
+  {# MAIN #}
+  <main class="mc-main">
+    <header class="mc-header">
+      <h2>Dispatch Queue</h2>
+      <div class="mc-header-r">
+        <div class="mc-srch-wrap">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input class="mc-srch" type="search" id="dispatchSearch"
+            placeholder="Search parts, drivers, plants…">
+        </div>
+        <button class="btn-create" onclick="openCreate()">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+          </svg>
+          <span>Create Hot Move</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="mc-body">
+
+      {# KPI row #}
+      <div class="kpi-row">
+        <a class="kpi {% if division_filter == 'All' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='All') }}" aria-label="Show all active moves">
+          <p class="kpi-lbl">Total Active Moves</p>
+          <div class="kpi-val">
+            <span class="kpi-num">{{ total_active_moves }}</span>
+            <span class="kpi-tag">
+              {{ active_driver_count }} driver{{ 's' if active_driver_count != 1 else '' }} active
+            </span>
+          </div>
+        </a>
+        <a class="kpi blue {% if division_filter == 'Plastics' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='Plastics') }}" aria-label="Show Plastics moves">
+          <p class="kpi-lbl">Plastics Division</p>
+          <div class="kpi-val">
+            <span class="kpi-num">{{ plastics_move_count }}</span>
+            <span class="kpi-tag">
+              {{ plastics_driver_count }} driver{{ 's' if plastics_driver_count != 1 else '' }}
+            </span>
+          </div>
+        </a>
+        <a class="kpi green {% if division_filter == 'Trim' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='Trim') }}" aria-label="Show Trim moves">
+          <p class="kpi-lbl">Trim Division</p>
+          <div class="kpi-val">
+            <span class="kpi-num">{{ trim_move_count }}</span>
+            <span class="kpi-tag">
+              {{ trim_driver_count }} driver{{ 's' if trim_driver_count != 1 else '' }}
+            </span>
+          </div>
+        </a>
+      </div>
+
+      {# Dispatch queue panel #}
+      <div class="panel">
+        <div class="panel-top">
+          <h3>
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0
+                   01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0
+                   012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+            </svg>
+            Active Jobs
+          </h3>
+          <div class="div-tabs">
+            {% for tab in ['All', 'Plastics', 'Trim'] %}
+              <a class="{% if division_filter == tab %}active{% endif %}"
+                 href="{{ url_for('manager.manager_dashboard', division=tab) }}">{{ tab }}</a>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="tbl-wrap">
+          <table class="dtbl" id="dispatchTable">
+            <thead>
+              <tr>
+                <th>Move ID</th>
+                <th>Division</th>
+                <th>Part / Skid</th>
+                <th>Route</th>
+                <th>Driver</th>
+                <th>Status</th>
+                <th style="text-align:right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if dispatch_rows %}
+                {% for row in dispatch_rows %}
+                  <tr
+                    data-id="{{ row.id }}"
+                    data-route="{{ row.route | e }}"
+                    data-part="{{ row.part | e }}"
+                    data-driver="{{ row.driver | e }}"
+                    data-driver-meta="{{ row.driver_meta | e }}"
+                    data-truck="{{ row.truck_id | e }}"
+                    data-truck-meta="{{ row.truck_meta | e }}"
+                    data-status="{{ row.status_key }}"
+                    data-division="{{ row.division }}"
+                    data-notes="{{ row.notes | e }}"
+                    data-action="{{ row.action_url }}"
+                    data-is-task="{{ '1' if row.id.startswith('T-') else '0' }}"
+                  >
+                    <td class="align-middle">
+                      <div class="cell-id">{{ row.id }}</div>
+                      <div class="truck-pill {% if row.truck_id in ['Truck not set', 'Truck pending'] %}missing{% endif %}">{{ row.truck_id }}</div>
+                      <div class="cell-sub">{{ row.time|to_detroit_datetime if row.time else '—' }}</div>
+                    </td>
+                    <td class="align-middle">
+                      <span class="div-badge {% if row.division == 'Trim' %}trim{% else %}plastics{% endif %}">
+                        {{ row.division }}
+                      </span>
+                    </td>
+                    <td class="align-middle">
+                      <div class="part-main">{{ row.part_primary }}</div>
+                      {% if row.part_meta %}
+                        <div class="part-meta text-muted text-sm">{{ row.part_meta }}</div>
+                      {% endif %}
+                    </td>
+                    <td class="align-middle whitespace-nowrap">
+                      <div class="route-cell whitespace-nowrap">
+                        {% if row.route_to %}
+                          <span>{{ row.route_from }}</span>
+                          <span class="route-arrow" aria-hidden="true">⇌</span>
+                          <span>{{ row.route_to }}</span>
+                        {% else %}
+                          <span>{{ row.route_from or row.route }}</span>
+                        {% endif %}
+                      </div>
+                    </td>
+                    <td class="align-middle">
+                      {% if row.driver == 'Open for any driver' %}
+                        <span class="unassigned-cell">
+                          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01"/>
+                          </svg>
+                          Open
+                        </span>
+                        <div class="driver-meta">{{ row.driver_meta }}</div>
+                      {% else %}
+                        <div class="driver-stack">
+                          <span class="driver-cell">
+                            <span class="d-av">{{ row.driver[:1]|upper }}</span>
+                            {{ row.driver }}
+                          </span>
+                          <span class="driver-meta">{{ row.driver_meta }}</span>
+                        </div>
+                      {% endif %}
+                    </td>
+                    <td class="align-middle">
+                      {% set sk = row.status_key %}
+                      <span class="sbadge
+                        {% if sk == 'hot' %}hot
+                        {% elif sk == 'in-progress' %}in-progress
+                        {% elif sk == 'logged' %}logged
+                        {% elif sk == 'loading' %}loading
+                        {% elif sk == 'completed' %}completed
+                        {% else %}pending{% endif %}">
+                        {{ row.status }}
+                      </span>
+                    </td>
+                    <td class="align-middle" style="text-align:right;">
+                      <button class="btn-manage"
+                        onclick="openManage(this.closest('tr'))">Manage</button>
+                    </td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr class="empty-row">
+                  <td colspan="7">No active moves for this filter.</td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>{# /mc-body #}
+  </main>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ── Driver choices for Manage modal ──
+const DRIVERS = [
+  {id: '', label: '— Unassign —'},
+  {% for val, label in (create_task_form.assigned_to.choices or []) %}
+  {id: {{ val }}, label: {{ label | tojson }}},
+  {% endfor %}
+];
+const CSRF = {{ (create_task_form.csrf_token._value() if create_task_form.csrf_token is defined else '') | tojson }};
+let currentManageAction = '#';
+
+// ── Search ──
+const srch = document.getElementById('dispatchSearch');
+srch?.addEventListener('input', () => {
+  const q = srch.value.trim().toLowerCase();
+  document.querySelectorAll('#dispatchTable tbody tr:not(.empty-row)').forEach(r => {
+    r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+
+// ── Manage modal ──
+function openManage(tr) {
+  const d = tr.dataset;
+  const isTask = d.isTask === '1';
+  currentManageAction = d.action || '#';
+  const div = d.division || '';
+
+  document.getElementById('mgTitleText').textContent = 'Manage Move ' + d.id;
+  document.getElementById('mgRoute').textContent = d.route || '—';
+  document.getElementById('mgPart').textContent  = d.part || '—';
+  document.getElementById('mgDriverContext').textContent = [d.driver, d.driverMeta].filter(Boolean).join(' | ') || '—';
+  document.getElementById('mgTruck').textContent = [d.truck, d.truckMeta].filter(Boolean).join(' | ') || '—';
+
+  const badge = document.getElementById('mgDivBadge');
+  badge.textContent = div + ' DIV';
+  badge.style.cssText = div === 'Trim'
+    ? 'background:rgba(16,185,129,.2);color:#6ee7b7;'
+    : 'background:rgba(59,130,246,.2);color:#93c5fd;';
+
+  if (isTask) {
+    document.getElementById('mgTaskSec').style.display = '';
+    document.getElementById('mgXferSec').style.display  = 'none';
+    document.getElementById('mgSaveBtn').style.display  = '';
+
+    document.getElementById('mgTaskForm').action = d.action;
+    document.getElementById('mgCSRF').value  = CSRF;
+    document.getElementById('mgNotes').value = d.notes || '';
+
+    // Set status dropdown
+    const sSel = document.getElementById('mgStatus');
+    for (const opt of sSel.options) opt.selected = (opt.value === d.status);
+
+    // Populate driver dropdown
+    const dSel = document.getElementById('mgDriverSel');
+    dSel.innerHTML = '';
+    DRIVERS.forEach(drv => {
+      const o = document.createElement('option');
+      o.value = drv.id;
+      o.textContent = drv.label;
+      if (drv.label === d.driver) o.selected = true;
+      dSel.appendChild(o);
+    });
+  } else {
+    document.getElementById('mgTaskSec').style.display = 'none';
+    document.getElementById('mgXferSec').style.display  = '';
+    document.getElementById('mgSaveBtn').style.display  = 'none';
+    document.getElementById('mgXferLink').href = d.action;
+  }
+
+  document.getElementById('manageModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeManage() {
+  document.getElementById('manageModal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function openAuditPrintView() {
+  if (currentManageAction && currentManageAction !== '#') {
+    window.open(currentManageAction, '_blank');
+  }
+}
+
+function escalateHot() {
+  const form = document.getElementById('mgTaskForm');
+  let inp = form.querySelector('[name="is_hot"]');
+  if (!inp) { inp = Object.assign(document.createElement('input'), {type:'hidden', name:'is_hot'}); form.appendChild(inp); }
+  inp.value = '1';
+  form.submit();
+}
+
+// ── Create modal ──
+function openCreate()  {
+  document.getElementById('createModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeCreate() {
+  document.getElementById('createModal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+if (window.io) {
+  const socket = io();
+  socket.on('task_updated', () => window.location.reload());
+  socket.on('task_assigned', () => window.location.reload());
+}
+
+// ESC closes any open modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeManage(); closeCreate(); }
+});
+</script>
 {% endblock %}

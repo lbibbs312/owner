@@ -3,13 +3,18 @@
 <div class="container fade-in" style="overflow-x: auto;">
   <h2 class="mt-4 mb-3">Complete PostTrip for PreTrip #{{ pretrip.id }}</h2>
   <p class="text-muted">Ending your shift clock and finalizing daily mileage.</p>
+  <div class="alert alert-secondary py-2">
+    <strong>Start Mileage:</strong> <span id="startMileage">{{ pretrip.start_mileage or 0 }}</span>
+    <span class="ms-3"><strong>Total Miles:</strong> <span id="totalMiles">--</span></span>
+  </div>
 
   <form method="POST" action="">
     {{ form.hidden_tag() }}
 
     <div class="mb-3">
       {{ form.end_mileage.label }}
-      {{ form.end_mileage(class="form-control") }}
+      {{ form.end_mileage(class="form-control", id="endMileageInput") }}
+      <div id="mileageHelp" class="form-text">Total miles calculates as end mileage minus start mileage.</div>
     </div>
     <div class="mb-3">
       {{ form.remarks.label }}
@@ -19,4 +24,32 @@
     {{ form.submit(class="btn btn-success hover-btn") }}
   </form>
 </div>
+<script>
+  const startMileage = Number({{ pretrip.start_mileage or 0 }});
+  const endMileageInput = document.getElementById('endMileageInput');
+  const totalMiles = document.getElementById('totalMiles');
+  const mileageHelp = document.getElementById('mileageHelp');
+
+  function updateMileageTotal() {
+    const endMileage = Number(endMileageInput.value);
+    if (!endMileageInput.value) {
+      totalMiles.textContent = '--';
+      mileageHelp.textContent = 'Total miles calculates as end mileage minus start mileage.';
+      mileageHelp.className = 'form-text';
+      return;
+    }
+    const total = endMileage - startMileage;
+    totalMiles.textContent = String(total);
+    if (total < 0) {
+      mileageHelp.textContent = 'End mileage is lower than start mileage. Check the number before submitting.';
+      mileageHelp.className = 'form-text text-danger fw-semibold';
+    } else {
+      mileageHelp.textContent = 'Calculated total: ' + total + ' mile(s).';
+      mileageHelp.className = 'form-text text-success fw-semibold';
+    }
+  }
+
+  endMileageInput.addEventListener('input', updateMileageTotal);
+  updateMileageTotal();
+</script>
 {% endblock %}

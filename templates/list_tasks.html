@@ -3,7 +3,7 @@
 <div class="container">
   <h2 class="my-3">All Tasks</h2>
   {% if current_user.role == 'management' %}
-    <a href="{{ url_for('create_task') }}" class="btn btn-success mb-2">Create Task</a>
+    <a href="{{ url_for('manager.manager_dashboard') }}" class="btn btn-success mb-2">Create Task</a>
   {% endif %}
 
   {% if tasks %}
@@ -20,20 +20,48 @@
       </thead>
       <tbody>
         {% for t in tasks %}
-          <tr>
+          <tr class="{% if t.is_hot %}table-danger{% elif t.status == 'in-progress' %}table-warning{% endif %}">
             <td>{{ t.id }}</td>
             <td>{{ t.title }}</td>
-            <td>{{ t.status }}</td>
-            <td>{{ t.shift if t.shift else "N/A" }}</td>
-            <td>{{ "Yes" if t.is_hot else "No" }}</td>
             <td>
-              {% if current_user.role == 'management' %}
-                <a href="{{ url_for('edit_task', task_id=t.id) }}" class="btn btn-sm btn-warning">Edit</a>
+              {% if t.status == 'completed' %}
+                <span class="badge bg-success">Completed</span>
+              {% elif t.status == 'in-progress' %}
+                <span class="badge bg-warning text-dark">In Progress</span>
+              {% elif t.status == 'pending' %}
+                <span class="badge bg-danger">Pending</span>
+              {% elif t.status == 'declined' %}
+                <span class="badge bg-secondary">Declined</span>
               {% else %}
-                <!-- Drivers can just see tasks, or mark them completed if needed -->
-                {% if t.status != "completed" %}
-                  <span class="badge bg-info">Pending Action</span>
-                {% endif %}
+                <span class="badge bg-secondary">{{ t.status }}</span>
+              {% endif %}
+            </td>
+            <td>{{ t.shift if t.shift else "N/A" }}</td>
+            <td>{% if t.is_hot %}<span class="badge bg-danger">HOT</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
+            <td>
+              {% if current_user.role != 'management' %}
+                <a href="{{ url_for('driver.view_task', task_id=t.id) }}" class="btn btn-sm btn-outline-primary">Details</a>
+              {% endif %}
+              {% if current_user.role == 'management' %}
+                <span class="badge bg-secondary">Assigned to {{ t.assigned_user.username if t.assigned_user else 'N/A' }}</span>
+              {% elif t.status == "pending" %}
+                <form action="{{ url_for('driver.accept_task', task_id=t.id) }}" method="POST" class="d-inline">
+                  <button type="submit" class="btn btn-sm btn-success">Accept</button>
+                </form>
+                <form action="{{ url_for('driver.decline_task', task_id=t.id) }}" method="POST" class="d-inline">
+                  <button type="submit" class="btn btn-sm btn-outline-warning">Decline</button>
+                </form>
+              {% elif t.status == "in-progress" %}
+                <form action="{{ url_for('driver.complete_task', task_id=t.id) }}" method="POST" class="d-inline">
+                  <button type="submit" class="btn btn-sm btn-success">Complete</button>
+                </form>
+                <form action="{{ url_for('driver.decline_task', task_id=t.id) }}" method="POST" class="d-inline">
+                  <button type="submit" class="btn btn-sm btn-outline-warning">Decline</button>
+                </form>
+              {% elif t.status == "completed" %}
+                <span class="badge bg-success">Done</span>
+              {% else %}
+                <span class="badge bg-secondary">No action</span>
               {% endif %}
             </td>
           </tr>

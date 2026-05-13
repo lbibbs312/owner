@@ -1,10 +1,19 @@
 from flask_wtf import FlaskForm
 from wtforms import BooleanField, SelectField, StringField, SubmitField, TextAreaField
-from wtforms.validators import DataRequired
+from wtforms.validators import Optional
+
+from app.services.plant_addresses import PLANT_ADDRESSES
+
+
+def _plant_choices():
+    return [("", "Select Plant...")] + [(name, name) for name in PLANT_ADDRESSES.keys()]
 
 
 class TaskForm(FlaskForm):
-    title = StringField("Title", validators=[DataRequired()])
+    route_from = SelectField("From Plant", choices=_plant_choices, validators=[Optional()])
+    route_to = SelectField("To Plant", choices=_plant_choices, validators=[Optional()])
+    title = StringField("Move Summary (Optional)", validators=[Optional()])
+    part_number = StringField("Part Number")
     details = TextAreaField("Details")
     is_hot = BooleanField("Mark as Hot")
     shift = SelectField(

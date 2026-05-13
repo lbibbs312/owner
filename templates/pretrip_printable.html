@@ -4,112 +4,189 @@
   <meta charset="utf-8">
   <title>PreTrip Inspection - Full DVIR</title>
   <style>
-    @media print {
-      @page {
-        size: Letter portrait;
-        margin: 0.5in;
-      }
+    @page {
+      size: Letter portrait;
+      margin: 0.35in;
     }
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 1rem;
-      background: #fff;
-      color: #000;
-      font-size: 0.8rem;
-    }
-    .print-container {
-      width: 100%;
-      max-width: 780px;
-      margin: 0 auto;
-      border: 2px solid #000;
-      padding: 1rem;
+    * {
       box-sizing: border-box;
     }
-    .print-btn {
-      margin-bottom: 1rem;
+    html, body {
+      width: auto;
+      min-height: auto;
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      color: #000;
+      font-family: Arial, sans-serif;
+      font-size: 9pt;
+      line-height: 1.15;
+    }
+    body {
+      padding: 0.2in;
+    }
+    .print-container {
+      width: 7.6in;
+      max-width: 100%;
+      margin: 0 auto;
+      border: 1px solid #000;
+      padding: 0.12in;
+    }
+    .print-guidance {
+      margin: 0 0 0.12in;
+      color: #444;
+      font-size: 9pt;
+    }
+    .print-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.08in;
+      margin-bottom: 0.12in;
+    }
+    .print-btn,
+    .edit-btn,
+    .back-btn {
+      display: inline-block;
       padding: 8px 16px;
-      background: #007bff;
-      color: #fff;
       border: none;
       cursor: pointer;
+      color: #fff;
+      text-decoration: none;
+      font-size: 10pt;
+      line-height: 1.1;
     }
-    @media print {
-      .print-btn {
-        display: none;
-      }
-      .print-container {
-        border: none;
-        width: 100%;
-        max-width: 100%;
-      }
-      body {
-        margin: 0;
-      }
+    .print-btn {
+      background: #007bff;
+    }
+    .edit-btn {
+      background: #8b1538;
+    }
+    .back-btn {
+      background: #333;
+    }
+    .email-btn {
+      display: inline-block;
+      padding: 8px 16px;
+      background: #198754;
+      color: #fff;
+      text-decoration: none;
+      font-size: 10pt;
+      line-height: 1.1;
     }
     h2 {
       text-align: center;
-      margin-bottom: 1rem;
+      margin: 0 0 0.08in;
       text-transform: uppercase;
+      font-size: 13pt;
+      line-height: 1.1;
+    }
+    p {
+      margin: 0 0 0.06in;
     }
     .section-header {
       background: #eee;
-      border-bottom: 1px solid #000;
+      border: 1px solid #000;
       font-weight: bold;
-      padding: 4px;
-      margin: 1rem 0 6px 0;
+      padding: 2px 4px;
+      margin: 0.08in 0 0.04in;
       text-transform: uppercase;
+      break-after: avoid;
+      page-break-after: avoid;
     }
     .flex-row {
-      display: flex;
-      gap: 1rem;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.06in;
+      align-items: stretch;
     }
-    .column {
-      flex: 1;
+    .column,
+    .towed-block,
+    .remarks-block {
       border: 1px solid #000;
-      padding: 0.5rem;
-      box-sizing: border-box;
-      min-height: 320px;
+      padding: 0.06in;
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
     .column h4 {
-      margin-top: 0;
+      margin: 0 0 0.03in;
       text-transform: uppercase;
-      font-size: 1rem;
-      margin-bottom: 4px;
+      font-size: 9pt;
+      line-height: 1.05;
     }
     .checkbox-line {
-      margin-bottom: 4px;
-      word-wrap: break-word;
-      max-width: 95%;
+      margin-bottom: 1px;
+      overflow-wrap: anywhere;
     }
     .no-defects {
-      margin-top: 6px;
+      margin-top: 3px;
       font-weight: bold;
+    }
+    .towed-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      column-gap: 0.1in;
     }
     .remarks-block {
-      border-top: 2px solid #000;
-      margin-top: 1rem;
-      padding-top: 0.5rem;
+      margin-top: 0.06in;
+      min-height: 0.25in;
     }
-    .remarks-label {
-      display: inline-block;
-      width: 90px;
-      font-weight: bold;
+    hr {
+      border: 0;
+      border-top: 1px solid #000;
+      margin: 0.04in 0;
     }
-    .remarks-line {
-      display: inline-block;
-      width: 200px;
-      border-bottom: 1px solid #000;
-      margin-right: 1rem;
-      vertical-align: middle;
+    @media screen {
+      body {
+        width: auto;
+        padding: 1rem;
+      }
+      .print-container {
+        box-shadow: 0 0 0 1px #ddd;
+      }
     }
+    @media print {
+      body {
+        padding: 0;
+      }
+      .print-guidance {
+      margin: 0 0 0.12in;
+      color: #444;
+      font-size: 9pt;
+    }
+    .print-actions,
+      .print-btn,
+      .edit-btn,
+      .back-btn {
+        display: none;
+      }
+      .print-container {
+        width: 100%;
+        border: none;
+        padding: 0;
+      }
+      * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+
   </style>
 </head>
 <body>
 
 <div class="print-container">
-  <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+{% set pretrip_attachment_endpoint = 'manager.pretrip_attachment' if current_user.role == 'management' else 'driver.pretrip_attachment' %}
+{% set pretrip_view_endpoint = 'manager.view_pretrip' if current_user.role == 'management' else 'driver.view_pretrip' %}
+{% set pretrip_mark_endpoint = 'manager.mark_pretrip_printed' if current_user.role == 'management' else 'driver.mark_pretrip_printed' %}
+<div class="print-actions">
+    {% if current_user.role == 'driver' and pretrip.user_id == current_user.id %}
+      <a class="edit-btn" href="{{ url_for('driver.edit_pretrip_entry', pretrip_id=pretrip.id) }}">Edit PreTrip Before Printing</a>
+    {% endif %}
+    <button class="print-btn" type="button" onclick="markPrintedAndPrint()">Print / Save as PDF</button>
+    <a class="email-btn" href="{{ url_for(pretrip_attachment_endpoint, pretrip_id=pretrip.id) }}">Download PDF Attachment</a>
+    <a class="back-btn" href="{{ url_for(pretrip_view_endpoint, pretrip_id=pretrip.id) }}">Back to PreTrip</a>
+  </div>
+  <p class="print-guidance">Review the DVIR first. Use Edit PreTrip if anything is wrong, then print on Letter paper in portrait orientation.</p>
 
   <h2>Daily Vehicle Inspection Report</h2>
 
@@ -167,7 +244,7 @@
       </div>
       <div class="checkbox-line">[ ] Other (Identify)</div>
       <div class="no-defects">
-        [{{ "X" if pretrip.gc_no_defects else " " }}] No Defects
+        [{{ "&#10003;"|safe if pretrip.gc_no_defects else " " }}] No Defects
       </div>
     </div>
 
@@ -214,7 +291,7 @@
         [{{ "X" if pretrip.safety_equipment else " " }}] Safety Equipment
       </div>
       <div class="no-defects">
-        [{{ "X" if pretrip.incab_no_defects else " " }}] No Defects
+        [{{ "&#10003;"|safe if pretrip.incab_no_defects else " " }}] No Defects
       </div>
     </div>
 
@@ -234,7 +311,7 @@
         [{{ "X" if pretrip.hoses else " " }}] Hoses
       </div>
       <div class="no-defects">
-        [{{ "X" if pretrip.ec_no_defects else " " }}] No Defects
+        [{{ "&#10003;"|safe if pretrip.ec_no_defects else " " }}] No Defects
       </div>
 
       <hr style="margin:8px 0;">
@@ -282,14 +359,14 @@
         [{{ "X" if pretrip.rear_end_protection else " " }}] Rear End Protection
       </div>
       <div class="no-defects">
-        [{{ "X" if pretrip.exterior_no_defects else " " }}] No Defects
+        [{{ "&#10003;"|safe if pretrip.exterior_no_defects else " " }}] No Defects
       </div>
     </div>
   </div>
 
   <!-- Towed Unit(s) -->
   <div class="section-header">Towed Unit(s)</div>
-  <div style="border:1px solid #000; padding:0.5rem;">
+  <div class="towed-block"><div class="towed-grid">
     <div class="checkbox-line">
       [{{ "X" if pretrip.towed_bodydoors else " " }}] Body/Doors
     </div>
@@ -330,9 +407,9 @@
       [{{ "X" if pretrip.towed_rearend else " " }}] Rear End
     </div>
     <div class="no-defects">
-      [{{ "X" if pretrip.towed_no_defects else " " }}] No Defects
+      [{{ "&#10003;"|safe if pretrip.towed_no_defects else " " }}] No Defects
     </div>
-  </div>
+  </div></div>
 
   <div class="remarks-block">
     <strong>Remarks:</strong><br>
@@ -351,9 +428,22 @@
   </div>
 
   <div class="remarks-block">
-    <strong>Reporting Driver:</strong> {{ current_user.username if current_user else "" }}<br>
+    <strong>Reporting Driver:</strong> {{ current_user.display_name if current_user else "" }}<br>
     <strong>Reviewing Driver:</strong> ________ (Emp. No: ____) Date: ________
   </div>
 </div>
+<script>
+  async function markPrintedAndPrint() {
+    try {
+      await fetch("{{ url_for(pretrip_mark_endpoint, pretrip_id=pretrip.id) }}", {
+        method: "POST",
+        credentials: "same-origin"
+      });
+    } catch (err) {
+      console.error("Could not record print activity:", err);
+    }
+    window.print();
+  }
+</script>
 </body>
 </html>

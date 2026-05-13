@@ -16,7 +16,7 @@
     {% for u in users %}
     <tr>
       <td>{{ u.id }}</td>
-      <td>{{ u.username }}</td>
+      <td><strong>{{ u.display_name }}</strong><div class="text-muted small">{{ u.division_label }} - Badge {{ u.badge_label }}</div></td>
       <td>{{ u.email }}</td>
       <td>{{ u.role }}</td>
     </tr>

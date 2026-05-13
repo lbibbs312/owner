@@ -1,23 +1,72 @@
-<!-- templates/view_pretrip.html (example) -->
 {% extends "base.html" %}
 {% block content %}
 <div class="container">
+  {% set pretrip_print_endpoint = 'manager.pretrip_printable' if current_user.role == 'management' else 'driver.pretrip_printable' %}
   <h2>View PreTrip (ID: {{ pretrip.id }})</h2>
-  
+
+  <div class="mb-3">
+    {% if pretrip.posttrip %}
+      <span class="badge bg-success">PostTrip Done</span>
+    {% else %}
+      <span class="badge bg-danger">PostTrip Needed</span>
+    {% endif %}
+  </div>
+
   <p><strong>Date:</strong> {{ pretrip.pretrip_date }}</p>
+  <p><strong>Truck / Tractor #:</strong> {{ pretrip.truck_number or '' }}</p>
+  <p><strong>Truck Type:</strong> {{ pretrip.truck_type or 'N/A' }}</p>
   <p><strong>Mileage:</strong> {{ pretrip.start_mileage or '' }}</p>
-  <p><strong>Oil Leak?</strong> {{ "Yes" if pretrip.oil_leak else "No" }}</p>
-  
-  <!-- or you can do a table with operational/damaged/missing/leaking, etc. -->
-  
-  <p><strong>Damage Report:</strong> {{ pretrip.damage_report or '' }}</p>
-  <p><strong>Oil System Status:</strong> {{ pretrip.oil_system_status }}</p>
-  
-  <!-- A link to the printable version: -->
-  <a href="{{ url_for('driver.pretrip_printable', pretrip_id=pretrip.id) }}"
-     class="btn btn-secondary"
-  >
-    Print DVIR
-  </a>
+  <p><strong>Shift:</strong> {{ pretrip.shift or 'N/A' }}</p>
+
+  <p>
+    <strong>Oil Leak?</strong>
+    {% if pretrip.oil_leak %}
+      <span class="badge bg-danger">Yes - Error</span>
+    {% else %}
+      <span class="badge bg-success">No</span>
+    {% endif %}
+  </p>
+
+  <p>
+    <strong>Damage Report:</strong>
+    {% if pretrip.damage_report %}
+      <span class="badge bg-warning text-dark">Reported</span>
+      {{ pretrip.damage_report }}
+    {% else %}
+      <span class="badge bg-success">None</span>
+    {% endif %}
+  </p>
+
+  <p>
+    <strong>Oil System Status:</strong>
+    {% if pretrip.oil_system_status == 'leaking' %}
+      <span class="badge bg-danger">Leaking - Error</span>
+    {% elif pretrip.oil_system_status == 'low' %}
+      <span class="badge bg-warning text-dark">Low</span>
+    {% else %}
+      <span class="badge bg-success">Good</span>
+    {% endif %}
+  </p>
+
+  {% set can_manage_pretrip = current_user.role == 'driver' and pretrip.user_id == current_user.id %}
+  {% set can_delete_pretrip = can_manage_pretrip and pretrip.pretrip_date == today_local_date %}
+  <div class="d-flex flex-wrap gap-2 mt-3">
+    <a href="{{ url_for(pretrip_print_endpoint, pretrip_id=pretrip.id) }}"
+       class="btn btn-secondary"
+    >
+      Print DVIR
+    </a>
+    {% if can_manage_pretrip %}
+      <a href="{{ url_for('driver.edit_pretrip_entry', pretrip_id=pretrip.id) }}" class="btn btn-warning">Edit</a>
+      {% if not pretrip.posttrip %}
+        <a href="{{ url_for('driver.do_posttrip', pretrip_id=pretrip.id) }}" class="btn btn-primary">Complete PostTrip</a>
+      {% endif %}
+      {% if can_delete_pretrip %}
+        <form action="{{ url_for('driver.delete_pretrip', pretrip_id=pretrip.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this PreTrip?');">
+          <button type="submit" class="btn btn-outline-danger">Delete</button>
+        </form>
+      {% endif %}
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

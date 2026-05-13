@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>LacksDrivers Reports</title>
+  <style>
+    :root { --bg:#090d12; --panel:#151a20; --line:#303a47; --text:#f8fafc; --muted:#94a3b8; --maroon:#7f1d2d; --green:#10b981; --amber:#f59e0b; --nav-height:88px; }
+    * { box-sizing:border-box; }
+    html, body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:Montserrat, Arial, sans-serif; }
+    a { color:inherit; text-decoration:none; }
+    .shell { min-height:100vh; max-width:480px; margin:0 auto; padding:18px 14px calc(var(--nav-height) + 18px); background:radial-gradient(circle at top right, rgba(127,29,45,.22), transparent 18rem), var(--bg); }
+    .top { position:sticky; top:0; z-index:10; margin:-18px -14px 16px; padding:16px 14px; background:rgba(9,13,18,.94); backdrop-filter:blur(14px); border-bottom:1px solid var(--line); }
+    .back { color:#f3c7cf; font-size:.82rem; font-weight:850; text-transform:uppercase; letter-spacing:.06em; }
+    h1 { margin:10px 0 2px; font-size:1.65rem; line-height:1; }
+    .sub { margin:0; color:var(--muted); font-size:.86rem; }
+    .list { display:grid; gap:12px; }
+    .card { background:rgba(21,26,32,.96); border:1px solid var(--line); border-radius:18px; overflow:hidden; box-shadow:0 18px 36px rgba(0,0,0,.26); }
+    .row { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; padding:14px; border-bottom:1px solid rgba(148,163,184,.13); }
+    .row:last-child { border-bottom:0; }
+    .title { margin:0 0 4px; font-weight:900; }
+    .meta { margin:0; color:var(--muted); font-size:.82rem; line-height:1.35; }
+    .badge { display:inline-flex; align-items:center; border-radius:999px; padding:4px 8px; font-size:.66rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em; background:rgba(16,185,129,.14); color:#a7f3d0; border:1px solid rgba(16,185,129,.26); white-space:nowrap; }
+    .badge.warn { background:rgba(245,158,11,.16); color:#fde68a; border-color:rgba(245,158,11,.28); }
+    .section-title { margin:18px 4px 8px; font-size:1rem; }
+    .side-nav { display:none; }
+    .bottom-nav { position:fixed; left:50%; bottom:0; transform:translateX(-50%); width:min(480px,100vw); height:var(--nav-height); background:rgba(9,13,18,.96); backdrop-filter:blur(16px); border-top:1px solid var(--line); display:grid; grid-template-columns:repeat(4,1fr); gap:4px; padding:9px 12px max(10px, env(safe-area-inset-bottom)); z-index:20; }
+    .nav-link { display:grid; place-items:center; gap:4px; color:#64748b; font-size:.67rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+    .nav-link strong { width:28px; height:28px; border-radius:999px; display:grid; place-items:center; background:rgba(255,255,255,.06); }
+    .nav-link.active { color:#f3c7cf; }
+    @media (min-width:600px) { body{background:#111827;} .shell{max-width:760px;margin:18px 18px 18px 112px;min-height:calc(100vh - 36px);border:1px solid var(--line);border-radius:28px;overflow:hidden;} .bottom-nav{display:none;} .side-nav{position:fixed;left:16px;top:86px;bottom:18px;width:76px;display:grid;align-content:start;gap:10px;padding:12px 8px;background:rgba(8,13,22,.96);border:1px solid var(--line);border-radius:24px;z-index:30;} .side-nav .nav-link{min-height:72px;border-radius:18px;} .side-nav .nav-link.active{background:rgba(127,29,45,.24);} }
+  </style>
+</head>
+
+<body>
+  <div class="shell">
+    <header class="top">
+      <a class="back" href="{{ url_for('driver.mobile_dashboard') }}">Back Home</a>
+      <h1>Reports</h1>
+      <p class="sub">Previous driver logs, inspections, and plant transfers by day.</p>
+    </header>
+
+    <div class="list">
+      {% if reports %}
+        {% for report in reports %}
+          <a class="card row" href="{{ url_for('driver.mobile_day_report', report_date=report.date.isoformat()) }}">
+            <div>
+              <p class="title">{{ report.date.strftime('%b %d, %Y') }}</p>
+              <p class="meta">{{ report.logs }} driver log(s) - {{ report.pretrips }} inspection(s) - {{ report.transfers }} transfer(s)</p>
+            </div>
+            <span class="badge">Open</span>
+          </a>
+        {% endfor %}
+      {% else %}
+        <div class="card row">
+          <div>
+            <p class="title">No history yet</p>
+            <p class="meta">Completed daily work will appear here after logs, inspections, or transfers are saved.</p>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <nav class="side-nav" aria-label="Driver wide navigation">
+    <a class="nav-link" href="{{ url_for('driver.mobile_dashboard') }}"><strong>HM</strong><span>Home</span></a>
+    <a class="nav-link" href="{{ url_for('driver.new_plant_transfer') }}"><strong>PT</strong><span>Transfer</span></a>
+    <a class="nav-link active" href="{{ url_for('driver.driver_logs') }}"><strong>DL</strong><span>Logs</span></a>
+    <a class="nav-link" href="{{ url_for('driver.profile') }}"><strong>DR</strong><span>Driver</span></a>
+  </nav>
+
+  <nav class="bottom-nav" aria-label="Driver mobile navigation">
+    <a class="nav-link" href="{{ url_for('driver.mobile_dashboard') }}"><strong>HM</strong><span>Home</span></a>
+    <a class="nav-link" href="{{ url_for('driver.new_plant_transfer') }}"><strong>PT</strong><span>Transfer</span></a>
+    <a class="nav-link active" href="{{ url_for('driver.driver_logs') }}"><strong>DL</strong><span>Logs</span></a>
+    <a class="nav-link" href="{{ url_for('driver.profile') }}"><strong>DR</strong><span>Driver</span></a>
+  </nav>
+</body>
+</html>

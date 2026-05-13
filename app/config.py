@@ -7,6 +7,10 @@ made again silently.
 """
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 def _env_bool(name, default=False):
     return os.environ.get(name, str(default)).lower() == "true"

@@ -11,6 +11,8 @@ from app.models.trip import PreTrip, PostTrip, ShiftRecord
 from app.models.log import DriverLog
 from app.models.messaging import ChatMessage, Announcement, DirectMessage
 from app.models.knowledge import KnowledgeBaseEntry
+from app.models.activity import ActivityEvent
+from app.models.plant_transfer import PlantTransfer, PlantTransferLine
 
 __all__ = [
     "User",
@@ -23,4 +25,7 @@ __all__ = [
     "Announcement",
     "DirectMessage",
     "KnowledgeBaseEntry",
+    "ActivityEvent",
+    "PlantTransfer",
+    "PlantTransferLine",
 ]

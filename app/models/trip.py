@@ -89,7 +89,10 @@ class PreTrip(db.Model):
     damage_report = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    deleted_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
+    deleted_by = db.relationship("User", foreign_keys=[deleted_by_id])
     posttrip = db.relationship("PostTrip", uselist=False, backref="pretrip")
 
 

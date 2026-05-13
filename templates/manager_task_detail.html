@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  body { background:#f8fafc; }
+  body.manager-shell-active .navbar,
+  body.manager-shell-active #fullscreenOverlay { display:none !important; }
+  body.manager-shell-active .container.mt-4.fade-in { max-width:none; margin:0 !important; padding:0 !important; animation:none; opacity:1; }
+  .detail-shell { min-height:100vh; background:#f8fafc; color:#1e293b; font-family:Montserrat, Arial, sans-serif; }
+  .detail-header { background:#0f172a; color:#fff; padding:22px 28px; display:flex; align-items:center; justify-content:space-between; gap:18px; }
+  .detail-header h1 { margin:0; font-size:1.45rem; font-weight:900; }
+  .detail-header p { margin:4px 0 0; color:#94a3b8; font-size:.86rem; }
+  .header-actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .header-actions a, .header-actions button { border:1px solid rgba(148,163,184,.35); background:rgba(255,255,255,.08); color:#fff; border-radius:10px; padding:9px 12px; font-weight:900; text-decoration:none; font-size:.84rem; }
+  .header-actions a:hover, .header-actions button:hover { background:rgba(255,255,255,.14); }
+  .detail-content { padding:26px; max-width:1180px; margin:0 auto; display:grid; gap:20px; }
+  .summary-grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:14px; }
+  .summary-card, .panel { background:#fff; border:1px solid #e2e8f0; border-radius:16px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+  .summary-card { padding:18px; }
+  .label { margin:0 0 6px; color:#64748b; font-size:.72rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; }
+  .value { margin:0; color:#0f172a; font-weight:900; }
+  .muted { color:#64748b; font-size:.84rem; }
+  .pill { display:inline-flex; border-radius:999px; padding:5px 10px; font-size:.72rem; font-weight:900; border:1px solid transparent; }
+  .pill.trim { background:#d1fae5; color:#047857; border-color:#a7f3d0; }
+  .pill.plastics { background:#dbeafe; color:#1d4ed8; border-color:#bfdbfe; }
+  .pill.hot { background:#ffe4e6; color:#be123c; border-color:#fecdd3; }
+  .detail-grid { display:grid; grid-template-columns:minmax(0, 1.2fr) minmax(320px, .8fr); gap:20px; align-items:start; }
+  .panel-head { padding:18px 20px; border-bottom:1px solid #e2e8f0; background:#f8fafc; }
+  .panel-head h2 { margin:0; font-size:1.05rem; font-weight:900; }
+  .panel-body { padding:20px; }
+  .manager-form { display:grid; gap:16px; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .manager-form label { font-size:.72rem; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:.05em; }
+  .manager-form .form-control, .manager-form .form-select { border-radius:10px; border-color:#cbd5e1; }
+  .checkline { display:flex; align-items:center; gap:9px; color:#be123c; font-weight:900; }
+  .save-row { display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap; padding-top:4px; }
+  .btn-primary-action { border:0; background:#2563eb; color:white; border-radius:10px; padding:10px 16px; font-weight:900; }
+  .btn-secondary-action { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:10px; padding:10px 16px; font-weight:900; text-decoration:none; }
+  .log-list { display:grid; gap:10px; }
+  .log-item { border:1px solid #e2e8f0; border-radius:12px; padding:12px; background:#fff; }
+  .log-item strong { color:#0f172a; }
+  @media (max-width:900px) {
+    .detail-header { align-items:flex-start; flex-direction:column; }
+    .summary-grid, .detail-grid, .form-row { grid-template-columns:1fr; }
+    .detail-content { padding:16px; }
+  }
+  .print-management-title { display:none; }
+  @media print {
+    @page { size: Letter portrait; margin:.35in; }
+    body { background:#fff !important; font-size:9pt; }
+    .header-actions, .manager-form, .save-row, .navbar, #fullscreenOverlay { display:none !important; }
+    body.manager-shell-active .container.mt-4.fade-in { padding:0 !important; }
+    .detail-shell { min-height:auto; background:#fff; }
+    .detail-header { background:#fff !important; color:#000; border-bottom:2px solid #111; padding:0 0 .08in; margin-bottom:.12in; }
+    .detail-header h1 { font-size:15pt; }
+    .detail-header p { color:#333; font-size:8.5pt; }
+    .print-management-title { display:block; font-size:9pt; font-weight:900; letter-spacing:.08em; color:#111; margin:0 0 2px; }
+    .detail-content { padding:0; max-width:none; gap:.12in; }
+    .summary-grid { grid-template-columns:repeat(4,1fr); gap:.08in; }
+    .summary-card, .panel { box-shadow:none; border:1px solid #222; border-radius:0; break-inside:avoid; }
+    .summary-card { padding:.08in; }
+    .detail-grid { grid-template-columns:1fr; gap:.12in; }
+    .panel-head { padding:.08in; background:#fff; border-bottom:1px solid #222; }
+    .panel-head h2 { font-size:10pt; }
+    .panel-body { padding:.08in; }
+    .log-list { gap:.05in; }
+    .log-item { border:1px solid #999; border-radius:0; padding:.06in; }
+    .label { font-size:7.5pt; }
+    .value { font-size:9.5pt; }
+  }
+</style>
+<script>document.body.classList.add('manager-shell-active');</script>
+<div class="detail-shell">
+  <header class="detail-header">
+    <div>
+      <div class="print-management-title">LACKSDRIVERS MANAGEMENT</div>
+      <h1>Manage Move T-{{ task.id }}</h1>
+      <p>{{ task.title }}{% if task.is_hot %} | Hot move{% endif %}</p>
+    </div>
+    <div class="header-actions">
+      <a href="{{ url_for('manager.manager_dashboard') }}">Back to Dashboard</a>
+      <button type="button" onclick="window.print()">Print Audit Log</button>
+    </div>
+  </header>
+
+  <main class="detail-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} mb-0">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <section class="summary-grid" aria-label="Move summary">
+      <div class="summary-card">
+        <p class="label">Division</p>
+        <p class="value"><span class="pill {% if division == 'Trim' %}trim{% else %}plastics{% endif %}">{{ division }}</span></p>
+      </div>
+      <div class="summary-card">
+        <p class="label">Driver</p>
+        <p class="value">{{ task.assigned_user.display_name if task.assigned_user else 'Open for any driver' }}</p>
+        {% if task.assigned_user %}<div class="muted">{{ task.assigned_user.division_label }} | Badge {{ task.assigned_user.badge_label }}</div>{% endif %}
+      </div>
+      <div class="summary-card">
+        <p class="label">Truck ID</p>
+        <p class="value">{{ truck_context.truck_id if truck_context else 'Truck pending' }}</p>
+        <div class="muted">{{ truck_context.truck_meta if truck_context else 'Assign or accept first' }}</div>
+      </div>
+      <div class="summary-card">
+        <p class="label">Status</p>
+        <p class="value">{{ task.status.replace('-', ' ')|title }}</p>
+      </div>
+    </section>
+
+    <section class="detail-grid">
+      <div class="panel">
+        <div class="panel-head"><h2>Manager Actions</h2></div>
+        <div class="panel-body">
+          <form method="POST" class="manager-form">
+            <div class="form-row">
+              <div>
+                <label for="assigned_to">Assign / Reassign Driver</label>
+                <select id="assigned_to" name="assigned_to" class="form-select">
+                  <option value="0" {% if not task.assigned_to %}selected{% endif %}>Unassigned / Broadcast</option>
+                  {% for driver in drivers %}
+                    <option value="{{ driver.id }}" {% if task.assigned_to == driver.id %}selected{% endif %}>{{ driver.manager_label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div>
+                <label for="status">Status</label>
+                <select id="status" name="status" class="form-select">
+                  {% for status in statuses %}
+                    <option value="{{ status }}" {% if task.status == status %}selected{% endif %}>{{ status.replace('-', ' ')|title }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label for="shift">Shift</label>
+                <select id="shift" name="shift" class="form-select">
+                  {% for shift in shifts %}
+                    <option value="{{ shift }}" {% if task.shift == shift %}selected{% endif %}>{{ shift }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div>
+                <label for="part_number">Part Number</label>
+                <input id="part_number" name="part_number" class="form-control" value="{{ task.part_number or '' }}" placeholder="Part number or hot parts ID">
+              </div>
+            </div>
+            <div>
+              <label class="checkline"><input type="checkbox" name="is_hot" value="y" {% if task.is_hot %}checked{% endif %}> Mark as HOT MOVE</label>
+            </div>
+            <div>
+              <label for="details">Dispatch Notes / Skid / Trailer</label>
+              <textarea id="details" name="details" rows="5" class="form-control" placeholder="Skid count, trailer number, dock notes, or compliance detail">{{ task.details or '' }}</textarea>
+            </div>
+            <div class="save-row">
+              <a class="btn-secondary-action" href="{{ url_for('manager.manager_dashboard') }}">Cancel</a>
+              <button class="btn-primary-action" type="submit">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="panel-head"><h2>Audit Context</h2></div>
+        <div class="panel-body">
+          <p class="label">Route / Work</p>
+          <p class="value mb-3">{{ task.title }}</p>
+          <p class="label">Part Number</p>
+          <p class="value mb-3">{{ task.part_number or 'Not recorded' }}</p>
+          <p class="label">Assignment</p>
+          <p class="mb-1">{% if task.assigned_user %}Assigned to {{ task.assigned_user.manager_label }}{% else %}Posted open for any driver{% endif %}</p>
+          <p class="label">Truck ID</p>
+          <p class="mb-3">{{ truck_context.truck_id if truck_context else 'Truck pending' }} <span class="muted">{{ truck_context.truck_meta if truck_context else 'Assign or accept first' }}</span></p>
+          {% if task.accepted_by %}
+            <p class="mb-1"><strong>Accepted by:</strong> {{ task.accepted_by.manager_label }}</p>
+            <p class="muted mb-3">{{ task.accepted_at|to_detroit_datetime if task.accepted_at else 'Acceptance time not recorded' }}</p>
+          {% else %}
+            <p class="muted mb-3">Not accepted yet.</p>
+          {% endif %}
+          {% if task.completed_by %}
+            <p class="mb-1"><strong>Completed by:</strong> {{ task.completed_by.manager_label }}</p>
+            <p class="muted mb-3">{{ task.completed_at|to_detroit_datetime if task.completed_at else 'Completion time not recorded' }}</p>
+          {% endif %}
+          <p class="label">Freight Notes</p>
+          <p class="mb-3">{{ task.details or 'No freight details recorded yet.' }}</p>
+          {% if task.is_hot %}<p><span class="pill hot">Hot Move</span></p>{% endif %}
+          <hr>
+          <p class="label">Recent Driver Logs</p>
+          <div class="log-list">
+            {% if related_logs %}
+              {% for log in related_logs %}
+                <div class="log-item">
+                  <strong>{{ log.plant_name }}</strong> <span class="muted">{{ log.load_size }}</span>
+                  <div class="muted">Arrive {{ log.arrive_time|to_local_time if log.arrive_time else '--' }} | Depart {{ log.depart_time|to_12h_format if log.depart_time else '--' }}</div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="muted">No recent driver logs for this assignment.</div>
+            {% endif %}
+          </div>
+        </div>
+      </aside>
+    </section>
+  </main>
+</div>
+{% endblock %}

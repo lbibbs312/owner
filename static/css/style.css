@@ -1,120 +1,345 @@
 /************************************************
-  style.css - custom brand colors + SweetAlert
+  LacksDrivers operational UI theme
+  Premium industrial cues: charcoal, maroon accent,
+  clean white work surfaces, compact status badges.
 *************************************************/
 
-/* BRAND COLORS (override some Bootstrap vars) */
 :root {
-  --bs-primary: #1F3A93;    /* Dark Blue */
-  --bs-secondary: #2ECC71;  /* Teal (secondary) */
-  --bs-danger: #E74C3C;     /* Red for hot tasks */
-  --bs-success: #27AE60;    /* Another green */
-  --bs-warning: #F39C12;
-  --bs-info: #3498DB;
-  --bs-light: #f8f9fa;
-  --bs-dark: #2C3E50;
+  --ld-ink: #15171a;
+  --ld-panel: #202328;
+  --ld-panel-2: #2d3138;
+  --ld-maroon: #7f1d2d;
+  --ld-maroon-dark: #5c1320;
+  --ld-steel: #6f7782;
+  --ld-line: #d9dde3;
+  --ld-paper: #ffffff;
+  --ld-bg: #f3f4f6;
+  --ld-muted: #6b7280;
+  --ld-success: #237a4b;
+  --ld-warning: #d89a1d;
+  --ld-danger: #b4232f;
+  --ld-info: #2d6f8f;
+
+  --bs-primary: var(--ld-maroon);
+  --bs-secondary: var(--ld-steel);
+  --bs-danger: var(--ld-danger);
+  --bs-success: var(--ld-success);
+  --bs-warning: var(--ld-warning);
+  --bs-info: var(--ld-info);
+  --bs-dark: var(--ld-ink);
 }
 
-/* Just an example of simple fade-in for your container, etc. */
+html,
+body {
+  background: var(--ld-bg) !important;
+  color: var(--ld-ink);
+}
+
+body {
+  font-family: Montserrat, Arial, sans-serif;
+}
+
+#pageContent {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(21, 23, 26, 0.035), rgba(243, 244, 246, 0) 16rem),
+    var(--ld-bg);
+}
+
+.navbar.bg-primary {
+  background: var(--ld-ink) !important;
+  border-bottom: 4px solid var(--ld-maroon);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+}
+
+.navbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 800 !important;
+  text-transform: uppercase;
+  color: #fff !important;
+}
+
+.navbar-brand::before {
+  content: "";
+  display: inline-block;
+  width: 0.7rem;
+  height: 1.65rem;
+  background: var(--ld-maroon);
+}
+
+.glow-text,
+.glow-text span {
+  color: #fff !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+  animation: none !important;
+}
+
+.navbar-nav .nav-link {
+  color: rgba(255, 255, 255, 0.84) !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+
+.navbar-nav .nav-link:hover,
+.navbar-nav .nav-link:focus {
+  color: #fff !important;
+  background: rgba(127, 29, 45, 0.36);
+}
+
+.dropdown-menu {
+  border: 1px solid rgba(127, 29, 45, 0.28);
+  border-radius: 6px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+.dropdown-item {
+  font-weight: 650;
+  color: var(--ld-ink);
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background: rgba(127, 29, 45, 0.1);
+  color: var(--ld-maroon-dark);
+}
+
+.container > h1,
+.container > h2,
+.container > h3,
+.card-header,
+.table thead th {
+  text-transform: uppercase;
+}
+
+.container > h1,
+.container > h2,
+.container > h3 {
+  color: var(--ld-ink);
+  font-weight: 800;
+  border-left: 5px solid var(--ld-maroon);
+  padding-left: 0.85rem;
+}
+
+.card {
+  border: 1px solid var(--ld-line) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 5px 16px rgba(20, 24, 32, 0.08);
+}
+
+.card:hover,
+.hover-card:hover {
+  transform: none !important;
+  box-shadow: 0 8px 22px rgba(20, 24, 32, 0.14) !important;
+}
+
+.card-header {
+  font-weight: 800;
+  border-bottom: 0 !important;
+}
+
+.card-header.bg-primary,
+.card-header.bg-info,
+.card-header.bg-secondary,
+.card-header.bg-warning,
+.card-header.bg-danger {
+  background: var(--ld-panel) !important;
+  color: #fff !important;
+  border-left: 5px solid var(--ld-maroon);
+}
+
+.card-body {
+  background: var(--ld-paper);
+}
+
+.btn {
+  border-radius: 4px !important;
+  font-weight: 750 !important;
+  text-transform: uppercase;
+  font-size: 0.78rem !important;
+}
+
+.btn-primary,
+.btn-success {
+  background: var(--ld-maroon) !important;
+  border-color: var(--ld-maroon) !important;
+}
+
+.btn-primary:hover,
+.btn-success:hover,
+.hover-btn:hover {
+  background: var(--ld-maroon-dark) !important;
+  border-color: var(--ld-maroon-dark) !important;
+  transform: none !important;
+}
+
+.btn-info {
+  background: var(--ld-info) !important;
+  border-color: var(--ld-info) !important;
+  color: #fff !important;
+}
+
+.btn-warning {
+  background: var(--ld-warning) !important;
+  border-color: var(--ld-warning) !important;
+  color: #111 !important;
+}
+
+.btn-danger {
+  background: var(--ld-danger) !important;
+  border-color: var(--ld-danger) !important;
+}
+
+.table {
+  background: #fff;
+  border: 1px solid var(--ld-line);
+}
+
+.table thead th {
+  background: var(--ld-panel);
+  color: #fff;
+  border-color: var(--ld-panel-2);
+  font-size: 0.76rem;
+}
+
+.table td,
+.table th {
+  vertical-align: middle;
+}
+
+.table-danger {
+  --bs-table-bg: #fff0f2;
+  --bs-table-striped-bg: #f9e6e9;
+  border-left: 5px solid var(--ld-danger);
+}
+
+.table-warning {
+  --bs-table-bg: #fff8e8;
+  --bs-table-striped-bg: #f7edda;
+  border-left: 5px solid var(--ld-warning);
+}
+
+.badge {
+  border-radius: 4px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.bg-danger {
+  background-color: var(--ld-danger) !important;
+}
+
+.bg-success {
+  background-color: var(--ld-success) !important;
+}
+
+.bg-warning {
+  background-color: var(--ld-warning) !important;
+}
+
+.bg-info {
+  background-color: var(--ld-info) !important;
+}
+
+.bg-secondary {
+  background-color: var(--ld-steel) !important;
+}
+
+.border-danger {
+  border-color: var(--ld-danger) !important;
+}
+
+.form-control,
+.form-select {
+  border-radius: 4px !important;
+  border-color: #c9ced6 !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--ld-maroon) !important;
+  box-shadow: 0 0 0 0.2rem rgba(127, 29, 45, 0.14) !important;
+}
+
+.list-group-item {
+  border-color: var(--ld-line) !important;
+}
+
+.fullscreen-overlay.show {
+  background: rgba(13, 15, 18, 0.66) !important;
+}
+
+.fullscreen-overlay-content {
+  border-radius: 6px !important;
+  border-top: 5px solid var(--ld-maroon);
+}
+
 .fade-in {
   opacity: 0;
-  animation: fadeInAnimation 0.6s forwards;
+  animation: fadeInAnimation 0.22s forwards;
 }
+
 @keyframes fadeInAnimation {
   to { opacity: 1; }
 }
 
-/* NAVBAR brand glow example (optional) */
-.glow-text {
-  font-weight: 700;
-  color: #fff;
-  position: relative;
-}
-.glow-text span {
-  display: inline-block;
-  color: transparent;
-  text-shadow: 0 0 5px rgba(255,255,255,0.1);
-  opacity: 0;
-  animation: glow 1s ease-in-out forwards;
-}
-@keyframes glow {
-  0% { color: transparent; opacity: 0; }
-  50% {
-    color: #fff; opacity: 1;
-    text-shadow: 0 0 10px rgba(255,255,255,0.8), 0 0 20px rgba(255,255,255,0.6);
-  }
-  100% {
-    color: #fff; opacity: 1;
-    text-shadow: 0 0 5px rgba(255,255,255,0.5), 0 0 10px rgba(255,255,255,0.4);
-  }
-}
-
-/* Example: card hover shadow */
-.card:hover {
-  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-  transition: box-shadow 0.3s ease-in-out;
-}
-
-/************************************************
-  SweetAlert Customization
-************************************************/
-
-/* 1) Darken and blur the background behind the alert */
 .sweet-overlay {
-  -webkit-backdrop-filter: blur(15px) !important; /* Safari prefix */
-  backdrop-filter: blur(15px) !important;         /* Others: Chrome, Firefox, etc. */
-  background-color: rgba(0,0,0,0.6) !important;   /* Dark overlay color */
-  transition: background-color 0.3s ease;
+  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(12px) !important;
+  background-color: rgba(13, 15, 18, 0.7) !important;
 }
 
-/* 2) Give the SweetAlert dialog more pop (vivid color, sharper text) */
 .sweet-alert {
-  background: #fff !important;                /* bright white background */
-  color: #333 !important;                     /* high contrast text */
-  border-radius: 8px !important;              /* a bit more rounded */
-  box-shadow: 0 5px 20px rgba(0,0,0,0.4) !important;
-  padding: 30px 40px !important;             /* some extra padding for size */
-  transition: all 0.3s ease;                 /* smooth transitions */
+  background: #fff !important;
+  color: var(--ld-ink) !important;
+  border-radius: 6px !important;
+  border-top: 5px solid var(--ld-maroon);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35) !important;
 }
 
-/* HEADINGS inside the alert */
 .sweet-alert h2 {
-  color: #2c3e50 !important;                 /* crisp heading color */
-  font-weight: 700 !important;
-  margin-bottom: 15px !important;
+  color: var(--ld-ink) !important;
+  font-weight: 800 !important;
+  text-transform: uppercase;
 }
 
-/* BODY TEXT inside the alert */
 .sweet-alert p {
-  font-size: 1rem !important;
-  color: #555 !important;
+  color: #4b5563 !important;
 }
 
-/* OK BUTTON style */
 .sweet-alert button.confirm {
-  background-color: #198754 !important;      /* strong green (Bootstrap's success) */
-  border: none !important;
-  color: #fff !important;
-  padding: 10px 20px !important;
-  font-weight: 600 !important;
-  font-size: 1rem !important;
+  background-color: var(--ld-maroon) !important;
   border-radius: 4px !important;
-  transition: background-color 0.2s ease;
-}
-.sweet-alert button.confirm:hover {
-  background-color: #157347 !important;      /* slightly darker on hover */
+  font-weight: 800 !important;
+  text-transform: uppercase;
 }
 
-/* CANCEL BUTTON style (if you use .cancel in some alerts) */
-.sweet-alert button.cancel {
-  background-color: #d33 !important;         /* a bright red for cancel button */
-  color: #fff !important;
-  margin-left: 10px !important;
-  border: none !important;
-  border-radius: 4px !important;
-  font-weight: 600 !important;
-  font-size: 1rem !important;
-  padding: 10px 20px !important;
+.sweet-alert button.confirm:hover {
+  background-color: var(--ld-maroon-dark) !important;
 }
-.sweet-alert button.cancel:hover {
-  background-color: #b12 !important;         /* slightly darker on hover */
+
+.sweet-alert button.cancel {
+  background-color: var(--ld-danger) !important;
+  border-radius: 4px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase;
+}
+
+@media (max-width: 767.98px) {
+  .navbar-nav .nav-link {
+    padding: 0.75rem 0.85rem;
+  }
+
+  .container > h1,
+  .container > h2,
+  .container > h3 {
+    font-size: 1.35rem;
+  }
+
+  .card-body {
+    padding: 0.9rem;
+  }
 }

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>LacksDrivers Mobile</title>
+  <style>
+    :root {
+      --bg: #090d12;
+      --panel: #151a20;
+      --panel-2: #202833;
+      --line: #303a47;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --blue: #7f1d2d;
+      --blue-dark: #5c1320;
+      --maroon: #8b1538;
+      --maroon-dark: #2b1118;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --nav-height: 88px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
+    body { font-family: Montserrat, Arial, sans-serif; }
+    a { color: inherit; text-decoration: none; }
+    button, .button { font: inherit; }
+
+    .mobile-shell {
+      min-height: 100vh;
+      max-width: 480px;
+      margin: 0 auto;
+      background: radial-gradient(circle at top right, rgba(127, 29, 45, 0.22), transparent 18rem), var(--bg);
+      padding-bottom: calc(var(--nav-height) + 18px);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(8, 13, 22, 0.94);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--line);
+      padding: 14px 18px;
+    }
+
+    .driver-row, .cluster, .split { display: flex; align-items: center; }
+    .driver-row, .split { justify-content: space-between; gap: 12px; }
+    .cluster { gap: 12px; min-width: 0; }
+
+    .avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--maroon), #374151);
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      border: 1px solid rgba(255,255,255,0.18);
+      flex: 0 0 auto;
+    }
+
+    .driver-name { margin: 0; font-size: 1rem; line-height: 1.1; font-weight: 850; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .status-line { display: flex; align-items: center; gap: 6px; color: var(--green); font-size: 0.76rem; font-weight: 750; margin-top: 4px; }
+    .dot { width: 7px; height: 7px; border-radius: 99px; background: currentColor; }
+    .dot.off { color: var(--muted); }
+
+    .shift-pill {
+      background: rgba(31, 41, 55, 0.9);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 8px 10px;
+      text-align: right;
+      flex: 0 0 auto;
+    }
+    .shift-pill span { display: block; color: var(--muted); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 800; }
+    .shift-pill strong { display: block; margin-top: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.95rem; }
+
+    main { padding: 18px 14px 0; display: grid; gap: 16px; }
+    .card {
+      background: rgba(17, 24, 39, 0.96);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 18px 36px rgba(0,0,0,0.26);
+      overflow: hidden;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, var(--maroon), var(--maroon-dark) 56%, #202833);
+      border-color: rgba(255,255,255,0.12);
+      padding: 18px;
+      position: relative;
+    }
+    .hero::after {
+      content: "LD";
+      position: absolute;
+      right: -10px;
+      top: 10px;
+      font-size: 5.8rem;
+      font-weight: 950;
+      color: rgba(255,255,255,0.07);
+      letter-spacing: -0.08em;
+    }
+    .eyebrow { display: flex; align-items: center; gap: 8px; color: #f5d6dc; font-size: 0.76rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; }
+    .bolt { width: 10px; height: 18px; background: var(--amber); clip-path: polygon(45% 0, 100% 0, 60% 44%, 100% 44%, 28% 100%, 45% 55%, 0 55%); }
+    .hero h1 { margin: 14px 0 4px; font-size: clamp(1.75rem, 9vw, 2.45rem); line-height: 0.96; letter-spacing: 0; }
+    .hero p { margin: 0 0 16px; color: #f5d6dc; font-size: 0.92rem; line-height: 1.35; }
+
+    .button, button.action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      border-radius: 13px;
+      border: 1px solid transparent;
+      padding: 0 14px;
+      font-weight: 850;
+      cursor: pointer;
+      width: 100%;
+    }
+    .button.primary, button.primary { background: #fff; color: #4c111d; }
+    .button.blue, button.blue { background: var(--blue); color: #fff; }
+    .button.green, button.green { background: var(--green); color: #062d21; }
+    .button.red, button.red { background: rgba(239, 68, 68, 0.14); color: #fecaca; border-color: rgba(239, 68, 68, 0.38); }
+    .button.ghost, button.ghost { background: rgba(255,255,255,0.06); color: #e5e7eb; border-color: rgba(255,255,255,0.12); }
+
+    .hero-actions, .task-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; position: relative; z-index: 2; }
+    .hero-actions.single { grid-template-columns: 1fr; }
+    .hero-actions.tri { grid-template-columns: repeat(3, 1fr); }
+
+    .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .quick-card {
+      background: rgba(17, 24, 39, 0.96);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 15px;
+      min-height: 128px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .quick-icon { width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: rgba(127, 29, 45, 0.2); color: #f3c7cf; font-weight: 950; }
+    .quick-icon.green { background: rgba(16, 185, 129, 0.16); color: #86efac; }
+    .quick-card strong { display: block; margin-top: 12px; font-size: 0.95rem; }
+    .quick-card span { display: block; margin-top: 3px; color: var(--muted); font-size: 0.74rem; line-height: 1.25; }
+
+    .section-head { display: flex; justify-content: space-between; align-items: end; padding: 0 4px; }
+    .section-head h2 { margin: 0; font-size: 1.02rem; }
+    .section-head span, .muted { color: var(--muted); font-size: 0.78rem; }
+
+    .list { display: grid; gap: 10px; }
+    .list-item { padding: 14px; border-bottom: 1px solid rgba(148,163,184,0.13); }
+    .list-item:last-child { border-bottom: 0; }
+    .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 0.66rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; }
+    .badge.hot { background: rgba(239,68,68,0.16); color: #fecaca; border: 1px solid rgba(239,68,68,0.28); }
+    .badge.progress { background: rgba(245,158,11,0.16); color: #fde68a; border: 1px solid rgba(245,158,11,0.28); }
+    .badge.ok { background: rgba(16,185,129,0.14); color: #a7f3d0; border: 1px solid rgba(16,185,129,0.26); }
+    .item-title { margin: 7px 0 3px; font-weight: 850; }
+    .item-meta { margin: 0; color: var(--muted); font-size: 0.82rem; line-height: 1.35; }
+
+    .transfer-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 13px 14px; border-bottom: 1px solid rgba(148,163,184,0.13); }
+    .transfer-row:last-child { border-bottom: 0; }
+    .route { font-weight: 900; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+    .flash { margin: 0 14px; padding: 11px 12px; border-radius: 12px; background: rgba(37,99,235,0.16); border: 1px solid rgba(37,99,235,0.28); color: #f5d6dc; font-size: 0.84rem; font-weight: 750; }
+
+    .side-nav { display:none; }
+
+    .bottom-nav {
+      position: fixed;
+      left: 50%;
+      bottom: 0;
+      transform: translateX(-50%);
+      width: min(480px, 100vw);
+      height: var(--nav-height);
+      background: rgba(8,13,22,0.96);
+      backdrop-filter: blur(16px);
+      border-top: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      padding: 9px 12px max(10px, env(safe-area-inset-bottom));
+      z-index: 30;
+    }
+    .nav-link { display: grid; place-items: center; gap: 4px; color: #64748b; font-size: 0.67rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; }
+    .nav-link strong { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; background: rgba(255,255,255,0.06); color: currentColor; }
+    .nav-link.active { color: #f3c7cf; }
+
+    @media (min-width: 600px) {
+      body { background: #111827; }
+      .mobile-shell { max-width: 760px; margin:18px 18px 18px 112px; min-height: calc(100vh - 36px); border: 1px solid var(--line); border-radius: 28px; overflow: hidden; }
+      .bottom-nav { display:none; }
+      .side-nav { position:fixed; left:16px; top:86px; bottom:18px; width:76px; display:grid; align-content:start; gap:10px; padding:12px 8px; background:rgba(8,13,22,.96); border:1px solid var(--line); border-radius:24px; z-index:30; }
+      .side-nav .nav-link { min-height:72px; border-radius:18px; }
+      .side-nav .nav-link.active { background:rgba(127,29,45,.24); }
+      main { padding-left: 22px; padding-right: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="mobile-shell">
+    <header class="topbar">
+      <div class="driver-row">
+        <div class="cluster">
+          <div class="avatar">{{ (current_user.first_name[:1] if current_user.first_name else current_user.username[:1])|upper }}{{ (current_user.last_name[:1] if current_user.last_name else '')|upper }}</div>
+          <div style="min-width:0;">
+            <p class="driver-name">{{ current_user.display_name }}</p>
+            <div class="status-line {% if not open_shift %}muted{% endif %}">
+              <span class="dot {% if not open_shift %}off{% endif %}"></span>
+              {% if open_shift %}On Duty{% else %}Off Duty{% endif %}{% if current_user.department %} - {{ current_user.department }}{% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="shift-pill">
+          <span>{% if open_shift %}Shift Time{% else %}Shift{% endif %}</span>
+          <strong>{{ shift_elapsed if shift_elapsed else '--:--' }}</strong>
+        </div>
+      </div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=True) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <p class="flash">{{ message }}</p>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <main>
+      <section class="card hero">
+        {% if active_task %}
+          <div class="eyebrow"><span class="bolt"></span>{% if active_task.is_hot %}Active Hot Move{% else %}Active Task{% endif %}</div>
+          <h1>{{ active_task.title }}</h1>
+          <p>{{ active_task.details or 'No extra dispatch notes.' }}</p>
+          <div class="hero-actions {% if active_task.status == 'pending' %}tri{% else %}{% endif %}">
+            <a class="button ghost" href="{{ url_for('driver.view_task', task_id=active_task.id) }}">Details</a>
+            {% if active_task.status == 'pending' %}
+              <form action="{{ url_for('driver.accept_task', task_id=active_task.id, next='mobile') }}" method="POST">
+                <button class="action primary" type="submit">Accept</button>
+              </form>
+              <form action="{{ url_for('driver.decline_task', task_id=active_task.id, next='mobile') }}" method="POST">
+                <button class="action red" type="submit">Decline</button>
+              </form>
+            {% else %}
+              <form action="{{ url_for('driver.complete_task', task_id=active_task.id, next='mobile') }}" method="POST">
+                <button class="action primary" type="submit">Complete</button>
+              </form>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="eyebrow"><span class="bolt"></span>Ready For Dispatch</div>
+          <h1>No active move</h1>
+          <p>You have no pending driver tasks right now. Create a driver log or open the task queue.</p>
+          <div class="hero-actions">
+            <a class="button primary" href="{{ url_for('driver.new_driving_log') }}">Create Driver Log</a>
+            <a class="button ghost" href="{{ url_for('driver.list_tasks') }}">View Tasks</a>
+          </div>
+        {% endif %}
+      </section>
+
+      <section class="quick-grid">
+        {% if active_task %}
+          <a class="quick-card" href="{{ url_for('driver.new_driving_log') }}">
+            <div class="quick-icon">DL</div>
+            <div><strong>Create Driver Log</strong><span>Record plant arrival, load, and parts</span></div>
+          </a>
+        {% else %}
+          <a class="quick-card" href="{{ url_for('driver.new_plant_transfer') }}">
+            <div class="quick-icon">PT</div>
+            <div><strong>Plant Transfer</strong><span>{{ latest_transfer.ship_from ~ ' to ' ~ latest_transfer.ship_to if latest_transfer else 'Create a transfer sheet' }}</span></div>
+          </a>
+        {% endif %}
+        {% if pending_posttrip and todays_pretrip %}
+          <a class="quick-card" href="{{ url_for('driver.do_posttrip', pretrip_id=todays_pretrip.id) }}">
+            <div class="quick-icon green">IN</div>
+            <div><strong>PostTrip Due</strong><span>Finish inspection and end shift</span></div>
+          </a>
+        {% else %}
+          <a class="quick-card" href="{{ url_for('driver.new_pretrip') }}">
+            <div class="quick-icon green">IN</div>
+            <div><strong>PreTrip / Shift</strong><span>{{ 'Shift started from PreTrip' if todays_pretrip else 'Start shift with PreTrip' }}</span></div>
+          </a>
+        {% endif %}
+      </section>
+
+      <section class="list">
+        <div class="section-head">
+          <h2>Up Next</h2>
+          <span>{{ queued_tasks|length }} queued - {{ hot_task_count }} hot</span>
+        </div>
+        <div class="card">
+          {% if queued_tasks %}
+            {% for task in queued_tasks %}
+              <div class="list-item">
+                <span class="badge {% if task.is_hot %}hot{% elif task.status == 'in-progress' %}progress{% else %}ok{% endif %}">{{ 'Hot' if task.is_hot else task.status }}</span>
+                <div class="item-title">{{ task.title }}</div>
+                <p class="item-meta">{{ task.details or 'No extra details' }}</p>
+                <p class="item-meta"><a class="muted" href="{{ url_for('driver.view_task', task_id=task.id) }}">Details</a></p>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="list-item">
+              <div class="item-title">Queue clear</div>
+              <p class="item-meta">No additional assigned work is waiting.</p>
+            </div>
+          {% endif %}
+        </div>
+      </section>
+
+
+
+      <section class="list">
+        <div class="section-head">
+          <h2>Recent Transfers</h2>
+          <a class="muted" href="{{ url_for('driver.plant_transfers') }}">View all</a>
+        </div>
+        <div class="card">
+          {% if recent_transfers %}
+            {% for transfer in recent_transfers %}
+              <a class="transfer-row" href="{{ url_for('driver.view_plant_transfer', transfer_id=transfer.id) }}">
+                <div>
+                  <div class="route">{{ transfer.ship_from }} to {{ transfer.ship_to }}</div>
+                  <p class="item-meta mono">Trailer {{ transfer.trailer_number or 'not set' }} - {{ transfer.lines|length }} line(s)</p>
+                </div>
+                <span class="badge ok">Logged</span>
+              </a>
+            {% endfor %}
+          {% else %}
+            <div class="transfer-row">
+              <div>
+                <div class="route">No transfers yet</div>
+                <p class="item-meta">Create one when you move parts between plants.</p>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="side-nav" aria-label="Driver wide navigation">
+    <a class="nav-link active" href="{{ url_for('driver.mobile_dashboard') }}"><strong>HM</strong><span>Home</span></a>
+    <a class="nav-link" href="{{ url_for('driver.new_plant_transfer') }}"><strong>PT</strong><span>Transfer</span></a>
+    <a class="nav-link" href="{{ url_for('driver.driver_logs') }}"><strong>DL</strong><span>Logs</span></a>
+    <a class="nav-link" href="{{ url_for('driver.profile') }}"><strong>DR</strong><span>Driver</span></a>
+  </nav>
+
+  <nav class="bottom-nav" aria-label="Driver mobile navigation">
+    <a class="nav-link active" href="{{ url_for('driver.mobile_dashboard') }}"><strong>HM</strong><span>Home</span></a>
+    <a class="nav-link" href="{{ url_for('driver.new_plant_transfer') }}"><strong>PT</strong><span>Transfer</span></a>
+    <a class="nav-link" href="{{ url_for('driver.driver_logs') }}"><strong>DL</strong><span>Logs</span></a>
+    <a class="nav-link" href="{{ url_for('driver.profile') }}"><strong>DR</strong><span>Driver</span></a>
+  </nav>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  if (window.io) {
+    const currentUserId = {{ current_user.id }};
+    const socket = io();
+    function shouldRefreshTask(data) {
+      return !data || data.assigned_driver_id === null || Number(data.assigned_driver_id) === Number(currentUserId);
+    }
+    socket.on('task_updated', (data) => { if (shouldRefreshTask(data)) window.location.reload(); });
+    socket.on('task_assigned', (data) => { if (shouldRefreshTask(data)) window.location.reload(); });
+  }
+</script>
+</body>
+</html>

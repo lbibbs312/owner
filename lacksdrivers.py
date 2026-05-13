@@ -12,6 +12,18 @@ Kept at the repo root for backwards compatibility with existing dev workflows
 forms, and SocketIO handlers live under ``app/``.
 """
 import os
+import sys
+
+
+def _reexec_in_local_venv():
+    if sys.prefix != sys.base_prefix:
+        return
+    venv_python = os.path.join(os.path.dirname(__file__), ".venv", "bin", "python")
+    if os.path.exists(venv_python):
+        os.execv(venv_python, [venv_python, *sys.argv])
+
+
+_reexec_in_local_venv()
 
 from app import create_app
 from app.extensions import socketio
@@ -20,6 +32,6 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    print("Starting SocketIO server on http://127.0.0.1:5000 ...")
+    print("Starting SocketIO server on http://127.0.0.1:5000 ...", flush=True)
     debug_enabled = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     socketio.run(app, host="0.0.0.0", port=5000, debug=debug_enabled)

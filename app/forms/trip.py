@@ -27,7 +27,7 @@ class PreTripForm(FlaskForm):
     # Additional info
     truck_type = SelectField(
         "Truck Type",
-        choices=[("Tractor", "Tractor"), ("Pickup", "Pickup"), ("Other", "Other")],
+        choices=[("Box Truck", "Box Truck"), ("Semi", "Semi"), ("Other", "Other")],
     )
     oil_system_status = SelectField(
         "Oil System Status",

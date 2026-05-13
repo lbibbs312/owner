@@ -1,0 +1,1113 @@
+import os
+
+import pytest
+
+
+@pytest.fixture()
+def app(monkeypatch):
+    monkeypatch.setenv("FLASK_ENV", "testing")
+    monkeypatch.setenv("MANAGER_REGISTRATION_PIN", "0000")
+    from app import create_app
+    from app.extensions import db
+
+    app = create_app()
+    app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+    with app.app_context():
+        db.create_all()
+        yield app
+        db.session.remove()
+        db.drop_all()
+
+
+@pytest.fixture()
+def client(app):
+    return app.test_client()
+
+
+def create_user(username, email, role="driver", password="password1", **attrs):
+    from app.extensions import db
+    from app.models import User
+
+    user = User(username=username, email=email, role=role, **attrs)
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+    return user
+
+
+def login(client, login_name, password="password1"):
+    return client.post(
+        "/login",
+        data={"login_name": login_name, "password": password},
+        follow_redirects=False,
+    )
+
+
+def test_registration_uses_manager_pin(client, app):
+    response = client.post(
+        "/register",
+        data={
+            "username": "manager1",
+            "email": "manager1@example.com",
+            "password": "password1",
+            "confirm_password": "password1",
+            "role": "management",
+            "manager_pin": "0000",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/login")
+    with app.app_context():
+        from app.models import User
+
+        user = User.query.filter_by(username="manager1").one()
+        assert user.role == "management"
+
+
+def test_login_redirects_by_role(client, app):
+    with app.app_context():
+        create_user(
+            "driver1",
+            "driver1@example.com",
+            "driver",
+            first_name="Driver",
+            last_name="One",
+            employee_id="1001",
+            department="RE",
+        )
+        create_user("manager1", "manager1@example.com", "management")
+
+    driver_response = login(client, "driver1")
+    assert driver_response.status_code == 302
+    assert driver_response.headers["Location"].endswith("/dashboard")
+
+    client.get("/logout")
+    manager_response = login(client, "manager1")
+    assert manager_response.status_code == 302
+    assert manager_response.headers["Location"].endswith("/manager/dashboard")
+
+
+def test_authenticated_user_cannot_view_login_or_register(client, app):
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+        create_user("manager1", "manager1@example.com", "management")
+
+    login(client, "driver1")
+    login_page = client.get("/login", follow_redirects=False)
+    register_page = client.get("/register", follow_redirects=False)
+    assert login_page.status_code == 302
+    assert login_page.headers["Location"].endswith("/dashboard")
+    assert register_page.status_code == 302
+    assert register_page.headers["Location"].endswith("/dashboard")
+
+    client.get("/logout")
+    login(client, "manager1")
+    manager_login_page = client.get("/login", follow_redirects=False)
+    assert manager_login_page.status_code == 302
+    assert manager_login_page.headers["Location"].endswith("/manager/dashboard")
+
+
+def test_cross_role_access_requires_matching_credentials(client, app):
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+        create_user("manager1", "manager1@example.com", "management")
+
+    login(client, "driver1")
+    manager_page = client.get("/manager/dashboard", follow_redirects=False)
+    assert manager_page.status_code == 302
+    assert "/login" in manager_page.headers["Location"]
+    assert "required_role=management" in manager_page.headers["Location"]
+
+    manager_login = client.post(
+        "/login?required_role=management&next=/manager/dashboard",
+        data={"login_name": "manager1", "password": "password1"},
+        follow_redirects=False,
+    )
+    assert manager_login.status_code == 302
+    assert manager_login.headers["Location"].endswith("/manager/dashboard")
+
+    driver_page = client.get("/new_driving_log", follow_redirects=False)
+    assert driver_page.status_code == 200
+
+    client.get("/logout")
+    login(client, "manager1")
+    driver_page_without_driver_login = client.get("/new_driving_log", follow_redirects=False)
+    assert driver_page_without_driver_login.status_code == 302
+    assert "/login" in driver_page_without_driver_login.headers["Location"]
+    assert "required_role=driver" in driver_page_without_driver_login.headers["Location"]
+
+    wrong_role_login = client.post(
+        "/login?required_role=driver&next=/new_driving_log",
+        data={"login_name": "manager1", "password": "password1"},
+        follow_redirects=False,
+    )
+    assert wrong_role_login.status_code == 302
+    assert wrong_role_login.headers["Location"].endswith("/manager/dashboard")
+
+
+def test_detroit_time_display_uses_12_hour_local_time(client, app):
+    from datetime import datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import Task
+
+        driver = create_user(
+            "driver1",
+            "driver1@example.com",
+            "driver",
+            first_name="Driver",
+            last_name="One",
+            employee_id="1001",
+            department="Plastic Plate",
+        )
+        create_user("manager1", "manager1@example.com", "management")
+        task = Task(
+            title="Time format check",
+            details="Verify display time",
+            status="pending",
+            assigned_to=driver.id,
+            created_at=datetime(2026, 5, 13, 16, 5),
+        )
+        db.session.add(task)
+        db.session.commit()
+
+    login(client, "manager1")
+    page = client.get("/manager/dashboard")
+    assert page.status_code == 200
+    assert b"2026-05-13 12:05pm EDT" in page.data
+    assert b"16:05" not in page.data
+
+
+def test_manager_assigns_task_and_driver_updates_status(client, app):
+    with app.app_context():
+        driver = create_user(
+            "driver1",
+            "driver1@example.com",
+            "driver",
+            first_name="Driver",
+            last_name="One",
+            employee_id="1001",
+            department="Plastic Plate",
+        )
+        create_user("manager1", "manager1@example.com", "management")
+        driver_id = driver.id
+
+    login(client, "manager1")
+    manager_page = client.get("/manager/dashboard")
+    assert manager_page.status_code == 200
+    assert b"Live Dispatch" in manager_page.data
+    assert b"Dispatch Queue" in manager_page.data
+    assert b"Create Hot Move" in manager_page.data
+    assert b"From Plant" in manager_page.data
+    assert b"To Plant" in manager_page.data
+    assert b"Part Number" in manager_page.data
+    assert b"Open for any driver" in manager_page.data
+    assert b"Driver One" in manager_page.data
+    assert b"Plastic Plate" in manager_page.data
+    assert b"Badge 1001" in manager_page.data
+    assert b">driver1<" not in manager_page.data
+    assert b'id="fullscreenOverlay"' not in manager_page.data
+    assert b'class="nav-link openOverlayLink"' not in manager_page.data
+    assert b"swal(" not in manager_page.data
+
+    response = client.post(
+        "/manager/create_task_from_dashboard",
+        data={
+            "title": "Move trailer",
+            "route_from": "RW",
+            "route_to": "KP",
+            "part_number": "P0903110",
+            "details": "Dock 4",
+            "shift": "1st",
+            "assigned_to": str(driver_id),
+            "is_hot": "y",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        from app.models import Task
+
+        task = Task.query.filter_by(title="RW to KP").one()
+        assert task.assigned_to == driver_id
+        assert task.status == "pending"
+        assert task.is_hot is True
+        assert task.part_number == "P0903110"
+        assert "Move trailer" in task.details
+        task_id = task.id
+
+    manage_page = client.get(f"/manager/tasks/{task_id}")
+    assert manage_page.status_code == 200
+    assert b"Manage Move" in manage_page.data
+    assert b"Assign / Reassign Driver" in manage_page.data
+    assert b"Print Audit Log" in manage_page.data
+    assert b"Driver One | Plastic Plate | Badge 1001" in manage_page.data
+
+    updated = client.post(
+        f"/manager/tasks/{task_id}",
+        data={
+            "assigned_to": str(driver_id),
+            "status": "pending",
+            "shift": "2nd",
+            "details": "Dock 5 part P-1 trailer TR-1",
+            "is_hot": "y",
+        },
+        follow_redirects=False,
+    )
+    assert updated.status_code == 302
+    with app.app_context():
+        from app.models import Task
+
+        task = Task.query.get(task_id)
+        assert task.assigned_to == driver_id
+        assert task.shift == "2nd"
+        assert task.details == "Dock 5 part P-1 trailer TR-1"
+        assert task.is_hot is True
+
+    client.get("/logout")
+    login(client, "driver1")
+
+    detail_page = client.get(f"/tasks/{task_id}")
+    assert detail_page.status_code == 200
+    assert b"Dispatch Details" in detail_page.data
+    assert b"Completed" in detail_page.data
+
+    accept = client.post(f"/tasks/{task_id}/accept", follow_redirects=False)
+    assert accept.status_code == 302
+    with app.app_context():
+        from app.models import Task
+
+        assert Task.query.get(task_id).status == "in-progress"
+
+    complete = client.post(f"/tasks/{task_id}/complete", follow_redirects=False)
+    assert complete.status_code == 302
+    with app.app_context():
+        from app.models import Task
+
+        task = Task.query.get(task_id)
+        assert task.status == "completed"
+        assert task.completed_by_id == driver_id
+        assert task.completed_at is not None
+
+    completed_detail = client.get(f"/tasks/{task_id}")
+    assert completed_detail.status_code == 200
+    assert b"Completed By:" in completed_detail.data
+    assert b"Driver One" in completed_detail.data
+    assert b"Plastic Plate" in completed_detail.data
+
+    client.get("/logout")
+    login(client, "manager1")
+    open_response = client.post(
+        "/manager/create_task_from_dashboard",
+        data={
+            "title": "Open move",
+            "route_from": "PC",
+            "route_to": "RE",
+            "part_number": "OPEN-123",
+            "details": "Any available driver",
+            "shift": "1st",
+            "assigned_to": "0",
+        },
+        follow_redirects=False,
+    )
+    assert open_response.status_code == 302
+    with app.app_context():
+        from app.models import Task
+
+        open_task = Task.query.filter_by(part_number="OPEN-123").one()
+        assert open_task.assigned_to is None
+        open_task_id = open_task.id
+
+    client.get("/logout")
+    login(client, "driver1")
+    open_detail = client.get(f"/tasks/{open_task_id}")
+    assert open_detail.status_code == 200
+    assert b"Open for any driver" in open_detail.data
+    open_complete = client.post(f"/tasks/{open_task_id}/complete", follow_redirects=False)
+    assert open_complete.status_code == 302
+    with app.app_context():
+        from app.models import Task
+
+        open_task = Task.query.get(open_task_id)
+        assert open_task.assigned_to == driver_id
+        assert open_task.status == "completed"
+
+
+def test_driver_profile_cannot_change_role(client, app):
+    with app.app_context():
+        create_user(
+            "driver1",
+            "driver1@example.com",
+            "driver",
+            first_name="Driver",
+            last_name="One",
+            employee_id="1001",
+            department="RE",
+        )
+
+    login(client, "driver1")
+    response = client.post(
+        "/profile",
+        data={
+            "username": "driver1",
+            "email": "driver1@example.com",
+            "role": "management",
+            "new_password": "",
+            "confirm_password": "",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        from app.models import User
+
+        assert User.query.filter_by(username="driver1").one().role == "driver"
+
+
+def test_pretrip_create_and_print_route(client, app):
+    with app.app_context():
+        create_user(
+            "driver1",
+            "driver1@example.com",
+            "driver",
+            first_name="Driver",
+            last_name="One",
+        )
+
+    login(client, "driver1")
+    response = client.post(
+        "/new_pretrip",
+        data={
+            "truck_number": "BT-1",
+            "trailer_number": "TR-2",
+            "pretrip_date": "2026-05-12",
+            "shift": "1st",
+            "start_mileage": "1000",
+            "truck_type": "Box Truck",
+            "oil_system_status": "good",
+            "tires_status": "good",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        from app.models import ActivityEvent, PreTrip, ShiftRecord
+
+        pretrip = PreTrip.query.filter_by(truck_number="BT-1").one()
+        assert pretrip.truck_type == "Box Truck"
+        pretrip_id = pretrip.id
+        shift = ShiftRecord.query.filter_by(pretrip_id=pretrip_id, end_time=None).one()
+        assert shift.user_id == pretrip.user_id
+        assert ActivityEvent.query.filter_by(
+            target_type="pretrip", target_id=pretrip_id, action="created"
+        ).count() == 1
+
+    edit_page = client.get(f"/edit_pretrip_entry/{pretrip_id}")
+    assert edit_page.status_code == 200
+    assert b"Truck / Tractor #" in edit_page.data
+    assert b"No Defects" in edit_page.data
+
+    edited_pretrip = client.post(
+        f"/edit_pretrip_entry/{pretrip_id}",
+        data={
+            "truck_number": "BT-9",
+            "trailer_number": "TR-9",
+            "pretrip_date": "2026-05-12",
+            "shift": "2nd",
+            "start_mileage": "1005",
+            "truck_type": "Semi",
+            "oil_system_status": "good",
+            "tires_status": "good",
+            "gc_no_defects": "y",
+            "incab_no_defects": "y",
+            "ec_no_defects": "y",
+            "exterior_no_defects": "y",
+            "towed_no_defects": "y",
+            "damage_report": "updated ok",
+        },
+        follow_redirects=False,
+    )
+    assert edited_pretrip.status_code == 302
+
+    with app.app_context():
+        from app.models import PreTrip
+
+        pretrip = PreTrip.query.get(pretrip_id)
+        assert pretrip.truck_number == "BT-9"
+        assert pretrip.shift == "2nd"
+        assert pretrip.gc_no_defects is True
+        assert pretrip.towed_no_defects is True
+        assert pretrip.damage_report == "updated ok"
+
+    posttrip = client.post(
+        f"/do_posttrip/{pretrip_id}",
+        data={"end_mileage": "1125", "remarks": "ok"},
+        follow_redirects=False,
+    )
+    assert posttrip.status_code == 302
+
+    with app.app_context():
+        from app.models import PostTrip
+
+        saved_posttrip = PostTrip.query.filter_by(pretrip_id=pretrip_id).one()
+        assert saved_posttrip.end_mileage == 1125
+        assert saved_posttrip.miles_driven == 120
+
+    printable = client.get(f"/pretrip_printable/{pretrip_id}")
+    assert printable.status_code == 200
+    assert b"Daily Vehicle Inspection Report" in printable.data
+    assert b"Edit PreTrip Before Printing" in printable.data
+    assert b"Review the DVIR first" in printable.data
+    assert b"Driver One" in printable.data
+    assert "&#10003;".encode() in printable.data
+
+    activity = client.get("/recent_activity")
+    assert activity.status_code == 200
+    assert b"PreTrip saved" in activity.data
+    assert b"PreTrip printed" not in activity.data
+
+    mark_printed = client.post(f"/pretrip_printable/{pretrip_id}/mark_printed")
+    assert mark_printed.status_code == 200
+    assert mark_printed.get_json()["ok"] is True
+
+    activity = client.get("/recent_activity")
+    assert b"PreTrip printed" in activity.data
+
+
+def test_driver_log_edit_and_depart_are_separate_actions(client, app):
+    with app.app_context():
+        create_user(
+            "driver1",
+            "driver1@example.com",
+            "driver",
+            first_name="Driver",
+            last_name="One",
+            employee_id="1001",
+            department="RE",
+        )
+
+    login(client, "driver1")
+    created = client.post(
+        "/new_driving_log",
+        data={
+            "plant_name": "RE",
+            "load_size": "Full",
+            "downtime_reason": "",
+            "depart_time": "",
+        },
+        follow_redirects=False,
+    )
+    assert created.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        log = DriverLog.query.filter_by(plant_name="RE").one()
+        log_id = log.id
+        assert log.depart_time is None
+
+    list_page = client.get("/driver_logs")
+    assert b"Driver One" in list_page.data
+    assert b"1001" in list_page.data
+    assert b"RE" in list_page.data
+    assert b"Edit" in list_page.data
+    assert b"Depart" in list_page.data
+    assert b"Delete" in list_page.data
+    assert b"Pickup" in list_page.data
+
+    edited = client.post(
+        f"/edit_driver_log/{log_id}",
+        data={
+            "plant_name": "RW",
+            "load_size": "Half",
+            "part_number": "P-DOCK",
+            "hot_parts": "y",
+            "arrive_time": "5:45pm",
+            "depart_time": "",
+        },
+        follow_redirects=False,
+    )
+    assert edited.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        log = DriverLog.query.get(log_id)
+        assert log.plant_name == "RW"
+        assert log.load_size == "Half"
+        assert log.part_number == "P-DOCK"
+        assert log.hot_parts is True
+        assert log.arrive_time.endswith("21:45:00")
+        assert log.depart_time is None
+
+    edit_page = client.get(f"/edit_driver_log/{log_id}")
+    assert b"5:45pm" in edit_page.data
+
+    departed = client.post(f"/driver_logs/{log_id}/depart", follow_redirects=False)
+    assert departed.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        assert DriverLog.query.get(log_id).depart_time is not None
+
+
+def test_manager_can_view_but_not_edit_driver_logs(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("driver1", "driver1@example.com", "driver")
+        create_user("manager1", "manager1@example.com", "management")
+        completed_log = DriverLog(
+            driver_id=driver.id,
+            date=date.today(),
+            plant_name="KP",
+            load_size="Full",
+            arrive_time="2026-05-13 11:00:00",
+            depart_time="12:15",
+        )
+        log = DriverLog(
+            driver_id=driver.id,
+            date=date.today(),
+            plant_name="RE",
+            load_size="Full",
+            arrive_time="2026-05-13 12:00:00",
+        )
+        db.session.add_all([completed_log, log])
+        db.session.commit()
+        log_id = log.id
+
+    login(client, "manager1")
+    page = client.get("/manager/driver-logs")
+    assert page.status_code == 200
+    assert b"RE" in page.data
+    assert "⇌".encode() in page.data
+    assert "→".encode() in page.data
+    assert b"Open stop" in page.data
+    assert b"Completed stop" in page.data
+    assert b"/edit_driver_log/" not in page.data
+    assert b"/depart" not in page.data
+    assert b"/pickup" not in page.data
+    assert b"/delete" not in page.data
+
+    driver_page_attempt = client.get("/driver_logs", follow_redirects=False)
+    assert driver_page_attempt.status_code == 302
+    assert "required_role=driver" in driver_page_attempt.headers["Location"]
+
+    login(client, "manager1")
+    edit_attempt = client.get(f"/edit_driver_log/{log_id}", follow_redirects=False)
+    assert edit_attempt.status_code == 302
+    assert "required_role=driver" in edit_attempt.headers["Location"]
+
+
+def test_drivers_can_delete_only_same_day_records(client, app):
+    from datetime import date, timedelta
+
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PlantTransfer, PreTrip
+
+        driver = create_user("driver1", "driver1@example.com", "driver")
+        today_log = DriverLog(
+            driver_id=driver.id,
+            date=today,
+            plant_name="RE",
+            load_size="Full",
+            arrive_time="2026-05-13 12:00:00",
+        )
+        old_log = DriverLog(
+            driver_id=driver.id,
+            date=yesterday,
+            plant_name="RW",
+            load_size="Half",
+            arrive_time="2026-05-12 12:00:00",
+        )
+        today_pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="BT-1",
+            pretrip_date=today,
+            shift="1st",
+        )
+        old_pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="BT-2",
+            pretrip_date=yesterday,
+            shift="1st",
+        )
+        today_transfer = PlantTransfer(
+            user_id=driver.id,
+            transfer_number="TRX-1",
+            transfer_date=today,
+            ship_to="RE",
+            ship_from="RW",
+            driver_name="Driver One",
+        )
+        old_transfer = PlantTransfer(
+            user_id=driver.id,
+            transfer_number="TRX-2",
+            transfer_date=yesterday,
+            ship_to="RE",
+            ship_from="RW",
+            driver_name="Driver One",
+        )
+        db.session.add_all(
+            [today_log, old_log, today_pretrip, old_pretrip, today_transfer, old_transfer]
+        )
+        db.session.commit()
+        ids = {
+            "today_log": today_log.id,
+            "old_log": old_log.id,
+            "today_pretrip": today_pretrip.id,
+            "old_pretrip": old_pretrip.id,
+            "today_transfer": today_transfer.id,
+            "old_transfer": old_transfer.id,
+        }
+
+    login(client, "driver1")
+    assert client.post(f"/driver_logs/{ids['today_log']}/delete").status_code == 302
+    assert client.post(f"/driver_logs/{ids['old_log']}/delete").status_code == 302
+    assert client.post(f"/pretrips/{ids['today_pretrip']}/delete").status_code == 302
+    assert client.post(f"/pretrips/{ids['old_pretrip']}/delete").status_code == 302
+    assert client.post(f"/plant_transfers/{ids['today_transfer']}/delete").status_code == 302
+    assert client.post(f"/plant_transfers/{ids['old_transfer']}/delete").status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog, PlantTransfer, PreTrip
+
+        today_log = DriverLog.query.get(ids["today_log"])
+        old_log = DriverLog.query.get(ids["old_log"])
+        today_pretrip = PreTrip.query.get(ids["today_pretrip"])
+        old_pretrip = PreTrip.query.get(ids["old_pretrip"])
+        today_transfer = PlantTransfer.query.get(ids["today_transfer"])
+        old_transfer = PlantTransfer.query.get(ids["old_transfer"])
+
+        assert today_log is not None and today_log.deleted_at is not None
+        assert old_log is not None and old_log.deleted_at is None
+        assert today_pretrip is not None and today_pretrip.deleted_at is not None
+        assert old_pretrip is not None and old_pretrip.deleted_at is None
+        assert today_transfer is not None and today_transfer.deleted_at is not None
+        assert old_transfer is not None and old_transfer.deleted_at is None
+
+
+def test_driver_log_pickup_closes_dropoff_and_starts_same_plant_log(client, app):
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+
+    login(client, "driver1")
+    created = client.post(
+        "/new_driving_log",
+        data={
+            "plant_name": "RE",
+            "load_size": "Full",
+            "downtime_reason": "",
+            "depart_time": "",
+        },
+        follow_redirects=False,
+    )
+    assert created.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        dropoff_log = DriverLog.query.filter_by(plant_name="RE").one()
+        dropoff_id = dropoff_log.id
+
+    pickup_page = client.get(f"/driver_logs/{dropoff_id}/pickup")
+    assert pickup_page.status_code == 200
+    assert b"Pickup at RE" in pickup_page.data
+
+    pickup = client.post(
+        f"/driver_logs/{dropoff_id}/pickup",
+        data={
+            "plant_name": "RE",
+            "load_size": "Half",
+            "part_number": "PICK-1",
+            "hot_parts": "y",
+        },
+        follow_redirects=False,
+    )
+    assert pickup.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        dropoff_log = DriverLog.query.get(dropoff_id)
+        pickup_log = DriverLog.query.filter(DriverLog.id != dropoff_id).one()
+        assert dropoff_log.depart_time is not None
+        assert pickup_log.plant_name == "RE"
+        assert pickup_log.load_size == "Half"
+        assert pickup_log.depart_time is None
+        assert pickup_log.part_number == "PICK-1"
+        assert pickup_log.hot_parts is True
+        pickup_id = pickup_log.id
+
+    no_pickup = client.post(f"/driver_logs/{pickup_id}/no_pickup", follow_redirects=False)
+    assert no_pickup.status_code == 302
+    with app.app_context():
+        from app.models import DriverLog
+
+        pickup_log = DriverLog.query.get(pickup_id)
+        assert pickup_log.no_pickup is True
+        assert pickup_log.load_size == "Empty"
+        assert pickup_log.depart_time is not None
+
+
+def test_driver_logs_prints_and_eod_create_activity_history(client, app):
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+
+    login(client, "driver1")
+    log_response = client.post(
+        "/new_driving_log",
+        data={
+            "plant_name": "RE",
+            "load_size": "Full",
+            "downtime_reason": "",
+            "depart_time": "",
+        },
+        follow_redirects=False,
+    )
+    assert log_response.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        from app.extensions import db
+
+        log = DriverLog.query.filter_by(plant_name="RE").one()
+        log.depart_time = "17:45"
+        db.session.commit()
+
+    print_response = client.get("/driver_logs_print")
+    assert print_response.status_code == 200
+    assert b"5:45pm" in print_response.data
+    assert b"17:45" not in print_response.data
+
+    eod_print = client.get("/end_of_day_print")
+    assert eod_print.status_code == 200
+    assert b"5:45pm" in eod_print.data
+    assert b"17:45" not in eod_print.data
+
+    eod_attachment = client.get("/end_of_day_print/attachment")
+    assert eod_attachment.status_code == 200
+    assert eod_attachment.headers["Content-Type"] == "application/pdf"
+
+    eod_response = client.post("/end_of_day_summary", data={}, follow_redirects=False)
+    assert eod_response.status_code == 302
+
+    activity = client.get("/recent_activity")
+    assert activity.status_code == 200
+    assert b"Driver log submitted" in activity.data
+    assert b"Driver logs printed" in activity.data
+    assert b"End of day finalized" in activity.data
+
+    unread = client.get("/count_unread").get_json()
+    assert unread["action_count"] >= 3
+    assert unread["unread_count"] >= unread["action_count"]
+
+
+def test_plant_transfer_flow_and_eod_includes_transfer(client, app):
+    from datetime import date
+
+    transfer_date = date.today().isoformat()
+
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+
+    login(client, "driver1")
+    response = client.post(
+        "/plant_transfers/new",
+        data={
+            "transfer_number": "809716",
+            "transfer_date": transfer_date,
+            "ship_to": "RE",
+            "ship_from": "RW",
+            "trailer_number": "TR-9",
+            "driver_name": "driver1",
+            "transfer_time": "13:30",
+            "loaded_by": "Loader",
+            "part_number_0": "GAUGE-1",
+            "quantity_0": "10",
+            "skids_0": "1",
+            "remarks_0": "Gauge transfer",
+            "part_number_10": "GAUGE-2",
+            "quantity_10": "5",
+            "skids_10": "1",
+            "remarks_10": "Second gauge",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        from app.models import PlantTransfer
+
+        transfer = PlantTransfer.query.filter_by(transfer_number="809716").one()
+        assert transfer.ship_to == "RE"
+        assert transfer.ship_from == "RW"
+        assert len(transfer.lines) == 2
+        transfer_id = transfer.id
+
+    printable = client.get(f"/plant_transfers/{transfer_id}/print")
+    assert printable.status_code == 200
+    assert b"White - DATA INPUT" in printable.data
+    assert b"Canary - RECEIVING PLANT" in printable.data
+    assert b"Pink - DRIVER" in printable.data
+    assert b"Blue - SHIPPING PLANT" in printable.data
+    assert b"GAUGE-1" in printable.data
+    assert b"1:30pm" in printable.data
+    assert b"13:30" not in printable.data
+
+    attachment = client.get(f"/plant_transfers/{transfer_id}/attachment?copy=blue")
+    assert attachment.status_code == 200
+    assert attachment.headers["Content-Type"] == "application/pdf"
+    assert attachment.headers["Content-Disposition"].startswith("attachment;")
+    assert attachment.headers["Content-Disposition"].endswith('.pdf"')
+    assert attachment.data.startswith(b"%PDF")
+
+    mark_printed = client.post(f"/plant_transfers/{transfer_id}/mark_printed")
+    assert mark_printed.status_code == 200
+    assert mark_printed.get_json()["ok"] is True
+
+    activity = client.get("/recent_activity")
+    assert b"Plant Transfer PDF downloaded" in activity.data
+    assert b"Plant Transfer printed" in activity.data
+
+    eod = client.get("/end_of_day_summary")
+    assert eod.status_code == 200
+    assert b"Today's Plant Transfer" in eod.data
+    assert b"809716" in eod.data
+
+    eod_print = client.get("/end_of_day_print")
+    assert eod_print.status_code == 200
+    assert b"Plant Transfers" in eod_print.data
+    assert b"809716" in eod_print.data
+
+
+
+def test_driver_mobile_dashboard_renders_real_workflow(client, app):
+    from datetime import date, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PlantTransfer, PlantTransferLine, PreTrip, Task
+
+        driver = create_user(
+            "driver1",
+            "driver1@example.com",
+            "driver",
+            first_name="Driver",
+            last_name="One",
+            department="ST4",
+        )
+        create_user("manager1", "manager1@example.com", "management")
+        task = Task(
+            title="RW to KP hot move",
+            details="Part P0903110 needs trailer assignment.",
+            is_hot=True,
+            status="pending",
+            assigned_to=driver.id,
+        )
+        pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="ST4",
+            trailer_number="TR-2",
+            pretrip_date=date.today(),
+            shift="1st",
+        )
+        transfer = PlantTransfer(
+            user_id=driver.id,
+            transfer_number="TRX-100",
+            transfer_date=date.today(),
+            ship_to="KP",
+            ship_from="RW",
+            trailer_number="TR-9",
+            driver_name="Driver One",
+            transfer_time="13:30",
+        )
+        transfer.lines.append(
+            PlantTransferLine(line_number=1, side="left", part_number="P0903110")
+        )
+        past_date = date.today() - timedelta(days=1)
+        past_transfer = PlantTransfer(
+            user_id=driver.id,
+            transfer_number="TRX-099",
+            transfer_date=past_date,
+            ship_to="RE",
+            ship_from="PC",
+            trailer_number="TR-8",
+            driver_name="Driver One",
+            transfer_time="08:15",
+        )
+        past_transfer.lines.append(
+            PlantTransferLine(
+                line_number=1,
+                side="left",
+                part_number="OLD-PART",
+                skids="2",
+                quantity="18",
+            )
+        )
+        today_log = DriverLog(
+            driver_id=driver.id,
+            date=date.today(),
+            plant_name="RE",
+            load_size="Half",
+            arrive_time=f"{date.today().isoformat()} 15:30:00",
+        )
+        past_log = DriverLog(
+            driver_id=driver.id,
+            date=past_date,
+            plant_name="DC",
+            load_size="Full",
+            arrive_time=f"{past_date.isoformat()} 20:05:00",
+            depart_time="17:45",
+        )
+        db.session.add_all([task, pretrip, transfer, past_transfer, today_log, past_log])
+        db.session.commit()
+
+    login(client, "driver1")
+    dashboard_redirect = client.get("/dashboard", follow_redirects=False)
+    assert dashboard_redirect.status_code == 302
+    assert dashboard_redirect.headers["Location"].endswith("/mobile")
+
+    page = client.get("/mobile")
+    assert page.status_code == 200
+    assert b"LacksDrivers Mobile" in page.data
+    assert b"RW to KP hot move" in page.data
+    assert b"Part P0903110 needs trailer assignment." in page.data
+    assert b"PostTrip Due" in page.data
+    assert b"RW to KP" in page.data
+    assert b"Previous Reports" not in page.data
+    assert b"All history" not in page.data
+
+    history = client.get("/mobile/history")
+    assert history.status_code == 200
+    assert b"Reports" in history.data
+    assert b"TRX" not in history.data
+
+    day_report = client.get(f"/mobile/history/{past_date.isoformat()}")
+    assert day_report.status_code == 200
+    assert b"PC to RE" in day_report.data
+    assert b"TRX-099" in day_report.data
+    assert b"TR-8" in day_report.data
+    assert b"OLD-PART" in day_report.data
+    assert b"2 skid(s)" in day_report.data
+    assert b"qty 18" in day_report.data
+    assert b"DC" in day_report.data
+    assert b"4:05pm" in day_report.data
+    assert b"5:45pm" in day_report.data
+    assert past_date.isoformat().encode() not in day_report.data
+    assert b"17:45" not in day_report.data
+    assert b"/edit_driver_log/" not in day_report.data
+    assert b"/pickup" not in day_report.data
+    assert b"/depart" not in day_report.data
+    assert b"/delete" not in day_report.data
+
+    today_report = client.get(f"/mobile/history/{date.today().isoformat()}")
+    assert today_report.status_code == 200
+    assert b"RE" in today_report.data
+    assert b"Edit" in today_report.data
+    assert b"Pickup" in today_report.data
+    assert b"Depart" in today_report.data
+    assert b"Delete" in today_report.data
+    assert b"13:30" not in today_report.data
+
+    assert page.data.count(b"Create Driver Log") == 1
+    assert b"Start Shift" not in page.data
+    assert b"End Shift" not in page.data
+
+
+
+def test_knowledge_base_uses_shared_app_shell(client, app):
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+
+    login(client, "driver1")
+    page = client.get("/knowledge_base")
+    assert page.status_code == 200
+    assert b"Knowledge Base" in page.data
+    assert b"LacksDrivers - Dynamic" not in page.data
+    assert b"openPanelBtn" not in page.data
+
+
+
+def test_manager_trim_dashboard_scopes_trim_operations(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PlantTransfer, PlantTransferLine, Task
+
+        trim_driver = create_user(
+            "trimdriver",
+            "trimdriver@example.com",
+            "driver",
+            first_name="Trim",
+            last_name="Driver",
+            department="Trim DC",
+            employee_id="T-77",
+        )
+        create_user("manager1", "manager1@example.com", "management")
+        task = Task(
+            title="Trim hot move",
+            details="Move rack through Trim DC",
+            is_hot=True,
+            status="pending",
+            assigned_to=trim_driver.id,
+        )
+        log = DriverLog(
+            driver_id=trim_driver.id,
+            date=date.today(),
+            plant_name="Trim DC",
+            load_size="Full",
+            arrive_time="2026-05-13 12:00:00",
+        )
+        transfer = PlantTransfer(
+            user_id=trim_driver.id,
+            transfer_number="TRIM-1",
+            transfer_date=date.today(),
+            ship_to="Trim DC",
+            ship_from="RW",
+            trailer_number="TR-4",
+            driver_name="Trim Driver",
+        )
+        transfer.lines.append(
+            PlantTransferLine(
+                line_number=1,
+                side="left",
+                part_number="TRIM-PART",
+                skids="3",
+                quantity="42",
+            )
+        )
+        db.session.add_all([task, log, transfer])
+        db.session.commit()
+
+    login(client, "manager1")
+    page = client.get("/manager/trim-dashboard")
+    assert page.status_code == 200
+    assert b"Trim Division Dashboard" in page.data
+    assert b"Trim hot move" in page.data
+    assert b"Trim DC" in page.data
+    assert b"Badge T-77" in page.data
+    assert b"trimdriver" not in page.data
+    assert b"TRIM-1" in page.data
+    assert b"TRIM-PART" in page.data
+    assert b"3 skid(s)" in page.data
+    assert b"qty 42" in page.data
+
+    dashboard = client.get("/manager/dashboard")
+    assert b"Trim Dashboard" in dashboard.data

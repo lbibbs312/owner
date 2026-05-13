@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  {% set transfers_endpoint = 'manager.plant_transfers' if current_user.role == 'management' else 'driver.plant_transfers' %}
+  {% set transfer_print_endpoint = 'manager.plant_transfer_printable' if current_user.role == 'management' else 'driver.plant_transfer_printable' %}
+  <div class="d-flex justify-content-between align-items-center mt-3 mb-3 gap-3 flex-wrap">
+    <h2 class="mb-0">Plant Transfer #{{ transfer.transfer_number or transfer.id }}</h2>
+    <div class="d-flex flex-wrap gap-2">
+      {% set can_manage_transfer = current_user.role == 'driver' and transfer.user_id == current_user.id %}
+      {% set can_delete_transfer = can_manage_transfer and transfer.transfer_date == today_local_date %}
+      {% if can_manage_transfer %}
+        <a href="{{ url_for('driver.edit_plant_transfer', transfer_id=transfer.id) }}" class="btn btn-secondary">Edit</a>
+      {% endif %}
+      <a href="{{ url_for(transfer_print_endpoint, transfer_id=transfer.id, copy='pink') }}" class="btn btn-warning">Print Copies</a>
+      {% if can_delete_transfer %}
+        <form action="{{ url_for('driver.delete_plant_transfer', transfer_id=transfer.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this Plant Transfer?');">
+          <button type="submit" class="btn btn-outline-danger">Delete</button>
+        </form>
+      {% endif %}
+      <a href="{{ url_for(transfers_endpoint) }}" class="btn btn-outline-secondary">Back</a>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><strong>Date:</strong> {{ transfer.transfer_date }}</div>
+    <div class="col-md-3"><strong>Ship To:</strong> {{ transfer.ship_to }}</div>
+    <div class="col-md-3"><strong>Ship From:</strong> {{ transfer.ship_from }}</div>
+    <div class="col-md-3"><strong>Trailer:</strong> {{ transfer.trailer_number or '' }}</div>
+    <div class="col-md-3"><strong>Driver:</strong> {{ transfer.driver_name or transfer.driver.display_name }}</div>
+    <div class="col-md-3"><strong>Time:</strong> {{ transfer.transfer_time|display_time if transfer.transfer_time else '' }}</div>
+    <div class="col-md-3"><strong>Loaded By:</strong> {{ transfer.loaded_by or '' }}</div>
+  </div>
+
+  <div class="copy-legend mb-3">
+    <span class="badge text-bg-light border">White - Data Input</span>
+    <span class="badge text-bg-warning">Canary - Receiving Plant</span>
+    <span class="badge" style="background:#f6a6c8;color:#111;">Pink - Driver</span>
+    <span class="badge text-bg-info">Blue - Shipping Plant</span>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-bordered table-sm align-middle">
+      <thead>
+        <tr><th>#</th><th>Side</th><th>Part Number</th><th>Quantity</th><th>Skids</th><th>Remarks</th></tr>
+      </thead>
+      <tbody>
+        {% for line in transfer.lines %}
+          <tr>
+            <td>{{ line.line_number }}</td>
+            <td>{{ line.side }}</td>
+            <td>{{ line.part_number }}</td>
+            <td>{{ line.quantity }}</td>
+            <td>{{ line.skids }}</td>
+            <td>{{ line.remarks }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

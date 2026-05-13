@@ -5,61 +5,135 @@
   <meta charset="utf-8">
   <title>End of Day - Print</title>
   <style>
+    @page {
+      size: Letter portrait;
+      margin: 0.5in;
+    }
+    * {
+      box-sizing: border-box;
+    }
     body {
+      width: auto;
+      min-height: auto;
+      margin: 0;
+      padding: 0.2in;
       font-family: Arial, sans-serif;
-      margin: 1rem;
+      font-size: 10pt;
       color: #000;
+      background: #fff;
     }
     .print-container {
-      width: 900px;
+      width: 7.5in;
+      max-width: 100%;
       margin: 0 auto;
       border: 1px solid #000;
-      padding: 1rem;
+      padding: 0.15in;
+    }
+    .print-guidance {
+      margin: 0 0 0.12in;
+      color: #444;
+      font-size: 9pt;
+    }
+    .email-btn {
+      display: inline-block;
+      margin-bottom: 0.12in;
+      padding: 8px 16px;
+      background: #198754;
+      color: #fff;
+      text-decoration: none;
+      font-size: 10pt;
+      line-height: 1.1;
     }
     .print-btn {
-      margin-bottom: 1rem;
+      margin-bottom: 0.12in;
       padding: 8px 16px;
       background: #007bff;
       color: #fff;
       border: none;
       cursor: pointer;
     }
-    @media print {
-      .print-btn {
-        display: none;
-      }
+    h2 {
+      margin: 0 0 0.12in;
+      font-size: 14pt;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 1rem;
+      table-layout: fixed;
+      margin-top: 0.12in;
     }
     th, td {
       border: 1px solid #000;
-      padding: 6px;
+      padding: 4px;
       text-align: center;
       vertical-align: middle;
+      overflow-wrap: anywhere;
     }
-    .downtime-col {
+    th:nth-child(1), td:nth-child(1) {
       width: 20%;
     }
+    th:nth-child(4), td:nth-child(4) {
+      width: 24%;
+    }
+    .downtime-col {
+      width: 24%;
+    }
+    .section-title {
+      margin-top: 0.18in;
+      font-size: 12pt;
+      font-weight: bold;
+      border-bottom: 1px solid #000;
+      padding-bottom: 2px;
+    }
+    @media screen {
+      body {
+        width: auto;
+        padding: 1rem;
+      }
+    }
+    @media print {
+      body {
+        width: auto;
+        padding: 0;
+      }
+      .print-guidance {
+      margin: 0 0 0.12in;
+      color: #444;
+      font-size: 9pt;
+    }
+    .print-btn {
+        display: none;
+      }
+      .print-container {
+        width: 100%;
+        border: none;
+        padding: 0;
+      }
+      * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+
   </style>
 </head>
 <body>
 
 <div class="print-container">
-  <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+<button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+  <a class="email-btn" href="{{ url_for('driver.end_of_day_attachment') }}">Download PDF Attachment</a>
+  <p class="print-guidance">Use Letter paper, portrait orientation, and disable browser headers/footers if your print dialog offers that option.</p>
 
   <h2>End of Day - {{ the_date }}</h2>
-  
-  {% if drivers_logs[current_user.username] %}
+
+  {% if drivers_logs[current_user.display_name] %}
     <table>
       <thead>
         <tr>
           <th>Plant</th>
           <th>Arrive</th>
           <th>Depart</th>
-          <th class="downtime-col">Downtime Reason</th>
+          <th class="downtime-col">Parts</th>
           <!-- Z / Q / H / TQ / F columns -->
           <th>Z</th>
           <th>Q</th>
@@ -69,12 +143,12 @@
         </tr>
       </thead>
       <tbody>
-        {% for log in drivers_logs[current_user.username] %}
+        {% for log in drivers_logs[current_user.display_name] %}
         <tr>
           <td>{{ log.plant_name }}</td>
           <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
-          <td>{{ log.depart_time|to_local_time if log.depart_time else '--' }}</td>
-          <td>{{ log.downtime_reason or "" }}</td>
+          <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
+          <td>{% if log.no_pickup %}No Pickup {% endif %}{% if log.hot_parts %}HOT {% endif %}{{ log.part_number or "" }}</td>
           <!-- Mark "X" in the correct load column -->
           <td>
             {% if log.load_size == "Empty" %}
@@ -117,6 +191,36 @@
     </table>
   {% else %}
     <p>No logs found for today.</p>
+  {% endif %}
+
+  <div class="section-title">Plant Transfers</div>
+  {% if drivers_plant_transfers[current_user.display_name] %}
+    <table>
+      <thead>
+        <tr>
+          <th>No.</th>
+          <th>Ship From</th>
+          <th>Ship To</th>
+          <th>Trailer</th>
+          <th>Driver</th>
+          <th>Lines</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for transfer in drivers_plant_transfers[current_user.display_name] %}
+          <tr>
+            <td>{{ transfer.transfer_number or transfer.id }}</td>
+            <td>{{ transfer.ship_from }}</td>
+            <td>{{ transfer.ship_to }}</td>
+            <td>{{ transfer.trailer_number or '' }}</td>
+            <td>{{ transfer.driver_name or transfer.driver.display_name }}</td>
+            <td>{{ transfer.lines|length }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No Plant Transfers for today.</p>
   {% endif %}
 </div>
 

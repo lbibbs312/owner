@@ -13,6 +13,7 @@ from app.blueprints.messaging import bp
 from app.extensions import db, socketio
 from app.forms.messaging import AnnouncementForm, DirectMessageForm, KnowledgeBaseForm
 from app.models import (
+    ActivityEvent,
     Announcement,
     ChatMessage,
     DirectMessage,
@@ -77,10 +78,15 @@ def recent_activity():
         DirectMessage.receiver_id == current_user.id,
         DirectMessage.timestamp >= cutoff,
     ).all()
+    activity_query = ActivityEvent.query.order_by(ActivityEvent.created_at.desc())
+    if current_user.role != "management":
+        activity_query = activity_query.filter_by(user_id=current_user.id)
+    action_history = activity_query.limit(100).all()
     return render_template(
         "recent_activity.html",
         new_announcements=new_ann,
         new_messages=new_dms,
+        action_history=action_history,
     )
 
 
@@ -88,11 +94,30 @@ def recent_activity():
 @login_required
 def count_unread():
     cutoff = datetime.now() - timedelta(days=1)
-    unread_count = DirectMessage.query.filter(
+    message_count = DirectMessage.query.filter(
         DirectMessage.receiver_id == current_user.id,
         DirectMessage.timestamp >= cutoff,
     ).count()
-    return jsonify({"unread_count": unread_count})
+    action_query = ActivityEvent.query.filter(ActivityEvent.created_at >= cutoff)
+    if current_user.role != "management":
+        action_query = action_query.filter_by(user_id=current_user.id)
+    action_events = action_query.all()
+    category_counts = {}
+    for event in action_events:
+        category_counts[event.category] = category_counts.get(event.category, 0) + 1
+    category_count = len(category_counts)
+    display_count = message_count + category_count
+    action_count = len(action_events)
+    return jsonify(
+        {
+            "unread_count": message_count + action_count,
+            "display_count": display_count,
+            "message_count": message_count,
+            "action_count": action_count,
+            "action_category_count": category_count,
+            "categories": category_counts,
+        }
+    )
 
 
 @bp.route("/direct_messages", methods=["GET", "POST"])

@@ -4,10 +4,10 @@
   <h2 class="mt-4 mb-3">End of Day Summary (Interactive)</h2>
 
   <form method="POST" action="{{ url_for('driver.end_of_day_summary') }}">
-    {{ form.csrf_token() }}
+    {{ form.hidden_tag() }}
 
     <h4>Today's PreTrip(s)</h4>
-    {% if drivers_pretrips[current_user.username] %}
+    {% if drivers_pretrips[current_user.display_name] %}
       <table class="table table-bordered table-sm mb-4">
         <thead>
           <tr>
@@ -20,9 +20,9 @@
           </tr>
         </thead>
         <tbody>
-          {% for pt in drivers_pretrips[current_user.username] %}
+          {% for pt in drivers_pretrips[current_user.display_name] %}
           <tr>
-            <td>{{ pt.truck_name }}</td>
+            <td>{{ pt.truck_number }}</td>
             <td>{{ pt.pretrip_date }}</td>
             <td>
               {% if pt.oil_leak or pt.fuel_leak or pt.coolant_leak %}
@@ -50,7 +50,7 @@
     {% endif %}
 
     <h4>Today's Driver Logs</h4>
-    {% if drivers_logs[current_user.username] %}
+    {% if drivers_logs[current_user.display_name] %}
       <table class="table table-bordered table-sm">
         <thead>
           <tr>
@@ -61,11 +61,11 @@
           </tr>
         </thead>
         <tbody>
-          {% for log in drivers_logs[current_user.username] %}
+          {% for log in drivers_logs[current_user.display_name] %}
           <tr>
             <td>{{ log.plant_name }}</td>
             <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
-            <td>{{ log.depart_time|to_local_time if log.depart_time else '--' }}</td>
+            <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
             <td>{{ log.load_size }}</td>
           </tr>
           {% endfor %}
@@ -73,6 +73,40 @@
       </table>
     {% else %}
       <p>No logs found for today.</p>
+    {% endif %}
+
+    <h4 class="mt-4">Today's Plant Transfer(s)</h4>
+    {% if drivers_plant_transfers[current_user.display_name] %}
+      <table class="table table-bordered table-sm mb-4">
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Ship From</th>
+            <th>Ship To</th>
+            <th>Trailer</th>
+            <th>Lines</th>
+            <th>Print Copies</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for transfer in drivers_plant_transfers[current_user.display_name] %}
+            <tr>
+              <td>{{ transfer.transfer_number or transfer.id }}</td>
+              <td>{{ transfer.ship_from }}</td>
+              <td>{{ transfer.ship_to }}</td>
+              <td>{{ transfer.trailer_number or '' }}</td>
+              <td>{{ transfer.lines|length }}</td>
+              <td>
+                <a href="{{ url_for('driver.plant_transfer_printable', transfer_id=transfer.id, copy='pink') }}" class="btn btn-sm btn-warning">
+                  Print Copy
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No Plant Transfers for today.</p>
     {% endif %}
 
     <a href="{{ url_for('driver.driver_logs_print') }}" class="btn btn-secondary">

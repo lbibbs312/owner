@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  {% set transfer_view_endpoint = 'manager.view_plant_transfer' if current_user.role == 'management' else 'driver.view_plant_transfer' %}
+  {% set transfer_print_endpoint = 'manager.plant_transfer_printable' if current_user.role == 'management' else 'driver.plant_transfer_printable' %}
+  <div class="d-flex justify-content-between align-items-center mt-3 mb-3 gap-3 flex-wrap">
+    <h2 class="mb-0">Plant Transfers</h2>
+    {% if current_user.role == 'driver' %}
+      <a href="{{ url_for('driver.new_plant_transfer') }}" class="btn btn-primary">New Plant Transfer</a>
+    {% endif %}
+  </div>
+
+  {% if transfers %}
+    <div class="table-responsive">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Date</th>
+            <th>Ship From</th>
+            <th>Ship To</th>
+            <th>Driver</th>
+            <th>Lines</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for transfer in transfers %}
+            <tr>
+              <td>{{ transfer.transfer_number or transfer.id }}</td>
+              <td>{{ transfer.transfer_date }}</td>
+              <td>{{ transfer.ship_from }}</td>
+              <td>{{ transfer.ship_to }}</td>
+              <td>{{ transfer.driver_name or transfer.driver.display_name }}</td>
+              <td><span class="badge bg-secondary">{{ transfer.lines|length }}</span></td>
+              <td>
+                {% set can_manage_transfer = current_user.role == 'driver' and transfer.user_id == current_user.id %}
+                {% set can_delete_transfer = can_manage_transfer and transfer.transfer_date == today_local_date %}
+                <div class="d-flex flex-wrap gap-1">
+                  <a href="{{ url_for(transfer_view_endpoint, transfer_id=transfer.id) }}" class="btn btn-sm btn-info">View</a>
+                  {% if can_manage_transfer %}
+                    <a href="{{ url_for('driver.edit_plant_transfer', transfer_id=transfer.id) }}" class="btn btn-sm btn-secondary">Edit</a>
+                  {% endif %}
+                  <a href="{{ url_for(transfer_print_endpoint, transfer_id=transfer.id, copy='pink') }}" class="btn btn-sm btn-warning">Print</a>
+                  {% if can_delete_transfer %}
+                    <form action="{{ url_for('driver.delete_plant_transfer', transfer_id=transfer.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this Plant Transfer?');">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="text-muted">No Plant Transfers yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

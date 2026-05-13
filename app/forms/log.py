@@ -57,9 +57,14 @@ class DriverLogForm(FlaskForm):
         ],
         validators=[DataRequired()],
     )
-    downtime_reason = StringField("Downtime Reason (optional)")
+    hot_parts = BooleanField("Hot Parts")
+    part_number = StringField("Part Number / Hot Part Number")
+    arrive_time = StringField(
+        "Arrival Time",
+        description="Enter Detroit local time like '545pm', '5:45pm', or '1:05pm'",
+    )
     depart_time = StringField(
         "Depart Time (optional)",
-        description="Enter time like '545' => 05:45 or '13:05' => 13:05",
+        description="Enter Detroit local time like '545pm', '5:45pm', or '1:05pm'",
     )
     submit = SubmitField("Submit Log Entry")

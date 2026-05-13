@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container fade-in" style="overflow-x: auto;">
-  <h2 class="mt-4 mb-3">Driver Dashboard - Dynamic Selections</h2>
+  <h2 class="mt-4 mb-3">Driver Dashboard</h2>
 
   <div class="row">
     <!-- MY TASKS -->
@@ -20,13 +20,13 @@
                   </span>
                   <div>
                     <!-- If you let drivers edit tasks, link here: -->
-                    <a href="{{ url_for('edit_task', task_id=t.id) }}" 
+                    <a href="{{ url_for('driver.list_tasks') }}"
                        class="btn btn-sm btn-warning me-2">
                       Edit
                     </a>
-                    <!-- If you have a separate 'view_task' route or a detail page, link to that: 
-                    <a href="{{ url_for('view_task', task_id=t.id) }}" 
-                       class="btn btn-sm btn-info">View</a> 
+                    <!-- If you have a separate 'view_task' route or a detail page, link to that:
+                    <a href="{{ url_for('view_task', task_id=t.id) }}"
+                       class="btn btn-sm btn-info">View</a>
                     -->
                   </div>
                 </li>
@@ -38,39 +38,14 @@
 
     <!-- MY LOGS -->
     <div class="col-md-6">
-      <div class="card mb-4">
+      <a href="{{ url_for('driver.driver_logs') }}" class="card mb-4 text-decoration-none text-reset">
         <div class="card-header bg-info text-white">
-          Recent Logs
+          Driver Logs
         </div>
         <div class="card-body">
-          {% if logs %}
-            <ul class="list-group">
-              {% for log in logs %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                  <span>
-                    <strong>Log #{{ log.id }}</strong> - {{ log.plant_name }} ({{ log.load_size }})
-                  </span>
-                  <div>
-                    <a href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}" 
-                       class="btn btn-sm btn-warning me-2">
-                      Edit
-                    </a>
-                    <a href="{{ url_for('driver.view_driver_log', log_id=log.id) }}" 
-                       class="btn btn-sm btn-info">
-                      View
-                    </a>
-                  </div>
-                </li>
-              {% endfor %}
-            </ul>
-          {% else %}
-            <p>No logs found.</p>
-          {% endif %}
-          <a href="{{ url_for('driver.new_driving_log') }}" class="btn btn-success btn-sm mt-3">
-            Create New Log
-          </a>
+          <p class="m-0">Open the full driver log menu with search, create, view, edit, and depart controls.</p>
         </div>
-      </div>
+      </a>
     </div>
   </div>
 
@@ -91,13 +66,13 @@
                 <strong>PreTrip #{{ p.id }}</strong> - {{ p.truck_name }}
               </span>
               <div>
-                <a href="{{ url_for('driver.view_pretrip', pretrip_id=p.id) }}" 
+                <a href="{{ url_for('driver.view_pretrip', pretrip_id=p.id) }}"
                    class="btn btn-sm btn-info me-2">
                   View
                 </a>
                 {% if not p.posttrip %}
                   <!-- Only show "Complete PostTrip" if posttrip not done yet -->
-                  <a href="{{ url_for('driver.do_posttrip', pretrip_id=p.id) }}" 
+                  <a href="{{ url_for('driver.do_posttrip', pretrip_id=p.id) }}"
                      class="btn btn-sm btn-danger">
                     Complete PostTrip
                   </a>

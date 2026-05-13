@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Task Details{% endblock %}
+{% block content %}
+<style>
+  .live-task { border:1px solid #dbeafe; background:#f8fbff; border-radius:14px; padding:16px; box-shadow:0 8px 24px rgba(15,23,42,.06); }
+  .live-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .live-title { margin:0; font-size:1.25rem; font-weight:900; color:#0f172a; }
+  .live-meta { color:#64748b; font-size:.88rem; font-weight:700; }
+  .live-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:14px; }
+  .live-stat { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:10px; }
+  .live-stat .label { margin:0 0 3px; color:#64748b; font-size:.68rem; text-transform:uppercase; font-weight:900; letter-spacing:.05em; }
+  .live-stat .value { margin:0; font-weight:900; color:#0f172a; }
+  .history-list { display:grid; gap:8px; }
+  .history-item { border:1px solid #e2e8f0; border-radius:10px; padding:10px; background:#fff; }
+  .history-item strong { color:#0f172a; }
+  .history-item .meta { color:#64748b; font-size:.82rem; }
+  @media (max-width:800px) { .live-grid { grid-template-columns:1fr 1fr; } .live-top { flex-direction:column; } }
+</style>
+<div class="container my-3">
+  <section class="live-task mb-3" id="liveTaskPanel" data-task-id="{{ task.id }}">
+    <div class="live-top">
+      <div>
+        <p class="live-meta mb-1">Live Assignment</p>
+        <h2 class="live-title">{{ task.title }}</h2>
+        <div class="live-meta">Shift {{ task.shift or 'N/A' }}{% if task.is_hot %} | HOT MOVE{% endif %}</div>
+      </div>
+      <span class="badge {% if task.status == 'completed' %}bg-success{% elif task.status == 'in-progress' %}bg-warning text-dark{% elif task.status == 'declined' %}bg-secondary{% else %}bg-danger{% endif %}" id="liveStatus">{{ task.status.replace('-', ' ')|title }}</span>
+    </div>
+    <div class="live-grid">
+      <div class="live-stat"><p class="label">Part</p><p class="value">{{ task.part_number or 'Not recorded' }}</p></div>
+      <div class="live-stat"><p class="label">Assigned To</p><p class="value">{{ task.assigned_user.display_name if task.assigned_user else 'Open' }}</p></div>
+      <div class="live-stat"><p class="label">Accepted</p><p class="value">{{ task.accepted_at|to_detroit_datetime if task.accepted_at else 'Not accepted' }}</p></div>
+      <div class="live-stat"><p class="label">Completed</p><p class="value">{{ task.completed_at|to_detroit_datetime if task.completed_at else 'Not completed' }}</p></div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 mt-3">
+      <a href="{{ url_for('driver.list_tasks') }}" class="btn btn-outline-secondary">Back to Tasks</a>
+      {% if task.status == 'pending' %}
+        <form action="{{ url_for('driver.accept_task', task_id=task.id) }}" method="POST"><button type="submit" class="btn btn-success">Accept</button></form>
+        {% if task.assigned_to == current_user.id %}<form action="{{ url_for('driver.decline_task', task_id=task.id) }}" method="POST"><button type="submit" class="btn btn-outline-warning">Decline</button></form>{% endif %}
+        <form action="{{ url_for('driver.complete_task', task_id=task.id) }}" method="POST"><button type="submit" class="btn btn-primary">Completed</button></form>
+      {% elif task.status == 'in-progress' %}
+        <form action="{{ url_for('driver.complete_task', task_id=task.id) }}" method="POST"><button type="submit" class="btn btn-primary">Completed</button></form>
+        <form action="{{ url_for('driver.decline_task', task_id=task.id) }}" method="POST"><button type="submit" class="btn btn-outline-warning">Decline</button></form>
+      {% endif %}
+    </div>
+  </section>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <h5 class="card-title">Dispatch Details</h5>
+      {% if task.part_number %}<p class="mb-2"><strong>Part Number:</strong> {{ task.part_number }}{% if task.is_hot %} <span class="badge bg-danger">Hot</span>{% endif %}</p>{% endif %}
+      <p class="card-text" style="white-space:pre-wrap;">{{ task.details or 'No extra dispatch notes.' }}</p>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <h5 class="card-title">Assignment History</h5>
+      <div class="history-list">
+        <div class="history-item"><strong>Assigned Driver:</strong> {{ task.assigned_user.display_name if task.assigned_user else 'Open for any driver' }}{% if task.assigned_user %}<div class="meta">{{ task.assigned_user.division_label }} | Badge {{ task.assigned_user.badge_label }}</div>{% endif %}</div>
+        {% if task.accepted_by %}<div class="history-item"><strong>Accepted By:</strong> {{ task.accepted_by.display_name }}<div class="meta">{{ task.accepted_by.division_label }} | Badge {{ task.accepted_by.badge_label }} | {{ task.accepted_at|to_detroit_datetime if task.accepted_at else 'Acceptance time not recorded' }}</div></div>{% endif %}
+        {% if task.completed_by %}<div class="history-item"><strong>Completed By:</strong> {{ task.completed_by.display_name }}<div class="meta">{{ task.completed_by.division_label }} | Badge {{ task.completed_by.badge_label }} | {{ task.completed_at|to_detroit_datetime if task.completed_at else 'Completion time not recorded' }}</div></div>{% endif %}
+        {% for event in task_events %}
+          <div class="history-item"><strong>{{ event.title }}</strong><div class="meta">{{ event.created_at|to_detroit_datetime }} | {{ event.user.display_name if event.user else 'System' }}</div>{% if event.details %}<div>{{ event.details }}</div>{% endif %}</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <h5 class="card-title">Hot Parts History</h5>
+      {% if hot_part_logs %}
+        <div class="history-list">
+          {% for log in hot_part_logs %}
+            <div class="history-item"><strong>{{ log.plant_name }}</strong> <span class="badge {% if log.no_pickup %}bg-dark{% elif log.hot_parts %}bg-danger{% else %}bg-secondary{% endif %}">{{ 'No Pickup' if log.no_pickup else ('Hot' if log.hot_parts else log.load_size) }}</span><div class="meta">{{ log.date }} | Arrive {{ log.arrive_time|to_local_time if log.arrive_time else '--' }} | Depart {{ log.depart_time|to_12h_format if log.depart_time else '--' }}</div><div>{{ log.part_number or 'No part number recorded' }}</div></div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-muted mb-0">No matching hot-part log history yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  if (window.io) {
+    const taskId = {{ task.id }};
+    const socket = io();
+    socket.on('task_updated', (data) => {
+      if (Number(data.task_id) === Number(taskId)) window.location.reload();
+    });
+  }
+</script>
+{% endblock %}
