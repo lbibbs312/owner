@@ -25,6 +25,8 @@ from sqlalchemy import Enum
 
 # Import the manager blueprint (if you have one)
 from manager_routes import manager_bp
+# Operations blueprint (transfer tracking, exceptions, audit, damage workflow).
+from ops_bp import ops_bp
 
 ############################################################################
 # Initialize app & config
@@ -46,6 +48,8 @@ login_manager.login_view = "login"
 
 # Register the manager blueprint so /manager/* routes become active
 app.register_blueprint(manager_bp)
+# Operations / transfer-tracking blueprint
+app.register_blueprint(ops_bp)
 
 ############################################################################
 # Utility Function (for time parsing)
