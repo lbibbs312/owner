@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-3">
+  <h2>{% if transfer %}Edit Transfer #{{ transfer.transfer_number or transfer.id }}{% else %}New Transfer{% endif %}</h2>
+
+  <form method="POST"
+        action="{% if transfer %}{{ url_for('ops_bp.update_transfer', tid=transfer.id) }}{% else %}{{ url_for('ops_bp.create_transfer') }}{% endif %}">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Transfer #</label>
+        <input class="form-control" name="transfer_number"
+               value="{{ transfer.transfer_number if transfer else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-control" name="transfer_date"
+               value="{{ (transfer.transfer_date.isoformat() if transfer and transfer.transfer_date else '') }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Time</label>
+        <input class="form-control" name="transfer_time" placeholder="HH:MM"
+               value="{{ transfer.transfer_time if transfer else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Trailer #</label>
+        <input class="form-control" name="trailer_number"
+               value="{{ transfer.trailer_number if transfer else '' }}">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Ship From</label>
+        <input class="form-control" name="ship_from"
+               value="{{ transfer.ship_from if transfer else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Ship To</label>
+        <input class="form-control" name="ship_to"
+               value="{{ transfer.ship_to if transfer else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Driver Name</label>
+        <input class="form-control" name="driver_name"
+               value="{{ transfer.driver_name if transfer else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Initials</label>
+        <input class="form-control" name="driver_initials"
+               value="{{ transfer.driver_initials if transfer else '' }}">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Loaded By</label>
+        <input class="form-control" name="loaded_by"
+               value="{{ transfer.loaded_by if transfer else '' }}">
+      </div>
+    </div>
+
+    <hr>
+    <h4>Part lines</h4>
+    <p class="text-muted small">Hot lines show a Scan button. Manual entry always works.</p>
+
+    <table class="table table-sm align-middle" id="linesTable">
+      <thead>
+        <tr>
+          <th>#</th><th>Side</th><th>Part #</th><th>Qty</th><th>Skids</th>
+          <th>Remarks</th><th>Hot</th><th>Scan</th>
+        </tr>
+      </thead>
+      <tbody id="linesBody">
+        {% set existing = lines if lines else [] %}
+        {% set initial = existing if existing|length else [None] * 6 %}
+        {% for line in initial %}
+          {% set i = loop.index %}
+          <tr data-line-index="{{ i }}">
+            <td>{{ i }}</td>
+            <td>
+              <select class="form-select form-select-sm" name="line_{{ i }}_side">
+                <option value="left"  {% if line and line.side == 'left' %}selected{% endif %}>Left</option>
+                <option value="right" {% if line and line.side == 'right' %}selected{% endif %}>Right</option>
+              </select>
+            </td>
+            <td>
+              <input class="form-control form-control-sm part-input"
+                     id="line_{{ i }}_part_number"
+                     name="line_{{ i }}_part_number"
+                     value="{{ line.part_number if line else '' }}">
+            </td>
+            <td>
+              <input type="number" min="0" class="form-control form-control-sm"
+                     name="line_{{ i }}_quantity"
+                     value="{{ line.quantity if line and line.quantity is not none else '' }}">
+            </td>
+            <td>
+              <input type="number" min="0" class="form-control form-control-sm"
+                     name="line_{{ i }}_skids"
+                     value="{{ line.skids if line and line.skids is not none else '' }}">
+            </td>
+            <td>
+              <input class="form-control form-control-sm"
+                     name="line_{{ i }}_remarks"
+                     value="{{ line.remarks if line else '' }}">
+            </td>
+            <td class="text-center">
+              <input type="checkbox" class="form-check-input hot-toggle"
+                     name="line_{{ i }}_is_hot" value="1"
+                     data-line-index="{{ i }}"
+                     {% if line and line.is_hot %}checked{% endif %}>
+            </td>
+            <td>
+              <button type="button"
+                      class="btn btn-sm btn-outline-primary scan-btn"
+                      data-target="#line_{{ i }}_part_number"
+                      data-line-index="{{ i }}"
+                      style="{% if not (line and line.is_hot) %}display:none;{% endif %}">
+                Scan
+              </button>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if transfer %}
+      <div class="mb-3">
+        <label class="form-label">Reason for edit (required)</label>
+        <input class="form-control" name="edit_reason" required>
+      </div>
+    {% endif %}
+
+    <button class="btn btn-primary" type="submit">
+      {% if transfer %}Save changes{% else %}Create transfer{% endif %}
+    </button>
+    <a class="btn btn-link" href="{{ url_for('ops_bp.list_transfers') }}">Cancel</a>
+  </form>
+</div>
+
+<script src="{{ url_for('static', filename='js/hot_parts_scanner.js') }}"></script>
+<script>
+  (function() {
+    function refreshScanButtons() {
+      document.querySelectorAll(".hot-toggle").forEach(function (cb) {
+        var row = cb.closest("tr");
+        if (!row) return;
+        var btn = row.querySelector(".scan-btn");
+        if (!btn) return;
+        btn.style.display = cb.checked ? "" : "none";
+      });
+    }
+    document.addEventListener("change", function (e) {
+      if (e.target && e.target.classList && e.target.classList.contains("hot-toggle")) {
+        refreshScanButtons();
+      }
+    });
+    if (window.HotPartsScanner) {
+      window.HotPartsScanner.attachScanner(".scan-btn");
+    }
+    refreshScanButtons();
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-3">
+  <h2>Damage Report #{{ report.id }}</h2>
+  <p>
+    Status:
+    {% if report.status == 'closed' %}
+      <span class="badge bg-success">Closed</span>
+    {% else %}
+      <span class="badge bg-danger">Open</span>
+    {% endif %}
+    {% if report.resolved_at %}<small class="text-muted">resolved {{ report.resolved_at }}</small>{% endif %}
+  </p>
+
+  <dl class="row">
+    <dt class="col-sm-3">Stage</dt><dd class="col-sm-9">{{ report.stage or '-' }}</dd>
+    <dt class="col-sm-3">Truck</dt><dd class="col-sm-9">{{ report.truck_number or '-' }}</dd>
+    <dt class="col-sm-3">Trailer</dt><dd class="col-sm-9">{{ report.trailer_number or '-' }}</dd>
+    <dt class="col-sm-3">Plant</dt><dd class="col-sm-9">{{ report.plant_name or '-' }}</dd>
+    <dt class="col-sm-3">Move</dt><dd class="col-sm-9">{{ report.move_reference or '-' }}</dd>
+    <dt class="col-sm-3">Damage time</dt><dd class="col-sm-9">{{ report.damage_time or '-' }}</dd>
+    <dt class="col-sm-3">Description</dt><dd class="col-sm-9">{{ report.description or '-' }}</dd>
+  </dl>
+
+  {% for stage, photos in photos_by_stage.items() %}
+    <h4 class="mt-3">{{ stage|capitalize }} photos</h4>
+    <div class="row g-2">
+      {% for p in photos %}
+        <div class="col-6 col-md-3">
+          <a href="{{ url_for('static', filename=p.filename) }}" target="_blank">
+            <img src="{{ url_for('static', filename=p.filename) }}"
+                 class="img-fluid rounded" alt="damage photo">
+          </a>
+          <small class="text-muted d-block">{{ p.original_filename or p.filename }}</small>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-muted">No photos attached.</p>
+  {% endfor %}
+
+  <p class="mt-3">
+    <a href="{{ url_for('ops_bp.manager_audit', target_type='damage_report', target_id=report.id) }}">
+      View audit history for this report
+    </a>
+  </p>
+
+  {% if report.status != 'closed' %}
+    <form method="POST" action="{{ url_for('ops_bp.close_damage_report', did=report.id) }}" class="mt-3">
+      <div class="mb-2">
+        <label class="form-label">Reason for closing</label>
+        <input class="form-control" name="edit_reason" required>
+      </div>
+      <button class="btn btn-success" type="submit">Close report</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

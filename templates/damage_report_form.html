@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-3">
+  <h2>New Damage Report</h2>
+  <form method="POST"
+        action="{{ url_for('ops_bp.create_damage_report') }}"
+        enctype="multipart/form-data">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Stage</label>
+        <select class="form-select" name="stage">
+          <option value="before">Before</option>
+          <option value="during">During</option>
+          <option value="after">After</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Truck #</label>
+        <input class="form-control" name="truck_number">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Trailer #</label>
+        <input class="form-control" name="trailer_number">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Plant</label>
+        <input class="form-control" name="plant_name">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Damage time</label>
+        <input class="form-control" name="damage_time" placeholder="HH:MM">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Move / reference</label>
+        <input class="form-control" name="move_reference">
+      </div>
+      <div class="col-md-12">
+        <label class="form-label">Description</label>
+        <textarea class="form-control" name="description" rows="3"></textarea>
+      </div>
+      <div class="col-md-12">
+        <label class="form-label">Photos</label>
+        <input type="file" class="form-control" name="photos"
+               multiple accept="image/*" capture="environment">
+        <small class="text-muted">Take photos with the rear camera; multiple allowed.</small>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Driver Log ID (optional)</label>
+        <input class="form-control" name="driver_log_id">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">PreTrip ID (optional)</label>
+        <input class="form-control" name="pretrip_id">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Transfer ID (optional)</label>
+        <input class="form-control" name="plant_transfer_id">
+      </div>
+    </div>
+    <button class="btn btn-danger mt-3" type="submit">Submit damage report</button>
+  </form>
+</div>
+{% endblock %}

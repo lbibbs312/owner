@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-3">
+  <h2>Audit Log</h2>
+  <form class="row g-2 mb-3" method="GET">
+    <div class="col-auto">
+      <input class="form-control" name="target_type" placeholder="target_type" value="{{ target_type }}">
+    </div>
+    <div class="col-auto">
+      <input class="form-control" name="target_id" placeholder="target_id" value="{{ target_id }}">
+    </div>
+    <div class="col-auto"><button class="btn btn-secondary" type="submit">Filter</button></div>
+  </form>
+
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>When</th><th>User</th><th>Target</th><th>Action</th><th>Reason</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in events %}
+        <tr>
+          <td>{{ e.created_at }}</td>
+          <td>{{ e.user_id }}</td>
+          <td>{{ e.target_type }} #{{ e.target_id or '-' }}</td>
+          <td>{{ e.action }}</td>
+          <td>{{ e.reason or '' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="text-muted">No audit events match.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <nav>
+    <ul class="pagination">
+      {% if page > 1 %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('ops_bp.manager_audit', page=page-1, target_type=target_type or None, target_id=target_id or None) }}">Prev</a>
+        </li>
+      {% endif %}
+      <li class="page-item disabled"><span class="page-link">Page {{ page }}</span></li>
+      {% if has_next %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('ops_bp.manager_audit', page=page+1, target_type=target_type or None, target_id=target_id or None) }}">Next</a>
+        </li>
+      {% endif %}
+    </ul>
+  </nav>
+</div>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-3">
+  <h2>Manager Review</h2>
+  <p class="text-muted">Week {{ metrics.week_start }} – {{ metrics.week_end }}</p>
+
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="card hover-card">
+        <div class="card-body">
+          <h5 class="card-title">Transfer completion</h5>
+          <p class="display-6 mb-0">{{ metrics.transfer_completion_rate }}%</p>
+          <small class="text-muted">
+            {{ metrics.complete_transfer_count }} / {{ metrics.total_transfer_count }} complete
+          </small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card hover-card">
+        <div class="card-body">
+          <h5 class="card-title">Hot moves</h5>
+          <p class="display-6 mb-0">
+            {{ metrics.hot_moves_completed_with_timestamps }} / {{ metrics.hot_move_count }}
+          </p>
+          <small class="text-muted">completed with full timestamps</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card hover-card">
+        <div class="card-body">
+          <h5 class="card-title">Same-day pretrips</h5>
+          <p class="display-6 mb-0">{{ metrics.same_day_pretrip_count }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card hover-card">
+        <div class="card-body">
+          <h5 class="card-title">Dock delays</h5>
+          <p class="display-6 mb-0">{{ metrics.delayed_dock_count }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card hover-card">
+        <div class="card-body">
+          <h5 class="card-title">Damage reports</h5>
+          <p class="display-6 mb-0">
+            {{ metrics.damage_reports_with_photos }} / {{ metrics.damage_report_count }}
+          </p>
+          <small class="text-muted">with photos</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card hover-card">
+        <div class="card-body">
+          <h5 class="card-title">Supervisor minutes saved</h5>
+          <p class="display-6 mb-0">{{ metrics.supervisor_minutes_saved }}</p>
+          <small class="text-muted">
+            from {{ metrics.missing_paperwork_prevented }} paperwork catches
+          </small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

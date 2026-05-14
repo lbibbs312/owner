@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-3" id="savings-print">
+  <div class="d-flex justify-content-between align-items-center">
+    <h2>Weekly Savings Report</h2>
+    <button class="btn btn-outline-secondary d-print-none" onclick="window.print()">Print</button>
+  </div>
+  <p class="text-muted">Week {{ metrics.week_start }} – {{ metrics.week_end }}</p>
+
+  <table class="table table-bordered">
+    <tbody>
+      <tr><th>Transfer completion</th>
+          <td>{{ metrics.transfer_completion_rate }}%
+              ({{ metrics.complete_transfer_count }} / {{ metrics.total_transfer_count }})</td></tr>
+      <tr><th>Incomplete transfers caught</th><td>{{ metrics.incomplete_transfer_count }}</td></tr>
+      <tr><th>Same-day pretrips</th><td>{{ metrics.same_day_pretrip_count }}</td></tr>
+      <tr><th>Hot moves completed with timestamps</th>
+          <td>{{ metrics.hot_moves_completed_with_timestamps }} / {{ metrics.hot_move_count }}</td></tr>
+      <tr><th>Dock delays</th><td>{{ metrics.delayed_dock_count }}</td></tr>
+      <tr><th>Damage reports (with photos / total)</th>
+          <td>{{ metrics.damage_reports_with_photos }} / {{ metrics.damage_report_count }}</td></tr>
+      <tr><th>Wrong-location / unclear-dispatch follow-ups</th>
+          <td>{{ metrics.wrong_location_or_unclear_dispatch_count }}</td></tr>
+      <tr><th>Gage-tracking follow-ups</th>
+          <td>{{ metrics.gage_tracking_followup_count }}</td></tr>
+      <tr><th>Completed moves</th><td>{{ metrics.completed_moves }}</td></tr>
+      <tr><th>Missing paperwork prevented</th><td>{{ metrics.missing_paperwork_prevented }}</td></tr>
+      <tr><th>Supervisor minutes saved</th>
+          <td><strong>{{ metrics.supervisor_minutes_saved }}</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h4 class="mt-4">Average dock wait by plant</h4>
+  <table class="table table-sm">
+    <thead><tr><th>Plant</th><th>Average wait (min)</th></tr></thead>
+    <tbody>
+      {% for plant, avg in metrics.plant_averages.items() %}
+        <tr><td>{{ plant }}</td><td>{{ avg }}</td></tr>
+      {% else %}
+        <tr><td colspan="2" class="text-muted">No dock-wait data this week.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

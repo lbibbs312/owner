@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-3">
+  <h2>Exceptions</h2>
+  <form method="GET" class="row g-2 mb-3">
+    <div class="col-auto">
+      <label class="col-form-label">Dock-delay threshold (min)</label>
+    </div>
+    <div class="col-auto">
+      <input class="form-control" type="number" name="threshold" value="{{ threshold }}">
+    </div>
+    <div class="col-auto"><button class="btn btn-secondary" type="submit">Apply</button></div>
+  </form>
+
+  {% for severity in ['high', 'medium', 'low'] %}
+    <h4 class="mt-4">
+      {% if severity == 'high' %}<span class="badge bg-danger">High</span>
+      {% elif severity == 'medium' %}<span class="badge bg-warning text-dark">Medium</span>
+      {% else %}<span class="badge bg-secondary">Low</span>{% endif %}
+      &nbsp;{{ grouped.get(severity, [])|length }} item(s)
+    </h4>
+    <ul class="list-group mb-3">
+      {% for it in grouped.get(severity, []) %}
+        <li class="list-group-item">
+          <strong>{{ it.label }}</strong>
+          <div class="small text-muted">{{ it.detail }}</div>
+          <div class="small">
+            <em>{{ it.category }}</em> -
+            {% if it.target_type == 'plant_transfer' %}
+              <a href="{{ url_for('ops_bp.edit_transfer', tid=it.target_id) }}">open transfer</a>
+            {% elif it.target_type == 'damage_report' %}
+              <a href="{{ url_for('ops_bp.view_damage_report', did=it.target_id) }}">open damage report</a>
+            {% else %}
+              <span class="text-muted">{{ it.target_type }} #{{ it.target_id }}</span>
+            {% endif %}
+          </div>
+        </li>
+      {% else %}
+        <li class="list-group-item text-muted">No {{ severity }}-severity exceptions.</li>
+      {% endfor %}
+    </ul>
+  {% endfor %}
+</div>
+{% endblock %}
