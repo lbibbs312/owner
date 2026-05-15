@@ -1,21 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container">
-  <h2 class="mt-3">Pickup at {{ log.plant_name }}</h2>
-  <p class="text-muted">This closes log #{{ log.id }} and starts a new open pickup log at the same plant.</p>
+  <h2 class="mt-3">Load &amp; Depart {{ log.plant_name }}</h2>
+  <p class="text-muted">Select the destination for the cargo leaving this plant.</p>
 
   <form method="POST" action="">
     {{ form.hidden_tag() }}
-    <input type="hidden" name="plant_name" value="{{ log.plant_name }}">
 
     <div class="mb-3">
-      <label class="form-label">Plant</label>
-      <input class="form-control" value="{{ log.plant_name }}" disabled>
-    </div>
-
-    <div class="mb-3">
-      {{ form.load_size.label }}
-      {{ form.load_size(class="form-select") }}
+      <label class="form-label">Where is it going?</label>
+      {{ form.plant_name(class="form-select") }}
     </div>
 
     <div class="mb-3 form-check">
@@ -23,24 +17,17 @@
       {{ form.hot_parts.label(class="form-check-label") }}
     </div>
     <div class="mb-3">
-      {{ form.part_number.label }}
+      {{ form.part_number.label(class="form-label") }}
       {{ form.part_number(class="form-control", placeholder="Part number from dispatch or shipper") }}
     </div>
 
-    <div class="mb-3 form-check">
-      {{ form.maintenance(class="form-check-input") }}
-      {{ form.maintenance.label(class="form-check-label") }}
-    </div>
-    <div class="mb-3 form-check">
-      {{ form.fuel(class="form-check-input") }}
-      {{ form.fuel.label(class="form-check-label") }}
-    </div>
-    <div class="mb-3 form-check">
-      {{ form.meeting(class="form-check-input") }}
-      {{ form.meeting.label(class="form-check-label") }}
+    <div class="d-flex flex-wrap gap-3 mb-3">
+      <div class="form-check">{{ form.maintenance(class="form-check-input") }} {{ form.maintenance.label(class="form-check-label") }}</div>
+      <div class="form-check">{{ form.fuel(class="form-check-input") }} {{ form.fuel.label(class="form-check-label") }}</div>
+      <div class="form-check">{{ form.meeting(class="form-check-input") }} {{ form.meeting.label(class="form-check-label") }}</div>
     </div>
 
-    <button type="submit" class="btn btn-primary">Record Pickup</button>
+    <button type="submit" class="btn btn-primary hover-btn">Record Load &amp; Depart</button>
     <a href="{{ url_for('driver.driver_logs') }}" class="btn btn-secondary ms-2">Cancel</a>
   </form>
 </div>

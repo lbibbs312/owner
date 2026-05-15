@@ -168,6 +168,46 @@
     .close-overlay-btn:hover {
       color: #d00;
     }
+
+
+    #pageContent > .container.mt-4.fade-in {
+      width: min(100%, calc(100vw - 24px));
+    }
+    .btn, .dropdown-item {
+      overflow-wrap: normal;
+      word-break: normal;
+    }
+    .card, .alert {
+      overflow-wrap: anywhere;
+    }
+    .table th, .table td {
+      overflow-wrap: normal;
+      word-break: normal;
+    }
+    .d-flex, .row, [class*="col-"] {
+      min-width: 0;
+    }
+    .responsive-workspace {
+      width: 100%;
+      max-width: 100%;
+    }
+    .route-workspace-table table {
+      min-width: 920px;
+    }
+    .damage-actions form {
+      margin: 0;
+    }
+    .report-description {
+      white-space: pre-wrap;
+    }
+    @media (min-width: 1200px) {
+      #pageContent > .container.mt-4.fade-in {
+        max-width: min(1680px, calc(100vw - 48px));
+      }
+      .responsive-form-panel {
+        padding: 1.25rem !important;
+      }
+    }
   </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
@@ -224,6 +264,12 @@
                   <a class="nav-link" href="{{ url_for('manager.trim_dashboard') }}">Trim Dashboard</a>
                 </li>
                 <li class="nav-item">
+                  <a class="nav-link" href="{{ url_for('manager.review_dashboard') }}">Review</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="{{ url_for('manager.delay_finder') }}">Delays</a>
+                </li>
+                <li class="nav-item">
                   <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
                 </li>
               {% else %}
@@ -248,6 +294,7 @@
                   <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="workMenu">
                     <li><a class="dropdown-item" href="{{ url_for('driver.driver_logs') }}">Driver Logs</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('driver.plant_transfers') }}">Plant Transfers</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('driver.damage_reports') }}">Damage Reports</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('driver.new_pretrip') }}">New PreTrip</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('driver.list_pretrips') }}">PreTrips</a></li>
                     <li><hr class="dropdown-divider"></li>

@@ -12,6 +12,9 @@ from app.models.log import DriverLog
 from app.models.messaging import ChatMessage, Announcement, DirectMessage
 from app.models.knowledge import KnowledgeBaseEntry
 from app.models.activity import ActivityEvent
+from app.models.audit import AuditEvent
+from app.models.damage import DamagePhoto, DamageReport
+from app.models.followup import OperationalFollowUp
 from app.models.plant_transfer import PlantTransfer, PlantTransferLine
 
 __all__ = [
@@ -26,6 +29,10 @@ __all__ = [
     "DirectMessage",
     "KnowledgeBaseEntry",
     "ActivityEvent",
+    "AuditEvent",
+    "DamagePhoto",
+    "DamageReport",
+    "OperationalFollowUp",
     "PlantTransfer",
     "PlantTransferLine",
 ]

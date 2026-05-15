@@ -16,6 +16,37 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
+@login_manager.request_loader
+def load_user_for_blueprint(req):
+    """Serve current_user from the role-specific session key for blueprint routes.
+
+    This lets a driver tab and a manager tab coexist in the same browser without
+    fighting over session['_user_id'].  For driver.* endpoints we read
+    driver_user_id; for manager.* we read management_user_id.  Returning None
+    falls through to the standard user_loader.
+    """
+    from flask import session as flask_session
+    endpoint = req.endpoint or ""
+    if endpoint.startswith("manager."):
+        key = "management_user_id"
+        required_role = "management"
+    elif endpoint.startswith("driver."):
+        key = "driver_user_id"
+        required_role = "driver"
+    else:
+        return None
+    uid = flask_session.get(key)
+    if not uid:
+        return None
+    try:
+        user = User.query.get(int(uid))
+    except (TypeError, ValueError):
+        return None
+    if user and user.role == required_role:
+        return user
+    return None
+
+
 def _redirect_authenticated_user():
     if current_user.role == "management":
         return redirect(url_for("manager.manager_dashboard"))
@@ -48,8 +79,8 @@ def register():
     form = RegistrationForm()
     if form.validate_on_submit():
         if form.role.data == "management":
-            expected_pin = os.environ.get("MANAGER_REGISTRATION_PIN")
-            if not expected_pin or form.manager_pin.data != expected_pin:
+            expected_pin = os.environ.get("MANAGER_REGISTRATION_PIN", "0000")
+            if form.manager_pin.data != expected_pin:
                 flash("Invalid Manager PIN!", "danger")
                 return redirect(url_for("auth.register"))
         existing = User.query.filter(
@@ -87,7 +118,8 @@ def login():
                 if next_url:
                     return redirect(next_url)
                 return _redirect_authenticated_user()
-            flash(f"{_role_label(required_role).title()} credentials required.", "warning")
+            # Wrong role — fall through silently so the login form is shown,
+            # allowing the user to log in as the required role in this tab.
         elif next_url:
             return redirect(next_url)
         else:

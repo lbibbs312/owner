@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4 responsive-workspace">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-1">Damage Reports</h1>
+      <p class="text-muted mb-0 small">Open driver reports can be edited, submitted, or deleted until the route is finalized.</p>
+    </div>
+    <a class="btn btn-primary" href="{{ url_for('driver.new_damage_report') }}">New Report</a>
+  </div>
+  <div class="table-responsive route-workspace-table">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Plant</th>
+          <th>Truck</th>
+          <th>Trailer</th>
+          <th>Stage</th>
+          <th>Status</th>
+          <th>Lock</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for report in reports %}
+          {% set can_modify = can_modify_damage_report(report) if can_modify_damage_report is defined else false %}
+          {% set finalized = route_finalized_for_report(report) if route_finalized_for_report is defined else false %}
+          <tr>
+            <td>{{ report.created_at|to_detroit_datetime }}</td>
+            <td>{{ report.plant_name }}</td>
+            <td>{{ report.truck_number or '' }}</td>
+            <td>{{ report.trailer_number or '' }}</td>
+            <td>{{ report.stage }}</td>
+            <td><span class="badge text-bg-{{ 'success' if report.status == 'submitted' else 'warning' }}">{{ report.status|title }}</span></td>
+            <td class="small text-muted">{% if finalized %}Route finalized{% elif report.status != 'open' %}Submitted{% else %}Editable{% endif %}</td>
+            <td>
+              <div class="d-flex flex-wrap gap-1 justify-content-end damage-actions">
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('driver.view_damage_report', report_id=report.id) }}">Open</a>
+                {% if can_modify %}
+                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Edit</a>
+                  <form method="POST" action="{{ url_for('driver.submit_damage_report', report_id=report.id) }}">
+                    <button class="btn btn-sm btn-success" type="submit">Submit</button>
+                  </form>
+                  <form method="POST" action="{{ url_for('driver.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Delete this damage report?');">
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                  </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="8" class="text-muted">No damage reports.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

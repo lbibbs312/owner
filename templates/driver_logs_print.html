@@ -3,178 +3,177 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Driver Logs Print</title>
+  <title>Driver Route Audit Sheet</title>
   <style>
-    @page {
-      size: Letter portrait;
-      margin: 0.5in;
-    }
-    * {
-      box-sizing: border-box;
-    }
-    body {
-      width: auto;
-      min-height: auto;
-      margin: 0;
-      padding: 0.2in;
-      font-family: Arial, sans-serif;
-      font-size: 10pt;
-      color: #000;
-      background: #fff;
-    }
-    .print-container {
-      width: 7.5in;
-      max-width: 100%;
-      margin: 0 auto;
-      border: 1px solid #000;
-      padding: 0.15in;
-    }
-    .print-guidance {
-      margin: 0 0 0.12in;
-      color: #444;
-      font-size: 9pt;
-    }
-    .email-btn {
-      display: inline-block;
-      margin-bottom: 0.12in;
-      padding: 8px 16px;
-      background: #198754;
-      color: #fff;
-      text-decoration: none;
-      font-size: 10pt;
-      line-height: 1.1;
-    }
-    .print-btn {
-      margin-bottom: 0.12in;
-      padding: 8px 16px;
-      background: #007bff;
-      color: #fff;
-      border: none;
-      cursor: pointer;
-    }
-    h2 {
-      margin: 0 0 0.12in;
-      font-size: 14pt;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      margin-top: 0.12in;
-    }
-    th, td {
-      border: 1px solid #000;
-      padding: 4px;
-      text-align: center;
-      vertical-align: middle;
-      overflow-wrap: anywhere;
-    }
-    th:nth-child(1), td:nth-child(1) {
-      width: 20%;
-    }
-    th:nth-child(4), td:nth-child(4) {
-      width: 24%;
-    }
-    .downtime-col {
-      width: 24%;
-    }
-    @media screen {
-      body {
-        width: auto;
-        padding: 1rem;
-      }
-    }
+    @page { size: Letter portrait; margin: 0.35in; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; width: 100%; min-height: 100%; }
+    body { font-family: Arial, sans-serif; font-size: 9pt; color: #000; background: #fff; }
+    .print-page { width: 100%; margin: 0; padding: 0; }
+    .print-guidance { margin: 0 0 0.12in; color: #444; font-size: 9pt; }
+    .email-btn { display: inline-block; margin-bottom: 0.12in; padding: 8px 16px; background: #198754; color: #fff; text-decoration: none; font-size: 10pt; line-height: 1.1; }
+    .print-btn { margin: 0 0 0.12in; padding: 8px 16px; background: #007bff; color: #fff; border: none; cursor: pointer; }
+    .sheet-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 0.2in; border-bottom: 2px solid #111; padding-bottom: 0.08in; margin-bottom: 0.14in; }
+    h2 { margin: 0; font-size: 15pt; letter-spacing: 0; }
+    .sheet-meta { text-align: right; font-size: 8.5pt; color: #333; line-height: 1.35; }
+    .qa-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.08in; margin: 0 0 0.12in; }
+    .qa-box { border: 1px solid #111; padding: 0.06in; min-height: 0.43in; }
+    .qa-label { display: block; font-size: 6.8pt; color: #444; text-transform: uppercase; font-weight: 900; letter-spacing: 0.04em; margin-bottom: 2px; }
+    .qa-value { font-size: 8.4pt; font-weight: 900; line-height: 1.25; }
+    .qa-note { font-size: 7.4pt; font-weight: 400; color: #333; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 0.08in; }
+    th, td { border: 1px solid #000; padding: 5px 6px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+    th { text-align: center; font-weight: bold; background: #f1f5f9; }
+    th:nth-child(1), td:nth-child(1) { width: 8%; text-align: center; }
+    th:nth-child(2), td:nth-child(2) { width: 25%; }
+    th:nth-child(3), td:nth-child(3), th:nth-child(4), td:nth-child(4) { width: 11%; text-align: center; white-space: nowrap; }
+    th:nth-child(5), td:nth-child(5) { width: 20%; }
+    th:nth-child(6), td:nth-child(6) { width: 25%; }
+    .route-leg { font-weight: 900; font-size: 9.5pt; }
+    .route-sub { margin-top: 2px; color: #555; font-size: 8pt; }
+    .cargo { font-weight: 900; }
+    .badge { display: inline-block; border: 1px solid #111; padding: 1px 5px; font-size: 7pt; font-weight: 900; text-transform: uppercase; margin-bottom: 3px; }
+    .badge.deviation { background: #111; color: #fff; }
+    .detail-line { margin: 0 0 2px; }
+    .issue { color: #7f1d1d; font-weight: 900; }
+    .muted { color: #555; font-size: 8pt; }
+    .final-row td { background: #f8fafc; }
+    @media screen { body { padding: 1rem; } }
     @media print {
-      body {
-        width: auto;
-        padding: 0;
-      }
-      .print-guidance {
-      margin: 0 0 0.12in;
-      color: #444;
-      font-size: 9pt;
+      body { padding: 0; }
+      .print-btn, .email-btn, .print-guidance { display: none; }
+      th { background: #eee !important; }
+      .final-row td { background: #f5f5f5 !important; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
-    .print-btn {
-        display: none;
-      }
-      .print-container {
-        width: 100%;
-        border: none;
-        padding: 0;
-      }
-      * {
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-    }
-
   </style>
 </head>
 <body>
-
-<div class="print-container">
-<button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+<div class="print-page">
+  <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
   <a class="email-btn" href="{{ url_for('driver.driver_logs_attachment') }}">Download PDF Attachment</a>
   <p class="print-guidance">Use Letter paper, portrait orientation, and disable browser headers/footers if your print dialog offers that option.</p>
-  <h2>Driver Logs for {{ the_date }}</h2>
+
+  <div class="sheet-head">
+    <div>
+      <h2>Driver Route Audit Sheet</h2>
+      <div class="muted">Chronological route record with cargo, stop actions, exceptions, and verification totals.</div>
+    </div>
+    <div class="sheet-meta">
+      <strong>Date:</strong> {{ the_date }}<br>
+      <strong>Total Stops:</strong> {{ logs|length if logs else 0 }}<br>
+      <strong>Driver:</strong> {{ current_user.display_name }}
+    </div>
+  </div>
+
+  <div class="qa-grid">
+    <div class="qa-box">
+      <span class="qa-label">Total Mileage</span>
+      <div class="qa-value">{% if total_miles is not none %}{{ total_miles }} miles{% elif logs and logs[-1].depart_time is none %}Pending posttrip mileage{% else %}Not recorded{% endif %}</div>
+    </div>
+    <div class="qa-box">
+      <span class="qa-label">Incidents / Damage</span>
+      <div class="qa-value">{% if damage_reports %}{{ damage_reports|length }} report{{ 's' if damage_reports|length != 1 else '' }} filed{% else %}No in-route damage/incidents reported{% endif %}</div>
+      {% if damage_reports %}<div class="qa-note">{% for report in damage_reports %}#{{ report.id }} {{ report.plant_name }}{% if not loop.last %}; {% endif %}{% endfor %}</div>{% endif %}
+    </div>
+    <div class="qa-box">
+      <span class="qa-label">Part References</span>
+      <div class="qa-value">{% if parts_carried %}{{ parts_carried|join(', ') }}{% else %}No part references recorded{% endif %}</div>
+    </div>
+    <div class="qa-box">
+      <span class="qa-label">Exceptions</span>
+      <div class="qa-value">{% if exception_notes %}{{ exception_notes|length }} exception{{ 's' if exception_notes|length != 1 else '' }}{% else %}No route exceptions recorded{% endif %}</div>
+      {% if exception_notes %}<div class="qa-note">{% for note in exception_notes %}{{ note }}{% if not loop.last %}; {% endif %}{% endfor %}</div>{% endif %}
+    </div>
+  </div>
 
   {% if logs %}
     <table>
       <thead>
         <tr>
-          <th>Plant</th>
-          <th>Arrive</th>
+          <th>Leg</th>
+          <th>Route</th>
           <th>Depart</th>
-          <th>Parts</th>
-          <th>Z</th>
-          <th>Q</th>
-          <th>H</th>
-          <th>TQ</th>
-          <th>F</th>
+          <th>Arrive</th>
+          <th>Transit Cargo</th>
+          <th>Stop Details</th>
         </tr>
       </thead>
       <tbody>
         {% for log in logs %}
-        <tr>
-          <td>{{ log.plant_name }}</td>
-          <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
-          <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
-          <td>{% if log.no_pickup %}No Pickup {% endif %}{% if log.hot_parts %}HOT {% endif %}{{ log.part_number or "" }}</td>
-          <!-- Z/Q/H/TQ/F logic -->
+        {% set route = (log_routes or {}).get(log.id) %}
+        {% set next_log = logs[loop.index0 + 1] if loop.index0 + 1 < logs|length else none %}
+        {% set next_route = (log_routes or {}).get(next_log.id) if next_log else none %}
+        {% set plant_name = route.plant if route else log.plant_name %}
+        {% set next_plant_name = next_route.plant if next_route else (next_log.plant_name if next_log else none) %}
+        {% set transit_cargo = route.depart_cargo_desc if route and route.depart_cargo_desc is not none else (log.depart_load_size or '--') %}
+        <tr class="{% if not next_log %}final-row{% endif %}">
+          <td>{{ loop.index }}</td>
           <td>
-            {% if log.load_size == "Empty" %}
-              X
+            {% if next_log %}
+              <div class="route-leg">{{ plant_name }} &#8594; {{ next_plant_name }}</div>
+              <div class="route-sub">Movement segment</div>
             {% else %}
-              &nbsp;
+              <div class="route-leg">Final Location: {{ plant_name }}</div>
+              <div class="route-sub">{% if route_finalized %}Route finalized{% else %}Route open / not finalized{% endif %}</div>
             {% endif %}
           </td>
           <td>
-            {% if log.load_size == "Quarter" %}
-              X
+            {% if next_log %}
+              {{ log.depart_time|to_12h_format if log.depart_time else '--' }}
             {% else %}
-              &nbsp;
+              --
             {% endif %}
           </td>
           <td>
-            {% if log.load_size == "Half" %}
-              X
+            {% if next_log %}
+              {{ next_log.arrive_time|to_local_time if next_log.arrive_time else '--' }}
             {% else %}
-              &nbsp;
+              {{ log.arrive_time|to_local_time if log.arrive_time else '--' }}
             {% endif %}
           </td>
           <td>
-            {% if log.load_size == "Partial" %}
-              X
+            {% if next_log %}
+              <span class="cargo">{{ transit_cargo }}</span>
             {% else %}
-              &nbsp;
+              <span class="cargo">{{ route.arrive_cargo_desc if route else log.load_size }}</span>
             {% endif %}
           </td>
           <td>
-            {% if log.load_size == "Full" %}
-              X
+            {% if next_log %}
+              {% if route and route.deviation %}<span class="badge deviation">Deviation</span>{% endif %}
+              {% if log.no_pickup %}
+                <p class="detail-line"><strong>{{ plant_name }}:</strong> No pickup recorded; departed empty.</p>
+              {% else %}
+                <p class="detail-line"><strong>{{ plant_name }}:</strong> {{ route.action if route else ('Open stop' if not log.depart_time else 'Completed stop') }}</p>
+                {% if route and route.depart_cargo_desc is not none and route.depart_cargo_desc != 'Empty' %}
+                  <p class="detail-line">Departed with {{ route.depart_cargo_desc }}.</p>
+                {% endif %}
+              {% endif %}
             {% else %}
-              &nbsp;
+              <p class="detail-line"><strong>{{ plant_name }}:</strong> Final location.</p>
+              {% if route and route.unloaded_on_arrival %}
+                <p class="detail-line">Final unload completed.</p>
+              {% endif %}
+              {% if route and route.secondary_dropped_on_arrival %}
+                <p class="detail-line">Final hot part drop completed.</p>
+              {% endif %}
+              {% if route and route.unload_blocked %}
+                <p class="detail-line issue">Final unload not completed: {{ route.unload_reason }}</p>
+              {% elif route and route.secondary_drop_blocked %}
+                <p class="detail-line issue">Final hot part not dropped: {{ route.secondary_drop_reason }}</p>
+              {% elif not log.depart_time %}
+                <p class="detail-line">Final stop remains open.</p>
+              {% else %}
+                <p class="detail-line">Completed stop; departed at {{ log.depart_time|to_12h_format }}.</p>
+                <p class="detail-line">End of shift after completed stop.</p>
+              {% endif %}
             {% endif %}
+            {% if log.no_pickup and not next_log %}<p class="detail-line issue">No pickup recorded.</p>{% endif %}
+            {% if route and route.unload_blocked %}<p class="detail-line issue">Unload issue: {{ route.unload_reason }}</p>{% endif %}
+            {% if route and route.secondary_drop_blocked %}<p class="detail-line issue">Hot part issue: {{ route.secondary_drop_reason }}</p>{% endif %}
+            {% if log.downtime_reason and not (route and (route.unload_blocked or route.secondary_drop_blocked)) %}<p class="detail-line issue">Plant issue: {{ log.downtime_reason }}</p>{% endif %}
+            {% if log.hot_parts or log.part_number %}<p class="detail-line muted">{% if log.hot_parts %}HOT {% endif %}{{ log.part_number or '' }}</p>{% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -184,6 +183,5 @@
     <p>No logs found for today.</p>
   {% endif %}
 </div>
-
 </body>
 </html>

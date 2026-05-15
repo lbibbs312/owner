@@ -525,6 +525,18 @@
         </svg>
         Audit &amp; Logs
       </a>
+      <a href="{{ url_for('manager.review_dashboard') }}">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5h6M9 12h6M9 19h6M5 5h.01M5 12h.01M5 19h.01"/>
+        </svg>
+        Exception Review
+      </a>
+      <a href="{{ url_for('manager.delay_finder') }}">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        Delay Finder
+      </a>
       <a href="{{ url_for('manager.list_pretrips') }}">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round"
@@ -579,8 +591,8 @@
 
     <div class="mc-body">
 
-      {# KPI row #}
-      <div class="kpi-row">
+      {# KPI row - shows Total Active Moves + the manager's own division only #}
+      <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);">
         <a class="kpi {% if division_filter == 'All' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='All') }}" aria-label="Show all active moves">
           <p class="kpi-lbl">Total Active Moves</p>
           <div class="kpi-val">
@@ -590,15 +602,7 @@
             </span>
           </div>
         </a>
-        <a class="kpi blue {% if division_filter == 'Plastics' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='Plastics') }}" aria-label="Show Plastics moves">
-          <p class="kpi-lbl">Plastics Division</p>
-          <div class="kpi-val">
-            <span class="kpi-num">{{ plastics_move_count }}</span>
-            <span class="kpi-tag">
-              {{ plastics_driver_count }} driver{{ 's' if plastics_driver_count != 1 else '' }}
-            </span>
-          </div>
-        </a>
+        {% if manager_division == 'Trim' %}
         <a class="kpi green {% if division_filter == 'Trim' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='Trim') }}" aria-label="Show Trim moves">
           <p class="kpi-lbl">Trim Division</p>
           <div class="kpi-val">
@@ -608,6 +612,17 @@
             </span>
           </div>
         </a>
+        {% else %}
+        <a class="kpi blue {% if division_filter == 'Plastics' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='Plastics') }}" aria-label="Show Plastics moves">
+          <p class="kpi-lbl">Plastics Division</p>
+          <div class="kpi-val">
+            <span class="kpi-num">{{ plastics_move_count }}</span>
+            <span class="kpi-tag">
+              {{ plastics_driver_count }} driver{{ 's' if plastics_driver_count != 1 else '' }}
+            </span>
+          </div>
+        </a>
+        {% endif %}
       </div>
 
       {# Dispatch queue panel #}

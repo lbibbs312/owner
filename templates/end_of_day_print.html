@@ -23,11 +23,10 @@
       background: #fff;
     }
     .print-container {
-      width: 7.5in;
-      max-width: 100%;
-      margin: 0 auto;
-      border: 1px solid #000;
-      padding: 0.15in;
+      width: 100%;
+      margin: 0;
+      border: 0;
+      padding: 0;
     }
     .print-guidance {
       margin: 0 0 0.12in;
@@ -133,58 +132,23 @@
           <th>Plant</th>
           <th>Arrive</th>
           <th>Depart</th>
+          <th>Cargo In</th>
+          <th>Cargo Out</th>
           <th class="downtime-col">Parts</th>
-          <!-- Z / Q / H / TQ / F columns -->
-          <th>Z</th>
-          <th>Q</th>
-          <th>H</th>
-          <th>TQ</th>
-          <th>F</th>
+          <th>Status</th>
         </tr>
       </thead>
       <tbody>
         {% for log in drivers_logs[current_user.display_name] %}
+        {% set route = (log_routes or {}).get(log.id) %}
         <tr>
-          <td>{{ log.plant_name }}</td>
+          <td>{{ route.plant if route else log.plant_name }}</td>
           <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
           <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
+          <td>{{ route.arrive_desc if route else log.load_size }}</td>
+          <td>{% if route and route.depart_desc is none %}--{% elif route %}{{ route.depart_desc }}{% else %}{{ log.depart_load_size or '--' }}{% endif %}</td>
           <td>{% if log.no_pickup %}No Pickup {% endif %}{% if log.hot_parts %}HOT {% endif %}{{ log.part_number or "" }}</td>
-          <!-- Mark "X" in the correct load column -->
-          <td>
-            {% if log.load_size == "Empty" %}
-              X
-            {% else %}
-              &nbsp;
-            {% endif %}
-          </td>
-          <td>
-            {% if log.load_size == "Quarter" %}
-              X
-            {% else %}
-              &nbsp;
-            {% endif %}
-          </td>
-          <td>
-            {% if log.load_size == "Half" %}
-              X
-            {% else %}
-              &nbsp;
-            {% endif %}
-          </td>
-          <td>
-            {% if log.load_size == "Partial" %}
-              X
-            {% else %}
-              &nbsp;
-            {% endif %}
-          </td>
-          <td>
-            {% if log.load_size == "Full" %}
-              X
-            {% else %}
-              &nbsp;
-            {% endif %}
-          </td>
+          <td>{% if route %}{{ route.action }}{% else %}{{ 'Open' if not log.depart_time else 'Complete' }}{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>

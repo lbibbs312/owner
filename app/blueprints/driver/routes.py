@@ -6,25 +6,43 @@ pre-trip / post-trip family lives here; the rest will move in subsequent sub-
 PRs of PR-5c.
 """
 from datetime import datetime, date
+import os
 
 import pytz
-from flask import flash, jsonify, make_response, redirect, render_template, request, session, url_for
+from flask import current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
+from werkzeug.utils import secure_filename
 
 from app.blueprints.driver import bp
 from app.extensions import db
 from app.extensions import socketio
-from app.forms.log import DriverLogForm
+from app.forms.damage import DamageReportForm
+from app.forms.log import DepartForm, DriverLogForm
 from app.forms.plant_transfer import PlantTransferForm
 from app.forms.messaging import DirectMessageForm
 from app.forms.shift import EndOfDayForm
 from app.forms.trip import PostTripForm, PreTripForm
 from app.forms.user import ProfileForm
 from app.services.activity import record_activity
+from app.services.audit import model_snapshot, record_audit_event
 from app.services.simple_pdf import LANDSCAPE_LETTER, LETTER, SimplePdf
+from app.services.load_state import (
+    SECONDARY_NOT_DROPPED_PREFIX,
+    UNLOAD_NOT_COMPLETED_PREFIX,
+    build_driver_log_route_context,
+    cargo_display,
+    current_load_after_logs,
+    destination_load_value,
+    hot_part_load_value,
+    is_load_for_plant,
+    load_display,
+)
+from app.services.plant_addresses import plant_label as _plant_label
 from app.services.role_session import restore_role_user
 from app.models import (
     ActivityEvent,
+    DamagePhoto,
+    DamageReport,
     DirectMessage,
     DriverLog,
     PlantTransfer,
@@ -38,10 +56,13 @@ from app.models import (
 
 
 PLANT_TRANSFER_LINE_COUNT = 20
+DRIVER_LOG_AUDIT_FIELDS = ["plant_name", "load_size", "depart_load_size", "secondary_load", "downtime_reason", "part_number", "hot_parts", "arrive_time", "depart_time", "dock_wait_minutes", "maintenance", "fuel", "meeting"]
+PLANT_TRANSFER_AUDIT_FIELDS = ["transfer_number", "transfer_date", "ship_to", "ship_from", "trailer_number", "driver_name", "driver_initials", "transfer_time", "loaded_by"]
 
 DRIVER_ONLY_ENDPOINTS = {
     "dashboard",
     "mobile_dashboard",
+    "mobile_ryder_service",
     "mobile_history",
     "mobile_day_report",
     "list_pretrips",
@@ -84,6 +105,12 @@ DRIVER_ONLY_ENDPOINTS = {
     "decline_task",
     "complete_task",
     "show_map",
+    "damage_reports",
+    "new_damage_report",
+    "view_damage_report",
+    "edit_damage_report",
+    "delete_damage_report",
+    "submit_damage_report",
 }
 
 
@@ -121,8 +148,28 @@ def _can_driver_change_same_day(record_user_id, record_date, record_label, actio
     return True
 
 
+def _driver_log_sort_key(log):
+    return (log.date or date.min, log.arrive_time or "", log.created_at or datetime.min, log.id or 0)
+
+
+def _driver_log_route_context(logs):
+    return build_driver_log_route_context(logs)
+
+
 def _active_driver_logs_query():
     return DriverLog.query.filter(DriverLog.deleted_at.is_(None))
+
+
+def _current_driver_load(driver_id):
+    logs = _active_driver_logs_query().filter_by(driver_id=driver_id).all()
+    return current_load_after_logs(logs)
+
+
+def _driver_log_context_for(log):
+    logs = _active_driver_logs_query().filter_by(
+        driver_id=log.driver_id, date=log.date
+    ).all()
+    return _driver_log_route_context(logs).get(log.id, {})
 
 
 def _active_pretrips_query():
@@ -272,6 +319,76 @@ def _document_attachment_response(*, pdf_bytes, filename, target_type, target_id
     )
     return response
 
+
+def _save_damage_photo(report, uploaded_file):
+    if not uploaded_file or not uploaded_file.filename:
+        return None
+    upload_root = current_app.config.get("DAMAGE_UPLOAD_FOLDER", "uploads/damage_photos")
+    upload_path = os.path.join(current_app.root_path, os.pardir, upload_root)
+    os.makedirs(upload_path, exist_ok=True)
+    original = secure_filename(uploaded_file.filename) or "damage-photo"
+    filename = f"damage-{report.id}-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}-{original}"
+    uploaded_file.save(os.path.join(upload_path, filename))
+    photo = DamagePhoto(
+        damage_report_id=report.id,
+        stage=report.stage,
+        filename=filename,
+        original_filename=original,
+        content_type=uploaded_file.content_type,
+    )
+    db.session.add(photo)
+    return photo
+
+
+
+
+def _damage_report_date(report):
+    stamp = report.damage_time or report.created_at or datetime.utcnow()
+    return stamp.date()
+
+
+def _is_damage_report_route_finalized(report):
+    report_date = _damage_report_date(report)
+    return ActivityEvent.query.filter_by(
+        user_id=report.reported_by_id,
+        category="eod",
+        action="finalized",
+        target_type="end_of_day",
+    ).filter(ActivityEvent.details.contains(str(report_date))).first() is not None
+
+
+def _can_modify_damage_report(report):
+    if current_user.role != "driver":
+        return False
+    if report.reported_by_id != current_user.id:
+        return False
+    if report.status != "open":
+        return False
+    return not _is_damage_report_route_finalized(report)
+
+
+def _damage_report_or_404(report_id):
+    report = DamageReport.query.get_or_404(report_id)
+    if current_user.role == "driver" and report.reported_by_id != current_user.id:
+        flash("Not authorized to access that damage report.", "danger")
+        return None
+    return report
+
+
+def _today_damage_reports(driver_id, report_date):
+    reports = DamageReport.query.filter_by(reported_by_id=driver_id).all()
+    return [report for report in reports if _damage_report_date(report) == report_date]
+
+
+def _total_miles_for_pretrips(pretrips):
+    total = 0
+    has_mileage = False
+    for pretrip in pretrips:
+        if pretrip.start_mileage is None or not pretrip.posttrip or pretrip.posttrip.end_mileage is None:
+            continue
+        total += pretrip.posttrip.end_mileage - pretrip.start_mileage
+        has_mileage = True
+    return total if has_mileage else None
 
 def _yes_no(value):
     return "Yes" if value else "No"
@@ -487,36 +604,39 @@ def _build_pretrip_pdf(pretrip):
 def _build_driver_logs_pdf(logs, the_date):
     pdf = SimplePdf("Driver Logs", LETTER)
     pdf.text(36, 748, f"Driver Logs - {the_date}", size=15, bold=True)
+    routes = _driver_log_route_context(logs)
     rows = []
     for log in logs:
+        route = routes.get(log.id, {})
         rows.append([
-            log.plant_name,
+            route.get("plant") or log.plant_name,
             _arrival_utc_to_local_hhmm(log.arrive_time) or "--",
             _format_hhmm_12h(log.depart_time) or "--",
+            route.get("arrive_desc") or load_display(log.load_size),
+            route.get("depart_desc") or "--",
             ("No Pickup " if log.no_pickup else "") + (("HOT " if log.hot_parts else "") + (log.part_number or "")).strip(),
-            "X" if log.load_size == "Empty" else "",
-            "X" if log.load_size == "Quarter" else "",
-            "X" if log.load_size == "Half" else "",
-            "X" if log.load_size == "Partial" else "",
-            "X" if log.load_size == "Full" else "",
+            route.get("action") or ("Open" if not log.depart_time else "Complete"),
         ])
-    pdf.table(36, 710, [72, 92, 70, 145, 24, 24, 24, 28, 24], 22, ["Plant", "Arrive", "Depart", "Parts", "Z", "Q", "H", "TQ", "F"], rows or [["No logs", "", "", "", "", "", "", "", ""]], font_size=7)
+    pdf.table(36, 710, [70, 58, 58, 110, 110, 105, 65], 24, ["Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Parts", "Status"], rows or [["No logs", "", "", "", "", "", ""]], font_size=7)
     return pdf.build()
 
 
 def _build_eod_pdf(the_date, logs, plant_transfers):
     pdf = SimplePdf("End of Day", LETTER)
     pdf.text(36, 748, f"End of Day - {the_date}", size=15, bold=True)
+    routes = _driver_log_route_context(logs)
     log_rows = []
     for log in logs:
+        route = routes.get(log.id, {})
         log_rows.append([
-            log.plant_name,
+            route.get("plant") or log.plant_name,
             _arrival_utc_to_local_hhmm(log.arrive_time) or "--",
             _format_hhmm_12h(log.depart_time) or "--",
+            route.get("arrive_desc") or load_display(log.load_size),
+            route.get("depart_desc") or "--",
             ("No Pickup " if log.no_pickup else "") + (("HOT " if log.hot_parts else "") + (log.part_number or "")).strip(),
-            log.load_size,
         ])
-    y = pdf.table(36, 710, [80, 105, 75, 210, 60], 22, ["Plant", "Arrive", "Depart", "Parts", "Load"], log_rows or [["No logs", "", "", "", ""]], font_size=8)
+    y = pdf.table(36, 710, [70, 58, 58, 120, 120, 150], 24, ["Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Parts"], log_rows or [["No logs", "", "", "", "", ""]], font_size=7)
     y -= 34
     pdf.text(36, y, "Plant Transfers", size=12, bold=True)
     y -= 14
@@ -558,7 +678,7 @@ def _build_plant_transfer_pdf(transfer, requested_copy):
     for idx, copy_set in enumerate(copy_sets):
         if idx:
             pdf.add_page(LANDSCAPE_LETTER)
-        pdf.text(340, 566, "LACKS INDUSTRIES INC.", size=8, bold=True)
+        pdf.text(340, 566, "CLIENT COMPANY", size=8, bold=True)
         pdf.text(310, 548, "PLANT TRANSFER", size=18, bold=True)
         pdf.text(650, 552, f"No. {transfer.transfer_number or transfer.id}", size=10, bold=True)
         pdf.text(36, 530, f"SHIP TO: {transfer.ship_to}", size=9, bold=True)
@@ -580,7 +700,8 @@ def _build_plant_transfer_pdf(transfer, requested_copy):
         pdf.table(36, 505, [120, 52, 42, 150, 120, 52, 42, 150], 30, ["Part Number", "Qty", "Skids", "Remarks", "Part Number", "Qty", "Skids", "Remarks"], table_rows, font_size=7)
         pdf.text(36, 118, f"TRAILER NO.: {transfer.trailer_number or ''}", size=9, bold=True)
         pdf.text(230, 118, f"DRIVER: {transfer.driver_name or transfer.driver.display_name}", size=9, bold=True)
-        pdf.text(430, 118, f"TIME: {_format_display_time(transfer.transfer_time)}", size=9, bold=True)
+        pdf.text(410, 118, f"INITIALS: {transfer.driver_initials or ''}", size=9, bold=True)
+        pdf.text(530, 118, f"TIME: {_format_display_time(transfer.transfer_time)}", size=9, bold=True)
         pdf.text(575, 118, f"LOADED BY: {transfer.loaded_by or ''}", size=9, bold=True)
         pdf.text(260, 82, "MAT-C - Plant Transfer | Ret: 1 mo. after creation | Effective Date: 1/1/10", size=7)
     return pdf.build(), requested_copy
@@ -992,6 +1113,7 @@ def new_plant_transfer():
             ship_from=form.ship_from.data,
             trailer_number=form.trailer_number.data,
             driver_name=form.driver_name.data,
+            driver_initials=(form.driver_initials.data or "").strip().upper() or None,
             transfer_time=_normalize_hhmm_time(form.transfer_time.data) or form.transfer_time.data,
             loaded_by=form.loaded_by.data,
         )
@@ -1044,15 +1166,28 @@ def edit_plant_transfer(transfer_id):
             return render_template(
                 "plant_transfer_form.html", form=form, lines=lines, transfer=transfer
             )
+        before_values = model_snapshot(transfer, PLANT_TRANSFER_AUDIT_FIELDS)
         transfer.transfer_number = form.transfer_number.data
         transfer.transfer_date = form.transfer_date.data
         transfer.ship_to = form.ship_to.data
         transfer.ship_from = form.ship_from.data
         transfer.trailer_number = form.trailer_number.data
         transfer.driver_name = form.driver_name.data
+        transfer.driver_initials = (form.driver_initials.data or "").strip().upper() or None
         transfer.transfer_time = _normalize_hhmm_time(form.transfer_time.data) or form.transfer_time.data
         transfer.loaded_by = form.loaded_by.data
         _replace_plant_transfer_lines(transfer)
+        after_values = model_snapshot(transfer, PLANT_TRANSFER_AUDIT_FIELDS)
+        record_audit_event(
+            user_id=current_user.id,
+            target_type="plant_transfer",
+            target_id=transfer.id,
+            action="updated",
+            reason=form.edit_reason.data,
+            before_values=before_values,
+            after_values=after_values,
+            commit=False,
+        )
         db.session.commit()
         record_activity(
             user_id=current_user.id,
@@ -1195,6 +1330,7 @@ def driver_logs():
         return render_template(
             "driver_logs.html",
             logs=logs,
+            log_routes=_driver_log_route_context(logs),
             all_drivers=all_drivers,
             selected_driver_id=selected_driver_id,
             search_date=search_date,
@@ -1209,6 +1345,7 @@ def driver_logs():
         return render_template(
             "driver_logs.html",
             logs=logs,
+            log_routes=_driver_log_route_context(logs),
             search_date=search_date,
             today_local_date=_today_local_date(),
         )
@@ -1218,10 +1355,44 @@ def driver_logs():
 @login_required
 def new_driving_log():
     form = DriverLogForm()
+    current_load = _current_driver_load(current_user.id)
+    current_load_value = current_load["value"] or "Empty"
+    current_secondary_value = current_load.get("secondary_value") or ""
+
     if form.validate_on_submit():
-        if not form.plant_name.data or not form.load_size.data:
-            flash("Please select a valid Plant Name and Load Size.", "danger")
+        if not form.plant_name.data:
+            flash("Please select the plant you arrived at.", "danger")
             return redirect(url_for("driver.new_driving_log"))
+
+        arrival_load = current_load_value if current_load_value != "Empty" else (form.load_size.data or "Empty")
+        arrival_secondary_load = current_secondary_value or None
+        reason_parts = []
+
+        if is_load_for_plant(arrival_load, form.plant_name.data):
+            unloaded = form.unloaded_on_arrival.data
+            if unloaded not in {"yes", "no"}:
+                flash("Please answer whether you unloaded the destination load.", "danger")
+                return render_template("new_driving_log.html", form=form, current_load=current_load)
+            if unloaded == "no":
+                reason = (form.unload_reason.data or "").strip()
+                if not reason:
+                    flash("Please enter why the load was not unloaded.", "danger")
+                    return render_template("new_driving_log.html", form=form, current_load=current_load)
+                reason_parts.append(f"{UNLOAD_NOT_COMPLETED_PREFIX} {reason}")
+
+        if arrival_secondary_load and is_load_for_plant(arrival_secondary_load, form.plant_name.data):
+            dropped = form.secondary_dropped_on_arrival.data
+            if dropped not in {"yes", "no"}:
+                flash("Please answer whether you dropped off the hot part.", "danger")
+                return render_template("new_driving_log.html", form=form, current_load=current_load)
+            if dropped == "yes":
+                arrival_secondary_load = None
+            else:
+                reason = (form.secondary_unload_reason.data or "").strip()
+                if not reason:
+                    flash("Please enter why the hot part was not dropped off.", "danger")
+                    return render_template("new_driving_log.html", form=form, current_load=current_load)
+                reason_parts.append(f"{SECONDARY_NOT_DROPPED_PREFIX} {reason}")
 
         local_tz = pytz.timezone("America/Detroit")
         now_local = datetime.now(local_tz)
@@ -1233,9 +1404,12 @@ def new_driving_log():
         newlog = DriverLog(
             driver_id=current_user.id,
             plant_name=form.plant_name.data,
-            load_size=form.load_size.data,
+            load_size=arrival_load,
+            secondary_load=arrival_secondary_load,
+            downtime_reason="; ".join(reason_parts) or None,
             part_number=(form.part_number.data or "").strip() or None,
             hot_parts=form.hot_parts.data,
+            dock_wait_minutes=form.dock_wait_minutes.data,
             arrive_time=arrive_time_str,
             maintenance=form.maintenance.data,
             fuel=form.fuel.data,
@@ -1249,15 +1423,17 @@ def new_driving_log():
             category="log",
             action="submitted",
             title="Driver log submitted",
-            details=f"{newlog.plant_name} / {newlog.load_size} load for {newlog.date}.",
+            details=f"{newlog.plant_name} arrival with {cargo_display(newlog.load_size, newlog.secondary_load)} for {newlog.date}.",
             target_type="driver_log",
             target_id=newlog.id,
         )
-        flash("New driving log added (local date, UTC arrival time)!", "success")
+        flash("Arrival recorded.", "success")
         return redirect(url_for("driver.driver_logs"))
 
     _prefill_log_form_from_task(form)
-    return render_template("new_driving_log.html", form=form)
+    form.load_size.data = current_load_value if current_load_value != "Empty" else "Empty"
+    form.secondary_load.data = current_secondary_value
+    return render_template("new_driving_log.html", form=form, current_load=current_load)
 
 
 @bp.route("/edit_driver_log/<int:log_id>", methods=["GET", "POST"])
@@ -1288,9 +1464,11 @@ def edit_driver_log(log_id):
             flash("Depart time must be a valid Detroit local time like 5:45am or 1:05pm.", "danger")
             return render_template("edit_driver_log.html", form=form, log=log)
 
+        before_values = model_snapshot(log, DRIVER_LOG_AUDIT_FIELDS)
         log.plant_name = form.plant_name.data
         log.load_size = form.load_size.data
         _apply_log_part_fields(log, form)
+        log.dock_wait_minutes = form.dock_wait_minutes.data
         log.maintenance = form.maintenance.data
         log.fuel = form.fuel.data
         log.meeting = form.meeting.data
@@ -1300,6 +1478,17 @@ def edit_driver_log(log_id):
         if depart_time:
             log.depart_time = depart_time
 
+        after_values = model_snapshot(log, DRIVER_LOG_AUDIT_FIELDS)
+        record_audit_event(
+            user_id=current_user.id,
+            target_type="driver_log",
+            target_id=log.id,
+            action="updated",
+            reason=form.edit_reason.data,
+            before_values=before_values,
+            after_values=after_values,
+            commit=False,
+        )
         db.session.commit()
         record_activity(
             user_id=current_user.id,
@@ -1339,7 +1528,7 @@ def delete_driver_log(log_id):
     return redirect(url_for("driver.driver_logs"))
 
 
-@bp.route("/driver_logs/<int:log_id>/depart", methods=["POST"])
+@bp.route("/driver_logs/<int:log_id>/depart", methods=["GET", "POST"])
 @login_required
 def depart_driver_log(log_id):
     log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
@@ -1350,21 +1539,44 @@ def depart_driver_log(log_id):
         flash("That log already has a departure time.", "warning")
         return redirect(url_for("driver.driver_logs"))
 
-    local_tz = pytz.timezone("America/Detroit")
-    now_local = datetime.now(local_tz)
-    log.depart_time = now_local.strftime("%H:%M")
-    db.session.commit()
-    record_activity(
-        user_id=current_user.id,
-        category="log",
-        action="departed",
-        title="Driver log departed",
-        details=f"{log.plant_name} departed at {_format_display_time(log.depart_time)}.",
-        target_type="driver_log",
-        target_id=log.id,
-    )
-    flash(f"Departed log #{log.id}.", "success")
-    return redirect(url_for("driver.driver_logs"))
+    form = DepartForm()
+    route = _driver_log_context_for(log)
+    if form.validate_on_submit():
+        if form.got_loaded.data == "yes":
+            if not form.destination.data:
+                flash("Please select where the primary load is going.", "danger")
+                return render_template("depart_driver_log.html", form=form, log=log, route=route)
+            departure_load = destination_load_value(form.destination.data)
+        elif form.got_loaded.data == "no":
+            departure_load = route.get("after_arrival_primary") or "Empty"
+        else:
+            flash("Please answer whether you got loaded.", "danger")
+            return render_template("depart_driver_log.html", form=form, log=log, route=route)
+
+        secondary_load = route.get("after_arrival_secondary") or None
+        if form.secondary_destination.data:
+            secondary_load = hot_part_load_value(form.secondary_destination.data)
+
+        local_tz = pytz.timezone("America/Detroit")
+        now_local = datetime.now(local_tz)
+        log.depart_time = now_local.strftime("%H:%M")
+        log.depart_load_size = departure_load
+        log.secondary_load = secondary_load or None
+        log.no_pickup = departure_load == "Empty" and not log.secondary_load
+        db.session.commit()
+        record_activity(
+            user_id=current_user.id,
+            category="log",
+            action="departed",
+            title="Driver log departed",
+            details=f"{log.plant_name} departed at {_format_display_time(log.depart_time)} with {cargo_display(log.depart_load_size, log.secondary_load)}.",
+            target_type="driver_log",
+            target_id=log.id,
+        )
+        flash(f"Departed {log.plant_name} with {cargo_display(log.depart_load_size, log.secondary_load)}.", "success")
+        return redirect(url_for("driver.driver_logs"))
+
+    return render_template("depart_driver_log.html", form=form, log=log, route=route)
 
 
 
@@ -1382,7 +1594,7 @@ def no_pickup_driver_log(log_id):
     local_tz = pytz.timezone("America/Detroit")
     now_local = datetime.now(local_tz)
     log.no_pickup = True
-    log.load_size = "Empty"
+    log.depart_load_size = "Empty"
     log.depart_time = now_local.strftime("%H:%M")
     db.session.commit()
     record_activity(
@@ -1410,42 +1622,32 @@ def pickup_driver_log(log_id):
         return redirect(url_for("driver.driver_logs"))
 
     form = DriverLogForm()
-    form.plant_name.data = log.plant_name
     _prefill_log_form_from_task(form)
     if form.validate_on_submit():
-        if not form.load_size.data:
-            flash("Please select the pickup load size.", "danger")
+        if not form.plant_name.data:
+            flash("Please select where the load is going.", "danger")
             return render_template("pickup_driver_log.html", form=form, log=log)
 
-        now_local, arrive_time_str = _now_local_and_utc()
+        now_local = datetime.now(pytz.timezone("America/Detroit"))
         log.depart_time = now_local.strftime("%H:%M")
-        pickup_log = DriverLog(
-            driver_id=log.driver_id,
-            plant_name=log.plant_name,
-            load_size=form.load_size.data,
-            part_number=(form.part_number.data or "").strip() or None,
-            hot_parts=form.hot_parts.data,
-            arrive_time=arrive_time_str,
-            maintenance=form.maintenance.data,
-            fuel=form.fuel.data,
-            meeting=form.meeting.data,
-            date=now_local.date(),
-        )
-        db.session.add(pickup_log)
+        log.depart_load_size = destination_load_value(form.plant_name.data)
+        log.part_number = (form.part_number.data or "").strip() or log.part_number
+        log.hot_parts = form.hot_parts.data
+        log.dock_wait_minutes = form.dock_wait_minutes.data or log.dock_wait_minutes
+        log.maintenance = form.maintenance.data
+        log.fuel = form.fuel.data
+        log.meeting = form.meeting.data
         db.session.commit()
         record_activity(
             user_id=current_user.id,
             category="log",
             action="pickup",
-            title="Same-plant pickup recorded",
-            details=(
-                f"{log.plant_name} dropoff log #{log.id} departed and "
-                f"pickup log #{pickup_log.id} started with {pickup_log.load_size} load."
-            ),
+            title="Pickup recorded",
+            details=f"{log.plant_name}: departed with {load_display(log.depart_load_size)}.",
             target_type="driver_log",
-            target_id=pickup_log.id,
+            target_id=log.id,
         )
-        flash(f"Pickup recorded at {log.plant_name}; new log #{pickup_log.id} started.", "success")
+        flash(f"Load recorded at {log.plant_name}; departing with {load_display(log.depart_load_size)}.", "success")
         return redirect(url_for("driver.driver_logs"))
 
     return render_template("pickup_driver_log.html", form=form, log=log)
@@ -1470,9 +1672,34 @@ def view_driver_log(log_id):
 def driver_logs_print():
     local_tz = pytz.timezone("America/Detroit")
     today_local_date = datetime.now(local_tz).date()
-    logs = _active_driver_logs_query().filter_by(
-        driver_id=current_user.id, date=today_local_date
+    logs = sorted(
+        _active_driver_logs_query().filter_by(driver_id=current_user.id, date=today_local_date).all(),
+        key=_driver_log_sort_key,
+    )
+    pretrips = _active_pretrips_query().filter_by(
+        user_id=current_user.id, pretrip_date=today_local_date
     ).all()
+    log_routes = _driver_log_route_context(logs)
+    damage_reports_today = _today_damage_reports(current_user.id, today_local_date)
+    parts_carried = sorted({log.part_number for log in logs if log.part_number})
+    exception_notes = []
+    for log in logs:
+        route = log_routes.get(log.id, {})
+        plant_name = route.get("plant") or _plant_label(log.plant_name)
+        if log.no_pickup:
+            exception_notes.append(f"No pickup at {plant_name}")
+        if route.get("unload_blocked"):
+            exception_notes.append(f"Unload issue at {plant_name}: {route.get('unload_reason')}")
+        elif route.get("secondary_drop_blocked"):
+            exception_notes.append(f"Hot part issue at {plant_name}: {route.get('secondary_drop_reason')}")
+        elif log.downtime_reason:
+            exception_notes.append(f"Plant issue at {plant_name}: {log.downtime_reason}")
+    route_finalized = ActivityEvent.query.filter_by(
+        user_id=current_user.id,
+        category="eod",
+        action="finalized",
+        target_type="end_of_day",
+    ).filter(ActivityEvent.details.contains(str(today_local_date))).first() is not None
     record_activity(
         user_id=current_user.id,
         category="print",
@@ -1484,7 +1711,14 @@ def driver_logs_print():
     return render_template(
         "driver_logs_print.html",
         logs=logs,
+        log_routes=log_routes,
         the_date=today_local_date,
+        pretrips=pretrips,
+        damage_reports=damage_reports_today,
+        total_miles=_total_miles_for_pretrips(pretrips),
+        parts_carried=parts_carried,
+        exception_notes=exception_notes,
+        route_finalized=route_finalized,
         email_mode=False,
     )
 
@@ -1586,6 +1820,7 @@ def end_of_day_summary():
         drivers_logs=drivers_logs,
         drivers_pretrips=drivers_pretrips,
         drivers_plant_transfers=drivers_plant_transfers,
+        log_routes=_driver_log_route_context(logs),
     )
 
 
@@ -1616,6 +1851,7 @@ def end_of_day_print():
         the_date=today_local_date,
         drivers_logs=drivers_logs,
         drivers_plant_transfers=drivers_plant_transfers,
+        log_routes=_driver_log_route_context(logs),
         email_mode=False,
     )
 
@@ -1647,6 +1883,165 @@ def submit_end_of_day():
     _record_eod_finalized(today_local_date, logs, pretrips_today, plant_transfers_today)
     flash("End of Day finalized and added to activity history.", "success")
     return redirect(url_for("driver.dashboard"))
+
+
+@bp.route("/damage_reports")
+@login_required
+def damage_reports():
+    if current_user.role == "management":
+        reports = DamageReport.query.order_by(DamageReport.created_at.desc()).all()
+    else:
+        reports = DamageReport.query.filter_by(reported_by_id=current_user.id).order_by(DamageReport.created_at.desc()).all()
+    return render_template(
+        "damage_reports.html",
+        reports=reports,
+        can_modify_damage_report=_can_modify_damage_report,
+        route_finalized_for_report=_is_damage_report_route_finalized,
+    )
+
+
+@bp.route("/damage_reports/new", methods=["GET", "POST"])
+@login_required
+def new_damage_report():
+    form = DamageReportForm()
+    if form.validate_on_submit():
+        report = DamageReport(
+            reported_by_id=current_user.id,
+            truck_number=(form.truck_number.data or "").strip() or None,
+            trailer_number=(form.trailer_number.data or "").strip() or None,
+            plant_name=form.plant_name.data,
+            stage=form.stage.data,
+            move_reference=(form.move_reference.data or "").strip() or None,
+            description=form.description.data,
+        )
+        db.session.add(report)
+        db.session.flush()
+        _save_damage_photo(report, request.files.get(form.photo.name))
+        db.session.commit()
+        record_activity(
+            user_id=current_user.id,
+            category="damage",
+            action="reported",
+            title="Damage report saved",
+            details=f"{report.plant_name}; {report.truck_number or 'truck not set'} / {report.trailer_number or 'trailer not set'}.",
+            target_type="damage_report",
+            target_id=report.id,
+        )
+        flash("Damage report saved. You can edit or delete it until the route is finalized or you submit it.", "success")
+        return redirect(url_for("driver.view_damage_report", report_id=report.id))
+    return render_template("damage_report_form.html", form=form, report=None, is_edit=False)
+
+
+@bp.route("/damage_reports/<int:report_id>")
+@login_required
+def view_damage_report(report_id):
+    report = _damage_report_or_404(report_id)
+    if report is None:
+        return redirect(url_for("driver.damage_reports"))
+    return render_template(
+        "view_damage_report.html",
+        report=report,
+        can_modify=_can_modify_damage_report(report),
+        route_finalized=_is_damage_report_route_finalized(report),
+    )
+
+
+@bp.route("/damage_reports/<int:report_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_damage_report(report_id):
+    report = _damage_report_or_404(report_id)
+    if report is None:
+        return redirect(url_for("driver.damage_reports"))
+    if not _can_modify_damage_report(report):
+        flash("This damage report is locked because it was submitted or the route was finalized.", "warning")
+        return redirect(url_for("driver.view_damage_report", report_id=report.id))
+
+    form = DamageReportForm(obj=report)
+    if form.validate_on_submit():
+        before = model_snapshot(report, ["truck_number", "trailer_number", "plant_name", "stage", "move_reference", "description", "status"])
+        report.truck_number = (form.truck_number.data or "").strip() or None
+        report.trailer_number = (form.trailer_number.data or "").strip() or None
+        report.plant_name = form.plant_name.data
+        report.stage = form.stage.data
+        report.move_reference = (form.move_reference.data or "").strip() or None
+        report.description = form.description.data
+        _save_damage_photo(report, request.files.get(form.photo.name))
+        after = model_snapshot(report, ["truck_number", "trailer_number", "plant_name", "stage", "move_reference", "description", "status"])
+        record_audit_event(
+            user_id=current_user.id,
+            target_type="damage_report",
+            target_id=report.id,
+            action="edited",
+            reason="Driver updated open damage report before route finalization.",
+            before_values=before,
+            after_values=after,
+            commit=False,
+        )
+        record_activity(
+            user_id=current_user.id,
+            category="damage",
+            action="edited",
+            title="Damage report edited",
+            details=f"Damage report #{report.id} updated for {report.plant_name}.",
+            target_type="damage_report",
+            target_id=report.id,
+        )
+        db.session.commit()
+        flash("Damage report updated.", "success")
+        return redirect(url_for("driver.view_damage_report", report_id=report.id))
+
+    return render_template("damage_report_form.html", form=form, report=report, is_edit=True)
+
+
+@bp.route("/damage_reports/<int:report_id>/submit", methods=["POST"])
+@login_required
+def submit_damage_report(report_id):
+    report = _damage_report_or_404(report_id)
+    if report is None:
+        return redirect(url_for("driver.damage_reports"))
+    if not _can_modify_damage_report(report):
+        flash("This damage report is already locked.", "warning")
+        return redirect(url_for("driver.view_damage_report", report_id=report.id))
+
+    report.status = "submitted"
+    record_activity(
+        user_id=current_user.id,
+        category="damage",
+        action="submitted",
+        title="Damage report submitted",
+        details=f"Damage report #{report.id} submitted and locked.",
+        target_type="damage_report",
+        target_id=report.id,
+    )
+    db.session.commit()
+    flash("Damage report submitted and locked.", "success")
+    return redirect(url_for("driver.view_damage_report", report_id=report.id))
+
+
+@bp.route("/damage_reports/<int:report_id>/delete", methods=["POST"])
+@login_required
+def delete_damage_report(report_id):
+    report = _damage_report_or_404(report_id)
+    if report is None:
+        return redirect(url_for("driver.damage_reports"))
+    if not _can_modify_damage_report(report):
+        flash("This damage report is locked because it was submitted or the route was finalized.", "warning")
+        return redirect(url_for("driver.view_damage_report", report_id=report.id))
+
+    details = f"Damage report #{report.id} deleted for {report.plant_name}."
+    record_activity(
+        user_id=current_user.id,
+        category="damage",
+        action="deleted",
+        title="Damage report deleted",
+        details=details,
+        target_type="damage_report",
+        target_id=report.id,
+    )
+    db.session.delete(report)
+    db.session.commit()
+    flash("Damage report deleted.", "success")
+    return redirect(url_for("driver.damage_reports"))
 
 
 @bp.route("/mobile/history")
@@ -1681,8 +2076,9 @@ def mobile_day_report(report_date):
         .order_by(PlantTransfer.created_at.desc())
         .all()
     )
+    log_routes = _driver_log_route_context(logs)
     log_reports = [
-        {"log": log, "freight": _log_freight_summary(log, transfers)}
+        {"log": log, "route": log_routes.get(log.id), "freight": _log_freight_summary(log, transfers)}
         for log in logs
     ]
     transfer_reports = [_transfer_summary(transfer) for transfer in transfers]
@@ -1693,6 +2089,7 @@ def mobile_day_report(report_date):
         today_local_date=today_local_date,
         logs=logs,
         log_reports=log_reports,
+        log_routes=log_routes,
         pretrips=pretrips,
         transfers=transfers,
         transfer_reports=transfer_reports,
@@ -1744,14 +2141,28 @@ def mobile_dashboard():
         .first()
     )
     pending_posttrip = bool(todays_pretrip and not todays_pretrip.posttrip)
-
-    recent_transfers = (
+    latest_transfer = (
         _active_plant_transfers_query().filter_by(user_id=current_user.id)
         .order_by(PlantTransfer.created_at.desc())
+        .first()
+    )
+
+    recent_ryder_events = (
+        ActivityEvent.query.filter_by(
+            user_id=current_user.id,
+            category="ryder",
+        )
+        .order_by(ActivityEvent.created_at.desc())
         .limit(3)
         .all()
     )
-    latest_transfer = recent_transfers[0] if recent_transfers else None
+
+    todays_logs = sorted(
+        _active_driver_logs_query().filter_by(driver_id=current_user.id, date=today_local_date).all(),
+        key=_driver_log_sort_key,
+    )
+    todays_log_routes = _driver_log_route_context(todays_logs)
+    current_stop = next((l for l in reversed(todays_logs) if not l.depart_time), None) or (todays_logs[-1] if todays_logs else None)
 
     return render_template(
         "driver_mobile.html",
@@ -1761,12 +2172,49 @@ def mobile_dashboard():
         latest_pretrip=latest_pretrip,
         todays_pretrip=todays_pretrip,
         pending_posttrip=pending_posttrip,
-        recent_transfers=recent_transfers,
         latest_transfer=latest_transfer,
+        recent_ryder_events=recent_ryder_events,
         open_shift=open_shift,
         shift_elapsed=shift_elapsed,
         today_local_date=today_local_date,
+        todays_logs=todays_logs,
+        todays_log_routes=todays_log_routes,
+        current_stop=current_stop,
     )
+
+
+@bp.route("/mobile/ryder-service", methods=["POST"])
+@login_required
+def mobile_ryder_service():
+    if current_user.role == "management":
+        return redirect(url_for("manager.manager_dashboard"))
+
+    truck_number = (request.form.get("truck_number") or "").strip() or "Truck not set"
+    issue = (request.form.get("issue") or "").strip()
+    outcome = (request.form.get("outcome") or "").strip()
+    notes = (request.form.get("notes") or "").strip()
+    outcome_labels = {
+        "fixed": "Fixed at Ryder",
+        "left": "Left at Ryder",
+        "rental": "Rental picked up",
+    }
+    if not issue or outcome not in outcome_labels:
+        flash("Enter the Ryder issue and choose the outcome.", "warning")
+        return redirect(url_for("driver.mobile_dashboard"))
+
+    details = f"Truck {truck_number}; Issue: {issue}; Outcome: {outcome_labels[outcome]}"
+    if notes:
+        details = f"{details}; Notes: {notes}"
+    record_activity(
+        user_id=current_user.id,
+        category="ryder",
+        action=outcome,
+        title=outcome_labels[outcome],
+        details=details,
+        target_type="ryder_service",
+    )
+    flash("Ryder service note saved.", "success")
+    return redirect(url_for("driver.mobile_dashboard"))
 
 
 @bp.route("/dashboard", methods=["GET", "POST"])

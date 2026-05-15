@@ -129,7 +129,9 @@ def test_cross_role_access_requires_matching_credentials(client, app):
     assert manager_login.headers["Location"].endswith("/manager/dashboard")
 
     driver_page = client.get("/new_driving_log", follow_redirects=False)
-    assert driver_page.status_code == 200
+    assert driver_page.status_code == 302
+    assert "/login" in driver_page.headers["Location"]
+    assert "required_role=driver" in driver_page.headers["Location"]
 
     client.get("/logout")
     login(client, "manager1")
@@ -519,7 +521,7 @@ def test_driver_log_edit_and_depart_are_separate_actions(client, app):
     assert b"Edit" in list_page.data
     assert b"Depart" in list_page.data
     assert b"Delete" in list_page.data
-    assert b"Pickup" in list_page.data
+    assert b"Depart / Load" in list_page.data
 
     edited = client.post(
         f"/edit_driver_log/{log_id}",
@@ -549,13 +551,20 @@ def test_driver_log_edit_and_depart_are_separate_actions(client, app):
     edit_page = client.get(f"/edit_driver_log/{log_id}")
     assert b"5:45pm" in edit_page.data
 
-    departed = client.post(f"/driver_logs/{log_id}/depart", follow_redirects=False)
+    departed = client.post(
+        f"/driver_logs/{log_id}/depart",
+        data={"got_loaded": "no", "destination": ""},
+        follow_redirects=False,
+    )
     assert departed.status_code == 302
 
     with app.app_context():
         from app.models import DriverLog
 
-        assert DriverLog.query.get(log_id).depart_time is not None
+        departed_log = DriverLog.query.get(log_id)
+        assert departed_log.depart_time is not None
+        assert departed_log.depart_load_size == "Empty"
+        assert departed_log.no_pickup is True
 
 
 def test_manager_can_view_but_not_edit_driver_logs(client, app):
@@ -590,10 +599,10 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     page = client.get("/manager/driver-logs")
     assert page.status_code == 200
     assert b"RE" in page.data
-    assert "⇌".encode() in page.data
-    assert "→".encode() in page.data
-    assert b"Open stop" in page.data
-    assert b"Completed stop" in page.data
+    assert b"Cargo In / Out" in page.data
+    assert b"At stop" in page.data
+    assert b"Open" in page.data
+    assert b"Completed" in page.data
     assert b"/edit_driver_log/" not in page.data
     assert b"/depart" not in page.data
     assert b"/pickup" not in page.data
@@ -701,67 +710,134 @@ def test_drivers_can_delete_only_same_day_records(client, app):
         assert old_transfer is not None and old_transfer.deleted_at is None
 
 
-def test_driver_log_pickup_closes_dropoff_and_starts_same_plant_log(client, app):
+def test_driver_log_departure_names_load_by_destination_and_arrival_unloads(client, app):
     with app.app_context():
         create_user("driver1", "driver1@example.com", "driver")
 
     login(client, "driver1")
-    created = client.post(
+    arrived_kraft = client.post(
+        "/new_driving_log",
+        data={"plant_name": "KP", "load_size": "Empty"},
+        follow_redirects=False,
+    )
+    assert arrived_kraft.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        kraft_log = DriverLog.query.filter_by(plant_name="KP").one()
+        kraft_id = kraft_log.id
+
+    depart_page = client.get(f"/driver_logs/{kraft_id}/depart")
+    assert depart_page.status_code == 200
+    assert b"Did you get loaded?" in depart_page.data
+    assert b"Primary destination" in depart_page.data
+
+    departed = client.post(
+        f"/driver_logs/{kraft_id}/depart",
+        data={"got_loaded": "yes", "destination": "Helios"},
+        follow_redirects=False,
+    )
+    assert departed.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        kraft_log = DriverLog.query.get(kraft_id)
+        assert kraft_log.depart_load_size == "Helios Load"
+        assert kraft_log.no_pickup is False
+
+    arrival_page = client.get("/new_driving_log")
+    assert b"In truck now" in arrival_page.data
+    assert b"Helios Load" in arrival_page.data
+
+    arrived_helios = client.post(
+        "/new_driving_log",
+        data={"plant_name": "Helios", "load_size": "Helios Load", "unloaded_on_arrival": "yes"},
+        follow_redirects=False,
+    )
+    assert arrived_helios.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        helios_log = DriverLog.query.filter_by(plant_name="Helios").one()
+        assert helios_log.load_size == "Helios Load"
+        assert helios_log.downtime_reason is None
+
+    print_page = client.get("/driver_logs_print")
+    assert b"Helios Load" in print_page.data
+    assert b"Kraft Plant Load" not in print_page.data
+
+
+def test_mixed_cargo_deviation_preserves_primary_and_drops_hot_part(client, app):
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+
+    login(client, "driver1")
+    assert client.post(
+        "/new_driving_log",
+        data={"plant_name": "KP", "load_size": "Empty"},
+        follow_redirects=False,
+    ).status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        kraft_id = DriverLog.query.filter_by(plant_name="KP").one().id
+
+    assert client.post(
+        f"/driver_logs/{kraft_id}/depart",
+        data={"got_loaded": "yes", "destination": "Trim DC", "secondary_destination": ""},
+        follow_redirects=False,
+    ).status_code == 302
+
+    assert client.post(
+        "/new_driving_log",
+        data={"plant_name": "PW", "load_size": "Trim DC Load"},
+        follow_redirects=False,
+    ).status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        paint_west_id = DriverLog.query.filter_by(plant_name="PW").one().id
+
+    assert client.post(
+        f"/driver_logs/{paint_west_id}/depart",
+        data={"got_loaded": "no", "destination": "", "secondary_destination": "Helios"},
+        follow_redirects=False,
+    ).status_code == 302
+
+    arrival_page = client.get("/new_driving_log")
+    assert b"Trim DC Load + Helios Hot Part" in arrival_page.data
+
+    assert client.post(
         "/new_driving_log",
         data={
-            "plant_name": "RE",
-            "load_size": "Full",
-            "downtime_reason": "",
-            "depart_time": "",
+            "plant_name": "Helios",
+            "load_size": "Trim DC Load",
+            "secondary_load": "Helios Hot Part",
+            "secondary_dropped_on_arrival": "yes",
         },
         follow_redirects=False,
-    )
-    assert created.status_code == 302
+    ).status_code == 302
 
     with app.app_context():
         from app.models import DriverLog
+        from app.services.load_state import current_load_after_logs
 
-        dropoff_log = DriverLog.query.filter_by(plant_name="RE").one()
-        dropoff_id = dropoff_log.id
+        helios_log = DriverLog.query.filter_by(plant_name="Helios").one()
+        assert helios_log.load_size == "Trim DC Load"
+        assert helios_log.secondary_load is None
+        logs = DriverLog.query.order_by(DriverLog.created_at.asc()).all()
+        current_load = current_load_after_logs(logs)
+        assert current_load["cargo_display"] == "Trim DC Load"
 
-    pickup_page = client.get(f"/driver_logs/{dropoff_id}/pickup")
-    assert pickup_page.status_code == 200
-    assert b"Pickup at RE" in pickup_page.data
-
-    pickup = client.post(
-        f"/driver_logs/{dropoff_id}/pickup",
-        data={
-            "plant_name": "RE",
-            "load_size": "Half",
-            "part_number": "PICK-1",
-            "hot_parts": "y",
-        },
-        follow_redirects=False,
-    )
-    assert pickup.status_code == 302
-
-    with app.app_context():
-        from app.models import DriverLog
-
-        dropoff_log = DriverLog.query.get(dropoff_id)
-        pickup_log = DriverLog.query.filter(DriverLog.id != dropoff_id).one()
-        assert dropoff_log.depart_time is not None
-        assert pickup_log.plant_name == "RE"
-        assert pickup_log.load_size == "Half"
-        assert pickup_log.depart_time is None
-        assert pickup_log.part_number == "PICK-1"
-        assert pickup_log.hot_parts is True
-        pickup_id = pickup_log.id
-
-    no_pickup = client.post(f"/driver_logs/{pickup_id}/no_pickup", follow_redirects=False)
-    assert no_pickup.status_code == 302
-    with app.app_context():
-        from app.models import DriverLog
-
-        pickup_log = DriverLog.query.get(pickup_id)
-        assert pickup_log.no_pickup is True
-        assert pickup_log.load_size == "Empty"
-        assert pickup_log.depart_time is not None
+    print_page = client.get("/driver_logs_print")
+    assert print_page.status_code == 200
+    assert b"Trim DC Load + Helios Hot Part" in print_page.data
+    assert b"Deviation" in print_page.data
 
 
 def test_driver_logs_prints_and_eod_create_activity_history(client, app):
@@ -816,6 +892,95 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
     unread = client.get("/count_unread").get_json()
     assert unread["action_count"] >= 3
     assert unread["unread_count"] >= unread["action_count"]
+
+
+def test_damage_report_edit_delete_submit_and_eod_lock(client, app):
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+
+    login(client, "driver1")
+
+    create_response = client.post(
+        "/damage_reports/new",
+        data={
+            "truck_number": "T1",
+            "trailer_number": "TR1",
+            "plant_name": "RE",
+            "stage": "before",
+            "move_reference": "Dock 4",
+            "description": "Scuffed bumper",
+        },
+        follow_redirects=False,
+    )
+    assert create_response.status_code == 302
+
+    with app.app_context():
+        from app.models import DamageReport
+
+        report = DamageReport.query.filter_by(description="Scuffed bumper").one()
+        report_id = report.id
+
+    edit_response = client.post(
+        f"/damage_reports/{report_id}/edit",
+        data={
+            "truck_number": "T2",
+            "trailer_number": "TR1",
+            "plant_name": "RE",
+            "stage": "after",
+            "move_reference": "Dock 5",
+            "description": "Scuffed bumper updated",
+        },
+        follow_redirects=False,
+    )
+    assert edit_response.status_code == 302
+
+    with app.app_context():
+        from app.models import DamageReport
+
+        report = DamageReport.query.get(report_id)
+        assert report.truck_number == "T2"
+        assert report.description == "Scuffed bumper updated"
+
+    submit_response = client.post(f"/damage_reports/{report_id}/submit", follow_redirects=False)
+    assert submit_response.status_code == 302
+
+    delete_submitted = client.post(f"/damage_reports/{report_id}/delete", follow_redirects=False)
+    assert delete_submitted.status_code == 302
+
+    with app.app_context():
+        from app.models import DamageReport
+
+        report = DamageReport.query.get(report_id)
+        assert report is not None
+        assert report.status == "submitted"
+
+    second_response = client.post(
+        "/damage_reports/new",
+        data={
+            "truck_number": "T3",
+            "trailer_number": "TR2",
+            "plant_name": "Helios",
+            "stage": "before",
+            "move_reference": "Dock 7",
+            "description": "Broken crate",
+        },
+        follow_redirects=False,
+    )
+    assert second_response.status_code == 302
+
+    with app.app_context():
+        from app.models import DamageReport
+
+        second_id = DamageReport.query.filter_by(description="Broken crate").one().id
+
+    assert client.post("/end_of_day_summary", data={}, follow_redirects=False).status_code == 302
+    locked_delete = client.post(f"/damage_reports/{second_id}/delete", follow_redirects=False)
+    assert locked_delete.status_code == 302
+
+    with app.app_context():
+        from app.models import DamageReport
+
+        assert DamageReport.query.get(second_id) is not None
 
 
 def test_plant_transfer_flow_and_eod_includes_transfer(client, app):
@@ -990,6 +1155,10 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"Part P0903110 needs trailer assignment." in page.data
     assert b"PostTrip Due" in page.data
     assert b"RW to KP" in page.data
+    assert b"Ryder Service" in page.data
+    assert b"Save Ryder Note" in page.data
+    assert b"Up Next" not in page.data
+    assert b"Recent Transfers" not in page.data
     assert b"Previous Reports" not in page.data
     assert b"All history" not in page.data
 
@@ -1006,7 +1175,7 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"OLD-PART" in day_report.data
     assert b"2 skid(s)" in day_report.data
     assert b"qty 18" in day_report.data
-    assert b"DC" in day_report.data
+    assert b"Distribution Center" in day_report.data
     assert b"4:05pm" in day_report.data
     assert b"5:45pm" in day_report.data
     assert past_date.isoformat().encode() not in day_report.data
@@ -1018,12 +1187,29 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
 
     today_report = client.get(f"/mobile/history/{date.today().isoformat()}")
     assert today_report.status_code == 200
-    assert b"RE" in today_report.data
+    assert b"Raleigh East" in today_report.data
     assert b"Edit" in today_report.data
     assert b"Pickup" in today_report.data
     assert b"Depart" in today_report.data
     assert b"Delete" in today_report.data
     assert b"13:30" not in today_report.data
+
+    ryder_response = client.post(
+        "/mobile/ryder-service",
+        data={
+            "truck_number": "ST4",
+            "issue": "Air leak",
+            "outcome": "rental",
+            "notes": "Left unit at Ryder and took rental R-18.",
+        },
+        follow_redirects=False,
+    )
+    assert ryder_response.status_code == 302
+
+    ryder_page = client.get("/mobile")
+    assert b"Rental picked up" in ryder_page.data
+    assert b"Air leak" in ryder_page.data
+    assert b"rental R-18" in ryder_page.data
 
     assert page.data.count(b"Create Driver Log") == 1
     assert b"Start Shift" not in page.data

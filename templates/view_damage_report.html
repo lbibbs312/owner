@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4 responsive-workspace">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-1">Damage Report #{{ report.id }}</h1>
+      <p class="text-muted mb-0 small">Status: {{ report.status|title }}{% if route_finalized|default(false) %} - Route finalized{% endif %}</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      {% if manager_view|default(false) %}
+        <a class="btn btn-outline-secondary" href="{{ url_for('manager.review_dashboard') }}">Review</a>
+      {% else %}
+        <a class="btn btn-outline-secondary" href="{{ url_for('driver.damage_reports') }}">History</a>
+      {% endif %}
+      {% if can_modify|default(false) %}
+        <a class="btn btn-primary" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Edit</a>
+        <form method="POST" action="{{ url_for('driver.submit_damage_report', report_id=report.id) }}">
+          <button class="btn btn-success" type="submit">Submit</button>
+        </form>
+        <form method="POST" action="{{ url_for('driver.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Delete this damage report?');">
+          <button class="btn btn-outline-danger" type="submit">Delete</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+  {% if not can_modify|default(false) and not manager_view|default(false) %}
+    <div class="alert alert-secondary small">This report is locked because it was submitted or the route was finalized.</div>
+  {% endif %}
+  <div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3"><strong>Plant:</strong> {{ report.plant_name }}</div>
+    <div class="col-sm-6 col-lg-3"><strong>Truck:</strong> {{ report.truck_number or '' }}</div>
+    <div class="col-sm-6 col-lg-3"><strong>Trailer:</strong> {{ report.trailer_number or '' }}</div>
+    <div class="col-sm-6 col-lg-3"><strong>Stage:</strong> {{ report.stage }}</div>
+    <div class="col-sm-6 col-lg-3"><strong>Move:</strong> {{ report.move_reference or '' }}</div>
+    <div class="col-sm-6 col-lg-3"><strong>Reported:</strong> {{ report.created_at|to_detroit_datetime }}</div>
+    <div class="col-sm-6 col-lg-3"><strong>Driver:</strong> {{ report.reported_by.display_name }}</div>
+    <div class="col-sm-6 col-lg-3"><strong>Status:</strong> {{ report.status }}</div>
+  </div>
+  <h2 class="h5">Description</h2>
+  <p class="border rounded p-3 report-description">{{ report.description }}</p>
+  <h2 class="h5">Photos</h2>
+  <div class="row g-3">
+    {% for photo in report.photos %}
+      <div class="col-md-6 col-xl-4"><div class="border rounded p-3 h-100"><strong>{{ photo.stage|title }}</strong><br><span class="text-muted small">{{ photo.original_filename }}</span><br><code class="small text-break">{{ photo.filename }}</code></div></div>
+    {% else %}
+      <div class="col-12 text-muted">No photo attached.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

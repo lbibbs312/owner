@@ -7,6 +7,40 @@ goes away and the context processor sources its data from the database scoped
 to the current tenant. Until then, this is the single source of truth for
 plant addresses across the app.
 """
+PLANT_LABELS = {
+    "RE": "Raleigh East",
+    "RW": "Raleigh West",
+    "PC": "Plastic Center",
+    "PE": "Paint East",
+    "PW": "Plastic West",
+    "KP": "Kraft Plant",
+    "PPL": "PPL",
+    "DC": "Distribution Center",
+    "Helios": "Helios",
+    "BP": "Barden Plant",
+    "52L": "52nd Street L",
+    "Trim DC": "Trim DC",
+    "52DC": "52nd Street DC",
+    "ALN": "Airlane North",
+    "AWE": "Airlane West",
+    "CORP": "Corporate",
+    "R&D": "R&D",
+    "GLA": "GLA",
+    "KM": "Kraft Main",
+    "KS": "Kraft South",
+    "MONROE": "Monroe",
+    "Other": "Other",
+    "Lab": "Lab",
+    "PPM": "PPM Monroe",
+}
+
+
+def plant_label(value):
+    """Return the display name for a plant code, falling back to the code itself."""
+    value = (value or "").strip()
+    return PLANT_LABELS.get(value, value)
+
+
 PLANT_ADDRESSES = {
     "RE": "3505 Kraft Ave SE",
     "RW": "3500 Raleigh Dr SE",
@@ -38,4 +72,4 @@ PLANT_ADDRESSES = {
 def register_context_processors(app):
     @app.context_processor
     def inject_plant_addresses():
-        return dict(PLANT_ADDRESSES=PLANT_ADDRESSES)
+        return dict(PLANT_ADDRESSES=PLANT_ADDRESSES, PLANT_LABELS=PLANT_LABELS)

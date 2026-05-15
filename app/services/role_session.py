@@ -1,8 +1,5 @@
 from flask import session
-from flask_login import current_user, login_user
-
-from app.extensions import db
-from app.models import User
+from flask_login import current_user
 
 
 ROLE_SESSION_KEYS = {
@@ -23,26 +20,11 @@ def clear_role_logins():
 
 
 def restore_role_user(required_role):
-    if current_user.is_authenticated and current_user.role == required_role:
-        remember_role_login(current_user)
-        return True
+    """Return True if the current request is authenticated as required_role.
 
-    key = ROLE_SESSION_KEYS.get(required_role)
-    user_id = session.get(key) if key else None
-    if not user_id:
-        return False
-
-    try:
-        user_id = int(user_id)
-    except (TypeError, ValueError):
-        session.pop(key, None)
-        return False
-
-    user = db.session.get(User, user_id)
-    if not user or user.role != required_role:
-        session.pop(key, None)
-        return False
-
-    login_user(user)
-    remember_role_login(user)
-    return True
+    current_user is already resolved by the request_loader in auth/routes.py
+    before before_request fires, so we only need to check it here.  There is
+    no login_user() call: that would overwrite session['_user_id'] and break
+    simultaneous driver + manager tabs in the same browser.
+    """
+    return current_user.is_authenticated and current_user.role == required_role

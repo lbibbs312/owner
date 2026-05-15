@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+    <div>
+      <h1 class="h3 mb-1">Manager Review</h1>
+      <p class="text-muted mb-0">{{ exceptions|length }} exception{{ 's' if exceptions|length != 1 else '' }} active this week</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-outline-primary" href="{{ url_for('manager.delay_finder') }}">Delay Finder</a>
+      <a class="btn btn-outline-primary" href="{{ url_for('manager.weekly_savings') }}">Weekly Savings</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('manager.audit_history') }}">Audit History</a>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Transfer Completeness</div><div class="display-6">{{ metrics.transfer_completion_rate }}%</div></div></div>
+    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Incomplete Records</div><div class="display-6">{{ metrics.incomplete_transfer_count }}</div></div></div>
+    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Delayed Dock Events</div><div class="display-6">{{ metrics.delayed_dock_count }}</div></div></div>
+    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Supervisor Time Saved</div><div class="display-6">{{ metrics.supervisor_minutes_saved }}m</div></div></div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h5 mb-0">Exceptions</h2>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead><tr><th>Priority</th><th>Type</th><th>Record</th><th>Details</th><th></th></tr></thead>
+          <tbody>
+            {% for item in exceptions %}
+              <tr>
+                <td><span class="badge text-bg-{{ 'danger' if item.severity == 'high' else 'warning' if item.severity == 'medium' else 'secondary' }}">{{ item.severity|title }}</span></td>
+                <td>{{ item.category }}</td>
+                <td>{{ item.label }}</td>
+                <td>{{ item.detail }}</td>
+                <td>{% if item.url %}<a class="btn btn-sm btn-outline-primary" href="{{ item.url }}">Open</a>{% endif %}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="5" class="text-muted">No active exceptions.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <h2 class="h5">Add Follow-up</h2>
+      <form method="POST" class="border rounded p-3 mb-4">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">{{ form.kind.label(class="form-label") }}{{ form.kind(class="form-select") }}</div>
+        <div class="mb-3">{{ form.plant_name.label(class="form-label") }}{{ form.plant_name(class="form-select") }}</div>
+        <div class="mb-3">{{ form.details.label(class="form-label") }}{{ form.details(class="form-control", rows="4") }}</div>
+        {{ form.submit(class="btn btn-primary w-100") }}
+      </form>
+
+      <h2 class="h5">Open Follow-ups</h2>
+      <div class="list-group mb-4">
+        {% for followup in followups if followup.status == 'open' %}
+          <div class="list-group-item">
+            <div class="d-flex justify-content-between gap-2">
+              <strong>{{ followup.kind.replace('_', ' ')|title }}</strong>
+              <form method="POST" action="{{ url_for('manager.close_followup', followup_id=followup.id) }}"><button class="btn btn-sm btn-outline-success">Close</button></form>
+            </div>
+            <div class="small text-muted">{{ followup.plant_name or 'No plant' }}</div>
+            <div>{{ followup.details }}</div>
+          </div>
+        {% else %}
+          <div class="list-group-item text-muted">No open follow-ups.</div>
+        {% endfor %}
+      </div>
+
+      <h2 class="h5">Damage Flags</h2>
+      <div class="list-group">
+        {% for report in damage_reports %}
+          <a class="list-group-item list-group-item-action" href="{{ url_for('manager.view_damage_report', report_id=report.id) }}">
+            <strong>{{ report.plant_name }}</strong> <span class="text-muted">{{ report.stage }}</span><br>
+            <span class="small">{{ report.truck_number or 'Truck not set' }} / {{ report.trailer_number or 'Trailer not set' }}</span>
+          </a>
+        {% else %}
+          <div class="list-group-item text-muted">No damage reports.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

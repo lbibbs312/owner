@@ -14,6 +14,7 @@ class PlantTransfer(db.Model):
     ship_from = db.Column(db.String(50), nullable=False)
     trailer_number = db.Column(db.String(50), nullable=True)
     driver_name = db.Column(db.String(100), nullable=True)
+    driver_initials = db.Column(db.String(12), nullable=True)
     transfer_time = db.Column(db.String(20), nullable=True)
     loaded_by = db.Column(db.String(100), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

@@ -23,7 +23,7 @@
     }
 
     * { box-sizing: border-box; }
-    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); overflow-x: hidden; }
     body { font-family: Montserrat, Arial, sans-serif; }
     a { color: inherit; text-decoration: none; }
     button, .button { font: inherit; }
@@ -131,20 +131,34 @@
     .hero-actions.tri { grid-template-columns: repeat(3, 1fr); }
 
     .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .wide-actions { display: none; }
     .quick-card {
       background: rgba(17, 24, 39, 0.96);
       border: 1px solid var(--line);
       border-radius: 18px;
-      padding: 15px;
-      min-height: 128px;
+      padding: 14px;
+      min-height: 104px;
       display: flex;
-      flex-direction: column;
-      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
     }
-    .quick-icon { width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: rgba(127, 29, 45, 0.2); color: #f3c7cf; font-weight: 950; }
+    .quick-icon { width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: rgba(127, 29, 45, 0.2); color: #f3c7cf; font-weight: 950; flex: 0 0 auto; }
     .quick-icon.green { background: rgba(16, 185, 129, 0.16); color: #86efac; }
-    .quick-card strong { display: block; margin-top: 12px; font-size: 0.95rem; }
+    .quick-card strong { display: block; margin-top: 0; font-size: 0.95rem; }
     .quick-card span { display: block; margin-top: 3px; color: var(--muted); font-size: 0.74rem; line-height: 1.25; }
+
+    .ryder-panel { padding: 16px; display: grid; gap: 12px; }
+    .ryder-form { display: grid; gap: 10px; }
+    .ryder-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    .ryder-field { display: grid; gap: 5px; }
+    .ryder-field label { color: var(--muted); font-size: .68rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
+    .ryder-input, .ryder-select, .ryder-textarea { width: 100%; min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: rgba(15,23,42,.96); color: var(--text); padding: 10px 12px; font: inherit; }
+    .ryder-textarea { min-height: 78px; resize: vertical; }
+    .ryder-submit { min-height: 46px; border-radius: 12px; border: 0; background: #fff; color: #4c111d; font-weight: 900; cursor: pointer; }
+    .ryder-history { display: grid; gap: 8px; }
+    .ryder-entry { border: 1px solid rgba(148,163,184,.18); border-radius: 12px; padding: 10px 12px; background: rgba(255,255,255,.035); }
+    .ryder-entry strong { display: block; font-size: .85rem; }
+    .ryder-entry span { display:block; color: var(--muted); font-size:.74rem; line-height:1.3; margin-top:3px; }
 
     .section-head { display: flex; justify-content: space-between; align-items: end; padding: 0 4px; }
     .section-head h2 { margin: 0; font-size: 1.02rem; }
@@ -198,6 +212,120 @@
       .side-nav .nav-link.active { background:rgba(127,29,45,.24); }
       main { padding-left: 22px; padding-right: 22px; }
     }
+    @media (min-width: 960px) {
+      .side-nav { display: none; }
+      .mobile-shell {
+        width: min(1560px, calc(100vw - 48px));
+        max-width: none;
+        margin: 18px auto;
+        overflow: visible;
+      }
+      .wide-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 390px); gap: 18px; align-items: start; }
+      main { padding-right: 0; }
+      .quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .quick-card { min-height: 86px; padding: 12px 14px; }
+      .wide-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+      .ryder-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr) minmax(170px, .7fr); }
+      .route-panel {
+        position: sticky;
+        top: 18px;
+        width: auto;
+        background: rgba(17,24,39,0.98);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        overflow: hidden;
+        margin: 18px 0;
+        max-height: calc(100vh - 36px);
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: #64748b rgba(15,23,42,.7);
+      }
+      .route-panel::-webkit-scrollbar { width: 8px; }
+      .route-panel::-webkit-scrollbar-thumb { background: #64748b; border-radius: 999px; }
+    }
+    .route-panel { display: none; }
+    @media (min-width: 960px) { .route-panel { display: block; } }
+
+    .rp-head {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .rp-head h3 { margin: 0; font-size: .82rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+    .rp-head span { font-size: .72rem; color: var(--muted); font-weight: 700; }
+    .rp-empty { padding: 20px 16px; color: var(--muted); font-size: .82rem; text-align: center; }
+    .rp-timeline { padding: 10px 0 14px; }
+    .rp-stop {
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 0 10px;
+      padding: 8px 16px 8px 10px;
+      position: relative;
+      border-left: 3px solid transparent;
+      transition: background .15s ease, border-color .15s ease;
+    }
+    .rp-stop:hover { background: rgba(255,255,255,.05); border-left-color: #f3c7cf; }
+    .rp-stop.is-current { background: rgba(127,29,45,.14); border-left-color: #f3c7cf; }
+    .rp-indicator {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+    .rp-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      border: 2px solid var(--line);
+      background: var(--panel);
+      display: grid;
+      place-items: center;
+      font-size: .6rem;
+      font-weight: 900;
+      flex-shrink: 0;
+      z-index: 1;
+    }
+    .rp-dot.done { background: rgba(16,185,129,.18); border-color: #10b981; color: #10b981; }
+    .rp-dot.open { background: rgba(245,158,11,.14); border-color: var(--amber); color: var(--amber); }
+    .rp-dot.current { background: rgba(239,68,68,.98); border-color: #fecaca; color: #fff; width:26px; height:26px; font-size:.68rem; position: relative; animation: currentPulse 1.45s ease-in-out infinite; box-shadow: 0 0 0 0 rgba(239,68,68,.55); }
+    @keyframes currentPulse {
+      0% { box-shadow: 0 0 0 0 rgba(239,68,68,.6); transform: scale(1); }
+      70% { box-shadow: 0 0 0 12px rgba(239,68,68,0); transform: scale(1.05); }
+      100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); transform: scale(1); }
+    }
+    .rp-line {
+      width: 2px;
+      flex: 1;
+      min-height: 14px;
+      background: var(--line);
+      margin: 2px auto 0;
+    }
+    .rp-stop:last-child .rp-line { display: none; }
+    .rp-content { padding-bottom: 4px; min-width: 0; }
+    .rp-plant { font-weight: 900; font-size: .9rem; line-height: 1.1; display: flex; align-items: center; gap: 6px; }
+    .rp-current-tag { font-size: .58rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; background: rgba(127,29,45,.4); color: #f3c7cf; padding: 2px 5px; border-radius: 5px; }
+    .rp-times { font-size: .72rem; color: var(--muted); margin-top: 3px; font-weight: 700; }
+    .rp-loads { font-size: .72rem; margin-top: 4px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .rp-load-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-weight: 900;
+      font-size: .65rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .rp-load-chip.in { background: rgba(100,116,139,.18); color: #94a3b8; border: 1px solid rgba(100,116,139,.3); }
+    .rp-load-chip.out { background: rgba(127,29,45,.2); color: #f3c7cf; border: 1px solid rgba(127,29,45,.35); }
+    .rp-load-chip.empty { background: rgba(30,41,59,.4); color: #64748b; border: 1px solid rgba(100,116,139,.18); }
+    .rp-parts { font-size: .72rem; color: var(--muted); margin-top: 3px; }
+    .rp-footer { padding: 10px 14px 14px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+    .rp-footer a { display: block; text-align: center; padding: 9px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid var(--line); font-size: .76rem; font-weight: 900; color: var(--muted); }
+    .rp-footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   </style>
 </head>
 <body>
@@ -229,6 +357,7 @@
       {% endif %}
     {% endwith %}
 
+    <div class="wide-body">
     <main>
       <section class="card hero">
         {% if active_task %}
@@ -286,59 +415,127 @@
         {% endif %}
       </section>
 
-      <section class="list">
-        <div class="section-head">
-          <h2>Up Next</h2>
-          <span>{{ queued_tasks|length }} queued - {{ hot_task_count }} hot</span>
-        </div>
-        <div class="card">
-          {% if queued_tasks %}
-            {% for task in queued_tasks %}
-              <div class="list-item">
-                <span class="badge {% if task.is_hot %}hot{% elif task.status == 'in-progress' %}progress{% else %}ok{% endif %}">{{ 'Hot' if task.is_hot else task.status }}</span>
-                <div class="item-title">{{ task.title }}</div>
-                <p class="item-meta">{{ task.details or 'No extra details' }}</p>
-                <p class="item-meta"><a class="muted" href="{{ url_for('driver.view_task', task_id=task.id) }}">Details</a></p>
-              </div>
-            {% endfor %}
-          {% else %}
-            <div class="list-item">
-              <div class="item-title">Queue clear</div>
-              <p class="item-meta">No additional assigned work is waiting.</p>
-            </div>
-          {% endif %}
-        </div>
+      <section class="wide-actions" aria-label="Desktop driver actions">
+        <a class="button ghost" href="{{ url_for('driver.damage_reports') }}">Damage Reports</a>
+        <a class="button ghost" href="{{ url_for('driver.driver_logs_print') }}">Print Route</a>
+        <a class="button ghost" href="{{ url_for('driver.end_of_day_summary') }}">Finalize Route</a>
+        <a class="button ghost" href="{{ url_for('driver.mobile_history') }}">Route History</a>
       </section>
 
-
-
       <section class="list">
         <div class="section-head">
-          <h2>Recent Transfers</h2>
-          <a class="muted" href="{{ url_for('driver.plant_transfers') }}">View all</a>
+          <h2>Ryder Service</h2>
+          <span>Truck issue follow-up</span>
         </div>
-        <div class="card">
-          {% if recent_transfers %}
-            {% for transfer in recent_transfers %}
-              <a class="transfer-row" href="{{ url_for('driver.view_plant_transfer', transfer_id=transfer.id) }}">
-                <div>
-                  <div class="route">{{ transfer.ship_from }} to {{ transfer.ship_to }}</div>
-                  <p class="item-meta mono">Trailer {{ transfer.trailer_number or 'not set' }} - {{ transfer.lines|length }} line(s)</p>
-                </div>
-                <span class="badge ok">Logged</span>
-              </a>
-            {% endfor %}
-          {% else %}
-            <div class="transfer-row">
-              <div>
-                <div class="route">No transfers yet</div>
-                <p class="item-meta">Create one when you move parts between plants.</p>
+        <div class="card ryder-panel">
+          <form class="ryder-form" method="POST" action="{{ url_for('driver.mobile_ryder_service') }}">
+            <div class="ryder-grid">
+              <div class="ryder-field">
+                <label for="ryderTruck">Truck</label>
+                <input id="ryderTruck" class="ryder-input" name="truck_number" value="{{ todays_pretrip.truck_number if todays_pretrip else '' }}" placeholder="Truck number">
+              </div>
+              <div class="ryder-field">
+                <label for="ryderIssue">Problem</label>
+                <input id="ryderIssue" class="ryder-input" name="issue" placeholder="What is wrong with the truck?" required>
+              </div>
+              <div class="ryder-field">
+                <label for="ryderOutcome">Outcome</label>
+                <select id="ryderOutcome" class="ryder-select" name="outcome" required>
+                  <option value="">Choose outcome</option>
+                  <option value="fixed">Fixed at Ryder</option>
+                  <option value="left">Left it at Ryder</option>
+                  <option value="rental">Got rental truck</option>
+                </select>
               </div>
             </div>
-          {% endif %}
+            <div class="ryder-field">
+              <label for="ryderNotes">Notes</label>
+              <textarea id="ryderNotes" class="ryder-textarea" name="notes" placeholder="What did Ryder say? What truck did you leave with?"></textarea>
+            </div>
+            <button class="ryder-submit" type="submit">Save Ryder Note</button>
+          </form>
+          <div class="ryder-history">
+            {% for event in recent_ryder_events %}
+              <div class="ryder-entry">
+                <strong>{{ event.title }}</strong>
+                <span>{{ event.details }}</span>
+              </div>
+            {% else %}
+              <div class="ryder-entry">
+                <strong>No Ryder notes today</strong>
+                <span>Use this when you take a truck in, leave it for repair, or switch to a rental.</span>
+              </div>
+            {% endfor %}
+          </div>
         </div>
       </section>
     </main>
+
+    <aside class="route-panel">
+      <div class="rp-head">
+        <h3>Today's Route</h3>
+        <span>{{ todays_logs|length }} stop{{ 's' if todays_logs|length != 1 else '' }}</span>
+      </div>
+      {% if todays_logs %}
+      <div class="rp-timeline">
+        {% for dl in todays_logs %}
+        {% set r = (todays_log_routes or {}).get(dl.id) %}
+        {% set is_done = dl.depart_time %}
+        {% set is_current = current_stop and dl.id == current_stop.id %}
+        <a class="rp-stop {% if is_current %}is-current{% endif %}" href="{{ url_for('driver.view_driver_log', log_id=dl.id) }}" title="Open {{ r.plant if r else dl.plant_name }} stop">
+          <div class="rp-indicator">
+            <div class="rp-dot {% if is_current %}current{% elif is_done %}done{% else %}open{% endif %}">
+              {% if is_done %}✓{% elif is_current %}●{% else %}○{% endif %}
+            </div>
+            <div class="rp-line"></div>
+          </div>
+          <div class="rp-content">
+            <div class="rp-plant">
+              {{ r.plant if r else dl.plant_name }}
+              {% if is_current %}<span class="rp-current-tag">here now</span>{% endif %}
+            </div>
+            <div class="rp-times">
+              {{ dl.arrive_time|to_local_time if dl.arrive_time else '—' }}
+              {% if dl.depart_time %} → {{ dl.depart_time|to_12h_format }}{% else %} → open{% endif %}
+            </div>
+            {% if r %}
+            <div class="rp-loads">
+              <span class="rp-load-chip in {% if r.arrive_cargo_desc == 'Empty' %}empty{% endif %}">
+                In: {{ r.arrive_cargo_desc }}
+              </span>
+              {% if dl.no_pickup %}
+                <span class="rp-load-chip out empty">Out: No Pickup</span>
+              {% elif r.depart_cargo_desc is none %}
+                <span class="rp-load-chip out empty">Out: --</span>
+              {% else %}
+                <span class="rp-load-chip out {% if r.depart_cargo_desc == 'Empty' %}empty{% endif %}">
+                  Out: {{ r.depart_cargo_desc }}
+                </span>
+              {% endif %}
+            </div>
+            {% endif %}
+            {% if dl.part_number or dl.no_pickup %}
+            <div class="rp-parts">
+              {% if dl.no_pickup %}No pickup{% elif dl.hot_parts %}🔥 {{ dl.part_number }}{% else %}{{ dl.part_number }}{% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="rp-empty">No stops logged yet today.</div>
+      {% endif %}
+      <div class="rp-footer">
+        <a href="{{ url_for('driver.driver_logs') }}">View full log</a>
+        <div class="rp-footer-grid">
+          <a href="{{ url_for('driver.new_driving_log') }}">Add Stop</a>
+          <a href="{{ url_for('driver.new_damage_report') }}">Damage</a>
+        </div>
+      </div>
+    </aside>
+
+    </div>{# end wide-body #}
   </div>
 
   <nav class="side-nav" aria-label="Driver wide navigation">

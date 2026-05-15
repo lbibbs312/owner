@@ -7,6 +7,7 @@ Create Date: 2026-05-13 00:00:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 revision = "a1b2c3d4e5f6"
@@ -15,14 +16,24 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
-    with op.batch_alter_table("task", schema=None) as batch_op:
-        batch_op.add_column(sa.Column("part_number", sa.String(length=80), nullable=True))
+def _column_names(table_name):
+    return {column["name"] for column in inspect(op.get_bind()).get_columns(table_name)}
 
+
+def upgrade():
+    task_columns = _column_names("task")
+    with op.batch_alter_table("task", schema=None) as batch_op:
+        if "part_number" not in task_columns:
+            batch_op.add_column(sa.Column("part_number", sa.String(length=80), nullable=True))
+
+    driver_log_columns = _column_names("driver_log")
     with op.batch_alter_table("driver_log", schema=None) as batch_op:
-        batch_op.add_column(sa.Column("part_number", sa.String(length=80), nullable=True))
-        batch_op.add_column(sa.Column("hot_parts", sa.Boolean(), nullable=True))
-        batch_op.add_column(sa.Column("no_pickup", sa.Boolean(), nullable=True))
+        if "part_number" not in driver_log_columns:
+            batch_op.add_column(sa.Column("part_number", sa.String(length=80), nullable=True))
+        if "hot_parts" not in driver_log_columns:
+            batch_op.add_column(sa.Column("hot_parts", sa.Boolean(), nullable=True))
+        if "no_pickup" not in driver_log_columns:
+            batch_op.add_column(sa.Column("no_pickup", sa.Boolean(), nullable=True))
 
 
 def downgrade():

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Audit History</h1>
+    <a class="btn btn-outline-secondary" href="{{ url_for('manager.review_dashboard') }}">Review</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Record</th><th>Reason</th><th>Before</th><th>After</th></tr></thead>
+      <tbody>
+        {% for event in audit_events %}
+          <tr>
+            <td>{{ event.created_at|to_detroit_datetime }}</td>
+            <td>{{ event.user.display_name }}</td>
+            <td>{{ event.action }}</td>
+            <td>{{ event.target_type }} #{{ event.target_id }}</td>
+            <td>{{ event.reason }}</td>
+            <td><code class="small">{{ event.before_values }}</code></td>
+            <td><code class="small">{{ event.after_values }}</code></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="text-muted">No audit events recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,21 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="{{ 'container-fluid manager-log-shell' if current_user.role == 'management' else 'container' }} slide-in">
+<div class="container-fluid driver-log-shell slide-in">
   {% set logs_endpoint = 'manager.driver_logs' if current_user.role == 'management' else 'driver.driver_logs' %}
   {% if current_user.role == 'management' %}<script>document.body.classList.add('manager-logs-active');</script>{% endif %}
   <style>
     body.manager-logs-active .container.mt-4.fade-in { max-width:none; width:100%; padding-left:0; padding-right:0; }
-    .log-route { display:inline-flex; align-items:center; gap:8px; white-space:nowrap; font-weight:800; }
-    .log-route-arrow { font-size:1.1rem; font-weight:900; color:#7f1d2d; }
-    .log-route.open .log-route-arrow { color:#dc2626; }
-    .log-route-state { display:block; margin-top:3px; font-size:.72rem; color:#64748b; font-weight:700; }
-    .manager-log-shell { width:100%; max-width:none; padding-left:16px; padding-right:16px; }
-    .manager-log-shell .table-responsive { overflow-x:auto; }
-    .manager-log-shell table { width:100%; min-width:0; }
-    .manager-log-shell th, .manager-log-shell td { vertical-align:middle; }
-    .manager-log-shell th, .manager-log-shell td { padding:.72rem .48rem; font-size:.88rem; }
-    .manager-log-shell .route-cell { white-space:nowrap; }
-    @media (min-width:1200px) { .manager-log-shell { padding-left:24px; padding-right:24px; } }
+    .driver-log-shell { width:100%; max-width:none; padding-left:16px; padding-right:16px; }
+    .driver-log-shell .table-responsive { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .driver-log-table { width:100%; min-width:1280px; table-layout:auto; }
+    .driver-log-table th, .driver-log-table td { vertical-align:middle; padding:.7rem .55rem; font-size:.88rem; overflow-wrap:normal; word-break:normal; }
+    .driver-log-table th { white-space:nowrap; line-height:1.15; }
+    .driver-log-table .route-cell { min-width:190px; }
+    .driver-log-table .cargo-cell { min-width:170px; }
+    .driver-log-table .parts-cell { min-width:110px; }
+    .driver-log-table .time-cell { min-width:86px; white-space:nowrap; }
+    .driver-log-table .actions-cell { min-width:210px; }
+    .driver-log-table .actions-cell .btn { white-space:nowrap; line-height:1.1; }
+    .driver-log-table .actions-cell form { margin:0; }
+    .log-route-state { display:block; margin-top:3px; font-size:.72rem; color:#64748b; font-weight:700; line-height:1.25; }
+    .cargo-stack { display:grid; gap:2px; line-height:1.2; }
+    .cargo-label { color:#64748b; font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+    @media (min-width:1200px) { .driver-log-shell { padding-left:24px; padding-right:24px; } }
   </style>
   {% set log_view_endpoint = 'manager.view_driver_log' if current_user.role == 'management' else 'driver.view_driver_log' %}
   <h2 class="mt-3">Driver Logs</h2>
@@ -77,7 +82,7 @@
   
   {% if logs %}
     <div class="table-responsive">
-    <table class="table table-striped align-middle">
+    <table class="table table-striped align-middle driver-log-table">
       <thead>
         <tr>
           <th>Driver</th>
@@ -85,8 +90,7 @@
           <th>Department</th>
           <th>Date</th>
           <th>Plant</th>
-          {% if current_user.role == 'management' %}<th>Route</th>{% endif %}
-          <th>Load</th>
+          <th>Cargo In / Out</th>
           <th>Parts</th>
           <th>Maintenance</th>
           <th>Fuel</th>
@@ -104,56 +108,39 @@
             <td>{{ log.driver.department or '--' }}</td>
             <td>{{ log.date }}</td>
             
-            <!-- Plant & Address -->
-            <td>
-              {{ log.plant_name }}
-              {% if log.plant_name in PLANT_ADDRESSES %}
-                <br>
-                <small class="text-muted">
-                  {{ PLANT_ADDRESSES[log.plant_name] }}
-                </small>
-              {% endif %}
-            </td>
-            
-            {% if current_user.role == 'management' %}
-              {% set route = (log_routes or {}).get(log.id) %}
-              <td class="route-cell">
-                {% if route %}
-                  {% if route.single %}
-                    <span class="log-route {{ route.class }}">
-                      <span>{{ route.origin }}</span>
-                      <span>{{ route.destination }}</span>
-                    </span>
-                  {% else %}
-                    <span class="log-route {{ route.class }}">
-                      <span>{{ route.origin }}</span>
-                      <span class="log-route-arrow">{{ route.arrow }}</span>
-                      <span>{{ route.destination }}</span>
-                    </span>
-                  {% endif %}
-                  <span class="log-route-state">{{ route.state }}</span>
-                {% else %}
-                  --
-                {% endif %}
-              </td>
-            {% endif %}
+            {% set route = (log_routes or {}).get(log.id) %}
 
-            <td>
-              {% if log.load_size == "Full" %}
-                <span class="badge bg-success">Full</span>
-              {% elif log.load_size == "Partial" %}
-                <span class="badge bg-warning text-dark">Partial</span>
-              {% elif log.load_size == "Half" %}
-                <span class="badge bg-primary">Half</span>
-              {% elif log.load_size == "Quarter" %}
-                <span class="badge bg-info text-dark">Quarter</span>
-              {% elif log.load_size == "Empty" %}
-                <span class="badge bg-secondary">Empty</span>
-              {% else %}
-                <span class="badge bg-secondary">{{ log.load_size }}</span>
+            <!-- Plant column: just where the driver is parked -->
+            <td class="route-cell">
+              <span class="fw-bold">{{ route.plant if route else log.plant_name }}</span>
+              {% if route %}
+                <span class="log-route-state">{{ route.action }} · {{ route.state }}</span>
+              {% endif %}
+              {% if log.plant_name in PLANT_ADDRESSES %}
+                <br><small class="text-muted">{{ PLANT_ADDRESSES[log.plant_name] }}</small>
               {% endif %}
             </td>
-            <td>
+
+            <!-- Cargo column: named loads (e.g. "Helios load"), not just badge sizes -->
+            <td class="cargo-cell">
+              {% if route %}
+                <div class="cargo-stack">
+                  <span class="cargo-label">In</span>
+                  <span class="fw-semibold">{{ route.arrive_cargo_desc }}</span>
+                  <span class="cargo-label">Out</span>
+                {% if route.depart_desc is none %}
+                  <span class="text-muted">--</span>
+                {% elif log.no_pickup %}
+                  <span class="badge bg-dark">No Pickup</span>
+                {% else %}
+                  <span class="fw-semibold">{{ route.depart_cargo_desc }}</span>
+                {% endif %}
+                </div>
+              {% else %}
+                {{ log.load_size }}
+              {% endif %}
+            </td>
+            <td class="parts-cell">
               {% if log.no_pickup %}
                 <span class="badge bg-dark">No Pickup</span>
               {% else %}
@@ -166,7 +153,7 @@
             <td>{% if log.meeting %}<span class="badge bg-info text-dark">Yes</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
             
             <!-- Arrival (assumes it's a full datetime) -->
-            <td>
+            <td class="time-cell">
               {% if log.arrive_time %}
                 {{ log.arrive_time|to_local_time }}
               {% else %}
@@ -175,7 +162,7 @@
             </td>
             
             <!-- Departure (assumes it's stored as "HH:MM" or a short string) -->
-            <td>
+            <td class="time-cell">
               {% if log.depart_time %}
                 {{ log.depart_time|to_12h_format }}
                 {% if log.depart_edited_at %}
@@ -189,7 +176,7 @@
               {% endif %}
             </td>
             
-            <td>
+            <td class="actions-cell">
               {% set can_manage_log = current_user.role == 'driver' and log.driver_id == current_user.id %}
               {% set can_delete_log = can_manage_log and log.date == today_local_date %}
               <div class="d-flex flex-wrap gap-1">
@@ -208,13 +195,7 @@
                     Edit
                   </a>
                   {% if not log.depart_time %}
-                    <a href="{{ url_for('driver.pickup_driver_log', log_id=log.id) }}" class="btn btn-sm btn-primary hover-btn">Pickup</a>
-                    <form action="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" method="POST" class="d-inline">
-                      <button type="submit" class="btn btn-sm btn-success hover-btn">Depart</button>
-                    </form>
-                    <form action="{{ url_for('driver.no_pickup_driver_log', log_id=log.id) }}" method="POST" class="d-inline">
-                      <button type="submit" class="btn btn-sm btn-outline-dark hover-btn">No Pickup</button>
-                    </form>
+                    <a href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" class="btn btn-sm btn-success hover-btn">Depart / Load</a>
                   {% endif %}
                   {% if can_delete_log %}
                     <form action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this driver log?');">

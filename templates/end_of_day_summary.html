@@ -57,16 +57,19 @@
             <th>Plant</th>
             <th>Arrive</th>
             <th>Depart</th>
-            <th>Load</th>
+            <th>Cargo In</th>
+            <th>Cargo Out</th>
           </tr>
         </thead>
         <tbody>
           {% for log in drivers_logs[current_user.display_name] %}
+          {% set route = (log_routes or {}).get(log.id) %}
           <tr>
-            <td>{{ log.plant_name }}</td>
+            <td>{{ route.plant if route else log.plant_name }}</td>
             <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
             <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
-            <td>{{ log.load_size }}</td>
+            <td>{{ route.arrive_desc if route else log.load_size }}</td>
+            <td>{% if route and route.depart_desc is none %}--{% elif route %}{{ route.depart_desc }}{% else %}{{ log.depart_load_size or '--' }}{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>

@@ -1,7 +1,7 @@
 from datetime import date
 
 from flask_wtf import FlaskForm
-from wtforms import DateField, SelectField, StringField, SubmitField
+from wtforms import DateField, SelectField, StringField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, Optional
 
 from app.services.plant_addresses import PLANT_ADDRESSES
@@ -20,6 +20,8 @@ class PlantTransferForm(FlaskForm):
     ship_from = SelectField("Ship From", choices=_plant_choices, validators=[DataRequired()])
     trailer_number = StringField("Trailer No.", validators=[Optional()])
     driver_name = StringField("Driver", validators=[Optional()])
+    driver_initials = StringField("Driver Initials", validators=[Optional()])
     transfer_time = StringField("Time", validators=[Optional()])
     loaded_by = StringField("Loaded By", validators=[Optional()])
+    edit_reason = TextAreaField("Edit Reason", validators=[Optional()])
     submit = SubmitField("Save Plant Transfer")

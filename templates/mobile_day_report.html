@@ -90,8 +90,9 @@
           {% set can_manage_log = report_date == today_local_date %}
           <div class="row">
             <div>
-              <p class="title">{{ log.plant_name }}</p>
-              <p class="meta">Arrive {{ log.arrive_time|to_local_time if log.arrive_time else '--' }} - Depart {{ log.depart_time|to_12h_format if log.depart_time else '--' }} - {{ log.load_size }}{% if log.no_pickup %} - No Pickup{% endif %}{% if log.part_number %} - {{ log.part_number }}{% endif %}</p>
+              {% set route = report.route %}
+              <p class="title">{{ route.plant if route else log.plant_name }}</p>
+              <p class="meta">Arrive {{ log.arrive_time|to_local_time if log.arrive_time else '--' }} - Depart {{ log.depart_time|to_12h_format if log.depart_time else '--' }} - In {{ route.arrive_desc if route else log.load_size }} - Out {% if route and route.depart_desc is none %}--{% elif route %}{{ route.depart_desc }}{% else %}{{ log.depart_load_size or '--' }}{% endif %}{% if log.no_pickup %} - No Pickup{% endif %}{% if log.part_number %} - {{ log.part_number }}{% endif %}</p>
               {% if report.freight %}
                 {% for freight in report.freight %}
                   <p class="meta">Trailer {{ freight.trailer }} - {{ freight.route }} - {{ freight.parts|join('; ') }}</p>

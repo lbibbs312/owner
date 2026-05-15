@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h3 mb-1">Weekly Savings</h1>
+      <p class="text-muted mb-0">{{ metrics.week_start }} to {{ metrics.week_end }}</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('manager.review_dashboard') }}">Review</a>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Completed Moves</div><div class="display-6">{{ metrics.completed_moves }}</div></div></div>
+    <div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Missing Paperwork Prevented</div><div class="display-6">{{ metrics.missing_paperwork_prevented }}</div></div></div>
+    <div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Supervisor Time Saved</div><div class="display-6">{{ metrics.supervisor_minutes_saved }}m</div></div></div>
+  </div>
+
+  <table class="table align-middle">
+    <tbody>
+      <tr><th>Plant transfer records with trailer, driver, time, and initials</th><td>{{ metrics.complete_transfer_count }} / {{ metrics.total_transfer_count }} ({{ metrics.transfer_completion_rate }}%)</td></tr>
+      <tr><th>Missing or incomplete transfer records</th><td>{{ metrics.incomplete_transfer_count }}</td></tr>
+      <tr><th>Same-day pre-trip/DVIR packets</th><td>{{ metrics.same_day_pretrip_count }}</td></tr>
+      <tr><th>Hot moves completed with full timestamps</th><td>{{ metrics.hot_moves_completed_with_timestamps }} / {{ metrics.hot_move_count }}</td></tr>
+      <tr><th>Delayed dock events found</th><td>{{ metrics.delayed_dock_count }}</td></tr>
+      <tr><th>Damage reports with photos</th><td>{{ metrics.damage_reports_with_photos }} / {{ metrics.damage_report_count }}</td></tr>
+      <tr><th>Wrong-location or unclear-dispatch events</th><td>{{ metrics.wrong_location_or_unclear_dispatch_count }}</td></tr>
+      <tr><th>Gage-tracking follow-ups</th><td>{{ metrics.gage_tracking_followup_count }}</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="h5 mt-4">Dock Wait Averages</h2>
+  <table class="table table-sm">
+    <thead><tr><th>Plant</th><th>Average Wait</th><th>Records</th></tr></thead>
+    <tbody>
+      {% for row in metrics.plant_averages %}
+        <tr><td>{{ row.plant }}</td><td>{{ row.average_wait }} min</td><td>{{ row.records }}</td></tr>
+      {% else %}
+        <tr><td colspan="3" class="text-muted">No dock wait data recorded.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

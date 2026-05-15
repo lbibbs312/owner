@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4 responsive-workspace">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-1">{% if is_edit|default(false) %}Edit Damage Report{% else %}Damage Report{% endif %}</h1>
+      <p class="text-muted mb-0 small">Open reports remain editable until you submit them or finalize the route.</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('driver.damage_reports') }}">History</a>
+  </div>
+  <form method="POST" enctype="multipart/form-data" class="border rounded p-3 responsive-form-panel">
+    {{ form.hidden_tag() }}
+    <div class="row g-3">
+      <div class="col-sm-6 col-xl-3">{{ form.truck_number.label(class="form-label") }}{{ form.truck_number(class="form-control") }}</div>
+      <div class="col-sm-6 col-xl-3">{{ form.trailer_number.label(class="form-label") }}{{ form.trailer_number(class="form-control") }}</div>
+      <div class="col-sm-6 col-xl-3">{{ form.plant_name.label(class="form-label") }}{{ form.plant_name(class="form-select") }}</div>
+      <div class="col-sm-6 col-xl-3">{{ form.stage.label(class="form-label") }}{{ form.stage(class="form-select") }}</div>
+      <div class="col-lg-5">{{ form.move_reference.label(class="form-label") }}{{ form.move_reference(class="form-control", placeholder="Task, transfer, dock, or move reference") }}</div>
+      <div class="col-lg-7">{{ form.photo.label(class="form-label") }}{{ form.photo(class="form-control", accept="image/*") }}</div>
+      <div class="col-12">{{ form.description.label(class="form-label") }}{{ form.description(class="form-control", rows="5") }}</div>
+    </div>
+    <div class="mt-3 d-flex flex-wrap gap-2">
+      {{ form.submit(class="btn btn-primary", value=("Update Damage Report" if is_edit|default(false) else "Save Damage Report")) }}
+      {% if report %}<a class="btn btn-outline-secondary" href="{{ url_for('driver.view_damage_report', report_id=report.id) }}">Cancel</a>{% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -12,6 +12,51 @@
     .status-chip.open { background:#fff1f2; color:#be123c; }
     .status-chip.done { background:#dcfce7; color:#166534; }
     .print-title { display:none; }
+    .report-section { margin-top:18px; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; }
+    .report-section-head { background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:10px 16px; font-size:.75rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; color:#475569; }
+    .report-section-head.red { background:#fff1f2; color:#be123c; border-color:#fecdd3; }
+    .report-section-head.amber { background:#fffbeb; color:#92400e; border-color:#fde68a; }
+    .report-section-body { padding:14px 16px; display:flex; flex-direction:column; gap:10px; }
+    .report-row { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; font-size:.875rem; }
+    .report-row-label { font-weight:700; color:#334155; min-width:120px; }
+    .report-row-val { color:#0f172a; font-weight:900; text-align:right; }
+    .delay-item { background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:10px 12px; }
+    .delay-item .plant { font-weight:900; color:#0f172a; font-size:.875rem; }
+    .delay-item .detail { color:#92400e; font-size:.8rem; margin-top:3px; }
+    .damage-item { background:#fff1f2; border:1px solid #fecdd3; border-radius:8px; padding:10px 12px; }
+    .damage-item .plant { font-weight:900; color:#be123c; font-size:.875rem; }
+    .damage-item .detail { color:#0f172a; font-size:.8rem; margin-top:3px; }
+    .damage-item .dmeta { color:#64748b; font-size:.75rem; margin-top:3px; }
+    .stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    .stat-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; text-align:center; }
+    .stat-card .sv { font-size:1.4rem; font-weight:900; color:#0f172a; }
+    .stat-card .sl { font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; color:#64748b; margin-top:2px; }
+    @media (max-width:900px) { .stat-grid { grid-template-columns:1fr 1fr; } }
+    .route-log-table { width:100%; border-collapse:collapse; font-size:.83rem; margin-top:0; }
+    .route-log-table th { padding:7px 10px; text-align:left; font-size:.65rem; font-weight:900; text-transform:uppercase; letter-spacing:.07em; color:#64748b; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+    .route-log-table td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+    .route-log-table tr.current-stop td { background:#eff6ff; }
+    .route-log-table tr.open-stop td { background:#fff1f2; }
+    .rlt-route { font-weight:800; color:#0f172a; white-space:nowrap; }
+    .rlt-route-arrow { font-weight:900; color:#7f1d2d; margin:0 4px; }
+    .rlt-load { font-size:.75rem; color:#475569; margin-top:3px; }
+    .rlt-load-val { font-weight:900; }
+    .current-stop-marker { display:inline-block; background:#2563eb; color:#fff; font-size:.6rem; font-weight:900; padding:1px 5px; border-radius:4px; margin-left:4px; text-transform:uppercase; vertical-align:middle; }
+    @media print {
+      .route-log-table { font-size:8.5pt; }
+      .route-log-table th { font-size:7pt; padding:4px 6px; }
+      .route-log-table td { padding:5px 6px; border-bottom:1px solid #ccc; }
+      .route-log-table tr.current-stop td { background:#e8f0ff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .route-log-table tr.open-stop td { background:#ffe8e8 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    }
+    @media print {
+      .report-section { border:1px solid #ccc; border-radius:0; break-inside:avoid; margin-top:.12in; }
+      .report-section-head { background:#eee !important; color:#000 !important; padding:5px 10px; font-size:8pt; }
+      .report-section-body { padding:8px 10px; gap:6px; }
+      .delay-item, .damage-item { background:#fff !important; border:1px solid #999; border-radius:0; padding:5px 8px; }
+      .stat-card { background:#fff !important; border:1px solid #999; }
+      .stat-card .sv { font-size:1.1rem; }
+    }
     @media (max-width:900px) { .log-detail-grid { grid-template-columns:1fr; } }
     @media print {
       @page { size: Letter portrait; margin:.35in; }
@@ -30,8 +75,8 @@
   </style>
   {% if current_user.role == 'management' %}
     <div class="print-title">
-      <h1>LACKSDRIVERS MANAGEMENT DRIVER LOG</h1>
-      <p>Driver stop audit | Log ID {{ log.id }} | {{ log.date }}</p>
+      <h1>LACKSDRIVERS — DRIVER DAY LOG</h1>
+      <p>{{ log.driver.display_name }} &nbsp;|&nbsp; {{ log.date }} &nbsp;|&nbsp; {{ stop_count }} stop{{ 's' if stop_count != 1 else '' }} &nbsp;|&nbsp; Viewing stop #{{ stop_position }}</p>
     </div>
   {% endif %}
   <div class="d-flex justify-content-between align-items-center gap-2 no-print">
@@ -63,19 +108,140 @@
       </div>
     </div>
   {% endif %}
+
+  {% if current_user.role == 'management' %}
+  {# ── Performance Summary ── #}
+  <div class="report-section">
+    <div class="report-section-head">Driver Day Summary — {{ log.driver.display_name }} on {{ log.date }}</div>
+    <div class="report-section-body">
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="sv">{{ stop_count }}</div>
+          <div class="sl">Total Stops</div>
+        </div>
+        <div class="stat-card">
+          <div class="sv">{{ delay_logs|length }}</div>
+          <div class="sl">Delay Events</div>
+        </div>
+        <div class="stat-card">
+          <div class="sv">{% if avg_dock_wait is not none %}{{ avg_dock_wait }} min{% else %}—{% endif %}</div>
+          <div class="sl">Avg Dock Wait</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Full-day route table ── #}
+  {% if day_logs %}
+  <div class="report-section">
+    <div class="report-section-head">Full Day Route — All Stops</div>
+    <div style="overflow-x:auto;">
+      <table class="route-log-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Route</th>
+            <th>Arrive</th>
+            <th>Depart</th>
+            <th>Parts</th>
+            <th>Dock Wait</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for dl in day_logs %}
+          {% set r = (log_routes or {}).get(dl.id) %}
+          <tr class="{% if dl.id == log.id %}current-stop{% elif not dl.depart_time %}open-stop{% endif %}">
+            <td style="font-weight:900;color:#475569;">
+              {{ loop.index }}
+              {% if dl.id == log.id %}<span class="current-stop-marker">this stop</span>{% endif %}
+            </td>
+            <td>
+              {% if r %}
+                <div class="rlt-route">{{ r.plant }}</div>
+                <div class="rlt-load">
+                  In: <span class="rlt-load-val">{{ r.arrive_desc }}</span>
+                </div>
+                <div class="rlt-load">
+                  Out: <span class="rlt-load-val">
+                    {% if r.depart_desc is none %}—
+                    {% elif dl.no_pickup %}No Pickup
+                    {% else %}{{ r.depart_desc }}{% endif %}
+                  </span>
+                </div>
+              {% else %}
+                {{ dl.plant_name }}
+              {% endif %}
+            </td>
+            <td style="white-space:nowrap;">{{ dl.arrive_time|to_local_time if dl.arrive_time else '—' }}</td>
+            <td style="white-space:nowrap;">
+              {% if dl.depart_time %}{{ dl.depart_time|to_12h_format }}{% else %}<span style="color:#be123c;font-weight:900;">Open</span>{% endif %}
+            </td>
+            <td>
+              {% if dl.no_pickup %}<em style="color:#475569;">No Pickup</em>
+              {% elif dl.hot_parts %}<strong style="color:#be123c;">HOT</strong> {{ dl.part_number or '' }}
+              {% else %}{{ dl.part_number or '—' }}{% endif %}
+            </td>
+            <td style="white-space:nowrap;">
+              {% if dl.dock_wait_minutes %}{{ dl.dock_wait_minutes }} min{% else %}—{% endif %}
+              {% if dl.downtime_reason %}<div style="font-size:.75rem;color:#92400e;">{{ dl.downtime_reason }}</div>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Delays ── #}
+  {% if delay_logs %}
+  <div class="report-section">
+    <div class="report-section-head amber">Delay Report ({{ delay_logs|length }} event{{ 's' if delay_logs|length != 1 else '' }})</div>
+    <div class="report-section-body">
+      {% for dl in delay_logs %}
+      <div class="delay-item">
+        <div class="plant">Stop #{{ loop.index }} — {{ dl.plant_name }}</div>
+        <div class="detail">
+          {% if dl.dock_wait_minutes %}Dock wait: {{ dl.dock_wait_minutes }} min{% endif %}
+          {% if dl.dock_wait_minutes and dl.downtime_reason %} · {% endif %}
+          {% if dl.downtime_reason %}Reason: {{ dl.downtime_reason }}{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Damage Reports ── #}
+  {% if damage_reports %}
+  <div class="report-section">
+    <div class="report-section-head red">Damage Reports ({{ damage_reports|length }})</div>
+    <div class="report-section-body">
+      {% for dr in damage_reports %}
+      <div class="damage-item">
+        <div class="plant">{{ dr.plant_name }} — {{ dr.stage|title }} move <span style="font-weight:700;font-size:.75rem;">[{{ dr.status|upper }}]</span></div>
+        <div class="detail">{{ dr.description }}</div>
+        <div class="dmeta">Reported {{ dr.damage_time.strftime('%Y-%m-%d %H:%M') if dr.damage_time else '—' }}{% if dr.truck_number %} · Truck {{ dr.truck_number }}{% endif %}{% if dr.trailer_number %} · Trailer {{ dr.trailer_number }}{% endif %}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
   <p><strong>Date:</strong> {{ log.date }}</p>
   <p><strong>Plant Name:</strong> {{ log.plant_name }}</p>
   {% if current_user.role == 'management' and log_route %}
-    <p><strong>Route:</strong>
-      {% if log_route.single %}
-        {{ log_route.origin }} {{ log_route.destination }}
-      {% else %}
-        {{ log_route.origin }} <span style="font-weight:900;color:#7f1d2d;">{{ log_route.arrow }}</span> {{ log_route.destination }}
-      {% endif %}
-      <span class="text-muted">({{ log_route.state }})</span>
+    <p><strong>Stop:</strong> {{ log_route.plant }}
+      <span class="text-muted">&nbsp;·&nbsp;{{ log_route.action }} &nbsp;·&nbsp; {{ log_route.state }}</span>
+    </p>
+    <p><strong>Arriving with:</strong> {{ log_route.arrive_desc }}</p>
+    <p><strong>Departing with:</strong>
+      {% if log_route.depart_desc is none %}<span class="badge bg-secondary">Open stop</span>
+      {% elif log.no_pickup %}No Pickup
+      {% else %}{{ log_route.depart_desc }}{% endif %}
     </p>
   {% endif %}
-  <p><strong>Load Size:</strong> {{ log.load_size }}</p>
   {% if current_user.role == 'management' %}
     <p><strong>Stop Status:</strong>
       {% if log.depart_time %}

@@ -12,15 +12,19 @@ Now wired against app.models.Task / app.extensions.db like everything else.
 from datetime import date, datetime
 import re
 
-from flask import flash, jsonify, make_response, redirect, render_template, request, url_for
+from flask import current_app, flash, jsonify, make_response, redirect, render_template, request, url_for
 from flask_login import current_user
 from sqlalchemy import or_
 
 from app.blueprints.manager import bp
 from app.extensions import db, socketio
+from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
-from app.models import DriverLog, PlantTransfer, PreTrip, Task, User
+from app.models import AuditEvent, DamageReport, DriverLog, OperationalFollowUp, PlantTransfer, PreTrip, Task, User
 from app.services.activity import record_activity
+from app.services.operations import build_delay_report, build_exception_items, build_weekly_savings
+from app.services.load_state import build_driver_log_route_context
+from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
 from app.services.role_session import restore_role_user
 from app.blueprints.driver.routes import (
     _build_plant_transfer_pdf,
@@ -30,18 +34,6 @@ from app.blueprints.driver.routes import (
 
 
 TRIM_PLANTS = ("Trim DC", "PPL", "DC")
-PLANT_LABELS = {
-    "RE": "Raleigh East",
-    "RW": "Raleigh West",
-    "PC": "Plastic Center",
-    "PE": "Plastic East",
-    "PW": "Plastic West",
-    "KP": "Kraft Plant",
-    "PPL": "PPL",
-    "DC": "Distribution Center",
-    "Trim DC": "Trim DC",
-    "52DC": "52nd Street DC",
-}
 PART_TOKEN_RE = re.compile(r"\b[A-Z]*\d[A-Z0-9-]{3,}\b", re.IGNORECASE)
 
 
@@ -198,11 +190,6 @@ def _status_label(task):
     return task.status.replace("-", " ").title()
 
 
-def _plant_label(value):
-    value = (value or "").strip()
-    return PLANT_LABELS.get(value, value)
-
-
 def _parse_route(value):
     value = (value or "").strip()
     if not value:
@@ -340,41 +327,7 @@ def _driver_log_sort_key(log):
 
 
 def _driver_log_route_context(logs):
-    by_group = {}
-    for log in logs:
-        by_group.setdefault((log.driver_id, log.date), []).append(log)
-
-    routes = {}
-    for group_logs in by_group.values():
-        previous_plant = None
-        for log in sorted(group_logs, key=_driver_log_sort_key):
-            plant = (log.plant_name or "Unknown").strip()
-            completed = bool(log.depart_time)
-            same_plant_stop = previous_plant and previous_plant == plant
-            if same_plant_stop:
-                label = "No pickup at" if log.no_pickup else "Pickup at"
-                state = "No pickup logged" if log.no_pickup else ("Pickup completed" if completed else "Pickup open")
-                routes[log.id] = {
-                    "origin": label,
-                    "destination": _plant_label(plant),
-                    "arrow": "",
-                    "state": state,
-                    "class": "complete" if completed else "open",
-                    "single": True,
-                }
-            else:
-                origin = previous_plant or "Start"
-                state = "No pickup logged" if log.no_pickup else ("Completed stop" if completed else "Open stop")
-                routes[log.id] = {
-                    "origin": _plant_label(origin),
-                    "destination": _plant_label(plant),
-                    "arrow": "⇌" if completed else "→",
-                    "state": state,
-                    "class": "complete" if completed else "open",
-                    "single": False,
-                }
-            previous_plant = plant
-    return routes
+    return build_driver_log_route_context(logs)
 
 def _requested_url():
     return request.full_path if request.query_string else request.path
@@ -397,6 +350,119 @@ def require_management_role():
 @bp.route("/")
 def manager_root():
     return redirect(url_for("manager.manager_dashboard"))
+
+
+def _dock_delay_minutes():
+    return int(current_app.config.get("DOCK_DELAY_MINUTES", 30))
+
+
+def _exception_url(item):
+    target_type = item.get("target_type")
+    target_id = item.get("target_id")
+    if target_type == "plant_transfer":
+        return url_for("manager.view_plant_transfer", transfer_id=target_id)
+    if target_type == "driver_log":
+        return url_for("manager.view_driver_log", log_id=target_id)
+    if target_type == "task":
+        return url_for("manager.manage_task", task_id=target_id)
+    if target_type == "damage_report":
+        return url_for("manager.view_damage_report", report_id=target_id)
+    return None
+
+
+def _with_exception_urls(items):
+    rows = []
+    for item in items:
+        row = dict(item)
+        row["url"] = _exception_url(item)
+        rows.append(row)
+    return rows
+
+
+@bp.route("/review", methods=["GET", "POST"])
+def review_dashboard():
+    form = OperationalFollowUpForm()
+    if form.validate_on_submit():
+        followup = OperationalFollowUp(
+            created_by_id=current_user.id,
+            kind=form.kind.data,
+            plant_name=form.plant_name.data or None,
+            details=form.details.data,
+        )
+        db.session.add(followup)
+        db.session.commit()
+        record_activity(
+            user_id=current_user.id,
+            category="followup",
+            action="created",
+            title="Operational follow-up added",
+            details=f"{followup.kind.replace('_', ' ').title()}: {followup.details}",
+            target_type="followup",
+            target_id=followup.id,
+        )
+        flash("Follow-up added.", "success")
+        return redirect(url_for("manager.review_dashboard"))
+
+    exceptions = _with_exception_urls(build_exception_items(dock_delay_minutes=_dock_delay_minutes()))
+    metrics = build_weekly_savings(dock_delay_minutes=_dock_delay_minutes())
+    followups = OperationalFollowUp.query.order_by(OperationalFollowUp.created_at.desc()).limit(20).all()
+    damage_reports = DamageReport.query.order_by(DamageReport.created_at.desc()).limit(10).all()
+    return render_template(
+        "manager_review.html",
+        form=form,
+        exceptions=exceptions,
+        metrics=metrics,
+        followups=followups,
+        damage_reports=damage_reports,
+    )
+
+
+@bp.route("/exceptions")
+def exceptions_dashboard():
+    return redirect(url_for("manager.review_dashboard"))
+
+
+@bp.route("/followups/<int:followup_id>/close", methods=["POST"])
+def close_followup(followup_id):
+    followup = OperationalFollowUp.query.get_or_404(followup_id)
+    followup.status = "closed"
+    followup.resolved_at = datetime.utcnow()
+    db.session.commit()
+    record_activity(
+        user_id=current_user.id,
+        category="followup",
+        action="closed",
+        title="Operational follow-up closed",
+        details=followup.details,
+        target_type="followup",
+        target_id=followup.id,
+    )
+    flash("Follow-up closed.", "success")
+    return redirect(url_for("manager.review_dashboard"))
+
+
+@bp.route("/damage-reports/<int:report_id>")
+def view_damage_report(report_id):
+    report = DamageReport.query.get_or_404(report_id)
+    return render_template("view_damage_report.html", report=report, manager_view=True)
+
+
+@bp.route("/delays")
+def delay_finder():
+    delay_report = build_delay_report(dock_delay_minutes=_dock_delay_minutes())
+    return render_template("delay_finder.html", delay_report=delay_report)
+
+
+@bp.route("/weekly-savings")
+def weekly_savings():
+    metrics = build_weekly_savings(dock_delay_minutes=_dock_delay_minutes())
+    return render_template("weekly_savings.html", metrics=metrics)
+
+
+@bp.route("/audit-history")
+def audit_history():
+    audit_events = AuditEvent.query.order_by(AuditEvent.created_at.desc()).limit(100).all()
+    return render_template("audit_history.html", audit_events=audit_events)
 
 
 @bp.route("/dashboard", methods=["GET", "POST"])
@@ -446,6 +512,7 @@ def manager_dashboard():
         trim_driver_count=len(trim_drivers),
         has_drivers=bool(drivers),
         today=today,
+        manager_division=_division_for_user(current_user),
     )
 
 
@@ -557,15 +624,46 @@ def view_driver_log(log_id):
     )
     related_task = _related_task_for_log(log)
     stop_position = next((index + 1 for index, day_log in enumerate(day_logs) if day_log.id == log.id), None)
+
+    # Damage reports linked to this log or reported by this driver on this date
+    damage_reports = (
+        DamageReport.query
+        .filter(
+            db.or_(
+                DamageReport.driver_log_id == log.id,
+                db.and_(
+                    DamageReport.reported_by_id == log.driver_id,
+                    DamageReport.driver_log_id.is_(None),
+                    db.func.date(DamageReport.created_at) == log.date,
+                )
+            )
+        )
+        .order_by(DamageReport.created_at.desc())
+        .all()
+    )
+
+    # Delay detail: any stop on this driver/date with dock wait or downtime reason
+    delay_logs = [dl for dl in day_logs if (dl.dock_wait_minutes or 0) > 0 or dl.downtime_reason]
+
+    # Average dock wait across the day (stops that recorded a value)
+    wait_values = [dl.dock_wait_minutes for dl in day_logs if dl.dock_wait_minutes is not None]
+    avg_dock_wait = round(sum(wait_values) / len(wait_values), 1) if wait_values else None
+
+    all_routes = _driver_log_route_context(day_logs)
     return render_template(
         "view_driver_log.html",
         log=log,
-        log_route=_driver_log_route_context(day_logs).get(log.id),
+        log_route=all_routes.get(log.id),
+        log_routes=all_routes,
         truck_context=_truck_context_for_driver(log.driver_id, log.date),
         related_task=related_task,
         stop_position=stop_position,
         stop_count=len(day_logs),
         today_local_date=date.today(),
+        damage_reports=damage_reports,
+        delay_logs=delay_logs,
+        avg_dock_wait=avg_dock_wait,
+        day_logs=day_logs,
     )
 
 

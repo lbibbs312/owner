@@ -3,33 +3,44 @@
 
 <div class="container">
   <h2 class="mt-3">New Driving Log</h2>
-  <form method="POST" action="">
+  {% set active_load = current_load.value if current_load else 'Empty' %}
+  {% set active_secondary = current_load.secondary_value if current_load else '' %}
+  {% set active_destination = current_load.destination if current_load else '' %}
+  {% set active_secondary_destination = current_load.secondary_destination if current_load else '' %}
+  <div class="alert alert-light border fw-semibold">
+    In truck now: <span id="currentLoadLabel">{{ current_load.cargo_display if current_load else active_load }}</span>
+  </div>
+
+  <form method="POST" action="" id="arrivalForm" data-load-destination="{{ active_destination or '' }}" data-secondary-destination="{{ active_secondary_destination or '' }}">
     {{ form.hidden_tag() }}
+    <input type="hidden" name="load_size" value="{{ active_load }}">
+    <input type="hidden" name="secondary_load" value="{{ active_secondary }}">
 
-    <!-- Maintenance / Fuel / Meeting checkboxes -->
-    <div class="mb-3 form-check">
-      {{ form.maintenance(class="form-check-input") }}
-      {{ form.maintenance.label(class="form-check-label") }}
-    </div>
-    <div class="mb-3 form-check">
-      {{ form.fuel(class="form-check-input") }}
-      {{ form.fuel.label(class="form-check-label") }}
-    </div>
-    <div class="mb-3 form-check">
-      {{ form.meeting(class="form-check-input") }}
-      {{ form.meeting.label(class="form-check-label") }}
-    </div>
-
-    <!-- Plant Name -->
     <div class="mb-3">
-      {{ form.plant_name.label }}
-      {{ form.plant_name(class="form-select") }}
+      {{ form.plant_name.label(class="form-label") }}
+      {{ form.plant_name(class="form-select", id="arrivalPlant") }}
     </div>
 
-    <!-- Load Size -->
-    <div class="mb-3">
-      {{ form.load_size.label }}
-      {{ form.load_size(class="form-select") }}
+    <div id="unloadPanel" class="border rounded p-3 mb-3 d-none">
+      <div class="mb-3">
+        {{ form.unloaded_on_arrival.label(class="form-label") }}
+        {{ form.unloaded_on_arrival(class="form-select", id="unloadedOnArrival") }}
+      </div>
+      <div id="unloadReasonPanel" class="mb-0 d-none">
+        {{ form.unload_reason.label(class="form-label") }}
+        {{ form.unload_reason(class="form-control", rows="3") }}
+      </div>
+    </div>
+
+    <div id="secondaryUnloadPanel" class="border rounded p-3 mb-3 d-none">
+      <div class="mb-3">
+        {{ form.secondary_dropped_on_arrival.label(class="form-label") }}
+        {{ form.secondary_dropped_on_arrival(class="form-select", id="secondaryDroppedOnArrival") }}
+      </div>
+      <div id="secondaryReasonPanel" class="mb-0 d-none">
+        {{ form.secondary_unload_reason.label(class="form-label") }}
+        {{ form.secondary_unload_reason(class="form-control", rows="3") }}
+      </div>
     </div>
 
     <div class="mb-3 form-check">
@@ -37,13 +48,60 @@
       {{ form.hot_parts.label(class="form-check-label") }}
     </div>
     <div class="mb-3">
-      {{ form.part_number.label }}
+      {{ form.part_number.label(class="form-label") }}
       {{ form.part_number(class="form-control", placeholder="Part number from dispatch or shipper") }}
     </div>
 
-    <!-- Submit button -->
+    <div class="d-flex flex-wrap gap-3 mb-3">
+      <div class="form-check">{{ form.maintenance(class="form-check-input") }} {{ form.maintenance.label(class="form-check-label") }}</div>
+      <div class="form-check">{{ form.fuel(class="form-check-input") }} {{ form.fuel.label(class="form-check-label") }}</div>
+      <div class="form-check">{{ form.meeting(class="form-check-input") }} {{ form.meeting.label(class="form-check-label") }}</div>
+    </div>
+
     {{ form.submit(class="btn btn-primary") }}
   </form>
 </div>
+
+<script>
+(function () {
+  const form = document.getElementById('arrivalForm');
+  const plant = document.getElementById('arrivalPlant');
+  const unloadPanel = document.getElementById('unloadPanel');
+  const unloaded = document.getElementById('unloadedOnArrival');
+  const reasonPanel = document.getElementById('unloadReasonPanel');
+  const secondaryUnloadPanel = document.getElementById('secondaryUnloadPanel');
+  const secondaryDropped = document.getElementById('secondaryDroppedOnArrival');
+  const secondaryReasonPanel = document.getElementById('secondaryReasonPanel');
+  const destination = form.dataset.loadDestination;
+  const secondaryDestination = form.dataset.secondaryDestination;
+
+  function syncUnloadPanel() {
+    const isDestination = destination && plant.value === destination;
+    unloadPanel.classList.toggle('d-none', !isDestination);
+    if (!isDestination) {
+      unloaded.value = '';
+      reasonPanel.classList.add('d-none');
+    }
+
+    const isSecondaryDestination = secondaryDestination && plant.value === secondaryDestination;
+    secondaryUnloadPanel.classList.toggle('d-none', !isSecondaryDestination);
+    if (!isSecondaryDestination) {
+      secondaryDropped.value = '';
+      secondaryReasonPanel.classList.add('d-none');
+    }
+  }
+
+  function syncReasonPanel() {
+    reasonPanel.classList.toggle('d-none', unloaded.value !== 'no');
+    secondaryReasonPanel.classList.toggle('d-none', secondaryDropped.value !== 'no');
+  }
+
+  plant.addEventListener('change', syncUnloadPanel);
+  unloaded.addEventListener('change', syncReasonPanel);
+  secondaryDropped.addEventListener('change', syncReasonPanel);
+  syncUnloadPanel();
+  syncReasonPanel();
+})();
+</script>
 
 {% endblock %}
