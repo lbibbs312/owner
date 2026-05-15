@@ -9,6 +9,10 @@
       {{ form.maintenance(class="form-check-input") }}
       {{ form.maintenance.label(class="form-check-label") }}
     </div>
+    <div class="mb-3">
+      {{ form.truck_issue.label(class="form-label") }}
+      {{ form.truck_issue(class="form-control", rows="3", placeholder="CEL light, regen, breakdown, Ryder, rental truck, etc.") }}
+    </div>
     <div class="mb-3 form-check">
       {{ form.fuel(class="form-check-input") }}
       {{ form.fuel.label(class="form-check-label") }}

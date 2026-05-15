@@ -27,7 +27,7 @@ YES_NO_CHOICES = [("", "Select..."), ("yes", "Yes"), ("no", "No")]
 
 
 class DriverLogForm(FlaskForm):
-    maintenance = BooleanField("Maintenance")
+    maintenance = BooleanField("Truck Issue / Maintenance")
     fuel = BooleanField("Fuel")
     meeting = BooleanField("Meeting")
     plant_name = SelectField(
@@ -65,6 +65,7 @@ class DriverLogForm(FlaskForm):
         description="Enter Detroit local time like '545pm', '5:45pm', or '1:05pm'",
     )
     dock_wait_minutes = IntegerField("Dock Wait Minutes", validators=[Optional()])
+    truck_issue = TextAreaField("Truck issue details (CEL, regen, breakdown)", validators=[Optional()])
     edit_reason = TextAreaField("Edit Reason", validators=[Optional()])
     submit = SubmitField("Submit Log Entry")
 

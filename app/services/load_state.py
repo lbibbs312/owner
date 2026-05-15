@@ -7,6 +7,7 @@ HOT_PART_SUFFIX = " Hot Part"
 LEGACY_SIZE_LOADS = {"quarter", "half", "partial", "full", "loaded"}
 UNLOAD_NOT_COMPLETED_PREFIX = "Unload not completed:"
 SECONDARY_NOT_DROPPED_PREFIX = "Hot part not dropped:"
+TRUCK_ISSUE_PREFIX = "Truck issue:"
 
 
 def _clean(value):
@@ -113,6 +114,19 @@ def secondary_not_dropped(log):
 
 def secondary_not_dropped_reason(log):
     return _prefixed_reason(log, SECONDARY_NOT_DROPPED_PREFIX)
+
+
+def truck_issue_reason(log):
+    return _prefixed_reason(log, TRUCK_ISSUE_PREFIX)
+
+
+def route_problem_reason(log):
+    reason_parts = []
+    for part in _reason_parts(log):
+        if part.startswith((UNLOAD_NOT_COMPLETED_PREFIX, SECONDARY_NOT_DROPPED_PREFIX, TRUCK_ISSUE_PREFIX)):
+            continue
+        reason_parts.append(part)
+    return "; ".join(reason_parts)
 
 
 def _driver_log_sort_key(log):

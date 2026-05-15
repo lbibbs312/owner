@@ -28,6 +28,7 @@ from app.services.audit import model_snapshot, record_audit_event
 from app.services.simple_pdf import LANDSCAPE_LETTER, LETTER, SimplePdf
 from app.services.load_state import (
     SECONDARY_NOT_DROPPED_PREFIX,
+    TRUCK_ISSUE_PREFIX,
     UNLOAD_NOT_COMPLETED_PREFIX,
     build_driver_log_route_context,
     cargo_display,
@@ -36,6 +37,8 @@ from app.services.load_state import (
     hot_part_load_value,
     is_load_for_plant,
     load_display,
+    route_problem_reason,
+    truck_issue_reason,
 )
 from app.services.plant_addresses import plant_label as _plant_label
 from app.services.role_session import restore_role_user
@@ -319,6 +322,26 @@ def _document_attachment_response(*, pdf_bytes, filename, target_type, target_id
     )
     return response
 
+
+
+
+def _reason_parts_from_text(value):
+    return [part.strip() for part in (value or "").split(";") if part.strip()]
+
+
+def _compose_downtime_reason(reason_parts, truck_issue, maintenance=False):
+    parts = [part for part in reason_parts if part]
+    truck_issue = (truck_issue or "").strip()
+    if truck_issue:
+        parts.append(f"{TRUCK_ISSUE_PREFIX} {truck_issue}")
+    elif maintenance:
+        parts.append(f"{TRUCK_ISSUE_PREFIX} Truck issue reported")
+    return "; ".join(parts) or None
+
+
+def _preserved_non_truck_reasons(log):
+    prefixes = (UNLOAD_NOT_COMPLETED_PREFIX, SECONDARY_NOT_DROPPED_PREFIX)
+    return [part for part in _reason_parts_from_text(log.downtime_reason) if part.startswith(prefixes)]
 
 def _save_damage_photo(report, uploaded_file):
     if not uploaded_file or not uploaded_file.filename:
@@ -1406,7 +1429,7 @@ def new_driving_log():
             plant_name=form.plant_name.data,
             load_size=arrival_load,
             secondary_load=arrival_secondary_load,
-            downtime_reason="; ".join(reason_parts) or None,
+            downtime_reason=_compose_downtime_reason(reason_parts, form.truck_issue.data, form.maintenance.data),
             part_number=(form.part_number.data or "").strip() or None,
             hot_parts=form.hot_parts.data,
             dock_wait_minutes=form.dock_wait_minutes.data,
@@ -1447,6 +1470,7 @@ def edit_driver_log(log_id):
     form = DriverLogForm(obj=log)
     if request.method == "GET":
         form.arrive_time.data = _arrival_utc_to_local_hhmm(log.arrive_time)
+        form.truck_issue.data = truck_issue_reason(log) or route_problem_reason(log)
     if form.validate_on_submit():
         if not form.plant_name.data or not form.load_size.data:
             flash("Please select a valid Plant Name and Load Size.", "danger")
@@ -1470,6 +1494,7 @@ def edit_driver_log(log_id):
         _apply_log_part_fields(log, form)
         log.dock_wait_minutes = form.dock_wait_minutes.data
         log.maintenance = form.maintenance.data
+        log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), form.truck_issue.data, form.maintenance.data)
         log.fuel = form.fuel.data
         log.meeting = form.meeting.data
 
@@ -1635,6 +1660,7 @@ def pickup_driver_log(log_id):
         log.hot_parts = form.hot_parts.data
         log.dock_wait_minutes = form.dock_wait_minutes.data or log.dock_wait_minutes
         log.maintenance = form.maintenance.data
+        log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), form.truck_issue.data, form.maintenance.data)
         log.fuel = form.fuel.data
         log.meeting = form.meeting.data
         db.session.commit()
@@ -1683,17 +1709,21 @@ def driver_logs_print():
     damage_reports_today = _today_damage_reports(current_user.id, today_local_date)
     parts_carried = sorted({log.part_number for log in logs if log.part_number})
     exception_notes = []
+    log_issue_details = {}
     for log in logs:
         route = log_routes.get(log.id, {})
         plant_name = route.get("plant") or _plant_label(log.plant_name)
-        if log.no_pickup:
-            exception_notes.append(f"No pickup at {plant_name}")
+        truck_issue = truck_issue_reason(log)
+        route_problem = route_problem_reason(log)
+        log_issue_details[log.id] = {"truck": truck_issue, "route": route_problem}
+        if log.maintenance or truck_issue:
+            exception_notes.append(f"Truck issue at {plant_name}: {truck_issue or 'Maintenance marked'}")
         if route.get("unload_blocked"):
             exception_notes.append(f"Unload issue at {plant_name}: {route.get('unload_reason')}")
         elif route.get("secondary_drop_blocked"):
             exception_notes.append(f"Hot part issue at {plant_name}: {route.get('secondary_drop_reason')}")
-        elif log.downtime_reason:
-            exception_notes.append(f"Plant issue at {plant_name}: {log.downtime_reason}")
+        elif route_problem:
+            exception_notes.append(f"Route issue at {plant_name}: {route_problem}")
     route_finalized = ActivityEvent.query.filter_by(
         user_id=current_user.id,
         category="eod",
@@ -1718,6 +1748,7 @@ def driver_logs_print():
         total_miles=_total_miles_for_pretrips(pretrips),
         parts_carried=parts_carried,
         exception_notes=exception_notes,
+        log_issue_details=log_issue_details,
         route_finalized=route_finalized,
         email_mode=False,
     )

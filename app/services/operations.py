@@ -2,6 +2,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 
 from app.models import DamageReport, DriverLog, OperationalFollowUp, PlantTransfer, PreTrip, Task
+from app.services.load_state import route_problem_reason, truck_issue_reason
 
 
 def _blank(value):
@@ -57,8 +58,12 @@ def build_exception_items(anchor=None, dock_delay_minutes=30):
             items.append({"severity": "medium", "category": "Missing time", "label": label, "detail": "Arrival or departure time is missing.", "target_type": "driver_log", "target_id": log.id})
         if (log.driver_id, log.date) not in pretrip_keys:
             items.append({"severity": "high", "category": "No pre-trip", "label": label, "detail": "Driver log exists without a same-day DVIR/pre-trip.", "target_type": "driver_log", "target_id": log.id})
-        if log.no_pickup:
-            items.append({"severity": "low", "category": "No pickup", "label": label, "detail": "Stop was marked no-pickup.", "target_type": "driver_log", "target_id": log.id})
+        truck_issue = truck_issue_reason(log)
+        route_problem = route_problem_reason(log)
+        if log.maintenance or truck_issue:
+            items.append({"severity": "high", "category": "Truck issue", "label": label, "detail": truck_issue or "Maintenance marked on driver log.", "target_type": "driver_log", "target_id": log.id})
+        if route_problem:
+            items.append({"severity": "medium", "category": "Route issue", "label": label, "detail": route_problem, "target_type": "driver_log", "target_id": log.id})
         if log.dock_wait_minutes is not None and log.dock_wait_minutes >= dock_delay_minutes:
             items.append({"severity": "high", "category": "Delayed dock time", "label": label, "detail": f"Dock wait recorded at {log.dock_wait_minutes} minutes.", "target_type": "driver_log", "target_id": log.id})
 

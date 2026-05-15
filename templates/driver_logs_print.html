@@ -107,6 +107,7 @@
         {% set plant_name = route.plant if route else log.plant_name %}
         {% set next_plant_name = next_route.plant if next_route else (next_log.plant_name if next_log else none) %}
         {% set transit_cargo = route.depart_cargo_desc if route and route.depart_cargo_desc is not none else (log.depart_load_size or '--') %}
+        {% set issue = (log_issue_details or {}).get(log.id, {}) %}
         <tr class="{% if not next_log %}final-row{% endif %}">
           <td>{{ loop.index }}</td>
           <td>
@@ -169,10 +170,11 @@
                 <p class="detail-line">End of shift after completed stop.</p>
               {% endif %}
             {% endif %}
-            {% if log.no_pickup and not next_log %}<p class="detail-line issue">No pickup recorded.</p>{% endif %}
+            {% if log.no_pickup and not next_log %}<p class="detail-line">No pickup recorded; departed empty.</p>{% endif %}
             {% if route and route.unload_blocked %}<p class="detail-line issue">Unload issue: {{ route.unload_reason }}</p>{% endif %}
             {% if route and route.secondary_drop_blocked %}<p class="detail-line issue">Hot part issue: {{ route.secondary_drop_reason }}</p>{% endif %}
-            {% if log.downtime_reason and not (route and (route.unload_blocked or route.secondary_drop_blocked)) %}<p class="detail-line issue">Plant issue: {{ log.downtime_reason }}</p>{% endif %}
+            {% if log.maintenance or issue.truck %}<p class="detail-line issue">Truck issue: {{ issue.truck or 'Maintenance marked' }}</p>{% endif %}
+            {% if issue.route %}<p class="detail-line issue">Route issue: {{ issue.route }}</p>{% endif %}
             {% if log.hot_parts or log.part_number %}<p class="detail-line muted">{% if log.hot_parts %}HOT {% endif %}{{ log.part_number or '' }}</p>{% endif %}
           </td>
         </tr>
