@@ -17,7 +17,7 @@ from app.blueprints.driver import bp
 from app.extensions import db
 from app.extensions import socketio
 from app.forms.damage import DamageReportForm
-from app.forms.log import DepartForm, DriverLogForm
+from app.forms.log import DepartForm, DriverLogForm, TRUCK_ISSUE_CHOICES, TRUCK_ISSUE_LABELS
 from app.forms.plant_transfer import PlantTransferForm
 from app.forms.messaging import DirectMessageForm
 from app.forms.shift import EndOfDayForm
@@ -59,8 +59,15 @@ from app.models import (
 
 
 PLANT_TRANSFER_LINE_COUNT = 20
-DRIVER_LOG_AUDIT_FIELDS = ["plant_name", "load_size", "depart_load_size", "secondary_load", "downtime_reason", "part_number", "hot_parts", "arrive_time", "depart_time", "dock_wait_minutes", "maintenance", "fuel", "meeting"]
+DRIVER_LOG_AUDIT_FIELDS = ["plant_name", "load_size", "depart_load_size", "secondary_load", "downtime_reason", "part_number", "hot_parts", "arrive_time", "depart_time", "dock_wait_minutes", "maintenance", "fuel", "fuel_mileage", "meeting"]
 PLANT_TRANSFER_AUDIT_FIELDS = ["transfer_number", "transfer_date", "ship_to", "ship_from", "trailer_number", "driver_name", "driver_initials", "transfer_time", "loaded_by"]
+RYDER_CLOSING_ACTIONS = {"fixed", "left", "rental"}
+RYDER_OUTCOME_LABELS = {
+    "headed": "Headed to Ryder",
+    "fixed": "Fixed at Ryder",
+    "left": "Left at Ryder",
+    "rental": "Rental picked up",
+}
 
 DRIVER_ONLY_ENDPOINTS = {
     "dashboard",
@@ -329,6 +336,46 @@ def _reason_parts_from_text(value):
     return [part.strip() for part in (value or "").split(";") if part.strip()]
 
 
+def _truck_issue_text(issue_code, notes):
+    issue_code = (issue_code or "").strip()
+    notes = (notes or "").strip()
+    if not issue_code:
+        return notes
+    label = TRUCK_ISSUE_LABELS.get(issue_code, issue_code).strip()
+    if label and notes:
+        return f"{label}: {notes}"
+    return label
+
+
+def _split_truck_issue_text(value):
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return "", ""
+    lower = cleaned.lower()
+    for code, label in TRUCK_ISSUE_CHOICES:
+        if not code:
+            continue
+        label_lower = label.lower()
+        if lower == label_lower:
+            return code, ""
+        prefix = f"{label_lower}:"
+        if lower.startswith(prefix):
+            return code, cleaned[len(label) + 1:].strip()
+    keyword_map = {
+        "cel": ("cel", "CEL light"),
+        "check engine": ("cel", "CEL light"),
+        "leak": ("leak", "Leak"),
+        "overheat": ("overheat", "Overheat"),
+        "flat": ("flat", "Flat tire"),
+        "tow": ("tow", "Need tow"),
+        "regen": ("regen", "Truck regen"),
+    }
+    for keyword, (code, label) in keyword_map.items():
+        if keyword in lower:
+            return code, cleaned if not lower.startswith(label.lower()) else cleaned[len(label):].lstrip(": ")
+    return "", cleaned
+
+
 def _compose_downtime_reason(reason_parts, truck_issue, maintenance=False):
     parts = [part for part in reason_parts if part]
     truck_issue = (truck_issue or "").strip()
@@ -485,6 +532,62 @@ def _format_duration(total_seconds):
     return f"{hours:02d}:{minutes:02d}"
 
 
+def _detail_value(details, key):
+    prefix = f"{key}:"
+    for part in (details or "").split(";"):
+        part = part.strip()
+        if part.startswith(prefix):
+            return part[len(prefix):].strip()
+    return ""
+
+
+def _open_ryder_event(user_id):
+    headed = (
+        ActivityEvent.query.filter_by(user_id=user_id, category="ryder", action="headed")
+        .order_by(ActivityEvent.created_at.desc())
+        .first()
+    )
+    if not headed:
+        return None
+    closed = (
+        ActivityEvent.query.filter(
+            ActivityEvent.user_id == user_id,
+            ActivityEvent.category == "ryder",
+            ActivityEvent.action.in_(RYDER_CLOSING_ACTIONS),
+            ActivityEvent.created_at > headed.created_at,
+        )
+        .order_by(ActivityEvent.created_at.desc())
+        .first()
+    )
+    return None if closed else headed
+
+
+def _ryder_followup_context(user_id):
+    event = _open_ryder_event(user_id)
+    if not event:
+        return {
+            "pending_ryder_event": None,
+            "pending_ryder_elapsed": None,
+            "pending_ryder_truck": "",
+            "pending_ryder_issue": "",
+        }
+    return {
+        "pending_ryder_event": event,
+        "pending_ryder_elapsed": _format_duration((datetime.utcnow() - event.created_at).total_seconds()),
+        "pending_ryder_truck": _detail_value(event.details, "Truck"),
+        "pending_ryder_issue": _detail_value(event.details, "Issue"),
+    }
+
+
+def _render_new_driving_log(form, current_load):
+    return render_template(
+        "new_driving_log.html",
+        form=form,
+        current_load=current_load,
+        **_ryder_followup_context(current_user.id),
+    )
+
+
 def _shift_redirect():
     if request.args.get("next") == "mobile":
         return redirect(url_for("driver.mobile_dashboard"))
@@ -624,9 +727,16 @@ def _build_pretrip_pdf(pretrip):
     return pdf.build()
 
 
-def _build_driver_logs_pdf(logs, the_date):
-    pdf = SimplePdf("Driver Logs", LETTER)
-    pdf.text(36, 748, f"Driver Logs - {the_date}", size=15, bold=True)
+def _build_driver_logs_pdf(logs, the_date, driver=None):
+    pdf = SimplePdf("Driver Route Sheet", LETTER)
+    pdf.text(36, 748, f"Driver Route Sheet - {the_date}", size=15, bold=True)
+    if driver:
+        info_parts = [driver.display_name]
+        if driver.shift:
+            info_parts.append(f"Shift: {driver.shift}")
+        if driver.employee_id:
+            info_parts.append(f"Badge: {driver.employee_id}")
+        pdf.text(36, 730, "  |  ".join(info_parts), size=9)
     routes = _driver_log_route_context(logs)
     rows = []
     for log in logs:
@@ -1381,8 +1491,12 @@ def new_driving_log():
     current_load = _current_driver_load(current_user.id)
     current_load_value = current_load["value"] or "Empty"
     current_secondary_value = current_load.get("secondary_value") or ""
+    pending_ryder_event = _open_ryder_event(current_user.id)
 
     if form.validate_on_submit():
+        if pending_ryder_event:
+            flash("Close the Ryder status before entering the next stop.", "warning")
+            return _render_new_driving_log(form, current_load)
         if not form.plant_name.data:
             flash("Please select the plant you arrived at.", "danger")
             return redirect(url_for("driver.new_driving_log"))
@@ -1395,26 +1509,26 @@ def new_driving_log():
             unloaded = form.unloaded_on_arrival.data
             if unloaded not in {"yes", "no"}:
                 flash("Please answer whether you unloaded the destination load.", "danger")
-                return render_template("new_driving_log.html", form=form, current_load=current_load)
+                return _render_new_driving_log(form, current_load)
             if unloaded == "no":
                 reason = (form.unload_reason.data or "").strip()
                 if not reason:
                     flash("Please enter why the load was not unloaded.", "danger")
-                    return render_template("new_driving_log.html", form=form, current_load=current_load)
+                    return _render_new_driving_log(form, current_load)
                 reason_parts.append(f"{UNLOAD_NOT_COMPLETED_PREFIX} {reason}")
 
         if arrival_secondary_load and is_load_for_plant(arrival_secondary_load, form.plant_name.data):
             dropped = form.secondary_dropped_on_arrival.data
             if dropped not in {"yes", "no"}:
                 flash("Please answer whether you dropped off the hot part.", "danger")
-                return render_template("new_driving_log.html", form=form, current_load=current_load)
+                return _render_new_driving_log(form, current_load)
             if dropped == "yes":
                 arrival_secondary_load = None
             else:
                 reason = (form.secondary_unload_reason.data or "").strip()
                 if not reason:
                     flash("Please enter why the hot part was not dropped off.", "danger")
-                    return render_template("new_driving_log.html", form=form, current_load=current_load)
+                    return _render_new_driving_log(form, current_load)
                 reason_parts.append(f"{SECONDARY_NOT_DROPPED_PREFIX} {reason}")
 
         local_tz = pytz.timezone("America/Detroit")
@@ -1429,13 +1543,14 @@ def new_driving_log():
             plant_name=form.plant_name.data,
             load_size=arrival_load,
             secondary_load=arrival_secondary_load,
-            downtime_reason=_compose_downtime_reason(reason_parts, form.truck_issue.data, form.maintenance.data),
+            downtime_reason=_compose_downtime_reason(reason_parts, _truck_issue_text(form.truck_issue.data, form.truck_issue_notes.data), form.maintenance.data),
             part_number=(form.part_number.data or "").strip() or None,
             hot_parts=form.hot_parts.data,
             dock_wait_minutes=form.dock_wait_minutes.data,
             arrive_time=arrive_time_str,
             maintenance=form.maintenance.data,
             fuel=form.fuel.data,
+            fuel_mileage=form.fuel_mileage.data if form.fuel.data else None,
             meeting=form.meeting.data,
             date=local_date,
         )
@@ -1456,7 +1571,7 @@ def new_driving_log():
     _prefill_log_form_from_task(form)
     form.load_size.data = current_load_value if current_load_value != "Empty" else "Empty"
     form.secondary_load.data = current_secondary_value
-    return render_template("new_driving_log.html", form=form, current_load=current_load)
+    return _render_new_driving_log(form, current_load)
 
 
 @bp.route("/edit_driver_log/<int:log_id>", methods=["GET", "POST"])
@@ -1470,7 +1585,9 @@ def edit_driver_log(log_id):
     form = DriverLogForm(obj=log)
     if request.method == "GET":
         form.arrive_time.data = _arrival_utc_to_local_hhmm(log.arrive_time)
-        form.truck_issue.data = truck_issue_reason(log) or route_problem_reason(log)
+        issue_code, issue_notes = _split_truck_issue_text(truck_issue_reason(log) or route_problem_reason(log))
+        form.truck_issue.data = issue_code
+        form.truck_issue_notes.data = issue_notes
     if form.validate_on_submit():
         if not form.plant_name.data or not form.load_size.data:
             flash("Please select a valid Plant Name and Load Size.", "danger")
@@ -1494,8 +1611,9 @@ def edit_driver_log(log_id):
         _apply_log_part_fields(log, form)
         log.dock_wait_minutes = form.dock_wait_minutes.data
         log.maintenance = form.maintenance.data
-        log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), form.truck_issue.data, form.maintenance.data)
+        log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), _truck_issue_text(form.truck_issue.data, form.truck_issue_notes.data), form.maintenance.data)
         log.fuel = form.fuel.data
+        log.fuel_mileage = form.fuel_mileage.data if form.fuel.data else None
         log.meeting = form.meeting.data
 
         if arrive_time:
@@ -1660,8 +1778,9 @@ def pickup_driver_log(log_id):
         log.hot_parts = form.hot_parts.data
         log.dock_wait_minutes = form.dock_wait_minutes.data or log.dock_wait_minutes
         log.maintenance = form.maintenance.data
-        log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), form.truck_issue.data, form.maintenance.data)
+        log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), _truck_issue_text(form.truck_issue.data, form.truck_issue_notes.data), form.maintenance.data)
         log.fuel = form.fuel.data
+        log.fuel_mileage = form.fuel_mileage.data if form.fuel.data else None
         log.meeting = form.meeting.data
         db.session.commit()
         record_activity(
@@ -1738,6 +1857,12 @@ def driver_logs_print():
         details=f"Printed {len(logs)} log(s) for {today_local_date}.",
         target_type="driver_log",
     )
+    shift_record = (
+        ShiftRecord.query.filter_by(user_id=current_user.id)
+        .filter(db.func.date(ShiftRecord.start_time) == today_local_date)
+        .order_by(ShiftRecord.start_time.desc())
+        .first()
+    )
     return render_template(
         "driver_logs_print.html",
         logs=logs,
@@ -1750,6 +1875,8 @@ def driver_logs_print():
         exception_notes=exception_notes,
         log_issue_details=log_issue_details,
         route_finalized=route_finalized,
+        driver_signature=shift_record.driver_signature if shift_record else None,
+        signature_timestamp=shift_record.signature_timestamp if shift_record else None,
         email_mode=False,
     )
 
@@ -1763,7 +1890,7 @@ def driver_logs_attachment():
         driver_id=current_user.id, date=today_local_date
     ).all()
     return _document_attachment_response(
-        pdf_bytes=_build_driver_logs_pdf(logs, today_local_date),
+        pdf_bytes=_build_driver_logs_pdf(logs, today_local_date, driver=current_user),
         filename=f"driver-logs-{today_local_date}.pdf",
         target_type="driver_log",
         title="Driver Logs PDF downloaded",
@@ -1836,6 +1963,15 @@ def end_of_day_summary():
     form = EndOfDayForm()
     today_local_date, logs, pretrips_today, plant_transfers_today = _get_today_eod_records()
     if form.validate_on_submit():
+        sig_data = form.driver_signature.data or ""
+        if sig_data.startswith("data:image/"):
+            open_shift = ShiftRecord.query.filter_by(
+                user_id=current_user.id, end_time=None
+            ).first()
+            if open_shift:
+                open_shift.driver_signature = sig_data
+                open_shift.signature_timestamp = datetime.utcnow()
+                db.session.commit()
         _record_eod_finalized(today_local_date, logs, pretrips_today, plant_transfers_today)
         flash("End of Day finalized and added to activity history.", "success")
         return redirect(url_for("driver.dashboard"))
@@ -2194,6 +2330,7 @@ def mobile_dashboard():
     )
     todays_log_routes = _driver_log_route_context(todays_logs)
     current_stop = next((l for l in reversed(todays_logs) if not l.depart_time), None) or (todays_logs[-1] if todays_logs else None)
+    ryder_context = _ryder_followup_context(current_user.id)
 
     return render_template(
         "driver_mobile.html",
@@ -2211,6 +2348,8 @@ def mobile_dashboard():
         todays_logs=todays_logs,
         todays_log_routes=todays_log_routes,
         current_stop=current_stop,
+        truck_issue_choices=TRUCK_ISSUE_CHOICES,
+        **ryder_context,
     )
 
 
@@ -2220,32 +2359,39 @@ def mobile_ryder_service():
     if current_user.role == "management":
         return redirect(url_for("manager.manager_dashboard"))
 
-    truck_number = (request.form.get("truck_number") or "").strip() or "Truck not set"
-    issue = (request.form.get("issue") or "").strip()
+    pending_ryder_event = _open_ryder_event(current_user.id)
+    truck_number = (request.form.get("truck_number") or "").strip()
+    issue_code = (request.form.get("issue") or "").strip()
     outcome = (request.form.get("outcome") or "").strip()
     notes = (request.form.get("notes") or "").strip()
-    outcome_labels = {
-        "fixed": "Fixed at Ryder",
-        "left": "Left at Ryder",
-        "rental": "Rental picked up",
-    }
-    if not issue or outcome not in outcome_labels:
-        flash("Enter the Ryder issue and choose the outcome.", "warning")
-        return redirect(url_for("driver.mobile_dashboard"))
+    next_target = (request.form.get("next") or "mobile").strip()
 
-    details = f"Truck {truck_number}; Issue: {issue}; Outcome: {outcome_labels[outcome]}"
+    if pending_ryder_event:
+        truck_number = truck_number or _detail_value(pending_ryder_event.details, "Truck")
+        issue_code = issue_code or _detail_value(pending_ryder_event.details, "Issue")
+    truck_number = truck_number or "Truck not set"
+    issue = TRUCK_ISSUE_LABELS.get(issue_code, issue_code).strip()
+
+    if not issue or outcome not in RYDER_OUTCOME_LABELS:
+        flash("Choose what is wrong with the truck and the Ryder status.", "warning")
+        return redirect(url_for("driver.new_driving_log" if next_target == "new_log" else "driver.mobile_dashboard"))
+
+    details = f"Truck: {truck_number}; Issue: {issue}; Outcome: {RYDER_OUTCOME_LABELS[outcome]}"
+    if pending_ryder_event and outcome in RYDER_CLOSING_ACTIONS:
+        details = f"{details}; Ryder time: {_format_duration((datetime.utcnow() - pending_ryder_event.created_at).total_seconds())}"
     if notes:
         details = f"{details}; Notes: {notes}"
     record_activity(
         user_id=current_user.id,
         category="ryder",
         action=outcome,
-        title=outcome_labels[outcome],
+        title=RYDER_OUTCOME_LABELS[outcome],
         details=details,
         target_type="ryder_service",
+        target_id=pending_ryder_event.id if pending_ryder_event and outcome in RYDER_CLOSING_ACTIONS else None,
     )
-    flash("Ryder service note saved.", "success")
-    return redirect(url_for("driver.mobile_dashboard"))
+    flash("Ryder service status saved.", "success")
+    return redirect(url_for("driver.new_driving_log" if next_target == "new_log" else "driver.mobile_dashboard"))
 
 
 @bp.route("/dashboard", methods=["GET", "POST"])

@@ -3,6 +3,7 @@ from wtforms import HiddenField
 
 
 class EndOfDayForm(FlaskForm):
-    """Empty form used only to provide a CSRF token on the EOD summary POST."""
+    """Provides CSRF token and captures the driver's e-signature on EOD submit."""
 
     hidden_example = HiddenField()
+    driver_signature = HiddenField()

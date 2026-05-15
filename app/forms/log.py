@@ -25,6 +25,18 @@ LOAD_SIZE_CHOICES = [
 
 YES_NO_CHOICES = [("", "Select..."), ("yes", "Yes"), ("no", "No")]
 
+TRUCK_ISSUE_CHOICES = [
+    ("", "No truck issue"),
+    ("cel", "CEL light"),
+    ("leak", "Leak"),
+    ("overheat", "Overheat"),
+    ("flat", "Flat tire"),
+    ("tow", "Need tow"),
+    ("regen", "Truck regen"),
+]
+
+TRUCK_ISSUE_LABELS = dict(TRUCK_ISSUE_CHOICES)
+
 
 class DriverLogForm(FlaskForm):
     maintenance = BooleanField("Truck Issue / Maintenance")
@@ -54,6 +66,7 @@ class DriverLogForm(FlaskForm):
     )
     secondary_unload_reason = TextAreaField("Why?", validators=[Optional()])
     secondary_load = StringField("Secondary / Hot Part Load", validators=[Optional()])
+    fuel_mileage = IntegerField("Mileage at Fuel Stop", validators=[Optional()])
     hot_parts = BooleanField("Hot Parts")
     part_number = StringField("Part Number / Hot Part Number")
     arrive_time = StringField(
@@ -65,7 +78,12 @@ class DriverLogForm(FlaskForm):
         description="Enter Detroit local time like '545pm', '5:45pm', or '1:05pm'",
     )
     dock_wait_minutes = IntegerField("Dock Wait Minutes", validators=[Optional()])
-    truck_issue = TextAreaField("Truck issue details (CEL, regen, breakdown)", validators=[Optional()])
+    truck_issue = SelectField(
+        "What's wrong with the truck?",
+        choices=TRUCK_ISSUE_CHOICES,
+        validators=[Optional()],
+    )
+    truck_issue_notes = TextAreaField("Truck issue notes", validators=[Optional()])
     edit_reason = TextAreaField("Edit Reason", validators=[Optional()])
     submit = SubmitField("Submit Log Entry")
 

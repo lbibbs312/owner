@@ -21,6 +21,7 @@ class DriverLog(db.Model):
     plant_name = db.Column(db.String(20), nullable=False)
     maintenance = db.Column(db.Boolean, default=False)
     fuel = db.Column(db.Boolean, default=False)
+    fuel_mileage = db.Column(db.Integer, nullable=True)
     meeting = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)

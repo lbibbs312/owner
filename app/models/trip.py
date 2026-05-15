@@ -116,6 +116,8 @@ class ShiftRecord(db.Model):
     end_time = db.Column(db.DateTime, nullable=True)
     total_hours = db.Column(db.Float, nullable=True)
     week_ending = db.Column(db.Date, nullable=True)
+    driver_signature = db.Column(db.Text, nullable=True)
+    signature_timestamp = db.Column(db.DateTime, nullable=True)
 
     user = db.relationship("User", backref="shift_records")
     pretrip = db.relationship("PreTrip", backref="shift_record")

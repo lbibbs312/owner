@@ -157,6 +157,7 @@
     .ryder-submit { min-height: 46px; border-radius: 12px; border: 0; background: #fff; color: #4c111d; font-weight: 900; cursor: pointer; }
     .ryder-history { display: grid; gap: 8px; }
     .ryder-entry { border: 1px solid rgba(148,163,184,.18); border-radius: 12px; padding: 10px 12px; background: rgba(255,255,255,.035); }
+    .ryder-entry.active { border-color: rgba(239,68,68,.45); background: rgba(239,68,68,.12); }
     .ryder-entry strong { display: block; font-size: .85rem; }
     .ryder-entry span { display:block; color: var(--muted); font-size:.74rem; line-height:1.3; margin-top:3px; }
 
@@ -428,6 +429,12 @@
           <span>Truck issue follow-up</span>
         </div>
         <div class="card ryder-panel">
+          {% if pending_ryder_event %}
+            <div class="ryder-entry active">
+              <strong>Ryder timer running: {{ pending_ryder_elapsed }}</strong>
+              <span>{{ pending_ryder_truck or 'Truck' }} headed to Ryder for {{ pending_ryder_issue or 'a truck issue' }}. Close this before the next stop.</span>
+            </div>
+          {% endif %}
           <form class="ryder-form" method="POST" action="{{ url_for('driver.mobile_ryder_service') }}">
             <div class="ryder-grid">
               <div class="ryder-field">
@@ -436,23 +443,28 @@
               </div>
               <div class="ryder-field">
                 <label for="ryderIssue">Problem</label>
-                <input id="ryderIssue" class="ryder-input" name="issue" placeholder="What is wrong with the truck?" required>
+                <select id="ryderIssue" class="ryder-select" name="issue" required>
+                  {% for value, label in truck_issue_choices %}
+                    <option value="{{ value }}" {% if pending_ryder_issue == label %}selected{% endif %}>{{ 'Choose problem' if not value else label }}</option>
+                  {% endfor %}
+                </select>
               </div>
               <div class="ryder-field">
-                <label for="ryderOutcome">Outcome</label>
+                <label for="ryderOutcome">Status</label>
                 <select id="ryderOutcome" class="ryder-select" name="outcome" required>
-                  <option value="">Choose outcome</option>
+                  <option value="">Choose status</option>
+                  <option value="headed">Headed to Ryder</option>
                   <option value="fixed">Fixed at Ryder</option>
-                  <option value="left">Left it at Ryder</option>
+                  <option value="left">Ryder kept it</option>
                   <option value="rental">Got rental truck</option>
                 </select>
               </div>
             </div>
             <div class="ryder-field">
               <label for="ryderNotes">Notes</label>
-              <textarea id="ryderNotes" class="ryder-textarea" name="notes" placeholder="What did Ryder say? What truck did you leave with?"></textarea>
+              <textarea id="ryderNotes" class="ryder-textarea" name="notes" placeholder="CEL code, leak location, rental number, tow info, or what Ryder said"></textarea>
             </div>
-            <button class="ryder-submit" type="submit">Save Ryder Note</button>
+            <button class="ryder-submit" type="submit">Save Ryder Status</button>
           </form>
           <div class="ryder-history">
             {% for event in recent_ryder_events %}
@@ -463,7 +475,7 @@
             {% else %}
               <div class="ryder-entry">
                 <strong>No Ryder notes today</strong>
-                <span>Use this when you take a truck in, leave it for repair, or switch to a rental.</span>
+                <span>Use Headed to Ryder to start the timer, then close it as fixed, kept by Ryder, or rental.</span>
               </div>
             {% endfor %}
           </div>

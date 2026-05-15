@@ -11,11 +11,19 @@
     </div>
     <div class="mb-3">
       {{ form.truck_issue.label(class="form-label") }}
-      {{ form.truck_issue(class="form-control", rows="3", placeholder="CEL light, regen, breakdown, Ryder, rental truck, etc.") }}
+      {{ form.truck_issue(class="form-select") }}
+    </div>
+    <div class="mb-3">
+      {{ form.truck_issue_notes.label(class="form-label") }}
+      {{ form.truck_issue_notes(class="form-control", rows="3", placeholder="CEL came on, leak, overheat, flat, tow, Ryder/rental details") }}
     </div>
     <div class="mb-3 form-check">
-      {{ form.fuel(class="form-check-input") }}
+      {{ form.fuel(class="form-check-input", id="fuelCheck") }}
       {{ form.fuel.label(class="form-check-label") }}
+    </div>
+    <div class="mb-3 d-none" id="fuelMileagePanel">
+      {{ form.fuel_mileage.label(class="form-label") }}
+      {{ form.fuel_mileage(class="form-control", placeholder="Current odometer reading") }}
     </div>
     <div class="mb-3 form-check">
       {{ form.meeting(class="form-check-input") }}
@@ -85,4 +93,15 @@ Enter Detroit local time only if you need to manually set or correct departure. 
     </div>
   {% endif %}
 </div>
+<script>
+(function () {
+  const fuelCheck = document.getElementById('fuelCheck');
+  const fuelMileagePanel = document.getElementById('fuelMileagePanel');
+  function syncFuelMileage() {
+    fuelMileagePanel.classList.toggle('d-none', !fuelCheck.checked);
+  }
+  fuelCheck.addEventListener('change', syncFuelMileage);
+  syncFuelMileage();
+})();
+</script>
 {% endblock %}

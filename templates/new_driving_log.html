@@ -11,6 +11,42 @@
     In truck now: <span id="currentLoadLabel">{{ current_load.cargo_display if current_load else active_load }}</span>
   </div>
 
+  {% if pending_ryder_event %}
+  <div class="alert alert-danger border fw-semibold" role="alert">
+    Ryder follow-up required before the next stop. {{ pending_ryder_truck or 'Truck' }} has been headed to Ryder for {{ pending_ryder_elapsed }}.
+  </div>
+  <div class="modal fade" id="ryderFollowupModal" tabindex="-1" aria-labelledby="ryderFollowupTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form method="POST" action="{{ url_for('driver.mobile_ryder_service') }}">
+          <div class="modal-header">
+            <h5 class="modal-title" id="ryderFollowupTitle">Ryder Follow-Up Required</h5>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" name="next" value="new_log">
+            <input type="hidden" name="truck_number" value="{{ pending_ryder_truck }}">
+            <input type="hidden" name="issue" value="{{ pending_ryder_issue }}">
+            <p class="mb-2"><strong>{{ pending_ryder_truck or 'Truck' }}</strong> went to Ryder for <strong>{{ pending_ryder_issue or 'a truck issue' }}</strong>.</p>
+            <p class="text-muted mb-3">Ryder timer: {{ pending_ryder_elapsed }}</p>
+            <label class="form-label" for="ryderOutcomePopup">What happened?</label>
+            <select class="form-select mb-3" id="ryderOutcomePopup" name="outcome" required>
+              <option value="">Choose outcome</option>
+              <option value="fixed">Fixed at Ryder</option>
+              <option value="left">Ryder kept it</option>
+              <option value="rental">Got rental truck</option>
+            </select>
+            <label class="form-label" for="ryderNotesPopup">Notes</label>
+            <textarea class="form-control" id="ryderNotesPopup" name="notes" rows="3" placeholder="Rental number, what Ryder fixed, or why it stayed there"></textarea>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" type="submit">Save Ryder Status</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <form method="POST" action="" id="arrivalForm" data-load-destination="{{ active_destination or '' }}" data-secondary-destination="{{ active_secondary_destination or '' }}">
     {{ form.hidden_tag() }}
     <input type="hidden" name="load_size" value="{{ active_load }}">
@@ -54,8 +90,10 @@
 
     <div class="d-flex flex-wrap gap-3 mb-3">
       <div class="form-check">{{ form.maintenance(class="form-check-input") }} {{ form.maintenance.label(class="form-check-label") }}</div>
-      <div class="w-100">{{ form.truck_issue.label(class="form-label") }}{{ form.truck_issue(class="form-control", rows="2", placeholder="CEL light, regen, breakdown, Ryder, rental truck, etc.") }}</div>
-      <div class="form-check">{{ form.fuel(class="form-check-input") }} {{ form.fuel.label(class="form-check-label") }}</div>
+      <div class="flex-grow-1">{{ form.truck_issue.label(class="form-label") }}{{ form.truck_issue(class="form-select") }}</div>
+      <div class="w-100">{{ form.truck_issue_notes.label(class="form-label") }}{{ form.truck_issue_notes(class="form-control", rows="2", placeholder="CEL came on, leaking air, overheating, flat tire, Ryder/tow details") }}</div>
+      <div class="form-check">{{ form.fuel(class="form-check-input", id="fuelCheck") }} {{ form.fuel.label(class="form-check-label") }}</div>
+      <div class="w-100 d-none" id="fuelMileagePanel">{{ form.fuel_mileage.label(class="form-label") }}{{ form.fuel_mileage(class="form-control", placeholder="Current odometer reading") }}</div>
       <div class="form-check">{{ form.meeting(class="form-check-input") }} {{ form.meeting.label(class="form-check-label") }}</div>
     </div>
 
@@ -97,12 +135,29 @@
     secondaryReasonPanel.classList.toggle('d-none', secondaryDropped.value !== 'no');
   }
 
+  const fuelCheck = document.getElementById('fuelCheck');
+  const fuelMileagePanel = document.getElementById('fuelMileagePanel');
+  function syncFuelMileage() {
+    fuelMileagePanel.classList.toggle('d-none', !fuelCheck.checked);
+  }
+  fuelCheck.addEventListener('change', syncFuelMileage);
+  syncFuelMileage();
+
   plant.addEventListener('change', syncUnloadPanel);
   unloaded.addEventListener('change', syncReasonPanel);
   secondaryDropped.addEventListener('change', syncReasonPanel);
   syncUnloadPanel();
   syncReasonPanel();
 })();
+
+{% if pending_ryder_event %}
+document.addEventListener('DOMContentLoaded', function () {
+  const modalEl = document.getElementById('ryderFollowupModal');
+  if (modalEl && window.bootstrap && window.bootstrap.Modal) {
+    window.bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+  }
+});
+{% endif %}
 </script>
 
 {% endblock %}

@@ -23,8 +23,10 @@
 
     <div class="d-flex flex-wrap gap-3 mb-3">
       <div class="form-check">{{ form.maintenance(class="form-check-input") }} {{ form.maintenance.label(class="form-check-label") }}</div>
-      <div class="w-100">{{ form.truck_issue.label(class="form-label") }}{{ form.truck_issue(class="form-control", rows="2", placeholder="CEL light, regen, breakdown, Ryder, rental truck, etc.") }}</div>
-      <div class="form-check">{{ form.fuel(class="form-check-input") }} {{ form.fuel.label(class="form-check-label") }}</div>
+      <div class="flex-grow-1">{{ form.truck_issue.label(class="form-label") }}{{ form.truck_issue(class="form-select") }}</div>
+      <div class="w-100">{{ form.truck_issue_notes.label(class="form-label") }}{{ form.truck_issue_notes(class="form-control", rows="2", placeholder="CEL came on, leak, overheat, flat, tow, Ryder/rental details") }}</div>
+      <div class="form-check">{{ form.fuel(class="form-check-input", id="fuelCheck") }} {{ form.fuel.label(class="form-check-label") }}</div>
+      <div class="w-100 d-none" id="fuelMileagePanel">{{ form.fuel_mileage.label(class="form-label") }}{{ form.fuel_mileage(class="form-control", placeholder="Current odometer reading") }}</div>
       <div class="form-check">{{ form.meeting(class="form-check-input") }} {{ form.meeting.label(class="form-check-label") }}</div>
     </div>
 
@@ -32,4 +34,15 @@
     <a href="{{ url_for('driver.driver_logs') }}" class="btn btn-secondary ms-2">Cancel</a>
   </form>
 </div>
+<script>
+(function () {
+  const fuelCheck = document.getElementById('fuelCheck');
+  const fuelMileagePanel = document.getElementById('fuelMileagePanel');
+  function syncFuelMileage() {
+    fuelMileagePanel.classList.toggle('d-none', !fuelCheck.checked);
+  }
+  fuelCheck.addEventListener('change', syncFuelMileage);
+  syncFuelMileage();
+})();
+</script>
 {% endblock %}

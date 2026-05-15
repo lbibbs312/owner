@@ -14,6 +14,7 @@ class User(db.Model, UserMixin):
     first_name = db.Column(db.String(64), nullable=True)
     last_name = db.Column(db.String(64), nullable=True)
     employee_id = db.Column(db.String(32), nullable=True)
+    shift = db.Column(db.String(16), nullable=True)
     department = db.Column(db.String(32), nullable=True)
 
     tasks = db.relationship(

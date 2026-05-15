@@ -1156,7 +1156,10 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"PostTrip Due" in page.data
     assert b"RW to KP" in page.data
     assert b"Ryder Service" in page.data
-    assert b"Save Ryder Note" in page.data
+    assert b"Save Ryder Status" in page.data
+    assert b"CEL light" in page.data
+    assert b"Need tow" in page.data
+    assert b"Headed to Ryder" in page.data
     assert b"Up Next" not in page.data
     assert b"Recent Transfers" not in page.data
     assert b"Previous Reports" not in page.data
@@ -1194,21 +1197,50 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"Delete" in today_report.data
     assert b"13:30" not in today_report.data
 
+    headed_response = client.post(
+        "/mobile/ryder-service",
+        data={
+            "truck_number": "ST4",
+            "issue": "leak",
+            "outcome": "headed",
+            "notes": "Taking it to Ryder now.",
+        },
+        follow_redirects=False,
+    )
+    assert headed_response.status_code == 302
+
+    pending_ryder_page = client.get("/mobile")
+    assert b"Ryder timer running" in pending_ryder_page.data
+    assert b"Leak" in pending_ryder_page.data
+
+    blocked_log = client.post(
+        "/new_driving_log",
+        data={"plant_name": "KP", "load_size": "Empty"},
+        follow_redirects=True,
+    )
+    assert b"Ryder follow-up required before the next stop" in blocked_log.data
+
     ryder_response = client.post(
         "/mobile/ryder-service",
         data={
             "truck_number": "ST4",
-            "issue": "Air leak",
+            "issue": "leak",
             "outcome": "rental",
             "notes": "Left unit at Ryder and took rental R-18.",
+            "next": "new_log",
         },
         follow_redirects=False,
     )
     assert ryder_response.status_code == 302
+    assert ryder_response.headers["Location"].endswith("/new_driving_log")
+
+    unblocked_log = client.get("/new_driving_log")
+    assert b"Ryder follow-up required before the next stop" not in unblocked_log.data
 
     ryder_page = client.get("/mobile")
     assert b"Rental picked up" in ryder_page.data
-    assert b"Air leak" in ryder_page.data
+    assert b"Leak" in ryder_page.data
+    assert b"Ryder time" in ryder_page.data
     assert b"rental R-18" in ryder_page.data
 
     assert page.data.count(b"Create Driver Log") == 1
