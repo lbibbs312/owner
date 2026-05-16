@@ -18,6 +18,9 @@
     .driver-log-table .actions-cell .btn { white-space:nowrap; line-height:1.1; }
     .driver-log-table .actions-cell form { margin:0; }
     .log-route-state { display:block; margin-top:3px; font-size:.72rem; color:#64748b; font-weight:700; line-height:1.25; }
+    .route-warnings { display:grid; gap:4px; margin-top:6px; }
+    .route-warning { display:inline-block; width:max-content; max-width:100%; border:1px solid #f59e0b; background:#fffbeb; color:#92400e; border-radius:6px; padding:3px 6px; font-size:.68rem; font-weight:800; line-height:1.2; }
+    .route-warning.route-warning-danger { border-color:#fecaca; background:#fef2f2; color:#991b1b; }
     .cargo-stack { display:grid; gap:2px; line-height:1.2; }
     .cargo-label { color:#64748b; font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
     @media (min-width:1200px) { .driver-log-shell { padding-left:24px; padding-right:24px; } }
@@ -121,6 +124,13 @@
               <span class="fw-bold">{{ route.plant if route else log.plant_name }}</span>
               {% if route %}
                 <span class="log-route-state">{{ route.action }} · {{ route.state }}</span>
+                {% if route.warnings %}
+                  <span class="route-warnings">
+                    {% for warning in route.warnings %}
+                      <span class="route-warning {% if 'before departure' in warning or 'Only ' in warning or 'still marked onboard' in warning %}route-warning-danger{% endif %}">{{ warning }}</span>
+                    {% endfor %}
+                  </span>
+                {% endif %}
               {% endif %}
               {% if log.plant_name in PLANT_ADDRESSES %}
                 <br><small class="text-muted">{{ PLANT_ADDRESSES[log.plant_name] }}</small>

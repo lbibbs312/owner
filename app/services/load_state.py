@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import pytz
 
 from app.services.plant_addresses import PLANT_LABELS, plant_label
 
@@ -8,6 +9,9 @@ LEGACY_SIZE_LOADS = {"quarter", "half", "partial", "full", "loaded"}
 UNLOAD_NOT_COMPLETED_PREFIX = "Unload not completed:"
 SECONDARY_NOT_DROPPED_PREFIX = "Hot part not dropped:"
 TRUCK_ISSUE_PREFIX = "Truck issue:"
+DETROIT_TZ = pytz.timezone("America/Detroit")
+UTC_TZ = pytz.utc
+MIN_PLANT_TRANSFER_MINUTES = 3
 
 
 def _clean(value):
@@ -131,6 +135,35 @@ def route_problem_reason(log):
 
 def _driver_log_sort_key(log):
     return (log.date or date.min, log.arrive_time or "", log.created_at or datetime.min, log.id or 0)
+
+
+def _arrival_local_datetime(log):
+    value = _clean(getattr(log, "arrive_time", ""))
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return UTC_TZ.localize(datetime.strptime(value, fmt)).astimezone(DETROIT_TZ)
+        except ValueError:
+            pass
+    try:
+        parsed_time = datetime.strptime(value, "%H:%M").time()
+    except ValueError:
+        return None
+    if not getattr(log, "date", None):
+        return None
+    return DETROIT_TZ.localize(datetime.combine(log.date, parsed_time))
+
+
+def _depart_local_datetime(log):
+    value = _clean(getattr(log, "depart_time", ""))
+    if not value or not getattr(log, "date", None):
+        return None
+    try:
+        parsed_time = datetime.strptime(value, "%H:%M").time()
+    except ValueError:
+        return None
+    return DETROIT_TZ.localize(datetime.combine(log.date, parsed_time))
 
 
 def _state(primary_destination=None, secondary_destination=None):
@@ -283,6 +316,29 @@ def build_driver_log_route_context(logs):
                 and (current_secondary_destination or destination_from_load(getattr(log, "secondary_load", None)) or getattr(log, "hot_parts", False))
             )
 
+            warnings = []
+            if unloaded_on_arrival:
+                warnings.append(f"Delivered {arrive_primary} here")
+            elif primary_unload_blocked:
+                warnings.append(f"{arrive_primary} is still marked onboard at its destination")
+            if secondary_dropped_on_arrival and arrive_secondary:
+                warnings.append(f"Dropped {arrive_secondary} here")
+            elif secondary_drop_blocked and arrive_secondary:
+                warnings.append(f"{arrive_secondary} is still marked onboard at its destination")
+            previous_log = sorted_logs[index - 1] if index > 0 else None
+            if previous_log:
+                previous_departure = _depart_local_datetime(previous_log)
+                current_arrival = _arrival_local_datetime(log)
+                previous_plant = _plant_code(previous_log.plant_name) or "Unknown"
+                if previous_departure and current_arrival:
+                    transit_minutes = int((current_arrival - previous_departure).total_seconds() // 60)
+                    if transit_minutes < 0:
+                        warnings.append(f"Arrival is before departure from {plant_label(previous_plant)}")
+                    elif previous_plant != plant and transit_minutes < MIN_PLANT_TRANSFER_MINUTES:
+                        warnings.append(f"Only {transit_minutes} min from {plant_label(previous_plant)} to {plant_label(plant)}; verify times or add missing stop")
+            if not completed:
+                warnings.append("Open stop - record departure/load before creating the next stop")
+
             routes[log.id] = {
                 "plant": plant_label(plant),
                 "arrive_desc": arrive_primary,
@@ -308,6 +364,7 @@ def build_driver_log_route_context(logs):
                 "primary_destination": current_primary_destination,
                 "secondary_destination": current_secondary_destination,
                 "deviation": deviation,
+                "warnings": warnings,
             }
 
             current_primary_destination = next_primary_destination

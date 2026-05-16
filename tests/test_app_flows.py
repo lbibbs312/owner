@@ -550,6 +550,10 @@ def test_driver_log_edit_and_depart_are_separate_actions(client, app):
 
     edit_page = client.get(f"/edit_driver_log/{log_id}")
     assert b"5:45pm" in edit_page.data
+    assert b"driver-log-conditionals.js" in edit_page.data
+    assert b"+ Add Missed Stop" not in edit_page.data
+    assert b"Pickup" not in edit_page.data
+    assert b"Depart Now" not in edit_page.data
 
     departed = client.post(
         f"/driver_logs/{log_id}/depart",
@@ -1016,6 +1020,44 @@ def test_new_log_load_state_ignores_previous_days_and_finalized_route(client, ap
     finalized_page = client.get("/new_driving_log")
     assert b"Empty" in finalized_page.data
     assert b"Raleigh East Load + PPL Hot Part" not in finalized_page.data
+
+
+def test_driver_logs_flags_impossible_plant_transfer_timing(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("driver1", "driver1@example.com", "driver")
+        route_date = date(2026, 5, 16)
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="PE",
+                load_size="Empty",
+                depart_load_size="Raleigh East Load",
+                depart_time="17:31",
+                arrive_time="2026-05-16 21:28:00",
+            )
+        )
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="RW",
+                load_size="Raleigh East Load",
+                arrive_time="2026-05-16 21:32:00",
+            )
+        )
+        db.session.commit()
+
+    login(client, "driver1")
+    page = client.get("/driver_logs?date=2026-05-16")
+    assert page.status_code == 200
+    assert b"Only 1 min from Paint East to Raleigh West" in page.data
+    assert b"Open stop - record departure/load before creating the next stop" in page.data
 
 
 def test_driver_logs_prints_and_eod_create_activity_history(client, app):

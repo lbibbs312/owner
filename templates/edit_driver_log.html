@@ -6,16 +6,20 @@
     {{ form.hidden_tag() }}
     
     <div class="mb-3 form-check">
-      {{ form.maintenance(class="form-check-input") }}
+      {{ form.maintenance(class="form-check-input", id="maintenanceCheck") }}
       {{ form.maintenance.label(class="form-check-label") }}
     </div>
-    <div class="mb-3">
-      {{ form.truck_issue.label(class="form-label") }}
-      {{ form.truck_issue(class="form-select") }}
-    </div>
-    <div class="mb-3">
-      {{ form.truck_issue_notes.label(class="form-label") }}
-      {{ form.truck_issue_notes(class="form-control", rows="3", placeholder="CEL came on, leak, overheat, flat, tow, Ryder/rental details") }}
+    <div class="mb-3 conditional-panel" id="truckIssuePanel">
+      <div class="row g-3">
+        <div class="col-md-5">
+          {{ form.truck_issue.label(class="form-label") }}
+          {{ form.truck_issue(class="form-select") }}
+        </div>
+        <div class="col-md-7">
+          {{ form.truck_issue_notes.label(class="form-label") }}
+          {{ form.truck_issue_notes(class="form-control", rows="3", placeholder="CEL came on, leak, overheat, flat, tow, Ryder/rental details") }}
+        </div>
+      </div>
     </div>
     <div class="mb-3 form-check">
       {{ form.fuel(class="form-check-input", id="fuelCheck") }}
@@ -44,10 +48,10 @@
       <div class="form-text">If you departed this stop loaded for two destinations, pick the second one here.</div>
     </div>
     <div class="mb-3 form-check">
-      {{ form.hot_parts(class="form-check-input") }}
+      {{ form.hot_parts(class="form-check-input", id="hotPartsCheck") }}
       {{ form.hot_parts.label(class="form-check-label") }}
     </div>
-    <div class="mb-3">
+    <div class="mb-3 conditional-panel" id="hotPartPanel">
       {{ form.part_number.label }}
       {{ form.part_number(class="form-control", placeholder="Part number from dispatch or shipper") }}
     </div>
@@ -90,17 +94,12 @@ Enter Detroit local time only if you need to manually set or correct departure. 
     </div>
   </form>
   {% if not log.depart_time %}
-    <div class="d-flex gap-2 mt-2">
-      <a href="{{ url_for('driver.pickup_driver_log', log_id=log.id) }}" class="btn btn-primary">Pickup</a>
-      <form action="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" method="POST">
-        <button type="submit" class="btn btn-success">Depart Now</button>
-      </form>
+    <div class="alert alert-light border mt-3 mb-0">
+      This stop is still open. Use <strong>Depart / Load</strong> from the driver logs table when you are ready to close it.
     </div>
   {% endif %}
-  <div class="mt-3">
-    <a href="{{ url_for('driver.add_stop', from_log_id=log.id) }}" class="btn btn-outline-primary">+ Add Missed Stop</a>
-  </div>
 </div>
+<script src="{{ url_for('static', filename='js/driver-log-conditionals.js') }}"></script>
 <script>
 (function () {
   const fuelCheck = document.getElementById('fuelCheck');
