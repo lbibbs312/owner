@@ -53,6 +53,11 @@ class DriverLogForm(FlaskForm):
         validators=[Optional()],
         validate_choice=False,
     )
+    secondary_departure_dest = SelectField(
+        "Also loaded for (second stop)",
+        choices=[("", "None / not applicable")] + [(code, label) for code, label in PLANT_LABELS.items()],
+        validators=[Optional()],
+    )
     unloaded_on_arrival = SelectField(
         "Did you unload?",
         choices=YES_NO_CHOICES,

@@ -38,6 +38,11 @@
       {{ form.load_size.label }}
       {{ form.load_size(class="form-select") }}
     </div>
+    <div class="mb-3">
+      {{ form.secondary_departure_dest.label(class="form-label") }}
+      {{ form.secondary_departure_dest(class="form-select") }}
+      <div class="form-text">If you departed this stop loaded for two destinations, pick the second one here.</div>
+    </div>
     <div class="mb-3 form-check">
       {{ form.hot_parts(class="form-check-input") }}
       {{ form.hot_parts.label(class="form-check-label") }}

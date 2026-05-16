@@ -33,6 +33,7 @@ from app.services.load_state import (
     build_driver_log_route_context,
     cargo_display,
     current_load_after_logs,
+    destination_from_load,
     destination_load_value,
     hot_part_load_value,
     is_load_for_plant,
@@ -1671,6 +1672,7 @@ def edit_driver_log(log_id):
         issue_code, issue_notes = _split_truck_issue_text(truck_issue_reason(log) or route_problem_reason(log))
         form.truck_issue.data = issue_code
         form.truck_issue_notes.data = issue_notes
+        form.secondary_departure_dest.data = destination_from_load(log.secondary_load) or ""
     if form.validate_on_submit():
         if not form.plant_name.data or not form.load_size.data:
             flash("Please select a valid Plant Name and Load Size.", "danger")
@@ -1698,6 +1700,8 @@ def edit_driver_log(log_id):
         log.fuel = form.fuel.data
         log.fuel_mileage = form.fuel_mileage.data if form.fuel.data else None
         log.meeting = form.meeting.data
+        sec_dest = form.secondary_departure_dest.data
+        log.secondary_load = destination_load_value(sec_dest) if sec_dest else None
 
         if arrive_time:
             log.arrive_time = _local_hhmm_to_arrival_utc(arrive_time, log.date)
