@@ -72,12 +72,8 @@
   
   <!-- "Create New Log" button for drivers -->
   {% if current_user.role == 'driver' %}
-    <a
-      href="{{ url_for('driver.new_driving_log') }}"
-      class="btn btn-primary mb-3 hover-btn"
-    >
-      Create New Log
-    </a>
+    <a href="{{ url_for('driver.new_driving_log') }}" class="btn btn-primary mb-3 hover-btn">Create New Log</a>
+    <a href="{{ url_for('driver.add_stop') }}" class="btn btn-outline-primary mb-3 hover-btn">+ Add Missed Stop</a>
   {% endif %}
   
   {% if logs %}

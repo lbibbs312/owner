@@ -94,6 +94,7 @@ DRIVER_ONLY_ENDPOINTS = {
     "mark_plant_transfer_printed",
     "driver_logs",
     "new_driving_log",
+    "add_stop",
     "edit_driver_log",
     "delete_driver_log",
     "depart_driver_log",
@@ -1572,6 +1573,68 @@ def new_driving_log():
     form.load_size.data = current_load_value if current_load_value != "Empty" else "Empty"
     form.secondary_load.data = current_secondary_value
     return _render_new_driving_log(form, current_load)
+
+
+@bp.route("/add_stop", methods=["GET", "POST"])
+@login_required
+def add_stop():
+    """Retroactively add a missed stop for today with a manually-entered arrive time."""
+    form = DriverLogForm()
+    local_tz = pytz.timezone("America/Detroit")
+    today_local_date = datetime.now(local_tz).date()
+
+    if form.validate_on_submit():
+        if not form.plant_name.data:
+            flash("Please select the plant.", "danger")
+            return render_template("add_stop.html", form=form)
+
+        arrive_time_raw = (form.arrive_time.data or "").strip()
+        arrive_time_norm = _normalize_hhmm_time(arrive_time_raw) if arrive_time_raw else None
+        if arrive_time_raw and arrive_time_norm is None:
+            flash("Arrival time must be a valid time like 5:45am or 1:05pm.", "danger")
+            return render_template("add_stop.html", form=form)
+
+        arrive_time_str = (
+            _local_hhmm_to_arrival_utc(arrive_time_norm, today_local_date)
+            if arrive_time_norm
+            else datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        )
+
+        newlog = DriverLog(
+            driver_id=current_user.id,
+            plant_name=form.plant_name.data,
+            load_size=form.load_size.data or "Empty",
+            secondary_load=None,
+            downtime_reason=_compose_downtime_reason(
+                [],
+                _truck_issue_text(form.truck_issue.data, form.truck_issue_notes.data),
+                form.maintenance.data,
+            ),
+            part_number=(form.part_number.data or "").strip() or None,
+            hot_parts=form.hot_parts.data,
+            dock_wait_minutes=form.dock_wait_minutes.data,
+            arrive_time=arrive_time_str,
+            maintenance=form.maintenance.data,
+            fuel=form.fuel.data,
+            fuel_mileage=form.fuel_mileage.data if form.fuel.data else None,
+            meeting=form.meeting.data,
+            date=today_local_date,
+        )
+        db.session.add(newlog)
+        db.session.commit()
+        record_activity(
+            user_id=current_user.id,
+            category="log",
+            action="submitted",
+            title="Additional stop added",
+            details=f"{newlog.plant_name} added retroactively for {newlog.date}.",
+            target_type="driver_log",
+            target_id=newlog.id,
+        )
+        flash("Additional stop added.", "success")
+        return redirect(url_for("driver.driver_logs"))
+
+    return render_template("add_stop.html", form=form)
 
 
 @bp.route("/edit_driver_log/<int:log_id>", methods=["GET", "POST"])
