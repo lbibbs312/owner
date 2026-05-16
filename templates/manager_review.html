@@ -31,7 +31,7 @@
           <tbody>
             {% for item in exceptions %}
               <tr>
-                <td><span class="badge text-bg-{{ 'danger' if item.severity == 'high' else 'warning' if item.severity == 'medium' else 'success' if item.severity == 'fixed' else 'secondary' }}">{{ item.severity|title }}</span></td>
+                <td><span class="badge text-bg-{{ 'danger' if item.severity == 'high' else 'warning' if item.severity == 'medium' else 'success' if item.severity == 'followup' else 'secondary' }}">{{ item.severity|title }}</span></td>
                 <td>{{ item.category }}</td>
                 <td>{{ item.label }}</td>
                 <td>{{ item.detail }}</td>
@@ -44,7 +44,17 @@
                       <input type="hidden" name="target_id" value="{{ item.target_id }}">
                       <input type="hidden" name="category" value="{{ item.category }}">
                       <input type="hidden" name="label" value="{{ item.label }}">
+                      <input type="hidden" name="review_action" value="reviewed">
                       <button class="btn btn-sm btn-outline-success" type="submit">Complete</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('manager.mark_exception_reviewed') }}">
+                      <input type="hidden" name="review_key" value="{{ item.review_key }}">
+                      <input type="hidden" name="target_type" value="{{ item.target_type }}">
+                      <input type="hidden" name="target_id" value="{{ item.target_id }}">
+                      <input type="hidden" name="category" value="{{ item.category }}">
+                      <input type="hidden" name="label" value="{{ item.label }}">
+                      <input type="hidden" name="review_action" value="deleted">
+                      <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
                     </form>
                   </div>
                 </td>
@@ -67,7 +77,23 @@
         {{ form.submit(class="btn btn-primary w-100") }}
       </form>
 
-      <div class="alert alert-light border small mb-4">Manager follow-ups now appear in the Exceptions table with Fixed priority until completed.</div>
+      <div class="alert alert-light border small mb-4">Manager follow-ups now appear in the Exceptions table with Follow-up priority until completed.</div>
+
+      <h2 class="h5">Exception History</h2>
+      <div class="list-group mb-4">
+        {% for event in exception_history %}
+          <div class="list-group-item">
+            <div class="d-flex justify-content-between gap-2">
+              <strong>{{ event.title }}</strong>
+              <span class="badge text-bg-{{ 'danger' if event.action == 'deleted' else 'success' }}">{{ event.action|title }}</span>
+            </div>
+            <div class="small text-muted">{{ event.created_at|to_detroit_datetime if event.created_at else '' }}</div>
+            <div class="small">{{ event.details }}</div>
+          </div>
+        {% else %}
+          <div class="list-group-item text-muted">No completed or deleted exceptions yet.</div>
+        {% endfor %}
+      </div>
 
       <h2 class="h5">Damage Flags</h2>
       <div class="list-group">

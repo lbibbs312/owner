@@ -631,6 +631,105 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     assert "required_role=driver" in edit_attempt.headers["Location"]
 
 
+def test_manager_search_suggest_learns_from_driver_logs(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("driver1", "driver1@example.com", "driver", first_name="Driver", last_name="One", employee_id="D-9")
+        create_user("manager1", "manager1@example.com", "management")
+        log = DriverLog(
+            driver_id=driver.id,
+            date=date.today(),
+            plant_name="KP",
+            load_size="Empty",
+            depart_load_size="Helios Load",
+            part_number="P0903110",
+            arrive_time="2026-05-13 12:00:00",
+        )
+        db.session.add(log)
+        db.session.commit()
+
+    login(client, "manager1")
+    part_suggestions = client.get("/manager/search/suggest?q=P090")
+    assert part_suggestions.status_code == 200
+    assert any(item["term"] == "P0903110" for item in part_suggestions.get_json()["results"])
+
+    driver_suggestions = client.get("/manager/search/suggest?q=Driver")
+    assert any(item["category"] == "driver" and "Driver One" in item["term"] for item in driver_suggestions.get_json()["results"])
+
+
+def test_manager_exception_complete_and_delete_are_history(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, OperationalFollowUp
+
+        driver = create_user("driver1", "driver1@example.com", "driver")
+        create_user("manager1", "manager1@example.com", "management")
+        log = DriverLog(
+            driver_id=driver.id,
+            date=date.today(),
+            plant_name="KP",
+            load_size="Full",
+            arrive_time="2026-05-13 12:00:00",
+        )
+        followup = OperationalFollowUp(
+            created_by_id=driver.id,
+            kind="delay",
+            plant_name="KP",
+            details="Check dock delay pattern.",
+        )
+        db.session.add_all([log, followup])
+        db.session.commit()
+        log_id = log.id
+        followup_id = followup.id
+
+    login(client, "manager1")
+    review_page = client.get("/manager/review")
+    assert b"Followup" in review_page.data
+    assert b"Check dock delay pattern" in review_page.data
+
+    complete = client.post(
+        "/manager/exceptions/reviewed",
+        data={
+            "review_key": f"followup:{followup_id}:Manager follow-up",
+            "target_type": "followup",
+            "target_id": str(followup_id),
+            "category": "Manager follow-up",
+            "label": "KP",
+            "review_action": "reviewed",
+        },
+        follow_redirects=True,
+    )
+    assert b"Exception reviewed" in complete.data
+
+    delete = client.post(
+        "/manager/exceptions/reviewed",
+        data={
+            "review_key": f"driver_log:{log_id}:No pre-trip",
+            "target_type": "driver_log",
+            "target_id": str(log_id),
+            "category": "No pre-trip",
+            "label": "Driver at KP",
+            "review_action": "deleted",
+        },
+        follow_redirects=True,
+    )
+    assert b"Exception deleted" in delete.data
+    assert b"Deleted" in delete.data
+
+    with app.app_context():
+        from app.models import ActivityEvent, OperationalFollowUp
+
+        assert OperationalFollowUp.query.get(followup_id).status == "closed"
+        assert ActivityEvent.query.filter_by(category="exception", action="reviewed").count() == 1
+        assert ActivityEvent.query.filter_by(category="exception", action="deleted").count() == 1
+
+
 def test_drivers_can_delete_only_same_day_records(client, app):
     from datetime import date, timedelta
 

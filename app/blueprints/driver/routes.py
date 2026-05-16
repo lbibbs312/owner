@@ -43,6 +43,7 @@ from app.services.load_state import (
 )
 from app.services.plant_addresses import plant_label as _plant_label
 from app.services.role_session import restore_role_user
+from app.services.search_corpus import ingest_driver_log
 from app.models import (
     ActivityEvent,
     DamagePhoto,
@@ -1591,6 +1592,7 @@ def new_driving_log():
             target_type="driver_log",
             target_id=newlog.id,
         )
+        ingest_driver_log(newlog, commit=True)
         _emit_driver_log_updated(newlog, "submitted")
         flash("Arrival recorded.", "success")
         return redirect(url_for("driver.driver_logs"))
@@ -1678,6 +1680,7 @@ def add_stop():
             target_type="driver_log",
             target_id=newlog.id,
         )
+        ingest_driver_log(newlog, commit=True)
         _emit_driver_log_updated(newlog, "added_stop")
         flash("Additional stop added.", "success")
         return redirect(url_for("driver.driver_logs"))
@@ -1762,6 +1765,7 @@ def edit_driver_log(log_id):
             target_type="driver_log",
             target_id=log.id,
         )
+        ingest_driver_log(log, commit=True)
         _emit_driver_log_updated(log, "updated")
         flash(f"Driving log updated (ID: {log.id}).", "success")
         return redirect(url_for("driver.driver_logs"))
@@ -1788,6 +1792,7 @@ def delete_driver_log(log_id):
         target_id=log_id,
     )
     db.session.commit()
+    ingest_driver_log(log, commit=True)
     _emit_driver_log_updated(log, "deleted")
     flash("Driver log deleted.", "success")
     return redirect(url_for("driver.driver_logs"))
@@ -1838,6 +1843,7 @@ def depart_driver_log(log_id):
             target_type="driver_log",
             target_id=log.id,
         )
+        ingest_driver_log(log, commit=True)
         _emit_driver_log_updated(log, "departed")
         flash(f"Departed {log.plant_name} with {cargo_display(log.depart_load_size, log.secondary_load)}.", "success")
         return redirect(url_for("driver.driver_logs"))
@@ -1872,6 +1878,7 @@ def no_pickup_driver_log(log_id):
         target_type="driver_log",
         target_id=log.id,
     )
+    ingest_driver_log(log, commit=True)
     _emit_driver_log_updated(log, "no_pickup")
     flash(f"No pickup recorded for log #{log.id}.", "success")
     return redirect(url_for("driver.driver_logs"))
@@ -1916,6 +1923,7 @@ def pickup_driver_log(log_id):
             target_type="driver_log",
             target_id=log.id,
         )
+        ingest_driver_log(log, commit=True)
         _emit_driver_log_updated(log, "pickup")
         flash(f"Load recorded at {log.plant_name}; departing with {load_display(log.depart_load_size)}.", "success")
         return redirect(url_for("driver.driver_logs"))

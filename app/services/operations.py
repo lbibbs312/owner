@@ -77,9 +77,9 @@ def build_exception_items(anchor=None, dock_delay_minutes=30):
 
     open_followups = OperationalFollowUp.query.filter_by(status="open").order_by(OperationalFollowUp.created_at.desc()).all()
     for followup in open_followups:
-        items.append({"severity": "fixed", "category": "Manager follow-up", "label": followup.plant_name or "Operations follow-up", "detail": f"{followup.kind.replace('_', ' ').title()}: {followup.details}", "target_type": "followup", "target_id": followup.id})
+        items.append({"severity": "followup", "category": "Manager follow-up", "label": followup.plant_name or "Operations follow-up", "detail": f"{followup.kind.replace('_', ' ').title()}: {followup.details}", "target_type": "followup", "target_id": followup.id})
 
-    severity_order = {"high": 0, "medium": 1, "fixed": 2, "low": 3}
+    severity_order = {"high": 0, "medium": 1, "followup": 2, "low": 3}
     return sorted(items, key=lambda item: (severity_order.get(item["severity"], 9), item["category"], item["label"]))
 
 

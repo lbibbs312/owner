@@ -26,6 +26,7 @@ from app.services.operations import build_delay_report, build_exception_items, b
 from app.services.load_state import build_driver_log_route_context
 from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
 from app.services.role_session import restore_role_user
+from app.services.search_corpus import suggest_terms
 from app.blueprints.driver.routes import (
     _build_driver_logs_pdf,
     _build_plant_transfer_pdf,
@@ -339,7 +340,10 @@ def _exception_key(item):
 
 
 def _reviewed_exception_keys():
-    events = ActivityEvent.query.filter_by(category="exception", action="reviewed").all()
+    events = ActivityEvent.query.filter(
+        ActivityEvent.category == "exception",
+        ActivityEvent.action.in_(["reviewed", "deleted"]),
+    ).all()
     keys = set()
     for event in events:
         for part in (event.details or "").split(";"):
@@ -499,6 +503,12 @@ def review_dashboard():
     metrics = build_weekly_savings(dock_delay_minutes=_dock_delay_minutes())
     followups = OperationalFollowUp.query.order_by(OperationalFollowUp.created_at.desc()).limit(20).all()
     damage_reports = DamageReport.query.order_by(DamageReport.created_at.desc()).limit(10).all()
+    exception_history = (
+        ActivityEvent.query.filter_by(category="exception")
+        .order_by(ActivityEvent.created_at.desc())
+        .limit(25)
+        .all()
+    )
     return render_template(
         "manager_review.html",
         form=form,
@@ -506,6 +516,7 @@ def review_dashboard():
         metrics=metrics,
         followups=followups,
         damage_reports=damage_reports,
+        exception_history=exception_history,
     )
 
 
@@ -521,6 +532,9 @@ def mark_exception_reviewed():
     target_id = request.form.get("target_id", type=int)
     category = (request.form.get("category") or "Exception").strip()
     label = (request.form.get("label") or "Exception").strip()
+    review_action = (request.form.get("review_action") or "reviewed").strip()
+    if review_action not in {"reviewed", "deleted"}:
+        review_action = "reviewed"
     if not review_key:
         flash("Exception review key missing.", "warning")
         return redirect(url_for("manager.review_dashboard"))
@@ -534,14 +548,14 @@ def mark_exception_reviewed():
     record_activity(
         user_id=current_user.id,
         category="exception",
-        action="reviewed",
-        title="Exception reviewed",
+        action=review_action,
+        title="Exception deleted" if review_action == "deleted" else "Exception reviewed",
         details=f"key:{review_key}; {category}: {label}",
         target_type=target_type,
         target_id=target_id,
     )
     db.session.commit()
-    flash("Exception marked completed.", "success")
+    flash("Exception deleted from active review." if review_action == "deleted" else "Exception marked completed.", "success")
     return redirect(url_for("manager.review_dashboard"))
 
 
@@ -586,6 +600,14 @@ def weekly_savings():
 def audit_history():
     audit_events = AuditEvent.query.order_by(AuditEvent.created_at.desc()).limit(100).all()
     return render_template("audit_history.html", audit_events=audit_events)
+
+
+@bp.route("/search/suggest")
+def search_suggest():
+    query = (request.args.get("q") or "").strip()
+    plant = (request.args.get("plant") or "").strip()
+    context_key = f"plant:{plant}" if plant else None
+    return jsonify({"results": suggest_terms(query, context_key=context_key, limit=10)})
 
 
 @bp.route("/dashboard", methods=["GET", "POST"])
