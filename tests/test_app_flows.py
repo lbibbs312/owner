@@ -482,6 +482,144 @@ def test_pretrip_create_and_print_route(client, app):
     assert b"PreTrip printed" in activity.data
 
 
+def test_driver_log_form_ignores_unchecked_hot_part_and_truck_issue_fields(client, app):
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+
+    login(client, "driver1")
+    created = client.post(
+        "/new_driving_log",
+        data={
+            "plant_name": "RE",
+            "load_size": "Empty",
+            "part_number": "P705",
+            "truck_issue": "cel",
+            "truck_issue_notes": "visible stale field",
+        },
+        follow_redirects=False,
+    )
+    assert created.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        log = DriverLog.query.filter_by(plant_name="RE").one()
+        assert log.hot_parts is False
+        assert log.part_number is None
+        assert log.maintenance is False
+        assert log.downtime_reason is None
+
+
+def test_driver_cannot_create_next_log_until_open_stop_is_departed(client, app):
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+
+    login(client, "driver1")
+    assert client.post("/new_driving_log", data={"plant_name": "RE", "load_size": "Empty"}).status_code == 302
+    blocked = client.post(
+        "/new_driving_log",
+        data={"plant_name": "KP", "load_size": "Empty"},
+        follow_redirects=True,
+    )
+    assert b"Close the open stop at Raleigh East before creating the next stop" in blocked.data
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        assert DriverLog.query.count() == 1
+
+
+def test_add_missed_stop_does_not_create_hot_cargo_or_mutate_source(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("driver1", "driver1@example.com", "driver")
+        source = DriverLog(
+            driver_id=driver.id,
+            date=date(2026, 5, 16),
+            plant_name="PE",
+            load_size="Empty",
+            depart_load_size="Raleigh East Load",
+            depart_time="12:00",
+            arrive_time="2026-05-16 15:45:00",
+        )
+        db.session.add(source)
+        db.session.commit()
+        source_id = source.id
+
+    login(client, "driver1")
+    response = client.post(
+        "/add_stop",
+        data={
+            "from_log_id": str(source_id),
+            "plant_name": "KP",
+            "load_size": "Raleigh East Load",
+            "arrive_time": "12:30pm",
+            "part_number": "P705",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        source = DriverLog.query.get(source_id)
+        added = DriverLog.query.filter_by(plant_name="KP").one()
+        assert source.secondary_load is None
+        assert added.hot_parts is False
+        assert added.part_number is None
+
+
+def test_edit_driver_log_rejects_impossible_depart_to_next_arrival(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("driver1", "driver1@example.com", "driver")
+        route_date = date(2026, 5, 16)
+        first = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="PE",
+            load_size="Empty",
+            arrive_time="2026-05-16 21:28:00",
+        )
+        second = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="RW",
+            load_size="Empty",
+            arrive_time="2026-05-16 21:32:00",
+        )
+        db.session.add_all([first, second])
+        db.session.commit()
+        first_id = first.id
+
+    login(client, "driver1")
+    response = client.post(
+        f"/edit_driver_log/{first_id}",
+        data={
+            "plant_name": "PE",
+            "load_size": "Empty",
+            "arrive_time": "5:28pm",
+            "depart_time": "5:31pm",
+        },
+        follow_redirects=True,
+    )
+    assert b"Only 1 min from Paint East to Raleigh West" in response.data
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        assert DriverLog.query.get(first_id).depart_time is None
+
+
 def test_driver_log_edit_and_depart_are_separate_actions(client, app):
     with app.app_context():
         create_user(

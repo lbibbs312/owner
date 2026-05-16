@@ -27,6 +27,7 @@ from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
 from app.services.simple_pdf import LANDSCAPE_LETTER, LETTER, SimplePdf
 from app.services.load_state import (
+    MIN_PLANT_TRANSFER_MINUTES,
     SECONDARY_NOT_DROPPED_PREFIX,
     TRUCK_ISSUE_PREFIX,
     UNLOAD_NOT_COMPLETED_PREFIX,
@@ -233,9 +234,108 @@ def _prefill_log_form_from_task(form, task=None):
         form.hot_parts.data = True
 
 
+def _form_hot_part_number(form):
+    if not form.hot_parts.data:
+        return None
+    return (form.part_number.data or "").strip() or None
+
+
+def _form_truck_issue_text(form):
+    if not form.maintenance.data:
+        return ""
+    return _truck_issue_text(form.truck_issue.data, form.truck_issue_notes.data)
+
+
 def _apply_log_part_fields(log, form):
-    log.part_number = (form.part_number.data or "").strip() or None
     log.hot_parts = bool(form.hot_parts.data)
+    log.part_number = _form_hot_part_number(form)
+
+
+def _local_dt_for_hhmm(log_date, hhmm):
+    if not log_date or not hhmm:
+        return None
+    try:
+        parsed_time = datetime.strptime(hhmm, "%H:%M").time()
+    except ValueError:
+        return None
+    return pytz.timezone("America/Detroit").localize(datetime.combine(log_date, parsed_time))
+
+
+def _arrival_local_dt_for_log(log):
+    value = (getattr(log, "arrive_time", None) or "").strip()
+    if not value:
+        return None
+    try:
+        utc_dt = pytz.utc.localize(datetime.strptime(value, "%Y-%m-%d %H:%M:%S"))
+        return utc_dt.astimezone(pytz.timezone("America/Detroit"))
+    except ValueError:
+        normalized = _normalize_hhmm_time(value)
+        if normalized is None:
+            return None
+        return _local_dt_for_hhmm(log.date, normalized)
+
+
+def _depart_local_dt_for_log(log):
+    return _local_dt_for_hhmm(getattr(log, "date", None), _normalize_hhmm_time(getattr(log, "depart_time", "")))
+
+
+def _arrival_hhmm_for_log(log):
+    return _normalize_hhmm_time(_arrival_utc_to_local_hhmm(log.arrive_time))
+
+
+def _open_stop_for_driver(driver_id, log_date, exclude_log_id=None):
+    query = _active_driver_logs_query().filter_by(driver_id=driver_id, date=log_date).filter(DriverLog.depart_time.is_(None))
+    if exclude_log_id:
+        query = query.filter(DriverLog.id != exclude_log_id)
+    return query.order_by(DriverLog.created_at.desc()).first()
+
+
+def _route_timing_errors(driver_id, log_date, plant_name, arrive_time, depart_time=None, exclude_log_id=None, check_previous=True):
+    errors = []
+    arrive_dt = _local_dt_for_hhmm(log_date, arrive_time) if arrive_time else None
+    depart_dt = _local_dt_for_hhmm(log_date, depart_time) if depart_time else None
+    if arrive_dt and depart_dt and depart_dt < arrive_dt:
+        errors.append("Depart time cannot be before arrival time.")
+
+    logs = (
+        _active_driver_logs_query()
+        .filter_by(driver_id=driver_id, date=log_date)
+        .filter(DriverLog.id != exclude_log_id)
+        .all()
+    )
+    previous = None
+    next_log = None
+    if arrive_dt:
+        departed_before = [(log, _depart_local_dt_for_log(log)) for log in logs]
+        departed_before = [(log, dt) for log, dt in departed_before if dt and dt <= arrive_dt]
+        if departed_before:
+            previous = max(departed_before, key=lambda item: item[1])
+
+    compare_start = depart_dt or arrive_dt
+    if compare_start:
+        next_candidates = [log for log in logs if not exclude_log_id or log.id > exclude_log_id]
+        arrivals_after = [(log, _arrival_local_dt_for_log(log)) for log in next_candidates]
+        arrivals_after = [(log, dt) for log, dt in arrivals_after if dt and dt > compare_start]
+        if arrivals_after:
+            next_log = min(arrivals_after, key=lambda item: item[1])
+
+    if check_previous and previous and arrive_dt:
+        previous_log, previous_depart = previous
+        minutes = int((arrive_dt - previous_depart).total_seconds() // 60)
+        if minutes < 0:
+            errors.append(f"Arrival is before departure from {_plant_label(previous_log.plant_name)}.")
+        elif previous_log.plant_name != plant_name and minutes < MIN_PLANT_TRANSFER_MINUTES:
+            errors.append(f"Only {minutes} min from {_plant_label(previous_log.plant_name)} to {_plant_label(plant_name)}. Fix the time or insert the missing stop in order.")
+
+    if next_log and compare_start:
+        following_log, next_arrival = next_log
+        minutes = int((next_arrival - compare_start).total_seconds() // 60)
+        if minutes < 0:
+            errors.append(f"Next stop at {_plant_label(following_log.plant_name)} arrives before this departure.")
+        elif following_log.plant_name != plant_name and minutes < MIN_PLANT_TRANSFER_MINUTES:
+            errors.append(f"Only {minutes} min from {_plant_label(plant_name)} to {_plant_label(following_log.plant_name)}. Fix the time or insert the missing stop in order.")
+    return errors
+
 
 def _get_plant_transfer_or_redirect(transfer_id):
     transfer = _active_plant_transfers_query().filter_by(id=transfer_id).first_or_404()
@@ -1528,6 +1628,9 @@ def new_driving_log():
     current_load_value = current_load["value"] or "Empty"
     current_secondary_value = current_load.get("secondary_value") or ""
     pending_ryder_event = _open_ryder_event(current_user.id)
+    local_tz = pytz.timezone("America/Detroit")
+    now_local = datetime.now(local_tz)
+    local_date = now_local.date()
 
     if form.validate_on_submit():
         if pending_ryder_event:
@@ -1536,6 +1639,10 @@ def new_driving_log():
         if not form.plant_name.data:
             flash("Please select the plant you arrived at.", "danger")
             return redirect(url_for("driver.new_driving_log"))
+        open_stop = _open_stop_for_driver(current_user.id, local_date)
+        if open_stop:
+            flash(f"Close the open stop at {_plant_label(open_stop.plant_name)} before creating the next stop.", "warning")
+            return redirect(url_for("driver.driver_logs"))
 
         arrival_load = current_load_value if current_load_value != "Empty" else (form.load_size.data or "Empty")
         arrival_secondary_load = current_secondary_value or None
@@ -1567,10 +1674,6 @@ def new_driving_log():
                     return _render_new_driving_log(form, current_load)
                 reason_parts.append(f"{SECONDARY_NOT_DROPPED_PREFIX} {reason}")
 
-        local_tz = pytz.timezone("America/Detroit")
-        now_local = datetime.now(local_tz)
-        local_date = now_local.date()
-
         now_utc = datetime.utcnow()
         arrive_time_str = now_utc.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -1579,9 +1682,9 @@ def new_driving_log():
             plant_name=form.plant_name.data,
             load_size=arrival_load,
             secondary_load=arrival_secondary_load,
-            downtime_reason=_compose_downtime_reason(reason_parts, _truck_issue_text(form.truck_issue.data, form.truck_issue_notes.data), form.maintenance.data),
-            part_number=(form.part_number.data or "").strip() or None,
-            hot_parts=form.hot_parts.data,
+            downtime_reason=_compose_downtime_reason(reason_parts, _form_truck_issue_text(form), form.maintenance.data),
+            part_number=_form_hot_part_number(form),
+            hot_parts=bool(form.hot_parts.data),
             dock_wait_minutes=form.dock_wait_minutes.data,
             arrive_time=arrive_time_str,
             maintenance=form.maintenance.data,
@@ -1649,6 +1752,11 @@ def add_stop():
             flash("Arrival time must be a valid time like 5:45am or 1:05pm.", "danger")
             return render_template("add_stop.html", form=form, source_log=source_log, from_log_id=from_log_id_raw)
 
+        timing_errors = _route_timing_errors(current_user.id, log_date, form.plant_name.data, arrive_time_norm)
+        if timing_errors:
+            flash(timing_errors[0], "danger")
+            return render_template("add_stop.html", form=form, source_log=source_log, from_log_id=from_log_id_raw)
+
         arrive_time_str = _local_hhmm_to_arrival_utc(arrive_time_norm, log_date)
 
         newlog = DriverLog(
@@ -1658,11 +1766,11 @@ def add_stop():
             secondary_load=None,
             downtime_reason=_compose_downtime_reason(
                 [],
-                _truck_issue_text(form.truck_issue.data, form.truck_issue_notes.data),
+                _form_truck_issue_text(form),
                 form.maintenance.data,
             ),
-            part_number=(form.part_number.data or "").strip() or None,
-            hot_parts=form.hot_parts.data,
+            part_number=_form_hot_part_number(form),
+            hot_parts=bool(form.hot_parts.data),
             dock_wait_minutes=form.dock_wait_minutes.data,
             arrive_time=arrive_time_str,
             maintenance=form.maintenance.data,
@@ -1672,12 +1780,6 @@ def add_stop():
             date=log_date,
         )
         db.session.add(newlog)
-
-        # Smart flag: if this stop was added from a source log and that source
-        # log has no secondary load set, automatically mark the source as also
-        # having departed loaded for this new stop's destination.
-        if source_log and not source_log.secondary_load:
-            source_log.secondary_load = destination_load_value(form.plant_name.data)
 
         db.session.commit()
         record_activity(
@@ -1735,13 +1837,20 @@ def edit_driver_log(log_id):
             flash("Depart time must be a valid Detroit local time like 5:45am or 1:05pm.", "danger")
             return render_template("edit_driver_log.html", form=form, log=log)
 
+        proposed_arrive = arrive_time or _normalize_hhmm_time(_arrival_utc_to_local_hhmm(log.arrive_time))
+        proposed_depart = depart_time or _normalize_hhmm_time(log.depart_time or "")
+        timing_errors = _route_timing_errors(log.driver_id, log.date, form.plant_name.data, proposed_arrive, proposed_depart, exclude_log_id=log.id)
+        if timing_errors:
+            flash(timing_errors[0], "danger")
+            return render_template("edit_driver_log.html", form=form, log=log)
+
         before_values = model_snapshot(log, DRIVER_LOG_AUDIT_FIELDS)
         log.plant_name = form.plant_name.data
         log.load_size = form.load_size.data
         _apply_log_part_fields(log, form)
         log.dock_wait_minutes = form.dock_wait_minutes.data
         log.maintenance = form.maintenance.data
-        log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), _truck_issue_text(form.truck_issue.data, form.truck_issue_notes.data), form.maintenance.data)
+        log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), _form_truck_issue_text(form), form.maintenance.data)
         log.fuel = form.fuel.data
         log.fuel_mileage = form.fuel_mileage.data if form.fuel.data else None
         log.meeting = form.meeting.data
@@ -1838,7 +1947,12 @@ def depart_driver_log(log_id):
 
         local_tz = pytz.timezone("America/Detroit")
         now_local = datetime.now(local_tz)
-        log.depart_time = now_local.strftime("%H:%M")
+        depart_time = now_local.strftime("%H:%M")
+        timing_errors = _route_timing_errors(log.driver_id, log.date, log.plant_name, _arrival_hhmm_for_log(log), depart_time, exclude_log_id=log.id, check_previous=False)
+        if timing_errors:
+            flash(timing_errors[0], "danger")
+            return render_template("depart_driver_log.html", form=form, log=log, route=route)
+        log.depart_time = depart_time
         log.depart_load_size = departure_load
         log.secondary_load = secondary_load or None
         log.no_pickup = departure_load == "Empty" and not log.secondary_load
@@ -1874,9 +1988,14 @@ def no_pickup_driver_log(log_id):
 
     local_tz = pytz.timezone("America/Detroit")
     now_local = datetime.now(local_tz)
+    depart_time = now_local.strftime("%H:%M")
+    timing_errors = _route_timing_errors(log.driver_id, log.date, log.plant_name, _arrival_hhmm_for_log(log), depart_time, exclude_log_id=log.id, check_previous=False)
+    if timing_errors:
+        flash(timing_errors[0], "danger")
+        return redirect(url_for("driver.driver_logs"))
     log.no_pickup = True
     log.depart_load_size = "Empty"
-    log.depart_time = now_local.strftime("%H:%M")
+    log.depart_time = depart_time
     db.session.commit()
     record_activity(
         user_id=current_user.id,
@@ -1912,13 +2031,18 @@ def pickup_driver_log(log_id):
             return render_template("pickup_driver_log.html", form=form, log=log)
 
         now_local = datetime.now(pytz.timezone("America/Detroit"))
-        log.depart_time = now_local.strftime("%H:%M")
+        depart_time = now_local.strftime("%H:%M")
+        timing_errors = _route_timing_errors(log.driver_id, log.date, log.plant_name, _arrival_hhmm_for_log(log), depart_time, exclude_log_id=log.id, check_previous=False)
+        if timing_errors:
+            flash(timing_errors[0], "danger")
+            return render_template("pickup_driver_log.html", form=form, log=log)
+        log.depart_time = depart_time
         log.depart_load_size = destination_load_value(form.plant_name.data)
-        log.part_number = (form.part_number.data or "").strip() or log.part_number
-        log.hot_parts = form.hot_parts.data
+        log.hot_parts = bool(form.hot_parts.data)
+        log.part_number = _form_hot_part_number(form) or (log.part_number if log.hot_parts else None)
         log.dock_wait_minutes = form.dock_wait_minutes.data or log.dock_wait_minutes
         log.maintenance = form.maintenance.data
-        log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), _truck_issue_text(form.truck_issue.data, form.truck_issue_notes.data), form.maintenance.data)
+        log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), _form_truck_issue_text(form), form.maintenance.data)
         log.fuel = form.fuel.data
         log.fuel_mileage = form.fuel_mileage.data if form.fuel.data else None
         log.meeting = form.meeting.data
