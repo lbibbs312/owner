@@ -594,6 +594,7 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
         db.session.add_all([completed_log, log])
         db.session.commit()
         log_id = log.id
+        driver_id = driver.id
 
     login(client, "manager1")
     page = client.get("/manager/driver-logs")
@@ -607,6 +608,18 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     assert b"/depart" not in page.data
     assert b"/pickup" not in page.data
     assert b"/delete" not in page.data
+
+    filtered_logs = client.get(f"/manager/driver-logs?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert b"Print / Save Route" in filtered_logs.data
+    assert b"Download Route PDF" in filtered_logs.data
+    route_print = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert route_print.status_code == 200
+    assert b"Driver Route Audit Sheet" in route_print.data
+
+    dashboard = client.get(f"/manager/dashboard?driver_id={driver_id}")
+    assert dashboard.status_code == 200
+    assert b"Live Routes &amp; Stops" in dashboard.data
+    assert b"Open stop - needs departure" in dashboard.data
 
     driver_page_attempt = client.get("/driver_logs", follow_redirects=False)
     assert driver_page_attempt.status_code == 302
@@ -1262,14 +1275,14 @@ def test_knowledge_base_uses_shared_app_shell(client, app):
 
 
 
-def test_manager_trim_dashboard_scopes_trim_operations(client, app):
+def test_manager_trim_dashboard_removed_and_live_dispatch_filters_driver(client, app):
     from datetime import date
 
     with app.app_context():
         from app.extensions import db
-        from app.models import DriverLog, PlantTransfer, PlantTransferLine, Task
+        from app.models import DriverLog
 
-        trim_driver = create_user(
+        driver = create_user(
             "trimdriver",
             "trimdriver@example.com",
             "driver",
@@ -1279,53 +1292,25 @@ def test_manager_trim_dashboard_scopes_trim_operations(client, app):
             employee_id="T-77",
         )
         create_user("manager1", "manager1@example.com", "management")
-        task = Task(
-            title="Trim hot move",
-            details="Move rack through Trim DC",
-            is_hot=True,
-            status="pending",
-            assigned_to=trim_driver.id,
-        )
         log = DriverLog(
-            driver_id=trim_driver.id,
+            driver_id=driver.id,
             date=date.today(),
             plant_name="Trim DC",
             load_size="Full",
             arrive_time="2026-05-13 12:00:00",
         )
-        transfer = PlantTransfer(
-            user_id=trim_driver.id,
-            transfer_number="TRIM-1",
-            transfer_date=date.today(),
-            ship_to="Trim DC",
-            ship_from="RW",
-            trailer_number="TR-4",
-            driver_name="Trim Driver",
-        )
-        transfer.lines.append(
-            PlantTransferLine(
-                line_number=1,
-                side="left",
-                part_number="TRIM-PART",
-                skids="3",
-                quantity="42",
-            )
-        )
-        db.session.add_all([task, log, transfer])
+        db.session.add(log)
         db.session.commit()
+        driver_id = driver.id
 
     login(client, "manager1")
-    page = client.get("/manager/trim-dashboard")
-    assert page.status_code == 200
-    assert b"Trim Division Dashboard" in page.data
-    assert b"Trim hot move" in page.data
-    assert b"Trim DC" in page.data
-    assert b"Badge T-77" in page.data
-    assert b"trimdriver" not in page.data
-    assert b"TRIM-1" in page.data
-    assert b"TRIM-PART" in page.data
-    assert b"3 skid(s)" in page.data
-    assert b"qty 42" in page.data
+    page = client.get("/manager/trim-dashboard", follow_redirects=False)
+    assert page.status_code == 302
+    assert page.headers["Location"].endswith("/manager/dashboard")
 
-    dashboard = client.get("/manager/dashboard")
-    assert b"Trim Dashboard" in dashboard.data
+    dashboard = client.get(f"/manager/dashboard?driver_id={driver_id}")
+    assert dashboard.status_code == 200
+    assert b"Trim Dashboard" not in dashboard.data
+    assert b"Live Routes &amp; Stops" in dashboard.data
+    assert b"Trim DC" in dashboard.data
+    assert b"Stop 1" in dashboard.data

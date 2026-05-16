@@ -157,6 +157,40 @@
     <p>No logs found for today.</p>
   {% endif %}
 
+  {% set today_pretrip = drivers_pretrips[current_user.display_name][0] if (drivers_pretrips is defined and drivers_pretrips[current_user.display_name]) else none %}
+  {% set fuel_logs = drivers_logs[current_user.display_name] | selectattr('fuel') | selectattr('fuel_mileage') | list %}
+  {% set start_mi = today_pretrip.start_mileage if today_pretrip else none %}
+  {% set end_mi = today_pretrip.posttrip.end_mileage if (today_pretrip and today_pretrip.posttrip) else none %}
+  {% if start_mi or fuel_logs %}
+  <div class="section-title">Mileage Summary</div>
+  <table style="width:auto;min-width:320px;max-width:520px;margin-top:4pt;">
+    <thead><tr><th>Checkpoint</th><th>Odometer</th><th>Notes</th></tr></thead>
+    <tbody>
+      {% if start_mi %}<tr><td>Pre-Trip Start</td><td>{{ "{:,}".format(start_mi) }} mi</td><td></td></tr>{% endif %}
+      {% for fl in fuel_logs %}
+      <tr>
+        <td>Fuel Stop</td>
+        <td>{{ "{:,}".format(fl.fuel_mileage) }} mi</td>
+        <td>{% if start_mi %}+{{ "{:,}".format(fl.fuel_mileage - start_mi) }} from start{% endif %}</td>
+      </tr>
+      {% endfor %}
+      {% if end_mi %}
+      <tr><td>Post-Trip End</td><td>{{ "{:,}".format(end_mi) }} mi</td><td>{% if start_mi %}{{ "{:,}".format(end_mi - start_mi) }} total mi{% endif %}</td></tr>
+      {% if start_mi and fuel_logs %}
+      {% set first_fuel = fuel_logs[0].fuel_mileage %}
+      <tr><td colspan="3" style="font-size:8pt;text-align:left;">
+        Before fuel: {{ "{:,}".format(first_fuel - start_mi) }} mi &nbsp;|&nbsp;
+        After fuel: {{ "{:,}".format(end_mi - first_fuel) }} mi &nbsp;|&nbsp;
+        Total: {{ "{:,}".format(end_mi - start_mi) }} mi
+      </td></tr>
+      {% endif %}
+      {% else %}
+      <tr><td colspan="3" style="font-style:italic;font-size:8pt;">Post-trip not yet submitted</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+  {% endif %}
+
   <div class="section-title">Plant Transfers</div>
   {% if drivers_plant_transfers[current_user.display_name] %}
     <table>

@@ -2,7 +2,7 @@
 {% block content %}
 <div class="container-fluid driver-log-shell slide-in">
   {% set logs_endpoint = 'manager.driver_logs' if current_user.role == 'management' else 'driver.driver_logs' %}
-  {% if current_user.role == 'management' %}<script>document.body.classList.add('manager-logs-active');</script>{% endif %}
+  <script>document.body.classList.add('manager-logs-active');</script>
   <style>
     body.manager-logs-active .container.mt-4.fade-in { max-width:none; width:100%; padding-left:0; padding-right:0; }
     .driver-log-shell { width:100%; max-width:none; padding-left:16px; padding-right:16px; }
@@ -69,6 +69,16 @@
       </div>
     </div>
   </form>
+
+  {% if current_user.role == 'management' and selected_driver_id and logs %}
+    <div class="alert alert-light border d-flex flex-wrap align-items-center gap-2 mb-3">
+      <strong>Entire route PDF:</strong>
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('manager.driver_route_print', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d')) }}">Print / Save Route</a>
+      <a class="btn btn-sm btn-outline-success" href="{{ url_for('manager.driver_route_attachment', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d')) }}">Download Route PDF</a>
+    </div>
+  {% elif current_user.role == 'management' and logs %}
+    <div class="alert alert-light border small mb-3">Choose a driver to print or download that driver's full route for this date.</div>
+  {% endif %}
   
   <!-- "Create New Log" button for drivers -->
   {% if current_user.role == 'driver' %}
@@ -145,7 +155,14 @@
               {% endif %}
             </td>
             <td>{% if log.maintenance %}<span class="badge bg-warning text-dark">Yes</span>{% else %}<span class="badge bg-success">No</span>{% endif %}</td>
-            <td>{% if log.fuel %}<span class="badge bg-info text-dark">Yes</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
+            <td>
+              {% if log.fuel %}
+                <span class="badge bg-info text-dark">Yes</span>
+                {% if log.fuel_mileage %}<br><small class="text-muted fw-semibold">{{ "{:,}".format(log.fuel_mileage) }} mi</small>{% endif %}
+              {% else %}
+                <span class="badge bg-secondary">No</span>
+              {% endif %}
+            </td>
             <td>{% if log.meeting %}<span class="badge bg-info text-dark">Yes</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
             
             <!-- Arrival (assumes it's a full datetime) -->

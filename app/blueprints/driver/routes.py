@@ -602,6 +602,20 @@ def _task_redirect():
     return redirect(url_for("driver.list_tasks"))
 
 
+def _emit_driver_log_updated(log, action="updated"):
+    socketio.emit(
+        "driver_log_updated",
+        {
+            "log_id": log.id,
+            "driver_id": log.driver_id,
+            "date": log.date.isoformat() if log.date else None,
+            "plant_name": log.plant_name,
+            "action": action,
+            "departed": bool(log.depart_time),
+        },
+    )
+
+
 def _mobile_report_days(limit=14):
     report_dates = set()
     for value, in _active_driver_logs_query().with_entities(DriverLog.date).filter_by(driver_id=current_user.id).all():
@@ -975,12 +989,22 @@ def do_posttrip(pretrip_id):
         flash("Not authorized to complete a PostTrip for someone else's PreTrip.", "danger")
         return redirect(url_for("driver.list_pretrips"))
 
+    local_tz = pytz.timezone("America/Detroit")
+    today_date = datetime.now(local_tz).date()
+    fuel_logs = (
+        _active_driver_logs_query()
+        .filter_by(driver_id=current_user.id, date=today_date, fuel=True)
+        .filter(DriverLog.fuel_mileage.isnot(None))
+        .order_by(DriverLog.arrive_time)
+        .all()
+    )
+
     form = PostTripForm()
     if form.validate_on_submit():
         end_mileage_val = form.end_mileage.data
         if pt.start_mileage is not None and end_mileage_val < pt.start_mileage:
             flash("End mileage cannot be lower than start mileage.", "danger")
-            return render_template("posttrip.html", form=form, pretrip=pt)
+            return render_template("posttrip.html", form=form, pretrip=pt, fuel_logs=fuel_logs)
         if pt.start_mileage is not None:
             miles_val = end_mileage_val - pt.start_mileage
         else:
@@ -1015,7 +1039,7 @@ def do_posttrip(pretrip_id):
 
         flash("PostTrip completed successfully and shift clock ended!", "success")
         return redirect(url_for("driver.view_pretrip", pretrip_id=pretrip_id))
-    return render_template("posttrip.html", form=form, pretrip=pt)
+    return render_template("posttrip.html", form=form, pretrip=pt, fuel_logs=fuel_logs)
 
 
 @bp.route("/view_pretrip/<int:pretrip_id>", methods=["GET", "POST"])
@@ -1567,6 +1591,7 @@ def new_driving_log():
             target_type="driver_log",
             target_id=newlog.id,
         )
+        _emit_driver_log_updated(newlog, "submitted")
         flash("Arrival recorded.", "success")
         return redirect(url_for("driver.driver_logs"))
 
@@ -1636,6 +1661,13 @@ def add_stop():
             date=log_date,
         )
         db.session.add(newlog)
+
+        # Smart flag: if this stop was added from a source log and that source
+        # log has no secondary load set, automatically mark the source as also
+        # having departed loaded for this new stop's destination.
+        if source_log and not source_log.secondary_load:
+            source_log.secondary_load = destination_load_value(form.plant_name.data)
+
         db.session.commit()
         record_activity(
             user_id=current_user.id,
@@ -1646,6 +1678,7 @@ def add_stop():
             target_type="driver_log",
             target_id=newlog.id,
         )
+        _emit_driver_log_updated(newlog, "added_stop")
         flash("Additional stop added.", "success")
         return redirect(url_for("driver.driver_logs"))
 
@@ -1729,6 +1762,7 @@ def edit_driver_log(log_id):
             target_type="driver_log",
             target_id=log.id,
         )
+        _emit_driver_log_updated(log, "updated")
         flash(f"Driving log updated (ID: {log.id}).", "success")
         return redirect(url_for("driver.driver_logs"))
 
@@ -1754,6 +1788,7 @@ def delete_driver_log(log_id):
         target_id=log_id,
     )
     db.session.commit()
+    _emit_driver_log_updated(log, "deleted")
     flash("Driver log deleted.", "success")
     return redirect(url_for("driver.driver_logs"))
 
@@ -1803,6 +1838,7 @@ def depart_driver_log(log_id):
             target_type="driver_log",
             target_id=log.id,
         )
+        _emit_driver_log_updated(log, "departed")
         flash(f"Departed {log.plant_name} with {cargo_display(log.depart_load_size, log.secondary_load)}.", "success")
         return redirect(url_for("driver.driver_logs"))
 
@@ -1836,6 +1872,7 @@ def no_pickup_driver_log(log_id):
         target_type="driver_log",
         target_id=log.id,
     )
+    _emit_driver_log_updated(log, "no_pickup")
     flash(f"No pickup recorded for log #{log.id}.", "success")
     return redirect(url_for("driver.driver_logs"))
 
@@ -1879,6 +1916,7 @@ def pickup_driver_log(log_id):
             target_type="driver_log",
             target_id=log.id,
         )
+        _emit_driver_log_updated(log, "pickup")
         flash(f"Load recorded at {log.plant_name}; departing with {load_display(log.depart_load_size)}.", "success")
         return redirect(url_for("driver.driver_logs"))
 
@@ -2089,8 +2127,10 @@ def end_of_day_print():
     plant_transfers = _active_plant_transfers_query().filter_by(
         user_id=current_user.id, transfer_date=today_local_date
     ).all()
+    pretrips_today = _active_pretrips_query().filter_by(user_id=current_user.id, pretrip_date=today_local_date).all()
     drivers_logs = {current_user.display_name: logs}
     drivers_plant_transfers = {current_user.display_name: plant_transfers}
+    drivers_pretrips = {current_user.display_name: pretrips_today}
     record_activity(
         user_id=current_user.id,
         category="print",
@@ -2105,6 +2145,7 @@ def end_of_day_print():
         the_date=today_local_date,
         drivers_logs=drivers_logs,
         drivers_plant_transfers=drivers_plant_transfers,
+        drivers_pretrips=drivers_pretrips,
         log_routes=_driver_log_route_context(logs),
         email_mode=False,
     )

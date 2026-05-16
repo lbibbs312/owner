@@ -5,6 +5,13 @@
   <p class="text-muted">Ending your shift clock and finalizing daily mileage.</p>
   <div class="alert alert-secondary py-2">
     <strong>Start Mileage:</strong> <span id="startMileage">{{ pretrip.start_mileage or 0 }}</span>
+    {% if fuel_logs %}
+      {% for fl in fuel_logs %}
+        <span class="ms-3"><strong>Fuel Stop:</strong> {{ "{:,}".format(fl.fuel_mileage) }}
+          {% if pretrip.start_mileage %}(+{{ "{:,}".format(fl.fuel_mileage - pretrip.start_mileage) }} mi from start){% endif %}
+        </span>
+      {% endfor %}
+    {% endif %}
     <span class="ms-3"><strong>Total Miles:</strong> <span id="totalMiles">--</span></span>
   </div>
 
@@ -30,6 +37,8 @@
   const totalMiles = document.getElementById('totalMiles');
   const mileageHelp = document.getElementById('mileageHelp');
 
+  const fuelMileage = {{ fuel_logs[0].fuel_mileage if fuel_logs else 'null' }};
+
   function updateMileageTotal() {
     const endMileage = Number(endMileageInput.value);
     if (!endMileageInput.value) {
@@ -43,6 +52,11 @@
     if (total < 0) {
       mileageHelp.textContent = 'End mileage is lower than start mileage. Check the number before submitting.';
       mileageHelp.className = 'form-text text-danger fw-semibold';
+    } else if (fuelMileage) {
+      const beforeFuel = fuelMileage - startMileage;
+      const afterFuel = endMileage - fuelMileage;
+      mileageHelp.textContent = `Total: ${total} mi  ·  Before fuel: ${beforeFuel} mi  ·  After fuel: ${afterFuel} mi`;
+      mileageHelp.className = 'form-text text-success fw-semibold';
     } else {
       mileageHelp.textContent = 'Calculated total: ' + total + ' mile(s).';
       mileageHelp.className = 'form-text text-success fw-semibold';

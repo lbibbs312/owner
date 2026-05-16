@@ -195,6 +195,7 @@ def build_driver_log_route_context(logs):
     for group_logs in by_group.values():
         current_primary_destination = None
         current_secondary_destination = None
+        current_secondary_value = ""  # full display string, e.g. "PPL Load" or "PPL Hot Part"
 
         sorted_logs = sorted(group_logs, key=_driver_log_sort_key)
         for index, log in enumerate(sorted_logs):
@@ -210,7 +211,7 @@ def build_driver_log_route_context(logs):
                 current_primary_destination = None
 
             arrive_primary = destination_load_value(current_primary_destination) if current_primary_destination else "Empty"
-            arrive_secondary = hot_part_load_value(current_secondary_destination) if current_secondary_destination else ""
+            arrive_secondary = current_secondary_value
             arrived_at_primary_destination = bool(current_primary_destination and current_primary_destination == plant)
             arrived_at_secondary_destination = bool(current_secondary_destination and current_secondary_destination == plant)
             primary_unload_blocked = arrived_at_primary_destination and unload_not_completed(log)
@@ -220,8 +221,9 @@ def build_driver_log_route_context(logs):
 
             after_primary_destination = None if unloaded_on_arrival else current_primary_destination
             after_secondary_destination = None if secondary_dropped_on_arrival else current_secondary_destination
+            after_secondary_value = "" if secondary_dropped_on_arrival else current_secondary_value
             after_primary = destination_load_value(after_primary_destination) if after_primary_destination else "Empty"
-            after_secondary = hot_part_load_value(after_secondary_destination) if after_secondary_destination else ""
+            after_secondary = after_secondary_value
 
             depart_size = log.depart_load_size
             if depart_size is None:
@@ -229,15 +231,16 @@ def build_driver_log_route_context(logs):
                 depart_secondary = None
                 depart_cargo = None
                 if unloaded_on_arrival and secondary_dropped_on_arrival:
-                    action = "Unloaded + hot part dropped"
+                    action = "Unloaded + secondary dropped"
                 elif unloaded_on_arrival:
                     action = "Unloaded"
                 elif secondary_dropped_on_arrival:
-                    action = "Hot part dropped"
+                    action = "Secondary load dropped"
                 else:
                     action = "At stop"
                 next_primary_destination = after_primary_destination
                 next_secondary_destination = after_secondary_destination
+                next_secondary_value = after_secondary_value
             else:
                 depart_destination = destination_from_load(depart_size)
                 if is_empty_load(depart_size):
@@ -253,19 +256,22 @@ def build_driver_log_route_context(logs):
                     depart_primary = load_display(depart_size)
                     next_primary_destination = after_primary_destination
 
-                depart_secondary_destination = destination_from_load(getattr(log, "secondary_load", None))
+                secondary_load_raw = getattr(log, "secondary_load", None)
+                depart_secondary_destination = destination_from_load(secondary_load_raw)
                 if depart_secondary_destination:
-                    depart_secondary = hot_part_load_value(depart_secondary_destination)
+                    depart_secondary = load_display(secondary_load_raw)  # preserve Load vs Hot Part suffix
                     next_secondary_destination = depart_secondary_destination
+                    next_secondary_value = depart_secondary
                 else:
                     depart_secondary = after_secondary
                     next_secondary_destination = after_secondary_destination
+                    next_secondary_value = after_secondary_value
 
                 depart_cargo = cargo_display(depart_primary, depart_secondary)
                 if depart_secondary and depart_secondary != "Empty" and depart_primary and depart_primary != "Empty":
                     action = "Loaded mixed cargo"
                 elif depart_secondary and depart_secondary != "Empty":
-                    action = "Loaded hot part"
+                    action = "Loaded secondary cargo"
                 elif depart_primary == "Empty":
                     action = "Unloaded, departed empty" if unloaded_on_arrival else "Departed empty"
                 else:
@@ -306,5 +312,6 @@ def build_driver_log_route_context(logs):
 
             current_primary_destination = next_primary_destination
             current_secondary_destination = next_secondary_destination
+            current_secondary_value = next_secondary_value
 
     return routes

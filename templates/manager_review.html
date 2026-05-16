@@ -31,11 +31,23 @@
           <tbody>
             {% for item in exceptions %}
               <tr>
-                <td><span class="badge text-bg-{{ 'danger' if item.severity == 'high' else 'warning' if item.severity == 'medium' else 'secondary' }}">{{ item.severity|title }}</span></td>
+                <td><span class="badge text-bg-{{ 'danger' if item.severity == 'high' else 'warning' if item.severity == 'medium' else 'success' if item.severity == 'fixed' else 'secondary' }}">{{ item.severity|title }}</span></td>
                 <td>{{ item.category }}</td>
                 <td>{{ item.label }}</td>
                 <td>{{ item.detail }}</td>
-                <td>{% if item.url %}<a class="btn btn-sm btn-outline-primary" href="{{ item.url }}">Open</a>{% endif %}</td>
+                <td class="text-end">
+                  <div class="d-flex gap-1 justify-content-end flex-wrap">
+                    {% if item.url %}<a class="btn btn-sm btn-outline-primary" href="{{ item.url }}">Open</a>{% endif %}
+                    <form method="POST" action="{{ url_for('manager.mark_exception_reviewed') }}">
+                      <input type="hidden" name="review_key" value="{{ item.review_key }}">
+                      <input type="hidden" name="target_type" value="{{ item.target_type }}">
+                      <input type="hidden" name="target_id" value="{{ item.target_id }}">
+                      <input type="hidden" name="category" value="{{ item.category }}">
+                      <input type="hidden" name="label" value="{{ item.label }}">
+                      <button class="btn btn-sm btn-outline-success" type="submit">Complete</button>
+                    </form>
+                  </div>
+                </td>
               </tr>
             {% else %}
               <tr><td colspan="5" class="text-muted">No active exceptions.</td></tr>
@@ -55,21 +67,7 @@
         {{ form.submit(class="btn btn-primary w-100") }}
       </form>
 
-      <h2 class="h5">Open Follow-ups</h2>
-      <div class="list-group mb-4">
-        {% for followup in followups if followup.status == 'open' %}
-          <div class="list-group-item">
-            <div class="d-flex justify-content-between gap-2">
-              <strong>{{ followup.kind.replace('_', ' ')|title }}</strong>
-              <form method="POST" action="{{ url_for('manager.close_followup', followup_id=followup.id) }}"><button class="btn btn-sm btn-outline-success">Close</button></form>
-            </div>
-            <div class="small text-muted">{{ followup.plant_name or 'No plant' }}</div>
-            <div>{{ followup.details }}</div>
-          </div>
-        {% else %}
-          <div class="list-group-item text-muted">No open follow-ups.</div>
-        {% endfor %}
-      </div>
+      <div class="alert alert-light border small mb-4">Manager follow-ups now appear in the Exceptions table with Fixed priority until completed.</div>
 
       <h2 class="h5">Damage Flags</h2>
       <div class="list-group">

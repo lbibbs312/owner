@@ -20,16 +20,18 @@ from app.blueprints.manager import bp
 from app.extensions import db, socketio
 from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
-from app.models import AuditEvent, DamageReport, DriverLog, OperationalFollowUp, PlantTransfer, PreTrip, Task, User
+from app.models import ActivityEvent, AuditEvent, DamageReport, DriverLog, OperationalFollowUp, PlantTransfer, PreTrip, Task, User
 from app.services.activity import record_activity
 from app.services.operations import build_delay_report, build_exception_items, build_weekly_savings
 from app.services.load_state import build_driver_log_route_context
 from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
 from app.services.role_session import restore_role_user
 from app.blueprints.driver.routes import (
+    _build_driver_logs_pdf,
     _build_plant_transfer_pdf,
     _build_pretrip_pdf,
     _plant_transfer_copy_sets,
+    _total_miles_for_pretrips,
 )
 
 
@@ -329,6 +331,93 @@ def _driver_log_sort_key(log):
 def _driver_log_route_context(logs):
     return build_driver_log_route_context(logs)
 
+def _exception_key(item):
+    return ":".join(
+        str(item.get(part) or "")
+        for part in ("target_type", "target_id", "category")
+    )
+
+
+def _reviewed_exception_keys():
+    events = ActivityEvent.query.filter_by(category="exception", action="reviewed").all()
+    keys = set()
+    for event in events:
+        for part in (event.details or "").split(";"):
+            part = part.strip()
+            if part.startswith("key:"):
+                keys.add(part[4:].strip())
+    return keys
+
+
+def _active_exception_items():
+    reviewed = _reviewed_exception_keys()
+    return [
+        item for item in build_exception_items(dock_delay_minutes=_dock_delay_minutes())
+        if _exception_key(item) not in reviewed
+    ]
+
+
+def _live_stop_rows(logs):
+    sorted_logs = sorted(logs, key=_driver_log_sort_key)
+    routes = _driver_log_route_context(sorted_logs)
+    counts = {}
+    rows = []
+    for log in sorted_logs:
+        key = (log.driver_id, log.date)
+        counts[key] = counts.get(key, 0) + 1
+        route = routes.get(log.id, {})
+        rows.append({
+            "log": log,
+            "route": route,
+            "stop_number": counts[key],
+            "driver": log.driver,
+            "status": "Open stop - needs departure" if not log.depart_time else "Completed stop",
+            "status_key": "open" if not log.depart_time else "complete",
+            "cargo": route.get("depart_cargo_desc") or route.get("arrive_cargo_desc") or log.depart_load_size or log.load_size or "--",
+            "url": url_for("manager.view_driver_log", log_id=log.id),
+        })
+    return list(reversed(rows))
+
+
+def _route_print_context(driver_id, route_date):
+    driver = User.query.get_or_404(driver_id)
+    logs = sorted(
+        _active_driver_logs_query().filter_by(driver_id=driver.id, date=route_date).all(),
+        key=_driver_log_sort_key,
+    )
+    pretrips = _active_pretrips_query().filter_by(user_id=driver.id, pretrip_date=route_date).all()
+    log_routes = _driver_log_route_context(logs)
+    damage_reports = (
+        DamageReport.query
+        .filter(
+            DamageReport.reported_by_id == driver.id,
+            db.func.date(DamageReport.created_at) == route_date,
+        )
+        .order_by(DamageReport.created_at.desc())
+        .all()
+    )
+    parts_carried = sorted({log.part_number for log in logs if log.part_number})
+    exception_notes = []
+    log_issue_details = {}
+    for log in logs:
+        route = log_routes.get(log.id, {})
+        plant_name = route.get("plant") or _plant_label(log.plant_name)
+        if log.maintenance or log.downtime_reason:
+            exception_notes.append(f"Issue at {plant_name}: {log.downtime_reason or 'Maintenance marked'}")
+            log_issue_details[log.id] = {"truck": log.downtime_reason or "Maintenance marked", "route": ""}
+    return {
+        "driver": driver,
+        "logs": logs,
+        "log_routes": log_routes,
+        "the_date": route_date,
+        "pretrips": pretrips,
+        "damage_reports": damage_reports,
+        "total_miles": _total_miles_for_pretrips(pretrips),
+        "parts_carried": parts_carried,
+        "exception_notes": exception_notes,
+        "log_issue_details": log_issue_details,
+    }
+
 def _requested_url():
     return request.full_path if request.query_string else request.path
 
@@ -367,6 +456,8 @@ def _exception_url(item):
         return url_for("manager.manage_task", task_id=target_id)
     if target_type == "damage_report":
         return url_for("manager.view_damage_report", report_id=target_id)
+    if target_type == "followup":
+        return url_for("manager.review_dashboard")
     return None
 
 
@@ -375,6 +466,7 @@ def _with_exception_urls(items):
     for item in items:
         row = dict(item)
         row["url"] = _exception_url(item)
+        row["review_key"] = _exception_key(item)
         rows.append(row)
     return rows
 
@@ -403,7 +495,7 @@ def review_dashboard():
         flash("Follow-up added.", "success")
         return redirect(url_for("manager.review_dashboard"))
 
-    exceptions = _with_exception_urls(build_exception_items(dock_delay_minutes=_dock_delay_minutes()))
+    exceptions = _with_exception_urls(_active_exception_items())
     metrics = build_weekly_savings(dock_delay_minutes=_dock_delay_minutes())
     followups = OperationalFollowUp.query.order_by(OperationalFollowUp.created_at.desc()).limit(20).all()
     damage_reports = DamageReport.query.order_by(DamageReport.created_at.desc()).limit(10).all()
@@ -419,6 +511,37 @@ def review_dashboard():
 
 @bp.route("/exceptions")
 def exceptions_dashboard():
+    return redirect(url_for("manager.review_dashboard"))
+
+
+@bp.route("/exceptions/reviewed", methods=["POST"])
+def mark_exception_reviewed():
+    review_key = (request.form.get("review_key") or "").strip()
+    target_type = (request.form.get("target_type") or "exception").strip()
+    target_id = request.form.get("target_id", type=int)
+    category = (request.form.get("category") or "Exception").strip()
+    label = (request.form.get("label") or "Exception").strip()
+    if not review_key:
+        flash("Exception review key missing.", "warning")
+        return redirect(url_for("manager.review_dashboard"))
+
+    if target_type == "followup" and target_id:
+        followup = OperationalFollowUp.query.get(target_id)
+        if followup:
+            followup.status = "closed"
+            followup.resolved_at = datetime.utcnow()
+
+    record_activity(
+        user_id=current_user.id,
+        category="exception",
+        action="reviewed",
+        title="Exception reviewed",
+        details=f"key:{review_key}; {category}: {label}",
+        target_type=target_type,
+        target_id=target_id,
+    )
+    db.session.commit()
+    flash("Exception marked completed.", "success")
     return redirect(url_for("manager.review_dashboard"))
 
 
@@ -473,6 +596,7 @@ def manager_dashboard():
     division_filter = request.args.get("division", "All")
     if division_filter not in {"All", "Plastics", "Trim"}:
         division_filter = "All"
+    selected_driver_id = request.args.get("driver_id", type=int)
 
     day_start = datetime.combine(today, datetime.min.time())
     uncompleted_tasks = (
@@ -486,6 +610,8 @@ def manager_dashboard():
         .all()
     )
     todays_logs = _active_driver_logs_query().filter_by(date=today).all()
+    live_logs = [log for log in todays_logs if not selected_driver_id or log.driver_id == selected_driver_id]
+    live_stop_rows = _live_stop_rows(live_logs)
 
     dispatch_rows = _build_dispatch_rows(uncompleted_tasks, todays_transfers)
     if division_filter != "All":
@@ -503,6 +629,9 @@ def manager_dashboard():
         create_task_form=create_task_form,
         uncompleted_tasks=uncompleted_tasks,
         dispatch_rows=dispatch_rows,
+        live_stop_rows=live_stop_rows,
+        selected_driver_id=selected_driver_id,
+        drivers=drivers,
         division_filter=division_filter,
         total_active_moves=len(uncompleted_tasks) + len(todays_transfers),
         plastics_move_count=len(plastics_moves),
@@ -519,67 +648,8 @@ def manager_dashboard():
 @bp.route("/trim")
 @bp.route("/trim-dashboard")
 def trim_dashboard():
-    today = date.today()
-    trim_drivers = (
-        User.query.filter_by(role="driver")
-        .filter(User.department.ilike("%trim%"))
-        .order_by(User.last_name, User.first_name, User.username)
-        .all()
-    )
-    trim_driver_ids = [driver.id for driver in trim_drivers]
-
-    todays_logs = (
-        _active_driver_logs_query().filter(DriverLog.plant_name.in_(TRIM_PLANTS))
-        .filter_by(date=today)
-        .order_by(DriverLog.created_at.desc())
-        .all()
-    )
-    todays_transfers = (
-        _active_plant_transfers_query().filter(
-            (PlantTransfer.ship_to.in_(TRIM_PLANTS))
-            | (PlantTransfer.ship_from.in_(TRIM_PLANTS))
-        )
-        .filter_by(transfer_date=today)
-        .order_by(PlantTransfer.created_at.desc())
-        .all()
-    )
-    open_tasks_query = Task.query.filter(Task.status != "completed")
-    if trim_driver_ids:
-        open_tasks_query = open_tasks_query.filter(
-            (Task.assigned_to.in_(trim_driver_ids))
-            | (Task.title.ilike("%trim%"))
-            | (Task.details.ilike("%trim%"))
-        )
-    else:
-        open_tasks_query = open_tasks_query.filter(
-            (Task.title.ilike("%trim%")) | (Task.details.ilike("%trim%"))
-        )
-    open_tasks = open_tasks_query.order_by(Task.created_at.desc()).all()
-
-    pending_pretrips = []
-    if trim_driver_ids:
-        pending_pretrips = (
-            _active_pretrips_query().filter(PreTrip.user_id.in_(trim_driver_ids))
-            .filter_by(pretrip_date=today)
-            .order_by(PreTrip.created_at.desc())
-            .all()
-        )
-
-    return render_template(
-        "manager_trim_dashboard.html",
-        trim_plants=TRIM_PLANTS,
-        trim_drivers=trim_drivers,
-        todays_logs=todays_logs,
-        trim_log_reports=[
-            {"log": log, "freight": _log_freight_summary(log, todays_transfers)}
-            for log in todays_logs
-        ],
-        todays_transfers=todays_transfers,
-        trim_transfer_reports=[_transfer_summary(transfer) for transfer in todays_transfers],
-        open_tasks=open_tasks,
-        pending_pretrips=pending_pretrips,
-        today=today,
-    )
+    flash("Trim dashboard was removed; use Live Dispatch filters instead.", "info")
+    return redirect(url_for("manager.manager_dashboard"))
 
 
 @bp.route("/driver-logs", methods=["GET"])
@@ -610,6 +680,48 @@ def driver_logs():
         selected_driver_id=selected_driver_id,
         search_date=search_date,
         today_local_date=date.today(),
+    )
+
+
+@bp.route("/driver-logs/route-print")
+def driver_route_print():
+    driver_id = request.args.get("driver_id", type=int)
+    if not driver_id:
+        flash("Choose a driver before printing the full route.", "warning")
+        return redirect(url_for("manager.driver_logs", date=request.args.get("date") or date.today().isoformat()))
+    try:
+        route_date = datetime.strptime(request.args.get("date") or date.today().isoformat(), "%Y-%m-%d").date()
+    except ValueError:
+        route_date = date.today()
+    ctx = _route_print_context(driver_id, route_date)
+    return render_template(
+        "driver_logs_print.html",
+        **ctx,
+        print_driver=ctx["driver"],
+        route_finalized=False,
+        driver_signature=None,
+        signature_timestamp=None,
+        attachment_url=url_for("manager.driver_route_attachment", driver_id=driver_id, date=route_date.isoformat()),
+        email_mode=False,
+    )
+
+
+@bp.route("/driver-logs/route-attachment")
+def driver_route_attachment():
+    driver_id = request.args.get("driver_id", type=int)
+    if not driver_id:
+        flash("Choose a driver before downloading the route PDF.", "warning")
+        return redirect(url_for("manager.driver_logs"))
+    try:
+        route_date = datetime.strptime(request.args.get("date") or date.today().isoformat(), "%Y-%m-%d").date()
+    except ValueError:
+        route_date = date.today()
+    ctx = _route_print_context(driver_id, route_date)
+    return _document_attachment_response(
+        pdf_bytes=_build_driver_logs_pdf(ctx["logs"], route_date, driver=ctx["driver"]),
+        filename=f"driver-route-{driver_id}-{route_date}.pdf",
+        target_type="driver_log",
+        title="Manager Driver Route PDF downloaded",
     )
 
 

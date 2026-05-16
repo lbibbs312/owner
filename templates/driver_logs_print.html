@@ -57,7 +57,7 @@
 <body>
 <div class="print-page">
   <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
-  <a class="email-btn" href="{{ url_for('driver.driver_logs_attachment') }}">Download PDF Attachment</a>
+  <a class="email-btn" href="{{ attachment_url if attachment_url is defined else url_for('driver.driver_logs_attachment') }}">Download PDF Attachment</a>
   <p class="print-guidance">Use Letter paper, portrait orientation, and disable browser headers/footers if your print dialog offers that option.</p>
 
   <div class="sheet-head">
@@ -68,7 +68,7 @@
     <div class="sheet-meta">
       <strong>Date:</strong> {{ the_date }}<br>
       <strong>Total Stops:</strong> {{ logs|length if logs else 0 }}<br>
-      <strong>Driver:</strong> {{ current_user.display_name }}
+      <strong>Driver:</strong> {{ print_driver.display_name if print_driver is defined and print_driver else current_user.display_name }}
     </div>
   </div>
 

@@ -423,6 +423,61 @@
         <a class="button ghost" href="{{ url_for('driver.mobile_history') }}">Route History</a>
       </section>
 
+      {% set fuel_logs = todays_logs | selectattr('fuel') | selectattr('fuel_mileage') | list %}
+      {% set start_mi = todays_pretrip.start_mileage if todays_pretrip else none %}
+      {% set end_mi = todays_pretrip.posttrip.end_mileage if (todays_pretrip and todays_pretrip.posttrip) else none %}
+      {% if start_mi or fuel_logs %}
+      <section class="list">
+        <div class="section-head">
+          <h2>Mileage Snapshot</h2>
+          <span>Odometer tracking for this shift</span>
+        </div>
+        <div class="card" style="padding:12px 16px;">
+          <table style="width:100%;font-size:.88rem;border-collapse:collapse;">
+            {% if start_mi %}
+            <tr>
+              <td style="padding:4px 0;color:#64748b;font-weight:700;">Pre-Trip Start</td>
+              <td style="padding:4px 0;font-weight:600;text-align:right;">{{ "{:,}".format(start_mi) }} mi</td>
+              <td style="padding:4px 0;text-align:right;color:#64748b;font-size:.8rem;"></td>
+            </tr>
+            {% endif %}
+            {% for fl in fuel_logs %}
+            <tr>
+              <td style="padding:4px 0;color:#0891b2;font-weight:700;">Fuel Stop</td>
+              <td style="padding:4px 0;font-weight:600;text-align:right;">{{ "{:,}".format(fl.fuel_mileage) }} mi</td>
+              <td style="padding:4px 0;text-align:right;color:#64748b;font-size:.8rem;">
+                {% if start_mi %}+{{ "{:,}".format(fl.fuel_mileage - start_mi) }} from start{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+            {% if end_mi %}
+            <tr>
+              <td style="padding:4px 0;color:#16a34a;font-weight:700;">Post-Trip End</td>
+              <td style="padding:4px 0;font-weight:600;text-align:right;">{{ "{:,}".format(end_mi) }} mi</td>
+              <td style="padding:4px 0;text-align:right;color:#64748b;font-size:.8rem;">
+                {% if start_mi %}{{ "{:,}".format(end_mi - start_mi) }} total mi{% endif %}
+              </td>
+            </tr>
+            {% if start_mi and fuel_logs %}
+            {% set first_fuel = fuel_logs[0].fuel_mileage %}
+            <tr style="border-top:1px solid #e2e8f0;">
+              <td style="padding:6px 0 2px;color:#64748b;font-size:.8rem;" colspan="3">
+                <strong>{{ "{:,}".format(first_fuel - start_mi) }} mi</strong> before fuel &nbsp;·&nbsp;
+                <strong>{{ "{:,}".format(end_mi - first_fuel) }} mi</strong> after fuel &nbsp;·&nbsp;
+                <strong>{{ "{:,}".format(end_mi - start_mi) }} mi</strong> total
+              </td>
+            </tr>
+            {% endif %}
+            {% elif start_mi %}
+            <tr style="border-top:1px dashed #e2e8f0;">
+              <td colspan="3" style="padding:6px 0 2px;color:#94a3b8;font-size:.8rem;">Post-trip not yet completed — end mileage pending</td>
+            </tr>
+            {% endif %}
+          </table>
+        </div>
+      </section>
+      {% endif %}
+
       <section class="list">
         <div class="section-head">
           <h2>Ryder Service</h2>

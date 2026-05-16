@@ -251,6 +251,7 @@
       {% endif %}
       {% if stop_position and stop_count %}<span class="text-muted">Stop {{ stop_position }} of {{ stop_count }} for this driver/date</span>{% endif %}
     </p>
+    <p class="text-muted small"><strong>Stop Status meaning:</strong> Open means the driver has arrived at this stop but has not recorded departure yet. Stop {{ stop_position or '?' }} of {{ stop_count or '?' }} is this stop's chronological position for that driver on {{ log.date }}.</p>
   {% endif %}
   <p><strong>Maintenance:</strong> {{ "Yes" if log.maintenance else "No" }}</p>
   <p><strong>Fuel:</strong> {{ "Yes" if log.fuel else "No" }}</p>
