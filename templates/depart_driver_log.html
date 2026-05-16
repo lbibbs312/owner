@@ -32,6 +32,12 @@
       <div class="form-text">Use this only when a separate hot part is added before leaving.</div>
     </div>
 
+    <div class="mb-3">
+      {{ form.dock_wait_minutes.label(class="form-label") }}
+      {{ form.dock_wait_minutes(class="form-control", min="0", placeholder="Minutes waiting/loading at dock") }}
+      <div class="form-text">Used for manager dock-delay averages and delay review.</div>
+    </div>
+
     {{ form.submit(class="btn btn-success hover-btn") }}
     <a href="{{ url_for('driver.driver_logs') }}" class="btn btn-secondary ms-2">Cancel</a>
   </form>

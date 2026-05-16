@@ -339,6 +339,150 @@ def test_manager_assigns_task_and_driver_updates_status(client, app):
         assert open_task.status == "completed"
 
 
+def test_driver_mobile_shows_full_parts_queue_and_route_task_events(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, Task
+
+        driver = create_user(
+            "driver1",
+            "driver1@example.com",
+            "driver",
+            first_name="Driver",
+            last_name="One",
+            employee_id="1001",
+            department="Plastic Plate",
+        )
+        assigned = Task(
+            title="KP to RE",
+            details="Assigned hot part for Raleigh East",
+            part_number="P-HOT-1",
+            is_hot=True,
+            status="pending",
+            assigned_to=driver.id,
+            created_at=datetime(2026, 5, 16, 12, 0),
+        )
+        open_task = Task(
+            title="PC to RW",
+            details="Open plant move",
+            part_number="P-OPEN-1",
+            is_hot=False,
+            status="pending",
+            created_at=datetime(2026, 5, 16, 12, 5),
+        )
+        db.session.add_all([assigned, open_task])
+        db.session.commit()
+        driver_id = driver.id
+        assigned_id = assigned.id
+
+    login(client, "driver1")
+    queue_page = client.get("/mobile")
+    assert queue_page.status_code == 200
+    assert b"Parts Queue" in queue_page.data
+    assert b"P-HOT-1" in queue_page.data
+    assert b"P-OPEN-1" in queue_page.data
+    assert b"Open for any driver" in queue_page.data
+
+    accepted = client.post(f"/tasks/{assigned_id}/accept?next=mobile", follow_redirects=False)
+    assert accepted.status_code == 302
+    assert accepted.headers["Location"].endswith("/mobile")
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        route_date = date.today()
+        first_stop = DriverLog(
+            driver_id=driver_id,
+            date=route_date,
+            plant_name="KP",
+            load_size="Empty",
+            depart_load_size="Raleigh East Load",
+            depart_time="08:15",
+            dock_wait_minutes=12,
+            arrive_time=f"{route_date.isoformat()} 12:00:00",
+        )
+        second_stop = DriverLog(
+            driver_id=driver_id,
+            date=route_date,
+            plant_name="RE",
+            load_size="Raleigh East Load",
+            depart_load_size="Empty",
+            depart_time="09:05",
+            arrive_time=f"{route_date.isoformat()} 13:00:00",
+        )
+        db.session.add_all([first_stop, second_stop])
+        db.session.commit()
+
+    completed = client.post(f"/tasks/{assigned_id}/complete?next=mobile", follow_redirects=False)
+    assert completed.status_code == 302
+
+    route_page = client.get("/mobile")
+    assert route_page.status_code == 200
+    assert b"T-" in route_page.data
+    assert b"P-HOT-1" in route_page.data
+    assert b"Accepted" in route_page.data
+    assert b"Unloaded" in route_page.data
+    assert b"Dock 12 min" in route_page.data
+
+
+def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user(
+            "driver1",
+            "driver1@example.com",
+            "driver",
+            first_name="Driver",
+            last_name="One",
+            employee_id="1001",
+            department="Plastic Plate",
+        )
+        create_user("manager1", "manager1@example.com", "management")
+        log = DriverLog(
+            driver_id=driver.id,
+            date=date.today(),
+            plant_name="KP",
+            load_size="Empty",
+            arrive_time=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        db.session.add(log)
+        db.session.commit()
+        log_id = log.id
+
+    login(client, "driver1")
+    departed = client.post(
+        f"/driver_logs/{log_id}/depart",
+        data={"got_loaded": "no", "destination": "", "dock_wait_minutes": "17"},
+        follow_redirects=False,
+    )
+    assert departed.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        saved = DriverLog.query.get(log_id)
+        assert saved.dock_wait_minutes == 17
+        assert saved.depart_load_size == "Empty"
+
+    client.get("/logout")
+    login(client, "manager1")
+    dashboard = client.get("/manager/dashboard?focus=delays")
+    assert dashboard.status_code == 200
+    assert b"Avg Dock Wait" in dashboard.data
+    assert b"17" in dashboard.data
+    assert b"Dock Wait" in dashboard.data
+    assert b"17 min" in dashboard.data
+    assert b"focus=delays" in dashboard.data
+    assert b"focus-panel" in dashboard.data
+
+
 def test_driver_profile_cannot_change_role(client, app):
     with app.app_context():
         create_user(

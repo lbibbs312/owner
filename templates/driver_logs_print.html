@@ -182,6 +182,9 @@
             {% if log.maintenance or issue.truck %}<p class="detail-line issue">Truck issue: {{ issue.truck or 'Maintenance marked' }}</p>{% endif %}
             {% if issue.route %}<p class="detail-line issue">Route issue: {{ issue.route }}</p>{% endif %}
             {% if log.hot_parts or log.part_number %}<p class="detail-line muted">{% if log.hot_parts %}HOT {% endif %}{{ log.part_number or '' }}</p>{% endif %}
+            {% for event in (route_task_events or {}).get(log.id, []) %}
+              <p class="detail-line muted">Task T-{{ event.id }} {{ event.label }}: {{ event.status }}{% if event.accepted_at %}; accepted {{ event.accepted_at|to_detroit_datetime }}{% endif %}{% if event.completed_at %}; unloaded {{ event.completed_at|to_detroit_datetime }}{% endif %}{{ ' (hot)' if event.is_hot else '' }}</p>
+            {% endfor %}
           </td>
         </tr>
         {% endfor %}

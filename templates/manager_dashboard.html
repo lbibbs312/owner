@@ -68,7 +68,9 @@
   /* ── KPI cards ── */
   .kpi-row { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
   .kpi { background:#fff; border:1px solid #e2e8f0; border-radius:16px;
-         padding:20px 22px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+         padding:20px 22px; box-shadow:0 1px 2px rgba(15,23,42,.04); text-decoration:none; display:block; cursor:pointer; transition:transform .15s, box-shadow .15s, border-color .15s; }
+  .kpi:hover { transform:translateY(-1px); box-shadow:0 10px 24px rgba(15,23,42,.09); border-color:#93c5fd; }
+  .kpi.active { outline:2px solid rgba(37,99,235,.35); }
   .kpi.blue  { background:#eff6ff; border-color:#bfdbfe; }
   .kpi.green { background:#ecfdf5; border-color:#a7f3d0; }
   .kpi-lbl { font-size:.67rem; font-weight:900; text-transform:uppercase;
@@ -85,6 +87,7 @@
   /* ── Panel ── */
   .panel { background:#fff; border:1px solid #e2e8f0; border-radius:18px;
            box-shadow:0 1px 2px rgba(15,23,42,.04); overflow:hidden; }
+  .panel.focus-panel { border-color:#93c5fd; box-shadow:0 0 0 3px rgba(147,197,253,.24), 0 1px 2px rgba(15,23,42,.04); }
   .panel-top { padding:14px 20px; border-bottom:1px solid #e2e8f0; background:#f8fafc;
                display:flex; align-items:center; justify-content:space-between;
                gap:12px; flex-wrap:wrap; }
@@ -597,42 +600,50 @@
 
     <div class="mc-body">
 
-      {# KPI row - shows Total Active Moves + the manager's own division only #}
-      <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);">
-        <a class="kpi {% if division_filter == 'All' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='All') }}" aria-label="Show all active moves">
+      {# KPI row - each card lands on a real dispatch section #}
+      <div class="kpi-row" style="grid-template-columns:repeat(4,minmax(0,1fr));">
+        <a class="kpi {% if division_filter == 'All' and focus_panel == 'jobs' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='All', focus='jobs') }}" aria-label="Show all active moves">
           <p class="kpi-lbl">Total Active Moves</p>
           <div class="kpi-val">
             <span class="kpi-num">{{ total_active_moves }}</span>
-            <span class="kpi-tag">
-              {{ active_driver_count }} driver{{ 's' if active_driver_count != 1 else '' }} active
-            </span>
+            <span class="kpi-tag">Open jobs</span>
+          </div>
+        </a>
+        <a class="kpi blue {% if focus_panel == 'routes' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division=division_filter, focus='routes') }}" aria-label="Show live driver routes">
+          <p class="kpi-lbl">Active Drivers</p>
+          <div class="kpi-val">
+            <span class="kpi-num">{{ active_driver_count }}</span>
+            <span class="kpi-tag">Live stops</span>
           </div>
         </a>
         {% if manager_division == 'Trim' %}
-        <a class="kpi green {% if division_filter == 'Trim' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='Trim') }}" aria-label="Show Trim moves">
+        <a class="kpi green {% if division_filter == 'Trim' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='Trim', focus='jobs') }}" aria-label="Show Trim moves">
           <p class="kpi-lbl">Trim Division</p>
           <div class="kpi-val">
             <span class="kpi-num">{{ trim_move_count }}</span>
-            <span class="kpi-tag">
-              {{ trim_driver_count }} driver{{ 's' if trim_driver_count != 1 else '' }}
-            </span>
+            <span class="kpi-tag">{{ trim_driver_count }} driver{{ 's' if trim_driver_count != 1 else '' }}</span>
           </div>
         </a>
         {% else %}
-        <a class="kpi blue {% if division_filter == 'Plastics' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='Plastics') }}" aria-label="Show Plastics moves">
+        <a class="kpi blue {% if division_filter == 'Plastics' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='Plastics', focus='jobs') }}" aria-label="Show Plastics moves">
           <p class="kpi-lbl">Plastics Division</p>
           <div class="kpi-val">
             <span class="kpi-num">{{ plastics_move_count }}</span>
-            <span class="kpi-tag">
-              {{ plastics_driver_count }} driver{{ 's' if plastics_driver_count != 1 else '' }}
-            </span>
+            <span class="kpi-tag">{{ plastics_driver_count }} driver{{ 's' if plastics_driver_count != 1 else '' }}</span>
           </div>
         </a>
         {% endif %}
+        <a class="kpi {% if focus_panel == 'delays' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division=division_filter, focus='delays') }}" aria-label="Show dock wait route data">
+          <p class="kpi-lbl">Avg Dock Wait</p>
+          <div class="kpi-val">
+            <span class="kpi-num">{% if avg_dock_wait_today is not none %}{{ avg_dock_wait_today }}{% else %}--{% endif %}</span>
+            <span class="kpi-tag">{{ dock_wait_record_count }} record{{ 's' if dock_wait_record_count != 1 else '' }}</span>
+          </div>
+        </a>
       </div>
 
       {# Live route/stop panel #}
-      <div class="panel">
+      <div class="panel {% if focus_panel in ['routes', 'delays'] %}focus-panel{% endif %}" id="liveRoutesPanel">
         <div class="panel-top">
           <h3>
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -643,9 +654,9 @@
           <span class="text-sm text-muted">Updates when drivers add, depart, or edit stops</span>
         </div>
         <div class="driver-filter-row">
-          <a class="{% if not selected_driver_id %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division=division_filter) }}">All Drivers</a>
+          <a class="{% if not selected_driver_id %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division=division_filter, focus='routes') }}">All Drivers</a>
           {% for driver in drivers %}
-            <a class="{% if selected_driver_id == driver.id %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division=division_filter, driver_id=driver.id) }}">{{ driver.display_name }}</a>
+            <a class="{% if selected_driver_id == driver.id %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division=division_filter, driver_id=driver.id, focus='routes') }}">{{ driver.display_name }}</a>
           {% endfor %}
         </div>
         <div class="tbl-wrap">
@@ -658,6 +669,7 @@
                 <th>Cargo</th>
                 <th>Arrive</th>
                 <th>Depart</th>
+                <th>Dock Wait</th>
                 <th>Status</th>
                 <th style="text-align:right;">Action</th>
               </tr>
@@ -678,11 +690,12 @@
                   <td class="align-middle">{{ row.cargo }}</td>
                   <td class="align-middle whitespace-nowrap">{{ log.arrive_time|to_local_time if log.arrive_time else '—' }}</td>
                   <td class="align-middle whitespace-nowrap">{{ log.depart_time|to_12h_format if log.depart_time else '—' }}</td>
+                  <td class="align-middle whitespace-nowrap">{{ row.dock_wait }}</td>
                   <td class="align-middle"><span class="sbadge {{ row.status_key }}">{{ row.status }}</span></td>
                   <td class="align-middle" style="text-align:right;"><a class="btn-manage" href="{{ row.url }}">Open</a></td>
                 </tr>
               {% else %}
-                <tr class="empty-row"><td colspan="8">No driver stops logged for this filter today.</td></tr>
+                <tr class="empty-row"><td colspan="9">No driver stops logged for this filter today.</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -690,7 +703,7 @@
       </div>
 
       {# Dispatch queue panel #}
-      <div class="panel">
+      <div class="panel {% if focus_panel == 'jobs' %}focus-panel{% endif %}" id="dispatchJobsPanel">
         <div class="panel-top">
           <h3>
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -704,7 +717,7 @@
           <div class="div-tabs">
             {% for tab in ['All', 'Plastics', 'Trim'] %}
               <a class="{% if division_filter == tab %}active{% endif %}"
-                 href="{{ url_for('manager.manager_dashboard', division=tab) }}">{{ tab }}</a>
+                 href="{{ url_for('manager.manager_dashboard', division=tab, focus='jobs') }}">{{ tab }}</a>
             {% endfor %}
           </div>
         </div>
@@ -977,6 +990,12 @@ function closeCreate() {
   document.getElementById('createModal').classList.remove('open');
   document.body.style.overflow = '';
 }
+
+const focusPanel = {{ focus_panel|tojson }};
+window.addEventListener('load', () => {
+  const target = ['routes', 'delays'].includes(focusPanel) ? document.getElementById('liveRoutesPanel') : document.getElementById('dispatchJobsPanel');
+  if (target && focusPanel !== 'jobs') target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 
 if (window.io) {
   const socket = io();

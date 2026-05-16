@@ -115,4 +115,5 @@ class DepartForm(FlaskForm):
         choices=LOAD_SIZE_CHOICES,
         validators=[Optional()],
     )
+    dock_wait_minutes = IntegerField("Dock Wait Minutes", validators=[Optional()])
     submit = SubmitField("Record Departure")

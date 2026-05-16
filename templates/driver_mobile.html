@@ -172,6 +172,21 @@
     .badge.hot { background: rgba(239,68,68,0.16); color: #fecaca; border: 1px solid rgba(239,68,68,0.28); }
     .badge.progress { background: rgba(245,158,11,0.16); color: #fde68a; border: 1px solid rgba(245,158,11,0.28); }
     .badge.ok { background: rgba(16,185,129,0.14); color: #a7f3d0; border: 1px solid rgba(16,185,129,0.26); }
+    .task-queue { display:grid; gap:10px; padding:12px; }
+    .task-row { display:grid; gap:9px; padding:12px; border:1px solid rgba(148,163,184,.18); border-radius:14px; background:rgba(255,255,255,.035); }
+    .task-row.hot { border-color:rgba(239,68,68,.32); background:rgba(239,68,68,.08); }
+    .task-row-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+    .task-title { margin:0; font-size:.92rem; font-weight:900; line-height:1.2; overflow-wrap:anywhere; }
+    .task-detail { margin:3px 0 0; color:var(--muted); font-size:.74rem; line-height:1.3; overflow-wrap:anywhere; }
+    .task-meta { display:flex; flex-wrap:wrap; gap:6px; }
+    .task-meta .badge { text-transform:none; letter-spacing:0; }
+    .queue-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
+    .queue-actions.two { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .queue-actions .button, .queue-actions button.action { min-height:36px; border-radius:10px; font-size:.74rem; padding:0 8px; }
+    .rp-task-events { display:grid; gap:4px; margin-top:6px; }
+    .rp-task-event { border:1px solid rgba(245,158,11,.28); background:rgba(245,158,11,.09); color:#fde68a; border-radius:8px; padding:5px 7px; font-size:.68rem; line-height:1.25; }
+    .rp-task-event.hot { border-color:rgba(239,68,68,.35); background:rgba(239,68,68,.11); color:#fecaca; }
+    .rp-task-event strong { color:inherit; }
     .item-title { margin: 7px 0 3px; font-weight: 850; }
     .item-meta { margin: 0; color: var(--muted); font-size: 0.82rem; line-height: 1.35; }
 
@@ -391,6 +406,42 @@
         {% endif %}
       </section>
 
+      <section class="list">
+        <div class="section-head">
+          <h2>Parts Queue</h2>
+          <span>{{ task_queue|length }} open</span>
+        </div>
+        <div class="card task-queue">
+          {% for task in task_queue %}
+            <article class="task-row {% if task.is_hot %}hot{% endif %}">
+              <div class="task-row-top">
+                <div>
+                  <p class="task-title">{{ task.title }}</p>
+                  <p class="task-detail">{{ task.details or 'No dispatch notes.' }}</p>
+                </div>
+                <span class="badge {% if task.is_hot %}hot{% elif task.status == 'in-progress' %}progress{% else %}ok{% endif %}">{{ 'HOT' if task.is_hot else task.status.replace('-', ' ')|title }}</span>
+              </div>
+              <div class="task-meta">
+                {% if task.part_number %}<span class="badge">Part {{ task.part_number }}</span>{% endif %}
+                <span class="badge">{{ 'Open for any driver' if not task.assigned_to else 'Assigned to you' }}</span>
+                {% if task.accepted_at %}<span class="badge progress">Accepted {{ task.accepted_at|to_detroit_datetime }}</span>{% endif %}
+              </div>
+              <div class="queue-actions {% if task.status == 'pending' %}{% else %}two{% endif %}">
+                <a class="button ghost" href="{{ url_for('driver.view_task', task_id=task.id) }}">Details</a>
+                {% if task.status == 'pending' %}
+                  <form action="{{ url_for('driver.accept_task', task_id=task.id, next='mobile') }}" method="POST"><button class="action primary" type="submit">Accept</button></form>
+                  <form action="{{ url_for('driver.decline_task', task_id=task.id, next='mobile') }}" method="POST"><button class="action red" type="submit">Decline</button></form>
+                {% else %}
+                  <form action="{{ url_for('driver.complete_task', task_id=task.id, next='mobile') }}" method="POST"><button class="action primary" type="submit">Complete</button></form>
+                {% endif %}
+              </div>
+            </article>
+          {% else %}
+            <div class="ryder-entry"><strong>No parts in queue</strong><span>Assigned and open moves will appear here together.</span></div>
+          {% endfor %}
+        </div>
+      </section>
+
       <section class="quick-grid">
         {% if active_task %}
           <a class="quick-card" href="{{ url_for('driver.new_driving_log') }}">
@@ -581,10 +632,20 @@
               {% endif %}
             </div>
             {% endif %}
-            {% if dl.part_number or dl.no_pickup %}
+            {% if dl.part_number or dl.no_pickup or dl.dock_wait_minutes %}
             <div class="rp-parts">
-              {% if dl.no_pickup %}No pickup{% elif dl.hot_parts %}🔥 {{ dl.part_number }}{% else %}{{ dl.part_number }}{% endif %}
+              {% if dl.no_pickup %}No pickup{% elif dl.hot_parts %}HOT {{ dl.part_number }}{% else %}{{ dl.part_number }}{% endif %}{% if dl.dock_wait_minutes %}{% if dl.part_number or dl.no_pickup %} - {% endif %}Dock {{ dl.dock_wait_minutes }} min{% endif %}
             </div>
+            {% endif %}
+            {% set stop_task_events = (route_task_events or {}).get(dl.id, []) %}
+            {% if stop_task_events %}
+              <div class="rp-task-events">
+                {% for event in stop_task_events %}
+                  <div class="rp-task-event {% if event.is_hot %}hot{% endif %}">
+                    <strong>T-{{ event.id }} {{ event.label }}</strong> - {{ event.status }}{% if event.accepted_at %} · Accepted {{ event.accepted_at|to_detroit_datetime }}{% endif %}{% if event.completed_at %} · Unloaded {{ event.completed_at|to_detroit_datetime }}{% endif %}
+                  </div>
+                {% endfor %}
+              </div>
             {% endif %}
           </div>
         </a>

@@ -11,6 +11,7 @@ import os
 import pytz
 from flask import current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
+from sqlalchemy import and_, or_
 from werkzeug.utils import secure_filename
 
 from app.blueprints.driver import bp
@@ -42,7 +43,7 @@ from app.services.load_state import (
     route_problem_reason,
     truck_issue_reason,
 )
-from app.services.plant_addresses import plant_label as _plant_label
+from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
 from app.services.role_session import restore_role_user
 from app.services.search_corpus import ingest_driver_log
 from app.models import (
@@ -214,6 +215,138 @@ def _active_driver_tasks_query():
         Task.status.in_(["pending", "in-progress"]),
         (Task.assigned_to == current_user.id) | ((Task.assigned_to.is_(None)) & (Task.status == "pending")),
     )
+
+
+
+def _task_sort_key(task):
+    created = task.created_at or datetime.min
+    return (
+        task.status != "in-progress",
+        task.assigned_to is None,
+        not task.is_hot,
+        -created.timestamp(),
+    )
+
+
+def _driver_task_query(driver_id):
+    return Task.query.filter(
+        Task.status.in_(["pending", "in-progress"]),
+        or_(
+            Task.assigned_to == driver_id,
+            and_(Task.assigned_to.is_(None), Task.status == "pending"),
+        ),
+    )
+
+
+def _driver_task_queue(driver_id):
+    return sorted(_driver_task_query(driver_id).all(), key=_task_sort_key)
+
+
+def _plant_code(value):
+    wanted = (value or "").strip().lower()
+    if not wanted:
+        return ""
+    for code, label in PLANT_LABELS.items():
+        if wanted in {code.lower(), label.lower()}:
+            return code
+    return (value or "").strip()
+
+
+def _task_route_codes(task):
+    title = (task.title or "").strip()
+    lowered = title.lower()
+    marker = " to "
+    split_at = lowered.find(marker)
+    if split_at < 0:
+        return "", ""
+    return _plant_code(title[:split_at]), _plant_code(title[split_at + len(marker):])
+
+
+def _task_part_label(task):
+    return (task.part_number or task.title or f"Task {task.id}").strip()
+
+
+def _task_matches_log(task, log):
+    task_part = (task.part_number or "").strip().lower()
+    log_part = (getattr(log, "part_number", None) or "").strip().lower()
+    if task_part and log_part and task_part == log_part:
+        return True
+
+    origin, destination = _task_route_codes(task)
+    plant = _plant_code(getattr(log, "plant_name", None))
+    if not plant:
+        return False
+    if task.completed_at and destination and plant == destination:
+        return True
+    if task.accepted_at and origin and plant == origin:
+        return True
+    if task.status in {"pending", "in-progress"} and task.assigned_to == getattr(log, "driver_id", None):
+        return plant in {origin, destination}
+    return False
+
+
+def _task_route_summary(task):
+    if task.completed_at:
+        status = "Unloaded"
+    elif task.accepted_at or task.status == "in-progress":
+        status = "Accepted"
+    elif task.assigned_to:
+        status = "Assigned"
+    else:
+        status = "Open"
+    return {
+        "id": task.id,
+        "label": _task_part_label(task),
+        "title": task.title,
+        "is_hot": bool(task.is_hot),
+        "status": status,
+        "accepted_at": task.accepted_at,
+        "completed_at": task.completed_at,
+    }
+
+
+def _driver_route_tasks(driver_id, route_date):
+    day_start = datetime.combine(route_date, datetime.min.time())
+    day_end = datetime.combine(route_date, datetime.max.time())
+    return Task.query.filter(
+        or_(
+            Task.assigned_to == driver_id,
+            Task.accepted_by_id == driver_id,
+            Task.completed_by_id == driver_id,
+        ),
+        or_(
+            Task.status.in_(["pending", "in-progress"]),
+            Task.created_at.between(day_start, day_end),
+            Task.accepted_at.between(day_start, day_end),
+            Task.completed_at.between(day_start, day_end),
+        ),
+    ).order_by(Task.created_at.desc()).all()
+
+
+def _task_route_events_for_logs(logs, tasks=None):
+    logs = list(logs or [])
+    if not logs:
+        return {}
+    if tasks is None:
+        grouped = {}
+        for log in logs:
+            grouped.setdefault((log.driver_id, log.date), None)
+        tasks = []
+        for driver_id, route_date in grouped:
+            tasks.extend(_driver_route_tasks(driver_id, route_date))
+    seen = set()
+    unique_tasks = []
+    for task in tasks:
+        if task.id in seen:
+            continue
+        seen.add(task.id)
+        unique_tasks.append(task)
+    events = {log.id: [] for log in logs}
+    for log in logs:
+        for task in unique_tasks:
+            if _task_matches_log(task, log):
+                events[log.id].append(_task_route_summary(task))
+    return {log_id: items for log_id, items in events.items() if items}
 
 
 def _current_driver_task():
@@ -1607,6 +1740,7 @@ def driver_logs():
             "driver_logs.html",
             logs=logs,
             log_routes=_driver_log_route_context(logs),
+            route_task_events=_task_route_events_for_logs(logs),
             all_drivers=all_drivers,
             selected_driver_id=selected_driver_id,
             search_date=search_date,
@@ -1622,6 +1756,7 @@ def driver_logs():
             "driver_logs.html",
             logs=logs,
             log_routes=_driver_log_route_context(logs),
+            route_task_events=_task_route_events_for_logs(logs),
             search_date=search_date,
             today_local_date=_today_local_date(),
         )
@@ -1990,6 +2125,8 @@ def depart_driver_log(log_id):
             flash(timing_errors[0], "danger")
             return render_template("depart_driver_log.html", form=form, log=log, route=route)
         log.depart_time = depart_time
+        if form.dock_wait_minutes.data is not None:
+            log.dock_wait_minutes = form.dock_wait_minutes.data
         log.depart_load_size = departure_load
         log.secondary_load = secondary_load or None
         log.no_pickup = departure_load == "Empty" and not log.secondary_load
@@ -2177,6 +2314,7 @@ def driver_logs_print():
         parts_carried=parts_carried,
         exception_notes=exception_notes,
         log_issue_details=log_issue_details,
+        route_task_events=_task_route_events_for_logs(logs),
         route_finalized=route_finalized,
         driver_signature=shift_record.driver_signature if shift_record else None,
         signature_timestamp=shift_record.signature_timestamp if shift_record else None,
@@ -2550,6 +2688,7 @@ def mobile_day_report(report_date):
         .all()
     )
     log_routes = _driver_log_route_context(logs)
+    route_task_events = _task_route_events_for_logs(logs, _driver_route_tasks(current_user.id, parsed_date))
     log_reports = [
         {"log": log, "route": log_routes.get(log.id), "freight": _log_freight_summary(log, transfers)}
         for log in logs
@@ -2563,6 +2702,7 @@ def mobile_day_report(report_date):
         logs=logs,
         log_reports=log_reports,
         log_routes=log_routes,
+        route_task_events=route_task_events,
         pretrips=pretrips,
         transfers=transfers,
         transfer_reports=transfer_reports,
@@ -2586,20 +2726,9 @@ def mobile_dashboard():
     if open_shift:
         shift_elapsed = _format_duration((datetime.utcnow() - open_shift.start_time).total_seconds())
 
-    tasks = (
-        _active_driver_tasks_query()
-        .order_by(Task.created_at.desc())
-        .all()
-    )
-    tasks = sorted(
-        tasks,
-        key=lambda task: (
-            task.status != "in-progress",
-            not task.is_hot,
-            task.created_at or datetime.min,
-        ),
-    )
+    tasks = _driver_task_queue(current_user.id)
     active_task = tasks[0] if tasks else None
+    task_queue = tasks
     queued_tasks = tasks[1:4]
     hot_task_count = len([task for task in tasks if task.is_hot])
 
@@ -2635,6 +2764,7 @@ def mobile_dashboard():
         key=_driver_log_sort_key,
     )
     todays_log_routes = _driver_log_route_context(todays_logs)
+    route_task_events = _task_route_events_for_logs(todays_logs, _driver_route_tasks(current_user.id, today_local_date))
     current_stop = next((l for l in reversed(todays_logs) if not l.depart_time), None) or (todays_logs[-1] if todays_logs else None)
     ryder_context = _ryder_followup_context(current_user.id)
 
@@ -2642,6 +2772,7 @@ def mobile_dashboard():
         "driver_mobile.html",
         active_task=active_task,
         queued_tasks=queued_tasks,
+        task_queue=task_queue,
         hot_task_count=hot_task_count,
         latest_pretrip=latest_pretrip,
         todays_pretrip=todays_pretrip,
@@ -2653,6 +2784,7 @@ def mobile_dashboard():
         today_local_date=today_local_date,
         todays_logs=todays_logs,
         todays_log_routes=todays_log_routes,
+        route_task_events=route_task_events,
         current_stop=current_stop,
         truck_issue_choices=TRUCK_ISSUE_CHOICES,
         **ryder_context,

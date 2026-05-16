@@ -33,6 +33,7 @@ from app.blueprints.driver.routes import (
     _build_pretrip_pdf,
     _plant_transfer_copy_sets,
     _total_miles_for_pretrips,
+    _task_route_events_for_logs,
 )
 
 
@@ -378,6 +379,7 @@ def _live_stop_rows(logs):
             "status": "Open stop - needs departure" if not log.depart_time else "Completed stop",
             "status_key": "open" if not log.depart_time else "complete",
             "cargo": route.get("depart_cargo_desc") or route.get("arrive_cargo_desc") or log.depart_load_size or log.load_size or "--",
+            "dock_wait": f"{log.dock_wait_minutes} min" if log.dock_wait_minutes is not None else "--",
             "url": url_for("manager.view_driver_log", log_id=log.id),
         })
     return list(reversed(rows))
@@ -420,6 +422,7 @@ def _route_print_context(driver_id, route_date):
         "parts_carried": parts_carried,
         "exception_notes": exception_notes,
         "log_issue_details": log_issue_details,
+        "route_task_events": _task_route_events_for_logs(logs),
     }
 
 def _requested_url():
@@ -619,6 +622,9 @@ def manager_dashboard():
     if division_filter not in {"All", "Plastics", "Trim"}:
         division_filter = "All"
     selected_driver_id = request.args.get("driver_id", type=int)
+    focus_panel = request.args.get("focus", "jobs")
+    if focus_panel not in {"jobs", "routes", "delays"}:
+        focus_panel = "jobs"
 
     day_start = datetime.combine(today, datetime.min.time())
     uncompleted_tasks = (
@@ -639,6 +645,9 @@ def manager_dashboard():
     if division_filter != "All":
         dispatch_rows = [row for row in dispatch_rows if row["division"] == division_filter]
 
+    dock_wait_values = [log.dock_wait_minutes for log in todays_logs if log.dock_wait_minutes is not None]
+    avg_dock_wait_today = round(sum(dock_wait_values) / len(dock_wait_values), 1) if dock_wait_values else None
+
     active_driver_ids = {log.driver_id for log in todays_logs}
     active_drivers = [driver for driver in drivers if driver.id in active_driver_ids]
     plastics_drivers = [driver for driver in drivers if _division_for_user(driver) == "Plastics"]
@@ -653,12 +662,15 @@ def manager_dashboard():
         dispatch_rows=dispatch_rows,
         live_stop_rows=live_stop_rows,
         selected_driver_id=selected_driver_id,
+        focus_panel=focus_panel,
         drivers=drivers,
         division_filter=division_filter,
         total_active_moves=len(uncompleted_tasks) + len(todays_transfers),
         plastics_move_count=len(plastics_moves),
         trim_move_count=len(trim_moves),
         active_driver_count=len(active_drivers),
+        avg_dock_wait_today=avg_dock_wait_today,
+        dock_wait_record_count=len(dock_wait_values),
         plastics_driver_count=len(plastics_drivers),
         trim_driver_count=len(trim_drivers),
         has_drivers=bool(drivers),
@@ -698,6 +710,7 @@ def driver_logs():
         "driver_logs.html",
         logs=logs,
         log_routes=_driver_log_route_context(logs),
+        route_task_events=_task_route_events_for_logs(logs),
         all_drivers=all_drivers,
         selected_driver_id=selected_driver_id,
         search_date=search_date,
