@@ -952,6 +952,72 @@ def test_mixed_cargo_deviation_preserves_primary_and_drops_hot_part(client, app)
     assert b"Deviation" in print_page.data
 
 
+def test_new_log_load_state_ignores_previous_days_and_finalized_route(client, app):
+    from datetime import timedelta
+
+    with app.app_context():
+        from app.blueprints.driver.routes import _today_local_date
+        from app.extensions import db
+        from app.models import ActivityEvent, DriverLog
+
+        driver = create_user("driver1", "driver1@example.com", "driver")
+        today = _today_local_date()
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=today - timedelta(days=1),
+                plant_name="KP",
+                load_size="Empty",
+                depart_load_size="Raleigh East Load",
+                secondary_load="PPL Hot Part",
+                depart_time="14:00",
+            )
+        )
+        db.session.commit()
+
+    login(client, "driver1")
+    page = client.get("/new_driving_log")
+    assert b"In truck now" in page.data
+    assert b"Empty" in page.data
+    assert b"Raleigh East Load + PPL Hot Part" not in page.data
+    assert b"conditional-panel" in page.data
+    assert b"No truck issue" not in page.data
+
+    with app.app_context():
+        from app.blueprints.driver.routes import _today_local_date
+        from app.extensions import db
+        from app.models import ActivityEvent, DriverLog, User
+
+        driver = User.query.filter_by(username="driver1").one()
+        today = _today_local_date()
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="KP",
+                load_size="Empty",
+                depart_load_size="Raleigh East Load",
+                secondary_load="PPL Hot Part",
+                depart_time="14:00",
+            )
+        )
+        db.session.add(
+            ActivityEvent(
+                user_id=driver.id,
+                category="eod",
+                action="finalized",
+                title="End of day finalized",
+                details=f"Reviewed 1 driver log(s), 0 pretrip(s), and 0 plant transfer(s) for {today}.",
+                target_type="end_of_day",
+            )
+        )
+        db.session.commit()
+
+    finalized_page = client.get("/new_driving_log")
+    assert b"Empty" in finalized_page.data
+    assert b"Raleigh East Load + PPL Hot Part" not in finalized_page.data
+
+
 def test_driver_logs_prints_and_eod_create_activity_history(client, app):
     with app.app_context():
         create_user("driver1", "driver1@example.com", "driver")

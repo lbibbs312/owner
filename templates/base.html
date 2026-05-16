@@ -197,6 +197,20 @@
     .damage-actions form {
       margin: 0;
     }
+    .conditional-panel {
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      pointer-events: none;
+      transition: max-height 0.22s ease, opacity 0.18s ease, margin-top 0.18s ease;
+      margin-top: 0 !important;
+    }
+    .conditional-panel.is-visible {
+      max-height: 260px;
+      opacity: 1;
+      pointer-events: auto;
+      margin-top: .75rem !important;
+    }
     .report-description {
       white-space: pre-wrap;
     }

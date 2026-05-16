@@ -26,7 +26,7 @@ LOAD_SIZE_CHOICES = [
 YES_NO_CHOICES = [("", "Select..."), ("yes", "Yes"), ("no", "No")]
 
 TRUCK_ISSUE_CHOICES = [
-    ("", "No truck issue"),
+    ("", "Select issue..."),
     ("cel", "CEL light"),
     ("leak", "Leak"),
     ("overheat", "Overheat"),

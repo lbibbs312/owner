@@ -80,18 +80,22 @@
     </div>
 
     <div class="mb-3 form-check">
-      {{ form.hot_parts(class="form-check-input") }}
+      {{ form.hot_parts(class="form-check-input", id="hotPartsCheck") }}
       {{ form.hot_parts.label(class="form-check-label") }}
     </div>
-    <div class="mb-3">
+    <div class="mb-3 conditional-panel" id="hotPartPanel">
       {{ form.part_number.label(class="form-label") }}
       {{ form.part_number(class="form-control", placeholder="Part number from dispatch or shipper") }}
     </div>
 
     <div class="d-flex flex-wrap gap-3 mb-3">
-      <div class="form-check">{{ form.maintenance(class="form-check-input") }} {{ form.maintenance.label(class="form-check-label") }}</div>
-      <div class="flex-grow-1">{{ form.truck_issue.label(class="form-label") }}{{ form.truck_issue(class="form-select") }}</div>
-      <div class="w-100">{{ form.truck_issue_notes.label(class="form-label") }}{{ form.truck_issue_notes(class="form-control", rows="2", placeholder="CEL came on, leaking air, overheating, flat tire, Ryder/tow details") }}</div>
+      <div class="form-check">{{ form.maintenance(class="form-check-input", id="maintenanceCheck") }} {{ form.maintenance.label(class="form-check-label") }}</div>
+      <div class="w-100 conditional-panel" id="truckIssuePanel">
+        <div class="row g-3">
+          <div class="col-md-5">{{ form.truck_issue.label(class="form-label") }}{{ form.truck_issue(class="form-select") }}</div>
+          <div class="col-md-7">{{ form.truck_issue_notes.label(class="form-label") }}{{ form.truck_issue_notes(class="form-control", rows="2", placeholder="CEL came on, leaking air, overheating, flat tire, Ryder/tow details") }}</div>
+        </div>
+      </div>
       <div class="form-check">{{ form.fuel(class="form-check-input", id="fuelCheck") }} {{ form.fuel.label(class="form-check-label") }}</div>
       <div class="w-100 d-none" id="fuelMileagePanel">{{ form.fuel_mileage.label(class="form-label") }}{{ form.fuel_mileage(class="form-control", placeholder="Current odometer reading") }}</div>
       <div class="form-check">{{ form.meeting(class="form-check-input") }} {{ form.meeting.label(class="form-check-label") }}</div>
@@ -101,6 +105,7 @@
   </form>
 </div>
 
+<script src="{{ url_for('static', filename='js/driver-log-conditionals.js') }}"></script>
 <script>
 (function () {
   const form = document.getElementById('arrivalForm');

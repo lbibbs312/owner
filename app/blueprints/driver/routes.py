@@ -174,7 +174,16 @@ def _active_driver_logs_query():
 
 
 def _current_driver_load(driver_id):
-    logs = _active_driver_logs_query().filter_by(driver_id=driver_id).all()
+    today_local_date = _today_local_date()
+    route_finalized = ActivityEvent.query.filter_by(
+        user_id=driver_id,
+        category="eod",
+        action="finalized",
+        target_type="end_of_day",
+    ).filter(ActivityEvent.details.contains(str(today_local_date))).first()
+    if route_finalized:
+        return current_load_after_logs([])
+    logs = _active_driver_logs_query().filter_by(driver_id=driver_id, date=today_local_date).all()
     return current_load_after_logs(logs)
 
 
