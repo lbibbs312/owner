@@ -1578,27 +1578,41 @@ def new_driving_log():
 @bp.route("/add_stop", methods=["GET", "POST"])
 @login_required
 def add_stop():
-    """Retroactively add a missed stop for today with a manually-entered arrive time."""
-    form = DriverLogForm()
+    """Retroactively add a missed stop with a manually-entered arrive time.
+    Optional ?from_log_id=<id> pre-fills cargo and date from that stop's departure."""
     local_tz = pytz.timezone("America/Detroit")
     today_local_date = datetime.now(local_tz).date()
+
+    # Resolve the source log (GET or hidden POST field).
+    from_log_id_raw = request.values.get("from_log_id", "")
+    source_log = None
+    if from_log_id_raw:
+        source_log = (
+            _active_driver_logs_query()
+            .filter_by(id=from_log_id_raw, driver_id=current_user.id)
+            .first()
+        )
+
+    log_date = source_log.date if source_log else today_local_date
+
+    form = DriverLogForm()
 
     if form.validate_on_submit():
         if not form.plant_name.data:
             flash("Please select the plant.", "danger")
-            return render_template("add_stop.html", form=form)
+            return render_template("add_stop.html", form=form, source_log=source_log, from_log_id=from_log_id_raw)
 
         arrive_time_raw = (form.arrive_time.data or "").strip()
-        arrive_time_norm = _normalize_hhmm_time(arrive_time_raw) if arrive_time_raw else None
-        if arrive_time_raw and arrive_time_norm is None:
-            flash("Arrival time must be a valid time like 5:45am or 1:05pm.", "danger")
-            return render_template("add_stop.html", form=form)
+        if not arrive_time_raw:
+            flash("Arrival time is required — enter the time you arrived at this stop.", "danger")
+            return render_template("add_stop.html", form=form, source_log=source_log, from_log_id=from_log_id_raw)
 
-        arrive_time_str = (
-            _local_hhmm_to_arrival_utc(arrive_time_norm, today_local_date)
-            if arrive_time_norm
-            else datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-        )
+        arrive_time_norm = _normalize_hhmm_time(arrive_time_raw)
+        if arrive_time_norm is None:
+            flash("Arrival time must be a valid time like 5:45am or 1:05pm.", "danger")
+            return render_template("add_stop.html", form=form, source_log=source_log, from_log_id=from_log_id_raw)
+
+        arrive_time_str = _local_hhmm_to_arrival_utc(arrive_time_norm, log_date)
 
         newlog = DriverLog(
             driver_id=current_user.id,
@@ -1618,7 +1632,7 @@ def add_stop():
             fuel=form.fuel.data,
             fuel_mileage=form.fuel_mileage.data if form.fuel.data else None,
             meeting=form.meeting.data,
-            date=today_local_date,
+            date=log_date,
         )
         db.session.add(newlog)
         db.session.commit()
@@ -1634,7 +1648,13 @@ def add_stop():
         flash("Additional stop added.", "success")
         return redirect(url_for("driver.driver_logs"))
 
-    return render_template("add_stop.html", form=form)
+    # GET: pre-fill load and time from the source log's departure.
+    if request.method == "GET" and source_log:
+        form.load_size.data = source_log.depart_load_size or "Empty"
+        if source_log.depart_time:
+            form.arrive_time.data = _format_hhmm_12h(source_log.depart_time)
+
+    return render_template("add_stop.html", form=form, source_log=source_log, from_log_id=from_log_id_raw)
 
 
 @bp.route("/edit_driver_log/<int:log_id>", methods=["GET", "POST"])

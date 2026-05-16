@@ -4,8 +4,20 @@
   <h2 class="mt-3">Add Missed Stop</h2>
   <p class="text-muted">Use this to log a stop you forgot to record during your shift.</p>
 
+  {% if source_log %}
+  <div class="alert alert-info mb-3">
+    <strong>Coming from:</strong> {{ source_log.plant_name }}
+    {% if source_log.depart_time %} — departed at {{ source_log.depart_time|to_12h_format }}{% endif %}
+    <br>
+    <strong>Cargo loaded at that stop:</strong> {{ source_log.depart_load_size or 'Empty' }}
+    <br>
+    <small class="text-muted">Arrive time and cargo below are pre-filled from that departure. Adjust if needed.</small>
+  </div>
+  {% endif %}
+
   <form method="POST" action="{{ url_for('driver.add_stop') }}">
     {{ form.hidden_tag() }}
+    <input type="hidden" name="from_log_id" value="{{ from_log_id or '' }}">
 
     <div class="mb-3">
       {{ form.plant_name.label(class="form-label") }}
@@ -19,9 +31,11 @@
     </div>
 
     <div class="mb-3">
-      {{ form.arrive_time.label(class="form-label") }}
-      {{ form.arrive_time(class="form-control", placeholder="e.g. 2:30pm") }}
-      <div class="form-text">Enter the Detroit local time you arrived. Leave blank to use right now.</div>
+      <label class="form-label fw-bold">
+        Arrival Time <span class="text-danger">*</span>
+      </label>
+      {{ form.arrive_time(class="form-control", placeholder="e.g. 7:56pm — required") }}
+      <div class="form-text">Enter the Detroit local time you arrived. This is required.</div>
     </div>
 
     <div class="mb-3 form-check">
