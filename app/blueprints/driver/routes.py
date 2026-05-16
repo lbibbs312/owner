@@ -692,10 +692,17 @@ def _ryder_followup_context(user_id):
 
 
 def _render_new_driving_log(form, current_load):
+    has_today_logs = (
+        _active_driver_logs_query()
+        .filter_by(driver_id=current_user.id, date=_today_local_date())
+        .first()
+        is not None
+    )
     return render_template(
         "new_driving_log.html",
         form=form,
         current_load=current_load,
+        has_today_logs=has_today_logs,
         **_ryder_followup_context(current_user.id),
     )
 
@@ -1891,7 +1898,37 @@ def edit_driver_log(log_id):
     return render_template("edit_driver_log.html", form=form, log=log)
 
 
-@bp.route("/driver_logs/<int:log_id>/delete", methods=["POST"])
+@bp.route("/edit_driving_log/<int:log_id>", methods=["GET", "POST"], strict_slashes=False)
+@login_required
+def legacy_edit_driving_log(log_id):
+    return redirect(url_for("driver.edit_driver_log", log_id=log_id), code=307 if request.method == "POST" else 302)
+
+
+@bp.route("/view_driving_log/<int:log_id>", methods=["GET"], strict_slashes=False)
+@login_required
+def legacy_view_driving_log(log_id):
+    return redirect(url_for("driver.view_driver_log", log_id=log_id))
+
+
+@bp.route("/depart_driver_log/<int:log_id>", methods=["GET", "POST"], strict_slashes=False)
+@login_required
+def legacy_depart_driver_log(log_id):
+    return redirect(url_for("driver.depart_driver_log", log_id=log_id), code=307 if request.method == "POST" else 302)
+
+
+@bp.route("/pickup_driver_log/<int:log_id>", methods=["GET", "POST"], strict_slashes=False)
+@login_required
+def legacy_pickup_driver_log(log_id):
+    return redirect(url_for("driver.depart_driver_log", log_id=log_id), code=307 if request.method == "POST" else 302)
+
+
+@bp.route("/no_pickup_driver_log/<int:log_id>", methods=["POST"], strict_slashes=False)
+@login_required
+def legacy_no_pickup_driver_log(log_id):
+    return redirect(url_for("driver.no_pickup_driver_log", log_id=log_id), code=307)
+
+
+@bp.route("/driver_logs/<int:log_id>/delete", methods=["POST"], strict_slashes=False)
 @login_required
 def delete_driver_log(log_id):
     log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
@@ -1916,7 +1953,7 @@ def delete_driver_log(log_id):
     return redirect(url_for("driver.driver_logs"))
 
 
-@bp.route("/driver_logs/<int:log_id>/depart", methods=["GET", "POST"])
+@bp.route("/driver_logs/<int:log_id>/depart", methods=["GET", "POST"], strict_slashes=False)
 @login_required
 def depart_driver_log(log_id):
     log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
@@ -1975,7 +2012,7 @@ def depart_driver_log(log_id):
 
 
 
-@bp.route("/driver_logs/<int:log_id>/no_pickup", methods=["POST"])
+@bp.route("/driver_logs/<int:log_id>/no_pickup", methods=["POST"], strict_slashes=False)
 @login_required
 def no_pickup_driver_log(log_id):
     log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
@@ -2012,7 +2049,7 @@ def no_pickup_driver_log(log_id):
     return redirect(url_for("driver.driver_logs"))
 
 
-@bp.route("/driver_logs/<int:log_id>/pickup", methods=["GET", "POST"])
+@bp.route("/driver_logs/<int:log_id>/pickup", methods=["GET", "POST"], strict_slashes=False)
 @login_required
 def pickup_driver_log(log_id):
     log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()

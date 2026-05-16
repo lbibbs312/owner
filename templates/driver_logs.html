@@ -19,10 +19,39 @@
     .driver-log-table .actions-cell form { margin:0; }
     .log-route-state { display:block; margin-top:3px; font-size:.72rem; color:#64748b; font-weight:700; line-height:1.25; }
     .route-warnings { display:grid; gap:4px; margin-top:6px; }
-    .route-warning { display:inline-block; width:max-content; max-width:100%; border:1px solid #f59e0b; background:#fffbeb; color:#92400e; border-radius:6px; padding:3px 6px; font-size:.68rem; font-weight:800; line-height:1.2; }
+    .route-warning { display:inline-block; width:auto; max-width:100%; overflow-wrap:anywhere; border:1px solid #f59e0b; background:#fffbeb; color:#92400e; border-radius:6px; padding:3px 6px; font-size:.68rem; font-weight:800; line-height:1.2; }
     .route-warning.route-warning-danger { border-color:#fecaca; background:#fef2f2; color:#991b1b; }
     .cargo-stack { display:grid; gap:2px; line-height:1.2; }
     .cargo-label { color:#64748b; font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+    .driver-route-list { display:grid; gap:12px; max-width:1120px; }
+    .driver-route-card { border:1px solid #dbe3ec; border-left:5px solid #64748b; background:#fff; border-radius:10px; padding:14px; box-shadow:0 8px 20px rgba(15,23,42,.04); }
+    .driver-route-card.is-open { border-left-color:#be123c; background:#fff7f8; }
+    .driver-route-card.has-warning { border-left-color:#f59e0b; }
+    .route-card-top { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:start; }
+    .route-card-eyebrow { color:#64748b; font-size:.7rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; }
+    .route-card-title { margin:2px 0 4px; font-size:1.1rem; font-weight:900; color:#111827; overflow-wrap:anywhere; }
+    .route-card-meta { color:#64748b; font-size:.82rem; font-weight:700; line-height:1.25; }
+    .route-card-times { display:grid; grid-template-columns:1fr 1fr; gap:6px; min-width:180px; }
+    .time-pill { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:7px 9px; text-align:center; }
+    .time-pill span { display:block; color:#64748b; font-size:.62rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+    .time-pill strong { display:block; color:#0f172a; font-size:.9rem; margin-top:1px; white-space:nowrap; }
+    .route-cargo-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px; }
+    .cargo-panel { border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; padding:9px; min-width:0; }
+    .cargo-panel .cargo-value { color:#111827; font-size:.95rem; font-weight:900; overflow-wrap:anywhere; }
+    .route-chip-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; align-items:center; }
+    .route-chip { display:inline-flex; align-items:center; min-height:24px; border-radius:999px; padding:3px 8px; background:#e2e8f0; color:#334155; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em; }
+    .route-chip.danger { background:#fee2e2; color:#991b1b; }
+    .route-chip.ok { background:#dcfce7; color:#166534; }
+    .route-chip.dark { background:#111827; color:#fff; }
+    .route-card-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
+    .route-card-actions .btn, .route-card-actions form { flex:1 1 130px; min-width:0; }
+    .route-card-actions .btn { width:100%; white-space:normal; }
+    @media (max-width:700px) {
+      .driver-log-shell { padding-left:10px; padding-right:10px; }
+      .route-card-top { grid-template-columns:1fr; }
+      .route-card-times, .route-cargo-grid { grid-template-columns:1fr; }
+      .route-card-actions .btn, .route-card-actions form { flex-basis:100%; }
+    }
     @media (min-width:1200px) { .driver-log-shell { padding-left:24px; padding-right:24px; } }
   </style>
   {% set log_view_endpoint = 'manager.view_driver_log' if current_user.role == 'management' else 'driver.view_driver_log' %}
@@ -85,11 +114,95 @@
   
   <!-- "Create New Log" button for drivers -->
   {% if current_user.role == 'driver' %}
-    <a href="{{ url_for('driver.new_driving_log') }}" class="btn btn-primary mb-3 hover-btn">Create New Log</a>
-    <a href="{{ url_for('driver.add_stop') }}" class="btn btn-outline-primary mb-3 hover-btn">+ Add Missed Stop</a>
+    <a href="{{ url_for('driver.new_driving_log') }}" class="btn btn-primary mb-3 hover-btn">Record Current Stop</a>
+    <a href="{{ url_for('driver.add_stop') }}" class="btn btn-outline-primary mb-3 hover-btn">Add Missed Stop</a>
   {% endif %}
   
   {% if logs %}
+    {% if current_user.role == 'driver' %}
+      <div class="driver-route-list">
+        {% for log in logs %}
+          {% set route = (log_routes or {}).get(log.id) %}
+          {% set can_manage_log = log.driver_id == current_user.id %}
+          {% set can_delete_log = can_manage_log and log.date == today_local_date %}
+          <article class="driver-route-card {% if not log.depart_time %}is-open{% endif %} {% if route and route.warnings %}has-warning{% endif %}">
+            <div class="route-card-top">
+              <div>
+                <div class="route-card-eyebrow">{{ 'Open stop' if not log.depart_time else 'Completed stop' }}</div>
+                <h3 class="route-card-title">{{ route.plant if route else log.plant_name }}</h3>
+                <div class="route-card-meta">
+                  {{ log.driver.display_name }}{% if log.driver.employee_id %} - ID {{ log.driver.employee_id }}{% endif %}{% if log.driver.department %} - {{ log.driver.department }}{% endif %}
+                  {% if route %}<br>{{ route.action }} - {{ route.state }}{% endif %}
+                  {% if log.plant_name in PLANT_ADDRESSES %}<br>{{ PLANT_ADDRESSES[log.plant_name] }}{% endif %}
+                </div>
+              </div>
+              <div class="route-card-times" aria-label="Stop times">
+                <div class="time-pill">
+                  <span>Arrive</span>
+                  <strong>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</strong>
+                </div>
+                <div class="time-pill">
+                  <span>Depart</span>
+                  <strong>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</strong>
+                </div>
+              </div>
+            </div>
+
+            {% if route and route.warnings %}
+              <div class="route-warnings">
+                {% for warning in route.warnings %}
+                  <span class="route-warning {% if 'before departure' in warning or 'Only ' in warning or 'still marked onboard' in warning %}route-warning-danger{% endif %}">{{ warning }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="route-cargo-grid">
+              <div class="cargo-panel">
+                <span class="cargo-label">In</span>
+                <div class="cargo-value">{{ route.arrive_cargo_desc if route else log.load_size }}</div>
+              </div>
+              <div class="cargo-panel">
+                <span class="cargo-label">Out</span>
+                <div class="cargo-value">
+                  {% if route and route.depart_desc is none %}
+                    --
+                  {% elif log.no_pickup %}
+                    No Pickup
+                  {% elif route %}
+                    {{ route.depart_cargo_desc }}
+                  {% else %}
+                    {{ log.depart_load_size or '--' }}
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div class="route-chip-row">
+              {% if log.no_pickup %}<span class="route-chip dark">No Pickup</span>{% endif %}
+              {% if log.hot_parts %}<span class="route-chip danger">Hot {{ log.part_number or '' }}</span>{% elif log.part_number %}<span class="route-chip">{{ log.part_number }}</span>{% endif %}
+              <span class="route-chip {% if log.maintenance %}danger{% else %}ok{% endif %}">Truck {{ 'Issue' if log.maintenance else 'OK' }}</span>
+              {% if log.fuel %}<span class="route-chip">Fuel{% if log.fuel_mileage %} - {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>{% endif %}
+              {% if log.meeting %}<span class="route-chip">Meeting</span>{% endif %}
+            </div>
+
+            <div class="route-card-actions">
+              <a href="{{ url_for(log_view_endpoint, log_id=log.id) }}" class="btn btn-sm btn-info hover-btn">View</a>
+              {% if can_manage_log %}
+                <a href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}" class="btn btn-sm btn-warning hover-btn">Edit</a>
+                {% if not log.depart_time %}
+                  <a href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" class="btn btn-sm btn-success hover-btn">Depart / Load</a>
+                {% endif %}
+                {% if can_delete_log %}
+                  <form action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" method="POST" onsubmit="return confirm('Delete this driver log?');">
+                    <button type="submit" class="btn btn-sm btn-outline-danger hover-btn">Delete</button>
+                  </form>
+                {% endif %}
+              {% endif %}
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
     <div class="table-responsive">
     <table class="table table-striped align-middle driver-log-table">
       <thead>
@@ -233,6 +346,7 @@
       </tbody>
     </table>
     </div>
+    {% endif %}
   {% else %}
     <p>No logs found for {{ search_date.strftime('%Y-%m-%d') }}.</p>
   {% endif %}

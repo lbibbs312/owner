@@ -510,6 +510,30 @@ def test_driver_log_form_ignores_unchecked_hot_part_and_truck_issue_fields(clien
         assert log.downtime_reason is None
 
 
+def test_first_driver_log_is_start_location_not_pickup(client, app):
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+
+    login(client, "driver1")
+    start_page = client.get("/new_driving_log")
+    assert start_page.status_code == 200
+    assert b"Start Shift Location" in start_page.data
+    assert b"Start location" in start_page.data
+    assert b"Start Route" in start_page.data
+    assert b"Pickup" not in start_page.data
+
+    created = client.post(
+        "/new_driving_log",
+        data={"plant_name": "KP", "load_size": "Empty"},
+        follow_redirects=False,
+    )
+    assert created.status_code == 302
+
+    next_page = client.get("/new_driving_log")
+    assert b"Record Next Stop" in next_page.data
+    assert b"Start Shift Location" not in next_page.data
+
+
 def test_driver_cannot_create_next_log_until_open_stop_is_departed(client, app):
     with app.app_context():
         create_user("driver1", "driver1@example.com", "driver")
@@ -572,6 +596,31 @@ def test_add_missed_stop_does_not_create_hot_cargo_or_mutate_source(client, app)
         assert source.secondary_load is None
         assert added.hot_parts is False
         assert added.part_number is None
+
+
+def test_legacy_driver_log_urls_redirect_to_current_depart_flow(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("driver1", "driver1@example.com", "driver")
+        log = DriverLog(
+            driver_id=driver.id,
+            date=date.today(),
+            plant_name="KP",
+            load_size="Empty",
+            arrive_time="2026-05-16 12:00:00",
+        )
+        db.session.add(log)
+        db.session.commit()
+        log_id = log.id
+
+    login(client, "driver1")
+    assert client.get(f"/depart_driver_log/{log_id}").headers["Location"].endswith(f"/driver_logs/{log_id}/depart")
+    assert client.get(f"/pickup_driver_log/{log_id}").headers["Location"].endswith(f"/driver_logs/{log_id}/depart")
+    assert client.get(f"/driver_logs/{log_id}/depart/").status_code == 200
 
 
 def test_edit_driver_log_rejects_impossible_depart_to_next_arrival(client, app):
@@ -1550,8 +1599,8 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert today_report.status_code == 200
     assert b"Raleigh East" in today_report.data
     assert b"Edit" in today_report.data
-    assert b"Pickup" in today_report.data
-    assert b"Depart" in today_report.data
+    assert b"Pickup" not in today_report.data
+    assert b"Depart / Load" in today_report.data
     assert b"Delete" in today_report.data
     assert b"13:30" not in today_report.data
 

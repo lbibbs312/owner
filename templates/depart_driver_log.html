@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container">
-  <h2 class="mt-3">Depart {{ log.plant_name }}</h2>
+  <h2 class="mt-3">Depart / Load {{ log.plant_name }}</h2>
   <p class="text-muted">
-    Arrived with: <strong>{{ route.arrive_cargo_desc if route else log.load_size }}</strong>
+    Closing this stop with: <strong>{{ route.arrive_cargo_desc if route else log.load_size }}</strong>
     {% if route and route.unloaded_on_arrival %}&nbsp;·&nbsp; Primary unloaded{% endif %}
     {% if route and route.secondary_dropped_on_arrival %}&nbsp;·&nbsp; Hot part dropped{% endif %}
     {% if route and route.unload_blocked %}&nbsp;·&nbsp; Not unloaded: {{ route.unload_reason }}{% endif %}
@@ -29,7 +29,7 @@
     <div class="mb-3">
       {{ form.secondary_destination.label(class="form-label") }}
       {{ form.secondary_destination(class="form-select") }}
-      <div class="form-text">Use this for an added hot part. Existing hot cargo is kept unless it was dropped at this stop.</div>
+      <div class="form-text">Use this only when a separate hot part is added before leaving.</div>
     </div>
 
     {{ form.submit(class="btn btn-success hover-btn") }}

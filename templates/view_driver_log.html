@@ -286,13 +286,7 @@
     {% if can_manage_log %}
       <a href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}" class="btn btn-warning">Edit</a>
       {% if not log.depart_time %}
-        <a href="{{ url_for('driver.pickup_driver_log', log_id=log.id) }}" class="btn btn-primary">Pickup</a>
-        <form action="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" method="POST" class="d-inline">
-          <button type="submit" class="btn btn-success">Depart</button>
-        </form>
-        <form action="{{ url_for('driver.no_pickup_driver_log', log_id=log.id) }}" method="POST" class="d-inline">
-          <button type="submit" class="btn btn-outline-dark">No Pickup</button>
-        </form>
+        <a href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" class="btn btn-success">Depart / Load</a>
       {% endif %}
       {% if can_delete_log %}
         <form action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this driver log?');">

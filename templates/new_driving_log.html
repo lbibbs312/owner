@@ -2,7 +2,7 @@
 {% block content %}
 
 <div class="container">
-  <h2 class="mt-3">New Driving Log</h2>
+  <h2 class="mt-3">{{ 'Record Next Stop' if has_today_logs else 'Start Shift Location' }}</h2>
   {% set active_load = current_load.value if current_load else 'Empty' %}
   {% set active_secondary = current_load.secondary_value if current_load else '' %}
   {% set active_destination = current_load.destination if current_load else '' %}
@@ -10,6 +10,9 @@
   <div class="alert alert-light border fw-semibold">
     In truck now: <span id="currentLoadLabel">{{ current_load.cargo_display if current_load else active_load }}</span>
   </div>
+  {% if not has_today_logs %}
+    <div class="alert alert-info border fw-semibold">First stop is your start location. Cargo leaving that location is recorded on Depart / Load.</div>
+  {% endif %}
 
   {% if pending_ryder_event %}
   <div class="alert alert-danger border fw-semibold" role="alert">
@@ -53,7 +56,7 @@
     <input type="hidden" name="secondary_load" value="{{ active_secondary }}">
 
     <div class="mb-3">
-      {{ form.plant_name.label(class="form-label") }}
+      <label class="form-label" for="arrivalPlant">{{ 'Start location' if not has_today_logs else form.plant_name.label.text }}</label>
       {{ form.plant_name(class="form-select", id="arrivalPlant") }}
     </div>
 
@@ -101,7 +104,7 @@
       <div class="form-check">{{ form.meeting(class="form-check-input") }} {{ form.meeting.label(class="form-check-label") }}</div>
     </div>
 
-    {{ form.submit(class="btn btn-primary") }}
+    {{ form.submit(class="btn btn-primary", value=("Start Route" if not has_today_logs else "Record Stop")) }}
   </form>
 </div>
 
