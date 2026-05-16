@@ -36,6 +36,9 @@ ngrok.exe
 *.pem
 *.key
 
+# Local runtime
+server.pid
+
 # Logs
 *.log
 logs/
