@@ -1560,6 +1560,11 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
         shift_id = shift.id
 
     login(client, "driver1")
+    signature_page = client.get("/end_of_day_summary")
+    assert signature_page.status_code == 200
+    assert b"pointerdown" in signature_page.data
+    assert b"form.addEventListener('submit'" in signature_page.data
+
     response = client.post(
         "/end_of_day_summary",
         data={"driver_signature": signature},

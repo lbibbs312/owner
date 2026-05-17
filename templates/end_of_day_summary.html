@@ -172,31 +172,73 @@
   const canvas = document.getElementById('sigCanvas');
   const ctx = canvas.getContext('2d');
   const sigData = document.getElementById('driverSigData');
+  const form = canvas.closest('form');
   let drawing = false;
   let hasInk = false;
 
   ctx.strokeStyle = '#111';
+  ctx.fillStyle = '#111';
   ctx.lineWidth = 2.5;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
   function pos(e) {
     const r = canvas.getBoundingClientRect();
-    const src = e.touches ? e.touches[0] : e;
+    const src = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
     return { x: src.clientX - r.left, y: src.clientY - r.top };
   }
 
-  function start(e) { e.preventDefault(); drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }
-  function move(e) { e.preventDefault(); if (!drawing) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); hasInk = true; }
-  function stop(e) { e.preventDefault(); drawing = false; }
+  function dot(p) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 1.25, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
-  canvas.addEventListener('mousedown', start);
-  canvas.addEventListener('mousemove', move);
-  canvas.addEventListener('mouseup', stop);
-  canvas.addEventListener('mouseleave', stop);
-  canvas.addEventListener('touchstart', start, { passive: false });
-  canvas.addEventListener('touchmove', move, { passive: false });
-  canvas.addEventListener('touchend', stop, { passive: false });
+  function start(e) {
+    e.preventDefault();
+    drawing = true;
+    hasInk = true;
+    if (e.pointerId !== undefined && canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+    const p = pos(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    dot(p);
+  }
+
+  function move(e) {
+    e.preventDefault();
+    if (!drawing) return;
+    const p = pos(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    hasInk = true;
+  }
+
+  function stop(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    drawing = false;
+  }
+
+  if (window.PointerEvent) {
+    canvas.addEventListener('pointerdown', start);
+    canvas.addEventListener('pointermove', move);
+    canvas.addEventListener('pointerup', stop);
+    canvas.addEventListener('pointercancel', stop);
+    canvas.addEventListener('pointerleave', stop);
+  } else {
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseup', stop);
+    canvas.addEventListener('mouseleave', stop);
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchmove', move, { passive: false });
+    canvas.addEventListener('touchend', stop, { passive: false });
+  }
+
+  function syncSignature() {
+    if (hasInk) sigData.value = canvas.toDataURL('image/png');
+    return Boolean(sigData.value && sigData.value.startsWith('data:image/'));
+  }
 
   document.getElementById('sigClear').addEventListener('click', function () {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -205,12 +247,18 @@
   });
 
   document.getElementById('sigSubmit').addEventListener('click', function () {
-    if (!hasInk) {
+    if (!syncSignature()) {
       alert('Please sign before submitting.');
       return;
     }
-    sigData.value = canvas.toDataURL('image/png');
-    canvas.closest('form').submit();
+    form.submit();
+  });
+
+  form.addEventListener('submit', function (e) {
+    if (!syncSignature()) {
+      e.preventDefault();
+      alert('Please sign before submitting.');
+    }
   });
 })();
 </script>
