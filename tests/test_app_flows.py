@@ -1493,7 +1493,7 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
     assert eod_attachment.status_code == 200
     assert eod_attachment.headers["Content-Type"] == "application/pdf"
 
-    eod_response = client.post("/end_of_day_summary", data={}, follow_redirects=False)
+    eod_response = client.post("/submit_end_of_day", follow_redirects=False)
     assert eod_response.status_code == 302
 
     activity = client.get("/recent_activity")
@@ -1566,6 +1566,7 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
         follow_redirects=False,
     )
     assert response.status_code == 302
+    assert response.headers["Location"].endswith("/driver_logs_print")
 
     with app.app_context():
         from app.models import ShiftRecord
@@ -1573,6 +1574,10 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
         saved_shift = ShiftRecord.query.get(shift_id)
         assert saved_shift.driver_signature == signature
         assert saved_shift.signature_timestamp is not None
+
+    unsigned = client.post("/end_of_day_summary", data={}, follow_redirects=False)
+    assert unsigned.status_code == 302
+    assert unsigned.headers["Location"].endswith("/end_of_day_summary")
 
     driver_print = client.get("/driver_logs_print")
     assert driver_print.status_code == 200
@@ -1666,7 +1671,7 @@ def test_damage_report_edit_delete_submit_and_eod_lock(client, app):
 
         second_id = DamageReport.query.filter_by(description="Broken crate").one().id
 
-    assert client.post("/end_of_day_summary", data={}, follow_redirects=False).status_code == 302
+    assert client.post("/submit_end_of_day", follow_redirects=False).status_code == 302
     locked_delete = client.post(f"/damage_reports/{second_id}/delete", follow_redirects=False)
     assert locked_delete.status_code == 302
 

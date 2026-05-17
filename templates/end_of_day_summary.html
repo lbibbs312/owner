@@ -173,6 +173,7 @@
   const ctx = canvas.getContext('2d');
   const sigData = document.getElementById('driverSigData');
   let drawing = false;
+  let hasInk = false;
 
   ctx.strokeStyle = '#111';
   ctx.lineWidth = 2.5;
@@ -186,7 +187,7 @@
   }
 
   function start(e) { e.preventDefault(); drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }
-  function move(e) { e.preventDefault(); if (!drawing) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }
+  function move(e) { e.preventDefault(); if (!drawing) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); hasInk = true; }
   function stop(e) { e.preventDefault(); drawing = false; }
 
   canvas.addEventListener('mousedown', start);
@@ -200,9 +201,14 @@
   document.getElementById('sigClear').addEventListener('click', function () {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     sigData.value = '';
+    hasInk = false;
   });
 
   document.getElementById('sigSubmit').addEventListener('click', function () {
+    if (!hasInk) {
+      alert('Please sign before submitting.');
+      return;
+    }
     sigData.value = canvas.toDataURL('image/png');
     canvas.closest('form').submit();
   });
