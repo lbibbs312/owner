@@ -1025,7 +1025,33 @@ def _build_pretrip_pdf(pretrip):
     return pdf.build()
 
 
-def _build_driver_logs_pdf(logs, the_date, driver=None):
+def _signature_timestamp_label(signature_timestamp):
+    if signature_timestamp:
+        return f"Signed {signature_timestamp.strftime('%m/%d/%Y %I:%M %p')} UTC"
+    return "Timestamp unavailable"
+
+
+def _draw_signature_pdf_block(pdf, driver_signature=None, signature_timestamp=None):
+    pdf.fill_rect(36, 34, 540, 94, gray=1)
+    pdf.rect(36, 34, 540, 94)
+    pdf.text(44, 112, "Driver Signature", size=9, bold=True)
+    pdf.text(330, 112, "Manager / Auditor Signature", size=9, bold=True)
+
+    if driver_signature:
+        image_drawn = pdf.image_png_data_url(driver_signature, 44, 62, 190, 38)
+        if not image_drawn:
+            pdf.text(44, 80, "Driver e-signature captured", size=10, bold=True)
+        pdf.line(44, 58, 252, 58)
+        pdf.text(44, 44, _signature_timestamp_label(signature_timestamp), size=8)
+    else:
+        pdf.line(44, 74, 252, 74)
+        pdf.text(44, 52, "Not yet signed", size=8)
+
+    pdf.line(330, 74, 552, 74)
+    pdf.text(330, 52, "Manager review signature", size=8)
+
+
+def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, signature_timestamp=None):
     pdf = SimplePdf("Driver Route Sheet", LETTER)
     pdf.text(36, 748, f"Driver Route Sheet - {the_date}", size=15, bold=True)
     if driver:
@@ -1049,10 +1075,11 @@ def _build_driver_logs_pdf(logs, the_date, driver=None):
             route.get("action") or ("Open" if not log.depart_time else "Complete"),
         ])
     pdf.table(36, 710, [70, 58, 58, 110, 110, 105, 65], 24, ["Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Parts", "Status"], rows or [["No logs", "", "", "", "", "", ""]], font_size=7)
+    _draw_signature_pdf_block(pdf, driver_signature, signature_timestamp)
     return pdf.build()
 
 
-def _build_eod_pdf(the_date, logs, plant_transfers):
+def _build_eod_pdf(the_date, logs, plant_transfers, driver_signature=None, signature_timestamp=None):
     pdf = SimplePdf("End of Day", LETTER)
     pdf.text(36, 748, f"End of Day - {the_date}", size=15, bold=True)
     routes = _driver_log_route_context(logs)
@@ -1082,6 +1109,7 @@ def _build_eod_pdf(the_date, logs, plant_transfers):
             len(transfer.lines),
         ])
     pdf.table(36, y, [60, 80, 80, 80, 150, 50], 22, ["No.", "From", "To", "Trailer", "Driver", "Lines"], transfer_rows or [["No transfers", "", "", "", "", ""]], font_size=8)
+    _draw_signature_pdf_block(pdf, driver_signature, signature_timestamp)
     return pdf.build()
 
 
@@ -2357,8 +2385,15 @@ def driver_logs_attachment():
     logs = _active_driver_logs_query().filter_by(
         driver_id=current_user.id, date=today_local_date
     ).all()
+    shift_record = _shift_record_for_driver_date(current_user.id, today_local_date, require_signature=True)
     return _document_attachment_response(
-        pdf_bytes=_build_driver_logs_pdf(logs, today_local_date, driver=current_user),
+        pdf_bytes=_build_driver_logs_pdf(
+            logs,
+            today_local_date,
+            driver=current_user,
+            driver_signature=shift_record.driver_signature if shift_record else None,
+            signature_timestamp=shift_record.signature_timestamp if shift_record else None,
+        ),
         filename=f"driver-logs-{today_local_date}.pdf",
         target_type="driver_log",
         title="Driver Logs PDF downloaded",
@@ -2495,6 +2530,7 @@ def end_of_day_print():
         target_type="end_of_day",
     )
 
+    signature_shift = _shift_record_for_driver_date(current_user.id, today_local_date, require_signature=True)
     return render_template(
         "end_of_day_print.html",
         the_date=today_local_date,
@@ -2502,6 +2538,8 @@ def end_of_day_print():
         drivers_plant_transfers=drivers_plant_transfers,
         drivers_pretrips=drivers_pretrips,
         log_routes=_driver_log_route_context(logs),
+        driver_signature=signature_shift.driver_signature if signature_shift else None,
+        signature_timestamp=signature_shift.signature_timestamp if signature_shift else None,
         email_mode=False,
     )
 
@@ -2519,8 +2557,15 @@ def end_of_day_attachment():
     ).all()
     drivers_logs = {current_user.display_name: logs}
     drivers_plant_transfers = {current_user.display_name: plant_transfers}
+    signature_shift = _shift_record_for_driver_date(current_user.id, today_local_date, require_signature=True)
     return _document_attachment_response(
-        pdf_bytes=_build_eod_pdf(today_local_date, logs, plant_transfers),
+        pdf_bytes=_build_eod_pdf(
+            today_local_date,
+            logs,
+            plant_transfers,
+            driver_signature=signature_shift.driver_signature if signature_shift else None,
+            signature_timestamp=signature_shift.signature_timestamp if signature_shift else None,
+        ),
         filename=f"end-of-day-{today_local_date}.pdf",
         target_type="end_of_day",
         title="End of Day PDF downloaded",

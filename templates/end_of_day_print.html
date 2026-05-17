@@ -84,6 +84,39 @@
       border-bottom: 1px solid #000;
       padding-bottom: 2px;
     }
+    .sig-block {
+      display: flex;
+      gap: 0.4in;
+      margin-top: 0.25in;
+      align-items: flex-end;
+    }
+    .sig-col {
+      flex: 1;
+    }
+    .sig-label {
+      font-size: 7.5pt;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #444;
+      margin-bottom: 2px;
+    }
+    .sig-line {
+      border-bottom: 1.5px solid #000;
+      min-height: 0.45in;
+      display: flex;
+      align-items: flex-end;
+      padding-bottom: 3px;
+    }
+    .sig-line img {
+      max-height: 0.4in;
+      max-width: 100%;
+    }
+    .sig-ts {
+      font-size: 7pt;
+      color: #555;
+      margin-top: 3px;
+    }
     @media screen {
       body {
         width: auto;
@@ -220,6 +253,31 @@
   {% else %}
     <p>No Plant Transfers for today.</p>
   {% endif %}
+
+  <div class="sig-block">
+    <div class="sig-col">
+      <div class="sig-label">Driver Signature</div>
+      <div class="sig-line">
+        {% if driver_signature %}
+          <img src="{{ driver_signature }}" alt="Driver signature">
+        {% endif %}
+      </div>
+      <div class="sig-ts">
+        {% if signature_timestamp %}
+          Signed {{ signature_timestamp.strftime('%m/%d/%Y %I:%M %p') }} UTC
+        {% elif driver_signature %}
+          Timestamp unavailable
+        {% else %}
+          Not yet signed
+        {% endif %}
+      </div>
+    </div>
+    <div class="sig-col">
+      <div class="sig-label">Manager / Auditor Signature</div>
+      <div class="sig-line"></div>
+      <div class="sig-ts">&nbsp;</div>
+    </div>
+  </div>
 </div>
 
 </body>

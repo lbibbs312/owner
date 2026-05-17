@@ -755,7 +755,13 @@ def driver_route_attachment():
         route_date = date.today()
     ctx = _route_print_context(driver_id, route_date)
     return _document_attachment_response(
-        pdf_bytes=_build_driver_logs_pdf(ctx["logs"], route_date, driver=ctx["driver"]),
+        pdf_bytes=_build_driver_logs_pdf(
+            ctx["logs"],
+            route_date,
+            driver=ctx["driver"],
+            driver_signature=ctx.get("driver_signature"),
+            signature_timestamp=ctx.get("signature_timestamp"),
+        ),
         filename=f"driver-route-{driver_id}-{route_date}.pdf",
         target_type="driver_log",
         title="Manager Driver Route PDF downloaded",

@@ -1589,12 +1589,31 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
     assert signature.encode() in driver_print.data
     assert b"Not yet signed" not in driver_print.data
 
+    driver_pdf = client.get("/driver_logs_print/attachment")
+    assert driver_pdf.status_code == 200
+    assert driver_pdf.headers["Content-Type"] == "application/pdf"
+    assert b"Driver e-signature captured" in driver_pdf.data
+
+    eod_print = client.get("/end_of_day_print")
+    assert eod_print.status_code == 200
+    assert signature.encode() in eod_print.data
+
+    eod_pdf = client.get("/end_of_day_print/attachment")
+    assert eod_pdf.status_code == 200
+    assert eod_pdf.headers["Content-Type"] == "application/pdf"
+    assert b"Driver e-signature captured" in eod_pdf.data
+
     client.get("/logout")
     login(client, "manager1")
     manager_print = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
     assert manager_print.status_code == 200
     assert signature.encode() in manager_print.data
     assert b"Not yet signed" not in manager_print.data
+
+    manager_pdf = client.get(f"/manager/driver-logs/route-attachment?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert manager_pdf.status_code == 200
+    assert manager_pdf.headers["Content-Type"] == "application/pdf"
+    assert b"Driver e-signature captured" in manager_pdf.data
 
 
 def test_damage_report_edit_delete_submit_and_eod_lock(client, app):
