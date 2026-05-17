@@ -409,7 +409,7 @@
       <section class="list">
         <div class="section-head">
           <h2>Parts Queue</h2>
-          <span>{{ task_queue|length }} open</span>
+          <span>{{ task_queue|length }} active/open</span>
         </div>
         <div class="card task-queue">
           {% for task in task_queue %}
@@ -642,7 +642,7 @@
               <div class="rp-task-events">
                 {% for event in stop_task_events %}
                   <div class="rp-task-event {% if event.is_hot %}hot{% endif %}">
-                    <strong>T-{{ event.id }} {{ event.label }}</strong> - {{ event.status }}{% if event.accepted_at %} · Accepted {{ event.accepted_at|to_detroit_datetime }}{% endif %}{% if event.completed_at %} · Unloaded {{ event.completed_at|to_detroit_datetime }}{% endif %}
+                    <strong>{{ event.kind_label }}: {{ event.label }}</strong> - {{ event.status }}{% if event.accepted_at %} · Accepted {{ event.accepted_at|to_detroit_datetime }}{% endif %}{% if event.completed_at %} · Unloaded {{ event.completed_at|to_detroit_datetime }}{% endif %}
                   </div>
                 {% endfor %}
               </div>

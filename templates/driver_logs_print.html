@@ -37,6 +37,9 @@
     .detail-line { margin: 0 0 2px; }
     .issue { color: #7f1d1d; font-weight: 900; }
     .muted { color: #555; font-size: 8pt; }
+    .task-note { border-left: 4px solid #2563eb; background: #eff6ff; color: #111; padding: 3px 5px; margin-top: 3px; font-size: 8pt; }
+    .task-note.hot { border-left-color: #dc2626; background: #fee2e2; }
+    .task-note.done { border-left-color: #16a34a; background: #dcfce7; }
     .final-row td { background: #f8fafc; }
     .sig-block { display: flex; gap: 0.4in; margin-top: 0.25in; align-items: flex-end; }
     .sig-col { flex: 1; }
@@ -152,7 +155,7 @@
               {% if log.no_pickup %}
                 <p class="detail-line"><strong>{{ plant_name }}:</strong> No pickup recorded; departed empty.</p>
               {% else %}
-                <p class="detail-line"><strong>{{ plant_name }}:</strong> {{ route.action if route else ('Open stop' if not log.depart_time else 'Completed stop') }}</p>
+                <p class="detail-line"><strong>{{ plant_name }}:</strong> {{ route.action if route else ('At stop - needs departure' if not log.depart_time else 'Departed stop') }}</p>
                 {% if route and route.depart_cargo_desc is not none and route.depart_cargo_desc != 'Empty' %}
                   <p class="detail-line">Departed with {{ route.depart_cargo_desc }}.</p>
                 {% endif %}
@@ -172,7 +175,7 @@
               {% elif not log.depart_time %}
                 <p class="detail-line">Final stop remains open.</p>
               {% else %}
-                <p class="detail-line">Completed stop; departed at {{ log.depart_time|to_12h_format }}.</p>
+                <p class="detail-line">Stop departed at {{ log.depart_time|to_12h_format }}.</p>
                 <p class="detail-line">End of shift after completed stop.</p>
               {% endif %}
             {% endif %}
@@ -183,7 +186,7 @@
             {% if issue.route %}<p class="detail-line issue">Route issue: {{ issue.route }}</p>{% endif %}
             {% if log.hot_parts or log.part_number %}<p class="detail-line muted">{% if log.hot_parts %}HOT {% endif %}{{ log.part_number or '' }}</p>{% endif %}
             {% for event in (route_task_events or {}).get(log.id, []) %}
-              <p class="detail-line muted">Task T-{{ event.id }} {{ event.label }}: {{ event.status }}{% if event.accepted_at %}; accepted {{ event.accepted_at|to_detroit_datetime }}{% endif %}{% if event.completed_at %}; unloaded {{ event.completed_at|to_detroit_datetime }}{% endif %}{{ ' (hot)' if event.is_hot else '' }}</p>
+              <p class="detail-line task-note {% if event.is_hot %}hot{% elif event.completed_at %}done{% endif %}">{{ event.kind_label }} {{ event.label }}: {{ event.status }}{% if event.accepted_at %}; accepted {{ event.accepted_at|to_detroit_datetime }}{% endif %}{% if event.completed_at %}; unloaded {{ event.completed_at|to_detroit_datetime }}{% endif %}</p>
             {% endfor %}
           </td>
         </tr>

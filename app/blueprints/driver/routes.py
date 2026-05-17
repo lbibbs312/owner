@@ -299,6 +299,7 @@ def _task_route_summary(task):
         "label": _task_part_label(task),
         "title": task.title,
         "is_hot": bool(task.is_hot),
+        "kind_label": "Hot Part" if task.is_hot else "Part Move",
         "status": status,
         "accepted_at": task.accepted_at,
         "completed_at": task.completed_at,
@@ -543,6 +544,35 @@ def _get_today_eod_records():
     return today_local_date, logs, pretrips, plant_transfers
 
 
+def _shift_record_for_driver_date(driver_id, route_date, *, require_signature=False):
+    def base_query():
+        query = ShiftRecord.query.filter(ShiftRecord.user_id == driver_id)
+        if require_signature:
+            query = query.filter(ShiftRecord.driver_signature.isnot(None))
+        return query
+
+    by_pretrip = (
+        base_query()
+        .join(PreTrip, ShiftRecord.pretrip_id == PreTrip.id)
+        .filter(PreTrip.pretrip_date == route_date)
+        .order_by(ShiftRecord.signature_timestamp.desc(), ShiftRecord.start_time.desc())
+        .first()
+    )
+    if by_pretrip:
+        return by_pretrip
+
+    local_tz = pytz.timezone("America/Detroit")
+    for shift in base_query().order_by(ShiftRecord.signature_timestamp.desc(), ShiftRecord.start_time.desc()).limit(50).all():
+        if not shift.start_time:
+            continue
+        start_time = shift.start_time
+        if start_time.tzinfo is None:
+            start_time = pytz.utc.localize(start_time)
+        if start_time.astimezone(local_tz).date() == route_date:
+            return shift
+    return None
+
+
 def _record_eod_finalized(today_local_date, logs, pretrips, plant_transfers):
     record_activity(
         user_id=current_user.id,
@@ -659,7 +689,9 @@ def _save_damage_photo(report, uploaded_file):
 
 def _damage_report_date(report):
     stamp = report.damage_time or report.created_at or datetime.utcnow()
-    return stamp.date()
+    if stamp.tzinfo is None:
+        stamp = pytz.utc.localize(stamp)
+    return stamp.astimezone(pytz.timezone("America/Detroit")).date()
 
 
 def _is_damage_report_route_finalized(report):
@@ -2297,12 +2329,7 @@ def driver_logs_print():
         details=f"Printed {len(logs)} log(s) for {today_local_date}.",
         target_type="driver_log",
     )
-    shift_record = (
-        ShiftRecord.query.filter_by(user_id=current_user.id)
-        .filter(db.func.date(ShiftRecord.start_time) == today_local_date)
-        .order_by(ShiftRecord.start_time.desc())
-        .first()
-    )
+    shift_record = _shift_record_for_driver_date(current_user.id, today_local_date, require_signature=True)
     return render_template(
         "driver_logs_print.html",
         logs=logs,
@@ -2406,13 +2433,22 @@ def end_of_day_summary():
     if form.validate_on_submit():
         sig_data = form.driver_signature.data or ""
         if sig_data.startswith("data:image/"):
-            open_shift = ShiftRecord.query.filter_by(
-                user_id=current_user.id, end_time=None
-            ).first()
-            if open_shift:
-                open_shift.driver_signature = sig_data
-                open_shift.signature_timestamp = datetime.utcnow()
-                db.session.commit()
+            signature_shift = (
+                ShiftRecord.query.filter_by(user_id=current_user.id, end_time=None)
+                .order_by(ShiftRecord.start_time.desc())
+                .first()
+            ) or _shift_record_for_driver_date(current_user.id, today_local_date)
+            if signature_shift is None:
+                signature_shift = ShiftRecord(
+                    user_id=current_user.id,
+                    pretrip_id=pretrips_today[0].id if pretrips_today else None,
+                    start_time=datetime.utcnow(),
+                    week_ending=None,
+                )
+                db.session.add(signature_shift)
+            signature_shift.driver_signature = sig_data
+            signature_shift.signature_timestamp = datetime.utcnow()
+            db.session.commit()
         _record_eod_finalized(today_local_date, logs, pretrips_today, plant_transfers_today)
         flash("End of Day finalized and added to activity history.", "success")
         return redirect(url_for("driver.dashboard"))

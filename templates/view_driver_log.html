@@ -11,6 +11,10 @@
     .status-chip { display:inline-flex; padding:4px 9px; border-radius:8px; background:#f1f5f9; color:#334155; font-weight:900; font-size:.78rem; }
     .status-chip.open { background:#fff1f2; color:#be123c; }
     .status-chip.done { background:#dcfce7; color:#166534; }
+    .move-chip { display:inline-flex; align-items:center; border-radius:999px; padding:3px 9px; margin-right:6px; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em; background:#dbeafe; color:#1d4ed8; }
+    .move-chip.hot { background:#fee2e2; color:#991b1b; }
+    .move-chip.done { background:#dcfce7; color:#166534; }
+    .stop-help { border-left:3px solid #93c5fd; padding-left:10px; }
     .print-title { display:none; }
     .report-section { margin-top:18px; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; }
     .report-section-head { background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:10px 16px; font-size:.75rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; color:#475569; }
@@ -99,8 +103,8 @@
       <div class="log-detail-card">
         <p class="label">Move Context</p>
         {% if related_task %}
-          <p class="value">T-{{ related_task.id }} | {{ related_task.status.replace('-', ' ')|title }}</p>
-          <p class="meta">{{ related_task.part_number or related_task.title }}{% if related_task.accepted_by %} | Accepted by {{ related_task.accepted_by.manager_label }}{% endif %}</p>
+          <p class="value"><span class="move-chip {% if related_task.is_hot %}hot{% elif related_task.status == 'completed' %}done{% endif %}">{{ 'Hot Part' if related_task.is_hot else 'Move' }}</span>{{ related_task.part_number or related_task.title }}</p>
+          <p class="meta">{{ related_task.title }} | {{ related_task.status.replace('-', ' ')|title }}{% if related_task.accepted_by %} | Accepted by {{ related_task.accepted_by.manager_label }}{% endif %}</p>
         {% else %}
           <p class="value">No linked move</p>
           <p class="meta">No active task matched this stop.</p>
@@ -243,15 +247,15 @@
     </p>
   {% endif %}
   {% if current_user.role == 'management' %}
-    <p><strong>Stop Status:</strong>
+    <p><strong>Stop Progress:</strong>
       {% if log.depart_time %}
-        <span class="status-chip done">Completed stop</span>
+        <span class="status-chip done">Arrival and departure recorded</span>
       {% else %}
-        <span class="status-chip open">Open stop - needs departure</span>
+        <span class="status-chip open">Driver is still at this stop</span>
       {% endif %}
-      {% if stop_position and stop_count %}<span class="text-muted">Stop {{ stop_position }} of {{ stop_count }} for this driver/date</span>{% endif %}
+      {% if stop_position and stop_count %}<span class="text-muted">Route position {{ stop_position }} of {{ stop_count }} on {{ log.date }}</span>{% endif %}
     </p>
-    <p class="text-muted small"><strong>Stop Status meaning:</strong> Open means the driver has arrived at this stop but has not recorded departure yet. Stop {{ stop_position or '?' }} of {{ stop_count or '?' }} is this stop's chronological position for that driver on {{ log.date }}.</p>
+    <p class="text-muted small stop-help"><strong>How to read it:</strong> This describes this one stop only. A departed stop has both arrival and departure saved; an open stop still needs the driver to record departure/load.</p>
   {% endif %}
   <p><strong>Maintenance:</strong> {{ "Yes" if log.maintenance else "No" }}</p>
   <p><strong>Fuel:</strong> {{ "Yes" if log.fuel else "No" }}</p>

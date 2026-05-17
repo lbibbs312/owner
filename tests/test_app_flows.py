@@ -421,8 +421,8 @@ def test_driver_mobile_shows_full_parts_queue_and_route_task_events(client, app)
 
     route_page = client.get("/mobile")
     assert route_page.status_code == 200
-    assert b"T-" in route_page.data
-    assert b"P-HOT-1" in route_page.data
+    assert b"Task T" not in route_page.data
+    assert b"Hot Part: P-HOT-1" in route_page.data
     assert b"Accepted" in route_page.data
     assert b"Unloaded" in route_page.data
     assert b"Dock 12 min" in route_page.data
@@ -954,7 +954,7 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     dashboard = client.get(f"/manager/dashboard?driver_id={driver_id}")
     assert dashboard.status_code == 200
     assert b"Live Routes &amp; Stops" in dashboard.data
-    assert b"Open stop - needs departure" in dashboard.data
+    assert b"At stop - needs departure" in dashboard.data
 
     driver_page_attempt = client.get("/driver_logs", follow_redirects=False)
     assert driver_page_attempt.status_code == 302
@@ -964,6 +964,68 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     edit_attempt = client.get(f"/edit_driver_log/{log_id}", follow_redirects=False)
     assert edit_attempt.status_code == 302
     assert "required_role=driver" in edit_attempt.headers["Location"]
+
+
+def test_manager_driver_log_uses_plain_stop_progress_and_named_task(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, Task
+
+        driver = create_user(
+            "driver1",
+            "driver1@example.com",
+            "driver",
+            first_name="Driver",
+            last_name="One",
+            employee_id="1001",
+            department="Plastic Plate",
+        )
+        create_user("manager1", "manager1@example.com", "management")
+        route_date = date.today()
+        first = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="KP",
+            load_size="Empty",
+            depart_load_size="Raleigh East Load",
+            depart_time="08:15",
+            part_number="P-HOT-1",
+            hot_parts=True,
+            arrive_time=f"{route_date.isoformat()} 12:00:00",
+        )
+        second = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="RE",
+            load_size="Raleigh East Load",
+            arrive_time=f"{route_date.isoformat()} 13:00:00",
+        )
+        task = Task(
+            title="KP to RE",
+            details="Raleigh hot part",
+            part_number="P-HOT-1",
+            is_hot=True,
+            status="in-progress",
+            assigned_to=driver.id,
+            accepted_at=datetime.utcnow(),
+            accepted_by_id=driver.id,
+        )
+        db.session.add_all([first, second, task])
+        db.session.commit()
+        log_id = first.id
+
+    login(client, "manager1")
+    page = client.get(f"/manager/driver-logs/{log_id}")
+    assert page.status_code == 200
+    assert b"Stop Progress" in page.data
+    assert b"Arrival and departure recorded" in page.data
+    assert b"Route position 1 of 2" in page.data
+    assert b"Hot Part" in page.data
+    assert b"P-HOT-1" in page.data
+    assert b"Stop Status meaning" not in page.data
+    assert b"Task T" not in page.data
 
 
 def test_manager_search_suggest_learns_from_driver_logs(client, app):
@@ -1443,6 +1505,86 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
     unread = client.get("/count_unread").get_json()
     assert unread["action_count"] >= 3
     assert unread["unread_count"] >= unread["action_count"]
+
+
+def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client, app):
+    from datetime import date, datetime
+
+    signature = "data:image/png;base64,abc123signature"
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PostTrip, PreTrip, ShiftRecord
+
+        driver = create_user(
+            "driver1",
+            "driver1@example.com",
+            "driver",
+            first_name="Driver",
+            last_name="One",
+            employee_id="1001",
+            department="Plastic Plate",
+        )
+        create_user("manager1", "manager1@example.com", "management")
+        route_date = date.today()
+        pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="BT-1",
+            pretrip_date=route_date,
+            shift="1st",
+            start_mileage=1000,
+        )
+        db.session.add(pretrip)
+        db.session.flush()
+        shift = ShiftRecord(
+            user_id=driver.id,
+            pretrip_id=pretrip.id,
+            start_time=datetime.utcnow(),
+            end_time=datetime.utcnow(),
+            total_hours=8.0,
+        )
+        db.session.add_all([
+            shift,
+            PostTrip(pretrip_id=pretrip.id, end_mileage=1100, miles_driven=100),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="KP",
+                load_size="Empty",
+                depart_load_size="Empty",
+                depart_time="08:15",
+                arrive_time=f"{route_date.isoformat()} 12:00:00",
+            ),
+        ])
+        db.session.commit()
+        driver_id = driver.id
+        shift_id = shift.id
+
+    login(client, "driver1")
+    response = client.post(
+        "/end_of_day_summary",
+        data={"driver_signature": signature},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        from app.models import ShiftRecord
+
+        saved_shift = ShiftRecord.query.get(shift_id)
+        assert saved_shift.driver_signature == signature
+        assert saved_shift.signature_timestamp is not None
+
+    driver_print = client.get("/driver_logs_print")
+    assert driver_print.status_code == 200
+    assert signature.encode() in driver_print.data
+    assert b"Not yet signed" not in driver_print.data
+
+    client.get("/logout")
+    login(client, "manager1")
+    manager_print = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert manager_print.status_code == 200
+    assert signature.encode() in manager_print.data
+    assert b"Not yet signed" not in manager_print.data
 
 
 def test_damage_report_edit_delete_submit_and_eod_lock(client, app):

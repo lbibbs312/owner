@@ -32,6 +32,7 @@ from app.blueprints.driver.routes import (
     _build_plant_transfer_pdf,
     _build_pretrip_pdf,
     _plant_transfer_copy_sets,
+    _shift_record_for_driver_date,
     _total_miles_for_pretrips,
     _task_route_events_for_logs,
 )
@@ -376,7 +377,7 @@ def _live_stop_rows(logs):
             "route": route,
             "stop_number": counts[key],
             "driver": log.driver,
-            "status": "Open stop - needs departure" if not log.depart_time else "Completed stop",
+            "status": "At stop - needs departure" if not log.depart_time else "Departed stop",
             "status_key": "open" if not log.depart_time else "complete",
             "cargo": route.get("depart_cargo_desc") or route.get("arrive_cargo_desc") or log.depart_load_size or log.load_size or "--",
             "dock_wait": f"{log.dock_wait_minutes} min" if log.dock_wait_minutes is not None else "--",
@@ -411,6 +412,7 @@ def _route_print_context(driver_id, route_date):
         if log.maintenance or log.downtime_reason:
             exception_notes.append(f"Issue at {plant_name}: {log.downtime_reason or 'Maintenance marked'}")
             log_issue_details[log.id] = {"truck": log.downtime_reason or "Maintenance marked", "route": ""}
+    signature_shift = _shift_record_for_driver_date(driver.id, route_date, require_signature=True)
     return {
         "driver": driver,
         "logs": logs,
@@ -423,6 +425,8 @@ def _route_print_context(driver_id, route_date):
         "exception_notes": exception_notes,
         "log_issue_details": log_issue_details,
         "route_task_events": _task_route_events_for_logs(logs),
+        "driver_signature": signature_shift.driver_signature if signature_shift else None,
+        "signature_timestamp": signature_shift.signature_timestamp if signature_shift else None,
     }
 
 def _requested_url():
@@ -734,8 +738,6 @@ def driver_route_print():
         **ctx,
         print_driver=ctx["driver"],
         route_finalized=False,
-        driver_signature=None,
-        signature_timestamp=None,
         attachment_url=url_for("manager.driver_route_attachment", driver_id=driver_id, date=route_date.isoformat()),
         email_mode=False,
     )

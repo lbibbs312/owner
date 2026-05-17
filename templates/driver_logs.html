@@ -42,6 +42,8 @@
     .route-chip { display:inline-flex; align-items:center; min-height:24px; border-radius:999px; padding:3px 8px; background:#e2e8f0; color:#334155; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em; }
     .route-chip.danger { background:#fee2e2; color:#991b1b; }
     .route-chip.ok { background:#dcfce7; color:#166534; }
+    .route-chip.warn { background:#fef3c7; color:#92400e; }
+    .route-chip.task-chip { text-transform:none; letter-spacing:0; font-size:.72rem; }
     .route-chip.dark { background:#111827; color:#fff; }
     .route-card-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
     .route-card-actions .btn, .route-card-actions form { flex:1 1 130px; min-width:0; }
@@ -128,7 +130,7 @@
           <article class="driver-route-card {% if not log.depart_time %}is-open{% endif %} {% if route and route.warnings %}has-warning{% endif %}">
             <div class="route-card-top">
               <div>
-                <div class="route-card-eyebrow">{{ 'Open stop' if not log.depart_time else 'Completed stop' }}</div>
+                <div class="route-card-eyebrow">{{ 'At stop - needs departure' if not log.depart_time else 'Departed stop' }}</div>
                 <h3 class="route-card-title">{{ route.plant if route else log.plant_name }}</h3>
                 <div class="route-card-meta">
                   {{ log.driver.display_name }}{% if log.driver.employee_id %} - ID {{ log.driver.employee_id }}{% endif %}{% if log.driver.department %} - {{ log.driver.department }}{% endif %}
@@ -185,7 +187,7 @@
               {% if log.dock_wait_minutes %}<span class="route-chip danger">Dock {{ log.dock_wait_minutes }} min</span>{% endif %}
               {% if log.meeting %}<span class="route-chip">Meeting</span>{% endif %}
               {% for event in (route_task_events or {}).get(log.id, []) %}
-                <span class="route-chip {% if event.is_hot %}danger{% else %}ok{% endif %}">T-{{ event.id }} {{ event.status }}{% if event.completed_at %} / Unloaded{% endif %}</span>
+                <span class="route-chip task-chip {% if event.is_hot %}danger{% elif event.completed_at %}ok{% else %}warn{% endif %}">{{ event.kind_label }}: {{ event.label }} - {{ event.status }}{% if event.completed_at %} / Unloaded{% endif %}</span>
               {% endfor %}
             </div>
 
