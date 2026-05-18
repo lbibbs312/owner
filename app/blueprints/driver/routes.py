@@ -178,17 +178,17 @@ def _active_driver_logs_query():
     return DriverLog.query.filter(DriverLog.deleted_at.is_(None))
 
 
-def _current_driver_load(driver_id):
-    today_local_date = _today_local_date()
+def _current_driver_load(driver_id, route_date=None):
+    route_date = route_date or _today_local_date()
     route_finalized = ActivityEvent.query.filter_by(
         user_id=driver_id,
         category="eod",
         action="finalized",
         target_type="end_of_day",
-    ).filter(ActivityEvent.details.contains(str(today_local_date))).first()
+    ).filter(ActivityEvent.details.contains(str(route_date))).first()
     if route_finalized:
         return current_load_after_logs([])
-    logs = _active_driver_logs_query().filter_by(driver_id=driver_id, date=today_local_date).all()
+    logs = _active_driver_logs_query().filter_by(driver_id=driver_id, date=route_date).all()
     return current_load_after_logs(logs)
 
 
@@ -205,6 +205,93 @@ def _active_pretrips_query():
 
 def _active_plant_transfers_query():
     return PlantTransfer.query.filter(PlantTransfer.deleted_at.is_(None))
+
+
+def _open_shift_for_driver(driver_id):
+    return (
+        ShiftRecord.query.filter_by(user_id=driver_id, end_time=None)
+        .order_by(ShiftRecord.start_time.desc())
+        .first()
+    )
+
+
+def _shift_route_date(shift):
+    if not shift:
+        return None
+    if shift.pretrip and shift.pretrip.pretrip_date:
+        return shift.pretrip.pretrip_date
+    if not shift.start_time:
+        return None
+    start_time = shift.start_time
+    if start_time.tzinfo is None:
+        start_time = pytz.utc.localize(start_time)
+    return start_time.astimezone(pytz.timezone("America/Detroit")).date()
+
+
+def _latest_open_pretrip(driver_id):
+    pretrips = (
+        _active_pretrips_query()
+        .filter_by(user_id=driver_id)
+        .order_by(PreTrip.created_at.desc(), PreTrip.id.desc())
+        .limit(20)
+        .all()
+    )
+    return next((pretrip for pretrip in pretrips if not pretrip.posttrip), None)
+
+
+def _active_route_date_for_driver(driver_id, today_local_date=None, open_shift=None):
+    today_local_date = today_local_date or _today_local_date()
+    open_shift = open_shift if open_shift is not None else _open_shift_for_driver(driver_id)
+    shift_date = _shift_route_date(open_shift)
+    if shift_date:
+        return shift_date
+    open_pretrip = _latest_open_pretrip(driver_id)
+    if open_pretrip and open_pretrip.pretrip_date:
+        return open_pretrip.pretrip_date
+    return today_local_date
+
+
+def _route_date_has_driver_records(driver_id, route_date):
+    if not route_date:
+        return False
+    return any(
+        [
+            _active_driver_logs_query().filter_by(driver_id=driver_id, date=route_date).first(),
+            _active_pretrips_query().filter_by(user_id=driver_id, pretrip_date=route_date).first(),
+            _active_plant_transfers_query().filter_by(user_id=driver_id, transfer_date=route_date).first(),
+        ]
+    )
+
+
+def _latest_driver_route_date(driver_id):
+    latest_log = (
+        _active_driver_logs_query()
+        .with_entities(DriverLog.date)
+        .filter_by(driver_id=driver_id)
+        .order_by(DriverLog.date.desc(), DriverLog.id.desc())
+        .first()
+    )
+    if latest_log and latest_log[0]:
+        return latest_log[0]
+    latest_pretrip = (
+        _active_pretrips_query()
+        .filter_by(user_id=driver_id)
+        .order_by(PreTrip.pretrip_date.desc(), PreTrip.id.desc())
+        .first()
+    )
+    if latest_pretrip and latest_pretrip.pretrip_date:
+        return latest_pretrip.pretrip_date
+    return None
+
+
+def _dashboard_route_date_for_driver(driver_id, today_local_date=None, open_shift=None):
+    today_local_date = today_local_date or _today_local_date()
+    active_route_date = _active_route_date_for_driver(driver_id, today_local_date, open_shift)
+    if open_shift or active_route_date != today_local_date:
+        return active_route_date
+    if _route_date_has_driver_records(driver_id, today_local_date):
+        return today_local_date
+    return _latest_driver_route_date(driver_id) or today_local_date
 
 
 def _soft_delete_record(record):
@@ -1948,13 +2035,14 @@ def driver_logs():
 @login_required
 def new_driving_log():
     form = DriverLogForm()
-    current_load = _current_driver_load(current_user.id)
-    current_load_value = current_load["value"] or "Empty"
-    current_secondary_value = current_load.get("secondary_value") or ""
     pending_ryder_event = _open_ryder_event(current_user.id)
     local_tz = pytz.timezone("America/Detroit")
     now_local = datetime.now(local_tz)
-    local_date = now_local.date()
+    open_shift = _open_shift_for_driver(current_user.id)
+    local_date = _active_route_date_for_driver(current_user.id, now_local.date(), open_shift=open_shift)
+    current_load = _current_driver_load(current_user.id, route_date=local_date)
+    current_load_value = current_load["value"] or "Empty"
+    current_secondary_value = current_load.get("secondary_value") or ""
 
     if form.validate_on_submit():
         if pending_ryder_event:
@@ -2046,6 +2134,11 @@ def add_stop():
     Optional ?from_log_id=<id> pre-fills cargo and date from that stop's departure."""
     local_tz = pytz.timezone("America/Detroit")
     today_local_date = datetime.now(local_tz).date()
+    active_log_date = _active_route_date_for_driver(
+        current_user.id,
+        today_local_date,
+        open_shift=_open_shift_for_driver(current_user.id),
+    )
 
     # Resolve the source log (GET or hidden POST field).
     from_log_id_raw = request.values.get("from_log_id", "")
@@ -2057,7 +2150,7 @@ def add_stop():
             .first()
         )
 
-    log_date = source_log.date if source_log else today_local_date
+    log_date = source_log.date if source_log else active_log_date
 
     form = DriverLogForm()
 
@@ -2962,11 +3055,8 @@ def mobile_dashboard():
 
     now_local, _ = _now_local_and_utc()
     today_local_date = now_local.date()
-    open_shift = (
-        ShiftRecord.query.filter_by(user_id=current_user.id, end_time=None)
-        .order_by(ShiftRecord.start_time.desc())
-        .first()
-    )
+    open_shift = _open_shift_for_driver(current_user.id)
+    route_date = _dashboard_route_date_for_driver(current_user.id, today_local_date, open_shift=open_shift)
     shift_elapsed = None
     if open_shift:
         shift_elapsed = _format_duration((datetime.utcnow() - open_shift.start_time).total_seconds())
@@ -2987,7 +3077,14 @@ def mobile_dashboard():
         .order_by(PreTrip.created_at.desc())
         .first()
     )
-    pending_posttrip = bool(todays_pretrip and not todays_pretrip.posttrip)
+    route_pretrip = (
+        _active_pretrips_query().filter_by(user_id=current_user.id, pretrip_date=route_date)
+        .order_by(PreTrip.created_at.desc())
+        .first()
+    )
+    route_is_active = bool(open_shift or (route_pretrip and not route_pretrip.posttrip))
+    active_pretrip = todays_pretrip or (route_pretrip if route_is_active else None)
+    pending_posttrip = bool(active_pretrip and not active_pretrip.posttrip)
     latest_transfer = (
         _active_plant_transfers_query().filter_by(user_id=current_user.id)
         .order_by(PlantTransfer.created_at.desc())
@@ -3005,18 +3102,25 @@ def mobile_dashboard():
     )
 
     todays_logs = sorted(
-        _active_driver_logs_query().filter_by(driver_id=current_user.id, date=today_local_date).all(),
+        _active_driver_logs_query().filter_by(driver_id=current_user.id, date=route_date).all(),
         key=_driver_log_sort_key,
     )
     todays_log_routes = _driver_log_route_context(todays_logs)
-    route_task_events = _task_route_events_for_logs(todays_logs, _driver_route_tasks(current_user.id, today_local_date))
+    route_task_events = _task_route_events_for_logs(todays_logs, _driver_route_tasks(current_user.id, route_date))
     current_stop = next((l for l in reversed(todays_logs) if not l.depart_time), None) or (todays_logs[-1] if todays_logs else None)
+    if route_date == today_local_date:
+        route_panel_title = "Today's Route"
+    elif route_is_active:
+        route_panel_title = "Active Route"
+    else:
+        route_panel_title = "Last Route"
+    truck_source_pretrip = active_pretrip or route_pretrip or latest_pretrip
     current_truck_number = _normalize_truck_number(
-        todays_pretrip.truck_number if todays_pretrip else (latest_pretrip.truck_number if latest_pretrip else "")
+        truck_source_pretrip.truck_number if truck_source_pretrip else ""
     )
     truck_maintenance_history = _truck_maintenance_history(
         current_truck_number,
-        current_pretrip_id=todays_pretrip.id if todays_pretrip else None,
+        current_pretrip_id=active_pretrip.id if active_pretrip else None,
         limit=6,
     )
     ryder_context = _ryder_followup_context(current_user.id)
@@ -3029,12 +3133,17 @@ def mobile_dashboard():
         hot_task_count=hot_task_count,
         latest_pretrip=latest_pretrip,
         todays_pretrip=todays_pretrip,
+        route_pretrip=route_pretrip,
+        active_pretrip=active_pretrip,
         pending_posttrip=pending_posttrip,
         latest_transfer=latest_transfer,
         recent_ryder_events=recent_ryder_events,
         open_shift=open_shift,
         shift_elapsed=shift_elapsed,
         today_local_date=today_local_date,
+        route_date=route_date,
+        route_panel_title=route_panel_title,
+        route_is_active=route_is_active,
         todays_logs=todays_logs,
         todays_log_routes=todays_log_routes,
         route_task_events=route_task_events,

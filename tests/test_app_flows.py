@@ -2064,6 +2064,100 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
 
 
 
+def test_mobile_dashboard_route_panel_falls_back_to_latest_route_when_today_is_empty(client, app):
+    from datetime import date, datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PostTrip, PreTrip
+
+        driver = create_user("driver1", "driver1@example.com", "driver", first_name="Driver", last_name="One")
+        route_date = date.today() - timedelta(days=3)
+        pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="ST2",
+            pretrip_date=route_date,
+            start_mileage=379164,
+        )
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all(
+            [
+                PostTrip(
+                    pretrip_id=pretrip.id,
+                    end_mileage=379202,
+                    miles_driven=38,
+                    created_at=datetime(2026, 5, 15, 20, 55, 0),
+                ),
+                DriverLog(
+                    driver_id=driver.id,
+                    date=route_date,
+                    plant_name="RE",
+                    load_size="Empty",
+                    arrive_time=f"{route_date.isoformat()} 15:21:00",
+                    depart_time="11:21",
+                ),
+            ]
+        )
+        db.session.commit()
+
+    login(client, "driver1")
+    page = client.get("/mobile")
+
+    assert page.status_code == 200
+    assert b"Last Route" in page.data
+    assert b"1 stop" in page.data
+    assert b"Raleigh East" in page.data
+    assert f"/driver_logs?date={route_date.isoformat()}".encode() in page.data
+    assert b"No stops logged yet today." not in page.data
+    assert b"Start shift with PreTrip" in page.data
+
+
+def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
+    from datetime import date, datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("driver1", "driver1@example.com", "driver", first_name="Driver", last_name="One")
+        route_date = date.today() - timedelta(days=1)
+        pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="ST2",
+            pretrip_date=route_date,
+            start_mileage=379164,
+        )
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all(
+            [
+                ShiftRecord(
+                    user_id=driver.id,
+                    pretrip_id=pretrip.id,
+                    start_time=datetime(2026, 5, 17, 23, 30, 0),
+                ),
+                DriverLog(
+                    driver_id=driver.id,
+                    date=route_date,
+                    plant_name="KP",
+                    load_size="Empty",
+                    arrive_time=f"{route_date.isoformat()} 23:45:00",
+                ),
+            ]
+        )
+        db.session.commit()
+
+    login(client, "driver1")
+    page = client.get("/mobile")
+
+    assert page.status_code == 200
+    assert b"Active Route" in page.data
+    assert b"1 stop" in page.data
+    assert b"Kraft" in page.data
+    assert b"PostTrip Due" in page.data
+
+
 def test_mobile_dashboard_shows_truck_maintenance_history_from_previous_posttrips(client, app):
     from datetime import date, datetime, timedelta
 

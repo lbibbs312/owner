@@ -169,13 +169,13 @@
     .maintenance-note strong { color: var(--text); }
     .maintenance-alert { margin: 6px 0 0; color: #fde68a; font-size: .8rem; line-height: 1.35; overflow-wrap: anywhere; }
     .maintenance-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
-    .maintenance-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: .76rem; }
+    .maintenance-table { width: 100%; border-collapse: collapse; table-layout: auto; font-size: .76rem; }
     .maintenance-table th, .maintenance-table td { padding: 9px 8px; border-bottom: 1px solid rgba(148,163,184,.14); vertical-align: top; text-align: left; }
     .maintenance-table th { color: var(--muted); font-size: .66rem; text-transform: uppercase; font-weight: 900; }
     .maintenance-table td strong, .maintenance-list strong { display: block; font-size: .78rem; }
     .maintenance-table td span, .maintenance-list span { display: block; color: var(--muted); line-height: 1.35; margin-top: 3px; }
     .maintenance-list { display: grid; gap: 4px; }
-    .maintenance-chip { display: inline-flex; width: max-content; align-items: center; border-radius: 999px; padding: 3px 7px; font-size: .64rem; font-weight: 900; text-transform: uppercase; background: rgba(16,185,129,.14); color: #a7f3d0; border: 1px solid rgba(16,185,129,.26); }
+    .maintenance-chip { display: inline-flex; width: max-content; align-items: center; border-radius: 999px; padding: 3px 7px; font-size: .64rem; font-weight: 900; text-transform: uppercase; white-space: nowrap; background: rgba(16,185,129,.14); color: #a7f3d0; border: 1px solid rgba(16,185,129,.26); }
     .maintenance-chip.warn { background: rgba(245,158,11,.16); color: #fde68a; border-color: rgba(245,158,11,.28); }
     .maintenance-empty { padding: 3px 0; color: var(--muted); font-size: .8rem; }
 
@@ -360,7 +360,8 @@
     .rp-load-chip.empty { background: rgba(30,41,59,.4); color: #64748b; border: 1px solid rgba(100,116,139,.18); }
     .rp-parts { font-size: .72rem; color: var(--muted); margin-top: 3px; }
     .rp-footer { padding: 10px 14px 14px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
-    .rp-footer a { display: block; text-align: center; padding: 9px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid var(--line); font-size: .76rem; font-weight: 900; color: var(--muted); }
+    .rp-footer a { display: block; text-align: center; padding: 9px; border-radius: 12px; background: rgba(127,29,45,.18); border: 1px solid rgba(243,199,207,.22); font-size: .76rem; font-weight: 900; color: #f8fafc; }
+    .rp-footer a:hover { background: rgba(127,29,45,.28); border-color: rgba(243,199,207,.36); }
     .rp-footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   </style>
 </head>
@@ -474,15 +475,15 @@
             <div><strong>Plant Transfer</strong><span>{{ latest_transfer.ship_from ~ ' to ' ~ latest_transfer.ship_to if latest_transfer else 'Create a transfer sheet' }}</span></div>
           </a>
         {% endif %}
-        {% if pending_posttrip and todays_pretrip %}
-          <a class="quick-card" href="{{ url_for('driver.do_posttrip', pretrip_id=todays_pretrip.id) }}">
+        {% if pending_posttrip and active_pretrip %}
+          <a class="quick-card" href="{{ url_for('driver.do_posttrip', pretrip_id=active_pretrip.id) }}">
             <div class="quick-icon green">IN</div>
             <div><strong>PostTrip Due</strong><span>Finish inspection and end shift</span></div>
           </a>
         {% else %}
           <a class="quick-card" href="{{ url_for('driver.new_pretrip') }}">
             <div class="quick-icon green">IN</div>
-            <div><strong>PreTrip / Shift</strong><span>{{ 'Shift started from PreTrip' if todays_pretrip else 'Start shift with PreTrip' }}</span></div>
+            <div><strong>PreTrip / Shift</strong><span>{{ 'Shift started from PreTrip' if active_pretrip else 'Start shift with PreTrip' }}</span></div>
           </a>
         {% endif %}
       </section>
@@ -495,8 +496,8 @@
       </section>
 
       {% set fuel_logs = todays_logs | selectattr('fuel') | selectattr('fuel_mileage') | list %}
-      {% set start_mi = todays_pretrip.start_mileage if todays_pretrip else none %}
-      {% set end_mi = todays_pretrip.posttrip.end_mileage if (todays_pretrip and todays_pretrip.posttrip) else none %}
+      {% set start_mi = route_pretrip.start_mileage if route_pretrip else none %}
+      {% set end_mi = route_pretrip.posttrip.end_mileage if (route_pretrip and route_pretrip.posttrip) else none %}
       {% if start_mi or fuel_logs %}
       <section class="list">
         <div class="section-head">
@@ -654,7 +655,7 @@
             <div class="ryder-grid">
               <div class="ryder-field">
                 <label for="ryderTruck">Truck</label>
-                <input id="ryderTruck" class="ryder-input" name="truck_number" value="{{ todays_pretrip.truck_number if todays_pretrip else '' }}" placeholder="Truck number">
+                <input id="ryderTruck" class="ryder-input" name="truck_number" value="{{ active_pretrip.truck_number if active_pretrip else '' }}" placeholder="Truck number">
               </div>
               <div class="ryder-field">
                 <label for="ryderIssue">Problem</label>
@@ -700,8 +701,8 @@
 
     <aside class="route-panel">
       <div class="rp-head">
-        <h3>Today's Route</h3>
-        <span>{{ todays_logs|length }} stop{{ 's' if todays_logs|length != 1 else '' }}</span>
+        <h3>{{ route_panel_title or "Today's Route" }}</h3>
+        <span>{% if route_date and route_date != today_local_date %}{{ route_date.strftime('%b %d') }} - {% endif %}{{ todays_logs|length }} stop{{ 's' if todays_logs|length != 1 else '' }}</span>
       </div>
       {% if todays_logs %}
       <div class="rp-timeline">
@@ -761,10 +762,10 @@
         {% endfor %}
       </div>
       {% else %}
-      <div class="rp-empty">No stops logged yet today.</div>
+      <div class="rp-empty">{% if route_date and route_date != today_local_date %}No stops logged for this route date.{% else %}No stops logged yet today.{% endif %}</div>
       {% endif %}
       <div class="rp-footer">
-        <a href="{{ url_for('driver.driver_logs') }}">View full log</a>
+        <a href="{{ url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) }}">View full log</a>
         <div class="rp-footer-grid">
           <a href="{{ url_for('driver.new_driving_log') }}">Add Stop</a>
           <a href="{{ url_for('driver.new_damage_report') }}">Damage</a>
