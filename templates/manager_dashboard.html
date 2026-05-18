@@ -62,6 +62,12 @@
   .btn-create:hover { background:#1d4ed8; }
   .btn-create svg { width:15px; height:15px; }
 
+  .db-alert { margin:0 28px; border:1px solid #fecaca; background:#fef2f2; color:#7f1d1d;
+              padding:10px 12px; border-radius:0 0 12px 12px; font-size:.82rem;
+              font-weight:800; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .db-alert strong { color:#991b1b; }
+  .db-alert span { color:#450a0a; font-weight:700; }
+
   /* Body scroll area */
   .mc-body { flex:1; overflow-y:auto; padding:22px 28px; display:flex; flex-direction:column; gap:18px; }
 
@@ -597,6 +603,13 @@
         </button>
       </div>
     </header>
+
+    {% if database_status and database_status.warning %}
+      <div class="db-alert">
+        <strong>Database warning: {{ database_status.label }}</strong>
+        <span>Safe for local testing only. Company use requires Postgres/persistent storage.</span>
+      </div>
+    {% endif %}
 
     <div class="mc-body">
 

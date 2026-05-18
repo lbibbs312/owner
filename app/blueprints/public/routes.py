@@ -1,10 +1,11 @@
-from flask import jsonify, render_template, send_from_directory
+from flask import current_app, jsonify, render_template, send_from_directory
 from flask_login import login_required
 from sqlalchemy import text
 
 from app.blueprints.public import bp
 from app.extensions import db
 from app.models import Announcement
+from app.config import is_sqlite_database_uri, runtime_requires_persistent_db
 
 
 @bp.route("/")
@@ -33,6 +34,17 @@ def healthz():
 def readyz():
     try:
         db.session.execute(text("SELECT 1"))
-        return jsonify(status="ok", db="ok"), 200
-    except Exception as exc:  # pragma: no cover — surface DB connectivity failures
+        bind = db.session.get_bind()
+        dialect = bind.dialect.name if bind is not None else "unknown"
+        database_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+        sqlite_database = dialect == "sqlite" or is_sqlite_database_uri(database_uri)
+        unsafe_runtime = runtime_requires_persistent_db() and sqlite_database
+        status_code = 503 if unsafe_runtime else 200
+        return jsonify(
+            status="degraded" if unsafe_runtime else "ok",
+            db="ok",
+            dialect=dialect,
+            persistent=not sqlite_database,
+        ), status_code
+    except Exception as exc:  # pragma: no cover - surface DB connectivity failures
         return jsonify(status="degraded", db=str(exc)), 503

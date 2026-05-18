@@ -25,6 +25,24 @@ def _reexec_in_local_venv():
 
 _reexec_in_local_venv()
 
+from app.config import is_render_runtime
+
+
+def _abort_render_dev_entrypoint():
+    if not is_render_runtime():
+        return
+    if os.environ.get("ALLOW_RENDER_DEV_ENTRYPOINT", "false").lower() == "true":
+        return
+    raise RuntimeError(
+        "Refusing to run python lacksdrivers.py on Render. "
+        "Use gunicorn --worker-class eventlet -w 1 wsgi:application --bind 0.0.0.0:$PORT "
+        "with FLASK_ENV=production and a persistent Postgres database."
+    )
+
+
+if __name__ == "__main__":
+    _abort_render_dev_entrypoint()
+
 from app import create_app
 from app.extensions import socketio
 

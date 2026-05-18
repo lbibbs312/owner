@@ -7,9 +7,12 @@ services:
     autoDeploy: true
 
     buildCommand: pip install -e .
+    preDeployCommand: flask --app lacksdrivers.py db upgrade
     startCommand: gunicorn --worker-class eventlet -w 1 wsgi:application --bind 0.0.0.0:$PORT
 
     envVars:
+      - key: FLASK_ENV
+        value: "production"
       - key: FLASK_DEBUG
         value: "false"
       - key: SESSION_COOKIE_SECURE
