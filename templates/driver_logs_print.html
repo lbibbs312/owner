@@ -159,6 +159,9 @@
                 {% if route and route.depart_cargo_desc is not none and route.depart_cargo_desc != 'Empty' %}
                   <p class="detail-line">Departed with {{ route.depart_cargo_desc }}.</p>
                 {% endif %}
+                {% if route and route.next_stop %}
+                  <p class="detail-line">First stop after departure: {{ route.next_stop }}.</p>
+                {% endif %}
               {% endif %}
             {% else %}
               <p class="detail-line"><strong>{{ plant_name }}:</strong> Final location.</p>
@@ -166,12 +169,12 @@
                 <p class="detail-line">Final unload completed.</p>
               {% endif %}
               {% if route and route.secondary_dropped_on_arrival %}
-                <p class="detail-line">Final hot part drop completed.</p>
+                <p class="detail-line">Final second-stop cargo drop completed.</p>
               {% endif %}
               {% if route and route.unload_blocked %}
                 <p class="detail-line issue">Final unload not completed: {{ route.unload_reason }}</p>
               {% elif route and route.secondary_drop_blocked %}
-                <p class="detail-line issue">Final hot part not dropped: {{ route.secondary_drop_reason }}</p>
+                <p class="detail-line issue">Final second-stop cargo not dropped: {{ route.secondary_drop_reason }}</p>
               {% elif not log.depart_time %}
                 <p class="detail-line">Final stop remains open.</p>
               {% else %}
@@ -181,8 +184,8 @@
             {% endif %}
             {% if log.no_pickup and not next_log %}<p class="detail-line">No pickup recorded; departed empty.</p>{% endif %}
             {% if route and route.unload_blocked %}<p class="detail-line issue">Unload issue: {{ route.unload_reason }}</p>{% endif %}
-            {% if route and route.secondary_drop_blocked %}<p class="detail-line issue">Hot part issue: {{ route.secondary_drop_reason }}</p>{% endif %}
-            {% if log.maintenance or issue.truck %}<p class="detail-line issue">Truck issue: {{ issue.truck or 'Maintenance marked' }}</p>{% endif %}
+            {% if route and route.secondary_drop_blocked %}<p class="detail-line issue">Second-stop cargo issue: {{ route.secondary_drop_reason }}</p>{% endif %}
+            {% if log.maintenance or issue.truck %}<p class="detail-line issue">Truck issue: {{ issue.truck or 'Maintenance marked' }}{% if log.fuel_mileage %}; odometer {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</p>{% endif %}
             {% if issue.route %}<p class="detail-line issue">Route issue: {{ issue.route }}</p>{% endif %}
             {% if log.hot_parts or log.part_number %}<p class="detail-line muted">{% if log.hot_parts %}HOT {% endif %}{{ log.part_number or '' }}</p>{% endif %}
             {% for event in (route_task_events or {}).get(log.id, []) %}

@@ -42,11 +42,14 @@
 <script>
 (function () {
   const fuelCheck = document.getElementById('fuelCheck');
+  const maintenanceCheck = document.getElementById('maintenanceCheck');
   const fuelMileagePanel = document.getElementById('fuelMileagePanel');
   function syncFuelMileage() {
-    fuelMileagePanel.classList.toggle('d-none', !fuelCheck.checked);
+    const showMileage = (fuelCheck && fuelCheck.checked) || (maintenanceCheck && maintenanceCheck.checked);
+    fuelMileagePanel.classList.toggle('d-none', !showMileage);
   }
-  fuelCheck.addEventListener('change', syncFuelMileage);
+  if (fuelCheck) fuelCheck.addEventListener('change', syncFuelMileage);
+  if (maintenanceCheck) maintenanceCheck.addEventListener('change', syncFuelMileage);
   syncFuelMileage();
 })();
 </script>

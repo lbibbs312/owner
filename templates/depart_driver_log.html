@@ -5,9 +5,9 @@
   <p class="text-muted">
     Closing this stop with: <strong>{{ route.arrive_cargo_desc if route else log.load_size }}</strong>
     {% if route and route.unloaded_on_arrival %}&nbsp;·&nbsp; Primary unloaded{% endif %}
-    {% if route and route.secondary_dropped_on_arrival %}&nbsp;·&nbsp; Hot part dropped{% endif %}
+    {% if route and route.secondary_dropped_on_arrival %}&nbsp;·&nbsp; Second-stop cargo dropped{% endif %}
     {% if route and route.unload_blocked %}&nbsp;·&nbsp; Not unloaded: {{ route.unload_reason }}{% endif %}
-    {% if route and route.secondary_drop_blocked %}&nbsp;·&nbsp; Hot part not dropped: {{ route.secondary_drop_reason }}{% endif %}
+    {% if route and route.secondary_drop_blocked %}&nbsp;·&nbsp; Second-stop cargo not dropped: {{ route.secondary_drop_reason }}{% endif %}
   </p>
 
   <form method="POST" action="" id="departForm">
@@ -28,8 +28,13 @@
 
     <div class="mb-3">
       {{ form.secondary_destination.label(class="form-label") }}
-      {{ form.secondary_destination(class="form-select") }}
-      <div class="form-text">Use this only when a separate hot part is added before leaving.</div>
+      {{ form.secondary_destination(class="form-select", id="secondaryDestination") }}
+      <div class="form-text">Use this when you leave with cargo for another stop.</div>
+    </div>
+
+    <div class="mb-3 d-none" id="secondaryLoadTypePanel">
+      {{ form.secondary_load_type.label(class="form-label") }}
+      {{ form.secondary_load_type(class="form-select") }}
     </div>
 
     <div class="mb-3">
@@ -47,10 +52,14 @@
 (function () {
   const gotLoaded = document.getElementById('gotLoaded');
   const destinationPanel = document.getElementById('destinationPanel');
+  const secondaryDestination = document.getElementById('secondaryDestination');
+  const secondaryLoadTypePanel = document.getElementById('secondaryLoadTypePanel');
   function syncDestination() {
     destinationPanel.classList.toggle('d-none', gotLoaded.value !== 'yes');
+    secondaryLoadTypePanel.classList.toggle('d-none', !secondaryDestination.value);
   }
   gotLoaded.addEventListener('change', syncDestination);
+  secondaryDestination.addEventListener('change', syncDestination);
   syncDestination();
 })();
 </script>

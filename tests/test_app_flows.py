@@ -861,7 +861,7 @@ def test_driver_log_edit_and_depart_are_separate_actions(client, app):
             "load_size": "Half",
             "part_number": "P-DOCK",
             "hot_parts": "y",
-            "arrive_time": "5:45pm",
+            "arrive_time": "12:01am",
             "depart_time": "",
         },
         follow_redirects=False,
@@ -875,12 +875,14 @@ def test_driver_log_edit_and_depart_are_separate_actions(client, app):
         assert log.plant_name == "RW"
         assert log.load_size == "Half"
         assert log.part_number == "P-DOCK"
+        from app.blueprints.driver.routes import _arrival_utc_to_local_hhmm
+
         assert log.hot_parts is True
-        assert log.arrive_time.endswith("21:45:00")
+        assert _arrival_utc_to_local_hhmm(log.arrive_time) == "12:01am"
         assert log.depart_time is None
 
     edit_page = client.get(f"/edit_driver_log/{log_id}")
-    assert b"5:45pm" in edit_page.data
+    assert b"12:01am" in edit_page.data
     assert b"driver-log-conditionals.js" in edit_page.data
     assert b"+ Add Missed Stop" not in edit_page.data
     assert b"Pickup" not in edit_page.data
@@ -1314,7 +1316,7 @@ def test_mixed_cargo_deviation_preserves_primary_and_drops_hot_part(client, app)
 
     assert client.post(
         f"/driver_logs/{paint_west_id}/depart",
-        data={"got_loaded": "no", "destination": "", "secondary_destination": "Helios"},
+        data={"got_loaded": "no", "destination": "", "secondary_destination": "Helios", "secondary_load_type": "hot"},
         follow_redirects=False,
     ).status_code == 302
 
@@ -1347,6 +1349,97 @@ def test_mixed_cargo_deviation_preserves_primary_and_drops_hot_part(client, app)
     assert print_page.status_code == 200
     assert b"Trim DC Load + Helios Hot Part" in print_page.data
     assert b"Deviation" in print_page.data
+
+
+def test_depart_second_stop_can_be_regular_load_and_finalized_route_shows_first_stop(client, app):
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+
+    login(client, "driver1")
+    assert client.post(
+        "/new_driving_log",
+        data={"plant_name": "KP", "load_size": "Empty"},
+        follow_redirects=False,
+    ).status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        kraft_id = DriverLog.query.filter_by(plant_name="KP").one().id
+
+    assert client.post(
+        f"/driver_logs/{kraft_id}/depart",
+        data={
+            "got_loaded": "yes",
+            "destination": "Trim DC",
+            "secondary_destination": "Helios",
+            "secondary_load_type": "load",
+        },
+        follow_redirects=False,
+    ).status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        kraft_log = DriverLog.query.get(kraft_id)
+        assert kraft_log.depart_load_size == "Trim DC Load"
+        assert kraft_log.secondary_load == "Helios Load"
+
+    arrival_page = client.get("/new_driving_log")
+    assert b"Trim DC Load + Helios Load" in arrival_page.data
+    assert b"Helios Hot Part" not in arrival_page.data
+
+    assert client.post(
+        "/new_driving_log",
+        data={
+            "plant_name": "Helios",
+            "load_size": "Trim DC Load",
+            "secondary_load": "Helios Load",
+            "secondary_dropped_on_arrival": "yes",
+        },
+        follow_redirects=False,
+    ).status_code == 302
+
+    finalized = client.post(
+        "/end_of_day_summary",
+        data={"driver_signature": "data:image/png;base64,abc"},
+        follow_redirects=True,
+    )
+    assert finalized.status_code == 200
+    assert b"Trim DC Load + Helios Load" in finalized.data
+    assert b"First stop after departure: Helios" in finalized.data
+    assert b"Route finalized" in finalized.data
+
+
+def test_truck_issue_records_odometer_without_fuel_stop(client, app):
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+
+    login(client, "driver1")
+    response = client.post(
+        "/new_driving_log",
+        data={
+            "plant_name": "RE",
+            "load_size": "Empty",
+            "maintenance": "y",
+            "truck_issue": "cel",
+            "truck_issue_notes": "warning light",
+            "fuel_mileage": "12345",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        log = DriverLog.query.filter_by(plant_name="RE").one()
+        assert log.maintenance is True
+        assert log.fuel is False
+        assert log.fuel_mileage == 12345
+
+    page = client.get("/driver_logs")
+    assert b"Truck Issue - 12,345 mi" in page.data
 
 
 def test_new_log_load_state_ignores_previous_days_and_finalized_route(client, app):
@@ -1969,6 +2062,123 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"Start Shift" not in page.data
     assert b"End Shift" not in page.data
 
+
+
+def test_mobile_dashboard_shows_truck_maintenance_history_from_previous_posttrips(client, app):
+    from datetime import date, datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PostTrip, PreTrip
+
+        current_driver = create_user(
+            "driver1",
+            "driver1@example.com",
+            "driver",
+            first_name="Current",
+            last_name="Driver",
+        )
+        prior_driver = create_user(
+            "driver2",
+            "driver2@example.com",
+            "driver",
+            first_name="Prior",
+            last_name="Driver",
+        )
+        other_driver = create_user("driver3", "driver3@example.com", "driver")
+        today = date.today()
+        prior_date = today - timedelta(days=1)
+
+        current_pretrip = PreTrip(
+            user_id=current_driver.id,
+            truck_number="ST4",
+            pretrip_date=today,
+            start_mileage=13000,
+        )
+        prior_pretrip = PreTrip(
+            user_id=prior_driver.id,
+            truck_number="ST4",
+            pretrip_date=prior_date,
+            start_mileage=12000,
+        )
+        other_pretrip = PreTrip(
+            user_id=other_driver.id,
+            truck_number="ST5",
+            pretrip_date=prior_date,
+            start_mileage=8000,
+        )
+        db.session.add_all([current_pretrip, prior_pretrip, other_pretrip])
+        db.session.flush()
+        db.session.add_all(
+            [
+                PostTrip(
+                    pretrip_id=prior_pretrip.id,
+                    end_mileage=12160,
+                    miles_driven=160,
+                    remarks="Regen completed and cleared.",
+                    created_at=datetime(2026, 5, 17, 21, 30, 0),
+                ),
+                PostTrip(
+                    pretrip_id=other_pretrip.id,
+                    end_mileage=8088,
+                    miles_driven=88,
+                    remarks="Other truck issue should not show.",
+                    created_at=datetime(2026, 5, 17, 20, 30, 0),
+                ),
+                DriverLog(
+                    driver_id=prior_driver.id,
+                    date=prior_date,
+                    plant_name="RW",
+                    load_size="Empty",
+                    arrive_time=f"{prior_date.isoformat()} 16:30:00",
+                    fuel=True,
+                    fuel_mileage=12050,
+                ),
+                DriverLog(
+                    driver_id=prior_driver.id,
+                    date=prior_date,
+                    plant_name="DC",
+                    load_size="Empty",
+                    arrive_time=f"{prior_date.isoformat()} 17:00:00",
+                    maintenance=True,
+                    downtime_reason="Truck issue: Truck regen: forced regen completed",
+                    fuel_mileage=12080,
+                ),
+                DriverLog(
+                    driver_id=other_driver.id,
+                    date=prior_date,
+                    plant_name="RE",
+                    load_size="Empty",
+                    arrive_time=f"{prior_date.isoformat()} 18:00:00",
+                    maintenance=True,
+                    downtime_reason="Truck issue: Leak: other truck",
+                    fuel_mileage=8010,
+                ),
+            ]
+        )
+        db.session.commit()
+
+    login(client, "driver1")
+
+    dashboard = client.get("/mobile")
+    assert dashboard.status_code == 200
+    assert b"Truck Maintenance History" in dashboard.data
+    assert b"Truck ST4" in dashboard.data
+    assert b"Prior Driver" in dashboard.data
+    assert b"Truck regen: forced regen completed" in dashboard.data
+    assert b"12,080 mi" in dashboard.data
+    assert b"12,050 mi" in dashboard.data
+    assert b"Closed on PostTrip" in dashboard.data
+    assert b'target="_blank"' in dashboard.data
+    assert b"Other truck issue should not show" not in dashboard.data
+
+    detail = client.get("/truck-maintenance-history?truck_number=ST4")
+    assert detail.status_code == 200
+    assert b"Issues Opened / Closed" in detail.data
+    assert b"Regen" in detail.data
+    assert b"Fuel Stops" in detail.data
+    assert b"Regen completed and cleared." in detail.data
+    assert b"Other truck issue should not show" not in detail.data
 
 
 def test_knowledge_base_uses_shared_app_shell(client, app):

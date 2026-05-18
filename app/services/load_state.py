@@ -7,7 +7,9 @@ LOAD_SUFFIX = " Load"
 HOT_PART_SUFFIX = " Hot Part"
 LEGACY_SIZE_LOADS = {"quarter", "half", "partial", "full", "loaded"}
 UNLOAD_NOT_COMPLETED_PREFIX = "Unload not completed:"
-SECONDARY_NOT_DROPPED_PREFIX = "Hot part not dropped:"
+SECONDARY_NOT_DROPPED_PREFIX = "Second-stop cargo not dropped:"
+LEGACY_SECONDARY_NOT_DROPPED_PREFIX = "Hot part not dropped:"
+SECONDARY_NOT_DROPPED_PREFIXES = (SECONDARY_NOT_DROPPED_PREFIX, LEGACY_SECONDARY_NOT_DROPPED_PREFIX)
 TRUCK_ISSUE_PREFIX = "Truck issue:"
 DETROIT_TZ = pytz.timezone("America/Detroit")
 UTC_TZ = pytz.utc
@@ -62,6 +64,14 @@ def hot_part_load_value(plant_code):
     return f"{plant_label(plant)}{HOT_PART_SUFFIX}" if plant else ""
 
 
+def secondary_load_value(plant_code, load_type="load"):
+    return hot_part_load_value(plant_code) if _norm(load_type) == "hot" else destination_load_value(plant_code)
+
+
+def load_type_from_load(value):
+    return "hot" if _norm(value).endswith(_norm(HOT_PART_SUFFIX)) else "load"
+
+
 def destination_from_load(value):
     text = _clean(value)
     if is_empty_load(text):
@@ -113,11 +123,15 @@ def unload_not_completed_reason(log):
 
 
 def secondary_not_dropped(log):
-    return bool(_prefixed_reason(log, SECONDARY_NOT_DROPPED_PREFIX))
+    return bool(secondary_not_dropped_reason(log))
 
 
 def secondary_not_dropped_reason(log):
-    return _prefixed_reason(log, SECONDARY_NOT_DROPPED_PREFIX)
+    for prefix in SECONDARY_NOT_DROPPED_PREFIXES:
+        reason = _prefixed_reason(log, prefix)
+        if reason:
+            return reason
+    return ""
 
 
 def truck_issue_reason(log):
@@ -127,7 +141,7 @@ def truck_issue_reason(log):
 def route_problem_reason(log):
     reason_parts = []
     for part in _reason_parts(log):
-        if part.startswith((UNLOAD_NOT_COMPLETED_PREFIX, SECONDARY_NOT_DROPPED_PREFIX, TRUCK_ISSUE_PREFIX)):
+        if part.startswith((UNLOAD_NOT_COMPLETED_PREFIX, TRUCK_ISSUE_PREFIX) + SECONDARY_NOT_DROPPED_PREFIXES):
             continue
         reason_parts.append(part)
     return "; ".join(reason_parts)
@@ -166,9 +180,9 @@ def _depart_local_datetime(log):
     return DETROIT_TZ.localize(datetime.combine(log.date, parsed_time))
 
 
-def _state(primary_destination=None, secondary_destination=None):
+def _state(primary_destination=None, secondary_destination=None, secondary_value=None):
     primary_value = destination_load_value(primary_destination) if primary_destination else "Empty"
-    secondary_value = hot_part_load_value(secondary_destination) if secondary_destination else ""
+    secondary_value = load_display(secondary_value) if secondary_value else (hot_part_load_value(secondary_destination) if secondary_destination else "")
     return {
         "value": primary_value,
         "destination": primary_destination,
@@ -183,6 +197,7 @@ def _state(primary_destination=None, secondary_destination=None):
 def current_load_after_logs(logs):
     current_primary_destination = None
     current_secondary_destination = None
+    current_secondary_value = ""
 
     for log in sorted(logs, key=_driver_log_sort_key):
         arrival_destination = destination_from_load(log.load_size)
@@ -196,11 +211,14 @@ def current_load_after_logs(logs):
             current_primary_destination = None
         if current_secondary_destination and current_secondary_destination == plant and not secondary_not_dropped(log):
             current_secondary_destination = None
+            current_secondary_value = ""
 
         if not log.depart_time:
-            open_secondary_destination = destination_from_load(getattr(log, "secondary_load", None))
+            open_secondary_raw = getattr(log, "secondary_load", None)
+            open_secondary_destination = destination_from_load(open_secondary_raw)
             if open_secondary_destination:
                 current_secondary_destination = open_secondary_destination
+                current_secondary_value = load_display(open_secondary_raw)
             continue
 
         if log.depart_load_size is not None:
@@ -210,13 +228,16 @@ def current_load_after_logs(logs):
             elif depart_destination:
                 current_primary_destination = depart_destination
 
-        depart_secondary_destination = destination_from_load(getattr(log, "secondary_load", None))
+        depart_secondary_raw = getattr(log, "secondary_load", None)
+        depart_secondary_destination = destination_from_load(depart_secondary_raw)
         if depart_secondary_destination:
             current_secondary_destination = depart_secondary_destination
+            current_secondary_value = load_display(depart_secondary_raw)
         elif current_secondary_destination and current_secondary_destination == plant and not secondary_not_dropped(log):
             current_secondary_destination = None
+            current_secondary_value = ""
 
-    return _state(current_primary_destination, current_secondary_destination)
+    return _state(current_primary_destination, current_secondary_destination, current_secondary_value)
 
 
 def build_driver_log_route_context(logs):
@@ -349,6 +370,8 @@ def build_driver_log_route_context(logs):
                 "depart_secondary_desc": depart_secondary,
                 "depart_cargo_desc": depart_cargo,
                 "depart_load": load_display(depart_size) if depart_size is not None else None,
+                "depart_plan": f"Departed with {depart_cargo}" if depart_cargo is not None else None,
+                "next_stop": plant_label(next_plant) if next_plant else None,
                 "action": action,
                 "state": "No pickup" if log.no_pickup else ("Completed" if completed else "Open"),
                 "class": "complete" if completed else "open",

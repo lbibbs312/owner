@@ -161,6 +161,24 @@
     .ryder-entry strong { display: block; font-size: .85rem; }
     .ryder-entry span { display:block; color: var(--muted); font-size:.74rem; line-height:1.3; margin-top:3px; }
 
+    .maintenance-card { padding: 16px; display: grid; gap: 14px; }
+    .maintenance-compact { display: grid; gap: 12px; }
+    .maintenance-wide { display: none; gap: 12px; }
+    .maintenance-title { margin: 0 0 4px; font-weight: 900; font-size: .98rem; }
+    .maintenance-meta, .maintenance-note { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.35; overflow-wrap: anywhere; }
+    .maintenance-note strong { color: var(--text); }
+    .maintenance-alert { margin: 6px 0 0; color: #fde68a; font-size: .8rem; line-height: 1.35; overflow-wrap: anywhere; }
+    .maintenance-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .maintenance-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: .76rem; }
+    .maintenance-table th, .maintenance-table td { padding: 9px 8px; border-bottom: 1px solid rgba(148,163,184,.14); vertical-align: top; text-align: left; }
+    .maintenance-table th { color: var(--muted); font-size: .66rem; text-transform: uppercase; font-weight: 900; }
+    .maintenance-table td strong, .maintenance-list strong { display: block; font-size: .78rem; }
+    .maintenance-table td span, .maintenance-list span { display: block; color: var(--muted); line-height: 1.35; margin-top: 3px; }
+    .maintenance-list { display: grid; gap: 4px; }
+    .maintenance-chip { display: inline-flex; width: max-content; align-items: center; border-radius: 999px; padding: 3px 7px; font-size: .64rem; font-weight: 900; text-transform: uppercase; background: rgba(16,185,129,.14); color: #a7f3d0; border: 1px solid rgba(16,185,129,.26); }
+    .maintenance-chip.warn { background: rgba(245,158,11,.16); color: #fde68a; border-color: rgba(245,158,11,.28); }
+    .maintenance-empty { padding: 3px 0; color: var(--muted); font-size: .8rem; }
+
     .section-head { display: flex; justify-content: space-between; align-items: end; padding: 0 4px; }
     .section-head h2 { margin: 0; font-size: 1.02rem; }
     .section-head span, .muted { color: var(--muted); font-size: 0.78rem; }
@@ -242,6 +260,8 @@
       .quick-card { min-height: 86px; padding: 12px 14px; }
       .wide-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
       .ryder-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr) minmax(170px, .7fr); }
+      .maintenance-compact { display: none; }
+      .maintenance-wide { display: grid; }
       .route-panel {
         position: sticky;
         top: 18px;
@@ -528,6 +548,95 @@
         </div>
       </section>
       {% endif %}
+
+      {% set truck_history_url = url_for('driver.truck_maintenance_history', truck_number=current_truck_number) if current_truck_number else url_for('driver.truck_maintenance_history') %}
+      <section class="list">
+        <div class="section-head">
+          <h2>Truck Maintenance History</h2>
+          <span>{{ current_truck_number or 'No truck set' }}</span>
+        </div>
+        <div class="card maintenance-card">
+          {% if current_truck_number %}
+            <div class="maintenance-compact">
+              {% if truck_maintenance_history %}
+                {% set latest = truck_maintenance_history[0] %}
+                <div>
+                  <p class="maintenance-title">Truck {{ current_truck_number }}</p>
+                  <p class="maintenance-meta">Last PostTrip {{ latest.closed_at|to_detroit_datetime if latest.closed_at else latest.date }}{% if latest.end_mileage is not none %} - {{ "{:,}".format(latest.end_mileage) }} mi{% endif %}</p>
+                  {% if latest.regen_events %}
+                    <p class="maintenance-alert">Regen {{ latest.regen_events[0].opened_label }}: {{ latest.regen_events[0].label }}{% if latest.regen_events[0].mileage is not none %} at {{ "{:,}".format(latest.regen_events[0].mileage) }} mi{% endif %}</p>
+                  {% elif latest.issues %}
+                    <p class="maintenance-alert">Issue {{ latest.issues[0].opened_label }}: {{ latest.issues[0].label }}{% if latest.issues[0].mileage is not none %} at {{ "{:,}".format(latest.issues[0].mileage) }} mi{% endif %}</p>
+                  {% else %}
+                    <p class="maintenance-note">No truck issues marked on the last completed PostTrip.</p>
+                  {% endif %}
+                </div>
+              {% else %}
+                <div>
+                  <p class="maintenance-title">Truck {{ current_truck_number }}</p>
+                  <p class="maintenance-note">No previous completed PostTrips found for this truck.</p>
+                </div>
+              {% endif %}
+              <div class="maintenance-actions">
+                <a class="button ghost" href="{{ truck_history_url }}" target="_blank" rel="noopener">Open History</a>
+              </div>
+            </div>
+
+            <div class="maintenance-wide">
+              {% if truck_maintenance_history %}
+                <table class="maintenance-table" aria-label="Truck maintenance history for {{ current_truck_number }}">
+                  <thead>
+                    <tr>
+                      <th>PostTrip</th>
+                      <th>Driver</th>
+                      <th>Mileage</th>
+                      <th>Fuel</th>
+                      <th>Issues</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for item in truck_maintenance_history %}
+                      {% if loop.index <= 5 %}
+                        <tr>
+                          <td><strong>{{ item.closed_at|to_detroit_datetime if item.closed_at else item.date }}</strong><span>{{ item.date.strftime('%b %d, %Y') if item.date else 'Date not set' }}</span></td>
+                          <td><strong>{{ item.driver_name }}</strong><span>Truck {{ item.pretrip.truck_number or current_truck_number }}</span></td>
+                          <td><strong>{% if item.end_mileage is not none %}{{ "{:,}".format(item.end_mileage) }} mi{% else %}--{% endif %}</strong><span>{% if item.miles_driven is not none %}{{ "{:,}".format(item.miles_driven) }} driven{% elif item.start_mileage is not none %}Start {{ "{:,}".format(item.start_mileage) }}{% else %}Miles not calculated{% endif %}</span></td>
+                          <td>
+                            <div class="maintenance-list">
+                              {% for fuel in item.fuel_logs[:2] %}
+                                <span><strong>{{ "{:,}".format(fuel.mileage) }} mi</strong>{{ fuel.time_label }} at {{ fuel.plant }}</span>
+                              {% else %}
+                                <span>No fuel logged</span>
+                              {% endfor %}
+                            </div>
+                          </td>
+                          <td>
+                            <div class="maintenance-list">
+                              {% if item.regen_events %}<span class="maintenance-chip warn">Regen</span>{% endif %}
+                              {% for issue in item.issues[:2] %}
+                                <span><strong>{{ issue.opened_label }} at {{ issue.plant }}</strong>{{ issue.label }}{% if issue.mileage is not none %} - {{ "{:,}".format(issue.mileage) }} mi{% endif %}</span>
+                              {% else %}
+                                <span>No issues logged</span>
+                              {% endfor %}
+                            </div>
+                          </td>
+                          <td><span class="maintenance-chip">{{ item.status_label }}</span>{% if item.remarks %}<span>{{ item.remarks }}</span>{% endif %}</td>
+                        </tr>
+                      {% endif %}
+                    {% endfor %}
+                  </tbody>
+                </table>
+                <a class="button ghost" href="{{ truck_history_url }}">Full History</a>
+              {% else %}
+                <p class="maintenance-empty">No previous completed PostTrips found for truck {{ current_truck_number }}.</p>
+              {% endif %}
+            </div>
+          {% else %}
+            <p class="maintenance-empty">Start a PreTrip with a truck number to load maintenance history.</p>
+          {% endif %}
+        </div>
+      </section>
 
       <section class="list">
         <div class="section-head">

@@ -92,7 +92,7 @@
             <div>
               {% set route = report.route %}
               <p class="title">{{ route.plant if route else log.plant_name }}</p>
-              <p class="meta">Arrive {{ log.arrive_time|to_local_time if log.arrive_time else '--' }} - Depart {{ log.depart_time|to_12h_format if log.depart_time else '--' }} - In {{ route.arrive_desc if route else log.load_size }} - Out {% if route and route.depart_desc is none %}--{% elif route %}{{ route.depart_desc }}{% else %}{{ log.depart_load_size or '--' }}{% endif %}{% if log.no_pickup %} - No Pickup{% endif %}{% if log.part_number %} - {{ log.part_number }}{% endif %}</p>
+              <p class="meta">Arrive {{ log.arrive_time|to_local_time if log.arrive_time else '--' }} - Depart {{ log.depart_time|to_12h_format if log.depart_time else '--' }} - In {{ route.arrive_cargo_desc if route else log.load_size }} - Out {% if route and route.depart_desc is none %}--{% elif route %}{{ route.depart_cargo_desc }}{% else %}{{ log.depart_load_size or '--' }}{% endif %}{% if route and route.next_stop %} - First stop {{ route.next_stop }}{% endif %}{% if log.no_pickup %} - No Pickup{% endif %}{% if log.part_number %} - {{ log.part_number }}{% endif %}</p>
               {% for event in (route_task_events or {}).get(log.id, []) %}
                 <p class="meta">{{ event.kind_label }} {{ event.label }} - {{ event.status }}{% if event.accepted_at %} - Accepted {{ event.accepted_at|to_detroit_datetime }}{% endif %}{% if event.completed_at %} - Unloaded {{ event.completed_at|to_detroit_datetime }}{% endif %}</p>
               {% endfor %}

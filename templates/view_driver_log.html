@@ -163,13 +163,13 @@
               {% if r %}
                 <div class="rlt-route">{{ r.plant }}</div>
                 <div class="rlt-load">
-                  In: <span class="rlt-load-val">{{ r.arrive_desc }}</span>
+                  In: <span class="rlt-load-val">{{ r.arrive_cargo_desc }}</span>
                 </div>
                 <div class="rlt-load">
                   Out: <span class="rlt-load-val">
                     {% if r.depart_desc is none %}—
                     {% elif dl.no_pickup %}No Pickup
-                    {% else %}{{ r.depart_desc }}{% endif %}
+                    {% else %}{{ r.depart_cargo_desc }}{% endif %}
                   </span>
                 </div>
               {% else %}
@@ -239,11 +239,11 @@
     <p><strong>Stop:</strong> {{ log_route.plant }}
       <span class="text-muted">&nbsp;·&nbsp;{{ log_route.action }} &nbsp;·&nbsp; {{ log_route.state }}</span>
     </p>
-    <p><strong>Arriving with:</strong> {{ log_route.arrive_desc }}</p>
+    <p><strong>Arriving with:</strong> {{ log_route.arrive_cargo_desc }}</p>
     <p><strong>Departing with:</strong>
       {% if log_route.depart_desc is none %}<span class="badge bg-secondary">Open stop</span>
       {% elif log.no_pickup %}No Pickup
-      {% else %}{{ log_route.depart_desc }}{% endif %}
+      {% else %}{{ log_route.depart_cargo_desc }}{% endif %}
     </p>
   {% endif %}
   {% if current_user.role == 'management' %}
@@ -257,7 +257,7 @@
     </p>
     <p class="text-muted small stop-help"><strong>How to read it:</strong> This describes this one stop only. A departed stop has both arrival and departure saved; an open stop still needs the driver to record departure/load.</p>
   {% endif %}
-  <p><strong>Maintenance:</strong> {{ "Yes" if log.maintenance else "No" }}</p>
+  <p><strong>Maintenance:</strong> {{ "Yes" if log.maintenance else "No" }}{% if log.maintenance and log.fuel_mileage %} - Odometer {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</p>
   <p><strong>Fuel:</strong> {{ "Yes" if log.fuel else "No" }}</p>
   <p><strong>Meeting:</strong> {{ "Yes" if log.meeting else "No" }}</p>
 

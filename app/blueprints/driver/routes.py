@@ -11,7 +11,7 @@ import os
 import pytz
 from flask import current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func, or_
 from werkzeug.utils import secure_filename
 
 from app.blueprints.driver import bp
@@ -30,6 +30,7 @@ from app.services.simple_pdf import LANDSCAPE_LETTER, LETTER, SimplePdf
 from app.services.load_state import (
     MIN_PLANT_TRANSFER_MINUTES,
     SECONDARY_NOT_DROPPED_PREFIX,
+    SECONDARY_NOT_DROPPED_PREFIXES,
     TRUCK_ISSUE_PREFIX,
     UNLOAD_NOT_COMPLETED_PREFIX,
     build_driver_log_route_context,
@@ -37,10 +38,11 @@ from app.services.load_state import (
     current_load_after_logs,
     destination_from_load,
     destination_load_value,
-    hot_part_load_value,
     is_load_for_plant,
     load_display,
+    load_type_from_load,
     route_problem_reason,
+    secondary_load_value,
     truck_issue_reason,
 )
 from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
@@ -79,6 +81,7 @@ DRIVER_ONLY_ENDPOINTS = {
     "mobile_ryder_service",
     "mobile_history",
     "mobile_day_report",
+    "truck_maintenance_history",
     "list_pretrips",
     "new_pretrip",
     "do_posttrip",
@@ -385,6 +388,10 @@ def _apply_log_part_fields(log, form):
     log.part_number = _form_hot_part_number(form)
 
 
+def _form_mileage_value(form):
+    return form.fuel_mileage.data if (form.fuel.data or form.maintenance.data) else None
+
+
 def _local_dt_for_hhmm(log_date, hhmm):
     if not log_date or not hhmm:
         return None
@@ -662,7 +669,7 @@ def _compose_downtime_reason(reason_parts, truck_issue, maintenance=False):
 
 
 def _preserved_non_truck_reasons(log):
-    prefixes = (UNLOAD_NOT_COMPLETED_PREFIX, SECONDARY_NOT_DROPPED_PREFIX)
+    prefixes = (UNLOAD_NOT_COMPLETED_PREFIX,) + SECONDARY_NOT_DROPPED_PREFIXES
     return [part for part in _reason_parts_from_text(log.downtime_reason) if part.startswith(prefixes)]
 
 def _save_damage_photo(report, uploaded_file):
@@ -923,6 +930,115 @@ def _mobile_report_days(limit=14):
     return reports
 
 
+def _normalize_truck_number(value):
+    return (value or "").strip()
+
+
+def _same_truck_number(left, right):
+    left_normalized = _normalize_truck_number(left).lower()
+    right_normalized = _normalize_truck_number(right).lower()
+    return bool(left_normalized and left_normalized == right_normalized)
+
+
+def _truck_history_time_label(log):
+    if not getattr(log, "arrive_time", None):
+        return "time not set"
+    return _format_display_time(_arrival_utc_to_local_hhmm(log.arrive_time)) or "time not set"
+
+
+def _truck_history_fuel_entries(logs):
+    entries = []
+    for log in logs:
+        if not log.fuel or log.fuel_mileage is None:
+            continue
+        entries.append(
+            {
+                "log": log,
+                "mileage": log.fuel_mileage,
+                "plant": _plant_label(log.plant_name),
+                "time_label": _truck_history_time_label(log),
+            }
+        )
+    return entries
+
+
+def _truck_history_issue_entries(logs):
+    entries = []
+    for log in logs:
+        issue = truck_issue_reason(log)
+        if not issue and log.maintenance:
+            issue = "Truck issue reported"
+        issue = (issue or "").strip()
+        if not issue:
+            continue
+        issue_code, _ = _split_truck_issue_text(issue)
+        lowered_issue = issue.lower()
+        entries.append(
+            {
+                "log": log,
+                "label": issue,
+                "is_regen": issue_code == "regen" or "regen" in lowered_issue,
+                "mileage": log.fuel_mileage,
+                "plant": _plant_label(log.plant_name),
+                "opened_label": _truck_history_time_label(log),
+            }
+        )
+    return entries
+
+
+def _truck_maintenance_history(truck_number, *, current_pretrip_id=None, limit=8):
+    truck_number = _normalize_truck_number(truck_number)
+    if not truck_number:
+        return []
+
+    query = (
+        _active_pretrips_query()
+        .join(PostTrip, PostTrip.pretrip_id == PreTrip.id)
+        .filter(func.lower(func.trim(PreTrip.truck_number)) == truck_number.lower())
+    )
+    if current_pretrip_id:
+        query = query.filter(PreTrip.id != current_pretrip_id)
+
+    pretrips = (
+        query.order_by(PostTrip.created_at.desc(), PreTrip.pretrip_date.desc(), PreTrip.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+    history = []
+    for pretrip in pretrips:
+        logs = sorted(
+            _active_driver_logs_query()
+            .filter_by(driver_id=pretrip.user_id, date=pretrip.pretrip_date)
+            .all(),
+            key=_driver_log_sort_key,
+        )
+        posttrip = pretrip.posttrip
+        fuel_logs = _truck_history_fuel_entries(logs)
+        issues = _truck_history_issue_entries(logs)
+        history.append(
+            {
+                "pretrip": pretrip,
+                "posttrip": posttrip,
+                "driver": pretrip.driver,
+                "driver_name": pretrip.driver.display_name if pretrip.driver else "Unknown driver",
+                "date": pretrip.pretrip_date,
+                "closed_at": posttrip.created_at if posttrip else None,
+                "start_mileage": pretrip.start_mileage,
+                "end_mileage": posttrip.end_mileage if posttrip else None,
+                "miles_driven": posttrip.miles_driven if posttrip else None,
+                "remarks": (posttrip.remarks or "").strip() if posttrip else "",
+                "fuel_logs": fuel_logs,
+                "fuel_count": len(fuel_logs),
+                "issues": issues,
+                "issue_count": len(issues),
+                "regen_events": [issue for issue in issues if issue["is_regen"]],
+                "status_label": "Closed on PostTrip" if posttrip else "Open",
+            }
+        )
+    return history
+
+
 def _parse_report_date(report_date):
     try:
         return datetime.strptime(report_date, "%Y-%m-%d").date()
@@ -1065,14 +1181,17 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
     rows = []
     for log in logs:
         route = routes.get(log.id, {})
+        status = route.get("action") or ("Open" if not log.depart_time else "Complete")
+        if route.get("next_stop"):
+            status = f"{status}; first stop {route.get('next_stop')}"
         rows.append([
             route.get("plant") or log.plant_name,
             _arrival_utc_to_local_hhmm(log.arrive_time) or "--",
             _format_hhmm_12h(log.depart_time) or "--",
-            route.get("arrive_desc") or load_display(log.load_size),
-            route.get("depart_desc") or "--",
+            route.get("arrive_cargo_desc") or route.get("arrive_desc") or load_display(log.load_size),
+            route.get("depart_cargo_desc") if route.get("depart_cargo_desc") is not None else "--",
             ("No Pickup " if log.no_pickup else "") + (("HOT " if log.hot_parts else "") + (log.part_number or "")).strip(),
-            route.get("action") or ("Open" if not log.depart_time else "Complete"),
+            status,
         ])
     pdf.table(36, 710, [70, 58, 58, 110, 110, 105, 65], 24, ["Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Parts", "Status"], rows or [["No logs", "", "", "", "", "", ""]], font_size=7)
     _draw_signature_pdf_block(pdf, driver_signature, signature_timestamp)
@@ -1086,12 +1205,15 @@ def _build_eod_pdf(the_date, logs, plant_transfers, driver_signature=None, signa
     log_rows = []
     for log in logs:
         route = routes.get(log.id, {})
+        cargo_out = route.get("depart_cargo_desc") if route.get("depart_cargo_desc") is not None else "--"
+        if route.get("next_stop"):
+            cargo_out = f"{cargo_out}; first stop {route.get('next_stop')}"
         log_rows.append([
             route.get("plant") or log.plant_name,
             _arrival_utc_to_local_hhmm(log.arrive_time) or "--",
             _format_hhmm_12h(log.depart_time) or "--",
-            route.get("arrive_desc") or load_display(log.load_size),
-            route.get("depart_desc") or "--",
+            route.get("arrive_cargo_desc") or route.get("arrive_desc") or load_display(log.load_size),
+            cargo_out,
             ("No Pickup " if log.no_pickup else "") + (("HOT " if log.hot_parts else "") + (log.part_number or "")).strip(),
         ])
     y = pdf.table(36, 710, [70, 58, 58, 120, 120, 150], 24, ["Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Parts"], log_rows or [["No logs", "", "", "", "", ""]], font_size=7)
@@ -1865,14 +1987,14 @@ def new_driving_log():
         if arrival_secondary_load and is_load_for_plant(arrival_secondary_load, form.plant_name.data):
             dropped = form.secondary_dropped_on_arrival.data
             if dropped not in {"yes", "no"}:
-                flash("Please answer whether you dropped off the hot part.", "danger")
+                flash("Please answer whether you dropped off the second-stop cargo.", "danger")
                 return _render_new_driving_log(form, current_load)
             if dropped == "yes":
                 arrival_secondary_load = None
             else:
                 reason = (form.secondary_unload_reason.data or "").strip()
                 if not reason:
-                    flash("Please enter why the hot part was not dropped off.", "danger")
+                    flash("Please enter why the second-stop cargo was not dropped off.", "danger")
                     return _render_new_driving_log(form, current_load)
                 reason_parts.append(f"{SECONDARY_NOT_DROPPED_PREFIX} {reason}")
 
@@ -1891,7 +2013,7 @@ def new_driving_log():
             arrive_time=arrive_time_str,
             maintenance=form.maintenance.data,
             fuel=form.fuel.data,
-            fuel_mileage=form.fuel_mileage.data if form.fuel.data else None,
+            fuel_mileage=_form_mileage_value(form),
             meeting=form.meeting.data,
             date=local_date,
         )
@@ -1977,7 +2099,7 @@ def add_stop():
             arrive_time=arrive_time_str,
             maintenance=form.maintenance.data,
             fuel=form.fuel.data,
-            fuel_mileage=form.fuel_mileage.data if form.fuel.data else None,
+            fuel_mileage=_form_mileage_value(form),
             meeting=form.meeting.data,
             date=log_date,
         )
@@ -2022,6 +2144,7 @@ def edit_driver_log(log_id):
         form.truck_issue.data = issue_code
         form.truck_issue_notes.data = issue_notes
         form.secondary_departure_dest.data = destination_from_load(log.secondary_load) or ""
+        form.secondary_departure_type.data = load_type_from_load(log.secondary_load)
     if form.validate_on_submit():
         if not form.plant_name.data or not form.load_size.data:
             flash("Please select a valid Plant Name and Load Size.", "danger")
@@ -2054,10 +2177,10 @@ def edit_driver_log(log_id):
         log.maintenance = form.maintenance.data
         log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), _form_truck_issue_text(form), form.maintenance.data)
         log.fuel = form.fuel.data
-        log.fuel_mileage = form.fuel_mileage.data if form.fuel.data else None
+        log.fuel_mileage = _form_mileage_value(form)
         log.meeting = form.meeting.data
         sec_dest = form.secondary_departure_dest.data
-        log.secondary_load = destination_load_value(sec_dest) if sec_dest else None
+        log.secondary_load = secondary_load_value(sec_dest, form.secondary_departure_type.data) if sec_dest else None
 
         if arrive_time:
             log.arrive_time = _local_hhmm_to_arrival_utc(arrive_time, log.date)
@@ -2175,7 +2298,7 @@ def depart_driver_log(log_id):
 
         secondary_load = route.get("after_arrival_secondary") or None
         if form.secondary_destination.data:
-            secondary_load = hot_part_load_value(form.secondary_destination.data)
+            secondary_load = secondary_load_value(form.secondary_destination.data, form.secondary_load_type.data)
 
         local_tz = pytz.timezone("America/Detroit")
         now_local = datetime.now(local_tz)
@@ -2278,7 +2401,7 @@ def pickup_driver_log(log_id):
         log.maintenance = form.maintenance.data
         log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), _form_truck_issue_text(form), form.maintenance.data)
         log.fuel = form.fuel.data
-        log.fuel_mileage = form.fuel_mileage.data if form.fuel.data else None
+        log.fuel_mileage = _form_mileage_value(form)
         log.meeting = form.meeting.data
         db.session.commit()
         record_activity(
@@ -2340,7 +2463,7 @@ def driver_logs_print():
         if route.get("unload_blocked"):
             exception_notes.append(f"Unload issue at {plant_name}: {route.get('unload_reason')}")
         elif route.get("secondary_drop_blocked"):
-            exception_notes.append(f"Hot part issue at {plant_name}: {route.get('secondary_drop_reason')}")
+            exception_notes.append(f"Second-stop cargo issue at {plant_name}: {route.get('secondary_drop_reason')}")
         elif route_problem:
             exception_notes.append(f"Route issue at {plant_name}: {route_problem}")
     route_finalized = ActivityEvent.query.filter_by(
@@ -2747,6 +2870,44 @@ def mobile_history():
     return render_template("mobile_history.html", reports=_mobile_report_days(30))
 
 
+@bp.route("/truck-maintenance-history")
+@login_required
+def truck_maintenance_history():
+    if current_user.role == "management":
+        return redirect(url_for("manager.manager_dashboard"))
+
+    today_local_date = _today_local_date()
+    todays_pretrip = (
+        _active_pretrips_query().filter_by(user_id=current_user.id, pretrip_date=today_local_date)
+        .order_by(PreTrip.created_at.desc())
+        .first()
+    )
+    latest_pretrip = (
+        _active_pretrips_query().filter_by(user_id=current_user.id)
+        .order_by(PreTrip.created_at.desc())
+        .first()
+    )
+    truck_number = _normalize_truck_number(request.args.get("truck_number"))
+    if not truck_number:
+        source_pretrip = todays_pretrip or latest_pretrip
+        truck_number = _normalize_truck_number(source_pretrip.truck_number if source_pretrip else "")
+
+    current_pretrip_id = None
+    if todays_pretrip and _same_truck_number(todays_pretrip.truck_number, truck_number):
+        current_pretrip_id = todays_pretrip.id
+
+    return render_template(
+        "truck_maintenance_history.html",
+        truck_number=truck_number,
+        history=_truck_maintenance_history(
+            truck_number,
+            current_pretrip_id=current_pretrip_id,
+            limit=25,
+        ),
+        todays_pretrip=todays_pretrip,
+    )
+
+
 @bp.route("/mobile/history/<report_date>")
 @login_required
 def mobile_day_report(report_date):
@@ -2850,6 +3011,14 @@ def mobile_dashboard():
     todays_log_routes = _driver_log_route_context(todays_logs)
     route_task_events = _task_route_events_for_logs(todays_logs, _driver_route_tasks(current_user.id, today_local_date))
     current_stop = next((l for l in reversed(todays_logs) if not l.depart_time), None) or (todays_logs[-1] if todays_logs else None)
+    current_truck_number = _normalize_truck_number(
+        todays_pretrip.truck_number if todays_pretrip else (latest_pretrip.truck_number if latest_pretrip else "")
+    )
+    truck_maintenance_history = _truck_maintenance_history(
+        current_truck_number,
+        current_pretrip_id=todays_pretrip.id if todays_pretrip else None,
+        limit=6,
+    )
     ryder_context = _ryder_followup_context(current_user.id)
 
     return render_template(
@@ -2870,6 +3039,8 @@ def mobile_dashboard():
         todays_log_routes=todays_log_routes,
         route_task_events=route_task_events,
         current_stop=current_stop,
+        current_truck_number=current_truck_number,
+        truck_maintenance_history=truck_maintenance_history,
         truck_issue_choices=TRUCK_ISSUE_CHOICES,
         **ryder_context,
     )

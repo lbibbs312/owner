@@ -68,8 +68,11 @@
             <td>{{ route.plant if route else log.plant_name }}</td>
             <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
             <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
-            <td>{{ route.arrive_desc if route else log.load_size }}</td>
-            <td>{% if route and route.depart_desc is none %}--{% elif route %}{{ route.depart_desc }}{% else %}{{ log.depart_load_size or '--' }}{% endif %}</td>
+            <td>{{ route.arrive_cargo_desc if route else log.load_size }}</td>
+            <td>
+              {% if route and route.depart_desc is none %}--{% elif route %}{{ route.depart_cargo_desc }}{% else %}{{ log.depart_load_size or '--' }}{% endif %}
+              {% if route and route.next_stop %}<br><small class="text-muted">First stop after departure: {{ route.next_stop }}</small>{% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>

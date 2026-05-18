@@ -25,6 +25,11 @@ LOAD_SIZE_CHOICES = [
 
 YES_NO_CHOICES = [("", "Select..."), ("yes", "Yes"), ("no", "No")]
 
+SECONDARY_LOAD_TYPE_CHOICES = [
+    ("load", "Regular load"),
+    ("hot", "Hot part"),
+]
+
 TRUCK_ISSUE_CHOICES = [
     ("", "Select issue..."),
     ("cel", "CEL light"),
@@ -58,6 +63,13 @@ class DriverLogForm(FlaskForm):
         choices=[("", "None / not applicable")] + [(code, label) for code, label in PLANT_LABELS.items()],
         validators=[Optional()],
     )
+    secondary_departure_type = SelectField(
+        "Second stop load type",
+        choices=SECONDARY_LOAD_TYPE_CHOICES,
+        default="load",
+        validators=[Optional()],
+        validate_choice=False,
+    )
     unloaded_on_arrival = SelectField(
         "Did you unload?",
         choices=YES_NO_CHOICES,
@@ -65,13 +77,13 @@ class DriverLogForm(FlaskForm):
     )
     unload_reason = TextAreaField("Why?", validators=[Optional()])
     secondary_dropped_on_arrival = SelectField(
-        "Did you drop off the hot part?",
+        "Did you drop off the second-stop cargo?",
         choices=YES_NO_CHOICES,
         validators=[Optional()],
     )
     secondary_unload_reason = TextAreaField("Why?", validators=[Optional()])
-    secondary_load = StringField("Secondary / Hot Part Load", validators=[Optional()])
-    fuel_mileage = IntegerField("Mileage at Fuel Stop", validators=[Optional()])
+    secondary_load = StringField("Second Stop Cargo", validators=[Optional()])
+    fuel_mileage = IntegerField("Odometer at Fuel / Truck Issue", validators=[Optional()])
     hot_parts = BooleanField("Hot Parts")
     part_number = StringField("Part Number / Hot Part Number")
     arrive_time = StringField(
@@ -106,9 +118,16 @@ class DepartForm(FlaskForm):
         validators=[Optional()],
     )
     secondary_destination = SelectField(
-        "Optional hot part destination",
+        "Optional second stop destination",
         choices=PLANT_CHOICES,
         validators=[Optional()],
+    )
+    secondary_load_type = SelectField(
+        "Second stop load type",
+        choices=SECONDARY_LOAD_TYPE_CHOICES,
+        default="load",
+        validators=[Optional()],
+        validate_choice=False,
     )
     depart_load_size = SelectField(
         "Departure Load",

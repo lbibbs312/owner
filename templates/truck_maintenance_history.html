@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>LacksDrivers Truck Maintenance</title>
+  <style>
+    :root { --bg:#090d12; --panel:#151a20; --line:#303a47; --text:#f8fafc; --muted:#94a3b8; --maroon:#7f1d2d; --green:#10b981; --amber:#f59e0b; --red:#ef4444; --nav-height:88px; }
+    * { box-sizing:border-box; }
+    html, body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:Montserrat, Arial, sans-serif; }
+    a { color:inherit; text-decoration:none; }
+    .shell { min-height:100vh; max-width:480px; margin:0 auto; padding:18px 14px calc(var(--nav-height) + 18px); background:radial-gradient(circle at top right, rgba(127,29,45,.22), transparent 18rem), var(--bg); }
+    .top { position:sticky; top:0; z-index:10; margin:-18px -14px 16px; padding:16px 14px; background:rgba(9,13,18,.94); backdrop-filter:blur(14px); border-bottom:1px solid var(--line); }
+    .back { color:#f3c7cf; font-size:.82rem; font-weight:850; text-transform:uppercase; }
+    h1 { margin:10px 0 2px; font-size:1.65rem; line-height:1; }
+    .sub { margin:0; color:var(--muted); font-size:.86rem; line-height:1.35; }
+    .list { display:grid; gap:12px; }
+    .card { background:rgba(21,26,32,.96); border:1px solid var(--line); border-radius:18px; overflow:hidden; box-shadow:0 18px 36px rgba(0,0,0,.26); }
+    .history-card { padding:14px; display:grid; gap:14px; }
+    .history-head { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:start; }
+    .title { margin:0 0 4px; font-weight:900; line-height:1.2; overflow-wrap:anywhere; }
+    .meta { margin:0; color:var(--muted); font-size:.82rem; line-height:1.35; overflow-wrap:anywhere; }
+    .section-title { margin:2px 0 0; font-size:.82rem; text-transform:uppercase; color:var(--muted); }
+    .badge { display:inline-flex; width:max-content; align-items:center; border-radius:999px; padding:4px 8px; font-size:.66rem; font-weight:900; text-transform:uppercase; background:rgba(16,185,129,.14); color:#a7f3d0; border:1px solid rgba(16,185,129,.26); white-space:nowrap; }
+    .badge.warn { background:rgba(245,158,11,.16); color:#fde68a; border-color:rgba(245,158,11,.28); }
+    .badge.issue { background:rgba(239,68,68,.14); color:#fecaca; border-color:rgba(239,68,68,.28); }
+    .fact-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .fact { border:1px solid rgba(148,163,184,.16); border-radius:12px; padding:10px; background:rgba(255,255,255,.035); min-width:0; }
+    .fact span { display:block; color:var(--muted); font-size:.68rem; font-weight:900; text-transform:uppercase; }
+    .fact strong { display:block; margin-top:3px; font-size:.9rem; overflow-wrap:anywhere; }
+    .event-list { display:grid; gap:8px; }
+    .event { border:1px solid rgba(148,163,184,.16); border-radius:12px; padding:10px; background:rgba(255,255,255,.035); display:grid; gap:5px; }
+    .event-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .empty { padding:14px; color:var(--muted); font-size:.86rem; line-height:1.35; }
+    .side-nav { display:none; }
+    .bottom-nav { position:fixed; left:50%; bottom:0; transform:translateX(-50%); width:min(480px,100vw); height:var(--nav-height); background:rgba(9,13,18,.96); backdrop-filter:blur(16px); border-top:1px solid var(--line); display:grid; grid-template-columns:repeat(4,1fr); gap:4px; padding:9px 12px max(10px, env(safe-area-inset-bottom)); z-index:20; }
+    .nav-link { display:grid; place-items:center; gap:4px; color:#64748b; font-size:.67rem; font-weight:900; text-transform:uppercase; }
+    .nav-link strong { width:28px; height:28px; border-radius:999px; display:grid; place-items:center; background:rgba(255,255,255,.06); }
+    .nav-link.active { color:#f3c7cf; }
+    @media (min-width:600px) { body{background:#111827;} .shell{max-width:760px;margin:18px 18px 18px 112px;min-height:calc(100vh - 36px);border:1px solid var(--line);border-radius:28px;overflow:hidden;} .bottom-nav{display:none;} .side-nav{position:fixed;left:16px;top:86px;bottom:18px;width:76px;display:grid;align-content:start;gap:10px;padding:12px 8px;background:rgba(8,13,22,.96);border:1px solid var(--line);border-radius:24px;z-index:30;} .side-nav .nav-link{min-height:72px;border-radius:18px;} .side-nav .nav-link.active{background:rgba(127,29,45,.24);} }
+    @media (min-width:960px) { .shell{max-width:1120px;margin:18px auto;} .fact-grid{grid-template-columns:repeat(4,minmax(0,1fr));} .history-card{padding:18px;} .event-list.two{grid-template-columns:repeat(2,minmax(0,1fr));} }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="top">
+      <a class="back" href="{{ url_for('driver.mobile_dashboard') }}">Back Home</a>
+      <h1>Truck Maintenance</h1>
+      <p class="sub">Truck {{ truck_number or 'not set' }} - previous completed PostTrips, fuel stops, and truck issues.</p>
+    </header>
+
+    <div class="list">
+      {% if truck_number and history %}
+        {% for item in history %}
+          <article class="card history-card">
+            <div class="history-head">
+              <div>
+                <p class="title">Truck {{ item.pretrip.truck_number or truck_number }}</p>
+                <p class="meta">{{ item.date.strftime('%b %d, %Y') if item.date else 'Date not set' }} - {{ item.driver_name }}</p>
+              </div>
+              <span class="badge">{{ item.status_label }}</span>
+            </div>
+
+            <div class="fact-grid">
+              <div class="fact"><span>Closed</span><strong>{{ item.closed_at|to_detroit_datetime if item.closed_at else 'PostTrip saved' }}</strong></div>
+              <div class="fact"><span>End Mileage</span><strong>{% if item.end_mileage is not none %}{{ "{:,}".format(item.end_mileage) }} mi{% else %}--{% endif %}</strong></div>
+              <div class="fact"><span>Miles Driven</span><strong>{% if item.miles_driven is not none %}{{ "{:,}".format(item.miles_driven) }}{% else %}Not calculated{% endif %}</strong></div>
+              <div class="fact"><span>Fuel Stops</span><strong>{{ item.fuel_count }}</strong></div>
+            </div>
+
+            <h2 class="section-title">Issues Opened / Closed</h2>
+            <div class="event-list two">
+              {% if item.issues %}
+                {% for issue in item.issues %}
+                  <div class="event">
+                    <div class="event-top"><p class="title">{{ issue.label }}</p><span class="badge {% if issue.is_regen %}warn{% else %}issue{% endif %}">{{ 'Regen' if issue.is_regen else 'Issue' }}</span></div>
+                    <p class="meta">Opened {{ issue.opened_label }} at {{ issue.plant }}{% if issue.mileage is not none %} - {{ "{:,}".format(issue.mileage) }} mi{% endif %}</p>
+                    <p class="meta">Closed {{ item.closed_at|to_detroit_datetime if item.closed_at else 'on PostTrip' }}</p>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <div class="event"><p class="title">No truck issues logged</p><p class="meta">This PostTrip closed with no maintenance issue marked in the driver logs.</p></div>
+              {% endif %}
+            </div>
+
+            <h2 class="section-title">Fuel</h2>
+            <div class="event-list two">
+              {% if item.fuel_logs %}
+                {% for fuel in item.fuel_logs %}
+                  <div class="event">
+                    <p class="title">{{ "{:,}".format(fuel.mileage) }} mi</p>
+                    <p class="meta">{{ fuel.time_label }} at {{ fuel.plant }}</p>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <div class="event"><p class="title">No fuel stop logged</p><p class="meta">No fuel mileage was saved in driver logs for this PostTrip day.</p></div>
+              {% endif %}
+            </div>
+
+            {% if item.remarks %}
+              <div class="event">
+                <p class="title">PostTrip Remarks</p>
+                <p class="meta">{{ item.remarks }}</p>
+              </div>
+            {% endif %}
+          </article>
+        {% endfor %}
+      {% elif truck_number %}
+        <div class="card empty">No previous completed PostTrips found for truck {{ truck_number }}.</div>
+      {% else %}
+        <div class="card empty">Start a PreTrip with a truck number to load maintenance history.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <nav class="side-nav" aria-label="Driver wide navigation">
+    <a class="nav-link active" href="{{ url_for('driver.mobile_dashboard') }}"><strong>HM</strong><span>Home</span></a>
+    <a class="nav-link" href="{{ url_for('driver.new_plant_transfer') }}"><strong>PT</strong><span>Transfer</span></a>
+    <a class="nav-link" href="{{ url_for('driver.driver_logs') }}"><strong>DL</strong><span>Logs</span></a>
+    <a class="nav-link" href="{{ url_for('driver.profile') }}"><strong>DR</strong><span>Driver</span></a>
+  </nav>
+
+  <nav class="bottom-nav" aria-label="Driver mobile navigation">
+    <a class="nav-link active" href="{{ url_for('driver.mobile_dashboard') }}"><strong>HM</strong><span>Home</span></a>
+    <a class="nav-link" href="{{ url_for('driver.new_plant_transfer') }}"><strong>PT</strong><span>Transfer</span></a>
+    <a class="nav-link" href="{{ url_for('driver.driver_logs') }}"><strong>DL</strong><span>Logs</span></a>
+    <a class="nav-link" href="{{ url_for('driver.profile') }}"><strong>DR</strong><span>Driver</span></a>
+  </nav>
+</body>
+</html>

@@ -134,7 +134,7 @@
                 <h3 class="route-card-title">{{ route.plant if route else log.plant_name }}</h3>
                 <div class="route-card-meta">
                   {{ log.driver.display_name }}{% if log.driver.employee_id %} - ID {{ log.driver.employee_id }}{% endif %}{% if log.driver.department %} - {{ log.driver.department }}{% endif %}
-                  {% if route %}<br>{{ route.action }} - {{ route.state }}{% endif %}
+                  {% if route %}<br>{{ route.action }} - {{ route.state }}{% if route.next_stop %}<br>First stop after departure: {{ route.next_stop }}{% endif %}{% endif %}
                   {% if log.plant_name in PLANT_ADDRESSES %}<br>{{ PLANT_ADDRESSES[log.plant_name] }}{% endif %}
                 </div>
               </div>
@@ -182,7 +182,7 @@
             <div class="route-chip-row">
               {% if log.no_pickup %}<span class="route-chip dark">No Pickup</span>{% endif %}
               {% if log.hot_parts %}<span class="route-chip danger">Hot {{ log.part_number or '' }}</span>{% elif log.part_number %}<span class="route-chip">{{ log.part_number }}</span>{% endif %}
-              <span class="route-chip {% if log.maintenance %}danger{% else %}ok{% endif %}">Truck {{ 'Issue' if log.maintenance else 'OK' }}</span>
+              <span class="route-chip {% if log.maintenance %}danger{% else %}ok{% endif %}">Truck {{ 'Issue' if log.maintenance else 'OK' }}{% if log.maintenance and log.fuel_mileage %} - {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>
               {% if log.fuel %}<span class="route-chip">Fuel{% if log.fuel_mileage %} - {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>{% endif %}
               {% if log.dock_wait_minutes %}<span class="route-chip danger">Dock {{ log.dock_wait_minutes }} min</span>{% endif %}
               {% if log.meeting %}<span class="route-chip">Meeting</span>{% endif %}
@@ -283,7 +283,14 @@
                 {{ log.part_number or '--' }}
               {% endif %}
             </td>
-            <td>{% if log.maintenance %}<span class="badge bg-warning text-dark">Yes</span>{% else %}<span class="badge bg-success">No</span>{% endif %}</td>
+            <td>
+              {% if log.maintenance %}
+                <span class="badge bg-warning text-dark">Yes</span>
+                {% if log.fuel_mileage %}<br><small class="text-muted fw-semibold">{{ "{:,}".format(log.fuel_mileage) }} mi</small>{% endif %}
+              {% else %}
+                <span class="badge bg-success">No</span>
+              {% endif %}
+            </td>
             <td>
               {% if log.fuel %}
                 <span class="badge bg-info text-dark">Yes</span>
