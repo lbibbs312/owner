@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "lacksdrivers"
 version = "0.1.0"
-description = "Driver dispatch, pre-trip / post-trip inspection, and shift logging for Lacks Enterprises"
+description = "Driver dispatch, pre-trip / post-trip inspection, and shift logging for MoveDefense"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 # Python 3.12 is excluded because eventlet (required for Flask-SocketIO async

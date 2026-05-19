@@ -148,7 +148,7 @@ def _png_data_url_to_rgb(data_url):
 
 
 class SimplePdf:
-    def __init__(self, title="LacksDrivers Document", pagesize=LETTER):
+    def __init__(self, title="MoveDefense Document", pagesize=LETTER):
         self.title = title
         self.pagesize = pagesize
         self.pages = []

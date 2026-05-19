@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>LacksDrivers</title>
+  <title>MoveDefense</title>
 
   <meta 
     name="viewport" 
@@ -233,11 +233,11 @@
         {% if current_user.is_authenticated %}
           {% if current_user.role == "management" %}
             <a class="navbar-brand glow-text" href="{{ url_for('manager.manager_dashboard') }}">
-              LacksDrivers (Manager)
+              MoveDefense (Manager)
             </a>
           {% else %}
             <a class="navbar-brand glow-text" href="{{ url_for('driver.mobile_dashboard') }}">
-              LacksDrivers
+              MoveDefense
             </a>
             <!-- Driver bell icon (mobile only) -->
             <a class="nav-link text-white d-md-none position-relative"
@@ -251,7 +251,7 @@
           {% endif %}
         {% else %}
           <a class="navbar-brand glow-text" href="{{ url_for('public.welcome') }}">
-            LacksDrivers
+            MoveDefense
           </a>
         {% endif %}
 

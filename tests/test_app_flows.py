@@ -1196,7 +1196,7 @@ def test_manager_driver_day_log_uses_management_readout_narrative(client, app):
     page = client.get(f"/manager/driver-logs/{log_id}")
 
     assert page.status_code == 200
-    assert "LACKSDRIVERS — ROUTE AUDIT".encode() in page.data
+    assert "MOVEDEFENSE — ROUTE AUDIT".encode() in page.data
     assert b"Viewing stop #" not in page.data
     assert b"Management Readout" in page.data
     assert b"Driver Day Log" not in page.data
@@ -2493,7 +2493,7 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
 
     page = client.get("/mobile")
     assert page.status_code == 200
-    assert b"LacksDrivers Mobile" in page.data
+    assert b"MoveDefense Mobile" in page.data
     assert b"RW to KP hot move" in page.data
     assert page.data.count(b"RW to KP hot move") == 1
     assert b"Part P0903110 needs trailer assignment." in page.data
@@ -2814,7 +2814,7 @@ def test_knowledge_base_uses_shared_app_shell(client, app):
     page = client.get("/knowledge_base")
     assert page.status_code == 200
     assert b"Knowledge Base" in page.data
-    assert b"LacksDrivers - Dynamic" not in page.data
+    assert b"MoveDefense - Dynamic" not in page.data
     assert b"openPanelBtn" not in page.data
 
 

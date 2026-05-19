@@ -1,7 +1,7 @@
-# Lacks Drivers
+# MoveDefense
 
 Driver dispatch, pre-trip / post-trip inspection, shift logging, and team
-messaging for the Lacks Enterprises fleet.
+messaging for the MoveDefense fleet.
 
 ## Quick start (local dev)
 

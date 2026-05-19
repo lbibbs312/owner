@@ -101,13 +101,13 @@
 
   {% if current_user.role == 'management' %}
     <div class="print-title">
-      <h1>LACKSDRIVERS — ROUTE AUDIT</h1>
+      <h1>MOVEDEFENSE — ROUTE AUDIT</h1>
       <p>{{ log.date }} &nbsp;|&nbsp; Driver: {{ log.driver.display_name }} &nbsp;|&nbsp; Truck: {{ truck_context.truck_id if truck_context else 'Truck not set' }} &nbsp;|&nbsp; Route Status: {{ management_narrative.route_status }}</p>
     </div>
   {% endif %}
 
   <div class="d-flex justify-content-between align-items-center gap-2 no-print">
-    <h2 class="mt-3 mb-0">{% if current_user.role == 'management' %}LACKSDRIVERS — ROUTE AUDIT{% else %}View Driver Log{% endif %}</h2>
+    <h2 class="mt-3 mb-0">{% if current_user.role == 'management' %}MOVEDEFENSE — ROUTE AUDIT{% else %}View Driver Log{% endif %}</h2>
     {% if current_user.role == 'management' %}<button type="button" class="btn btn-outline-secondary" onclick="window.print()">Print Management Copy</button>{% endif %}
   </div>
 
