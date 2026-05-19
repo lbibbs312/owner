@@ -217,6 +217,39 @@ def critical_cargo_review_events(part_scan_events):
     ]
 
 
+def _photo_proof_sentence(driver_log_photos, routes=None):
+    photos = list(driver_log_photos or [])
+    if not photos:
+        return ""
+    latest = next((photo for photo in reversed(photos) if (getattr(photo, "note", "") or "").strip()), photos[-1])
+    stop = _stop_label(getattr(latest, "log", None), routes) or "a route stop"
+    note = (getattr(latest, "note", "") or "").strip().rstrip(".?!")
+    subject = "stop photo proof" if len(photos) == 1 else "stop photo proofs"
+    sentence = f"{_count_word(len(photos))} {subject} {_was_were(len(photos))} attached."
+    if note:
+        sentence += f" Latest proof from {stop} says: {note}."
+    return sentence
+
+
+def _photo_review_item_sentence(driver_log_photos, routes=None):
+    photos = list(driver_log_photos or [])
+    if not photos:
+        return ""
+    latest = next((photo for photo in reversed(photos) if (getattr(photo, "note", "") or "").strip()), photos[-1])
+    stop = _stop_label(getattr(latest, "log", None), routes) or "a route stop"
+    note = (getattr(latest, "note", "") or "").strip().rstrip(".?!")
+    base = f"{_count_label(len(photos), 'stop photo proof')} attached for manager review."
+    if note:
+        base += f" Latest proof from {stop}: {note}."
+    return base
+
+
+def _photo_review_title(driver_log_photos):
+    joined = " ".join((getattr(photo, "note", "") or "").lower() for photo in driver_log_photos or [])
+    cargo_terms = ("cargo", "load", "skid", "pallet", "unbalanced", "un-balanced", "seal")
+    return "Cargo Photo Proof" if any(term in joined for term in cargo_terms) else "Photo Proof"
+
+
 def is_current_active_stop(open_log, day_logs):
     return bool(
         open_log
@@ -304,6 +337,8 @@ def build_route_summary_sentence(
     delay_logs,
     damage_reports,
     review_count,
+    driver_log_photos=None,
+    routes=None,
 ):
     driver = _driver_short_name(log)
     pieces = [f"{driver} completed {completed_count} of {stop_count} stops."]
@@ -312,6 +347,9 @@ def build_route_summary_sentence(
     elif completed_count >= stop_count:
         pieces.append("The route has departure/load-out recorded for every stop.")
     pieces.append(_event_status_sentence(delay_logs, damage_reports))
+    photo_sentence = _photo_proof_sentence(driver_log_photos, routes)
+    if photo_sentence:
+        pieces.append(photo_sentence)
     review_sentence = _scan_review_sentence(review_count)
     if review_sentence:
         pieces.append(review_sentence)
@@ -358,6 +396,7 @@ def build_management_narrative(day_log):
     damage_reports = day_log.get("damage_reports") or []
     truck_context = day_log.get("truck_context") or {}
     part_scan_events = day_log.get("part_scan_events") or []
+    driver_log_photos = day_log.get("driver_log_photos") or []
     hot_part_proof = day_log.get("hot_part_proof")
     route_finalized = _route_finalized(day_log)
 
@@ -410,6 +449,9 @@ def build_management_narrative(day_log):
     scan_review_item = _scan_review_item_sentence(review_count)
     if scan_review_item:
         needs_review_items.append(_severity_item("Needs Review", "Cargo Review", scan_review_item))
+    photo_review_item = _photo_review_item_sentence(driver_log_photos, routes)
+    if photo_review_item:
+        needs_review_items.append(_severity_item("Needs Review", _photo_review_title(driver_log_photos), photo_review_item))
 
     if open_exception and open_log:
         critical_exception_items.append(
@@ -473,12 +515,15 @@ def build_management_narrative(day_log):
         delay_logs,
         damage_reports,
         review_count,
+        driver_log_photos,
+        routes,
     )
     delay_summary = _delay_summary(delay_logs)
     damage_summary = _damage_summary(damage_reports)
     flag_summary = _flag_summary(day_logs)
     event_summary = _event_status_sentence(delay_logs, damage_reports)
-    exception_parts = [event_summary, flag_summary, scan_sentence]
+    photo_summary = _photo_proof_sentence(driver_log_photos, routes)
+    exception_parts = [event_summary, flag_summary, photo_summary, scan_sentence]
     if hot_part_proof:
         hot_part_summary = hot_part_proof.get("proof_sentence") or ""
         if hot_part_proof.get("open_exception"):
@@ -507,7 +552,9 @@ def build_management_narrative(day_log):
             {"label": "Route activity", "text": completed_text},
             {"label": "Current activity", "text": open_text},
             {"label": "Delay and damage", "text": event_summary},
-        ] + ([{"label": "Cargo review", "text": scan_sentence}] if scan_sentence else []),
+        ]
+        + ([{"label": "Photo proof", "text": photo_summary}] if photo_summary else [])
+        + ([{"label": "Cargo review", "text": scan_sentence}] if scan_sentence else []),
         "action_items": action_items,
         "evidence_references": _evidence_references(
             day_logs, routes, delay_logs, damage_reports, open_log, open_exception
@@ -530,6 +577,8 @@ def build_management_narrative(day_log):
         "has_damage_photos": has_damage_photos(damage_reports),
         "cargo_review_events": review_events,
         "cargo_review_count": review_count,
+        "driver_log_photo_count": len(driver_log_photos),
+        "photo_summary": photo_summary,
         "needs_review_items": needs_review_items,
         "critical_exception_items": critical_exception_items,
         "critical_exception_count": len(critical_exception_items),

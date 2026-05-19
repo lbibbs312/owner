@@ -65,6 +65,12 @@
     .damage-photo-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,180px)); gap:10px; margin-top:10px; }
     .damage-photo-link { display:block; border:1px solid #fecdd3; border-radius:8px; overflow:hidden; background:#fff; }
     .damage-photo-thumb { display:block; width:100%; height:120px; object-fit:cover; }
+    .proof-photo-card { border:1px solid #fecdd3; border-radius:8px; overflow:hidden; background:#fff; }
+    .proof-photo-card .damage-photo-link { border:0; border-radius:0; }
+    .missing-photo-proof { padding:10px; background:#fff7ed; color:#92400e; min-height:120px; }
+    .missing-photo-proof strong { display:block; color:#9a3412; font-size:.82rem; }
+    .missing-photo-proof small { display:block; margin-top:4px; color:#92400e; font-weight:800; }
+    .proof-photo-delete { width:100%; border:0; border-top:1px solid #fecdd3; background:#fff1f2; color:#be123c; padding:7px 8px; font-weight:900; font-size:.72rem; }
     .hot-proof-thumbs { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
     .hot-proof-thumb { display:block; width:96px; height:72px; object-fit:cover; border:1px solid #fecaca; border-radius:7px; background:#fff; }
     .evidence-caption { padding:6px 8px; color:#475569; font-size:.72rem; font-weight:900; }
@@ -258,10 +264,26 @@
           {% for photo in driver_log_photos %}
             {% set photo_stop = photo.log %}
             {% set photo_endpoint = 'manager.driver_log_photo' if current_user.role == 'management' else 'driver.driver_log_photo' %}
-            <a class="damage-photo-link" href="{{ url_for(photo_endpoint, photo_id=photo.id) }}" target="_blank" rel="noopener">
-              <img class="damage-photo-thumb" src="{{ url_for(photo_endpoint, photo_id=photo.id) }}" alt="Stop proof photo {{ loop.index }}">
-              <div class="evidence-caption">Stop #{{ day_log_positions.get(photo.driver_log_id, '?') if day_log_positions is defined else loop.index }} - {{ photo_stop.plant_name if photo_stop else 'Route stop' }} - {{ (photo.source or 'photo')|replace('_', ' ')|title }}{% if photo.note %}<br>Reason: {{ photo.note }}{% endif %}</div>
-            </a>
+            {% set photo_delete_endpoint = 'manager.delete_driver_log_photo' if current_user.role == 'management' else 'driver.delete_driver_log_photo' %}
+            <div class="proof-photo-card">
+              {% if photo.file_available %}
+                <a class="damage-photo-link" href="{{ url_for(photo_endpoint, photo_id=photo.id) }}" target="_blank" rel="noopener">
+                  <img class="damage-photo-thumb" src="{{ url_for(photo_endpoint, photo_id=photo.id) }}" alt="Stop proof photo {{ loop.index }}">
+                  <div class="evidence-caption">Stop #{{ day_log_positions.get(photo.driver_log_id, '?') if day_log_positions is defined else loop.index }} - {{ photo_stop.plant_name if photo_stop else 'Route stop' }} - {{ (photo.source or 'photo')|replace('_', ' ')|title }}{% if photo.note %}<br>Reason: {{ photo.note }}{% endif %}</div>
+                </a>
+              {% else %}
+                <div class="damage-photo-link missing-photo-proof">
+                  <strong>Photo file missing</strong>
+                  <small>Stop #{{ day_log_positions.get(photo.driver_log_id, '?') if day_log_positions is defined else loop.index }} - {{ photo_stop.plant_name if photo_stop else 'Route stop' }} - {{ (photo.source or 'photo')|replace('_', ' ')|title }}</small>
+                  {% if photo.note %}<small>Reason: {{ photo.note }}</small>{% endif %}
+                  <small>Delete this missing proof record and upload the photo again.</small>
+                </div>
+              {% endif %}
+              <form method="POST" action="{{ url_for(photo_delete_endpoint, photo_id=photo.id) }}" onsubmit="return confirm('Delete this stop photo proof?');">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                <button class="proof-photo-delete" type="submit">Delete Photo</button>
+              </form>
+            </div>
           {% endfor %}
         </div>
       </div>
@@ -407,10 +429,25 @@
         <div class="report-section-body">
           <div class="damage-photo-grid">
             {% for photo in driver_log_photos %}
-              <a class="damage-photo-link" href="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" target="_blank" rel="noopener">
-                <img class="damage-photo-thumb" src="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" alt="Stop proof photo {{ loop.index }}">
-                <div class="evidence-caption">{{ (photo.source or 'photo')|replace('_', ' ')|title }}{% if photo.note %}<br>Reason: {{ photo.note }}{% endif %}</div>
-              </a>
+              <div class="proof-photo-card">
+                {% if photo.file_available %}
+                  <a class="damage-photo-link" href="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" target="_blank" rel="noopener">
+                    <img class="damage-photo-thumb" src="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" alt="Stop proof photo {{ loop.index }}">
+                    <div class="evidence-caption">{{ (photo.source or 'photo')|replace('_', ' ')|title }}{% if photo.note %}<br>Reason: {{ photo.note }}{% endif %}</div>
+                  </a>
+                {% else %}
+                  <div class="damage-photo-link missing-photo-proof">
+                    <strong>Photo file missing</strong>
+                    <small>{{ (photo.source or 'photo')|replace('_', ' ')|title }}</small>
+                    {% if photo.note %}<small>Reason: {{ photo.note }}</small>{% endif %}
+                    <small>Delete this missing proof record and upload the photo again.</small>
+                  </div>
+                {% endif %}
+                <form method="POST" action="{{ url_for('driver.delete_driver_log_photo', photo_id=photo.id) }}" onsubmit="return confirm('Delete this stop photo proof?');">
+                  <input type="hidden" name="next" value="{{ request.full_path }}">
+                  <button class="proof-photo-delete" type="submit">Delete Photo</button>
+                </form>
+              </div>
             {% endfor %}
           </div>
         </div>

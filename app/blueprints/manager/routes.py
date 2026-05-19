@@ -865,6 +865,39 @@ def driver_log_photo(photo_id):
     return send_from_directory(upload_path, photo.filename)
 
 
+def _delete_driver_log_photo_file(photo):
+    upload_root = current_app.config.get("DRIVER_LOG_PHOTO_UPLOAD_FOLDER", "uploads/driver_log_photos")
+    upload_path = os.path.abspath(os.path.join(current_app.root_path, os.pardir, upload_root, photo.filename))
+    try:
+        if os.path.exists(upload_path):
+            os.remove(upload_path)
+    except OSError:
+        current_app.logger.warning("Unable to remove driver log photo %s", upload_path, exc_info=True)
+
+
+@bp.route("/driver-log-photos/<int:photo_id>/delete", methods=["POST"], strict_slashes=False)
+def delete_driver_log_photo(photo_id):
+    photo = DriverLogPhoto.query.get_or_404(photo_id)
+    log = photo.log
+    photo_label = photo.original_filename or photo.filename
+    note = photo.note
+    _delete_driver_log_photo_file(photo)
+    record_activity(
+        user_id=current_user.id,
+        category="log_photo",
+        action="deleted",
+        title="Stop photo proof deleted",
+        details=f"Deleted stop photo {photo_label}. Reason was: {note or 'No reason recorded'}",
+        target_type="driver_log",
+        target_id=log.id if log else None,
+        commit=False,
+    )
+    db.session.delete(photo)
+    db.session.commit()
+    flash("Stop photo proof deleted.", "success")
+    return redirect(request.form.get("next") or (url_for("manager.view_driver_log", log_id=log.id) if log else url_for("manager.driver_logs")))
+
+
 @bp.route("/damage-reports/<int:report_id>")
 def view_damage_report(report_id):
     report = DamageReport.query.get_or_404(report_id)
@@ -1200,6 +1233,7 @@ def view_driver_log(log_id):
             "truck_context": truck_context,
             "related_task": related_task,
             "part_scan_events": part_scan_events,
+            "driver_log_photos": driver_log_photos,
             "hot_part_proof": hot_part_proof,
             "route_finalized": route_finalized,
         }

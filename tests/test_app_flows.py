@@ -2032,6 +2032,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert driver_detail.status_code == 200
     assert b"Stop Photo Proof" in driver_detail.data
     assert b"Loaded seal photo from gallery" in driver_detail.data
+    assert b"Delete Photo" in driver_detail.data
 
     with app.app_context():
         from app.models import DriverLogPhoto
@@ -2052,12 +2053,62 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     manager_page = client.get(f"/manager/driver-logs/{log_id}")
     assert manager_page.status_code == 200
     assert b"Stop Photo Proof" in manager_page.data
+    assert b"Cargo Photo Proof" in manager_page.data
+    assert b"Two stop photo proofs were attached" in manager_page.data
+    assert b"Latest proof from Paint Central says: Departing load proof from gallery" in manager_page.data
     assert b"Loaded seal photo from gallery" in manager_page.data
+    assert b"Delete Photo" in manager_page.data
     assert f"/manager/driver-log-photos/{first_photo_id}".encode() in manager_page.data
     assert f"/manager/driver-log-photos/{second_photo_id}".encode() in manager_page.data
     manager_photo = client.get(f"/manager/driver-log-photos/{second_photo_id}")
     assert manager_photo.status_code == 200
     assert manager_photo.data == b"departure-gallery-photo"
+
+    manager_delete = client.post(
+        f"/manager/driver-log-photos/{first_photo_id}/delete",
+        data={"next": f"/manager/driver-logs/{log_id}"},
+        follow_redirects=False,
+    )
+    assert manager_delete.status_code == 302
+    manager_page_after_delete = client.get(f"/manager/driver-logs/{log_id}")
+    assert b"Loaded seal photo from gallery" not in manager_page_after_delete.data
+    assert b"Departing load proof from gallery" in manager_page_after_delete.data
+    assert client.get(f"/manager/driver-log-photos/{first_photo_id}").status_code == 404
+
+    with app.app_context():
+        missing_photo = DriverLogPhoto.query.get(second_photo_id)
+        missing_path = os.path.abspath(
+            os.path.join(
+                app.root_path,
+                os.pardir,
+                app.config["DRIVER_LOG_PHOTO_UPLOAD_FOLDER"],
+                missing_photo.filename,
+            )
+        )
+        os.remove(missing_path)
+
+    manager_page_missing_file = client.get(f"/manager/driver-logs/{log_id}")
+    assert manager_page_missing_file.status_code == 200
+    assert b"Photo file missing" in manager_page_missing_file.data
+    assert b"Delete this missing proof record" in manager_page_missing_file.data
+
+    client.get("/logout")
+    login(client, "photo_driver")
+    driver_edit_missing_file = client.get(f"/edit_driver_log/{log_id}")
+    assert driver_edit_missing_file.status_code == 200
+    assert b"Photo file missing" in driver_edit_missing_file.data
+    assert b"Delete Photo" in driver_edit_missing_file.data
+
+    driver_delete = client.post(
+        f"/driver_logs/photos/{second_photo_id}/delete",
+        data={"next": "/driver_logs"},
+        follow_redirects=False,
+    )
+    assert driver_delete.status_code == 302
+    assert client.get(first_photo["url"]).status_code == 404
+    assert client.get(second_photo["url"]).status_code == 404
+    with app.app_context():
+        assert DriverLogPhoto.query.count() == 0
 
 
 def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_review(client, app):

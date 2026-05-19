@@ -7,7 +7,7 @@
     body.manager-logs-active .container.mt-4.fade-in { max-width:none; width:100%; padding-left:0; padding-right:0; }
     .driver-log-shell { width:100%; max-width:none; padding-left:16px; padding-right:16px; }
     .driver-log-shell .table-responsive { overflow-x:auto; -webkit-overflow-scrolling:touch; }
-    .driver-log-table { width:100%; min-width:1280px; table-layout:auto; }
+    .driver-log-table { width:100%; min-width:1500px; table-layout:auto; }
     .driver-log-table th, .driver-log-table td { vertical-align:middle; padding:.7rem .55rem; font-size:.88rem; overflow-wrap:normal; word-break:normal; }
     .driver-log-table th { white-space:nowrap; line-height:1.15; }
     .driver-log-table .route-cell { min-width:190px; }
@@ -15,6 +15,10 @@
     .driver-log-table .parts-cell { min-width:110px; }
     .driver-log-table .time-cell { min-width:86px; white-space:nowrap; }
     .driver-log-table .actions-cell { min-width:210px; }
+    .driver-log-table .proof-cell { min-width:280px; width:300px; }
+    .driver-log-table .proof-cell .route-photo-strip { display:grid; grid-template-columns:1fr; gap:7px; margin-top:0; }
+    .driver-log-table .proof-cell .route-photo-card { width:100%; }
+    .driver-log-table .proof-cell .route-photo-link { flex:1 1 auto; min-height:50px; }
     .driver-log-table .actions-cell .btn { white-space:nowrap; line-height:1.1; }
     .driver-log-table .actions-cell form { margin:0; }
     .log-route-state { display:block; margin-top:3px; font-size:.72rem; color:#64748b; font-weight:700; line-height:1.25; }
@@ -50,11 +54,16 @@
     .route-chip.task-chip { text-transform:none; letter-spacing:0; font-size:.72rem; }
     .route-chip.dark { background:#111827; color:#fff; }
     .route-photo-strip { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:stretch; }
-    .route-photo-link { display:inline-flex; align-items:center; gap:8px; max-width:100%; border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; border-radius:8px; padding:5px 8px; text-decoration:none; font-size:.72rem; font-weight:900; line-height:1.2; }
-    .route-photo-link:hover { color:#1e40af; border-color:#93c5fd; background:#dbeafe; }
+    .route-photo-card { display:inline-flex; align-items:stretch; max-width:100%; border:1px solid #bfdbfe; background:#eff6ff; border-radius:8px; overflow:hidden; }
+    .route-photo-link { display:inline-flex; align-items:center; gap:8px; max-width:100%; border:0; background:#eff6ff; color:#1d4ed8; padding:5px 8px; text-decoration:none; font-size:.72rem; font-weight:900; line-height:1.2; }
+    .route-photo-link:hover { color:#1e40af; background:#dbeafe; }
+    .route-photo-missing { color:#92400e; background:#fff7ed; }
+    .route-photo-missing:hover { color:#92400e; background:#fff7ed; }
     .route-photo-link img { width:42px; height:34px; object-fit:cover; border:1px solid #bfdbfe; border-radius:5px; background:#fff; flex:0 0 auto; }
     .route-photo-link span { min-width:0; overflow-wrap:anywhere; }
     .route-photo-note { display:block; color:#334155; font-size:.68rem; font-weight:800; margin-top:1px; }
+    .route-photo-delete-form { display:flex; margin:0; }
+    .route-photo-delete { border:0; border-left:1px solid #bfdbfe; background:#fff1f2; color:#be123c; padding:0 8px; font-size:.68rem; font-weight:900; }
     .route-card-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
     .route-card-actions .btn, .route-card-actions form { flex:1 1 130px; min-width:0; }
     .route-card-actions .btn { width:100%; white-space:normal; }
@@ -207,10 +216,23 @@
               <div class="route-photo-strip" aria-label="Stop photo proof">
                 {% for photo in log.photos %}
                   {% set photo_url = url_for('manager.driver_log_photo', photo_id=photo.id) if current_user.role == 'management' else url_for('driver.driver_log_photo', photo_id=photo.id) %}
-                  <a class="route-photo-link" href="{{ photo_url }}" target="_blank" rel="noopener">
-                    <img src="{{ photo_url }}" alt="Stop proof photo {{ loop.index }}">
-                    <span>Photo proof {{ loop.index }}<small class="route-photo-note">{{ photo.note or ((photo.source or 'photo')|replace('_', ' ')|title) }}</small></span>
-                  </a>
+                  {% set photo_delete_url = url_for('manager.delete_driver_log_photo', photo_id=photo.id) if current_user.role == 'management' else url_for('driver.delete_driver_log_photo', photo_id=photo.id) %}
+                  <div class="route-photo-card">
+                    {% if photo.file_available %}
+                      <a class="route-photo-link" href="{{ photo_url }}" target="_blank" rel="noopener">
+                        <img src="{{ photo_url }}" alt="Stop proof photo {{ loop.index }}">
+                        <span>Photo proof {{ loop.index }}<small class="route-photo-note">{{ photo.note or ((photo.source or 'photo')|replace('_', ' ')|title) }}</small></span>
+                      </a>
+                    {% else %}
+                      <div class="route-photo-link route-photo-missing">
+                        <span>Photo file missing<small class="route-photo-note">{{ photo.note or ((photo.source or 'photo')|replace('_', ' ')|title) }}</small></span>
+                      </div>
+                    {% endif %}
+                    <form class="route-photo-delete-form" method="POST" action="{{ photo_delete_url }}" onsubmit="return confirm('Delete this stop photo proof?');">
+                      <input type="hidden" name="next" value="{{ request.full_path }}">
+                      <button class="route-photo-delete" type="submit">Delete</button>
+                    </form>
+                  </div>
                 {% endfor %}
               </div>
             {% endif %}
@@ -254,7 +276,7 @@
           <th>Meeting</th>
           <th>Arrive</th>
           <th>Depart</th>
-          <th>Proof</th>
+          <th class="proof-cell">Proof</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -355,15 +377,28 @@
               {% endif %}
             </td>
 
-            <td>
+            <td class="proof-cell">
               {% if log.photos %}
                 <div class="route-photo-strip" aria-label="Stop photo proof">
                   {% for photo in log.photos %}
                     {% set photo_url = url_for('manager.driver_log_photo', photo_id=photo.id) if current_user.role == 'management' else url_for('driver.driver_log_photo', photo_id=photo.id) %}
-                    <a class="route-photo-link" href="{{ photo_url }}" target="_blank" rel="noopener">
-                      <img src="{{ photo_url }}" alt="Stop proof photo {{ loop.index }}">
-                      <span>Photo {{ loop.index }}<small class="route-photo-note">{{ photo.note or ((photo.source or 'photo')|replace('_', ' ')|title) }}</small></span>
-                    </a>
+                    {% set photo_delete_url = url_for('manager.delete_driver_log_photo', photo_id=photo.id) if current_user.role == 'management' else url_for('driver.delete_driver_log_photo', photo_id=photo.id) %}
+                    <div class="route-photo-card">
+                      {% if photo.file_available %}
+                        <a class="route-photo-link" href="{{ photo_url }}" target="_blank" rel="noopener">
+                          <img src="{{ photo_url }}" alt="Stop proof photo {{ loop.index }}">
+                          <span>Photo {{ loop.index }}<small class="route-photo-note">{{ photo.note or ((photo.source or 'photo')|replace('_', ' ')|title) }}</small></span>
+                        </a>
+                      {% else %}
+                        <div class="route-photo-link route-photo-missing">
+                          <span>Photo file missing<small class="route-photo-note">{{ photo.note or ((photo.source or 'photo')|replace('_', ' ')|title) }}</small></span>
+                        </div>
+                      {% endif %}
+                      <form class="route-photo-delete-form" method="POST" action="{{ photo_delete_url }}" onsubmit="return confirm('Delete this stop photo proof?');">
+                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                        <button class="route-photo-delete" type="submit">Delete</button>
+                      </form>
+                    </div>
                   {% endfor %}
                 </div>
               {% else %}

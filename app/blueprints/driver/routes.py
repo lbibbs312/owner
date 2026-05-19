@@ -143,6 +143,7 @@ DRIVER_ONLY_ENDPOINTS = {
     "record_part_scan",
     "record_driver_log_photo",
     "driver_log_photo",
+    "delete_driver_log_photo",
     "pickup_driver_log",
     "no_pickup_driver_log",
     "view_driver_log",
@@ -899,6 +900,7 @@ def _driver_log_photo_payload(photo):
     return {
         "id": photo.id,
         "url": url_for("driver.driver_log_photo", photo_id=photo.id),
+        "delete_url": url_for("driver.delete_driver_log_photo", photo_id=photo.id),
         "original_filename": photo.original_filename or photo.filename,
         "source": (photo.source or "gallery").replace("_", " ").title(),
         "note": photo.note or "",
@@ -2678,6 +2680,41 @@ def driver_log_photo(photo_id):
     if not photo.log or photo.log.driver_id != current_user.id:
         abort(403)
     return send_from_directory(_driver_log_photo_upload_path(), photo.filename)
+
+
+def _delete_driver_log_photo_file(photo):
+    path = os.path.join(_driver_log_photo_upload_path(), photo.filename)
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+    except OSError:
+        current_app.logger.warning("Unable to remove driver log photo %s", path, exc_info=True)
+
+
+@bp.route("/driver_logs/photos/<int:photo_id>/delete", methods=["POST"], strict_slashes=False)
+@login_required
+def delete_driver_log_photo(photo_id):
+    photo = DriverLogPhoto.query.get_or_404(photo_id)
+    log = photo.log
+    if not log or log.driver_id != current_user.id:
+        abort(403)
+    photo_label = photo.original_filename or photo.filename
+    note = photo.note
+    _delete_driver_log_photo_file(photo)
+    record_activity(
+        user_id=current_user.id,
+        category="log_photo",
+        action="deleted",
+        title="Stop photo proof deleted",
+        details=f"Deleted stop photo {photo_label}. Reason was: {note or 'No reason recorded'}",
+        target_type="driver_log",
+        target_id=log.id,
+        commit=False,
+    )
+    db.session.delete(photo)
+    db.session.commit()
+    flash("Stop photo proof deleted.", "success")
+    return redirect(request.form.get("next") or url_for("driver.edit_driver_log", log_id=log.id))
 
 
 @bp.route("/driver_logs/<int:log_id>/photos", methods=["POST"], strict_slashes=False)

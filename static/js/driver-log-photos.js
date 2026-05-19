@@ -8,15 +8,19 @@
   function addPhotoCard(list, photo) {
     const empty = list.querySelector('[data-stop-photo-empty]');
     if (empty) empty.remove();
-    const link = document.createElement('a');
-    link.className = 'stop-photo-card';
-    link.href = photo.url;
-    link.target = '_blank';
-    link.rel = 'noopener';
-    link.innerHTML = '<img src="' + photo.url + '" alt="Stop proof photo">' +
+    const card = document.createElement('div');
+    card.className = 'stop-photo-card';
+    const next = window.location.pathname + window.location.search;
+    card.innerHTML = '<a class="stop-photo-image-link" href="' + photo.url + '" target="_blank" rel="noopener">' +
+      '<img src="' + photo.url + '" alt="Stop proof photo">' +
       '<span>' + escapeHtml(photo.source) + ' - ' + escapeHtml(photo.original_filename) + '</span>' +
-      (photo.note ? '<small>Reason: ' + escapeHtml(photo.note) + '</small>' : '');
-    list.prepend(link);
+      (photo.note ? '<small>Reason: ' + escapeHtml(photo.note) + '</small>' : '') +
+      '</a>' +
+      '<form method="POST" action="' + photo.delete_url + '" onsubmit="return confirm(\'Delete this stop photo proof?\');">' +
+      '<input type="hidden" name="next" value="' + escapeHtml(next) + '">' +
+      '<button class="stop-photo-delete" type="submit">Delete Photo</button>' +
+      '</form>';
+    list.prepend(card);
   }
 
   document.querySelectorAll('[data-stop-photo-panel]').forEach(function (panel) {

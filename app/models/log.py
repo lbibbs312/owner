@@ -1,4 +1,7 @@
 from datetime import datetime
+import os
+
+from flask import current_app
 
 from app.extensions import db
 
@@ -57,4 +60,13 @@ class DriverLogPhoto(db.Model):
         ),
     )
     uploaded_by = db.relationship("User", backref="driver_log_photos")
+
+    @property
+    def file_available(self):
+        try:
+            upload_root = current_app.config.get("DRIVER_LOG_PHOTO_UPLOAD_FOLDER", "uploads/driver_log_photos")
+            upload_path = os.path.abspath(os.path.join(current_app.root_path, os.pardir, upload_root, self.filename))
+        except RuntimeError:
+            return False
+        return os.path.isfile(upload_path)
 
