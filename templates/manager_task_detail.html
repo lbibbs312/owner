@@ -116,7 +116,7 @@
       <div class="panel">
         <div class="panel-head"><h2>Manager Actions</h2></div>
         <div class="panel-body">
-          <form method="POST" class="manager-form">
+          <form method="POST" class="manager-form" data-autosave="true" data-autosave-key="manager-task-{{ task.id }}">
             <div class="form-row">
               <div>
                 <label for="assigned_to">Assign / Reassign Driver</label>

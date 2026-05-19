@@ -15,7 +15,7 @@
     <span class="ms-3"><strong>Total Miles:</strong> <span id="totalMiles">--</span></span>
   </div>
 
-  <form method="POST" action="">
+  <form method="POST" action="" data-autosave="true" data-autosave-key="posttrip-{{ pretrip.id }}">
     {{ form.hidden_tag() }}
 
     <div class="mb-3">

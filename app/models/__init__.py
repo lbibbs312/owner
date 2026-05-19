@@ -14,6 +14,7 @@ from app.models.knowledge import KnowledgeBaseEntry
 from app.models.activity import ActivityEvent
 from app.models.audit import AuditEvent
 from app.models.damage import DamagePhoto, DamageReport
+from app.models.draft import DraftEntry
 from app.models.followup import OperationalFollowUp
 from app.models.plant_transfer import PlantTransfer, PlantTransferLine
 from app.models.search import SearchCorpus
@@ -46,6 +47,7 @@ __all__ = [
     "AuditEvent",
     "DamagePhoto",
     "DamageReport",
+    "DraftEntry",
     "OperationalFollowUp",
     "PlantTransfer",
     "PlantTransferLine",

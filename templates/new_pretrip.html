@@ -13,7 +13,7 @@
 <div class="container my-4">
   <h1 class="mb-3">New PreTrip Inspection</h1>
 
-  <form method="POST" action="" enctype="multipart/form-data">
+  <form method="POST" action="" enctype="multipart/form-data" data-autosave="true" data-autosave-key="pretrip-new">
     <!-- CRITICAL: ensures CSRF token is included -->
     {{ form.hidden_tag() }}
 
@@ -337,5 +337,17 @@
 
 <!-- Optional: Bootstrap 5 JS for collapse/accordion, if needed -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+{% if current_user.is_authenticated %}
+<script>
+  window.MoveDefenseAutosave = {
+    userId: {{ current_user.id|tojson }},
+    saveUrl: {{ url_for('drafts.save_autosave')|tojson }},
+    clearUrl: {{ url_for('drafts.clear_autosave')|tojson }},
+    intervalMs: 7500
+  };
+</script>
+<script src="{{ url_for('static', filename='js/autosave-drafts.js') }}"></script>
+{% endif %}
+
 </body>
 </html>

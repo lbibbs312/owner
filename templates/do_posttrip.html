@@ -3,7 +3,7 @@
 
 {% block content %}
 <h2>PostTrip for PreTrip #{{ pretrip.id }}</h2>
-<form method="POST" class="row g-3">
+<form method="POST" class="row g-3" data-autosave="true" data-autosave-key="posttrip-{{ pretrip.id }}">
   {{ form.hidden_tag() }}
 
   <div class="col-md-6">

@@ -21,7 +21,7 @@
   <div class="modal fade" id="ryderFollowupModal" tabindex="-1" aria-labelledby="ryderFollowupTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <form method="POST" action="{{ url_for('driver.mobile_ryder_service') }}">
+        <form method="POST" action="{{ url_for('driver.mobile_ryder_service') }}" data-autosave="true" data-autosave-key="ryder-followup-popup">
           <div class="modal-header">
             <h5 class="modal-title" id="ryderFollowupTitle">Ryder Follow-Up Required</h5>
           </div>
@@ -50,7 +50,7 @@
   </div>
   {% endif %}
 
-  <form method="POST" action="" id="arrivalForm" data-load-destination="{{ active_destination or '' }}" data-secondary-destination="{{ active_secondary_destination or '' }}">
+  <form method="POST" action="" id="arrivalForm" data-autosave="true" data-autosave-key="driver-log-arrival" data-load-destination="{{ active_destination or '' }}" data-secondary-destination="{{ active_secondary_destination or '' }}">
     {{ form.hidden_tag() }}
     <input type="hidden" name="load_size" value="{{ active_load }}">
     <input type="hidden" name="secondary_load" value="{{ active_secondary }}">

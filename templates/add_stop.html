@@ -15,7 +15,7 @@
   </div>
   {% endif %}
 
-  <form method="POST" action="{{ url_for('driver.add_stop') }}">
+  <form method="POST" action="{{ url_for('driver.add_stop') }}" data-autosave="true" data-autosave-key="driver-log-add-stop">
     {{ form.hidden_tag() }}
     <input type="hidden" name="from_log_id" value="{{ from_log_id or '' }}">
 

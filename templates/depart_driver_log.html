@@ -22,7 +22,7 @@
     {% if route and route.secondary_drop_blocked %}&nbsp;·&nbsp; Second-stop cargo not dropped: {{ route.secondary_drop_reason }}{% endif %}
   </p>
 
-  <form method="POST" action="" id="departForm">
+  <form method="POST" action="" id="departForm" data-autosave="true" data-autosave-key="driver-log-depart-{{ log.id }}">
     {{ form.hidden_tag() }}
 
     <div class="mb-3">

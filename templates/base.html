@@ -477,6 +477,18 @@
     });
   </script>
 
+  {% if current_user.is_authenticated %}
+  <script>
+    window.MoveDefenseAutosave = {
+      userId: {{ current_user.id|tojson }},
+      saveUrl: {{ url_for('drafts.save_autosave')|tojson }},
+      clearUrl: {{ url_for('drafts.clear_autosave')|tojson }},
+      intervalMs: 7500
+    };
+  </script>
+  <script src="{{ url_for('static', filename='js/autosave-drafts.js') }}"></script>
+  {% endif %}
+
   <!-- OneSignal, SweetAlert, etc. (if used) -->
   <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async></script>
   <script>

@@ -3,7 +3,7 @@
 <div class="container my-4">
   <h1 class="mb-3">Edit PreTrip Entry (ID: {{ pretrip.id }})</h1>
 
-  <form method="POST" action="" enctype="multipart/form-data">
+  <form method="POST" action="" enctype="multipart/form-data" data-autosave="true" data-autosave-key="pretrip-entry-{{ pretrip.id }}">
     <!-- CRITICAL: ensures CSRF token is included -->
     {{ form.hidden_tag() }}
 

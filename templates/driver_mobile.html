@@ -676,7 +676,7 @@
               <span>{{ pending_ryder_truck or 'Truck' }} headed to Ryder for {{ pending_ryder_issue or 'a truck issue' }}. Close this before the next stop.</span>
             </div>
           {% endif %}
-          <form class="ryder-form" method="POST" action="{{ url_for('driver.mobile_ryder_service') }}">
+          <form class="ryder-form" method="POST" action="{{ url_for('driver.mobile_ryder_service') }}" data-autosave="true" data-autosave-key="mobile-ryder-service">
             <div class="ryder-grid">
               <div class="ryder-field">
                 <label for="ryderTruck">Truck</label>
@@ -814,6 +814,16 @@
     <a class="nav-link" href="{{ url_for('driver.driver_logs') }}"><strong>DL</strong><span>Logs</span></a>
     <a class="nav-link" href="{{ url_for('driver.profile') }}"><strong>DR</strong><span>Driver</span></a>
   </nav>
+
+<script>
+  window.MoveDefenseAutosave = {
+    userId: {{ current_user.id|tojson }},
+    saveUrl: {{ url_for('drafts.save_autosave')|tojson }},
+    clearUrl: {{ url_for('drafts.clear_autosave')|tojson }},
+    intervalMs: 7500
+  };
+</script>
+<script src="{{ url_for('static', filename='js/autosave-drafts.js') }}"></script>
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>

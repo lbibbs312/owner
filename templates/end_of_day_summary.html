@@ -3,7 +3,7 @@
 <div class="container fade-in">
   <h2 class="mt-4 mb-3">End of Day Summary (Interactive)</h2>
 
-  <form method="POST" action="{{ url_for('driver.end_of_day_summary') }}">
+  <form method="POST" action="{{ url_for('driver.end_of_day_summary') }}" data-autosave="true" data-autosave-key="end-of-day-{{ current_user.id }}">
     {{ form.hidden_tag() }}
 
     <h4>Today's PreTrip(s)</h4>

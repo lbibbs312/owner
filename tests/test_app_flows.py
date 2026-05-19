@@ -48,6 +48,79 @@ def login(client, login_name, password="password1"):
     )
 
 
+
+def test_autosave_draft_round_trip_is_user_scoped(client, app):
+    with app.app_context():
+        driver = create_user("draft_driver", "draft@example.com")
+        other = create_user("other_draft_driver", "otherdraft@example.com")
+        driver_id = driver.id
+        other_id = other.id
+
+    login(client, "draft_driver")
+    payload = {
+        "plant_name": {"type": "select-one", "value": "PE"},
+        "damage_report": {"type": "textarea", "value": "Scrape on trailer door"},
+        "hot_parts": {"type": "checkbox", "checked": True, "value": "y"},
+    }
+    response = client.post(
+        "/drafts/autosave",
+        json={
+            "draft_key": "movedefense:draft:test:/new_pretrip:pretrip-new",
+            "form_id": "pretrip-new",
+            "path": "/new_pretrip",
+            "payload": payload,
+        },
+    )
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "saved"
+
+    with app.app_context():
+        from app.models import DraftEntry
+
+        saved = DraftEntry.query.filter_by(user_id=driver_id).one()
+        assert saved.payload["damage_report"]["value"] == "Scrape on trailer door"
+        assert DraftEntry.query.filter_by(user_id=other_id).count() == 0
+
+    loaded = client.get(
+        "/drafts/autosave",
+        query_string={"draft_key": "movedefense:draft:test:/new_pretrip:pretrip-new"},
+    )
+    assert loaded.status_code == 200
+    assert loaded.get_json()["found"] is True
+    assert loaded.get_json()["payload"] == payload
+
+    missing = client.get("/drafts/autosave", query_string={"draft_key": "other-key"})
+    assert missing.status_code == 200
+    assert missing.get_json()["found"] is False
+
+    cleared = client.post(
+        "/drafts/clear",
+        json={"draft_key": "movedefense:draft:test:/new_pretrip:pretrip-new"},
+    )
+    assert cleared.status_code == 200
+    with app.app_context():
+        from app.models import DraftEntry
+
+        assert DraftEntry.query.filter_by(user_id=driver_id).count() == 0
+
+
+def test_driver_entry_forms_load_autosave(client, app):
+    with app.app_context():
+        create_user("autosave_driver", "autosave@example.com")
+
+    login(client, "autosave_driver")
+    pretrip_page = client.get("/new_pretrip")
+    assert pretrip_page.status_code == 200
+    assert b'data-autosave="true"' in pretrip_page.data
+    assert b'data-autosave-key="pretrip-new"' in pretrip_page.data
+    assert b"js/autosave-drafts.js" in pretrip_page.data
+    assert b"/drafts/autosave" in pretrip_page.data
+
+    damage_page = client.get("/damage_reports/new")
+    assert damage_page.status_code == 200
+    assert b'data-autosave-key="damage-report-new"' in damage_page.data
+    assert b"js/autosave-drafts.js" in damage_page.data
+
 def test_registration_uses_manager_pin(client, app):
     response = client.post(
         "/register",

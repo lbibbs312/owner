@@ -464,7 +464,7 @@
       </button>
     </div>
 
-    <form method="POST" action="{{ url_for('manager.create_task_from_dashboard') }}">
+    <form method="POST" action="{{ url_for('manager.create_task_from_dashboard') }}" data-autosave="true" data-autosave-key="manager-dashboard-task-new">
       {{ create_task_form.hidden_tag() }}
       <div class="mdl-body">
         <div class="cr-grid">
