@@ -530,13 +530,12 @@ def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
 
     client.get("/logout")
     login(client, "manager1")
-    dashboard = client.get("/manager/dashboard?focus=delays")
+    dashboard = client.get("/manager/dashboard?focus=routes")
     assert dashboard.status_code == 200
-    assert b"Avg Dock Wait" in dashboard.data
-    assert b"17" in dashboard.data
-    assert b"Dock Wait" in dashboard.data
+    assert b"Avg Dock Wait" not in dashboard.data
+    assert b"Delay" in dashboard.data
     assert b"17 min" in dashboard.data
-    assert b"focus=delays" in dashboard.data
+    assert b"focus=delays" not in dashboard.data
     assert b"focus-panel" in dashboard.data
 
 
@@ -581,6 +580,7 @@ def test_pretrip_create_and_print_route(client, app):
             first_name="Driver",
             last_name="One",
         )
+        create_user("manager1", "manager1@example.com", "management")
 
     login(client, "driver1")
     new_page = client.get("/new_pretrip")
@@ -658,6 +658,15 @@ def test_pretrip_create_and_print_route(client, app):
         assert pretrip.gc_no_defects is True
         assert pretrip.towed_no_defects is True
         assert pretrip.damage_report == "updated ok"
+
+    client.get("/logout")
+    login(client, "manager1")
+    manager_pretrip = client.get(f"/manager/pretrips/{pretrip_id}")
+    assert manager_pretrip.status_code == 200
+    assert b"Working" in manager_pretrip.data
+    assert b"Blank" not in manager_pretrip.data
+    client.get("/logout")
+    login(client, "driver1")
 
     posttrip = client.post(
         f"/do_posttrip/{pretrip_id}",
@@ -1025,7 +1034,17 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
             load_size="Full",
             arrive_time="2026-05-13 12:00:00",
         )
-        db.session.add_all([completed_log, log])
+        problem_log = DriverLog(
+            driver_id=driver.id,
+            date=date.today(),
+            plant_name="PW",
+            load_size="Empty",
+            arrive_time="2026-05-13 13:00:00",
+            depart_time="13:20",
+            maintenance=True,
+            downtime_reason="Truck Issue: CEL light",
+        )
+        db.session.add_all([completed_log, log, problem_log])
         db.session.commit()
         log_id = log.id
         driver_id = driver.id
@@ -1053,7 +1072,13 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     dashboard = client.get(f"/manager/dashboard?driver_id={driver_id}")
     assert dashboard.status_code == 200
     assert b"Live Routes &amp; Stops" in dashboard.data
-    assert b"At stop - needs departure" in dashboard.data
+    assert b"Open stop" in dashboard.data
+    assert b"Completed stop" in dashboard.data
+    assert b"Problem" in dashboard.data
+    assert b"status-dot open" in dashboard.data
+    assert b"status-dot complete" in dashboard.data
+    assert b"status-dot problem" in dashboard.data
+    assert b"Live Problems" in dashboard.data
 
     driver_page_attempt = client.get("/driver_logs", follow_redirects=False)
     assert driver_page_attempt.status_code == 302

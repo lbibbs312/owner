@@ -23,8 +23,8 @@ from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
 from app.models import ActivityEvent, AuditEvent, DamageReport, DriverLog, OperationalFollowUp, PlantTransfer, PreTrip, Task, User
 from app.services.activity import record_activity
-from app.services.operations import build_delay_report, build_exception_items, build_weekly_savings
-from app.services.load_state import build_driver_log_route_context
+from app.services.operations import build_delay_report, build_exception_items
+from app.services.load_state import build_driver_log_route_context, truck_issue_reason
 from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
 from app.services.role_session import restore_role_user
 from app.services.search_corpus import suggest_terms
@@ -335,6 +335,23 @@ def _driver_log_sort_key(log):
 def _driver_log_route_context(logs):
     return build_driver_log_route_context(logs)
 
+
+def _log_has_live_problem(log):
+    truck_issue = bool(log.maintenance or truck_issue_reason(log))
+    damage_report = DamageReport.query.filter(
+        DamageReport.status != "closed",
+        db.or_(
+            DamageReport.driver_log_id == log.id,
+            db.and_(
+                DamageReport.reported_by_id == log.driver_id,
+                DamageReport.driver_log_id.is_(None),
+                db.func.date(DamageReport.created_at) == log.date,
+            ),
+        )
+    ).first()
+    return truck_issue or bool(damage_report)
+
+
 def _exception_key(item):
     return ":".join(
         str(item.get(part) or "")
@@ -373,15 +390,18 @@ def _live_stop_rows(logs):
         key = (log.driver_id, log.date)
         counts[key] = counts.get(key, 0) + 1
         route = routes.get(log.id, {})
+        has_problem = _log_has_live_problem(log)
+        status_key = "problem" if has_problem else "open" if not log.depart_time else "complete"
+        status = "Problem" if has_problem else "Open stop" if not log.depart_time else "Completed stop"
         rows.append({
             "log": log,
             "route": route,
             "stop_number": counts[key],
             "driver": log.driver,
-            "status": "At stop - needs departure" if not log.depart_time else "Departed stop",
-            "status_key": "open" if not log.depart_time else "complete",
+            "status": status,
+            "status_key": status_key,
             "cargo": route.get("depart_cargo_desc") or route.get("arrive_cargo_desc") or log.depart_load_size or log.load_size or "--",
-            "dock_wait": f"{log.dock_wait_minutes} min" if log.dock_wait_minutes is not None else "--",
+            "dock_wait": f"{log.dock_wait_minutes} min" if (log.dock_wait_minutes or 0) > 0 else "--",
             "url": url_for("manager.view_driver_log", log_id=log.id),
         })
     return list(reversed(rows))
@@ -508,7 +528,12 @@ def review_dashboard():
         return redirect(url_for("manager.review_dashboard"))
 
     exceptions = _with_exception_urls(_active_exception_items())
-    metrics = build_weekly_savings(dock_delay_minutes=_dock_delay_minutes())
+    metrics = {
+        "active_count": len(exceptions),
+        "high_count": len([item for item in exceptions if item["severity"] == "high"]),
+        "truck_damage_count": len([item for item in exceptions if item["category"] in {"Truck issue", "Damage flag"}]),
+        "followup_count": len([item for item in exceptions if item["severity"] == "followup"]),
+    }
     followups = OperationalFollowUp.query.order_by(OperationalFollowUp.created_at.desc()).limit(20).all()
     damage_reports = DamageReport.query.order_by(DamageReport.created_at.desc()).limit(10).all()
     exception_history = (
@@ -597,13 +622,6 @@ def delay_finder():
     delay_report = build_delay_report(dock_delay_minutes=_dock_delay_minutes())
     return render_template("delay_finder.html", delay_report=delay_report)
 
-
-@bp.route("/weekly-savings")
-def weekly_savings():
-    metrics = build_weekly_savings(dock_delay_minutes=_dock_delay_minutes())
-    return render_template("weekly_savings.html", metrics=metrics)
-
-
 @bp.route("/audit-history")
 def audit_history():
     audit_events = AuditEvent.query.order_by(AuditEvent.created_at.desc()).limit(100).all()
@@ -628,7 +646,7 @@ def manager_dashboard():
         division_filter = "All"
     selected_driver_id = request.args.get("driver_id", type=int)
     focus_panel = request.args.get("focus", "jobs")
-    if focus_panel not in {"jobs", "routes", "delays"}:
+    if focus_panel not in {"jobs", "routes"}:
         focus_panel = "jobs"
 
     day_start = datetime.combine(today, datetime.min.time())
@@ -650,8 +668,8 @@ def manager_dashboard():
     if division_filter != "All":
         dispatch_rows = [row for row in dispatch_rows if row["division"] == division_filter]
 
-    dock_wait_values = [log.dock_wait_minutes for log in todays_logs if log.dock_wait_minutes is not None]
-    avg_dock_wait_today = round(sum(dock_wait_values) / len(dock_wait_values), 1) if dock_wait_values else None
+    reported_delay_count = len([log for log in todays_logs if (log.dock_wait_minutes or 0) > 0])
+    live_problem_count = len([row for row in live_stop_rows if row["status_key"] == "problem"])
 
     active_driver_ids = {log.driver_id for log in todays_logs}
     active_drivers = [driver for driver in drivers if driver.id in active_driver_ids]
@@ -674,8 +692,8 @@ def manager_dashboard():
         plastics_move_count=len(plastics_moves),
         trim_move_count=len(trim_moves),
         active_driver_count=len(active_drivers),
-        avg_dock_wait_today=avg_dock_wait_today,
-        dock_wait_record_count=len(dock_wait_values),
+        reported_delay_count=reported_delay_count,
+        live_problem_count=live_problem_count,
         plastics_driver_count=len(plastics_drivers),
         trim_driver_count=len(trim_drivers),
         has_drivers=bool(drivers),

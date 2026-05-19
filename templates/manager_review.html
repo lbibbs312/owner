@@ -7,17 +7,15 @@
       <p class="text-muted mb-0">{{ exceptions|length }} exception{{ 's' if exceptions|length != 1 else '' }} active this week</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-      <a class="btn btn-outline-primary" href="{{ url_for('manager.delay_finder') }}">Delay Finder</a>
-      <a class="btn btn-outline-primary" href="{{ url_for('manager.weekly_savings') }}">Weekly Savings</a>
       <a class="btn btn-outline-secondary" href="{{ url_for('manager.audit_history') }}">Audit History</a>
     </div>
   </div>
 
   <div class="row g-3 mb-4">
-    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Transfer Completeness</div><div class="display-6">{{ metrics.transfer_completion_rate }}%</div></div></div>
-    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Incomplete Records</div><div class="display-6">{{ metrics.incomplete_transfer_count }}</div></div></div>
-    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Delayed Dock Events</div><div class="display-6">{{ metrics.delayed_dock_count }}</div></div></div>
-    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Supervisor Time Saved</div><div class="display-6">{{ metrics.supervisor_minutes_saved }}m</div></div></div>
+    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Active Exceptions</div><div class="display-6">{{ metrics.active_count }}</div></div></div>
+    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">High Priority</div><div class="display-6">{{ metrics.high_count }}</div></div></div>
+    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Truck / Damage</div><div class="display-6">{{ metrics.truck_damage_count }}</div></div></div>
+    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Open Follow-ups</div><div class="display-6">{{ metrics.followup_count }}</div></div></div>
   </div>
 
   <div class="row g-4">
