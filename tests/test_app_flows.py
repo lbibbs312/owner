@@ -101,6 +101,46 @@ def test_login_redirects_by_role(client, app):
     assert manager_response.headers["Location"].endswith("/manager/dashboard")
 
 
+def test_login_checks_password_against_all_matching_usernames_and_emails(client, app):
+    with app.app_context():
+        create_user("driver1", "shared@example.com", "driver", password="firstpass")
+        create_user(
+            "shared@example.com",
+            "driver2@example.com",
+            "driver",
+            password="secondpass",
+        )
+
+    response = login(client, "shared@example.com", "secondpass")
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/dashboard")
+
+
+def test_registration_rejects_username_email_cross_collision(client, app):
+    with app.app_context():
+        create_user("driver1", "shared@example.com", "driver")
+
+    response = client.post(
+        "/register",
+        data={
+            "username": "shared@example.com",
+            "email": "new@example.com",
+            "password": "password1",
+            "confirm_password": "password1",
+            "role": "driver",
+            "manager_pin": "",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    with app.app_context():
+        from app.models import User
+
+        assert User.query.filter_by(email="new@example.com").first() is None
+
+
 def test_authenticated_user_cannot_view_login_or_register(client, app):
     with app.app_context():
         create_user("driver1", "driver1@example.com", "driver")

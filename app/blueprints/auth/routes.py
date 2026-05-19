@@ -84,7 +84,10 @@ def register():
                 flash("Invalid Manager PIN!", "danger")
                 return redirect(url_for("auth.register"))
         existing = User.query.filter(
-            (User.email == form.email.data) | (User.username == form.username.data)
+            (User.email == form.email.data)
+            | (User.username == form.username.data)
+            | (User.email == form.username.data)
+            | (User.username == form.email.data)
         ).first()
         if existing:
             flash("User already exists with that email or username.", "danger")
@@ -127,10 +130,18 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         name_or_email = form.login_name.data
-        user = User.query.filter(
+        matching_users = User.query.filter(
             (User.username == name_or_email) | (User.email == name_or_email)
-        ).first()
-        if user and user.check_password(form.password.data):
+        ).all()
+        user = next(
+            (
+                candidate
+                for candidate in matching_users
+                if candidate.check_password(form.password.data)
+            ),
+            None,
+        )
+        if user:
             login_user(user, remember=form.remember.data)
             remember_role_login(user)
             flash("Logged in!", "success")
