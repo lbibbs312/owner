@@ -738,6 +738,12 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
     assert b"Damage - RE" in page.data
     assert b"Stop forecast pending" not in page.data
     assert b"Movement segment" not in page.data
+    assert b"Plant Legend" in page.data
+    assert b"PPL = PPL" in page.data
+    assert b"RE = Raleigh East" in page.data
+    assert b"DC = Distribution Center" in page.data
+    assert b"KP = Kraft Plant" in page.data
+    assert b"PC = Paint Central" in page.data
 
 
 def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
@@ -814,7 +820,8 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
     assert b"Manifest Linked: Yes" not in response.data
     assert b"Scan records are attached to this route." not in response.data
     assert b"Delay / Dock Time Review" in response.data
-    assert b"Not enough plant history yet" in response.data
+    assert b"First-time stop - no historical baseline for dock time" in response.data
+    assert b"Not enough plant history yet" not in response.data
     assert b"Collecting samples" not in response.data
     assert b"No baseline" not in response.data
     assert b"No in-route damage/incidents reported" not in response.data
@@ -824,6 +831,37 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
     assert pdf.headers["Content-Type"] == "application/pdf"
     assert b"Manager Route Review" in pdf.data
     assert b"Review Status: Needs Review" in pdf.data
+
+
+def test_manager_route_review_resolves_post_unload_non_cargo_stops(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("noncargo_driver", "noncargo@example.com", "driver", first_name="Lamar")
+        create_user("noncargo_manager", "noncargo-manager@example.com", "management")
+        route_date = date.today()
+        logs = [
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="KP", load_size="Empty", depart_load_size="Raleigh East Load", arrive_time="13:00", depart_time="14:00", created_at=datetime(2026, 5, 19, 13, 0)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="RE", load_size="Raleigh East Load", depart_load_size="Empty", no_pickup=True, arrive_time="16:23", depart_time="16:43", created_at=datetime(2026, 5, 19, 16, 23)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="PC", load_size="Empty", depart_load_size="Empty", no_pickup=True, arrive_time="17:10", depart_time="17:20", created_at=datetime(2026, 5, 19, 17, 10)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="Ryder Rentals", load_size="Empty", depart_load_size="Empty", no_pickup=True, maintenance=True, downtime_reason="Truck Issue: rental swap", arrive_time="17:45", depart_time="18:05", created_at=datetime(2026, 5, 19, 17, 45)),
+        ]
+        db.session.add_all(logs)
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "noncargo_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert response.status_code == 200
+    assert b"Route complete: final cargo unload at Raleigh East 4:43pm" in response.data
+    assert b"Subsequent stops were non-cargo" in response.data
+    assert b"Paint Central drop/no pickup" in response.data
+    assert b"Ryder Rentals maintenance" in response.data
+    assert b"Final cargo unload appears" not in response.data
+    assert b"Manager must confirm whether the extra" not in response.data
 
 
 def test_damage_evidence_packet_includes_timeline_hashes_related_records_and_warnings(client, app):
@@ -2129,6 +2167,8 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert b"Loaded seal photo from gallery" in driver_print.data
     assert b"Departing load proof from gallery" in driver_print.data
     assert b"Photo proof review" in driver_print.data
+    assert b"Uploaded " in driver_print.data
+    assert b" UTC" not in driver_print.data
     assert b"Stop forecast pending" not in driver_print.data
 
     with app.app_context():

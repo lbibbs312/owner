@@ -866,7 +866,7 @@ def _manager_delay_forecast_label(forecast):
         return "No plant average available", "muted"
     severity = forecast.get("severity") or "muted"
     if forecast.get("estimate_minutes") is None:
-        return "Not enough plant history yet", "muted"
+        return "First-time stop - no historical baseline for dock time", "muted"
     status = forecast.get("status") or "On pace"
     elapsed = forecast.get("elapsed_label") or "--"
     estimate = forecast.get("estimate_label") or "--"
@@ -948,6 +948,66 @@ def _manager_review_status(required_actions, data_quality_items, photo_reviews, 
     return "Needs Review"
 
 
+def _manager_time_label(value):
+    if not value:
+        return ""
+    if isinstance(value, datetime):
+        stamp = pytz.utc.localize(value) if value.tzinfo is None else value.astimezone(pytz.utc)
+        return stamp.astimezone(pytz.timezone("America/Detroit")).strftime("%I:%M%p").lower().lstrip("0")
+    raw = str(value).strip()
+    if not raw:
+        return ""
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            stamp = pytz.utc.localize(datetime.strptime(raw, fmt))
+            return stamp.astimezone(pytz.timezone("America/Detroit")).strftime("%I:%M%p").lower().lstrip("0")
+        except ValueError:
+            pass
+    normalized = raw.lower().replace(" ", "")
+    for fmt in ("%I:%M%p", "%I%M%p", "%H:%M", "%H%M"):
+        try:
+            return datetime.strptime(normalized, fmt).strftime("%I:%M%p").lower().lstrip("0")
+        except ValueError:
+            pass
+    return raw
+
+
+def _manager_stop_complete_time(log):
+    return _manager_time_label(getattr(log, "depart_time", None)) or _manager_time_label(getattr(log, "arrive_time", None))
+
+
+def _manager_empty_cargo(value):
+    cleaned = str(value or "").strip().lower()
+    return cleaned in {"", "--", "none", "n/a", "empty", "no pickup", "no-pickup"}
+
+
+def _manager_post_unload_cargo_activity(log, route):
+    if route.get("unload_blocked") or route.get("secondary_drop_blocked"):
+        return True
+    if route.get("unloaded_on_arrival") or route.get("secondary_dropped_on_arrival"):
+        return True
+    outbound = route.get("depart_cargo_desc") if route.get("depart_cargo_desc") is not None else getattr(log, "depart_load_size", None)
+    inbound = route.get("arrive_cargo_desc") or route.get("arrive_desc") or getattr(log, "load_size", None)
+    if not _manager_empty_cargo(outbound):
+        return True
+    if not _manager_empty_cargo(inbound) and not (getattr(log, "maintenance", False) or getattr(log, "fuel", False) or getattr(log, "meeting", False) or getattr(log, "no_pickup", False)):
+        return True
+    return False
+
+
+def _manager_post_unload_stop_label(log, route):
+    plant = route.get("plant") or _plant_label(getattr(log, "plant_name", ""))
+    if getattr(log, "maintenance", False) or truck_issue_reason(log):
+        return f"{plant} maintenance"
+    if getattr(log, "fuel", False):
+        return f"{plant} fuel"
+    if getattr(log, "meeting", False):
+        return f"{plant} meeting"
+    if getattr(log, "no_pickup", False):
+        return f"{plant} drop/no pickup"
+    return f"{plant} non-cargo stop"
+
+
 def _manager_summary_sentence(driver, logs, log_routes, route_status, damage_reports, photo_reviews, total_miles, data_quality_items):
     name = _driver_short_name(driver)
     parts = [f"{name} has {len(logs)} recorded stop{'s' if len(logs) != 1 else ''} for this route."]
@@ -959,10 +1019,19 @@ def _manager_summary_sentence(driver, logs, log_routes, route_status, damage_rep
         unload_route = log_routes.get(final_unload_log.id, {})
         final_unload_plant = unload_route.get("plant") or _plant_label(final_unload_log.plant_name)
     if final_unload_plant and last_stop_plant and final_unload_plant != last_stop_plant:
-        parts.append(
-            f"Final cargo unload appears to be {final_unload_plant}, but the last recorded stop is {last_stop_plant}. "
-            f"Manager must confirm whether the extra {last_stop_plant} stop is valid before finalizing."
-        )
+        final_unload_index = logs.index(final_unload_log) if final_unload_log in logs else -1
+        post_unload_logs = logs[final_unload_index + 1:] if final_unload_index >= 0 else []
+        post_unload_cargo = [log for log in post_unload_logs if _manager_post_unload_cargo_activity(log, log_routes.get(log.id, {}))]
+        unload_time = _manager_stop_complete_time(final_unload_log)
+        unload_stamp = f" {unload_time}" if unload_time else ""
+        if post_unload_logs and not post_unload_cargo:
+            post_labels = "; ".join(_manager_post_unload_stop_label(log, log_routes.get(log.id, {})) for log in post_unload_logs)
+            parts.append(f"Route complete: final cargo unload at {final_unload_plant}{unload_stamp}. Subsequent stops were non-cargo ({post_labels}).")
+        elif post_unload_cargo:
+            cargo_plants = ", ".join((log_routes.get(log.id, {}) or {}).get("plant") or _plant_label(log.plant_name) for log in post_unload_cargo)
+            parts.append(f"Route needs review: final cargo unload at {final_unload_plant}{unload_stamp}, but later cargo activity was recorded at {cargo_plants}.")
+        else:
+            parts.append(f"Route complete: final cargo unload at {final_unload_plant}{unload_stamp}.")
     elif route_status == "Finalization Required":
         parts.append("The route appears complete but is not finalized.")
     elif route_status == "Active":
