@@ -427,6 +427,16 @@ def _damage_matches_log(report, log, route):
     return report_plant in candidates
 
 
+def _damage_photo_url(photo):
+    if not photo:
+        return None
+    upload_root = current_app.config.get("DAMAGE_UPLOAD_FOLDER", "uploads/damage_photos")
+    upload_path = os.path.abspath(os.path.join(current_app.root_path, os.pardir, upload_root, photo.filename))
+    if not os.path.exists(upload_path):
+        return None
+    return url_for("manager.damage_photo", photo_id=photo.id)
+
+
 def _damage_report_summary(report):
     photo = report.photos[0] if report.photos else None
     plant = report.plant_name or "Other"
@@ -434,7 +444,7 @@ def _damage_report_summary(report):
         "type": "Damage Open" if (report.status or "").lower() != "closed" else "Damage Submitted",
         "label": "Damage Open" if (report.status or "").lower() != "closed" else "Damage Submitted",
         "detail": f"{plant} - {report.stage or 'move'} move - {report.description or 'Damage report'}",
-        "photo_url": url_for("manager.damage_photo", photo_id=photo.id) if photo else None,
+        "photo_url": _damage_photo_url(photo),
         "url": url_for("manager.view_damage_report", report_id=report.id),
     }
 
