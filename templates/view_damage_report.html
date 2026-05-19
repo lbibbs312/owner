@@ -41,7 +41,13 @@
   <h2 class="h5">Photos</h2>
   <div class="row g-3">
     {% for photo in report.photos %}
-      <div class="col-md-6 col-xl-4"><div class="border rounded p-3 h-100"><strong>{{ photo.stage|title }}</strong><br><span class="text-muted small">{{ photo.original_filename }}</span><br><code class="small text-break">{{ photo.filename }}</code></div></div>
+      <div class="col-md-6 col-xl-4">
+        <div class="border rounded p-3 h-100">
+          <strong>{{ photo.stage|title }}</strong><br>
+          <span class="text-muted small">{{ photo.original_filename }}</span>
+          <img class="img-fluid rounded border mt-2" src="{{ url_for('manager.damage_photo', photo_id=photo.id) }}" alt="Damage photo {{ photo.id }}">
+        </div>
+      </div>
     {% else %}
       <div class="col-12 text-muted">No photo attached.</div>
     {% endfor %}

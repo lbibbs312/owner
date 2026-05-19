@@ -72,22 +72,22 @@
   .mc-body { flex:1; overflow-y:auto; padding:22px 28px; display:flex; flex-direction:column; gap:18px; }
 
   /* ── KPI cards ── */
-  .kpi-row { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
-  .kpi { background:#fff; border:1px solid #e2e8f0; border-radius:16px;
-         padding:20px 22px; box-shadow:0 1px 2px rgba(15,23,42,.04); text-decoration:none; display:block; cursor:pointer; transition:transform .15s, box-shadow .15s, border-color .15s; }
+  .kpi-row { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  .kpi { background:#fff; border:1px solid #e2e8f0; border-radius:10px;
+         padding:12px 14px; box-shadow:0 1px 2px rgba(15,23,42,.04); text-decoration:none; display:block; cursor:pointer; transition:transform .15s, box-shadow .15s, border-color .15s; }
   .kpi:hover { transform:translateY(-1px); box-shadow:0 10px 24px rgba(15,23,42,.09); border-color:#93c5fd; }
   .kpi.active { outline:2px solid rgba(37,99,235,.35); }
   .kpi.blue  { background:#eff6ff; border-color:#bfdbfe; }
   .kpi.green { background:#ecfdf5; border-color:#a7f3d0; }
   .kpi.danger { background:#fff1f2; border-color:#fecdd3; }
-  .kpi-lbl { font-size:.67rem; font-weight:900; text-transform:uppercase;
-             letter-spacing:.07em; color:#64748b; margin:0 0 10px; }
+  .kpi-lbl { font-size:.64rem; font-weight:900; text-transform:uppercase;
+             letter-spacing:.07em; color:#64748b; margin:0 0 5px; }
   .kpi.blue  .kpi-lbl { color:#2563eb; }
   .kpi.green .kpi-lbl { color:#047857; }
   .kpi.danger .kpi-lbl { color:#be123c; }
   .kpi-val { display:flex; align-items:flex-end; justify-content:space-between; gap:10px; }
-  .kpi-num { font-size:2.4rem; font-weight:900; line-height:1; color:#0f172a; }
-  .kpi-tag { font-size:.73rem; font-weight:800; padding:4px 9px; border-radius:8px;
+  .kpi-num { font-size:1.65rem; font-weight:900; line-height:1; color:#0f172a; }
+  .kpi-tag { font-size:.71rem; font-weight:800; padding:3px 8px; border-radius:8px;
              background:#e2e8f0; color:#334155; white-space:nowrap; }
   .kpi.blue  .kpi-tag { background:#bfdbfe; color:#1d4ed8; }
   .kpi.green .kpi-tag { background:#a7f3d0; color:#047857; }
@@ -177,6 +177,9 @@
   .status-dot.problem { background:#dc2626; animation:pulse-red 1.15s infinite; box-shadow:0 0 0 0 rgba(220,38,38,.55); }
   .status-dot.open { background:#f59e0b; animation:pulse-yellow 1.35s infinite; box-shadow:0 0 0 0 rgba(245,158,11,.55); }
   .status-dot.complete { background:#16a34a; }
+  .problem-line { display:flex; align-items:center; gap:8px; margin-top:6px; max-width:280px; color:#7f1d1d; font-size:.72rem; line-height:1.25; font-weight:800; }
+  .problem-thumb { width:42px; height:32px; object-fit:cover; border-radius:6px; border:1px solid #fecaca; background:#fff; flex:0 0 42px; }
+  .problem-label { color:#be123c; text-transform:uppercase; letter-spacing:.04em; font-size:.62rem; display:block; }
   @keyframes pulse-red { 70% { box-shadow:0 0 0 8px rgba(220,38,38,0); } 100% { box-shadow:0 0 0 0 rgba(220,38,38,0); } }
   @keyframes pulse-yellow { 70% { box-shadow:0 0 0 8px rgba(245,158,11,0); } 100% { box-shadow:0 0 0 0 rgba(245,158,11,0); } }
   .driver-filter-row { display:flex; flex-wrap:wrap; gap:7px; padding:12px 20px; border-bottom:1px solid #e2e8f0; background:#fff; }
@@ -618,17 +621,17 @@
 
     <div class="mc-body">
 
-      {# KPI row - each card lands on a real dispatch section #}
-      <div class="kpi-row" style="grid-template-columns:repeat({{ 4 if live_problem_count else 3 }},minmax(0,1fr));">
+      {# Compact live summary - division counts stay in the detailed table filters below #}
+      <div class="kpi-row" style="grid-template-columns:repeat({{ 3 if live_problem_count else 2 }},minmax(0,1fr));">
         <a class="kpi {% if division_filter == 'All' and focus_panel == 'jobs' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='All', focus='jobs') }}" aria-label="Show all active moves">
-          <p class="kpi-lbl">Total Active Moves</p>
+          <p class="kpi-lbl">Active Moves</p>
           <div class="kpi-val">
             <span class="kpi-num">{{ total_active_moves }}</span>
             <span class="kpi-tag">Open jobs</span>
           </div>
         </a>
         <a class="kpi blue {% if focus_panel == 'routes' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division=division_filter, focus='routes') }}" aria-label="Show live driver routes">
-          <p class="kpi-lbl">Active Drivers</p>
+          <p class="kpi-lbl">Drivers Moving</p>
           <div class="kpi-val">
             <span class="kpi-num">{{ active_driver_count }}</span>
             <span class="kpi-tag">Live stops</span>
@@ -640,23 +643,6 @@
           <div class="kpi-val">
             <span class="kpi-num">{{ live_problem_count }}</span>
             <span class="kpi-tag"><span class="status-dot problem" aria-hidden="true"></span>Damage / truck</span>
-          </div>
-        </a>
-        {% endif %}
-        {% if manager_division == 'Trim' %}
-        <a class="kpi green {% if division_filter == 'Trim' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='Trim', focus='jobs') }}" aria-label="Show Trim moves">
-          <p class="kpi-lbl">Trim Division</p>
-          <div class="kpi-val">
-            <span class="kpi-num">{{ trim_move_count }}</span>
-            <span class="kpi-tag">{{ trim_driver_count }} driver{{ 's' if trim_driver_count != 1 else '' }}</span>
-          </div>
-        </a>
-        {% else %}
-        <a class="kpi blue {% if division_filter == 'Plastics' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='Plastics', focus='jobs') }}" aria-label="Show Plastics moves">
-          <p class="kpi-lbl">Plastics Division</p>
-          <div class="kpi-val">
-            <span class="kpi-num">{{ plastics_move_count }}</span>
-            <span class="kpi-tag">{{ plastics_driver_count }} driver{{ 's' if plastics_driver_count != 1 else '' }}</span>
           </div>
         </a>
         {% endif %}
@@ -711,7 +697,15 @@
                   <td class="align-middle whitespace-nowrap">{{ log.arrive_time|to_local_time if log.arrive_time else '—' }}</td>
                   <td class="align-middle whitespace-nowrap">{{ log.depart_time|to_12h_format if log.depart_time else '—' }}</td>
                   {% if reported_delay_count %}<td class="align-middle whitespace-nowrap">{{ row.dock_wait }}</td>{% endif %}
-                  <td class="align-middle"><span class="status-signal"><span class="status-dot {{ row.status_key }}" aria-hidden="true"></span><span class="sbadge {{ row.status_key }}">{{ row.status }}</span></span></td>
+                  <td class="align-middle">
+                    <span class="status-signal"><span class="status-dot {{ row.status_key }}" aria-hidden="true"></span><span class="sbadge {{ row.status_key }}">{{ row.status }}</span></span>
+                    {% if row.problem %}
+                      <div class="problem-line">
+                        {% if row.problem.photo_url %}<img class="problem-thumb" src="{{ row.problem.photo_url }}" alt="Damage photo">{% endif %}
+                        <span><span class="problem-label">{{ row.problem.label }}</span>{{ row.problem.detail }}</span>
+                      </div>
+                    {% endif %}
+                  </td>
                   <td class="align-middle" style="text-align:right;"><a class="btn-manage" href="{{ row.url }}">Open</a></td>
                 </tr>
               {% else %}

@@ -1,4 +1,3 @@
-from collections import defaultdict
 from datetime import date, timedelta
 
 from app.models import DamageReport, DriverLog, OperationalFollowUp, PlantTransfer, PreTrip, Task
@@ -81,24 +80,3 @@ def build_exception_items(anchor=None, dock_delay_minutes=30):
 
     severity_order = {"high": 0, "medium": 1, "followup": 2, "low": 3}
     return sorted(items, key=lambda item: (severity_order.get(item["severity"], 9), item["category"], item["label"]))
-
-
-def build_delay_report(anchor=None, dock_delay_minutes=30):
-    today = anchor or date.today()
-    week_start, week_end = week_bounds(today)
-    logs = DriverLog.query.filter(
-        DriverLog.deleted_at.is_(None),
-        DriverLog.date >= week_start,
-        DriverLog.date < week_end,
-        DriverLog.dock_wait_minutes.isnot(None),
-    ).all()
-    logs = [log for log in logs if (log.dock_wait_minutes or 0) > 0]
-    delayed_logs = [log for log in logs if (log.dock_wait_minutes or 0) >= dock_delay_minutes]
-    by_plant = defaultdict(list)
-    for log in logs:
-        by_plant[log.plant_name].append(log.dock_wait_minutes or 0)
-    plant_averages = [
-        {"plant": plant, "average_wait": round(sum(values) / len(values), 1), "records": len(values)}
-        for plant, values in sorted(by_plant.items())
-    ]
-    return {"week_start": week_start, "week_end": week_end - timedelta(days=1), "delayed_logs": delayed_logs, "plant_averages": plant_averages, "threshold": dock_delay_minutes}

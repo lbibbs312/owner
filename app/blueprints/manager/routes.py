@@ -10,9 +10,12 @@ raised "RuntimeError: working outside of application context").
 Now wired against app.models.Task / app.extensions.db like everything else.
 """
 from datetime import date, datetime
+import csv
+import io
+import os
 import re
 
-from flask import current_app, flash, jsonify, make_response, redirect, render_template, request, url_for
+from flask import current_app, flash, jsonify, make_response, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user
 from sqlalchemy import or_
 
@@ -21,9 +24,9 @@ from app.services.database_status import database_status
 from app.extensions import db, socketio
 from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
-from app.models import ActivityEvent, AuditEvent, DamageReport, DriverLog, OperationalFollowUp, PlantTransfer, PreTrip, Task, User
+from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DriverLog, OperationalFollowUp, PlantTransfer, PreTrip, Task, User
 from app.services.activity import record_activity
-from app.services.operations import build_delay_report, build_exception_items
+from app.services.operations import build_exception_items
 from app.services.load_state import build_driver_log_route_context, truck_issue_reason
 from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
 from app.services.role_session import restore_role_user
@@ -41,6 +44,14 @@ from app.blueprints.driver.routes import (
 
 TRIM_PLANTS = ("Trim DC", "PPL", "DC")
 PART_TOKEN_RE = re.compile(r"\b[A-Z]*\d[A-Z0-9-]{3,}\b", re.IGNORECASE)
+
+
+@bp.after_request
+def _no_store_manager_pages(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 def _populate_task_driver_choices(form):
@@ -129,6 +140,61 @@ def _document_attachment_response(*, pdf_bytes, filename, target_type, target_id
         details=f"Prepared {filename} as a PDF attachment.",
         target_type=target_type,
         target_id=target_id,
+    )
+    return response
+
+
+def _route_export_response(ctx, *, filename, delimiter, content_type, title):
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=delimiter)
+    writer.writerow([
+        "Stop",
+        "Date",
+        "Driver",
+        "Plant",
+        "Route Action",
+        "Arrive",
+        "Depart",
+        "Inbound Cargo",
+        "Outbound Cargo",
+        "Part Number",
+        "Hot",
+        "No Pickup",
+        "Delay Minutes",
+        "Issue",
+        "Fuel",
+        "Fuel Mileage",
+    ])
+    for index, log in enumerate(ctx["logs"], 1):
+        route = ctx["log_routes"].get(log.id, {})
+        writer.writerow([
+            index,
+            log.date,
+            ctx["driver"].display_name,
+            route.get("plant") or _plant_label(log.plant_name),
+            route.get("action") or "Logged stop",
+            log.arrive_time or "",
+            log.depart_time or "",
+            route.get("arrive_cargo_desc") or log.load_size or "",
+            route.get("depart_cargo_desc") or log.depart_load_size or "",
+            log.part_number or "",
+            "yes" if log.hot_parts else "",
+            "yes" if log.no_pickup else "",
+            log.dock_wait_minutes or "",
+            log.downtime_reason or "",
+            log.fuel or "",
+            log.fuel_mileage or "",
+        ])
+    response = make_response(output.getvalue())
+    response.headers["Content-Type"] = content_type
+    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    record_activity(
+        user_id=current_user.id,
+        category="download",
+        action="manager_route_export",
+        title=title,
+        details=f"Prepared {filename} route export.",
+        target_type="driver_log",
     )
     return response
 
@@ -336,8 +402,7 @@ def _driver_log_route_context(logs):
     return build_driver_log_route_context(logs)
 
 
-def _log_has_live_problem(log):
-    truck_issue = bool(log.maintenance or truck_issue_reason(log))
+def _live_problem_for_log(log):
     damage_report = DamageReport.query.filter(
         DamageReport.status != "closed",
         db.or_(
@@ -348,8 +413,23 @@ def _log_has_live_problem(log):
                 db.func.date(DamageReport.created_at) == log.date,
             ),
         )
-    ).first()
-    return truck_issue or bool(damage_report)
+    ).order_by(DamageReport.created_at.desc()).first()
+    if damage_report:
+        photo = damage_report.photos[0] if damage_report.photos else None
+        return {
+            "label": "Damage report",
+            "detail": damage_report.description or "Open damage report",
+            "photo_url": url_for("manager.damage_photo", photo_id=photo.id) if photo else None,
+        }
+
+    truck_issue = truck_issue_reason(log)
+    if log.maintenance or truck_issue:
+        return {
+            "label": "Truck issue",
+            "detail": truck_issue or "Maintenance issue checked by driver",
+            "photo_url": None,
+        }
+    return None
 
 
 def _exception_key(item):
@@ -390,9 +470,9 @@ def _live_stop_rows(logs):
         key = (log.driver_id, log.date)
         counts[key] = counts.get(key, 0) + 1
         route = routes.get(log.id, {})
-        has_problem = _log_has_live_problem(log)
-        status_key = "problem" if has_problem else "open" if not log.depart_time else "complete"
-        status = "Problem" if has_problem else "Open stop" if not log.depart_time else "Completed stop"
+        live_problem = _live_problem_for_log(log)
+        status_key = "problem" if live_problem else "open" if not log.depart_time else "complete"
+        status = "Problem" if live_problem else "Open stop" if not log.depart_time else "Completed stop"
         rows.append({
             "log": log,
             "route": route,
@@ -402,6 +482,7 @@ def _live_stop_rows(logs):
             "status_key": status_key,
             "cargo": route.get("depart_cargo_desc") or route.get("arrive_cargo_desc") or log.depart_load_size or log.load_size or "--",
             "dock_wait": f"{log.dock_wait_minutes} min" if (log.dock_wait_minutes or 0) > 0 else "--",
+            "problem": live_problem,
             "url": url_for("manager.view_driver_log", log_id=log.id),
         })
     return list(reversed(rows))
@@ -611,16 +692,19 @@ def close_followup(followup_id):
     return redirect(url_for("manager.review_dashboard"))
 
 
+@bp.route("/damage-photos/<int:photo_id>")
+def damage_photo(photo_id):
+    photo = DamagePhoto.query.get_or_404(photo_id)
+    upload_root = current_app.config.get("DAMAGE_UPLOAD_FOLDER", "uploads/damage_photos")
+    upload_path = os.path.abspath(os.path.join(current_app.root_path, os.pardir, upload_root))
+    return send_from_directory(upload_path, photo.filename)
+
+
 @bp.route("/damage-reports/<int:report_id>")
 def view_damage_report(report_id):
     report = DamageReport.query.get_or_404(report_id)
     return render_template("view_damage_report.html", report=report, manager_view=True)
 
-
-@bp.route("/delays")
-def delay_finder():
-    delay_report = build_delay_report(dock_delay_minutes=_dock_delay_minutes())
-    return render_template("delay_finder.html", delay_report=delay_report)
 
 @bp.route("/audit-history")
 def audit_history():
@@ -673,11 +757,6 @@ def manager_dashboard():
 
     active_driver_ids = {log.driver_id for log in todays_logs}
     active_drivers = [driver for driver in drivers if driver.id in active_driver_ids]
-    plastics_drivers = [driver for driver in drivers if _division_for_user(driver) == "Plastics"]
-    trim_drivers = [driver for driver in drivers if _division_for_user(driver) == "Trim"]
-    plastics_moves = [row for row in _build_dispatch_rows(uncompleted_tasks, todays_transfers) if row["division"] == "Plastics"]
-    trim_moves = [row for row in _build_dispatch_rows(uncompleted_tasks, todays_transfers) if row["division"] == "Trim"]
-
     return render_template(
         "manager_dashboard.html",
         create_task_form=create_task_form,
@@ -689,16 +768,11 @@ def manager_dashboard():
         drivers=drivers,
         division_filter=division_filter,
         total_active_moves=len(uncompleted_tasks) + len(todays_transfers),
-        plastics_move_count=len(plastics_moves),
-        trim_move_count=len(trim_moves),
         active_driver_count=len(active_drivers),
         reported_delay_count=reported_delay_count,
         live_problem_count=live_problem_count,
-        plastics_driver_count=len(plastics_drivers),
-        trim_driver_count=len(trim_drivers),
         has_drivers=bool(drivers),
         today=today,
-        manager_division=_division_for_user(current_user),
         database_status=database_status(current_app.config.get("SQLALCHEMY_DATABASE_URI", "")),
     )
 
@@ -759,6 +833,8 @@ def driver_route_print():
         print_driver=ctx["driver"],
         route_finalized=False,
         attachment_url=url_for("manager.driver_route_attachment", driver_id=driver_id, date=route_date.isoformat()),
+        csv_url=url_for("manager.driver_route_export", driver_id=driver_id, date=route_date.isoformat(), type="csv"),
+        sheets_url=url_for("manager.driver_route_export", driver_id=driver_id, date=route_date.isoformat(), type="sheets"),
         email_mode=False,
     )
 
@@ -785,6 +861,35 @@ def driver_route_attachment():
         filename=f"driver-route-{driver_id}-{route_date}.pdf",
         target_type="driver_log",
         title="Manager Driver Route PDF downloaded",
+    )
+
+
+@bp.route("/driver-logs/route-export")
+def driver_route_export():
+    driver_id = request.args.get("driver_id", type=int)
+    if not driver_id:
+        flash("Choose a driver before exporting the route.", "warning")
+        return redirect(url_for("manager.driver_logs"))
+    try:
+        route_date = datetime.strptime(request.args.get("date") or date.today().isoformat(), "%Y-%m-%d").date()
+    except ValueError:
+        route_date = date.today()
+    export_type = request.args.get("type", "csv")
+    ctx = _route_print_context(driver_id, route_date)
+    if export_type == "sheets":
+        return _route_export_response(
+            ctx,
+            filename=f"driver-route-{driver_id}-{route_date}-sheets.tsv",
+            delimiter="\t",
+            content_type="text/tab-separated-values; charset=utf-8",
+            title="Manager Driver Route Sheets export downloaded",
+        )
+    return _route_export_response(
+        ctx,
+        filename=f"driver-route-{driver_id}-{route_date}.csv",
+        delimiter=",",
+        content_type="text/csv; charset=utf-8",
+        title="Manager Driver Route CSV downloaded",
     )
 
 
@@ -817,12 +922,9 @@ def view_driver_log(log_id):
         .all()
     )
 
-    # Delay detail: any stop on this driver/date with dock wait or downtime reason
+    # Delay detail: only stops where the driver recorded a wait or downtime reason.
     delay_logs = [dl for dl in day_logs if (dl.dock_wait_minutes or 0) > 0 or dl.downtime_reason]
-
-    # Average dock wait across the day (stops that recorded a value)
-    wait_values = [dl.dock_wait_minutes for dl in day_logs if dl.dock_wait_minutes is not None]
-    avg_dock_wait = round(sum(wait_values) / len(wait_values), 1) if wait_values else None
+    has_reported_delay = any((dl.dock_wait_minutes or 0) > 0 for dl in day_logs)
 
     all_routes = _driver_log_route_context(day_logs)
     return render_template(
@@ -837,7 +939,7 @@ def view_driver_log(log_id):
         today_local_date=date.today(),
         damage_reports=damage_reports,
         delay_logs=delay_logs,
-        avg_dock_wait=avg_dock_wait,
+        has_reported_delay=has_reported_delay,
         day_logs=day_logs,
     )
 

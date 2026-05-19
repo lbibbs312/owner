@@ -123,13 +123,15 @@
           <div class="sv">{{ stop_count }}</div>
           <div class="sl">Total Stops</div>
         </div>
+        {% if delay_logs %}
         <div class="stat-card">
           <div class="sv">{{ delay_logs|length }}</div>
           <div class="sl">Delay Events</div>
         </div>
+        {% endif %}
         <div class="stat-card">
-          <div class="sv">{% if avg_dock_wait is not none %}{{ avg_dock_wait }} min{% else %}—{% endif %}</div>
-          <div class="sl">Avg Dock Wait</div>
+          <div class="sv">{{ damage_reports|length }}</div>
+          <div class="sl">Damage Reports</div>
         </div>
       </div>
     </div>
@@ -148,7 +150,7 @@
             <th>Arrive</th>
             <th>Depart</th>
             <th>Parts</th>
-            <th>Dock Wait</th>
+            {% if has_reported_delay %}<th>Delay</th>{% endif %}
           </tr>
         </thead>
         <tbody>
@@ -185,10 +187,12 @@
               {% elif dl.hot_parts %}<strong style="color:#be123c;">HOT</strong> {{ dl.part_number or '' }}
               {% else %}{{ dl.part_number or '—' }}{% endif %}
             </td>
+            {% if has_reported_delay %}
             <td style="white-space:nowrap;">
               {% if dl.dock_wait_minutes %}{{ dl.dock_wait_minutes }} min{% else %}—{% endif %}
               {% if dl.downtime_reason %}<div style="font-size:.75rem;color:#92400e;">{{ dl.downtime_reason }}</div>{% endif %}
             </td>
+            {% endif %}
           </tr>
           {% endfor %}
         </tbody>

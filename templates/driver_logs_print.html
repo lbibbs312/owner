@@ -61,6 +61,8 @@
 <div class="print-page">
   <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
   <a class="email-btn" href="{{ attachment_url if attachment_url is defined else url_for('driver.driver_logs_attachment') }}">Download PDF Attachment</a>
+  {% if csv_url is defined %}<a class="email-btn" href="{{ csv_url }}">CSV Export</a>{% endif %}
+  {% if sheets_url is defined %}<a class="email-btn" href="{{ sheets_url }}">Sheets Export</a>{% endif %}
   <p class="print-guidance">Use Letter paper, portrait orientation, and disable browser headers/footers if your print dialog offers that option.</p>
 
   <div class="sheet-head">

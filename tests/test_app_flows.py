@@ -532,7 +532,11 @@ def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
     login(client, "manager1")
     dashboard = client.get("/manager/dashboard?focus=routes")
     assert dashboard.status_code == 200
+    assert dashboard.headers["Cache-Control"].startswith("no-store")
+    assert client.get("/manager/delays").status_code == 404
     assert b"Avg Dock Wait" not in dashboard.data
+    assert b"Trim Division" not in dashboard.data
+    assert b"Plastics Division" not in dashboard.data
     assert b"Delay" in dashboard.data
     assert b"17 min" in dashboard.data
     assert b"focus=delays" not in dashboard.data
@@ -1065,9 +1069,23 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     filtered_logs = client.get(f"/manager/driver-logs?driver_id={driver_id}&date={date.today().isoformat()}")
     assert b"Print / Save Route" in filtered_logs.data
     assert b"Download Route PDF" in filtered_logs.data
+    assert b"CSV" in filtered_logs.data
+    assert b"Sheets" in filtered_logs.data
     route_print = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
     assert route_print.status_code == 200
     assert b"Driver Route Audit Sheet" in route_print.data
+    assert b"CSV Export" in route_print.data
+    assert b"Sheets Export" in route_print.data
+
+    route_csv = client.get(f"/manager/driver-logs/route-export?driver_id={driver_id}&date={date.today().isoformat()}&type=csv")
+    assert route_csv.status_code == 200
+    assert route_csv.headers["Content-Type"].startswith("text/csv")
+    assert b"Stop,Date,Driver" in route_csv.data
+
+    route_sheets = client.get(f"/manager/driver-logs/route-export?driver_id={driver_id}&date={date.today().isoformat()}&type=sheets")
+    assert route_sheets.status_code == 200
+    assert route_sheets.headers["Content-Type"].startswith("text/tab-separated-values")
+    assert b"Stop	Date	Driver" in route_sheets.data
 
     dashboard = client.get(f"/manager/dashboard?driver_id={driver_id}")
     assert dashboard.status_code == 200
@@ -1079,6 +1097,9 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     assert b"status-dot complete" in dashboard.data
     assert b"status-dot problem" in dashboard.data
     assert b"Live Problems" in dashboard.data
+    detail_page = client.get(f"/manager/driver-logs/{log_id}")
+    assert detail_page.status_code == 200
+    assert b"Avg Dock Wait" not in detail_page.data
 
     driver_page_attempt = client.get("/driver_logs", follow_redirects=False)
     assert driver_page_attempt.status_code == 302
