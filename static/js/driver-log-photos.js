@@ -14,7 +14,8 @@
     link.target = '_blank';
     link.rel = 'noopener';
     link.innerHTML = '<img src="' + photo.url + '" alt="Stop proof photo">' +
-      '<span>' + escapeHtml(photo.source) + ' - ' + escapeHtml(photo.original_filename) + '</span>';
+      '<span>' + escapeHtml(photo.source) + ' - ' + escapeHtml(photo.original_filename) + '</span>' +
+      (photo.note ? '<small>Reason: ' + escapeHtml(photo.note) + '</small>' : '');
     list.prepend(link);
   }
 
@@ -22,12 +23,20 @@
     const uploadUrl = panel.dataset.uploadUrl;
     const status = panel.querySelector('[data-stop-photo-status]');
     const list = panel.querySelector('[data-stop-photo-list]');
+    const noteInput = panel.querySelector('[data-stop-photo-note]');
 
     async function uploadFile(file, source) {
       if (!file) return;
+      const note = noteInput ? noteInput.value.trim() : '';
+      if (!note) {
+        status.textContent = 'Add a short reason before choosing a photo.';
+        if (noteInput) noteInput.focus();
+        return;
+      }
       const formData = new FormData();
       formData.append('photo', file);
       formData.append('source', source || 'gallery');
+      formData.append('note', note);
       status.textContent = 'Uploading photo...';
       const response = await fetch(uploadUrl, {
         method: 'POST',
@@ -37,11 +46,18 @@
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Photo upload failed.');
       addPhotoCard(list, payload.photo);
+      if (noteInput) noteInput.value = '';
       status.textContent = 'Photo saved to this stop.';
     }
 
     panel.querySelectorAll('[data-stop-photo-trigger]').forEach(function (button) {
       button.addEventListener('click', function () {
+        const note = noteInput ? noteInput.value.trim() : '';
+        if (!note) {
+          status.textContent = 'Add a short reason before choosing a photo.';
+          if (noteInput) noteInput.focus();
+          return;
+        }
         const source = button.dataset.source || 'gallery';
         const input = panel.querySelector('[data-stop-photo-input="' + source + '"]');
         if (input) input.click();

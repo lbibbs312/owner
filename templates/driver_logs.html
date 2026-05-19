@@ -49,6 +49,12 @@
     .route-chip.warn { background:#fef3c7; color:#92400e; }
     .route-chip.task-chip { text-transform:none; letter-spacing:0; font-size:.72rem; }
     .route-chip.dark { background:#111827; color:#fff; }
+    .route-photo-strip { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:stretch; }
+    .route-photo-link { display:inline-flex; align-items:center; gap:8px; max-width:100%; border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; border-radius:8px; padding:5px 8px; text-decoration:none; font-size:.72rem; font-weight:900; line-height:1.2; }
+    .route-photo-link:hover { color:#1e40af; border-color:#93c5fd; background:#dbeafe; }
+    .route-photo-link img { width:42px; height:34px; object-fit:cover; border:1px solid #bfdbfe; border-radius:5px; background:#fff; flex:0 0 auto; }
+    .route-photo-link span { min-width:0; overflow-wrap:anywhere; }
+    .route-photo-note { display:block; color:#334155; font-size:.68rem; font-weight:800; margin-top:1px; }
     .route-card-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
     .route-card-actions .btn, .route-card-actions form { flex:1 1 130px; min-width:0; }
     .route-card-actions .btn { width:100%; white-space:normal; }
@@ -197,6 +203,18 @@
               {% endfor %}
             </div>
 
+            {% if log.photos %}
+              <div class="route-photo-strip" aria-label="Stop photo proof">
+                {% for photo in log.photos %}
+                  {% set photo_url = url_for('manager.driver_log_photo', photo_id=photo.id) if current_user.role == 'management' else url_for('driver.driver_log_photo', photo_id=photo.id) %}
+                  <a class="route-photo-link" href="{{ photo_url }}" target="_blank" rel="noopener">
+                    <img src="{{ photo_url }}" alt="Stop proof photo {{ loop.index }}">
+                    <span>Photo proof {{ loop.index }}<small class="route-photo-note">{{ photo.note or ((photo.source or 'photo')|replace('_', ' ')|title) }}</small></span>
+                  </a>
+                {% endfor %}
+              </div>
+            {% endif %}
+
             <div class="route-card-actions">
               <a href="{{ url_for(log_view_endpoint, log_id=log.id) }}" class="btn btn-sm btn-info hover-btn">View</a>
               {% if can_manage_log %}
@@ -236,6 +254,7 @@
           <th>Meeting</th>
           <th>Arrive</th>
           <th>Depart</th>
+          <th>Proof</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -333,6 +352,22 @@
                 {% endif %}
               {% else %}
                 --
+              {% endif %}
+            </td>
+
+            <td>
+              {% if log.photos %}
+                <div class="route-photo-strip" aria-label="Stop photo proof">
+                  {% for photo in log.photos %}
+                    {% set photo_url = url_for('manager.driver_log_photo', photo_id=photo.id) if current_user.role == 'management' else url_for('driver.driver_log_photo', photo_id=photo.id) %}
+                    <a class="route-photo-link" href="{{ photo_url }}" target="_blank" rel="noopener">
+                      <img src="{{ photo_url }}" alt="Stop proof photo {{ loop.index }}">
+                      <span>Photo {{ loop.index }}<small class="route-photo-note">{{ photo.note or ((photo.source or 'photo')|replace('_', ' ')|title) }}</small></span>
+                    </a>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <span class="text-muted">--</span>
               {% endif %}
             </td>
             

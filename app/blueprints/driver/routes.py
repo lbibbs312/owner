@@ -875,6 +875,9 @@ def _save_driver_log_photo(log, uploaded_file, *, source="gallery", note=None, u
         raise ValueError("Choose a photo from your gallery or camera before saving proof.")
     original = secure_filename(uploaded_file.filename) or "stop-photo"
     name, ext = os.path.splitext(original)
+    note_text = (note or "").strip()
+    if not note_text:
+        raise ValueError("Add a short reason for this stop photo before uploading.")
     filename = f"driver-log-{log.id}-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}-{uuid4().hex}{ext or '.jpg'}"
     uploaded_file.save(os.path.join(_driver_log_photo_upload_path(), filename))
     photo = DriverLogPhoto(
@@ -883,7 +886,7 @@ def _save_driver_log_photo(log, uploaded_file, *, source="gallery", note=None, u
         original_filename=original,
         content_type=getattr(uploaded_file, "mimetype", None) or getattr(uploaded_file, "content_type", None),
         source=(source or "gallery")[:40],
-        note=(note or "").strip() or None,
+        note=note_text[:500],
         uploaded_by_id=uploaded_by_id,
         uploaded_at=datetime.utcnow(),
     )
@@ -898,6 +901,7 @@ def _driver_log_photo_payload(photo):
         "url": url_for("driver.driver_log_photo", photo_id=photo.id),
         "original_filename": photo.original_filename or photo.filename,
         "source": (photo.source or "gallery").replace("_", " ").title(),
+        "note": photo.note or "",
     }
 
 
@@ -2706,7 +2710,7 @@ def record_driver_log_photo(log_id):
         category="log_photo",
         action="created",
         title="Stop photo proof uploaded",
-        details=f"{_plant_label(log.plant_name)} stop photo: {photo.original_filename or photo.filename}",
+        details=f"{_plant_label(log.plant_name)} stop photo: {photo.original_filename or photo.filename}. Reason: {photo.note}",
         target_type="driver_log_photo",
         target_id=photo.id,
         commit=False,
@@ -2974,6 +2978,7 @@ def view_driver_log(log_id):
         "view_driver_log.html",
         log=log,
         today_local_date=_today_local_date(),
+        driver_log_photos=list(log.photos),
     )
 
 

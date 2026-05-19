@@ -1969,18 +1969,32 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     edit_page = client.get(f"/edit_driver_log/{log_id}")
     assert edit_page.status_code == 200
     assert b"Add Picture To This Stop" in edit_page.data
+    assert b"Why are you adding this picture?" in edit_page.data
     assert b"Upload From Gallery" in edit_page.data
     assert b'data-stop-photo-input="edit_gallery"' in edit_page.data
     assert b'capture="environment" data-stop-photo-input="edit_camera"' in edit_page.data
 
-    first_upload = client.post(
+    missing_note = client.post(
         f"/driver_logs/{log_id}/photos",
         data={"source": "edit_gallery", "photo": (BytesIO(b"edit-gallery-photo"), "edit-gallery.jpg")},
+        headers={"Accept": "application/json"},
+    )
+    assert missing_note.status_code == 400
+    assert "reason" in missing_note.get_json()["error"]
+
+    first_upload = client.post(
+        f"/driver_logs/{log_id}/photos",
+        data={
+            "source": "edit_gallery",
+            "note": "Loaded seal photo from gallery",
+            "photo": (BytesIO(b"edit-gallery-photo"), "edit-gallery.jpg"),
+        },
         headers={"Accept": "application/json"},
     )
     assert first_upload.status_code == 200
     first_photo = first_upload.get_json()["photo"]
     assert first_photo["source"] == "Edit Gallery"
+    assert first_photo["note"] == "Loaded seal photo from gallery"
     driver_photo = client.get(first_photo["url"])
     assert driver_photo.status_code == 200
     assert driver_photo.data == b"edit-gallery-photo"
@@ -1988,6 +2002,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     depart_page = client.get(f"/driver_logs/{log_id}/depart")
     assert depart_page.status_code == 200
     assert b"Add Picture To This Stop" in depart_page.data
+    assert b"Why are you adding this picture?" in depart_page.data
     assert b"Upload From Gallery" in depart_page.data
     assert b'data-stop-photo-input="departure_gallery"' in depart_page.data
     assert b"Upload Label Photo" not in depart_page.data
@@ -1995,12 +2010,28 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
 
     second_upload = client.post(
         f"/driver_logs/{log_id}/photos",
-        data={"source": "departure_gallery", "photo": (BytesIO(b"departure-gallery-photo"), "departure-gallery.png")},
+        data={
+            "source": "departure_gallery",
+            "note": "Departing load proof from gallery",
+            "photo": (BytesIO(b"departure-gallery-photo"), "departure-gallery.png"),
+        },
         headers={"Accept": "application/json"},
     )
     assert second_upload.status_code == 200
     second_photo = second_upload.get_json()["photo"]
     assert second_photo["source"] == "Departure Gallery"
+    assert second_photo["note"] == "Departing load proof from gallery"
+
+    driver_list = client.get("/driver_logs")
+    assert driver_list.status_code == 200
+    assert b"Photo proof 1" in driver_list.data
+    assert b"Loaded seal photo from gallery" in driver_list.data
+    assert b"Departing load proof from gallery" in driver_list.data
+
+    driver_detail = client.get(f"/view_driver_log/{log_id}")
+    assert driver_detail.status_code == 200
+    assert b"Stop Photo Proof" in driver_detail.data
+    assert b"Loaded seal photo from gallery" in driver_detail.data
 
     with app.app_context():
         from app.models import DriverLogPhoto
@@ -2012,9 +2043,16 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
 
     client.get("/logout")
     login(client, "photo_manager")
+    manager_list = client.get(f"/manager/driver-logs?date={date.today().isoformat()}")
+    assert manager_list.status_code == 200
+    assert b"Proof" in manager_list.data
+    assert b"Loaded seal photo from gallery" in manager_list.data
+    assert b"Departing load proof from gallery" in manager_list.data
+
     manager_page = client.get(f"/manager/driver-logs/{log_id}")
     assert manager_page.status_code == 200
     assert b"Stop Photo Proof" in manager_page.data
+    assert b"Loaded seal photo from gallery" in manager_page.data
     assert f"/manager/driver-log-photos/{first_photo_id}".encode() in manager_page.data
     assert f"/manager/driver-log-photos/{second_photo_id}".encode() in manager_page.data
     manager_photo = client.get(f"/manager/driver-log-photos/{second_photo_id}")
