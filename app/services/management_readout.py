@@ -37,15 +37,30 @@ def _stop_label(log, routes):
     return route.get("plant") or plant_label(getattr(log, "plant_name", ""))
 
 
+def _stop_position(log, day_logs):
+    for index, day_stop in enumerate(day_logs, start=1):
+        if getattr(day_stop, "id", None) == getattr(log, "id", None):
+            return index
+    return None
+
+
 def _truck_phrase(truck_id):
     if truck_id and truck_id != "Truck not set":
         return f"using truck {truck_id}"
     return "without a recorded truck ID"
 
 
+def _raw_delay_reason(log):
+    return (getattr(log, "downtime_reason", "") or "").strip()
+
+
 def _delay_reason(log):
-    reason = (getattr(log, "downtime_reason", "") or "").strip()
-    if reason:
+    raw = _raw_delay_reason(log)
+    lowered = raw.lower()
+    if "second-stop cargo" in lowered and ("not dropped" in lowered or "not being dropped" in lowered):
+        return "second-stop cargo was not dropped"
+    if raw:
+        reason = raw
         if ":" in reason:
             reason = reason.split(":", 1)[1].strip() or reason
         return reason[:1].lower() + reason[1:]
@@ -55,14 +70,9 @@ def _delay_reason(log):
     return ""
 
 
-def _action_reason(reason):
-    cleaned = (reason or "the recorded process issue").strip().rstrip(".")
-    return cleaned.replace("not being", "was not")
-
-
 def _classify_delay(log):
-    reason = _delay_reason(log).lower()
-    if getattr(log, "dock_wait_minutes", None) and not reason:
+    reason = f"{_raw_delay_reason(log)} {_delay_reason(log)}".lower()
+    if getattr(log, "dock_wait_minutes", None) and not reason.strip():
         reason = "dock wait"
     for label, keywords in DELAY_CLASSIFIERS:
         if any(keyword in reason for keyword in keywords):
@@ -104,7 +114,9 @@ def _damage_summary(damage_reports):
         return "No damage reports were filed."
 
     count = len(damage_reports)
-    open_count = sum(1 for report in damage_reports if (getattr(report, "status", "") or "").lower() != "closed")
+    open_count = sum(
+        1 for report in damage_reports if (getattr(report, "status", "") or "").lower() != "closed"
+    )
     summary = f"{_count_label(count, 'damage report')} {_was_were(count)} filed."
     if open_count:
         summary += f" {_count_label(open_count, 'report')} remains open and needs follow-up."
@@ -120,8 +132,8 @@ def _flag_summary(day_logs):
     if any(getattr(log, "meeting", False) for log in day_logs):
         flags.append("meeting")
     if not flags:
-        return ""
-    return f"{_human_join(flags).capitalize()} was also flagged in the route log."
+        return "No maintenance, fuel, or meeting flags were recorded."
+    return f"{_human_join(flags).capitalize()} was flagged in the route log."
 
 
 def _evidence_references(day_logs, routes, delay_logs, damage_reports, open_log):
@@ -144,6 +156,15 @@ def _evidence_references(day_logs, routes, delay_logs, damage_reports, open_log)
     return references[:5]
 
 
+def _process_action_item(delay_log):
+    reason = f"{_raw_delay_reason(delay_log)} {_delay_reason(delay_log)}".lower()
+    if "second-stop cargo" in reason or "not dropped" in reason or "cargo" in reason:
+        return "Review why the second-stop cargo was not dropped."
+    if "wrong load" in reason:
+        return "Review the wrong-load process issue."
+    return "Review the process/load-handling exception."
+
+
 def build_management_narrative(day_log):
     """Build deterministic management copy from collected day-log records."""
     log = day_log["log"]
@@ -155,35 +176,43 @@ def build_management_narrative(day_log):
 
     truck_id = truck_context.get("truck_id") or "Truck not set"
     stop_count = len(day_logs)
+    completed_count = sum(1 for day_stop in day_logs if getattr(day_stop, "depart_time", None))
     open_logs = [day_stop for day_stop in day_logs if not getattr(day_stop, "depart_time", None)]
     open_log = log if not getattr(log, "depart_time", None) else (open_logs[0] if open_logs else None)
     open_stop = _stop_label(open_log, routes) if open_log else None
+    open_stop_position = _stop_position(open_log, day_logs) if open_log else None
 
     base = f"This route recorded {_count_label(stop_count, 'stop')} {_truck_phrase(truck_id)}."
+    completed_text = f"{completed_count} of {stop_count} stops are completed."
     if open_log:
         route_status = "In Progress / Open Stop"
-        status_summary = (
-            f"{base} The route is still open at {open_stop} because no departure/load-out "
-            "time has been recorded."
+        open_text = (
+            f"Stop #{open_stop_position} {open_stop} remains open and needs departure/load-out."
         )
-        main_issue = f"Open follow-up: record departure/load-out for {open_stop}."
+        status_summary = f"{base} {completed_text} The route is still open at {open_stop}."
+        main_issue = f"Open follow-up: record departure/load-out for Stop #{open_stop_position} {open_stop}."
     else:
         route_status = "Completed"
-        status_summary = f"{base} The route was completed with departure times recorded for all stops."
+        open_text = "No open stops are visible; the route was completed."
+        status_summary = f"{base} All {stop_count} stops are completed. The route was completed."
         main_issue = "No open route stop is visible from the collected log data."
 
     delay_summary = _delay_summary(delay_logs)
     damage_summary = _damage_summary(damage_reports)
     flag_summary = _flag_summary(day_logs)
-    exception_summary = " ".join(part for part in (delay_summary, damage_summary, flag_summary) if part)
+    exception_summary = " ".join((delay_summary, damage_summary, flag_summary))
 
     action_items = []
     if open_log:
         action_items.append(f"Close out the open {open_stop} stop.")
     for delay_log in delay_logs:
         if _classify_delay(delay_log) == "process/load-handling issue":
-            action_items.append(f"Review why {_action_reason(_delay_reason(delay_log))}.")
-    open_damage_count = sum(1 for report in damage_reports if (getattr(report, "status", "") or "").lower() != "closed")
+            item = _process_action_item(delay_log)
+            if item not in action_items:
+                action_items.append(item)
+    open_damage_count = sum(
+        1 for report in damage_reports if (getattr(report, "status", "") or "").lower() != "closed"
+    )
     if open_damage_count == 1:
         action_items.append("Assign or close the open damage report.")
     elif open_damage_count > 1:
@@ -195,10 +224,20 @@ def build_management_narrative(day_log):
         "status_summary": status_summary,
         "main_issue": main_issue,
         "exception_summary": exception_summary,
+        "narrative_lines": [
+            {"label": "Completed stops", "text": completed_text},
+            {"label": "Open stop", "text": open_text},
+            {"label": "Delay events", "text": delay_summary},
+            {"label": "Damage reports", "text": damage_summary},
+            {"label": "Maintenance flags", "text": flag_summary},
+        ],
         "action_items": action_items,
         "evidence_references": _evidence_references(day_logs, routes, delay_logs, damage_reports, open_log),
         "route_status": route_status,
         "current_stop": open_stop or _stop_label(log, routes),
+        "open_stop": open_stop,
+        "open_stop_position": open_stop_position,
+        "completed_stop_count": completed_count,
         "delay_count": len(delay_logs),
         "damage_count": len(damage_reports),
         "open_damage_count": open_damage_count,

@@ -1113,10 +1113,11 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
 
 def test_manager_driver_day_log_uses_management_readout_narrative(client, app):
     from datetime import date, datetime
+    from pathlib import Path
 
     with app.app_context():
         from app.extensions import db
-        from app.models import DamageReport, DriverLog, PreTrip
+        from app.models import DamagePhoto, DamageReport, DriverLog, PreTrip
 
         driver = create_user(
             "lbibbs312",
@@ -1127,13 +1128,18 @@ def test_manager_driver_day_log_uses_management_readout_narrative(client, app):
         )
         create_user("manager1", "manager1@example.com", "management")
         route_date = date(2026, 5, 19)
-        pretrip = PreTrip(user_id=driver.id, truck_number="st4", pretrip_date=route_date)
+        pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="st4",
+            pretrip_date=route_date,
+            start_mileage=11111111,
+        )
         first = DriverLog(
             driver_id=driver.id,
             date=route_date,
-            plant_name="KP",
+            plant_name="RE",
             load_size="Empty",
-            depart_load_size="PC Load",
+            depart_load_size="KP Load",
             arrive_time="2026-05-19 08:00:00",
             depart_time="08:20",
             downtime_reason="Truck Issue: Truck regen",
@@ -1143,12 +1149,12 @@ def test_manager_driver_day_log_uses_management_readout_narrative(client, app):
         second = DriverLog(
             driver_id=driver.id,
             date=route_date,
-            plant_name="PC",
-            load_size="PC Load",
+            plant_name="KP",
+            load_size="KP Load",
             depart_load_size="PE Load",
             arrive_time="2026-05-19 09:00:00",
             depart_time="09:30",
-            downtime_reason="Second-stop cargo not being dropped",
+            downtime_reason="Second-stop cargo not dropped: forgot",
             created_at=datetime(2026, 5, 19, 9, 0),
         )
         third = DriverLog(
@@ -1171,31 +1177,60 @@ def test_manager_driver_day_log_uses_management_readout_narrative(client, app):
         )
         db.session.add(damage)
         db.session.commit()
+        upload_root = Path(app.config["DAMAGE_UPLOAD_FOLDER"])
+        upload_root.mkdir(parents=True, exist_ok=True)
+        (upload_root / "damage-proof.jpg").write_bytes(b"fake image bytes")
+        photo = DamagePhoto(
+            damage_report_id=damage.id,
+            stage="after",
+            filename="damage-proof.jpg",
+            original_filename="driver-uploaded-proof.jpg",
+        )
+        db.session.add(photo)
+        db.session.commit()
         log_id = third.id
+        photo_id = photo.id
 
     login(client, "manager1")
     page = client.get(f"/manager/driver-logs/{log_id}")
 
     assert page.status_code == 200
+    assert "LACKSDRIVERS — ROUTE AUDIT".encode() in page.data
+    assert b"Viewing stop #" not in page.data
     assert b"Management Readout" in page.data
+    assert b"Driver Day Log" not in page.data
     assert page.data.count(b"Lamar Bibbs") == 1
     assert b"No division" not in page.data
     assert b"Badge No badge" not in page.data
     assert b"Driver Day Summary" not in page.data
     assert b"Truck ID" not in page.data
-    assert b"The route is still open at Paint East" in page.data
+    assert b"2 of 3 stops are completed" in page.data
+    assert b"Stop #3 Paint East remains open" in page.data
+    assert b"Open Route Stop" in page.data
+    assert b"Stop #3 - Paint East" in page.data
+    assert b"Selected Stop Details" in page.data
+    assert b"Selected Stop" in page.data
+    assert b"Stop #1 - Raleigh East" in page.data
+    assert b"Stop #3 - Paint East" in page.data
     assert b"2 delay events were reported" in page.data
     assert b"vehicle-related issue" in page.data
     assert b"process/load-handling issue" in page.data
     assert b"1 damage report was filed" in page.data
     assert b"Close out the open Paint East stop." in page.data
-    assert b"Review why second-stop cargo was not dropped." in page.data
+    assert b"Review why the second-stop cargo was not dropped." in page.data
+    assert b"Review why forgot" not in page.data
     assert b"Assign or close the open damage report." in page.data
+    assert b"Evidence References" not in page.data
     assert b"Full Day Route" in page.data
-    assert b"Delay Reports" in page.data
-    assert b"Damage Reports" in page.data
-    assert b"Stop Details" in page.data
+    assert b"Exceptions" in page.data
     assert b"Open scuff report" in page.data
+    assert f'/manager/damage-photos/{photo_id}'.encode() in page.data
+    assert b"damage-proof.jpg" not in page.data
+    assert b"11,111,111 mi is unusually high" in page.data
+
+    photo_response = client.get(f"/manager/damage-photos/{photo_id}")
+    assert photo_response.status_code == 200
+    assert photo_response.data == b"fake image bytes"
 
 
 def test_manager_driver_log_uses_plain_stop_progress_and_named_task(client, app):

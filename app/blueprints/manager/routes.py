@@ -111,12 +111,18 @@ def _truck_context_for_driver(driver_id, target_date=None):
         meta.append(f"Trailer {pretrip.trailer_number}")
     if pretrip.truck_type:
         meta.append(pretrip.truck_type)
+    odometer_warning = None
     if pretrip.start_mileage is not None:
         meta.append(f"Start {pretrip.start_mileage} mi")
+        if pretrip.start_mileage >= 1_000_000:
+            odometer_warning = (
+                f"Verify odometer entry: {pretrip.start_mileage:,} mi is unusually high."
+            )
     return {
         "truck_id": pretrip.truck_number or "Truck not set",
         "truck_meta": " • ".join(meta) if meta else f"DVIR #{pretrip.id}",
         "pretrip_id": pretrip.id,
+        "odometer_warning": odometer_warning,
     }
 
 
@@ -904,7 +910,8 @@ def view_driver_log(log_id):
         .all()
     )
     related_task = _related_task_for_log(log)
-    stop_position = next((index + 1 for index, day_log in enumerate(day_logs) if day_log.id == log.id), None)
+    day_log_positions = {day_log.id: index + 1 for index, day_log in enumerate(day_logs)}
+    stop_position = day_log_positions.get(log.id)
 
     # Damage reports linked to this log or reported by this driver on this date
     damage_reports = (
@@ -954,6 +961,7 @@ def view_driver_log(log_id):
         delay_logs=delay_logs,
         has_reported_delay=has_reported_delay,
         day_logs=day_logs,
+        day_log_positions=day_log_positions,
         management_narrative=management_narrative,
     )
 
