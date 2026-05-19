@@ -37,8 +37,8 @@ from app.services.plant_time import forecast_for_stop, plant_forecast_rows, rout
 from app.services.report_summary import damage_report_count_label, damage_report_detail_label
 from app.services.role_session import restore_role_user
 from app.services.search_corpus import suggest_terms
+from app.services.simple_pdf import LETTER, SimplePdf
 from app.blueprints.driver.routes import (
-    _build_driver_logs_pdf,
     _build_plant_transfer_pdf,
     _build_pretrip_pdf,
     _plant_transfer_copy_sets,
@@ -685,7 +685,293 @@ def _route_print_context(driver_id, route_date):
         "stop_forecasts": route_stop_forecasts(logs),
         "driver_signature": signature_shift.driver_signature if signature_shift else None,
         "signature_timestamp": signature_shift.signature_timestamp if signature_shift else None,
+        "route_finalized": _route_finalized_for_driver_date(driver.id, route_date),
+        "part_scan_events": _part_scan_events_for_logs(logs),
     }
+
+
+def _route_finalized_for_driver_date(driver_id, route_date):
+    return ActivityEvent.query.filter_by(
+        user_id=driver_id,
+        category="eod",
+        action="finalized",
+        target_type="end_of_day",
+    ).filter(ActivityEvent.details.contains(str(route_date))).first() is not None
+
+
+def _part_scan_events_for_logs(logs):
+    log_ids = [log.id for log in logs]
+    if not log_ids:
+        return []
+    return (
+        PartScanEvent.query
+        .filter(PartScanEvent.stop_id.in_(log_ids))
+        .order_by(PartScanEvent.timestamp.asc(), PartScanEvent.id.asc())
+        .all()
+    )
+
+
+def _driver_short_name(driver):
+    return (driver.first_name or driver.display_name or driver.username or "Driver").split()[0]
+
+
+def _manager_truck_label(pretrips):
+    latest = pretrips[-1] if pretrips else None
+    if not latest:
+        return "Not recorded"
+    parts = [part for part in (latest.truck_number, latest.trailer_number) if part]
+    return " / ".join(parts) if parts else "Not recorded"
+
+
+def _mileage_quality_item(total_miles):
+    if total_miles is None:
+        return {"label": "Mileage", "status": "Pending", "detail": "Posttrip mileage has not been recorded."}
+    try:
+        miles = int(total_miles)
+    except (TypeError, ValueError):
+        return {"label": "Mileage", "status": "Needs correction", "detail": f"Mileage value {total_miles} is not numeric."}
+    if miles < 0 or miles > 1000:
+        return {"label": "Mileage", "status": "Needs correction", "detail": f"{miles:,} miles is outside normal route range."}
+    return {"label": "Mileage", "status": "Normal", "detail": f"{miles:,} miles recorded."}
+
+
+def _manager_photo_reviews(logs, log_routes):
+    rows = []
+    for log in logs:
+        plant = (log_routes.get(log.id) or {}).get("plant") or _plant_label(log.plant_name)
+        summary = _stop_photo_review_summary(log, plant)
+        if not summary:
+            continue
+        latest = summary.get("latest")
+        note = (getattr(latest, "note", "") or "").strip()
+        lower_note = note.lower()
+        safety_terms = ("unbalanced", "un-balanced", "skid", "tip", "tipped", "safety", "unsafe")
+        review_type = "Cargo safety review" if any(term in lower_note for term in safety_terms) else summary["label"]
+        rows.append({
+            "log": log,
+            "plant": plant,
+            "summary": summary,
+            "photo": latest,
+            "thumbnail": summary.get("thumbnail"),
+            "note": note,
+            "review_type": review_type,
+            "uploaded_at": getattr(latest, "uploaded_at", None),
+            "photo_url": url_for("manager.driver_log_photo", photo_id=summary["thumbnail"].id) if summary.get("thumbnail") else None,
+        })
+    return rows
+
+
+def _manager_cargo_review(logs, log_routes, part_scan_events):
+    movement_rows = []
+    issues = []
+    for log in logs:
+        route = log_routes.get(log.id, {})
+        plant = route.get("plant") or _plant_label(log.plant_name)
+        movement_rows.append({
+            "plant": plant,
+            "picked_up": route.get("depart_cargo_desc") if route.get("depart_cargo_desc") is not None else (log.depart_load_size or "--"),
+            "dropped": "Final unload recorded" if route.get("unloaded_on_arrival") else ("Second-stop drop recorded" if route.get("secondary_dropped_on_arrival") else "--"),
+            "onboard": route.get("arrive_cargo_desc") or route.get("arrive_desc") or log.load_size or "--",
+            "empty_departure": bool(log.no_pickup or route.get("depart_cargo_desc") == "Empty"),
+        })
+        cargo_issue = secondary_not_dropped_reason(log) or route_problem_reason(log)
+        if cargo_issue:
+            issues.append(f"{plant}: {cargo_issue}")
+    pending_scans = [event for event in part_scan_events if (event.validation_status or "").lower() in {"unknown", "pending", "needs_review", "needs review"}]
+    failed_scans = [event for event in part_scan_events if (event.validation_status or "").lower() in {"failed", "unexpected", "mismatch"}]
+    return {
+        "movement_rows": movement_rows,
+        "issues": issues,
+        "manifest_linked": bool(part_scan_events),
+        "scan_review_status": "Needs manager confirmation" if pending_scans or failed_scans else ("Recorded" if part_scan_events else "No scan records linked"),
+        "pending_scan_count": len(pending_scans) + len(failed_scans),
+    }
+
+
+def _manager_delay_review(logs, log_routes, stop_forecasts):
+    rows = []
+    for log in logs:
+        route = log_routes.get(log.id, {})
+        forecast = (stop_forecasts or {}).get(log.id)
+        if (log.dock_wait_minutes or 0) > 0 or log.downtime_reason or (forecast and forecast.get("severity") in {"warning", "high"}):
+            plant = route.get("plant") or _plant_label(log.plant_name)
+            rows.append({
+                "plant": plant,
+                "dock_wait": f"{log.dock_wait_minutes} min" if (log.dock_wait_minutes or 0) > 0 else "--",
+                "reason": log.downtime_reason or "--",
+                "forecast": forecast.get("status") if forecast else "--",
+                "estimate": forecast.get("estimate_label") if forecast else "--",
+            })
+    return rows
+
+
+def _manager_data_quality(logs, log_routes, total_miles, driver_signature, route_finalized):
+    items = []
+    mileage_item = _mileage_quality_item(total_miles)
+    if mileage_item["status"] != "Normal":
+        items.append(mileage_item)
+    all_departed = bool(logs) and all(log.depart_time for log in logs)
+    if all_departed and not route_finalized:
+        items.append({"label": "Route status", "status": "Finalization required", "detail": "Final stop appears completed, but the route is still marked open."})
+    for index, log in enumerate(logs):
+        route = log_routes.get(log.id, {})
+        plant = route.get("plant") or _plant_label(log.plant_name)
+        if not log.depart_time and index < len(logs) - 1:
+            items.append({"label": "Missing departure", "status": "Correction required", "detail": f"{plant} is missing departure even though a later stop exists."})
+        if log.arrive_time and log.depart_time:
+            # Keep detailed time math out of this lightweight report until arrival/departure formats are normalized.
+            pass
+    if not driver_signature:
+        items.append({"label": "Driver signature", "status": "Missing", "detail": "Driver route signature has not been captured."})
+    items.append({"label": "Manager signature", "status": "Pending", "detail": "Manager review signature is required before approval."})
+    return items
+
+
+def _manager_required_actions(data_quality_items, photo_reviews, cargo_review, route_finalized, logs, driver_signature):
+    actions = []
+    if any(item["label"] == "Mileage" and item["status"] != "Normal" for item in data_quality_items):
+        actions.append("Correct mileage before approving route.")
+    for review in photo_reviews:
+        if "safety" in review["review_type"].lower() or review["summary"]["label"] == "Cargo Photo Proof":
+            actions.append(f"Review/classify {review['plant']} cargo photo.")
+            break
+    if cargo_review["issues"] or cargo_review["pending_scan_count"]:
+        actions.append("Confirm cargo movement and pending scan review.")
+    all_departed = bool(logs) and all(log.depart_time for log in logs)
+    if all_departed and not route_finalized:
+        actions.append("Finalize route after confirming final unload.")
+    if not driver_signature:
+        actions.append("Collect missing signatures.")
+    if not actions:
+        actions.append("Sign manager review or approve route.")
+    return actions
+
+
+def _manager_review_status(required_actions, data_quality_items, photo_reviews, cargo_review, route_finalized, logs):
+    correction_labels = {"Missing departure"}
+    if any(item["label"] in correction_labels and item["status"] in {"Needs correction", "Correction required"} for item in data_quality_items):
+        return "Correction Required"
+    if photo_reviews or cargo_review["issues"] or cargo_review["pending_scan_count"] or any(item["status"] in {"Missing", "Finalization required", "Pending"} for item in data_quality_items):
+        return "Needs Review"
+    if route_finalized:
+        return "Clean"
+    if logs:
+        return "Needs Review"
+    return "Needs Review"
+
+
+def _manager_summary_sentence(driver, logs, log_routes, route_status, damage_reports, photo_reviews, total_miles, data_quality_items):
+    name = _driver_short_name(driver)
+    parts = [f"{name} completed {len(logs)} route leg{'s' if len(logs) != 1 else ''}"]
+    final_route = log_routes.get(logs[-1].id, {}) if logs else {}
+    final_plant = final_route.get("plant") or (_plant_label(logs[-1].plant_name) if logs else None)
+    if final_plant:
+        if final_route.get("unloaded_on_arrival"):
+            parts[0] += f" and the final unload at {final_plant}."
+        else:
+            parts[0] += f" ending at {final_plant}."
+    else:
+        parts[0] += "."
+    if route_status == "Finalization Required":
+        parts.append("The route is still marked open and needs manager finalization.")
+    elif route_status == "Active":
+        parts.append("The route is active and still in progress.")
+    elif route_status == "Finalized":
+        parts.append("The route has been finalized.")
+    if damage_reports:
+        parts.append(damage_report_count_label(damage_reports) + ".")
+    elif photo_reviews:
+        first = photo_reviews[0]
+        parts.append(f"No formal damage report was filed, but one {first['plant']} cargo photo requires manager classification.")
+    else:
+        parts.append("No formal damage report was filed.")
+    mileage_issue = next((item for item in data_quality_items if item["label"] == "Mileage"), None)
+    if mileage_issue and mileage_issue["status"] != "Normal":
+        parts.append("Mileage requires correction before approval.")
+    return " ".join(parts)
+
+
+def _manager_route_review_context(ctx):
+    logs = ctx.get("logs") or []
+    log_routes = ctx.get("log_routes") or {}
+    route_finalized = bool(ctx.get("route_finalized"))
+    all_departed = bool(logs) and all(log.depart_time for log in logs)
+    if route_finalized:
+        route_status = "Finalized"
+    elif all_departed:
+        route_status = "Finalization Required"
+    elif logs:
+        route_status = "Active"
+    else:
+        route_status = "No Route"
+    photo_reviews = _manager_photo_reviews(logs, log_routes)
+    cargo_review = _manager_cargo_review(logs, log_routes, ctx.get("part_scan_events") or [])
+    delay_review_rows = _manager_delay_review(logs, log_routes, ctx.get("stop_forecasts") or {})
+    data_quality_items = _manager_data_quality(logs, log_routes, ctx.get("total_miles"), ctx.get("driver_signature"), route_finalized)
+    required_actions = _manager_required_actions(data_quality_items, photo_reviews, cargo_review, route_finalized, logs, ctx.get("driver_signature"))
+    review_status = _manager_review_status(required_actions, data_quality_items, photo_reviews, cargo_review, route_finalized, logs)
+    manager_summary = _manager_summary_sentence(ctx["driver"], logs, log_routes, route_status, ctx.get("damage_reports") or [], photo_reviews, ctx.get("total_miles"), data_quality_items)
+    return {
+        **ctx,
+        "review_status": review_status,
+        "route_status": route_status,
+        "manager_summary": manager_summary,
+        "required_actions": required_actions,
+        "data_quality_items": data_quality_items,
+        "photo_reviews": photo_reviews,
+        "cargo_review": cargo_review,
+        "delay_review_rows": delay_review_rows,
+        "truck_label": _manager_truck_label(ctx.get("pretrips") or []),
+    }
+
+
+def _build_manager_route_review_pdf(review):
+    pdf = SimplePdf("Manager Route Review", LETTER)
+    pdf.text(36, 748, "Manager Route Review", size=16, bold=True)
+    pdf.text(36, 730, f"Review Status: {review['review_status']}", size=11, bold=True)
+    pdf.text(330, 748, f"Date: {review['the_date']}", size=9, bold=True)
+    pdf.text(330, 734, f"Driver: {review['driver'].display_name}", size=9)
+    pdf.text(330, 720, f"Truck: {review['truck_label']}", size=9)
+    y = 704
+    y = pdf.multiline_text(36, y, review["manager_summary"], width_chars=95, size=9, leading=11, max_lines=4)
+    y -= 16
+    pdf.text(36, y, "Required Actions", size=11, bold=True)
+    y -= 14
+    for idx, action in enumerate(review["required_actions"], start=1):
+        y = pdf.multiline_text(44, y, f"{idx}. {action}", width_chars=85, size=8, leading=10, max_lines=2)
+    y -= 12
+    pdf.text(36, y, "Data Quality Review", size=11, bold=True)
+    y -= 14
+    quality_rows = [[item["label"], item["status"], item["detail"]] for item in review["data_quality_items"]] or [["Route", "Clean", "No data quality issues flagged."]]
+    y = pdf.table(36, y, [110, 110, 320], 22, ["Check", "Status", "Detail"], quality_rows[:5], font_size=7)
+    y -= 18
+    if review["photo_reviews"]:
+        pdf.text(36, y, "Photo / Damage / Safety Review", size=11, bold=True)
+        y -= 14
+        photo_rows = [[row["plant"], row["review_type"], row["note"] or row["summary"]["detail"]] for row in review["photo_reviews"]]
+        y = pdf.table(36, y, [95, 130, 315], 26, ["Stop", "Review", "Driver Note"], photo_rows[:4], font_size=7)
+        y -= 12
+    if y < 190:
+        pdf.add_page()
+        y = 748
+    pdf.text(36, y, "Manager Decision", size=11, bold=True)
+    y -= 16
+    decisions = ["Approve route", "Return to driver for correction", "Escalate to safety", "Escalate to maintenance", "Escalate to plant manager", "Data-entry correction only"]
+    for decision in decisions:
+        pdf.text(44, y, f"[ ] {decision}", size=8)
+        y -= 12
+    y -= 6
+    pdf.text(36, y, "Manager notes:", size=8, bold=True)
+    pdf.rect(36, y - 48, 540, 42)
+    y -= 70
+    pdf.text(36, y, "Manager Signature", size=9, bold=True)
+    pdf.line(36, y - 18, 270, y - 18)
+    pdf.text(330, y, "Reviewed date/time", size=9, bold=True)
+    pdf.line(330, y - 18, 576, y - 18)
+    if review.get("driver_signature"):
+        pdf.text(36, 42, "Driver e-signature captured", size=8)
+    return pdf.build()
+
 
 def _requested_url():
     return request.full_path if request.query_string else request.path
@@ -1113,12 +1399,10 @@ def driver_route_print():
         route_date = datetime.strptime(request.args.get("date") or date.today().isoformat(), "%Y-%m-%d").date()
     except ValueError:
         route_date = date.today()
-    ctx = _route_print_context(driver_id, route_date)
+    ctx = _manager_route_review_context(_route_print_context(driver_id, route_date))
     return render_template(
-        "driver_logs_print.html",
+        "manager_route_review.html",
         **ctx,
-        print_driver=ctx["driver"],
-        route_finalized=False,
         attachment_url=url_for("manager.driver_route_attachment", driver_id=driver_id, date=route_date.isoformat()),
         csv_url=url_for("manager.driver_route_export", driver_id=driver_id, date=route_date.isoformat(), type="csv"),
         sheets_url=url_for("manager.driver_route_export", driver_id=driver_id, date=route_date.isoformat(), type="sheets"),
@@ -1136,18 +1420,12 @@ def driver_route_attachment():
         route_date = datetime.strptime(request.args.get("date") or date.today().isoformat(), "%Y-%m-%d").date()
     except ValueError:
         route_date = date.today()
-    ctx = _route_print_context(driver_id, route_date)
+    ctx = _manager_route_review_context(_route_print_context(driver_id, route_date))
     return _document_attachment_response(
-        pdf_bytes=_build_driver_logs_pdf(
-            ctx["logs"],
-            route_date,
-            driver=ctx["driver"],
-            driver_signature=ctx.get("driver_signature"),
-            signature_timestamp=ctx.get("signature_timestamp"),
-        ),
-        filename=f"driver-route-{driver_id}-{route_date}.pdf",
+        pdf_bytes=_build_manager_route_review_pdf(ctx),
+        filename=f"manager-route-review-{driver_id}-{route_date}.pdf",
         target_type="driver_log",
-        title="Manager Driver Route PDF downloaded",
+        title="Manager Route Review PDF downloaded",
     )
 
 

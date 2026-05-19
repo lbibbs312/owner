@@ -740,6 +740,74 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
     assert b"Movement segment" not in page.data
 
 
+def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, DriverLogPhoto, PostTrip, PreTrip
+
+        driver = create_user("lamar_review", "lamar-review@example.com", "driver", first_name="Lamar", last_name="Bibbs")
+        create_user("manager1", "manager1@example.com", "management")
+        route_date = date.today()
+        logs = [
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="RW", load_size="Empty", depart_load_size="Empty", no_pickup=True, arrive_time="13:50", depart_time="13:55", created_at=datetime(2026, 5, 19, 13, 50)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="H", load_size="Empty", depart_load_size="Raleigh East Load", secondary_load="PPL Load", arrive_time="14:01", depart_time="14:17", created_at=datetime(2026, 5, 19, 14, 1)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="RE", load_size="Raleigh East Load", depart_load_size="PPL Load", arrive_time="14:25", depart_time="14:35", created_at=datetime(2026, 5, 19, 14, 25)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="PPL", load_size="PPL Load", depart_load_size="Empty", no_pickup=True, arrive_time="14:51", depart_time="14:58", created_at=datetime(2026, 5, 19, 14, 51)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="PC", load_size="Empty", depart_load_size="Raleigh East Load", arrive_time="15:07", depart_time="16:09", created_at=datetime(2026, 5, 19, 15, 7)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="RE", load_size="Raleigh East Load", depart_load_size="Empty", no_pickup=True, arrive_time="16:23", depart_time="16:43", created_at=datetime(2026, 5, 19, 16, 23)),
+        ]
+        db.session.add_all(logs)
+        db.session.flush()
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="Truck 12", start_mileage=0)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add(PostTrip(pretrip_id=pretrip.id, end_mileage=121970))
+        upload_dir = os.path.abspath(app.config["DRIVER_LOG_PHOTO_UPLOAD_FOLDER"])
+        os.makedirs(upload_dir, exist_ok=True)
+        filename = "paint-central-cargo-proof.jpg"
+        with open(os.path.join(upload_dir, filename), "wb") as fh:
+            fh.write(b"cargo-photo")
+        db.session.add(DriverLogPhoto(
+            driver_log_id=logs[4].id,
+            filename=filename,
+            original_filename="paint-central-cargo-proof.jpg",
+            content_type="image/jpeg",
+            source="departure_gallery",
+            note="load is unbalanced; skid tip risk",
+            uploaded_by_id=driver.id,
+        ))
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "manager1")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert response.status_code == 200
+    assert b"Manager Route Review" in response.data
+    assert b"Driver Route Audit Sheet" not in response.data
+    assert b"Review Status" in response.data
+    assert b"Needs Review" in response.data
+    assert b"Lamar completed 6 route legs and the final unload at Raleigh East" in response.data
+    assert b"route is still marked open and needs manager finalization" in response.data
+    assert b"No formal damage report was filed, but one Paint Central cargo photo requires manager classification" in response.data
+    assert b"Mileage requires correction before approval" in response.data
+    assert b"Correct mileage before approving route" in response.data
+    assert b"Review/classify Paint Central cargo photo" in response.data
+    assert b"Finalize route after confirming final unload" in response.data
+    assert b"Collect missing signatures" in response.data
+    assert b"121,970 miles is outside normal route range" in response.data
+    assert b"Cargo safety review" in response.data
+    assert b"load is unbalanced; skid tip risk" in response.data
+    assert b"No in-route damage/incidents reported" not in response.data
+
+    pdf = client.get(f"/manager/driver-logs/route-attachment?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert pdf.status_code == 200
+    assert pdf.headers["Content-Type"] == "application/pdf"
+    assert b"Manager Route Review" in pdf.data
+    assert b"Review Status: Needs Review" in pdf.data
+
+
 def test_damage_evidence_packet_includes_timeline_hashes_related_records_and_warnings(client, app):
     from datetime import date, datetime
     from hashlib import sha256
@@ -1385,13 +1453,15 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     assert b"/delete" not in page.data
 
     filtered_logs = client.get(f"/manager/driver-logs?driver_id={driver_id}&date={date.today().isoformat()}")
-    assert b"Print / Save Route" in filtered_logs.data
-    assert b"Download Route PDF" in filtered_logs.data
+    assert b"Manager Route Review" in filtered_logs.data
+    assert b"Download Manager Review PDF" in filtered_logs.data
     assert b"CSV" in filtered_logs.data
     assert b"Sheets" in filtered_logs.data
     route_print = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
     assert route_print.status_code == 200
-    assert b"Driver Route Audit Sheet" in route_print.data
+    assert b"Manager Route Review" in route_print.data
+    assert b"Review Status" in route_print.data
+    assert b"Driver Route Audit Sheet" not in route_print.data
     assert b"CSV Export" in route_print.data
     assert b"Sheets Export" in route_print.data
 
@@ -2067,7 +2137,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
 
     manager_print = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
     assert manager_print.status_code == 200
-    assert b"Stop Photo Proof" in manager_print.data
+    assert b"Photo / Damage / Safety Review" in manager_print.data
     assert b"Departing load proof from gallery" in manager_print.data
     assert b"Stop forecast pending" not in manager_print.data
 

@@ -125,9 +125,9 @@
 
   {% if current_user.role == 'management' and selected_driver_id and logs %}
     <div class="alert alert-light border d-flex flex-wrap align-items-center gap-2 mb-3">
-      <strong>Route exports:</strong>
-      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('manager.driver_route_print', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d')) }}">Print / Save Route</a>
-      <a class="btn btn-sm btn-outline-success" href="{{ url_for('manager.driver_route_attachment', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d')) }}">Download Route PDF</a>
+      <strong>Manager review:</strong>
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('manager.driver_route_print', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d')) }}">Manager Route Review</a>
+      <a class="btn btn-sm btn-outline-success" href="{{ url_for('manager.driver_route_attachment', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d')) }}">Download Manager Review PDF</a>
       <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('manager.driver_route_export', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d'), type='csv') }}">CSV</a>
       <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('manager.driver_route_export', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d'), type='sheets') }}">Sheets</a>
     </div>

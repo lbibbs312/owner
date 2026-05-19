@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Manager Route Review</title>
+  <style>
+    @page { size: Letter portrait; margin: 0.35in; }
+    * { box-sizing: border-box; }
+    body { margin:0; padding:1rem; font-family:Arial, sans-serif; font-size:9pt; color:#111; background:#fff; }
+    .print-btn, .email-btn { display:inline-block; margin:0 0 0.12in; padding:8px 14px; border:0; color:#fff; text-decoration:none; font-size:10pt; line-height:1.1; }
+    .print-btn { background:#0d6efd; cursor:pointer; }
+    .email-btn { background:#198754; }
+    .sheet-head { display:flex; justify-content:space-between; gap:0.25in; border-bottom:2px solid #111; padding-bottom:0.09in; margin-bottom:0.12in; }
+    h1 { margin:0; font-size:16pt; }
+    h2 { margin:0 0 0.06in; font-size:10.5pt; text-transform:uppercase; letter-spacing:.04em; }
+    .subtitle { color:#444; margin-top:2px; }
+    .meta { text-align:right; line-height:1.35; color:#333; }
+    .status-band { border:2px solid #111; padding:0.08in; margin:0 0 0.12in; display:grid; grid-template-columns:1fr 3fr; gap:0.12in; align-items:start; }
+    .status-label { font-size:7pt; text-transform:uppercase; letter-spacing:.06em; color:#555; font-weight:900; }
+    .status-value { font-size:15pt; font-weight:900; text-transform:uppercase; }
+    .summary { font-size:10pt; line-height:1.35; font-weight:700; }
+    .section { border:1px solid #111; margin-top:0.1in; break-inside:avoid; }
+    .section h2 { background:#f1f5f9; padding:0.06in 0.08in; border-bottom:1px solid #111; }
+    .section-body { padding:0.08in; }
+    .actions { margin:0; padding-left:0.18in; font-size:9.5pt; line-height:1.35; font-weight:800; }
+    .qa-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:0.07in; }
+    .qa-item { border:1px solid #cbd5e1; padding:0.06in; min-height:0.42in; }
+    .qa-item strong { display:block; font-size:7pt; text-transform:uppercase; letter-spacing:.05em; color:#475569; }
+    .qa-item span { display:block; font-weight:900; margin-top:2px; }
+    .qa-item small { display:block; margin-top:2px; color:#334155; line-height:1.25; }
+    table { width:100%; border-collapse:collapse; table-layout:fixed; }
+    th, td { border:1px solid #111; padding:5px 6px; vertical-align:top; overflow-wrap:anywhere; }
+    th { background:#f1f5f9; text-transform:uppercase; font-size:7pt; letter-spacing:.04em; }
+    .photo-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:0.08in; }
+    .photo-card { border:1px solid #111; padding:0.06in; min-height:1.3in; }
+    .photo-card img { width:100%; height:1.0in; object-fit:cover; border:1px solid #94a3b8; display:block; margin-bottom:4px; }
+    .photo-missing { height:1.0in; display:grid; place-items:center; background:#fff7ed; border:1px solid #b45309; color:#92400e; font-weight:900; margin-bottom:4px; }
+    .check-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:3px 10px; margin-top:6px; font-size:8pt; }
+    .decision-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:5px 14px; font-weight:800; }
+    .notes-box { height:0.7in; border:1px solid #111; margin-top:0.08in; }
+    .sig-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.25in; margin-top:0.16in; }
+    .sig-line { border-bottom:1.5px solid #111; height:0.42in; display:flex; align-items:flex-end; }
+    .sig-line img { max-height:0.38in; max-width:100%; }
+    .muted { color:#555; }
+    @media print { body { padding:0; } .print-btn, .email-btn, .print-guidance { display:none; } * { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+  </style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()">Print / Save Manager Review</button>
+  <a class="email-btn" href="{{ attachment_url }}">Download Manager Review PDF</a>
+  {% if csv_url is defined %}<a class="email-btn" href="{{ csv_url }}">CSV Export</a>{% endif %}
+  {% if sheets_url is defined %}<a class="email-btn" href="{{ sheets_url }}">Sheets Export</a>{% endif %}
+  <p class="print-guidance muted">Use Letter paper, portrait orientation, and disable browser headers/footers if available.</p>
+
+  <div class="sheet-head">
+    <div>
+      <h1>Manager Route Review</h1>
+      <div class="subtitle">Review and approval copy for route corrections, evidence, and follow-up.</div>
+    </div>
+    <div class="meta">
+      <strong>Date:</strong> {{ the_date }}<br>
+      <strong>Driver:</strong> {{ driver.display_name }}<br>
+      <strong>Truck:</strong> {{ truck_label }}<br>
+      <strong>Total Stops:</strong> {{ logs|length if logs else 0 }}<br>
+      <strong>Route Status:</strong> {{ route_status }}
+    </div>
+  </div>
+
+  <div class="status-band">
+    <div>
+      <div class="status-label">Review Status</div>
+      <div class="status-value">{{ review_status }}</div>
+    </div>
+    <div>
+      <div class="status-label">Manager Summary</div>
+      <div class="summary">{{ manager_summary }}</div>
+    </div>
+  </div>
+
+  {% if required_actions %}
+  <div class="section">
+    <h2>Required Actions</h2>
+    <div class="section-body">
+      <ol class="actions">
+        {% for action in required_actions %}<li>{{ action }}</li>{% endfor %}
+      </ol>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if data_quality_items %}
+  <div class="section">
+    <h2>Data Quality Review</h2>
+    <div class="section-body qa-grid">
+      {% for item in data_quality_items %}
+        <div class="qa-item"><strong>{{ item.label }}</strong><span>{{ item.status }}</span><small>{{ item.detail }}</small></div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="section">
+    <h2>Cargo / Manifest Review</h2>
+    <div class="section-body">
+      <div class="qa-grid" style="margin-bottom:0.08in;">
+        <div class="qa-item"><strong>Manifest linked</strong><span>{{ 'Yes' if cargo_review.manifest_linked else 'No' }}</span><small>{{ 'Scan records are attached to this route.' if cargo_review.manifest_linked else 'Manifest/part references not linked for this route.' }}</small></div>
+        <div class="qa-item"><strong>Scan review</strong><span>{{ cargo_review.scan_review_status }}</span><small>{% if cargo_review.pending_scan_count %}{{ cargo_review.pending_scan_count }} scan{{ 's' if cargo_review.pending_scan_count != 1 else '' }} need manager confirmation.{% else %}No pending scan review flagged.{% endif %}</small></div>
+      </div>
+      {% if cargo_review.issues %}
+        <p><strong>Cargo issues:</strong> {{ cargo_review.issues|join('; ') }}</p>
+      {% else %}
+        <p><strong>Cargo path appears complete.</strong></p>
+      {% endif %}
+      <table>
+        <thead><tr><th>Stop</th><th>Picked Up / Departed With</th><th>Dropped</th><th>On Arrival</th></tr></thead>
+        <tbody>
+          {% for row in cargo_review.movement_rows %}
+            <tr><td>{{ row.plant }}</td><td>{{ row.picked_up }}</td><td>{{ row.dropped }}</td><td>{{ row.onboard }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if photo_reviews or damage_reports %}
+  <div class="section">
+    <h2>Photo / Damage / Safety Review</h2>
+    <div class="section-body">
+      {% if not damage_reports and photo_reviews %}<p><strong>No formal damage report was filed. Cargo/photo proof requires manager classification.</strong></p>{% endif %}
+      {% if damage_reports %}<p><strong>{{ damage_report_summary }}.</strong> {{ damage_report_details|join('; ') }}</p>{% endif %}
+      {% if photo_reviews %}
+      <div class="photo-grid">
+        {% for review in photo_reviews %}
+          <div class="photo-card">
+            {% if review.photo_url %}<img src="{{ review.photo_url }}" alt="Cargo photo proof">{% else %}<div class="photo-missing">Photo file missing</div>{% endif %}
+            <strong>{{ review.plant }} - {{ review.review_type }}</strong><br>
+            <span class="muted">Uploaded {{ review.uploaded_at.strftime('%m/%d/%Y %I:%M %p') if review.uploaded_at else '--' }} UTC</span><br>
+            {% if review.note %}<span>Driver note: {{ review.note }}</span>{% else %}<span>No driver note recorded.</span>{% endif %}
+            <div class="check-grid">
+              <span>[ ] No issue</span><span>[ ] Cargo loading issue</span>
+              <span>[ ] Damage event</span><span>[ ] Safety concern</span>
+              <span>[ ] Plant follow-up required</span><span>[ ] Driver coaching required</span>
+            </div>
+            <div class="notes-box"></div>
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if delay_review_rows %}
+  <div class="section">
+    <h2>Delay / Dock Time Review</h2>
+    <div class="section-body">
+      <table><thead><tr><th>Stop</th><th>Dock Wait</th><th>Forecast</th><th>Reason</th></tr></thead><tbody>
+      {% for row in delay_review_rows %}<tr><td>{{ row.plant }}</td><td>{{ row.dock_wait }}</td><td>{{ row.forecast }} / {{ row.estimate }}</td><td>{{ row.reason }}</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if logs %}
+  <div class="section">
+    <h2>Route Detail Table</h2>
+    <div class="section-body">
+      <table>
+        <thead><tr><th>Stop</th><th>Plant</th><th>Arrive</th><th>Depart</th><th>Cargo Out</th><th>Notes</th></tr></thead>
+        <tbody>
+          {% for log in logs %}
+            {% set route = (log_routes or {}).get(log.id) %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ route.plant if route else log.plant_name }}</td>
+              <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
+              <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
+              <td>{{ route.depart_cargo_desc if route and route.depart_cargo_desc is not none else (log.depart_load_size or '--') }}</td>
+              <td>{{ route.action if route else 'Logged stop' }}{% if log.photos %}; {{ log.photos|length }} photo proof{{ 's' if log.photos|length != 1 else '' }}{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="section">
+    <h2>Manager Decision</h2>
+    <div class="section-body">
+      <div class="decision-grid">
+        <span>[ ] Approve route</span>
+        <span>[ ] Return to driver for correction</span>
+        <span>[ ] Escalate to safety</span>
+        <span>[ ] Escalate to maintenance</span>
+        <span>[ ] Escalate to plant manager</span>
+        <span>[ ] Mark as data-entry correction only</span>
+      </div>
+      <p><strong>Manager Notes - Internal</strong></p>
+      <div class="notes-box"></div>
+      <div class="sig-grid">
+        <div>
+          <p><strong>Driver Signature</strong></p>
+          <div class="sig-line">{% if driver_signature %}<img src="{{ driver_signature }}" alt="Driver signature">{% endif %}</div>
+          <small class="muted">{% if signature_timestamp %}Signed {{ signature_timestamp.strftime('%m/%d/%Y %I:%M %p') }} UTC{% else %}Not yet signed{% endif %}</small>
+        </div>
+        <div>
+          <p><strong>Manager Signature</strong></p>
+          <div class="sig-line"></div>
+          <small class="muted">Reviewed date/time: ____________________</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
