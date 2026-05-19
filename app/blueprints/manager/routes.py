@@ -17,6 +17,7 @@ import re
 
 from flask import current_app, flash, jsonify, make_response, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user
+import pytz
 from sqlalchemy import or_
 
 from app.blueprints.manager import bp
@@ -712,7 +713,8 @@ def _part_scan_events_for_logs(logs):
 
 
 def _driver_short_name(driver):
-    return (driver.first_name or driver.display_name or driver.username or "Driver").split()[0]
+    raw_name = (driver.first_name or driver.display_name or driver.username or "Driver").split()[0]
+    return raw_name[:1].upper() + raw_name[1:] if raw_name else "Driver"
 
 
 def _manager_truck_label(pretrips):
@@ -735,6 +737,32 @@ def _mileage_quality_item(total_miles):
     return {"label": "Mileage", "status": "Normal", "detail": f"{miles:,} miles recorded."}
 
 
+def _manager_uploaded_label(stamp):
+    if not stamp:
+        return "--"
+    if stamp.tzinfo is None:
+        stamp = pytz.utc.localize(stamp)
+    utc_stamp = stamp.astimezone(pytz.utc)
+    local_stamp = utc_stamp.astimezone(pytz.timezone("America/Detroit"))
+    time_part = local_stamp.strftime("%I:%M%p").lstrip("0").lower()
+    return f"{time_part} {local_stamp.tzname()}"
+
+
+def _clean_manager_driver_note(note):
+    text = re.sub(r"\s+", " ", (note or "").strip())
+    if not text:
+        return ""
+    text = re.sub(r"\bun[\s-]?balanced\b", "unbalanced", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+([,.!?;:])", r"\1", text)
+    normalized = text.lower()
+    if "load is unbalanced" in normalized and "causes skid" in normalized and "tip over" in normalized:
+        return "The load is unbalanced. This is what causes skids to tip over."
+    text = text[:1].upper() + text[1:]
+    if text[-1] not in ".!?":
+        text += "."
+    return text
+
+
 def _manager_photo_reviews(logs, log_routes):
     rows = []
     for log in logs:
@@ -747,6 +775,7 @@ def _manager_photo_reviews(logs, log_routes):
         lower_note = note.lower()
         safety_terms = ("unbalanced", "un-balanced", "skid", "tip", "tipped", "safety", "unsafe")
         review_type = "Cargo safety review" if any(term in lower_note for term in safety_terms) else summary["label"]
+        photo_for_url = latest or summary.get("thumbnail")
         rows.append({
             "log": log,
             "plant": plant,
@@ -754,9 +783,12 @@ def _manager_photo_reviews(logs, log_routes):
             "photo": latest,
             "thumbnail": summary.get("thumbnail"),
             "note": note,
+            "display_note": _clean_manager_driver_note(note),
             "review_type": review_type,
             "uploaded_at": getattr(latest, "uploaded_at", None),
-            "photo_url": url_for("manager.driver_log_photo", photo_id=summary["thumbnail"].id) if summary.get("thumbnail") else None,
+            "uploaded_label": _manager_uploaded_label(getattr(latest, "uploaded_at", None)),
+            "photo_url": url_for("manager.driver_log_photo", photo_id=photo_for_url.id) if photo_for_url else None,
+            "photo_load_warning": not bool(getattr(photo_for_url, "file_available", False)) if photo_for_url else True,
         })
     return rows
 
@@ -782,7 +814,9 @@ def _manager_cargo_review(logs, log_routes, part_scan_events):
     return {
         "movement_rows": movement_rows,
         "issues": issues,
-        "manifest_linked": bool(part_scan_events),
+        "scan_records_attached": bool(part_scan_events),
+        "manifest_linked": False,
+        "manifest_label": "No / Not yet linked",
         "scan_review_status": "Needs manager confirmation" if pending_scans or failed_scans else ("Recorded" if part_scan_events else "No scan records linked"),
         "pending_scan_count": len(pending_scans) + len(failed_scans),
     }
@@ -862,32 +896,37 @@ def _manager_review_status(required_actions, data_quality_items, photo_reviews, 
 
 def _manager_summary_sentence(driver, logs, log_routes, route_status, damage_reports, photo_reviews, total_miles, data_quality_items):
     name = _driver_short_name(driver)
-    parts = [f"{name} completed {len(logs)} route leg{'s' if len(logs) != 1 else ''}"]
+    parts = [f"{name} has {len(logs)} recorded stop{'s' if len(logs) != 1 else ''} for this route."]
     final_route = log_routes.get(logs[-1].id, {}) if logs else {}
-    final_plant = final_route.get("plant") or (_plant_label(logs[-1].plant_name) if logs else None)
-    if final_plant:
-        if final_route.get("unloaded_on_arrival"):
-            parts[0] += f" and the final unload at {final_plant}."
-        else:
-            parts[0] += f" ending at {final_plant}."
-    else:
-        parts[0] += "."
-    if route_status == "Finalization Required":
-        parts.append("The route is still marked open and needs manager finalization.")
+    last_stop_plant = final_route.get("plant") or (_plant_label(logs[-1].plant_name) if logs else None)
+    final_unload_log = next((log for log in reversed(logs) if (log_routes.get(log.id) or {}).get("unloaded_on_arrival")), None)
+    final_unload_plant = None
+    if final_unload_log:
+        unload_route = log_routes.get(final_unload_log.id, {})
+        final_unload_plant = unload_route.get("plant") or _plant_label(final_unload_log.plant_name)
+    if final_unload_plant and last_stop_plant and final_unload_plant != last_stop_plant:
+        parts.append(
+            f"Final cargo unload appears to be {final_unload_plant}, but the last recorded stop is {last_stop_plant}. "
+            f"Manager must confirm whether the extra {last_stop_plant} stop is valid before finalizing."
+        )
+    elif route_status == "Finalization Required":
+        parts.append("The route appears complete but is not finalized.")
     elif route_status == "Active":
         parts.append("The route is active and still in progress.")
     elif route_status == "Finalized":
         parts.append("The route has been finalized.")
+    mileage_issue = next((item for item in data_quality_items if item["label"] == "Mileage"), None)
+    if mileage_issue and mileage_issue["status"] != "Normal":
+        parts.append("Mileage is invalid and must be corrected before approval.")
     if damage_reports:
         parts.append(damage_report_count_label(damage_reports) + ".")
     elif photo_reviews:
         first = photo_reviews[0]
-        parts.append(f"No formal damage report was filed, but one {first['plant']} cargo photo requires manager classification.")
+        photo_type = "cargo-safety photo" if "safety" in first["review_type"].lower() else "cargo photo"
+        parts.append(f"One {first['plant']} {photo_type} requires manager classification.")
+        parts.append("No formal damage report was filed.")
     else:
         parts.append("No formal damage report was filed.")
-    mileage_issue = next((item for item in data_quality_items if item["label"] == "Mileage"), None)
-    if mileage_issue and mileage_issue["status"] != "Normal":
-        parts.append("Mileage requires correction before approval.")
     return " ".join(parts)
 
 
@@ -948,7 +987,7 @@ def _build_manager_route_review_pdf(review):
     if review["photo_reviews"]:
         pdf.text(36, y, "Photo / Damage / Safety Review", size=11, bold=True)
         y -= 14
-        photo_rows = [[row["plant"], row["review_type"], row["note"] or row["summary"]["detail"]] for row in review["photo_reviews"]]
+        photo_rows = [[row["plant"], row["review_type"], row["display_note"] or row["summary"]["detail"]] for row in review["photo_reviews"]]
         y = pdf.table(36, y, [95, 130, 315], 26, ["Stop", "Review", "Driver Note"], photo_rows[:4], font_size=7)
         y -= 12
     if y < 190:

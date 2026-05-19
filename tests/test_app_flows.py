@@ -775,8 +775,9 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
             original_filename="paint-central-cargo-proof.jpg",
             content_type="image/jpeg",
             source="departure_gallery",
-            note="load is unbalanced; skid tip risk",
+            note="the load is un-balanced , this is what causes skid to tip over.",
             uploaded_by_id=driver.id,
+            uploaded_at=datetime(2026, 5, 19, 21, 34),
         ))
         db.session.commit()
         driver_id = driver.id
@@ -788,17 +789,24 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
     assert b"Driver Route Audit Sheet" not in response.data
     assert b"Review Status" in response.data
     assert b"Needs Review" in response.data
-    assert b"Lamar completed 6 route legs and the final unload at Raleigh East" in response.data
-    assert b"route is still marked open and needs manager finalization" in response.data
-    assert b"No formal damage report was filed, but one Paint Central cargo photo requires manager classification" in response.data
-    assert b"Mileage requires correction before approval" in response.data
+    assert b"Lamar has 6 recorded stops for this route" in response.data
+    assert b"The route appears complete but is not finalized" in response.data
+    assert b"Mileage is invalid and must be corrected before approval" in response.data
+    assert b"One Paint Central cargo-safety photo requires manager classification" in response.data
+    assert b"No formal damage report was filed" in response.data
     assert b"Correct mileage before approving route" in response.data
     assert b"Review/classify Paint Central cargo photo" in response.data
     assert b"Finalize route after confirming final unload" in response.data
     assert b"Collect missing signatures" in response.data
     assert b"121,970 miles is outside normal route range" in response.data
     assert b"Cargo safety review" in response.data
-    assert b"load is unbalanced; skid tip risk" in response.data
+    assert b"The load is unbalanced. This is what causes skids to tip over." in response.data
+    assert b"Uploaded 5:34pm EDT" in response.data
+    assert b"Scan records attached" in response.data
+    assert b"Manifest linked" in response.data
+    assert b"No / Not yet linked" in response.data
+    assert b"Manifest Linked: Yes" not in response.data
+    assert b"Scan records are attached to this route." not in response.data
     assert b"No in-route damage/incidents reported" not in response.data
 
     pdf = client.get(f"/manager/driver-logs/route-attachment?driver_id={driver_id}&date={date.today().isoformat()}")
@@ -2182,6 +2190,11 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert manager_page_missing_file.status_code == 200
     assert b"Photo file missing" in manager_page_missing_file.data
     assert b"Delete this missing proof record" in manager_page_missing_file.data
+
+    manager_print_missing_file = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert manager_print_missing_file.status_code == 200
+    assert b"Photo record exists, but image file could not be loaded into this PDF" in manager_print_missing_file.data
+    assert b"Review photo in system before approval" in manager_print_missing_file.data
 
     client.get("/logout")
     login(client, "photo_driver")

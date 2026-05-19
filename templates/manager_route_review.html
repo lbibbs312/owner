@@ -34,7 +34,8 @@
     .photo-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:0.08in; }
     .photo-card { border:1px solid #111; padding:0.06in; min-height:1.3in; }
     .photo-card img { width:100%; height:1.0in; object-fit:cover; border:1px solid #94a3b8; display:block; margin-bottom:4px; }
-    .photo-missing { height:1.0in; display:grid; place-items:center; background:#fff7ed; border:1px solid #b45309; color:#92400e; font-weight:900; margin-bottom:4px; }
+    .photo-missing { min-height:1.0in; display:grid; place-items:center; background:#fff7ed; border:1px solid #b45309; color:#92400e; font-weight:900; margin-bottom:4px; padding:6px; text-align:center; line-height:1.25; }
+    .photo-missing.hidden { display:none; }
     .check-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:3px 10px; margin-top:6px; font-size:8pt; }
     .decision-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:5px 14px; font-weight:800; }
     .notes-box { height:0.7in; border:1px solid #111; margin-top:0.08in; }
@@ -103,7 +104,8 @@
     <h2>Cargo / Manifest Review</h2>
     <div class="section-body">
       <div class="qa-grid" style="margin-bottom:0.08in;">
-        <div class="qa-item"><strong>Manifest linked</strong><span>{{ 'Yes' if cargo_review.manifest_linked else 'No' }}</span><small>{{ 'Scan records are attached to this route.' if cargo_review.manifest_linked else 'Manifest/part references not linked for this route.' }}</small></div>
+        <div class="qa-item"><strong>Scan records attached</strong><span>{{ 'Yes' if cargo_review.scan_records_attached else 'No' }}</span><small>{{ 'Cargo scan records are attached to this route.' if cargo_review.scan_records_attached else 'No cargo scan records are attached to this route.' }}</small></div>
+        <div class="qa-item"><strong>Manifest linked</strong><span>{{ 'Yes' if cargo_review.manifest_linked else cargo_review.manifest_label }}</span><small>{{ 'Verified manifest, shipper, or uploaded shipper record is linked.' if cargo_review.manifest_linked else 'Scan records alone do not count as a linked manifest.' }}</small></div>
         <div class="qa-item"><strong>Scan review</strong><span>{{ cargo_review.scan_review_status }}</span><small>{% if cargo_review.pending_scan_count %}{{ cargo_review.pending_scan_count }} scan{{ 's' if cargo_review.pending_scan_count != 1 else '' }} need manager confirmation.{% else %}No pending scan review flagged.{% endif %}</small></div>
       </div>
       {% if cargo_review.issues %}
@@ -132,10 +134,15 @@
       <div class="photo-grid">
         {% for review in photo_reviews %}
           <div class="photo-card">
-            {% if review.photo_url %}<img src="{{ review.photo_url }}" alt="Cargo photo proof">{% else %}<div class="photo-missing">Photo file missing</div>{% endif %}
+            {% if review.photo_url %}
+              <img src="{{ review.photo_url }}" alt="Cargo photo proof" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';">
+              <div class="photo-missing{% if not review.photo_load_warning %} hidden{% endif %}">Photo record exists, but image file could not be loaded into this PDF. Review photo in system before approval.</div>
+            {% else %}
+              <div class="photo-missing">Photo record exists, but image file could not be loaded into this PDF. Review photo in system before approval.</div>
+            {% endif %}
             <strong>{{ review.plant }} - {{ review.review_type }}</strong><br>
-            <span class="muted">Uploaded {{ review.uploaded_at.strftime('%m/%d/%Y %I:%M %p') if review.uploaded_at else '--' }} UTC</span><br>
-            {% if review.note %}<span>Driver note: {{ review.note }}</span>{% else %}<span>No driver note recorded.</span>{% endif %}
+            <span class="muted">Uploaded {{ review.uploaded_label }}</span><br>
+            {% if review.display_note %}<span>Driver note: "{{ review.display_note }}"</span>{% else %}<span>No driver note recorded.</span>{% endif %}
             <div class="check-grid">
               <span>[ ] No issue</span><span>[ ] Cargo loading issue</span>
               <span>[ ] Damage event</span><span>[ ] Safety concern</span>
