@@ -117,6 +117,10 @@
       margin-bottom: 1px;
       overflow-wrap: anywhere;
     }
+    .defect-marked {
+      color: #b00020;
+      font-weight: 700;
+    }
     .no-defects {
       margin-top: 3px;
       font-weight: bold;
@@ -129,6 +133,10 @@
     .remarks-block {
       margin-top: 0.06in;
       min-height: 0.25in;
+    }
+    .remarks-written {
+      color: #b00020;
+      font-weight: 800;
     }
     hr {
       border: 0;
@@ -178,6 +186,11 @@
 {% set pretrip_attachment_endpoint = 'manager.pretrip_attachment' if current_user.role == 'management' else 'driver.pretrip_attachment' %}
 {% set pretrip_view_endpoint = 'manager.view_pretrip' if current_user.role == 'management' else 'driver.view_pretrip' %}
 {% set pretrip_mark_endpoint = 'manager.mark_pretrip_printed' if current_user.role == 'management' else 'driver.mark_pretrip_printed' %}
+{% macro defect_item(flag, label) -%}
+  <div class="checkbox-line{% if flag %} defect-marked{% endif %}">
+    [{{ "X" if flag else " " }}] {{ label }}
+  </div>
+{%- endmacro %}
 <div class="print-actions">
     {% if current_user.role == 'driver' and pretrip.user_id == current_user.id %}
       <a class="edit-btn" href="{{ url_for('driver.edit_pretrip_entry', pretrip_id=pretrip.id) }}">Edit PreTrip Before Printing</a>
@@ -224,24 +237,12 @@
     <!-- General Condition -->
     <div class="column">
       <h4>General Condition</h4>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.cab_doors_windows else " " }}] Cab/Doors/Windows
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.body_doors else " " }}] Body/Doors
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.oil_leak else " " }}] Oil Leak
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.grease_leak else " " }}] Grease Leak
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.coolant_leak else " " }}] Coolant Leak
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.fuel_leak else " " }}] Fuel Leak
-      </div>
+      {{ defect_item(pretrip.cab_doors_windows, "Cab/Doors/Windows") }}
+      {{ defect_item(pretrip.body_doors, "Body/Doors") }}
+      {{ defect_item(pretrip.oil_leak, "Oil Leak") }}
+      {{ defect_item(pretrip.grease_leak, "Grease Leak") }}
+      {{ defect_item(pretrip.coolant_leak, "Coolant Leak") }}
+      {{ defect_item(pretrip.fuel_leak, "Fuel Leak") }}
       <div class="checkbox-line">[ ] Other (Identify)</div>
       <div class="no-defects">
         [{{ "&#10003;"|safe if pretrip.gc_no_defects else " " }}] No Defects
@@ -251,45 +252,19 @@
     <!-- In-Cab -->
     <div class="column">
       <h4>In-Cab</h4>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.gauges_warning else " " }}] Gauges/Warning Indicators
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.wipers else " " }}] Windshield Wipers/Washers
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.horn else " " }}] Horn
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.heater_defroster else " " }}] Heater/Defroster
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.mirrors else " " }}] Mirrors
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.seat_belts_steering else " " }}] Seat Belts/Steering
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.clutch else " " }}] Clutch
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.service_brakes else " " }}] Service Brakes
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.parking_brake else " " }}] Parking Brake
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.emergency_brakes else " " }}] Emergency Brakes
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.triangles else " " }}] Triangles
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.fire_extinguisher else " " }}] Fire Extinguisher
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.safety_equipment else " " }}] Safety Equipment
-      </div>
+      {{ defect_item(pretrip.gauges_warning, "Gauges/Warning Indicators") }}
+      {{ defect_item(pretrip.wipers, "Windshield Wipers/Washers") }}
+      {{ defect_item(pretrip.horn, "Horn") }}
+      {{ defect_item(pretrip.heater_defroster, "Heater/Defroster") }}
+      {{ defect_item(pretrip.mirrors, "Mirrors") }}
+      {{ defect_item(pretrip.seat_belts_steering, "Seat Belts/Steering") }}
+      {{ defect_item(pretrip.clutch, "Clutch") }}
+      {{ defect_item(pretrip.service_brakes, "Service Brakes") }}
+      {{ defect_item(pretrip.parking_brake, "Parking Brake") }}
+      {{ defect_item(pretrip.emergency_brakes, "Emergency Brakes") }}
+      {{ defect_item(pretrip.triangles, "Triangles") }}
+      {{ defect_item(pretrip.fire_extinguisher, "Fire Extinguisher") }}
+      {{ defect_item(pretrip.safety_equipment, "Safety Equipment") }}
       <div class="no-defects">
         [{{ "&#10003;"|safe if pretrip.incab_no_defects else " " }}] No Defects
       </div>
@@ -298,66 +273,30 @@
     <!-- Engine Compartment + Exterior, etc. -->
     <div class="column">
       <h4>Engine Compartment</h4>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.oil_level else " " }}] Oil Level
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.coolant_level else " " }}] Coolant Level
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.belts else " " }}] Belts
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.hoses else " " }}] Hoses
-      </div>
+      {{ defect_item(pretrip.oil_level, "Oil Level") }}
+      {{ defect_item(pretrip.coolant_level, "Coolant Level") }}
+      {{ defect_item(pretrip.belts, "Belts") }}
+      {{ defect_item(pretrip.hoses, "Hoses") }}
       <div class="no-defects">
         [{{ "&#10003;"|safe if pretrip.ec_no_defects else " " }}] No Defects
       </div>
 
       <hr style="margin:8px 0;">
       <h4>Exterior</h4>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.lights_working else " " }}] Lights Working
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.reflectors else " " }}] Reflectors
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.suspension else " " }}] Suspension
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.tires else " " }}] Tires
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.wheels_rims else " " }}] Wheels/Rims
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.battery else " " }}] Battery
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.exhaust else " " }}] Exhaust
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.brakes else " " }}] Brakes
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.air_lines else " " }}] Air Lines
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.light_line else " " }}] Light Line
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.fifth_wheel else " " }}] Fifth Wheel
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.coupling else " " }}] Coupling
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.tie_downs else " " }}] Tie Downs
-      </div>
-      <div class="checkbox-line">
-        [{{ "X" if pretrip.rear_end_protection else " " }}] Rear End Protection
-      </div>
+      {{ defect_item(pretrip.lights_working, "Lights Working") }}
+      {{ defect_item(pretrip.reflectors, "Reflectors") }}
+      {{ defect_item(pretrip.suspension, "Suspension") }}
+      {{ defect_item(pretrip.tires, "Tires") }}
+      {{ defect_item(pretrip.wheels_rims, "Wheels/Rims") }}
+      {{ defect_item(pretrip.battery, "Battery") }}
+      {{ defect_item(pretrip.exhaust, "Exhaust") }}
+      {{ defect_item(pretrip.brakes, "Brakes") }}
+      {{ defect_item(pretrip.air_lines, "Air Lines") }}
+      {{ defect_item(pretrip.light_line, "Light Line") }}
+      {{ defect_item(pretrip.fifth_wheel, "Fifth Wheel") }}
+      {{ defect_item(pretrip.coupling, "Coupling") }}
+      {{ defect_item(pretrip.tie_downs, "Tie Downs") }}
+      {{ defect_item(pretrip.rear_end_protection, "Rear End Protection") }}
       <div class="no-defects">
         [{{ "&#10003;"|safe if pretrip.exterior_no_defects else " " }}] No Defects
       </div>
@@ -367,51 +306,26 @@
   <!-- Towed Unit(s) -->
   <div class="section-header">Towed Unit(s)</div>
   <div class="towed-block"><div class="towed-grid">
-    <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_bodydoors else " " }}] Body/Doors
-    </div>
-    <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_tiedowns else " " }}] Tie-Downs
-    </div>
-    <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_lights else " " }}] Lights
-    </div>
-    <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_reflectors else " " }}] Reflectors
-    </div>
-    <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_suspension else " " }}] Suspension
-    </div>
-    <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_tires else " " }}] Tires
-    </div>
-    <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_wheels else " " }}] Wheels
-    </div>
-    <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_brakes else " " }}] Brakes
-    </div>
-    <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_landing_gear else " " }}] Landing Gear
-    </div>
-    <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_kingpin else " " }}] Kingpin
-    </div>
-    <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_fifthwheel else " " }}] Fifth Wheel
-    </div>
-    <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_othercoupling else " " }}] Other Coupling
-    </div>
-    <div class="checkbox-line">
-      [{{ "X" if pretrip.towed_rearend else " " }}] Rear End
-    </div>
+    {{ defect_item(pretrip.towed_bodydoors, "Body/Doors") }}
+    {{ defect_item(pretrip.towed_tiedowns, "Tie-Downs") }}
+    {{ defect_item(pretrip.towed_lights, "Lights") }}
+    {{ defect_item(pretrip.towed_reflectors, "Reflectors") }}
+    {{ defect_item(pretrip.towed_suspension, "Suspension") }}
+    {{ defect_item(pretrip.towed_tires, "Tires") }}
+    {{ defect_item(pretrip.towed_wheels, "Wheels") }}
+    {{ defect_item(pretrip.towed_brakes, "Brakes") }}
+    {{ defect_item(pretrip.towed_landing_gear, "Landing Gear") }}
+    {{ defect_item(pretrip.towed_kingpin, "Kingpin") }}
+    {{ defect_item(pretrip.towed_fifthwheel, "Fifth Wheel") }}
+    {{ defect_item(pretrip.towed_othercoupling, "Other Coupling") }}
+    {{ defect_item(pretrip.towed_rearend, "Rear End") }}
     <div class="no-defects">
       [{{ "&#10003;"|safe if pretrip.towed_no_defects else " " }}] No Defects
     </div>
   </div></div>
 
-  <div class="remarks-block">
+  {% set has_written_remarks = pretrip.damage_report and pretrip.damage_report|trim %}
+  <div class="remarks-block{% if has_written_remarks %} remarks-written{% endif %}">
     <strong>Remarks:</strong><br>
     {{ pretrip.damage_report or "" }}
   </div>

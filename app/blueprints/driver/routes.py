@@ -900,6 +900,66 @@ def _yes_no(value):
     return "Yes" if value else "No"
 
 
+PDF_ALERT_RED = (176, 0, 32)
+
+_PRETRIP_DEFECT_FIELDS = [
+    ("cab_doors_windows", "General - Cab/Doors/Windows"),
+    ("body_doors", "General - Body/Doors"),
+    ("oil_leak", "General - Oil Leak"),
+    ("grease_leak", "General - Grease Leak"),
+    ("coolant_leak", "General - Coolant Leak"),
+    ("fuel_leak", "General - Fuel Leak"),
+    ("gauges_warning", "In-Cab - Gauges/Warning Indicators"),
+    ("wipers", "In-Cab - Windshield Wipers/Washers"),
+    ("horn", "In-Cab - Horn"),
+    ("heater_defroster", "In-Cab - Heater/Defroster"),
+    ("mirrors", "In-Cab - Mirrors"),
+    ("seat_belts_steering", "In-Cab - Seat Belts/Steering"),
+    ("clutch", "In-Cab - Clutch"),
+    ("service_brakes", "In-Cab - Service Brakes"),
+    ("parking_brake", "In-Cab - Parking Brake"),
+    ("emergency_brakes", "In-Cab - Emergency Brakes"),
+    ("triangles", "In-Cab - Triangles"),
+    ("fire_extinguisher", "In-Cab - Fire Extinguisher"),
+    ("safety_equipment", "In-Cab - Safety Equipment"),
+    ("oil_level", "Engine - Oil Level"),
+    ("coolant_level", "Engine - Coolant Level"),
+    ("belts", "Engine - Belts"),
+    ("hoses", "Engine - Hoses"),
+    ("lights_working", "Exterior - Lights Working"),
+    ("reflectors", "Exterior - Reflectors"),
+    ("suspension", "Exterior - Suspension"),
+    ("tires", "Exterior - Tires"),
+    ("wheels_rims", "Exterior - Wheels/Rims"),
+    ("battery", "Exterior - Battery"),
+    ("exhaust", "Exterior - Exhaust"),
+    ("brakes", "Exterior - Brakes"),
+    ("air_lines", "Exterior - Air Lines"),
+    ("light_line", "Exterior - Light Line"),
+    ("fifth_wheel", "Exterior - Fifth Wheel"),
+    ("coupling", "Exterior - Coupling"),
+    ("tie_downs", "Exterior - Tie Downs"),
+    ("rear_end_protection", "Exterior - Rear End Protection"),
+    ("towed_bodydoors", "Towed - Body/Doors"),
+    ("towed_tiedowns", "Towed - Tie-Downs"),
+    ("towed_lights", "Towed - Lights"),
+    ("towed_reflectors", "Towed - Reflectors"),
+    ("towed_suspension", "Towed - Suspension"),
+    ("towed_tires", "Towed - Tires"),
+    ("towed_wheels", "Towed - Wheels"),
+    ("towed_brakes", "Towed - Brakes"),
+    ("towed_landing_gear", "Towed - Landing Gear"),
+    ("towed_kingpin", "Towed - Kingpin"),
+    ("towed_fifthwheel", "Towed - Fifth Wheel"),
+    ("towed_othercoupling", "Towed - Other Coupling"),
+    ("towed_rearend", "Towed - Rear End"),
+]
+
+
+def _pretrip_marked_defects(pretrip):
+    return [label for field, label in _PRETRIP_DEFECT_FIELDS if getattr(pretrip, field, False)]
+
+
 def _normalize_hhmm_time(value):
     value = (value or "").strip().lower().replace(" ", "")
     if not value:
@@ -1283,11 +1343,46 @@ def _build_pretrip_pdf(pretrip):
     ]
     left = rows[:13]
     right = rows[13:]
-    pdf.table(36, y, [150, 80, 150, 80], 18, ["Item", "Status", "Item", "Status"], [l + r for l, r in zip(left, right)], font_size=8)
+    y = pdf.table(
+        36,
+        y,
+        [150, 80, 150, 80],
+        18,
+        ["Item", "Status", "Item", "Status"],
+        [l + r for l, r in zip(left, right)],
+        font_size=8,
+    )
+    marked_defects = _pretrip_marked_defects(pretrip)
+    if marked_defects:
+        y -= 14
+        pdf.text(36, y, "Defects Marked", size=10, bold=True, color=PDF_ALERT_RED)
+        pdf.multiline_text(
+            42,
+            y - 14,
+            "; ".join(marked_defects),
+            width_chars=105,
+            size=8,
+            leading=10,
+            bold=True,
+            max_lines=5,
+            color=PDF_ALERT_RED,
+        )
+
     y = 210
-    pdf.text(36, y, "Damage / Remarks", size=10, bold=True)
+    remarks = (pretrip.damage_report or "").strip()
+    remarks_color = PDF_ALERT_RED if remarks else None
+    pdf.text(36, y, "Damage / Remarks", size=10, bold=True, color=remarks_color)
     pdf.rect(36, y - 70, 540, 60)
-    pdf.multiline_text(42, y - 20, pretrip.damage_report or "", width_chars=95, size=9, max_lines=5)
+    pdf.multiline_text(
+        42,
+        y - 20,
+        remarks,
+        width_chars=95,
+        size=9,
+        bold=bool(remarks),
+        max_lines=5,
+        color=remarks_color,
+    )
     pdf.text(36, 92, "Driver Signature: ____________________________", size=10)
     pdf.text(335, 92, "Date: __________________", size=10)
     return pdf.build()
@@ -2549,20 +2644,30 @@ def depart_driver_log(log_id):
             .first()
         )
         override_reason = (request.form.get("cargo_override_reason") or "").strip()
-        if unresolved_scan and not override_reason:
-            flash("Cargo scan validation needs review. Add a supervisor override reason before closing this stop.", "danger")
-            return render_depart_page()
-        if unresolved_scan and override_reason:
-            record_activity(
-                user_id=current_user.id,
-                category="part_scan",
-                action="override",
-                title="Cargo scan override recorded",
-                details=f"{unresolved_scan.normalized_value}: {override_reason}",
-                target_type="part_scan_event",
-                target_id=unresolved_scan.id,
-                commit=False,
-            )
+        if unresolved_scan:
+            if override_reason:
+                record_activity(
+                    user_id=current_user.id,
+                    category="part_scan",
+                    action="override",
+                    title="Cargo scan override recorded",
+                    details=f"{unresolved_scan.normalized_value}: {override_reason}",
+                    target_type="part_scan_event",
+                    target_id=unresolved_scan.id,
+                    commit=False,
+                )
+            else:
+                detail = unresolved_scan.validation_message or unresolved_scan.validation_status
+                record_activity(
+                    user_id=current_user.id,
+                    category="part_scan",
+                    action="needs_review",
+                    title="Cargo scan needs manager review",
+                    details=f"{unresolved_scan.normalized_value}: {detail}",
+                    target_type="part_scan_event",
+                    target_id=unresolved_scan.id,
+                    commit=False,
+                )
 
         local_tz = pytz.timezone("America/Detroit")
         now_local = datetime.now(local_tz)

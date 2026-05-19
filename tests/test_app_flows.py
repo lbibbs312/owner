@@ -1763,7 +1763,7 @@ def test_search_corpus_fts_sync_is_sqlite_only(client, app, monkeypatch):
         search_corpus._sync_fts_row(row)
 
 
-def test_driver_can_record_auditable_part_scan_and_override_pending_cargo(client, app):
+def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_review(client, app):
     from datetime import date
 
     with app.app_context():
@@ -1787,6 +1787,7 @@ def test_driver_can_record_auditable_part_scan_and_override_pending_cargo(client
     assert depart_page.status_code == 200
     assert b"Scan Arriving Cargo" in depart_page.data
     assert b"@zxing/browser" in depart_page.data
+    assert b"Manager review / override note" in depart_page.data
 
     scan = client.post(
         f"/driver_logs/{log_id}/part-scans",
@@ -1797,31 +1798,24 @@ def test_driver_can_record_auditable_part_scan_and_override_pending_cargo(client
     assert payload["normalized_value"] == "L861"
     assert payload["validation_status"] == "pending_part"
 
-    blocked = client.post(
-        f"/driver_logs/{log_id}/depart",
-        data={"got_loaded": "no", "destination": "", "secondary_destination": ""},
-        follow_redirects=True,
-    )
-    assert b"Cargo scan validation needs review" in blocked.data
-
     departed = client.post(
         f"/driver_logs/{log_id}/depart",
-        data={
-            "got_loaded": "no",
-            "destination": "",
-            "secondary_destination": "",
-            "cargo_override_reason": "Supervisor confirmed L861 label.",
-        },
+        data={"got_loaded": "no", "destination": "", "secondary_destination": ""},
         follow_redirects=False,
     )
     assert departed.status_code == 302
 
     with app.app_context():
-        from app.models import PartAlias, PartMaster, PartScanEvent
+        from app.models import ActivityEvent, DriverLog, PartAlias, PartMaster, PartScanEvent
 
+        assert DriverLog.query.get(log_id).depart_time is not None
         assert PartScanEvent.query.count() == 1
         assert PartAlias.query.filter_by(normalized_value="L861").count() == 1
         assert PartMaster.query.filter_by(canonical_part_number="L861", status="pending").count() == 1
+        review = ActivityEvent.query.filter_by(
+            category="part_scan", action="needs_review", title="Cargo scan needs manager review"
+        ).one()
+        assert "L861" in review.details
 
 
 def test_driver_hot_part_proof_one_tap_flags_missing_scan_for_manager(client, app):
@@ -2497,6 +2491,108 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
     assert manager_pdf.status_code == 200
     assert manager_pdf.headers["Content-Type"] == "application/pdf"
     assert b"Driver e-signature captured" in manager_pdf.data
+
+
+def test_pretrip_printout_highlights_defects_and_written_remarks(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import PreTrip
+
+        driver = create_user(
+            "driver1",
+            "driver1@example.com",
+            "driver",
+            first_name="Driver",
+            last_name="One",
+        )
+        pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="BT-RED",
+            trailer_number="TR-RED",
+            pretrip_date=date.today(),
+            shift="1st",
+            start_mileage=1200,
+            cab_doors_windows=True,
+            service_brakes=True,
+            towed_tires=True,
+            damage_report="Air leak under trailer",
+        )
+        db.session.add(pretrip)
+        db.session.commit()
+        pretrip_id = pretrip.id
+
+    login(client, "driver1")
+    printable = client.get(f"/pretrip_printable/{pretrip_id}")
+    assert printable.status_code == 200
+    assert printable.data.count(b"defect-marked") >= 3
+    assert b"remarks-written" in printable.data
+    assert b"Air leak under trailer" in printable.data
+
+    pdf = client.get(f"/pretrip_printable/{pretrip_id}/attachment")
+    assert pdf.status_code == 200
+    assert pdf.headers["Content-Type"] == "application/pdf"
+    assert b"Defects Marked" in pdf.data
+    assert b"Air leak under trailer" in pdf.data
+    assert b"0.690 0.000 0.125 rg" in pdf.data
+
+
+def test_manager_can_delete_old_damage_report_test_records(client, app):
+    from datetime import datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DamageReport
+
+        driver = create_user("driver1", "driver1@example.com", "driver")
+        create_user("manager1", "manager1@example.com", "management")
+        old_stamp = datetime.utcnow() - timedelta(days=30)
+        report = DamageReport(
+            reported_by_id=driver.id,
+            truck_number="TEST-1",
+            trailer_number="TEST-TR",
+            plant_name="RE",
+            damage_time=old_stamp,
+            created_at=old_stamp,
+            stage="before",
+            move_reference="old test",
+            description="Old damage report test",
+            status="submitted",
+        )
+        db.session.add(report)
+        db.session.commit()
+        report_id = report.id
+
+    login(client, "manager1")
+    review = client.get("/manager/review")
+    assert review.status_code == 200
+    assert f"/manager/damage-reports/{report_id}/delete".encode() in review.data
+
+    detail = client.get(f"/manager/damage-reports/{report_id}")
+    assert detail.status_code == 200
+    assert b"Delete Report" in detail.data
+
+    deleted = client.post(
+        f"/manager/damage-reports/{report_id}/delete",
+        data={"next": "/manager/review"},
+        follow_redirects=False,
+    )
+    assert deleted.status_code == 302
+    assert deleted.headers["Location"].endswith("/manager/review")
+
+    with app.app_context():
+        from app.models import ActivityEvent, AuditEvent, DamageReport
+
+        assert DamageReport.query.get(report_id) is None
+        audit = AuditEvent.query.filter_by(
+            target_type="damage_report", target_id=report_id, action="manager_deleted"
+        ).one()
+        assert "Old damage report test" in audit.before_values
+        activity = ActivityEvent.query.filter_by(
+            target_type="damage_report", target_id=report_id, action="deleted"
+        ).one()
+        assert activity.title == "Damage report deleted by manager"
 
 
 def test_damage_report_edit_delete_submit_and_eod_lock(client, app):

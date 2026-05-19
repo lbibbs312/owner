@@ -27,6 +27,7 @@ from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
 from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DriverLog, HotPartPhoto, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, Task, User
 from app.services.activity import record_activity
+from app.services.audit import model_snapshot, record_audit_event
 from app.services.operations import build_exception_items
 from app.services.load_state import build_driver_log_route_context, route_problem_reason, secondary_not_dropped_reason, truck_issue_reason
 from app.services.hot_parts import build_route_hot_part_proof, ensure_hot_move_for_task
@@ -670,6 +671,13 @@ def _requested_url():
     return request.full_path if request.query_string else request.path
 
 
+def _safe_manager_next(default_endpoint="manager.review_dashboard"):
+    target = (request.form.get("next") or "").strip()
+    if target.startswith("/") and not target.startswith("//"):
+        return target
+    return url_for(default_endpoint)
+
+
 @bp.before_request
 def require_management_role():
     if restore_role_user("management"):
@@ -849,6 +857,55 @@ def hot_part_photo(photo_id):
 def view_damage_report(report_id):
     report = DamageReport.query.get_or_404(report_id)
     return render_template("view_damage_report.html", report=report, manager_view=True)
+
+
+@bp.route("/damage-reports/<int:report_id>/delete", methods=["POST"])
+def delete_damage_report(report_id):
+    report = DamageReport.query.get_or_404(report_id)
+    before = model_snapshot(
+        report,
+        [
+            "reported_by_id",
+            "task_id",
+            "driver_log_id",
+            "plant_transfer_id",
+            "truck_number",
+            "trailer_number",
+            "plant_name",
+            "damage_time",
+            "stage",
+            "move_reference",
+            "description",
+            "status",
+            "created_at",
+            "resolved_at",
+        ],
+    )
+    before["photos"] = [photo.filename for photo in report.photos]
+    record_audit_event(
+        user_id=current_user.id,
+        target_type="damage_report",
+        target_id=report.id,
+        action="manager_deleted",
+        reason="Manager deleted damage report from review cleanup.",
+        before_values=before,
+        after_values={"deleted": True},
+        commit=False,
+    )
+    record_activity(
+        user_id=current_user.id,
+        category="damage",
+        action="deleted",
+        title="Damage report deleted by manager",
+        details=f"Damage report #{report.id} deleted for {report.plant_name}.",
+        target_type="damage_report",
+        target_id=report.id,
+        commit=False,
+    )
+    db.session.delete(report)
+    db.session.commit()
+    flash("Damage report deleted.", "success")
+    return redirect(_safe_manager_next())
 
 
 @bp.route("/damage-reports/<int:report_id>/evidence-packet")

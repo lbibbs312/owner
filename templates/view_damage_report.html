@@ -49,6 +49,10 @@
       <button class="btn btn-outline-primary" type="button" onclick="window.print()">Print Report</button>
       {% if manager_view|default(false) %}
         <a class="btn btn-primary" href="{{ url_for('manager.damage_evidence_packet', report_id=report.id) }}">Generate Evidence Packet</a>
+        <form method="POST" action="{{ url_for('manager.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Delete this damage report?');">
+          <input type="hidden" name="next" value="{{ url_for('manager.review_dashboard') }}">
+          <button class="btn btn-outline-danger" type="submit">Delete Report</button>
+        </form>
       {% else %}
         <a class="btn btn-primary" href="{{ url_for('driver.damage_evidence_packet', report_id=report.id) }}">Generate Evidence Packet</a>
       {% endif %}

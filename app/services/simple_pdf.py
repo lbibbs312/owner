@@ -14,6 +14,17 @@ def _escape_pdf_text(value):
     return text
 
 
+def _normalize_rgb(color):
+    if color is None:
+        return None
+    red, green, blue = color
+    values = [float(red), float(green), float(blue)]
+    if any(value > 1 for value in values):
+        values = [value / 255 for value in values]
+    values = [min(1, max(0, value)) for value in values]
+    return " ".join(f"{value:.3f}" for value in values)
+
+
 def _wrap_text(value, max_chars):
     text = re.sub(r"\s+", " ", "" if value is None else str(value)).strip()
     if not text:
@@ -163,16 +174,20 @@ class SimplePdf:
         self.current = []
         self.pages.append((self.width, self.height, self.current))
 
-    def text(self, x, y, value, size=10, bold=False):
+    def text(self, x, y, value, size=10, bold=False, color=None):
         font = "F2" if bold else "F1"
-        self.current.append(
-            f"BT /{font} {size} Tf {x:.2f} {y:.2f} Td ({_escape_pdf_text(value)}) Tj ET"
-        )
+        command = f"BT /{font} {size} Tf {x:.2f} {y:.2f} Td ({_escape_pdf_text(value)}) Tj ET"
+        rgb = _normalize_rgb(color)
+        if rgb:
+            command = f"q {rgb} rg {command} Q"
+        self.current.append(command)
 
-    def multiline_text(self, x, y, value, width_chars=40, size=9, leading=11, bold=False, max_lines=3):
+    def multiline_text(
+        self, x, y, value, width_chars=40, size=9, leading=11, bold=False, max_lines=3, color=None
+    ):
         lines = _wrap_text(value, width_chars)[:max_lines]
         for idx, line in enumerate(lines):
-            self.text(x, y - (idx * leading), line, size=size, bold=bold)
+            self.text(x, y - (idx * leading), line, size=size, bold=bold, color=color)
         return y - (len(lines) * leading)
 
     def line(self, x1, y1, x2, y2, width=0.5):

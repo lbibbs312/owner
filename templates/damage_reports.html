@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+{% set is_manager_history = current_user.role == 'management' %}
 <div class="container-fluid py-4 responsive-workspace">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <div>
@@ -36,8 +37,13 @@
             <td class="small text-muted">{% if finalized %}Route finalized{% elif report.status != 'open' %}Submitted{% else %}Editable{% endif %}</td>
             <td>
               <div class="d-flex flex-wrap gap-1 justify-content-end damage-actions">
-                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('driver.view_damage_report', report_id=report.id) }}">Open</a>
-                {% if can_modify %}
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('manager.view_damage_report' if is_manager_history else 'driver.view_damage_report', report_id=report.id) }}">Open</a>
+                {% if is_manager_history %}
+                  <form method="POST" action="{{ url_for('manager.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Delete this damage report?');">
+                    <input type="hidden" name="next" value="{{ url_for('driver.damage_reports') }}">
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                  </form>
+                {% elif can_modify %}
                   <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Edit</a>
                   <form method="POST" action="{{ url_for('driver.submit_damage_report', report_id=report.id) }}">
                     <button class="btn btn-sm btn-success" type="submit">Submit</button>
