@@ -193,6 +193,8 @@
   .exception-chip.damage { background:#fff1f2; color:#be123c; border-color:#fecdd3; }
   .exception-chip.missing { background:#fef3c7; color:#92400e; border-color:#fde68a; }
   .exception-chip.truck { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+  .exception-chip.photo { background:#eef2ff; color:#3730a3; border-color:#c7d2fe; }
+  .exception-chip-thumb { width:22px; height:18px; object-fit:cover; border-radius:4px; border:1px solid rgba(55,48,163,.25); margin-left:-2px; }
   @keyframes pulse-red { 70% { box-shadow:0 0 0 8px rgba(220,38,38,0); } 100% { box-shadow:0 0 0 0 rgba(220,38,38,0); } }
   @keyframes pulse-yellow { 70% { box-shadow:0 0 0 8px rgba(245,158,11,0); } 100% { box-shadow:0 0 0 0 rgba(245,158,11,0); } }
   .driver-filter-row { display:flex; flex-wrap:wrap; gap:7px; padding:12px 20px; border-bottom:1px solid #e2e8f0; background:#fff; }
@@ -689,7 +691,7 @@
               <span class="critical-type">{{ item.type }}</span>
               <span class="critical-stop">{{ item.route_stop }}</span>
               <span class="critical-issue">{{ item.issue }}</span>
-              {% if item.photo_url %}<img class="problem-thumb" src="{{ item.photo_url }}" alt="Damage proof">{% endif %}
+              {% if item.photo_url %}<img class="problem-thumb" src="{{ item.photo_url }}" alt="Proof photo">{% endif %}
             </a>
           {% else %}
             <div class="empty-row"><span>No critical exceptions for this filter.</span></div>
@@ -774,7 +776,7 @@
                     {% if row.exceptions %}
                       <div class="exception-chip-list">
                         {% for item in row.exceptions %}
-                          <span class="exception-chip {% if 'Damage' in item.label %}damage{% elif 'Missing' in item.label %}missing{% elif 'Truck' in item.label %}truck{% endif %}" title="{{ item.detail }}">{{ item.label }}</span>
+                          <span class="exception-chip {% if 'Damage' in item.label %}damage{% elif 'Missing' in item.label %}missing{% elif 'Truck' in item.label %}truck{% elif 'Photo' in item.label %}photo{% endif %}" title="{{ item.detail }}">{% if item.photo_url %}<img class="exception-chip-thumb" src="{{ item.photo_url }}" alt="Photo proof">{% endif %}{{ item.label }}</span>
                         {% endfor %}
                       </div>
                     {% else %}

@@ -45,6 +45,14 @@
     .task-note { border-left: 4px solid #2563eb; background: #eff6ff; color: #111; padding: 3px 5px; margin-top: 3px; font-size: 8pt; }
     .task-note.hot { border-left-color: #dc2626; background: #fee2e2; }
     .task-note.done { border-left-color: #16a34a; background: #dcfce7; }
+    .photo-proof-section { margin-top: 0.14in; break-inside: avoid; }
+    .photo-proof-section h3 { margin: 0 0 0.06in; font-size: 10pt; }
+    .photo-proof-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.08in; }
+    .photo-proof-card { border: 1px solid #111; padding: 0.05in; min-height: 1.2in; break-inside: avoid; }
+    .photo-proof-card img { width: 100%; height: 0.82in; object-fit: cover; border: 1px solid #999; display: block; margin-bottom: 4px; }
+    .photo-proof-meta { font-size: 7.2pt; line-height: 1.25; }
+    .photo-proof-meta strong { display: block; font-size: 7.6pt; }
+    .photo-proof-missing { min-height: 0.82in; border: 1px solid #b45309; background: #fff7ed; color: #92400e; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; font-size: 8pt; margin-bottom: 4px; padding: 4px; }
     .final-row td { background: #f8fafc; }
     .sig-block { display: flex; gap: 0.4in; margin-top: 0.25in; align-items: flex-end; }
     .sig-col { flex: 1; }
@@ -130,13 +138,9 @@
           <td>
             {% if next_log %}
               <div class="route-leg">{{ plant_name }} &#8594; {{ next_plant_name }}</div>
-              <div class="route-sub">
-                {% if stop_forecast and stop_forecast.estimate_minutes is not none %}
-                  Stop forecast: <span class="forecast-status {{ stop_forecast.severity }}">{{ stop_forecast.status }}</span>
-                {% else %}
-                  Stop forecast pending
-                {% endif %}
-              </div>
+              {% if stop_forecast and stop_forecast.estimate_minutes is not none %}
+                <div class="route-sub">Stop forecast: <span class="forecast-status {{ stop_forecast.severity }}">{{ stop_forecast.status }}</span></div>
+              {% endif %}
             {% else %}
               <div class="route-leg">Final Location: {{ plant_name }}</div>
               <div class="route-sub">{% if route_finalized %}Route finalized{% else %}Route open / not finalized{% endif %}</div>
@@ -202,6 +206,7 @@
             {% if log.maintenance or issue.truck %}<p class="detail-line issue">Truck issue: {{ issue.truck or 'Maintenance marked' }}{% if log.fuel_mileage %}; odometer {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</p>{% endif %}
             {% if issue.route %}<p class="detail-line issue">Route issue: {{ issue.route }}</p>{% endif %}
             {% if log.hot_parts or log.part_number %}<p class="detail-line muted">{% if log.hot_parts %}HOT {% endif %}{{ log.part_number or '' }}</p>{% endif %}
+            {% if log.photos %}<p class="detail-line issue">Photo proof review: {{ log.photos|length }} attached.</p>{% endif %}
             {% for event in (route_task_events or {}).get(log.id, []) %}
               <p class="detail-line task-note {% if event.is_hot %}hot{% elif event.completed_at %}done{% endif %}">{{ event.kind_label }} {{ event.label }}: {{ event.status }}{% if event.accepted_at %}; accepted {{ event.accepted_at|to_detroit_datetime }}{% endif %}{% if event.completed_at %}; unloaded {{ event.completed_at|to_detroit_datetime }}{% endif %}</p>
             {% endfor %}
@@ -210,6 +215,36 @@
         {% endfor %}
       </tbody>
     </table>
+    {% set photo_proof_count = namespace(value=0) %}
+    {% for proof_log in logs %}
+      {% set photo_proof_count.value = photo_proof_count.value + (proof_log.photos|length) %}
+    {% endfor %}
+    {% if photo_proof_count.value %}
+      <div class="photo-proof-section">
+        <h3>Stop Photo Proof</h3>
+        <div class="photo-proof-grid">
+          {% for proof_log in logs %}
+            {% set proof_route = (log_routes or {}).get(proof_log.id) %}
+            {% set proof_plant = proof_route.plant if proof_route else proof_log.plant_name %}
+            {% for photo in proof_log.photos %}
+              {% set photo_endpoint = 'manager.driver_log_photo' if current_user.role == 'management' else 'driver.driver_log_photo' %}
+              <div class="photo-proof-card">
+                {% if photo.file_available %}
+                  <img src="{{ url_for(photo_endpoint, photo_id=photo.id) }}" alt="Stop photo proof {{ loop.index }}">
+                {% else %}
+                  <div class="photo-proof-missing">Photo file missing</div>
+                {% endif %}
+                <div class="photo-proof-meta">
+                  <strong>{{ proof_plant }} - {{ (photo.source or 'photo')|replace('_', ' ')|title }}</strong>
+                  {% if photo.note %}Reason: {{ photo.note }}<br>{% endif %}
+                  Uploaded {{ photo.uploaded_at.strftime('%m/%d/%Y %I:%M %p') if photo.uploaded_at else '--' }} UTC
+                </div>
+              </div>
+            {% endfor %}
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
   {% else %}
     <p>No logs found for today.</p>
   {% endif %}

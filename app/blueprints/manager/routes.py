@@ -45,6 +45,7 @@ from app.blueprints.driver.routes import (
     _shift_record_for_driver_date,
     _total_miles_for_pretrips,
     _task_route_events_for_logs,
+    _stop_photo_review_summary,
 )
 
 
@@ -476,6 +477,18 @@ def _live_exceptions_for_log(log, route=None):
         if _damage_matches_log(report, log, route):
             exceptions.append(_damage_report_summary(report))
 
+    plant_name = route.get("plant") or _plant_label(log.plant_name)
+    photo_review = _stop_photo_review_summary(log, plant_name)
+    if photo_review:
+        thumbnail = photo_review.get("thumbnail")
+        exceptions.append({
+            "type": photo_review["label"],
+            "label": photo_review["label"],
+            "detail": photo_review["detail"],
+            "photo_url": url_for("manager.driver_log_photo", photo_id=thumbnail.id) if thumbnail else None,
+            "url": url_for("manager.view_driver_log", log_id=log.id),
+        })
+
     truck_issue = truck_issue_reason(log)
     if log.maintenance or truck_issue:
         exceptions.append({
@@ -651,6 +664,9 @@ def _route_print_context(driver_id, route_date):
         if log.maintenance or log.downtime_reason:
             exception_notes.append(f"Issue at {plant_name}: {log.downtime_reason or 'Maintenance marked'}")
             log_issue_details[log.id] = {"truck": log.downtime_reason or "Maintenance marked", "route": ""}
+        photo_review = _stop_photo_review_summary(log, plant_name)
+        if photo_review:
+            exception_notes.append(f"{photo_review['label']}: {photo_review['detail']}")
     signature_shift = _shift_record_for_driver_date(driver.id, route_date, require_signature=True)
     return {
         "driver": driver,

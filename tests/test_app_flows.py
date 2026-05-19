@@ -736,7 +736,7 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
     assert b"1 incident report, 1 damage report filed" in page.data
     assert b"Incident - Other" in page.data
     assert b"Damage - RE" in page.data
-    assert b"Stop forecast pending" in page.data
+    assert b"Stop forecast pending" not in page.data
     assert b"Movement segment" not in page.data
 
 
@@ -1964,6 +1964,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
         db.session.add(log)
         db.session.commit()
         log_id = log.id
+        driver_id = driver.id
 
     login(client, "photo_driver")
     edit_page = client.get(f"/edit_driver_log/{log_id}")
@@ -2034,6 +2035,14 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert b"Loaded seal photo from gallery" in driver_detail.data
     assert b"Delete Photo" in driver_detail.data
 
+    driver_print = client.get("/driver_logs_print")
+    assert driver_print.status_code == 200
+    assert b"Stop Photo Proof" in driver_print.data
+    assert b"Loaded seal photo from gallery" in driver_print.data
+    assert b"Departing load proof from gallery" in driver_print.data
+    assert b"Photo proof review" in driver_print.data
+    assert b"Stop forecast pending" not in driver_print.data
+
     with app.app_context():
         from app.models import DriverLogPhoto
 
@@ -2049,6 +2058,18 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert b"Proof" in manager_list.data
     assert b"Loaded seal photo from gallery" in manager_list.data
     assert b"Departing load proof from gallery" in manager_list.data
+
+    manager_dashboard = client.get(f"/manager/dashboard?driver_id={driver_id}&focus=routes")
+    assert manager_dashboard.status_code == 200
+    assert b"Cargo Photo Proof" in manager_dashboard.data
+    assert b"Departing load proof from gallery" in manager_dashboard.data
+    assert f"/manager/driver-log-photos/{second_photo_id}".encode() in manager_dashboard.data
+
+    manager_print = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert manager_print.status_code == 200
+    assert b"Stop Photo Proof" in manager_print.data
+    assert b"Departing load proof from gallery" in manager_print.data
+    assert b"Stop forecast pending" not in manager_print.data
 
     manager_page = client.get(f"/manager/driver-logs/{log_id}")
     assert manager_page.status_code == 200

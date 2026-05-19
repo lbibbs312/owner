@@ -896,6 +896,39 @@ def _save_driver_log_photo(log, uploaded_file, *, source="gallery", note=None, u
     return photo
 
 
+PHOTO_PROOF_CARGO_TERMS = ("cargo", "load", "skid", "pallet", "unbalanced", "un-balanced", "seal")
+
+
+def _stop_photo_review_summary(log, plant_name=None):
+    photos = list(getattr(log, "photos", []) or [])
+    if not photos:
+        return None
+    latest = next((photo for photo in reversed(photos) if (photo.note or "").strip()), photos[-1])
+    thumbnail = next((photo for photo in reversed(photos) if getattr(photo, "file_available", False)), None)
+    joined_notes = " ".join((photo.note or "").lower() for photo in photos)
+    label = "Cargo Photo Proof" if any(term in joined_notes for term in PHOTO_PROOF_CARGO_TERMS) else "Photo Proof"
+    count = len(photos)
+    proof_label = "stop photo proof" if count == 1 else "stop photo proofs"
+    detail = f"{count} {proof_label} attached"
+    if plant_name:
+        detail += f" at {plant_name}"
+    note = (latest.note or "").strip()
+    if note:
+        detail += f": {note}"
+    missing_count = len([photo for photo in photos if not getattr(photo, "file_available", False)])
+    if missing_count:
+        file_label = "file" if missing_count == 1 else "files"
+        detail += f" ({missing_count} photo {file_label} missing)"
+    return {
+        "label": label,
+        "detail": detail,
+        "count": count,
+        "latest": latest,
+        "thumbnail": thumbnail,
+        "missing_count": missing_count,
+    }
+
+
 def _driver_log_photo_payload(photo):
     return {
         "id": photo.id,
@@ -3051,6 +3084,9 @@ def driver_logs_print():
             exception_notes.append(f"Second-stop cargo issue at {plant_name}: {route.get('secondary_drop_reason')}")
         elif route_problem:
             exception_notes.append(f"Route issue at {plant_name}: {route_problem}")
+        photo_review = _stop_photo_review_summary(log, plant_name)
+        if photo_review:
+            exception_notes.append(f"{photo_review['label']}: {photo_review['detail']}")
     route_finalized = ActivityEvent.query.filter_by(
         user_id=current_user.id,
         category="eod",
