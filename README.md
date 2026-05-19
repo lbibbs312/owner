@@ -29,6 +29,7 @@ All runtime configuration is loaded from environment variables. See
 | `SQLALCHEMY_DATABASE_URI` | no | Defaults to local SQLite |
 | `FLASK_DEBUG` | no | Default `false` |
 | `SESSION_COOKIE_SECURE` | yes over HTTPS | Default `false` for local HTTP |
+| `ENABLE_SOCKETIO` | no | Default `false` in production/Render; keep disabled unless the hosted worker is socket-safe |
 | `MANAGER_REGISTRATION_PIN` | no | Unset disables manager self-registration |
 
 ## Development

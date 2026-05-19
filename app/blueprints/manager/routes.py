@@ -21,6 +21,7 @@ from sqlalchemy import or_
 
 from app.blueprints.manager import bp
 from app.services.database_status import database_status
+from app.services.evidence_packet import build_damage_evidence_packet
 from app.extensions import db, socketio
 from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
@@ -31,6 +32,7 @@ from app.services.load_state import build_driver_log_route_context, route_proble
 from app.services.hot_parts import build_route_hot_part_proof, ensure_hot_move_for_task
 from app.services.management_readout import build_management_narrative
 from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
+from app.services.plant_time import forecast_for_stop, plant_forecast_rows
 from app.services.role_session import restore_role_user
 from app.services.search_corpus import suggest_terms
 from app.blueprints.driver.routes import (
@@ -594,6 +596,15 @@ def _live_stop_rows(logs):
         route = routes.get(log.id, {})
         route["stop_number"] = counts[key]
         exceptions = _live_exceptions_for_log(log, route)
+        forecast = forecast_for_stop(log) if not log.depart_time else None
+        if forecast and forecast["severity"] in {"warning", "high"}:
+            exceptions.append({
+                "type": "Dock Forecast",
+                "label": "Dock Forecast",
+                "detail": f"{forecast['status']}: elapsed {forecast['elapsed_label']} vs estimate {forecast['estimate_label']}.",
+                "photo_url": None,
+                "url": url_for("manager.view_driver_log", log_id=log.id),
+            })
         status_key = "open" if not log.depart_time else "complete"
         status = "Missing Departure" if not log.depart_time else "Completed"
         rows.append({
@@ -605,6 +616,7 @@ def _live_stop_rows(logs):
             "status_key": status_key,
             "cargo": route.get("depart_cargo_desc") or route.get("arrive_cargo_desc") or log.depart_load_size or log.load_size or "--",
             "dock_wait": f"{log.dock_wait_minutes} min" if (log.dock_wait_minutes or 0) > 0 else "--",
+            "forecast": forecast,
             "exceptions": exceptions,
             "url": url_for("manager.view_driver_log", log_id=log.id),
         })
@@ -740,6 +752,7 @@ def review_dashboard():
     }
     followups = OperationalFollowUp.query.order_by(OperationalFollowUp.created_at.desc()).limit(20).all()
     damage_reports = DamageReport.query.order_by(DamageReport.created_at.desc()).limit(10).all()
+    plant_forecasts = plant_forecast_rows(date.today())[:8]
     exception_history = (
         ActivityEvent.query.filter_by(category="exception")
         .order_by(ActivityEvent.created_at.desc())
@@ -753,6 +766,7 @@ def review_dashboard():
         metrics=metrics,
         followups=followups,
         damage_reports=damage_reports,
+        plant_forecasts=plant_forecasts,
         exception_history=exception_history,
     )
 
@@ -837,6 +851,27 @@ def view_damage_report(report_id):
     return render_template("view_damage_report.html", report=report, manager_view=True)
 
 
+@bp.route("/damage-reports/<int:report_id>/evidence-packet")
+def damage_evidence_packet(report_id):
+    report = DamageReport.query.get_or_404(report_id)
+    record_activity(
+        user_id=current_user.id,
+        category="damage",
+        action="evidence_packet_generated",
+        title="Evidence packet generated",
+        details=f"Generated damage evidence packet #{report.id}.",
+        target_type="damage_report",
+        target_id=report.id,
+    )
+    packet = build_damage_evidence_packet(report, generated_by=current_user)
+    return render_template(
+        "damage_evidence_packet.html",
+        packet=packet,
+        manager_view=True,
+        back_url=url_for("manager.view_damage_report", report_id=report.id),
+    )
+
+
 @bp.route("/audit-history")
 def audit_history():
     audit_events = AuditEvent.query.order_by(AuditEvent.created_at.desc()).limit(100).all()
@@ -904,6 +939,7 @@ def manager_dashboard():
         reported_delay_count=reported_delay_count,
         live_problem_count=live_problem_count,
         critical_exceptions=critical_exceptions,
+        plant_forecasts=plant_forecast_rows(today)[:6],
         has_drivers=bool(drivers),
         today=today,
         database_status=database_status(current_app.config.get("SQLALCHEMY_DATABASE_URI", "")),

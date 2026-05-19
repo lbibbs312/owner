@@ -59,6 +59,14 @@ class BaseConfig:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", False)
+    ENABLE_SOCKETIO = _env_bool("ENABLE_SOCKETIO", not runtime_requires_persistent_db())
+    SOCKETIO_ASYNC_MODE = os.environ.get("SOCKETIO_ASYNC_MODE", "threading")
+    SOCKETIO_PATH = os.environ.get(
+        "SOCKETIO_PATH",
+        "socket.io" if ENABLE_SOCKETIO else "_socketio_disabled",
+    )
+    SOCKETIO_PING_INTERVAL = int(os.environ.get("SOCKETIO_PING_INTERVAL", "25"))
+    SOCKETIO_PING_TIMEOUT = int(os.environ.get("SOCKETIO_PING_TIMEOUT", "20"))
 
 
 class DevConfig(BaseConfig):

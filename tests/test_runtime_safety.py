@@ -15,6 +15,9 @@ def _reload_config(monkeypatch, **values):
         "SECRET_KEY",
         "SQLALCHEMY_DATABASE_URI",
         "DATABASE_URL",
+        "ENABLE_SOCKETIO",
+        "SOCKETIO_ASYNC_MODE",
+        "SOCKETIO_PATH",
     ]:
         monkeypatch.delenv(key, raising=False)
     for key, value in values.items():
@@ -55,7 +58,26 @@ def test_render_runtime_uses_prod_config_with_postgres(monkeypatch):
 
     assert selected is config.ProdConfig
     assert selected.SESSION_COOKIE_SECURE is True
+    assert selected.ENABLE_SOCKETIO is False
+    assert selected.SOCKETIO_ASYNC_MODE == "threading"
+    assert selected.SOCKETIO_PATH == "_socketio_disabled"
     assert selected.SQLALCHEMY_DATABASE_URI.startswith("postgresql://")
+
+
+def test_socketio_can_be_explicitly_enabled(monkeypatch):
+    config = _reload_config(
+        monkeypatch,
+        RENDER="true",
+        SECRET_KEY="secret",
+        SQLALCHEMY_DATABASE_URI="postgresql://user:pass@example.com/db",
+        ENABLE_SOCKETIO="true",
+    )
+
+    selected = config.get_config()
+
+    assert selected.ENABLE_SOCKETIO is True
+    assert selected.SOCKETIO_ASYNC_MODE == "threading"
+    assert selected.SOCKETIO_PATH == "socket.io"
 
 
 def test_database_url_fallback_normalizes_render_postgres_scheme(monkeypatch):

@@ -46,7 +46,12 @@
       {% else %}
         <a class="btn btn-outline-secondary" href="{{ url_for('driver.damage_reports') }}">History</a>
       {% endif %}
-      <button class="btn btn-outline-primary" type="button" onclick="window.print()">Print Evidence Packet</button>
+      <button class="btn btn-outline-primary" type="button" onclick="window.print()">Print Report</button>
+      {% if manager_view|default(false) %}
+        <a class="btn btn-primary" href="{{ url_for('manager.damage_evidence_packet', report_id=report.id) }}">Generate Evidence Packet</a>
+      {% else %}
+        <a class="btn btn-primary" href="{{ url_for('driver.damage_evidence_packet', report_id=report.id) }}">Generate Evidence Packet</a>
+      {% endif %}
       {% if can_modify|default(false) %}
         <a class="btn btn-primary" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Edit</a>
         <form method="POST" action="{{ url_for('driver.submit_damage_report', report_id=report.id) }}">

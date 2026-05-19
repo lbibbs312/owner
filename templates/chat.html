@@ -16,6 +16,7 @@
   </form>
 </div>
 
+{% if config.ENABLE_SOCKETIO %}
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
   var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
@@ -37,4 +38,11 @@
     document.getElementById("chat-input").value = "";
   });
 </script>
+{% else %}
+<script>
+  document.getElementById("chat-form")?.addEventListener("submit", function(e){
+    e.preventDefault();
+  });
+</script>
+{% endif %}
 {% endblock %}

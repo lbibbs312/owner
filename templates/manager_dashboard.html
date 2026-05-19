@@ -201,6 +201,17 @@
   .live-route-stack { display:grid; gap:3px; }
   .live-route-main { font-weight:900; color:#0f172a; }
   .live-route-sub { font-size:.72rem; color:#64748b; font-weight:700; }
+  .forecast-cell { display:grid; gap:3px; min-width:130px; }
+  .forecast-main { font-weight:900; color:#0f172a; white-space:nowrap; }
+  .forecast-sub { color:#64748b; font-size:.7rem; font-weight:700; }
+  .forecast-state { display:inline-flex; width:max-content; border-radius:999px; padding:2px 7px; font-size:.62rem; font-weight:900; text-transform:uppercase; background:#f1f5f9; color:#475569; }
+  .forecast-state.ok { background:#dcfce7; color:#166534; }
+  .forecast-state.warning { background:#fef3c7; color:#92400e; }
+  .forecast-state.high { background:#fee2e2; color:#991b1b; }
+  .plant-forecast-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; margin:10px 0 0; }
+  .plant-forecast-card { border:1px solid #e2e8f0; border-radius:10px; padding:9px 10px; background:#f8fafc; }
+  .plant-forecast-card strong { display:block; font-size:.86rem; }
+  .plant-forecast-card span { display:block; color:#64748b; font-size:.72rem; margin-top:2px; }
 
   /* Manage button */
   .btn-manage { background:#fff; border:1px solid #cbd5e1; color:#334155;
@@ -703,6 +714,16 @@
             <a class="{% if selected_driver_id == driver.id %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division=division_filter, driver_id=driver.id, focus='routes') }}">{{ driver.display_name }}</a>
           {% endfor %}
         </div>
+        {% if plant_forecasts %}
+        <div class="plant-forecast-strip" aria-label="Plant load forecasts">
+          {% for forecast in plant_forecasts %}
+            <div class="plant-forecast-card">
+              <strong>{{ forecast.plant }}</strong>
+              <span>{{ forecast.estimate_label }} avg - {{ forecast.confidence }}</span>
+            </div>
+          {% endfor %}
+        </div>
+        {% endif %}
         <div class="tbl-wrap live-stops-scroll" tabindex="0" aria-label="Scrollable live route stops">
           <table class="dtbl" id="liveStopsTable">
             <thead>
@@ -714,6 +735,7 @@
                 <th>Arrive</th>
                 <th>Depart</th>
                 {% if reported_delay_count %}<th>Delay</th>{% endif %}
+                <th>Forecast</th>
                 <th>Exceptions</th>
                 <th>Stop Status</th>
                 <th style="text-align:right;">Action</th>
@@ -737,6 +759,18 @@
                   <td class="align-middle whitespace-nowrap">{{ log.depart_time|to_12h_format if log.depart_time else '—' }}</td>
                   {% if reported_delay_count %}<td class="align-middle whitespace-nowrap">{{ row.dock_wait }}</td>{% endif %}
                   <td class="align-middle">
+                    <div class="forecast-cell">
+                      {% if row.forecast %}
+                        <span class="forecast-main">{{ row.forecast.estimate_label }}</span>
+                        <span class="forecast-sub">{% if row.forecast.ready_at_label %}Ready {{ row.forecast.ready_at_label }}{% else %}{{ row.forecast.confidence }}{% endif %}</span>
+                        <span class="forecast-state {{ row.forecast.severity }}">{{ row.forecast.status }}</span>
+                      {% else %}
+                        <span class="forecast-main">Complete</span>
+                        <span class="forecast-sub">No active wait</span>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td class="align-middle">
                     {% if row.exceptions %}
                       <div class="exception-chip-list">
                         {% for item in row.exceptions %}
@@ -753,7 +787,7 @@
                   <td class="align-middle" style="text-align:right;"><a class="btn-manage" href="{{ row.url }}">Open</a></td>
                 </tr>
               {% else %}
-                <tr class="empty-row"><td colspan="{{ 10 if reported_delay_count else 9 }}">No driver stops logged for this filter today.</td></tr>
+                <tr class="empty-row"><td colspan="{{ 11 if reported_delay_count else 10 }}">No driver stops logged for this filter today.</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -889,7 +923,9 @@
   </main>
 </div>
 
+{% if config.ENABLE_SOCKETIO %}
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+{% endif %}
 <script>
 // ── Driver choices for Manage modal ──
 const DRIVERS = [
@@ -1055,12 +1091,14 @@ window.addEventListener('load', () => {
   if (target && focusPanel !== 'jobs') target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
+{% if config.ENABLE_SOCKETIO %}
 if (window.io) {
   const socket = io();
   socket.on('task_updated', () => window.location.reload());
   socket.on('task_assigned', () => window.location.reload());
   socket.on('driver_log_updated', () => window.location.reload());
 }
+{% endif %}
 
 // ESC closes any open modal
 document.addEventListener('keydown', e => {

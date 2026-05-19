@@ -20,8 +20,20 @@ login_manager = LoginManager()
 login_manager.login_view = "auth.login"
 
 
+def _socketio_options(app):
+    options = {
+        "path": app.config.get("SOCKETIO_PATH", "socket.io"),
+        "ping_interval": app.config.get("SOCKETIO_PING_INTERVAL", 25),
+        "ping_timeout": app.config.get("SOCKETIO_PING_TIMEOUT", 20),
+    }
+    async_mode = app.config.get("SOCKETIO_ASYNC_MODE")
+    if async_mode:
+        options["async_mode"] = async_mode
+    return options
+
+
 def init_extensions(app):
     db.init_app(app)
-    socketio.init_app(app)
+    socketio.init_app(app, **_socketio_options(app))
     migrate.init_app(app, db)
     login_manager.init_app(app)

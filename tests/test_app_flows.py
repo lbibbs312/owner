@@ -616,6 +616,182 @@ def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
     assert b"focus-panel" in dashboard.data
 
 
+def test_plant_load_forecast_uses_today_average_on_driver_and_manager_dashboards(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user(
+            "forecast_driver",
+            "forecast@example.com",
+            "driver",
+            first_name="Forecast",
+            last_name="Driver",
+        )
+        create_user("manager1", "manager1@example.com", "management")
+        route_date = date.today()
+        logs = [
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="KP",
+                load_size="Empty",
+                depart_load_size="RE Load",
+                arrive_time="08:00",
+                depart_time="10:00",
+                created_at=datetime(2026, 5, 19, 8, 0),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="KP",
+                load_size="Empty",
+                depart_load_size="PE Load",
+                arrive_time="10:30",
+                depart_time="11:30",
+                created_at=datetime(2026, 5, 19, 10, 30),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="KP",
+                load_size="Empty",
+                arrive_time="12:00",
+                created_at=datetime(2026, 5, 19, 12, 0),
+            ),
+        ]
+        db.session.add_all(logs)
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "forecast_driver")
+    mobile = client.get("/mobile")
+    assert mobile.status_code == 200
+    assert b"Kraft Plant Load Forecast" in mobile.data
+    assert b"Today Average" in mobile.data
+    assert b"1h 30m" in mobile.data
+    assert b"Medium" in mobile.data
+
+    client.get("/logout")
+    login(client, "manager1")
+    manager = client.get(f"/manager/dashboard?driver_id={driver_id}&focus=routes")
+    assert manager.status_code == 200
+    assert b"Plant load forecasts" in manager.data
+    assert b"Kraft Plant" in manager.data
+    assert b"1h 30m" in manager.data
+
+
+def test_damage_evidence_packet_includes_timeline_hashes_related_records_and_warnings(client, app):
+    from datetime import date, datetime
+    from hashlib import sha256
+    from pathlib import Path
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import AuditEvent, DamagePhoto, DamageReport, DriverLog, PlantTransfer, PlantTransferLine, PreTrip
+
+        driver = create_user(
+            "evidence_driver",
+            "evidence@example.com",
+            "driver",
+            first_name="Evidence",
+            last_name="Driver",
+        )
+        manager = create_user("manager1", "manager1@example.com", "management")
+        route_date = date.today()
+        pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="T-42",
+            trailer_number="TR-77",
+            pretrip_date=route_date,
+            start_mileage=1000001,
+            damage_report="No new damage at start.",
+        )
+        log = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="KP",
+            load_size="Empty",
+            depart_load_size="RE Load",
+            arrive_time="08:00",
+            depart_time="09:00",
+            created_at=datetime(2026, 5, 19, 8, 0),
+        )
+        transfer = PlantTransfer(
+            user_id=driver.id,
+            transfer_number="TX-900",
+            transfer_date=route_date,
+            ship_from="KP",
+            ship_to="RE",
+            trailer_number="TR-77",
+            driver_name="Evidence Driver",
+            driver_initials="ED",
+            transfer_time="09:00",
+        )
+        transfer.lines.append(PlantTransferLine(line_number=1, side="left", part_number="PART-42", quantity="4"))
+        db.session.add_all([pretrip, log, transfer])
+        db.session.commit()
+        report = DamageReport(
+            reported_by_id=driver.id,
+            driver_log_id=log.id,
+            truck_number="T-42",
+            trailer_number="TR-77",
+            plant_name="KP",
+            stage="after",
+            move_reference="Stop 1 / dock 4",
+            description="Forklift scrape on trailer door",
+            status="submitted",
+        )
+        db.session.add(report)
+        db.session.commit()
+        upload_root = Path(app.config["DAMAGE_UPLOAD_FOLDER"])
+        upload_root.mkdir(parents=True, exist_ok=True)
+        photo_bytes = b"evidence-photo-bytes"
+        (upload_root / "packet-proof.jpg").write_bytes(photo_bytes)
+        photo = DamagePhoto(
+            damage_report_id=report.id,
+            stage="after",
+            filename="packet-proof.jpg",
+            original_filename="driver-door.jpg",
+            content_type="image/jpeg",
+        )
+        audit = AuditEvent(
+            user_id=manager.id,
+            target_type="damage_report",
+            target_id=report.id,
+            action="reviewed",
+            reason="Manager checked trailer damage.",
+            before_values="{}",
+            after_values="{}",
+        )
+        db.session.add_all([photo, audit])
+        db.session.commit()
+        report_id = report.id
+        expected_hash = sha256(photo_bytes).hexdigest().encode()
+
+    login(client, "manager1")
+    report_page = client.get(f"/manager/damage-reports/{report_id}")
+    assert report_page.status_code == 200
+    assert b"Print Report" in report_page.data
+    assert b"Generate Evidence Packet" in report_page.data
+
+    packet = client.get(f"/manager/damage-reports/{report_id}/evidence-packet")
+    assert packet.status_code == 200
+    assert b"Evidence Cover Page" in packet.data
+    assert b"Full Event Timeline" in packet.data
+    assert b"Photo Evidence" in packet.data
+    assert b"Chain of Custody" in packet.data
+    assert b"Related Route Records" in packet.data
+    assert b"PreTrip DVIR created" in packet.data
+    assert b"Plant transfer paperwork created" in packet.data
+    assert b"Audit: reviewed" in packet.data
+    assert expected_hash in packet.data
+    assert b"Verify odometer entry" in packet.data
+    assert b"No manager/auditor signature field is stored" in packet.data
+
+
 def test_driver_profile_cannot_change_role(client, app):
     with app.app_context():
         create_user(
@@ -1546,7 +1722,7 @@ def test_drivers_can_delete_only_same_day_records(client, app):
     assert client.post(f"/plant_transfers/{ids['old_transfer']}/delete").status_code == 302
 
     with app.app_context():
-        from app.models import DriverLog, PlantTransfer, PreTrip
+        from app.models import DriverLog, PlantTransfer, PreTrip, SearchCorpus
 
         today_log = DriverLog.query.get(ids["today_log"])
         old_log = DriverLog.query.get(ids["old_log"])
@@ -1561,6 +1737,30 @@ def test_drivers_can_delete_only_same_day_records(client, app):
         assert old_pretrip is not None and old_pretrip.deleted_at is None
         assert today_transfer is not None and today_transfer.deleted_at is not None
         assert old_transfer is not None and old_transfer.deleted_at is None
+        assert SearchCorpus.query.count() == 0
+
+
+def test_search_corpus_fts_sync_is_sqlite_only(client, app, monkeypatch):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import SearchCorpus
+        from app.services import search_corpus
+
+        row = SearchCorpus(
+            category="plant",
+            term="Raleigh East",
+            normalized_term="raleigh east",
+            context_key="plant:RE",
+        )
+        db.session.add(row)
+        db.session.flush()
+        monkeypatch.setattr(search_corpus, "_session_dialect_name", lambda: "postgresql")
+
+        def fail_execute(*args, **kwargs):
+            raise AssertionError("Postgres must not touch the SQLite FTS table")
+
+        monkeypatch.setattr(db.session, "execute", fail_execute)
+        search_corpus._sync_fts_row(row)
 
 
 def test_driver_can_record_auditable_part_scan_and_override_pending_cargo(client, app):

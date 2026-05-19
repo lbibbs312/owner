@@ -51,13 +51,19 @@ def _upsert_term(category, term, context_key=None, used_at=None):
     return row
 
 
+def _session_dialect_name():
+    bind = db.session.get_bind()
+    return bind.dialect.name if bind is not None else ""
+
+
 def _sync_fts_row(row):
-    if db.session.bind and db.session.bind.dialect.name == "sqlite":
-        exists = db.session.execute(
-            text("SELECT name FROM sqlite_master WHERE type='table' AND name='search_corpus_fts'")
-        ).first()
-        if not exists:
-            return
+    if _session_dialect_name() != "sqlite":
+        return
+    exists = db.session.execute(
+        text("SELECT name FROM sqlite_master WHERE type='table' AND name='search_corpus_fts'")
+    ).first()
+    if not exists:
+        return
     try:
         db.session.execute(
             text(
@@ -94,7 +100,7 @@ def _terms_from_text(value):
 
 
 def ingest_driver_log(log, commit=False):
-    if not log:
+    if not log or getattr(log, "deleted_at", None):
         return
     used_at = log.created_at or datetime.utcnow()
     context = _context_for_log(log)

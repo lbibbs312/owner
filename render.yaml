@@ -8,7 +8,7 @@ services:
 
     buildCommand: pip install -e .
     preDeployCommand: flask --app lacksdrivers.py deploy-db
-    startCommand: gunicorn --worker-class eventlet -w 1 wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: gunicorn --worker-class gthread --workers 1 --threads 4 --timeout 120 wsgi:application --bind 0.0.0.0:$PORT
 
     envVars:
       - key: FLASK_ENV
@@ -17,6 +17,8 @@ services:
         value: "false"
       - key: SESSION_COOKIE_SECURE
         value: "true"
+      - key: ENABLE_SOCKETIO
+        value: "false"
       - key: SECRET_KEY
         sync: false
       - key: SQLALCHEMY_DATABASE_URI

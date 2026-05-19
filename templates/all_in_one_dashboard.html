@@ -356,7 +356,9 @@
         crossorigin="anonymous"></script>
 
 <!-- Socket.IO client -->
+{% if config.ENABLE_SOCKETIO %}
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+{% endif %}
 
 <script>
   // Slide in
@@ -384,7 +386,7 @@
     }, 400);
   });
 
-  {% if current_user.is_authenticated %}
+  {% if current_user.is_authenticated and config.ENABLE_SOCKETIO %}
     var socket = io();
     var currentUserId = {{ current_user.id|safe }};
     var notifCountElem = document.getElementById('notif-count');

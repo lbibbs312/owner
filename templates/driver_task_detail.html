@@ -154,6 +154,7 @@
   });
 })();
 </script>
+{% if config.ENABLE_SOCKETIO %}
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
   if (window.io) {
@@ -164,4 +165,5 @@
     });
   }
 </script>
+{% endif %}
 {% endblock %}

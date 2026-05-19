@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 from app.models import DamageReport, DriverLog, OperationalFollowUp, PlantTransfer, PreTrip, Task
 from app.services.load_state import route_problem_reason, truck_issue_reason
+from app.services.plant_time import forecast_for_stop
 
 
 def _blank(value):
@@ -65,6 +66,11 @@ def build_exception_items(anchor=None, dock_delay_minutes=30):
             items.append({"severity": "medium", "category": "Route issue", "label": label, "detail": route_problem, "target_type": "driver_log", "target_id": log.id})
         if log.dock_wait_minutes is not None and log.dock_wait_minutes >= dock_delay_minutes:
             items.append({"severity": "high", "category": "Delayed dock time", "label": label, "detail": f"Dock wait recorded at {log.dock_wait_minutes} minutes.", "target_type": "driver_log", "target_id": log.id})
+        if not log.depart_time:
+            forecast = forecast_for_stop(log)
+            if forecast["severity"] in {"warning", "high"}:
+                severity = "high" if forecast["severity"] == "high" else "medium"
+                items.append({"severity": severity, "category": "Dock forecast", "label": label, "detail": f"{forecast['status']}: elapsed {forecast['elapsed_label']} vs plant estimate {forecast['estimate_label']}.", "target_type": "driver_log", "target_id": log.id})
 
     open_hot_tasks = Task.query.filter(Task.is_hot.is_(True), Task.status.in_(["pending", "in-progress"])).all()
     for task in open_hot_tasks:

@@ -27,6 +27,7 @@ from app.forms.trip import PostTripForm, PreTripForm
 from app.forms.user import ProfileForm
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
+from app.services.evidence_packet import build_damage_evidence_packet
 from app.services.simple_pdf import LANDSCAPE_LETTER, LETTER, SimplePdf
 from app.services.load_state import (
     MIN_PLANT_TRANSFER_MINUTES,
@@ -47,6 +48,7 @@ from app.services.load_state import (
     truck_issue_reason,
 )
 from app.services.parts import record_part_scan as save_part_scan, scan_event_payload
+from app.services.plant_time import forecast_for_stop
 from app.services.hot_parts import (
     build_hot_part_proof,
     ensure_hot_move_for_task,
@@ -162,6 +164,7 @@ DRIVER_ONLY_ENDPOINTS = {
     "edit_damage_report",
     "delete_damage_report",
     "submit_damage_report",
+    "damage_evidence_packet",
 }
 
 
@@ -2443,7 +2446,6 @@ def delete_driver_log(log_id):
         target_id=log_id,
     )
     db.session.commit()
-    ingest_driver_log(log, commit=True)
     _emit_driver_log_updated(log, "deleted")
     flash("Driver log deleted.", "success")
     return redirect(url_for("driver.driver_logs"))
@@ -3041,6 +3043,30 @@ def view_damage_report(report_id):
     )
 
 
+@bp.route("/damage_reports/<int:report_id>/evidence_packet")
+@login_required
+def damage_evidence_packet(report_id):
+    report = _damage_report_or_404(report_id)
+    if report is None:
+        return redirect(url_for("driver.damage_reports"))
+    record_activity(
+        user_id=current_user.id,
+        category="damage",
+        action="evidence_packet_generated",
+        title="Evidence packet generated",
+        details=f"Generated damage evidence packet #{report.id}.",
+        target_type="damage_report",
+        target_id=report.id,
+    )
+    packet = build_damage_evidence_packet(report, generated_by=current_user)
+    return render_template(
+        "damage_evidence_packet.html",
+        packet=packet,
+        manager_view=False,
+        back_url=url_for("driver.view_damage_report", report_id=report.id),
+    )
+
+
 @bp.route("/damage_reports/<int:report_id>/edit", methods=["GET", "POST"])
 @login_required
 def edit_damage_report(report_id):
@@ -3292,6 +3318,12 @@ def mobile_dashboard():
     todays_log_routes = _driver_log_route_context(todays_logs)
     route_task_events = _task_route_events_for_logs(todays_logs, _driver_route_tasks(current_user.id, route_date))
     current_stop = next((l for l in reversed(todays_logs) if not l.depart_time), None) or (todays_logs[-1] if todays_logs else None)
+    current_stop_forecast = (
+        forecast_for_stop(current_stop, now=now_local)
+        if current_stop and not current_stop.depart_time
+        else None
+    )
+    stop_forecasts = {current_stop.id: current_stop_forecast} if current_stop_forecast else {}
     if route_date == today_local_date:
         route_panel_title = "Today's Route"
     elif route_is_active:
@@ -3332,6 +3364,8 @@ def mobile_dashboard():
         todays_log_routes=todays_log_routes,
         route_task_events=route_task_events,
         current_stop=current_stop,
+        stop_forecasts=stop_forecasts,
+        current_stop_forecast=current_stop_forecast,
         current_truck_number=current_truck_number,
         truck_maintenance_history=truck_maintenance_history,
         truck_issue_choices=TRUCK_ISSUE_CHOICES,

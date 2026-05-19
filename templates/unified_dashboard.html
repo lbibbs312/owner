@@ -370,7 +370,9 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"
         crossorigin="anonymous"></script>
 <!-- Socket.IO client -->
+{% if config.ENABLE_SOCKETIO %}
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+{% endif %}
 <script>
   // Slide in effect
   document.addEventListener('DOMContentLoaded', function() {
@@ -397,7 +399,7 @@
   });
 
   // Real-time notifications if user is logged in
-  {% if current_user.is_authenticated %}
+  {% if current_user.is_authenticated and config.ENABLE_SOCKETIO %}
     var socket = io();
     var currentUserId = {{ current_user.id|safe }};
     var notifCountElem = document.getElementById('notif-count');

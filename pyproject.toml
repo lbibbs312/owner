@@ -8,9 +8,9 @@ version = "0.1.0"
 description = "Driver dispatch, pre-trip / post-trip inspection, and shift logging for MoveDefense"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
-# Python 3.12 is excluded because eventlet (required for Flask-SocketIO async
-# mode under gunicorn) has known compatibility issues on 3.12. Revisit when
-# eventlet 0.40+ ships or we migrate to ASGI workers.
+# Production runs Flask-SocketIO in threading mode behind a gthread Gunicorn
+# worker. Eventlet remains installed only for compatibility with older local
+# workflows and should not be used for the hosted database runtime.
 
 dependencies = [
     # Web framework
