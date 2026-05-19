@@ -755,7 +755,7 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
             DriverLog(driver_id=driver.id, date=route_date, plant_name="H", load_size="Empty", depart_load_size="Raleigh East Load", secondary_load="PPL Load", arrive_time="14:01", depart_time="14:17", created_at=datetime(2026, 5, 19, 14, 1)),
             DriverLog(driver_id=driver.id, date=route_date, plant_name="RE", load_size="Raleigh East Load", depart_load_size="PPL Load", arrive_time="14:25", depart_time="14:35", created_at=datetime(2026, 5, 19, 14, 25)),
             DriverLog(driver_id=driver.id, date=route_date, plant_name="PPL", load_size="PPL Load", depart_load_size="Empty", no_pickup=True, arrive_time="14:51", depart_time="14:58", created_at=datetime(2026, 5, 19, 14, 51)),
-            DriverLog(driver_id=driver.id, date=route_date, plant_name="PC", load_size="Empty", depart_load_size="Raleigh East Load", arrive_time="15:07", depart_time="16:09", created_at=datetime(2026, 5, 19, 15, 7)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="PC", load_size="Empty", depart_load_size="Raleigh East Load", arrive_time="15:07", depart_time="16:09", dock_wait_minutes=15, created_at=datetime(2026, 5, 19, 15, 7)),
             DriverLog(driver_id=driver.id, date=route_date, plant_name="RE", load_size="Raleigh East Load", depart_load_size="Empty", no_pickup=True, arrive_time="16:23", depart_time="16:43", created_at=datetime(2026, 5, 19, 16, 23)),
         ]
         db.session.add_all(logs)
@@ -802,11 +802,21 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
     assert b"Cargo safety review" in response.data
     assert b"The load is unbalanced. This is what causes skids to tip over." in response.data
     assert b"Uploaded 5:34pm EDT" in response.data
-    assert b"Scan records attached" in response.data
+    assert b"Scan records" in response.data
+    assert b"Cargo Review" in response.data
+    assert b"Clean" in response.data
     assert b"Manifest linked" in response.data
-    assert b"No / Not yet linked" in response.data
+    assert b"Not yet linked" in response.data
+    assert b"No actual manifest or shipper record is linked" in response.data
+    assert b"Cargo path" in response.data
+    assert b"Appears complete" in response.data
+    assert b"Picked Up / Departed With" not in response.data
     assert b"Manifest Linked: Yes" not in response.data
     assert b"Scan records are attached to this route." not in response.data
+    assert b"Delay / Dock Time Review" in response.data
+    assert b"Not enough plant history yet" in response.data
+    assert b"Collecting samples" not in response.data
+    assert b"No baseline" not in response.data
     assert b"No in-route damage/incidents reported" not in response.data
 
     pdf = client.get(f"/manager/driver-logs/route-attachment?driver_id={driver_id}&date={date.today().isoformat()}")
@@ -2147,6 +2157,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert manager_print.status_code == 200
     assert b"Photo / Damage / Safety Review" in manager_print.data
     assert b"Departing load proof from gallery" in manager_print.data
+    assert b"height:2.15in" in manager_print.data
     assert b"Stop forecast pending" not in manager_print.data
 
     manager_page = client.get(f"/manager/driver-logs/{log_id}")
@@ -2223,6 +2234,7 @@ def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_rev
         from app.models import DriverLog
 
         driver = create_user("driver_scan", "driver_scan@example.com", "driver")
+        create_user("scan_manager", "scan-manager@example.com", "management")
         log = DriverLog(
             driver_id=driver.id,
             date=date.today(),
@@ -2233,6 +2245,7 @@ def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_rev
         db.session.add(log)
         db.session.commit()
         log_id = log.id
+        driver_id = driver.id
 
     login(client, "driver_scan")
     depart_page = client.get(f"/driver_logs/{log_id}/depart")
@@ -2273,6 +2286,20 @@ def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_rev
             category="part_scan", action="needs_review", title="Cargo scan needs manager review"
         ).one()
         assert "L861" in review.details
+
+    client.get("/logout")
+    login(client, "scan_manager")
+    manager_print = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert manager_print.status_code == 200
+    assert b"Cargo / Manifest Review" in manager_print.data
+    assert b"Cargo Review" in manager_print.data
+    assert b"Needs Review" in manager_print.data
+    assert b"Scan records" in manager_print.data
+    assert b"Attached" in manager_print.data
+    assert b"Manifest linked" in manager_print.data
+    assert b"Not yet linked" in manager_print.data
+    assert b"1 scan need manager confirmation" in manager_print.data
+    assert b"Picked Up / Departed With" in manager_print.data
 
 
 def test_driver_hot_part_proof_one_tap_flags_missing_scan_for_manager(client, app):

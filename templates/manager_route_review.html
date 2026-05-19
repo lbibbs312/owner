@@ -22,19 +22,39 @@
     .section { border:1px solid #111; margin-top:0.1in; break-inside:avoid; }
     .section h2 { background:#f1f5f9; padding:0.06in 0.08in; border-bottom:1px solid #111; }
     .section-body { padding:0.08in; }
-    .actions { margin:0; padding-left:0.18in; font-size:9.5pt; line-height:1.35; font-weight:800; }
+    .action-section { border-color:#b45309; background:#fffbeb; }
+    .action-section h2 { background:#fef3c7; color:#92400e; border-bottom-color:#b45309; }
+    .action-section .section-body { background:#fffbeb; }
+    .actions { margin:0; padding-left:0.18in; font-size:9.5pt; line-height:1.35; font-weight:900; color:#78350f; }
     .qa-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:0.07in; }
     .qa-item { border:1px solid #cbd5e1; padding:0.06in; min-height:0.42in; }
     .qa-item strong { display:block; font-size:7pt; text-transform:uppercase; letter-spacing:.05em; color:#475569; }
     .qa-item span { display:block; font-weight:900; margin-top:2px; }
     .qa-item small { display:block; margin-top:2px; color:#334155; line-height:1.25; }
+    .audit-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:0.07in; margin-bottom:0.08in; }
+    .audit-item { border:1px solid #cbd5e1; padding:0.06in; min-height:0.5in; background:#fff; }
+    .audit-item strong { display:block; font-size:7pt; text-transform:uppercase; letter-spacing:.05em; color:#475569; }
+    .audit-item span { display:block; font-size:9.2pt; font-weight:900; margin-top:2px; }
+    .audit-item small { display:block; margin-top:2px; color:#334155; line-height:1.25; }
+    .audit-item.clean { border-color:#86efac; background:#f0fdf4; }
+    .audit-item.clean span { color:#166534; }
+    .audit-item.needs-review { border-color:#f59e0b; background:#fffbeb; }
+    .audit-item.needs-review span { color:#92400e; }
+    .audit-item.warning { border-color:#facc15; background:#fefce8; }
+    .audit-item.warning span { color:#854d0e; }
+    .audit-item.ok span { color:#166534; }
+    .delay-status { display:inline-block; padding:2px 7px; border-radius:999px; font-size:7pt; font-weight:900; }
+    .delay-status.ok { background:#dcfce7; color:#166534; }
+    .delay-status.warning { background:#fef3c7; color:#92400e; }
+    .delay-status.high { background:#fee2e2; color:#991b1b; }
+    .delay-status.muted { background:#f1f5f9; color:#475569; }
     table { width:100%; border-collapse:collapse; table-layout:fixed; }
     th, td { border:1px solid #111; padding:5px 6px; vertical-align:top; overflow-wrap:anywhere; }
     th { background:#f1f5f9; text-transform:uppercase; font-size:7pt; letter-spacing:.04em; }
-    .photo-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:0.08in; }
-    .photo-card { border:1px solid #111; padding:0.06in; min-height:1.3in; }
-    .photo-card img { width:100%; height:1.0in; object-fit:cover; border:1px solid #94a3b8; display:block; margin-bottom:4px; }
-    .photo-missing { min-height:1.0in; display:grid; place-items:center; background:#fff7ed; border:1px solid #b45309; color:#92400e; font-weight:900; margin-bottom:4px; padding:6px; text-align:center; line-height:1.25; }
+    .photo-grid { display:grid; grid-template-columns:1fr; gap:0.08in; }
+    .photo-card { border:1px solid #111; padding:0.06in; min-height:2.55in; }
+    .photo-card img { width:100%; height:2.15in; object-fit:contain; border:1px solid #94a3b8; display:block; margin-bottom:4px; background:#f8fafc; }
+    .photo-missing { min-height:2.15in; display:grid; place-items:center; background:#fff7ed; border:1px solid #b45309; color:#92400e; font-weight:900; margin-bottom:4px; padding:6px; text-align:center; line-height:1.25; }
     .photo-missing.hidden { display:none; }
     .check-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:3px 10px; margin-top:6px; font-size:8pt; }
     .decision-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:5px 14px; font-weight:800; }
@@ -79,7 +99,7 @@
   </div>
 
   {% if required_actions %}
-  <div class="section">
+  <div class="section action-section">
     <h2>Required Actions</h2>
     <div class="section-body">
       <ol class="actions">
@@ -103,24 +123,22 @@
   <div class="section">
     <h2>Cargo / Manifest Review</h2>
     <div class="section-body">
-      <div class="qa-grid" style="margin-bottom:0.08in;">
-        <div class="qa-item"><strong>Scan records attached</strong><span>{{ 'Yes' if cargo_review.scan_records_attached else 'No' }}</span><small>{{ 'Cargo scan records are attached to this route.' if cargo_review.scan_records_attached else 'No cargo scan records are attached to this route.' }}</small></div>
-        <div class="qa-item"><strong>Manifest linked</strong><span>{{ 'Yes' if cargo_review.manifest_linked else cargo_review.manifest_label }}</span><small>{{ 'Verified manifest, shipper, or uploaded shipper record is linked.' if cargo_review.manifest_linked else 'Scan records alone do not count as a linked manifest.' }}</small></div>
-        <div class="qa-item"><strong>Scan review</strong><span>{{ cargo_review.scan_review_status }}</span><small>{% if cargo_review.pending_scan_count %}{{ cargo_review.pending_scan_count }} scan{{ 's' if cargo_review.pending_scan_count != 1 else '' }} need manager confirmation.{% else %}No pending scan review flagged.{% endif %}</small></div>
+      <div class="audit-grid">
+        {% for item in cargo_review.summary_rows %}
+          <div class="audit-item {{ item.class }}"><strong>{{ item.label }}</strong><span>{{ item.value }}</span><small>{{ item.detail }}</small></div>
+        {% endfor %}
       </div>
-      {% if cargo_review.issues %}
-        <p><strong>Cargo issues:</strong> {{ cargo_review.issues|join('; ') }}</p>
-      {% else %}
-        <p><strong>Cargo path appears complete.</strong></p>
+      {% if cargo_review.detail_needed %}
+        <p><strong>Cargo detail rows are shown because this route needs cargo review.</strong></p>
+        <table>
+          <thead><tr><th>Stop</th><th>Picked Up / Departed With</th><th>Dropped</th><th>On Arrival</th></tr></thead>
+          <tbody>
+            {% for row in cargo_review.movement_rows %}
+              <tr><td>{{ row.plant }}</td><td>{{ row.picked_up }}</td><td>{{ row.dropped }}</td><td>{{ row.onboard }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
       {% endif %}
-      <table>
-        <thead><tr><th>Stop</th><th>Picked Up / Departed With</th><th>Dropped</th><th>On Arrival</th></tr></thead>
-        <tbody>
-          {% for row in cargo_review.movement_rows %}
-            <tr><td>{{ row.plant }}</td><td>{{ row.picked_up }}</td><td>{{ row.dropped }}</td><td>{{ row.onboard }}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
     </div>
   </div>
 
@@ -161,8 +179,8 @@
   <div class="section">
     <h2>Delay / Dock Time Review</h2>
     <div class="section-body">
-      <table><thead><tr><th>Stop</th><th>Dock Wait</th><th>Forecast</th><th>Reason</th></tr></thead><tbody>
-      {% for row in delay_review_rows %}<tr><td>{{ row.plant }}</td><td>{{ row.dock_wait }}</td><td>{{ row.forecast }} / {{ row.estimate }}</td><td>{{ row.reason }}</td></tr>{% endfor %}
+      <table><thead><tr><th>Stop</th><th>Dock Time</th><th>Load-Time Status</th><th>Reason</th></tr></thead><tbody>
+      {% for row in delay_review_rows %}<tr><td>{{ row.plant }}</td><td>{{ row.dock_wait }}</td><td><span class="delay-status {{ row.forecast_class }}">{{ row.forecast }}</span></td><td>{{ row.reason }}</td></tr>{% endfor %}
       </tbody></table>
     </div>
   </div>

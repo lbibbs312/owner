@@ -796,6 +796,7 @@ def _manager_photo_reviews(logs, log_routes):
 def _manager_cargo_review(logs, log_routes, part_scan_events):
     movement_rows = []
     issues = []
+    still_onboard = False
     for log in logs:
         route = log_routes.get(log.id, {})
         plant = route.get("plant") or _plant_label(log.plant_name)
@@ -809,17 +810,69 @@ def _manager_cargo_review(logs, log_routes, part_scan_events):
         cargo_issue = secondary_not_dropped_reason(log) or route_problem_reason(log)
         if cargo_issue:
             issues.append(f"{plant}: {cargo_issue}")
-    pending_scans = [event for event in part_scan_events if (event.validation_status or "").lower() in {"unknown", "pending", "needs_review", "needs review"}]
-    failed_scans = [event for event in part_scan_events if (event.validation_status or "").lower() in {"failed", "unexpected", "mismatch"}]
+        if route.get("unload_blocked") or route.get("secondary_drop_blocked"):
+            still_onboard = True
+            blocked = route.get("unload_reason") or route.get("secondary_drop_reason") or "Cargo still marked onboard at destination"
+            issues.append(f"{plant}: {blocked}")
+    pending_statuses = {"unknown", "pending", "needs_review", "needs review", "pending_part"}
+    failed_statuses = {"failed", "unexpected", "mismatch"}
+    pending_scans = []
+    failed_scans = []
+    unexpected_scans = []
+    for event in part_scan_events:
+        status = (event.validation_status or "").lower().strip()
+        if status in failed_statuses:
+            failed_scans.append(event)
+        if status == "unexpected":
+            unexpected_scans.append(event)
+        if status in pending_statuses or status.startswith("pending"):
+            pending_scans.append(event)
+    pending_count = len(pending_scans) + len(failed_scans)
+    needs_review = bool(issues or pending_count or still_onboard or unexpected_scans)
+    cargo_status = "Needs Review" if needs_review else "Clean"
+    scan_records_attached = bool(part_scan_events)
+    manifest_linked = False
+    cargo_path = "Needs review" if issues else "Appears complete"
+    pending_items = f"{pending_count} scan{'s' if pending_count != 1 else ''} need manager confirmation" if pending_count else "None"
+    mismatches = f"{len(failed_scans)} scan validation issue{'s' if len(failed_scans) != 1 else ''}" if failed_scans else "None"
+    unexpected_cargo = f"{len(unexpected_scans)} unexpected scan{'s' if len(unexpected_scans) != 1 else ''}" if unexpected_scans else "No"
+    summary_rows = [
+        {"label": "Cargo Review", "value": cargo_status, "detail": "Manager confirmation required." if needs_review else "Cargo movement reads clean.", "class": "needs-review" if needs_review else "clean"},
+        {"label": "Manifest linked", "value": "Not yet linked", "detail": "No actual manifest or shipper record is linked.", "class": "warning"},
+        {"label": "Scan records", "value": "Attached" if scan_records_attached else "None", "detail": "Scans are saved on this route." if scan_records_attached else "No cargo scans saved.", "class": "ok" if scan_records_attached else "muted"},
+        {"label": "Cargo path", "value": cargo_path, "detail": "No cargo movement mismatch detected." if not issues else "; ".join(issues[:2]), "class": "clean" if not issues else "needs-review"},
+        {"label": "Pending items", "value": pending_items, "detail": "No cargo follow-up needed." if pending_items == "None" else "Manager must confirm scan/cargo status.", "class": "clean" if pending_items == "None" else "needs-review"},
+        {"label": "Mismatches", "value": mismatches, "detail": "No scan mismatches detected." if mismatches == "None" else "Review failed or unexpected scans.", "class": "clean" if mismatches == "None" else "needs-review"},
+        {"label": "Still onboard after destination", "value": "Yes" if still_onboard else "No", "detail": "Cargo appears left onboard at its destination." if still_onboard else "No destination cargo is flagged onboard.", "class": "needs-review" if still_onboard else "clean"},
+        {"label": "Unexpected cargo", "value": unexpected_cargo, "detail": "No unexpected cargo scans." if unexpected_cargo == "No" else "Unexpected scan requires manager review.", "class": "clean" if unexpected_cargo == "No" else "needs-review"},
+    ]
     return {
         "movement_rows": movement_rows,
         "issues": issues,
-        "scan_records_attached": bool(part_scan_events),
-        "manifest_linked": False,
-        "manifest_label": "No / Not yet linked",
-        "scan_review_status": "Needs manager confirmation" if pending_scans or failed_scans else ("Recorded" if part_scan_events else "No scan records linked"),
-        "pending_scan_count": len(pending_scans) + len(failed_scans),
+        "scan_records_attached": scan_records_attached,
+        "manifest_linked": manifest_linked,
+        "manifest_label": "Not yet linked",
+        "scan_review_status": "Needs manager confirmation" if pending_count else ("Recorded" if part_scan_events else "No scan records linked"),
+        "pending_scan_count": pending_count,
+        "status": cargo_status,
+        "status_class": "needs-review" if needs_review else "clean",
+        "summary_rows": summary_rows,
+        "detail_needed": needs_review,
     }
+
+
+def _manager_delay_forecast_label(forecast):
+    if not forecast:
+        return "No plant average available", "muted"
+    severity = forecast.get("severity") or "muted"
+    if forecast.get("estimate_minutes") is None:
+        return "Not enough plant history yet", "muted"
+    status = forecast.get("status") or "On pace"
+    elapsed = forecast.get("elapsed_label") or "--"
+    estimate = forecast.get("estimate_label") or "--"
+    if severity in {"warning", "high"}:
+        return f"{status}; elapsed {elapsed} vs expected {estimate}", severity
+    return f"On pace; expected around {estimate}", "ok"
 
 
 def _manager_delay_review(logs, log_routes, stop_forecasts):
@@ -829,12 +882,13 @@ def _manager_delay_review(logs, log_routes, stop_forecasts):
         forecast = (stop_forecasts or {}).get(log.id)
         if (log.dock_wait_minutes or 0) > 0 or log.downtime_reason or (forecast and forecast.get("severity") in {"warning", "high"}):
             plant = route.get("plant") or _plant_label(log.plant_name)
+            forecast_label, forecast_class = _manager_delay_forecast_label(forecast)
             rows.append({
                 "plant": plant,
-                "dock_wait": f"{log.dock_wait_minutes} min" if (log.dock_wait_minutes or 0) > 0 else "--",
-                "reason": log.downtime_reason or "--",
-                "forecast": forecast.get("status") if forecast else "--",
-                "estimate": forecast.get("estimate_label") if forecast else "--",
+                "dock_wait": f"{log.dock_wait_minutes} min" if (log.dock_wait_minutes or 0) > 0 else (forecast.get("elapsed_label") if forecast else "--"),
+                "reason": log.downtime_reason or "No driver delay reason recorded.",
+                "forecast": forecast_label,
+                "forecast_class": forecast_class,
             })
     return rows
 
@@ -983,6 +1037,11 @@ def _build_manager_route_review_pdf(review):
     y -= 14
     quality_rows = [[item["label"], item["status"], item["detail"]] for item in review["data_quality_items"]] or [["Route", "Clean", "No data quality issues flagged."]]
     y = pdf.table(36, y, [110, 110, 320], 22, ["Check", "Status", "Detail"], quality_rows[:5], font_size=7)
+    y -= 18
+    pdf.text(36, y, "Cargo Review", size=11, bold=True)
+    y -= 14
+    cargo_rows = [[row["label"], row["value"], row["detail"]] for row in review["cargo_review"]["summary_rows"]]
+    y = pdf.table(36, y, [120, 120, 300], 20, ["Audit", "Status", "Detail"], cargo_rows[:8], font_size=7)
     y -= 18
     if review["photo_reviews"]:
         pdf.text(36, y, "Photo / Damage / Safety Review", size=11, bold=True)
