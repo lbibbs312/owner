@@ -1,5 +1,5 @@
 """Database readiness helpers for deploy and health checks."""
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from app.config import is_sqlite_database_uri, runtime_requires_persistent_db
 from app.extensions import db
@@ -11,8 +11,11 @@ def required_table_names():
     return set(db.metadata.tables.keys())
 
 
-def database_table_names():
-    return set(inspect(db.engine).get_table_names())
+def database_table_names(connection=None):
+    if connection is not None:
+        return set(inspect(connection).get_table_names())
+    with db.engine.connect() as connection:
+        return database_table_names(connection)
 
 
 def app_table_names(table_names=None):
@@ -21,10 +24,11 @@ def app_table_names(table_names=None):
 
 
 def database_status(database_uri=""):
-    bind = db.session.get_bind()
-    dialect = bind.dialect.name if bind is not None else "unknown"
+    with db.engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+        dialect = connection.dialect.name
+        table_names = database_table_names(connection)
     sqlite_database = dialect == "sqlite" or is_sqlite_database_uri(database_uri)
-    table_names = database_table_names()
     missing_tables = sorted(required_table_names() - table_names)
     unsafe_runtime = runtime_requires_persistent_db() and sqlite_database
     return {

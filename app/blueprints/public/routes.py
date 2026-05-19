@@ -1,9 +1,7 @@
 from flask import current_app, jsonify, render_template, send_from_directory
 from flask_login import login_required
-from sqlalchemy import text
 
 from app.blueprints.public import bp
-from app.extensions import db
 from app.models import Announcement
 from app.services.database_status import database_status
 
@@ -33,7 +31,6 @@ def healthz():
 @bp.route("/readyz")
 def readyz():
     try:
-        db.session.execute(text("SELECT 1"))
         status = database_status(current_app.config.get("SQLALCHEMY_DATABASE_URI", ""))
         return jsonify(
             status="ok" if status["ready"] else "degraded",

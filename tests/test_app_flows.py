@@ -66,6 +66,18 @@ def test_registration_uses_manager_pin(client, app):
         assert user.role == "management"
 
 
+def test_password_hash_column_fits_werkzeug_hashes(app):
+    with app.app_context():
+        from app.models import User
+
+        user = User(username="driver1", email="driver1@example.com", role="driver")
+        user.set_password("password1")
+        column_length = User.__table__.c.password_hash.type.length
+
+        assert column_length >= 255
+        assert len(user.password_hash) <= column_length
+
+
 def test_login_redirects_by_role(client, app):
     with app.app_context():
         create_user(
