@@ -3,11 +3,6 @@
 <div class="container">
   {% set logs_endpoint = 'manager.driver_logs' if current_user.role == 'management' else 'driver.driver_logs' %}
   <style>
-    .log-detail-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:18px 0; }
-    .log-detail-card { border:1px solid #e2e8f0; border-radius:12px; padding:14px; background:#fff; }
-    .log-detail-card .label { margin:0 0 4px; color:#64748b; font-size:.72rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
-    .log-detail-card .value { margin:0; color:#0f172a; font-size:1rem; font-weight:900; }
-    .log-detail-card .meta { margin:4px 0 0; color:#64748b; font-size:.82rem; font-weight:700; }
     .status-chip { display:inline-flex; padding:4px 9px; border-radius:8px; background:#f1f5f9; color:#334155; font-weight:900; font-size:.78rem; }
     .status-chip.open { background:#fff1f2; color:#be123c; }
     .status-chip.done { background:#dcfce7; color:#166534; }
@@ -16,14 +11,38 @@
     .move-chip.done { background:#dcfce7; color:#166534; }
     .stop-help { border-left:3px solid #93c5fd; padding-left:10px; }
     .print-title { display:none; }
-    .report-section { margin-top:18px; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; }
+    .management-readout { margin:18px 0; border:1px solid #cbd5e1; border-radius:8px; background:#fff; overflow:hidden; }
+    .readout-header { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding:16px 18px 12px; border-bottom:1px solid #e2e8f0; background:#f8fafc; }
+    .readout-eyebrow { margin:0 0 3px; font-size:.72rem; font-weight:900; color:#475569; text-transform:uppercase; letter-spacing:.06em; }
+    .readout-title { margin:0; font-size:1.2rem; font-weight:900; color:#0f172a; }
+    .readout-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0; border-bottom:1px solid #e2e8f0; }
+    .readout-item { padding:12px 18px; border-top:1px solid #f1f5f9; }
+    .readout-item span { display:block; margin-bottom:2px; color:#64748b; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+    .readout-item strong { display:block; color:#0f172a; font-size:.98rem; font-weight:900; }
+    .readout-item small { display:block; margin-top:3px; color:#64748b; font-size:.78rem; font-weight:700; }
+    .readout-body { padding:14px 18px 16px; display:grid; grid-template-columns:minmax(0,1.6fr) minmax(220px,.8fr); gap:18px; }
+    .readout-narrative p { margin:0 0 8px; color:#1e293b; line-height:1.45; }
+    .readout-narrative p:last-child { margin-bottom:0; }
+    .readout-subhead { margin:0 0 6px; color:#475569; font-size:.7rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; }
+    .readout-list { margin:0; padding-left:18px; color:#0f172a; font-size:.88rem; }
+    .readout-list li { margin-bottom:5px; }
+    .readout-list li:last-child { margin-bottom:0; }
+    .readout-evidence { margin-top:12px; }
+    .report-section { margin-top:18px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; background:#fff; }
     .report-section-head { background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:10px 16px; font-size:.75rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; color:#475569; }
     .report-section-head.red { background:#fff1f2; color:#be123c; border-color:#fecdd3; }
     .report-section-head.amber { background:#fffbeb; color:#92400e; border-color:#fde68a; }
     .report-section-body { padding:14px 16px; display:flex; flex-direction:column; gap:10px; }
-    .report-row { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; font-size:.875rem; }
-    .report-row-label { font-weight:700; color:#334155; min-width:120px; }
-    .report-row-val { color:#0f172a; font-weight:900; text-align:right; }
+    .support-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0; }
+    .support-item { padding:4px 12px 4px 0; }
+    .support-item span { display:block; margin-bottom:2px; color:#64748b; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+    .support-item strong { display:block; color:#0f172a; font-size:.95rem; font-weight:900; }
+    .support-item small { display:block; margin-top:3px; color:#64748b; font-size:.78rem; font-weight:700; }
+    .detail-pairs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 18px; }
+    .detail-pair { margin:0; display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid #f1f5f9; padding-bottom:7px; }
+    .detail-pair span { color:#64748b; font-weight:800; }
+    .detail-pair strong { color:#0f172a; font-weight:900; text-align:right; }
+    .empty-proof { margin:0; color:#64748b; font-weight:700; }
     .delay-item { background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:10px 12px; }
     .delay-item .plant { font-weight:900; color:#0f172a; font-size:.875rem; }
     .delay-item .detail { color:#92400e; font-size:.8rem; margin-top:3px; }
@@ -31,37 +50,22 @@
     .damage-item .plant { font-weight:900; color:#be123c; font-size:.875rem; }
     .damage-item .detail { color:#0f172a; font-size:.8rem; margin-top:3px; }
     .damage-item .dmeta { color:#64748b; font-size:.75rem; margin-top:3px; }
-    .stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
-    .stat-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; text-align:center; }
-    .stat-card .sv { font-size:1.4rem; font-weight:900; color:#0f172a; }
-    .stat-card .sl { font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; color:#64748b; margin-top:2px; }
-    @media (max-width:900px) { .stat-grid { grid-template-columns:1fr 1fr; } }
     .route-log-table { width:100%; border-collapse:collapse; font-size:.83rem; margin-top:0; }
     .route-log-table th { padding:7px 10px; text-align:left; font-size:.65rem; font-weight:900; text-transform:uppercase; letter-spacing:.07em; color:#64748b; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
     .route-log-table td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
     .route-log-table tr.current-stop td { background:#eff6ff; }
     .route-log-table tr.open-stop td { background:#fff1f2; }
     .rlt-route { font-weight:800; color:#0f172a; white-space:nowrap; }
-    .rlt-route-arrow { font-weight:900; color:#7f1d2d; margin:0 4px; }
     .rlt-load { font-size:.75rem; color:#475569; margin-top:3px; }
     .rlt-load-val { font-weight:900; }
     .current-stop-marker { display:inline-block; background:#2563eb; color:#fff; font-size:.6rem; font-weight:900; padding:1px 5px; border-radius:4px; margin-left:4px; text-transform:uppercase; vertical-align:middle; }
-    @media print {
-      .route-log-table { font-size:8.5pt; }
-      .route-log-table th { font-size:7pt; padding:4px 6px; }
-      .route-log-table td { padding:5px 6px; border-bottom:1px solid #ccc; }
-      .route-log-table tr.current-stop td { background:#e8f0ff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-      .route-log-table tr.open-stop td { background:#ffe8e8 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    @media (max-width:900px) {
+      .readout-header { flex-direction:column; }
+      .readout-grid, .support-grid, .detail-pairs { grid-template-columns:1fr; }
+      .readout-body { grid-template-columns:1fr; }
+      .detail-pair strong { text-align:left; }
+      .detail-pair { flex-direction:column; gap:2px; }
     }
-    @media print {
-      .report-section { border:1px solid #ccc; border-radius:0; break-inside:avoid; margin-top:.12in; }
-      .report-section-head { background:#eee !important; color:#000 !important; padding:5px 10px; font-size:8pt; }
-      .report-section-body { padding:8px 10px; gap:6px; }
-      .delay-item, .damage-item { background:#fff !important; border:1px solid #999; border-radius:0; padding:5px 8px; }
-      .stat-card { background:#fff !important; border:1px solid #999; }
-      .stat-card .sv { font-size:1.1rem; }
-    }
-    @media (max-width:900px) { .log-detail-grid { grid-template-columns:1fr; } }
     @media print {
       @page { size: Letter portrait; margin:.35in; }
       body { background:#fff !important; font-size:9.5pt; }
@@ -71,220 +75,234 @@
       .print-title h1 { margin:0; font-size:15pt; letter-spacing:.03em; }
       .print-title p { margin:2px 0 0; font-size:8.5pt; color:#333; }
       h2.mt-3 { display:none; }
-      .log-detail-grid { grid-template-columns:repeat(3,1fr); gap:.08in; margin:.1in 0 .16in; }
-      .log-detail-card { border:1px solid #222; border-radius:0; padding:.08in; break-inside:avoid; }
-      p { margin:.05in 0; }
+      .management-readout, .report-section { border:1px solid #222; border-radius:0; break-inside:avoid; margin-top:.12in; }
+      .readout-header, .report-section-head { background:#eee !important; color:#000 !important; padding:5px 10px; }
+      .readout-body, .report-section-body { padding:8px 10px; gap:6px; }
+      .readout-grid { grid-template-columns:repeat(3,1fr); }
+      .delay-item, .damage-item { background:#fff !important; border:1px solid #999; border-radius:0; padding:5px 8px; }
+      .route-log-table { font-size:8.5pt; }
+      .route-log-table th { font-size:7pt; padding:4px 6px; }
+      .route-log-table td { padding:5px 6px; border-bottom:1px solid #ccc; }
+      .route-log-table tr.current-stop td { background:#e8f0ff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .route-log-table tr.open-stop td { background:#ffe8e8 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
       .status-chip { border:1px solid #111; background:#fff !important; color:#000 !important; }
     }
   </style>
+
   {% if current_user.role == 'management' %}
     <div class="print-title">
       <h1>LACKSDRIVERS — DRIVER DAY LOG</h1>
-      <p>{{ log.driver.display_name }} &nbsp;|&nbsp; {{ log.date }} &nbsp;|&nbsp; {{ stop_count }} stop{{ 's' if stop_count != 1 else '' }} &nbsp;|&nbsp; Viewing stop #{{ stop_position }}</p>
+      <p>Management route audit &nbsp;|&nbsp; {{ log.date }} &nbsp;|&nbsp; {{ stop_count }} stop{{ 's' if stop_count != 1 else '' }} &nbsp;|&nbsp; Viewing stop #{{ stop_position }}</p>
     </div>
   {% endif %}
+
   <div class="d-flex justify-content-between align-items-center gap-2 no-print">
     <h2 class="mt-3 mb-0">View Driver Log</h2>
     {% if current_user.role == 'management' %}<button type="button" class="btn btn-outline-secondary" onclick="window.print()">Print Management Copy</button>{% endif %}
   </div>
-  <p><strong>ID:</strong> {{ log.id }}</p>
-  {% if current_user.role == 'management' %}
-    <div class="log-detail-grid">
-      <div class="log-detail-card">
-        <p class="label">Driver</p>
-        <p class="value">{{ log.driver.manager_label }}</p>
-        <p class="meta">{{ log.driver.division_label }} | Badge {{ log.driver.badge_label }}</p>
-      </div>
-      <div class="log-detail-card">
-        <p class="label">Truck ID</p>
-        <p class="value">{{ truck_context.truck_id if truck_context else 'Truck not set' }}</p>
-        <p class="meta">{{ truck_context.truck_meta if truck_context else 'No DVIR found' }}</p>
-      </div>
-      <div class="log-detail-card">
-        <p class="label">Move Context</p>
-        {% if related_task %}
-          <p class="value"><span class="move-chip {% if related_task.is_hot %}hot{% elif related_task.status == 'completed' %}done{% endif %}">{{ 'Hot Part' if related_task.is_hot else 'Move' }}</span>{{ related_task.part_number or related_task.title }}</p>
-          <p class="meta">{{ related_task.title }} | {{ related_task.status.replace('-', ' ')|title }}{% if related_task.accepted_by %} | Accepted by {{ related_task.accepted_by.manager_label }}{% endif %}</p>
-        {% else %}
-          <p class="value">No linked move</p>
-          <p class="meta">No active task matched this stop.</p>
-        {% endif %}
-      </div>
-    </div>
-  {% endif %}
 
   {% if current_user.role == 'management' %}
-  {# ── Performance Summary ── #}
-  <div class="report-section">
-    <div class="report-section-head">Driver Day Summary — {{ log.driver.display_name }} on {{ log.date }}</div>
-    <div class="report-section-body">
-      <div class="stat-grid">
-        <div class="stat-card">
-          <div class="sv">{{ stop_count }}</div>
-          <div class="sl">Total Stops</div>
+    <div class="management-readout">
+      <div class="readout-header">
+        <div>
+          <p class="readout-eyebrow">Management Readout</p>
+          <h3 class="readout-title">Driver Day Log</h3>
         </div>
-        {% if delay_logs %}
-        <div class="stat-card">
-          <div class="sv">{{ delay_logs|length }}</div>
-          <div class="sl">Delay Events</div>
+      </div>
+      <div class="readout-grid">
+        <div class="readout-item">
+          <span>Driver</span>
+          <strong>{{ log.driver.display_name }}</strong>
+          {% if log.driver.department or log.driver.employee_id %}
+            <small>{% if log.driver.department %}{{ log.driver.department }}{% endif %}{% if log.driver.department and log.driver.employee_id %} &middot; {% endif %}{% if log.driver.employee_id %}Badge {{ log.driver.employee_id }}{% endif %}</small>
+          {% endif %}
         </div>
-        {% endif %}
-        <div class="stat-card">
-          <div class="sv">{{ damage_reports|length }}</div>
-          <div class="sl">Damage Reports</div>
+        <div class="readout-item"><span>Date</span><strong>{{ log.date }}</strong></div>
+        <div class="readout-item"><span>Truck</span><strong>{{ truck_context.truck_id if truck_context else 'Truck not set' }}</strong>{% if truck_context and truck_context.truck_meta %}<small>{{ truck_context.truck_meta }}</small>{% endif %}</div>
+        <div class="readout-item"><span>Route Status</span><strong>{{ management_narrative.route_status }}</strong></div>
+        <div class="readout-item"><span>Stops</span><strong>{{ stop_count }}</strong></div>
+        <div class="readout-item"><span>Exceptions</span><strong>{{ delay_logs|length }} delay{{ 's' if delay_logs|length != 1 else '' }}, {{ damage_reports|length }} damage report{{ 's' if damage_reports|length != 1 else '' }}</strong></div>
+      </div>
+      <div class="readout-body">
+        <div class="readout-narrative">
+          <p>{{ management_narrative.status_summary }}</p>
+          <p>{{ management_narrative.exception_summary }}</p>
+          <p>{{ management_narrative.main_issue }}</p>
+        </div>
+        <div>
+          <p class="readout-subhead">Action Items</p>
+          <ul class="readout-list">
+            {% for item in management_narrative.action_items %}<li>{{ item }}</li>{% endfor %}
+          </ul>
+          {% if management_narrative.evidence_references %}
+            <div class="readout-evidence">
+              <p class="readout-subhead">Evidence References</p>
+              <ul class="readout-list">
+                {% for item in management_narrative.evidence_references %}<li>{{ item }}</li>{% endfor %}
+              </ul>
+            </div>
+          {% endif %}
         </div>
       </div>
     </div>
-  </div>
 
-  {# ── Full-day route table ── #}
-  {% if day_logs %}
-  <div class="report-section">
-    <div class="report-section-head">Full Day Route — All Stops</div>
-    <div style="overflow-x:auto;">
-      <table class="route-log-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Route</th>
-            <th>Arrive</th>
-            <th>Depart</th>
-            <th>Parts</th>
-            {% if has_reported_delay %}<th>Delay</th>{% endif %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for dl in day_logs %}
-          {% set r = (log_routes or {}).get(dl.id) %}
-          <tr class="{% if dl.id == log.id %}current-stop{% elif not dl.depart_time %}open-stop{% endif %}">
-            <td style="font-weight:900;color:#475569;">
-              {{ loop.index }}
-              {% if dl.id == log.id %}<span class="current-stop-marker">this stop</span>{% endif %}
-            </td>
-            <td>
-              {% if r %}
-                <div class="rlt-route">{{ r.plant }}</div>
-                <div class="rlt-load">
-                  In: <span class="rlt-load-val">{{ r.arrive_cargo_desc }}</span>
-                </div>
-                <div class="rlt-load">
-                  Out: <span class="rlt-load-val">
-                    {% if r.depart_desc is none %}—
-                    {% elif dl.no_pickup %}No Pickup
-                    {% else %}{{ r.depart_cargo_desc }}{% endif %}
-                  </span>
-                </div>
-              {% else %}
-                {{ dl.plant_name }}
-              {% endif %}
-            </td>
-            <td style="white-space:nowrap;">{{ dl.arrive_time|to_local_time if dl.arrive_time else '—' }}</td>
-            <td style="white-space:nowrap;">
-              {% if dl.depart_time %}{{ dl.depart_time|to_12h_format }}{% else %}<span style="color:#be123c;font-weight:900;">Open</span>{% endif %}
-            </td>
-            <td>
-              {% if dl.no_pickup %}<em style="color:#475569;">No Pickup</em>
-              {% elif dl.hot_parts %}<strong style="color:#be123c;">HOT</strong> {{ dl.part_number or '' }}
-              {% else %}{{ dl.part_number or '—' }}{% endif %}
-            </td>
-            {% if has_reported_delay %}
-            <td style="white-space:nowrap;">
-              {% if dl.dock_wait_minutes %}{{ dl.dock_wait_minutes }} min{% else %}—{% endif %}
-              {% if dl.downtime_reason %}<div style="font-size:.75rem;color:#92400e;">{{ dl.downtime_reason }}</div>{% endif %}
-            </td>
+    <div class="report-section">
+      <div class="report-section-head">Current Stop / Move Context</div>
+      <div class="report-section-body">
+        <div class="support-grid">
+          <div class="support-item">
+            <span>Current Stop</span>
+            <strong>{{ management_narrative.current_stop }}</strong>
+            {% if stop_position and stop_count %}<small>Route position {{ stop_position }} of {{ stop_count }}</small>{% endif %}
+          </div>
+          <div class="support-item">
+            <span>Stop State</span>
+            <strong>{% if log.depart_time %}<span class="status-chip done">Departure recorded</span>{% else %}<span class="status-chip open">Open stop</span>{% endif %}</strong>
+            <small>{% if log.depart_time %}Arrival and departure are saved.{% else %}Driver still needs departure/load-out.{% endif %}</small>
+          </div>
+          <div class="support-item">
+            <span>Move Context</span>
+            {% if related_task %}
+              <strong><span class="move-chip {% if related_task.is_hot %}hot{% elif related_task.status == 'completed' %}done{% endif %}">{{ 'Hot Part' if related_task.is_hot else 'Move' }}</span>{{ related_task.part_number or related_task.title }}</strong>
+              <small>{{ related_task.title }} | {{ related_task.status.replace('-', ' ')|title }}{% if related_task.accepted_by and related_task.accepted_by_id != log.driver_id %} | Accepted by {{ related_task.accepted_by.display_name }}{% elif related_task.accepted_by %} | Accepted{% endif %}</small>
+            {% else %}
+              <strong>No linked move</strong>
+              <small>No active task matched this stop.</small>
             {% endif %}
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-
-  {# ── Delays ── #}
-  {% if delay_logs %}
-  <div class="report-section">
-    <div class="report-section-head amber">Delay Report ({{ delay_logs|length }} event{{ 's' if delay_logs|length != 1 else '' }})</div>
-    <div class="report-section-body">
-      {% for dl in delay_logs %}
-      <div class="delay-item">
-        <div class="plant">Stop #{{ loop.index }} — {{ dl.plant_name }}</div>
-        <div class="detail">
-          {% if dl.dock_wait_minutes %}Dock wait: {{ dl.dock_wait_minutes }} min{% endif %}
-          {% if dl.dock_wait_minutes and dl.downtime_reason %} · {% endif %}
-          {% if dl.downtime_reason %}Reason: {{ dl.downtime_reason }}{% endif %}
+          </div>
         </div>
       </div>
-      {% endfor %}
     </div>
-  </div>
-  {% endif %}
 
-  {# ── Damage Reports ── #}
-  {% if damage_reports %}
-  <div class="report-section">
-    <div class="report-section-head red">Damage Reports ({{ damage_reports|length }})</div>
-    <div class="report-section-body">
-      {% for dr in damage_reports %}
-      <div class="damage-item">
-        <div class="plant">{{ dr.plant_name }} — {{ dr.stage|title }} move <span style="font-weight:700;font-size:.75rem;">[{{ dr.status|upper }}]</span></div>
-        <div class="detail">{{ dr.description }}</div>
-        <div class="dmeta">Reported {{ dr.damage_time.strftime('%Y-%m-%d %H:%M') if dr.damage_time else '—' }}{% if dr.truck_number %} · Truck {{ dr.truck_number }}{% endif %}{% if dr.trailer_number %} · Trailer {{ dr.trailer_number }}{% endif %}</div>
+    {% if day_logs %}
+    <div class="report-section">
+      <div class="report-section-head">Full Day Route</div>
+      <div style="overflow-x:auto;">
+        <table class="route-log-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Route</th>
+              <th>Arrive</th>
+              <th>Depart</th>
+              <th>Parts</th>
+              {% if has_reported_delay %}<th>Delay</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for dl in day_logs %}
+            {% set r = (log_routes or {}).get(dl.id) %}
+            <tr class="{% if dl.id == log.id %}current-stop{% elif not dl.depart_time %}open-stop{% endif %}">
+              <td style="font-weight:900;color:#475569;">
+                {{ loop.index }}
+                {% if dl.id == log.id %}<span class="current-stop-marker">this stop</span>{% endif %}
+              </td>
+              <td>
+                {% if r %}
+                  <div class="rlt-route">{{ r.plant }}</div>
+                  <div class="rlt-load">In: <span class="rlt-load-val">{{ r.arrive_cargo_desc }}</span></div>
+                  <div class="rlt-load">Out: <span class="rlt-load-val">{% if r.depart_desc is none %}&mdash;{% elif dl.no_pickup %}No Pickup{% else %}{{ r.depart_cargo_desc }}{% endif %}</span></div>
+                {% else %}
+                  {{ dl.plant_name }}
+                {% endif %}
+              </td>
+              <td style="white-space:nowrap;">{{ dl.arrive_time|to_local_time if dl.arrive_time else '--' }}</td>
+              <td style="white-space:nowrap;">
+                {% if dl.depart_time %}{{ dl.depart_time|to_12h_format }}{% else %}<span style="color:#be123c;font-weight:900;">Open</span>{% endif %}
+              </td>
+              <td>
+                {% if dl.no_pickup %}<em style="color:#475569;">No Pickup</em>
+                {% elif dl.hot_parts %}<strong style="color:#be123c;">HOT</strong> {{ dl.part_number or '' }}
+                {% else %}{{ dl.part_number or '--' }}{% endif %}
+              </td>
+              {% if has_reported_delay %}
+              <td style="white-space:nowrap;">
+                {% if dl.dock_wait_minutes %}{{ dl.dock_wait_minutes }} min{% else %}&mdash;{% endif %}
+                {% if dl.downtime_reason %}<div style="font-size:.75rem;color:#92400e;">{{ dl.downtime_reason }}</div>{% endif %}
+              </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-      {% endfor %}
     </div>
-  </div>
-  {% endif %}
-  {% endif %}
-
-  <p><strong>Date:</strong> {{ log.date }}</p>
-  <p><strong>Plant Name:</strong> {{ log.plant_name }}</p>
-  {% if current_user.role == 'management' and log_route %}
-    <p><strong>Stop:</strong> {{ log_route.plant }}
-      <span class="text-muted">&nbsp;·&nbsp;{{ log_route.action }} &nbsp;·&nbsp; {{ log_route.state }}</span>
-    </p>
-    <p><strong>Arriving with:</strong> {{ log_route.arrive_cargo_desc }}</p>
-    <p><strong>Departing with:</strong>
-      {% if log_route.depart_desc is none %}<span class="badge bg-secondary">Open stop</span>
-      {% elif log.no_pickup %}No Pickup
-      {% else %}{{ log_route.depart_cargo_desc }}{% endif %}
-    </p>
-  {% endif %}
-  {% if current_user.role == 'management' %}
-    <p><strong>Stop Progress:</strong>
-      {% if log.depart_time %}
-        <span class="status-chip done">Arrival and departure recorded</span>
-      {% else %}
-        <span class="status-chip open">Driver is still at this stop</span>
-      {% endif %}
-      {% if stop_position and stop_count %}<span class="text-muted">Route position {{ stop_position }} of {{ stop_count }} on {{ log.date }}</span>{% endif %}
-    </p>
-    <p class="text-muted small stop-help"><strong>How to read it:</strong> This describes this one stop only. A departed stop has both arrival and departure saved; an open stop still needs the driver to record departure/load.</p>
-  {% endif %}
-  <p><strong>Maintenance:</strong> {{ "Yes" if log.maintenance else "No" }}{% if log.maintenance and log.fuel_mileage %} - Odometer {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</p>
-  <p><strong>Fuel:</strong> {{ "Yes" if log.fuel else "No" }}</p>
-  <p><strong>Meeting:</strong> {{ "Yes" if log.meeting else "No" }}</p>
-
-  <p><strong>Arrive Time:</strong> 
-    {% if log.arrive_time %}
-      {{ log.arrive_time|to_local_time }}
-    {% else %}
-      --
     {% endif %}
-  </p>
 
-  <p><strong>Depart Time:</strong> 
-    {% if log.depart_time %}
-      {{ log.depart_time|to_12h_format }}
-    {% else %}
-      --
-    {% endif %}
-  </p>
+    <div class="report-section">
+      <div class="report-section-head amber">Delay Reports ({{ delay_logs|length }} event{{ 's' if delay_logs|length != 1 else '' }})</div>
+      <div class="report-section-body">
+        {% if delay_logs %}
+          {% for dl in delay_logs %}
+          <div class="delay-item">
+            <div class="plant">Stop #{{ loop.index }} - {{ dl.plant_name }}</div>
+            <div class="detail">
+              {% if dl.dock_wait_minutes %}Dock wait: {{ dl.dock_wait_minutes }} min{% endif %}
+              {% if dl.dock_wait_minutes and dl.downtime_reason %} &middot; {% endif %}
+              {% if dl.downtime_reason %}Reason: {{ dl.downtime_reason }}{% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="empty-proof">No delay events were reported for this route.</p>
+        {% endif %}
+      </div>
+    </div>
 
-  {% if log.no_pickup %}
-    <p><strong>Parts:</strong> <span class="badge bg-dark">No Pickup</span></p>
+    <div class="report-section">
+      <div class="report-section-head red">Damage Reports ({{ damage_reports|length }})</div>
+      <div class="report-section-body">
+        {% if damage_reports %}
+          {% for dr in damage_reports %}
+          <div class="damage-item">
+            <div class="plant">{{ dr.plant_name }} - {{ dr.stage|title }} move <span style="font-weight:700;font-size:.75rem;">[{{ dr.status|upper }}]</span></div>
+            <div class="detail">{{ dr.description }}</div>
+            <div class="dmeta">Reported {{ dr.damage_time.strftime('%Y-%m-%d %H:%M') if dr.damage_time else '--' }}{% if dr.truck_number %} &middot; Truck {{ dr.truck_number }}{% endif %}{% if dr.trailer_number %} &middot; Trailer {{ dr.trailer_number }}{% endif %}</div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="empty-proof">No damage reports were filed for this route.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="report-section">
+      <div class="report-section-head">Stop Details</div>
+      <div class="report-section-body">
+        <div class="detail-pairs">
+          <p class="detail-pair"><span>Log ID</span><strong>{{ log.id }}</strong></p>
+          <p class="detail-pair"><span>Date</span><strong>{{ log.date }}</strong></p>
+          <p class="detail-pair"><span>Plant Name</span><strong>{{ log.plant_name }}</strong></p>
+          {% if log_route %}
+            <p class="detail-pair"><span>Stop</span><strong>{{ log_route.plant }} | {{ log_route.action }} | {{ log_route.state }}</strong></p>
+            <p class="detail-pair"><span>Arriving With</span><strong>{{ log_route.arrive_cargo_desc }}</strong></p>
+            <p class="detail-pair"><span>Departing With</span><strong>{% if log_route.depart_desc is none %}Open stop{% elif log.no_pickup %}No Pickup{% else %}{{ log_route.depart_cargo_desc }}{% endif %}</strong></p>
+          {% endif %}
+          <p class="detail-pair"><span>Maintenance</span><strong>{{ "Yes" if log.maintenance else "No" }}{% if log.maintenance and log.fuel_mileage %} - Odometer {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</strong></p>
+          <p class="detail-pair"><span>Fuel</span><strong>{{ "Yes" if log.fuel else "No" }}</strong></p>
+          <p class="detail-pair"><span>Meeting</span><strong>{{ "Yes" if log.meeting else "No" }}</strong></p>
+          <p class="detail-pair"><span>Stop Progress</span><strong>{% if log.depart_time %}Arrival and departure recorded{% else %}Driver is still at this stop{% endif %}{% if stop_position and stop_count %} | Route position {{ stop_position }} of {{ stop_count }}{% endif %}</strong></p>
+          <p class="detail-pair"><span>Arrive Time</span><strong>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</strong></p>
+          <p class="detail-pair"><span>Depart Time</span><strong>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</strong></p>
+          <p class="detail-pair"><span>Parts</span><strong>{% if log.no_pickup %}No Pickup{% elif log.hot_parts %}Hot {{ log.part_number or '' }}{% else %}{{ log.part_number or 'N/A' }}{% endif %}</strong></p>
+        </div>
+        <p class="text-muted small stop-help"><strong>How to read it:</strong> This section is supporting audit proof for the selected stop. An open stop still needs the driver to record departure/load.</p>
+      </div>
+    </div>
   {% else %}
-    <p><strong>Parts:</strong> {% if log.hot_parts %}<span class="badge bg-danger">Hot</span>{% endif %} {{ log.part_number or "N/A" }}</p>
+    <p><strong>ID:</strong> {{ log.id }}</p>
+    <p><strong>Date:</strong> {{ log.date }}</p>
+    <p><strong>Plant Name:</strong> {{ log.plant_name }}</p>
+    <p><strong>Maintenance:</strong> {{ "Yes" if log.maintenance else "No" }}{% if log.maintenance and log.fuel_mileage %} - Odometer {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</p>
+    <p><strong>Fuel:</strong> {{ "Yes" if log.fuel else "No" }}</p>
+    <p><strong>Meeting:</strong> {{ "Yes" if log.meeting else "No" }}</p>
+    <p><strong>Arrive Time:</strong> {{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</p>
+    <p><strong>Depart Time:</strong> {{ log.depart_time|to_12h_format if log.depart_time else '--' }}</p>
+    {% if log.no_pickup %}
+      <p><strong>Parts:</strong> <span class="badge bg-dark">No Pickup</span></p>
+    {% else %}
+      <p><strong>Parts:</strong> {% if log.hot_parts %}<span class="badge bg-danger">Hot</span>{% endif %} {{ log.part_number or "N/A" }}</p>
+    {% endif %}
   {% endif %}
 
   {% set can_manage_log = current_user.role == 'driver' and log.driver_id == current_user.id %}

@@ -28,6 +28,7 @@ from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, Dri
 from app.services.activity import record_activity
 from app.services.operations import build_exception_items
 from app.services.load_state import build_driver_log_route_context, truck_issue_reason
+from app.services.management_readout import build_management_narrative
 from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
 from app.services.role_session import restore_role_user
 from app.services.search_corpus import suggest_terms
@@ -927,12 +928,24 @@ def view_driver_log(log_id):
     has_reported_delay = any((dl.dock_wait_minutes or 0) > 0 for dl in day_logs)
 
     all_routes = _driver_log_route_context(day_logs)
+    truck_context = _truck_context_for_driver(log.driver_id, log.date)
+    management_narrative = build_management_narrative(
+        {
+            "log": log,
+            "day_logs": day_logs,
+            "log_routes": all_routes,
+            "delay_logs": delay_logs,
+            "damage_reports": damage_reports,
+            "truck_context": truck_context,
+            "related_task": related_task,
+        }
+    )
     return render_template(
         "view_driver_log.html",
         log=log,
         log_route=all_routes.get(log.id),
         log_routes=all_routes,
-        truck_context=_truck_context_for_driver(log.driver_id, log.date),
+        truck_context=truck_context,
         related_task=related_task,
         stop_position=stop_position,
         stop_count=len(day_logs),
@@ -941,6 +954,7 @@ def view_driver_log(log_id):
         delay_logs=delay_logs,
         has_reported_delay=has_reported_delay,
         day_logs=day_logs,
+        management_narrative=management_narrative,
     )
 
 
