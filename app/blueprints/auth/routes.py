@@ -137,6 +137,7 @@ def login():
             (
                 candidate
                 for candidate in matching_users
+                if candidate.password_hash
                 if candidate.check_password(form.password.data)
             ),
             None,
