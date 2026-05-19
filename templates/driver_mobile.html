@@ -47,7 +47,7 @@
     }
 
     .driver-row, .cluster, .split { display: flex; align-items: center; }
-    .driver-row, .split { justify-content: space-between; gap: 12px; }
+    .driver-row, .split, .header-actions { justify-content: space-between; gap: 12px; }
     .cluster { gap: 12px; min-width: 0; }
 
     .avatar {
@@ -66,6 +66,21 @@
     .status-line { display: flex; align-items: center; gap: 6px; color: var(--green); font-size: 0.76rem; font-weight: 750; margin-top: 4px; }
     .dot { width: 7px; height: 7px; border-radius: 99px; background: currentColor; }
     .dot.off { color: var(--muted); }
+
+    .header-actions { display: flex; align-items: center; flex: 0 0 auto; }
+    .logout-link {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.14);
+      color: #f3c7cf;
+      font-size: 0.7rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
 
     .shift-pill {
       background: rgba(31, 41, 55, 0.9);
@@ -198,6 +213,7 @@
     .task-detail { margin:3px 0 0; color:var(--muted); font-size:.74rem; line-height:1.3; overflow-wrap:anywhere; }
     .task-meta { display:flex; flex-wrap:wrap; gap:6px; }
     .task-meta .badge { text-transform:none; letter-spacing:0; }
+    .hero .task-meta { margin:-6px 0 16px; position:relative; z-index:2; }
     .queue-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
     .queue-actions.two { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .queue-actions .button, .queue-actions button.action { min-height:36px; border-radius:10px; font-size:.74rem; padding:0 8px; }
@@ -379,9 +395,12 @@
             </div>
           </div>
         </div>
-        <div class="shift-pill">
-          <span>{% if open_shift %}Shift Time{% else %}Shift{% endif %}</span>
-          <strong>{{ shift_elapsed if shift_elapsed else '--:--' }}</strong>
+        <div class="header-actions">
+          <a class="logout-link" href="{{ url_for('auth.logout') }}">Logout</a>
+          <div class="shift-pill">
+            <span>{% if open_shift %}Shift Time{% else %}Shift{% endif %}</span>
+            <strong>{{ shift_elapsed if shift_elapsed else '--:--' }}</strong>
+          </div>
         </div>
       </div>
     </header>
@@ -401,6 +420,12 @@
           <div class="eyebrow"><span class="bolt"></span>{% if active_task.is_hot %}Active Hot Move{% else %}Active Task{% endif %}</div>
           <h1>{{ active_task.title }}</h1>
           <p>{{ active_task.details or 'No extra dispatch notes.' }}</p>
+          <div class="task-meta">
+            {% if active_task.part_number %}<span class="badge {% if active_task.is_hot %}hot{% endif %}">Part {{ active_task.part_number }}</span>{% endif %}
+            <span class="badge {% if active_task.is_hot %}hot{% elif active_task.status == 'in-progress' %}progress{% else %}ok{% endif %}">{{ 'HOT' if active_task.is_hot else active_task.status.replace('-', ' ')|title }}</span>
+            <span class="badge">{{ 'Open for any driver' if not active_task.assigned_to else 'Assigned to you' }}</span>
+            {% if active_task.accepted_at %}<span class="badge progress">Accepted {{ active_task.accepted_at|to_detroit_datetime }}</span>{% endif %}
+          </div>
           <div class="hero-actions {% if active_task.status == 'pending' %}tri{% else %}{% endif %}">
             <a class="button ghost" href="{{ url_for('driver.view_task', task_id=active_task.id) }}">Details</a>
             {% if active_task.status == 'pending' %}
@@ -427,6 +452,7 @@
         {% endif %}
       </section>
 
+      {% if task_queue %}
       <section class="list">
         <div class="section-head">
           <h2>Parts Queue</h2>
@@ -457,11 +483,10 @@
                 {% endif %}
               </div>
             </article>
-          {% else %}
-            <div class="ryder-entry"><strong>No parts in queue</strong><span>Assigned and open moves will appear here together.</span></div>
           {% endfor %}
         </div>
       </section>
+      {% endif %}
 
       <section class="quick-grid">
         {% if active_task %}

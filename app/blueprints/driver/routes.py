@@ -6,6 +6,7 @@ pre-trip / post-trip family lives here; the rest will move in subsequent sub-
 PRs of PR-5c.
 """
 from datetime import datetime, date
+from functools import wraps
 import os
 
 import pytz
@@ -74,6 +75,24 @@ RYDER_OUTCOME_LABELS = {
     "left": "Left at Ryder",
     "rental": "Rental picked up",
 }
+
+
+def _driver_route_guard(target_endpoint, page_label, retry_label="the mobile dashboard"):
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapped(*args, **kwargs):
+            try:
+                return view_func(*args, **kwargs)
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception("Driver route failed: %s", request.path)
+                flash(
+                    f"We could not open {page_label}. Nothing was changed. Try again from {retry_label}.",
+                    "danger",
+                )
+                return redirect(url_for(target_endpoint))
+        return wrapped
+    return decorator
 
 DRIVER_ONLY_ENDPOINTS = {
     "dashboard",
@@ -788,6 +807,26 @@ def _save_damage_photo(report, uploaded_file):
     return photo
 
 
+def _save_pretrip_damage_report(pretrip, form):
+    uploaded_file = request.files.get(form.damage_photo.name)
+    if not uploaded_file or not uploaded_file.filename:
+        return None
+    description = (form.damage_report.data or "").strip() or "PreTrip damage photo."
+    report = DamageReport(
+        reported_by_id=current_user.id,
+        truck_number=(pretrip.truck_number or "").strip() or None,
+        trailer_number=(pretrip.trailer_number or "").strip() or None,
+        plant_name="Other",
+        stage="before",
+        move_reference=f"PreTrip #{pretrip.id}",
+        description=description,
+    )
+    db.session.add(report)
+    db.session.flush()
+    _save_damage_photo(report, uploaded_file)
+    return report
+
+
 
 
 def _damage_report_date(report):
@@ -1480,6 +1519,7 @@ def new_pretrip():
 
         db.session.add(new_pt)
         db.session.flush()
+        damage_report = _save_pretrip_damage_report(new_pt, form)
         existing_open_shift = ShiftRecord.query.filter_by(
             user_id=current_user.id, end_time=None
         ).first()
@@ -1502,6 +1542,16 @@ def new_pretrip():
             target_type="pretrip",
             target_id=new_pt.id,
         )
+        if damage_report:
+            record_activity(
+                user_id=current_user.id,
+                category="damage",
+                action="reported",
+                title="PreTrip damage photo saved",
+                details=f"Truck {new_pt.truck_number or 'unlisted'} pretrip damage photo.",
+                target_type="damage_report",
+                target_id=damage_report.id,
+            )
 
         flash("PreTrip saved successfully!", "success")
         return redirect(url_for("driver.list_pretrips"))
@@ -1663,6 +1713,7 @@ def edit_pretrip_entry(pretrip_id):
         pt.towed_rearend = form.towed_rearend.data
         pt.towed_no_defects = form.towed_no_defects.data
         pt.damage_report = form.damage_report.data
+        damage_report = _save_pretrip_damage_report(pt, form)
 
         db.session.commit()
         record_activity(
@@ -1674,6 +1725,16 @@ def edit_pretrip_entry(pretrip_id):
             target_type="pretrip",
             target_id=pt.id,
         )
+        if damage_report:
+            record_activity(
+                user_id=current_user.id,
+                category="damage",
+                action="reported",
+                title="PreTrip damage photo saved",
+                details=f"Truck {pt.truck_number or 'unlisted'} pretrip damage photo.",
+                target_type="damage_report",
+                target_id=damage_report.id,
+            )
 
         session["reviewing_driver"] = request.form.get("reviewing_driver")
         session["reviewing_date"] = request.form.get("reviewing_date")
@@ -2042,6 +2103,7 @@ def driver_logs():
 
 @bp.route("/new_driving_log", methods=["GET", "POST"])
 @login_required
+@_driver_route_guard("driver.mobile_dashboard", "the driver log page")
 def new_driving_log():
     form = DriverLogForm()
     pending_ryder_event = _open_ryder_event(current_user.id)
@@ -2375,6 +2437,7 @@ def delete_driver_log(log_id):
 
 @bp.route("/driver_logs/<int:log_id>/depart", methods=["GET", "POST"], strict_slashes=False)
 @login_required
+@_driver_route_guard("driver.driver_logs", "that departure page", "Driver Logs")
 def depart_driver_log(log_id):
     log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
     if current_user.role == "driver" and log.driver_id != current_user.id:
@@ -3072,8 +3135,8 @@ def mobile_dashboard():
 
     tasks = _driver_task_queue(current_user.id)
     active_task = tasks[0] if tasks else None
-    task_queue = tasks
-    queued_tasks = tasks[1:4]
+    task_queue = [task for task in tasks if not active_task or task.id != active_task.id]
+    queued_tasks = task_queue[:3]
     hot_task_count = len([task for task in tasks if task.is_hot])
 
     latest_pretrip = (

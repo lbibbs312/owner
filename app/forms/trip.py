@@ -8,6 +8,7 @@ from flask_wtf import FlaskForm
 from wtforms import (
     BooleanField,
     DateField,
+    FileField,
     IntegerField,
     SelectField,
     StringField,
@@ -100,6 +101,7 @@ class PreTripForm(FlaskForm):
     towed_no_defects = BooleanField("No Defects (Towed Unit)")
     # REMARKS / DAMAGE
     damage_report = TextAreaField("Damage Report")
+    damage_photo = FileField("Damage Photo")
     submit = SubmitField("Save PreTrip")
 
 

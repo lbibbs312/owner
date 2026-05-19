@@ -1,17 +1,22 @@
+from io import BytesIO
 import os
 
 import pytest
 
 
 @pytest.fixture()
-def app(monkeypatch):
+def app(monkeypatch, tmp_path):
     monkeypatch.setenv("FLASK_ENV", "testing")
     monkeypatch.setenv("MANAGER_REGISTRATION_PIN", "0000")
     from app import create_app
     from app.extensions import db
 
     app = create_app()
-    app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+    app.config.update(
+        TESTING=True,
+        WTF_CSRF_ENABLED=False,
+        DAMAGE_UPLOAD_FOLDER=str(tmp_path / "damage_uploads"),
+    )
     with app.app_context():
         db.create_all()
         yield app
@@ -578,6 +583,10 @@ def test_pretrip_create_and_print_route(client, app):
         )
 
     login(client, "driver1")
+    new_page = client.get("/new_pretrip")
+    assert new_page.status_code == 200
+    assert b'capture="environment"' in new_page.data
+
     response = client.post(
         "/new_pretrip",
         data={
@@ -589,19 +598,25 @@ def test_pretrip_create_and_print_route(client, app):
             "truck_type": "Box Truck",
             "oil_system_status": "good",
             "tires_status": "good",
+            "damage_report": "Scratch on bumper",
+            "damage_photo": (BytesIO(b"fake image"), "pretrip-damage.jpg"),
         },
+        content_type="multipart/form-data",
         follow_redirects=False,
     )
     assert response.status_code == 302
 
     with app.app_context():
-        from app.models import ActivityEvent, PreTrip, ShiftRecord
+        from app.models import ActivityEvent, DamageReport, PreTrip, ShiftRecord
 
         pretrip = PreTrip.query.filter_by(truck_number="BT-1").one()
         assert pretrip.truck_type == "Box Truck"
         pretrip_id = pretrip.id
         shift = ShiftRecord.query.filter_by(pretrip_id=pretrip_id, end_time=None).one()
         assert shift.user_id == pretrip.user_id
+        damage = DamageReport.query.filter_by(move_reference=f"PreTrip #{pretrip_id}").one()
+        assert damage.description == "Scratch on bumper"
+        assert len(damage.photos) == 1
         assert ActivityEvent.query.filter_by(
             target_type="pretrip", target_id=pretrip_id, action="created"
         ).count() == 1
@@ -610,6 +625,7 @@ def test_pretrip_create_and_print_route(client, app):
     assert edit_page.status_code == 200
     assert b"Truck / Tractor #" in edit_page.data
     assert b"No Defects" in edit_page.data
+    assert b'capture="environment"' in edit_page.data
 
     edited_pretrip = client.post(
         f"/edit_pretrip_entry/{pretrip_id}",
@@ -817,6 +833,35 @@ def test_legacy_driver_log_urls_redirect_to_current_depart_flow(client, app):
     assert client.get(f"/depart_driver_log/{log_id}").headers["Location"].endswith(f"/driver_logs/{log_id}/depart")
     assert client.get(f"/pickup_driver_log/{log_id}").headers["Location"].endswith(f"/driver_logs/{log_id}/depart")
     assert client.get(f"/driver_logs/{log_id}/depart/").status_code == 200
+
+
+def test_new_driving_log_failure_redirects_to_mobile(client, app, monkeypatch):
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+
+    def fail_current_load(*args, **kwargs):
+        raise RuntimeError("forced driver log failure")
+
+    import app.blueprints.driver.routes as driver_routes
+
+    monkeypatch.setattr(driver_routes, "_current_driver_load", fail_current_load)
+    login(client, "driver1")
+
+    response = client.get("/new_driving_log", follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/mobile")
+
+
+def test_depart_missing_driver_log_redirects_instead_of_error(client, app):
+    with app.app_context():
+        create_user("driver1", "driver1@example.com", "driver")
+
+    login(client, "driver1")
+    response = client.get("/driver_logs/999/depart", follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/driver_logs")
 
 
 def test_edit_driver_log_rejects_impossible_depart_to_next_arrival(client, app):
@@ -1767,6 +1812,10 @@ def test_damage_report_edit_delete_submit_and_eod_lock(client, app):
 
     login(client, "driver1")
 
+    new_damage_page = client.get("/damage_reports/new")
+    assert new_damage_page.status_code == 200
+    assert b'capture="environment"' in new_damage_page.data
+
     create_response = client.post(
         "/damage_reports/new",
         data={
@@ -1776,7 +1825,9 @@ def test_damage_report_edit_delete_submit_and_eod_lock(client, app):
             "stage": "before",
             "move_reference": "Dock 4",
             "description": "Scuffed bumper",
+            "photo": (BytesIO(b"damage image"), "damage.jpg"),
         },
+        content_type="multipart/form-data",
         follow_redirects=False,
     )
     assert create_response.status_code == 302
@@ -1786,6 +1837,11 @@ def test_damage_report_edit_delete_submit_and_eod_lock(client, app):
 
         report = DamageReport.query.filter_by(description="Scuffed bumper").one()
         report_id = report.id
+        assert len(report.photos) == 1
+
+    edit_page = client.get(f"/damage_reports/{report_id}/edit")
+    assert edit_page.status_code == 200
+    assert b'capture="environment"' in edit_page.data
 
     edit_response = client.post(
         f"/damage_reports/{report_id}/edit",
@@ -2019,8 +2075,11 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert page.status_code == 200
     assert b"LacksDrivers Mobile" in page.data
     assert b"RW to KP hot move" in page.data
+    assert page.data.count(b"RW to KP hot move") == 1
     assert b"Part P0903110 needs trailer assignment." in page.data
     assert b"PostTrip Due" in page.data
+    assert b"Logout" in page.data
+    assert b"Parts Queue" not in page.data
     assert b"RW to KP" in page.data
     assert b"Ryder Service" in page.data
     assert b"Save Ryder Status" in page.data
