@@ -11,10 +11,20 @@
   .live-stat .label { margin:0 0 3px; color:#64748b; font-size:.68rem; text-transform:uppercase; font-weight:900; letter-spacing:.05em; }
   .live-stat .value { margin:0; font-weight:900; color:#0f172a; }
   .history-list { display:grid; gap:8px; }
+  .hot-proof-panel { border:1px solid #fecdd3; background:#fff7f7; border-radius:12px; padding:14px; }
+  .hot-proof-head { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:10px; }
+  .hot-proof-title { margin:0; color:#7f1d1d; font-size:1rem; font-weight:900; }
+  .hot-proof-meta { margin:2px 0 0; color:#991b1b; font-weight:800; font-size:.9rem; }
+  .hot-proof-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+  .hot-proof-actions button, .hot-photo-button { min-height:44px; border:1px solid #fecaca; background:#fff; color:#7f1d1d; border-radius:8px; font-weight:900; padding:8px 10px; }
+  .hot-proof-actions button:active, .hot-photo-button:active { transform:scale(.98); }
+  .hot-scan-row { display:flex; gap:8px; margin-bottom:8px; }
+  .hot-scan-row input { flex:1; min-width:0; border:1px solid #fecaca; border-radius:8px; padding:9px 10px; font-weight:800; }
+  .hot-proof-status { margin:10px 0 0; color:#7f1d1d; font-size:.86rem; font-weight:800; }
   .history-item { border:1px solid #e2e8f0; border-radius:10px; padding:10px; background:#fff; }
   .history-item strong { color:#0f172a; }
   .history-item .meta { color:#64748b; font-size:.82rem; }
-  @media (max-width:800px) { .live-grid { grid-template-columns:1fr 1fr; } .live-top { flex-direction:column; } }
+  @media (max-width:800px) { .live-grid { grid-template-columns:1fr 1fr; } .live-top { flex-direction:column; } .hot-proof-actions { grid-template-columns:1fr 1fr; } .hot-scan-row { flex-direction:column; } }
 </style>
 <div class="container my-3">
   <section class="live-task mb-3" id="liveTaskPanel" data-task-id="{{ task.id }}">
@@ -44,6 +54,36 @@
       {% endif %}
     </div>
   </section>
+
+  {% if task.is_hot and hot_part_proof %}
+  <section class="hot-proof-panel mb-3" aria-label="Hot Part Proof">
+    <div class="hot-proof-head">
+      <div>
+        <h3 class="hot-proof-title">Hot Part Proof</h3>
+        <p class="hot-proof-meta">Hot Part: {{ hot_part_proof.hot_part_number }}</p>
+        <p class="hot-proof-meta">Move Status: <span id="hotMoveStatus">{{ hot_part_proof.current_status }}</span></p>
+      </div>
+      {% if hot_part_proof.open_exception %}<span class="badge bg-warning text-dark">{{ hot_part_proof.open_exception }}</span>{% endif %}
+    </div>
+    <div class="hot-scan-row">
+      <input id="hotScanValue" autocomplete="off" inputmode="text" placeholder="Scan or enter part label">
+      <button type="button" class="hot-photo-button" id="hotScanBtn">Scan Part Label</button>
+    </div>
+    <div class="hot-proof-actions">
+      <form action="{{ url_for('driver.record_hot_part_photo', task_id=task.id) }}" method="POST" enctype="multipart/form-data">
+        <input class="d-none" id="hotPartPhoto" name="photo" type="file" accept="image/*" capture="environment" onchange="this.form.submit()">
+        <button type="button" class="hot-photo-button w-100" onclick="document.getElementById('hotPartPhoto').click()">Take Photo</button>
+      </form>
+      <button type="button" data-hot-event="picked_up">Picked Up</button>
+      <button type="button" data-hot-event="dropped_off">Dropped Off</button>
+      <button type="button" data-hot-event="cant_find_part">Can't Find Part</button>
+      <button type="button" data-hot-event="wrong_part">Wrong Part</button>
+      <button type="button" data-hot-event="delay_reported">Report Delay</button>
+    </div>
+    <p class="hot-proof-status" id="hotProofStatus">{{ hot_part_proof.proof_sentence }}</p>
+  </section>
+
+  {% endif %}
 
   <div class="card mb-3">
     <div class="card-body">
@@ -82,6 +122,38 @@
     </div>
   </div>
 </div>
+<script>
+(function () {
+  const endpoint = {{ url_for('driver.record_hot_part_proof', task_id=task.id)|tojson }};
+  const status = document.getElementById('hotProofStatus');
+  const moveStatus = document.getElementById('hotMoveStatus');
+  const scanInput = document.getElementById('hotScanValue');
+  async function saveHotProof(eventType, rawValue) {
+    if (eventType === 'label_scanned' && !(rawValue || '').trim()) {
+      if (status) status.textContent = 'Scan the part label first.';
+      return;
+    }
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({event_type: eventType, raw_scan_value: rawValue || ''})
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      if (status) status.textContent = payload.error || 'Hot part proof was not saved.';
+      return;
+    }
+    if (status) status.textContent = payload.proof.proof_sentence;
+    if (moveStatus) moveStatus.textContent = payload.proof.current_status;
+    if (scanInput) scanInput.value = '';
+  }
+  const scanBtn = document.getElementById('hotScanBtn');
+  if (scanBtn) scanBtn.addEventListener('click', () => saveHotProof('label_scanned', scanInput ? scanInput.value : ''));
+  document.querySelectorAll('[data-hot-event]').forEach((button) => {
+    button.addEventListener('click', () => saveHotProof(button.dataset.hotEvent, ''));
+  });
+})();
+</script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
   if (window.io) {

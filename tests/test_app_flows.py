@@ -1551,6 +1551,193 @@ def test_driver_can_record_auditable_part_scan_and_override_pending_cargo(client
         assert PartMaster.query.filter_by(canonical_part_number="L861", status="pending").count() == 1
 
 
+def test_driver_hot_part_proof_one_tap_flags_missing_scan_for_manager(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, HotPartEvent, HotMove, PreTrip, Task
+
+        driver = create_user("hot_driver", "hot_driver@example.com", "driver", first_name="Hot", last_name="Driver")
+        create_user("manager1", "manager1@example.com", "management")
+        route_date = date.today()
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="ST4", trailer_number="TR9")
+        log = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="KP",
+            load_size="Empty",
+            hot_parts=True,
+            part_number="L861",
+            arrive_time=f"{route_date.isoformat()} 08:00:00",
+        )
+        task = Task(
+            title="KP to RE",
+            details="Move hot part L861",
+            part_number="L861",
+            is_hot=True,
+            status="pending",
+            assigned_to=driver.id,
+        )
+        db.session.add_all([pretrip, log, task])
+        db.session.commit()
+        driver_id = driver.id
+        task_id = task.id
+        log_id = log.id
+
+    login(client, "hot_driver")
+    page = client.get(f"/tasks/{task_id}")
+    assert page.status_code == 200
+    assert b"Hot Part Proof" in page.data
+    assert b"Hot Part: L861" in page.data
+    assert b"Scan Part Label" in page.data
+    assert b"Picked Up" in page.data
+    assert b"Dropped Off" in page.data
+    assert b"Can't Find Part" in page.data
+    assert b"Wrong Part" in page.data
+    assert b"Report Delay" in page.data
+    assert b"manifest lines" not in page.data.lower()
+    assert b"expected pallet" not in page.data.lower()
+    assert b"bol line" not in page.data.lower()
+
+    picked = client.post(f"/tasks/{task_id}/hot-proof", json={"event_type": "picked_up"})
+    assert picked.status_code == 200
+    payload = picked.get_json()
+    assert payload["proof"]["has_scan_proof"] is False
+    assert payload["proof"]["proof_sentence"] == "No hot-part scan proof was recorded for this route."
+
+    with app.app_context():
+        hot_move = HotMove.query.filter_by(move_id=task_id).one()
+        events = HotPartEvent.query.filter_by(hot_move_id=hot_move.id).order_by(HotPartEvent.id).all()
+        assert hot_move.status == "picked_up"
+        assert events[-1].event_type == "picked_up"
+        assert events[-1].driver_id == driver_id
+        assert events[-1].truck_id == "ST4"
+        assert events[-1].stop_id == log_id
+        assert events[-1].plant_id == "KP"
+
+    client.get("/logout")
+    login(client, "manager1")
+    manager_page = client.get(f"/manager/driver-logs/{log_id}")
+    assert manager_page.status_code == 200
+    assert b"Hot Part Proof" in manager_page.data
+    assert b"Hot Part Number" in manager_page.data
+    assert b"L861" in manager_page.data
+    assert b"No hot-part scan proof was recorded for this route." in manager_page.data
+
+
+def test_driver_hot_part_scan_builds_manager_narrative_and_unknown_alias(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, Task
+
+        driver = create_user("scan_hot", "scan_hot@example.com", "driver")
+        create_user("manager1", "manager1@example.com", "management")
+        route_date = date.today()
+        log = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="KP",
+            load_size="Empty",
+            hot_parts=True,
+            part_number="L861",
+            arrive_time=f"{route_date.isoformat()} 08:00:00",
+        )
+        task = Task(title="KP to RE", part_number="L861", is_hot=True, status="pending", assigned_to=driver.id)
+        db.session.add_all([log, task])
+        db.session.commit()
+        task_id = task.id
+        log_id = log.id
+
+    login(client, "scan_hot")
+    scanned = client.post(
+        f"/tasks/{task_id}/hot-proof",
+        json={"event_type": "label_scanned", "raw_scan_value": "PART-L861-KP", "barcode_format": "code_128"},
+    )
+    assert scanned.status_code == 200
+    assert scanned.get_json()["event"]["normalized_scan_value"] == "L861"
+
+    picked = client.post(f"/tasks/{task_id}/hot-proof", json={"event_type": "picked_up"})
+    assert picked.status_code == 200
+    assert picked.get_json()["proof"]["proof_sentence"] == "Driver scanned hot part L861 and marked it picked up."
+
+    with app.app_context():
+        from app.models import PartAlias, PartMaster
+
+        part = PartMaster.query.filter_by(canonical_part_number="L861").one()
+        alias = PartAlias.query.filter_by(part_id=part.id, normalized_value="L861").first()
+        assert alias is not None
+        assert alias.raw_scan_value == "PART-L861-KP"
+        assert alias.label_format == "code_128"
+
+    client.get("/logout")
+    login(client, "manager1")
+    manager_page = client.get(f"/manager/driver-logs/{log_id}")
+    assert b"Driver scanned hot part L861 and marked it picked up." in manager_page.data
+    assert b"No hot-part scan proof was recorded for this route." not in manager_page.data
+
+
+def test_hot_part_exception_routes_to_manager_followup(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, Task
+
+        driver = create_user("exception_hot", "exception_hot@example.com", "driver")
+        create_user("manager1", "manager1@example.com", "management")
+        route_date = date.today()
+        log = DriverLog(driver_id=driver.id, date=route_date, plant_name="KP", load_size="Empty", arrive_time=f"{route_date.isoformat()} 08:00:00")
+        task = Task(title="KP to RE", part_number="L861", is_hot=True, status="pending", assigned_to=driver.id)
+        db.session.add_all([log, task])
+        db.session.commit()
+        task_id = task.id
+
+    login(client, "exception_hot")
+    response = client.post(f"/tasks/{task_id}/hot-proof", json={"event_type": "cant_find_part"})
+    assert response.status_code == 200
+    assert response.get_json()["proof"]["open_exception"] == "Can't Find Part"
+
+    with app.app_context():
+        from app.models import ActivityEvent, OperationalFollowUp
+
+        followup = OperationalFollowUp.query.filter_by(kind="hot_part_exception", status="open").one()
+        assert "Dispatch review is required" in followup.details
+        assert ActivityEvent.query.filter_by(category="exception", action="cant_find_part").count() == 1
+
+
+def test_completed_hot_moves_suggest_but_do_not_overwrite_default_route(app):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import PartMaster, PartRouteProfile, Task
+        from app.services.hot_parts import ensure_hot_move_for_task, record_hot_part_event
+
+        driver = create_user("route_hot", "route_hot@example.com", "driver")
+        for index in range(3):
+            task = Task(
+                title="KP to RE",
+                part_number="L861",
+                is_hot=True,
+                status="in-progress",
+                assigned_to=driver.id,
+            )
+            db.session.add(task)
+            db.session.flush()
+            hot_move = ensure_hot_move_for_task(task, driver_id=driver.id, source="dispatch")
+            record_hot_part_event(hot_move, "dropped_off", driver_id=driver.id)
+        db.session.commit()
+
+        part = PartMaster.query.filter_by(canonical_part_number="L861").one()
+        profile = PartRouteProfile.query.filter_by(part_id=part.id, origin_plant_id="KP", destination_plant_id="RE").one()
+        assert profile.times_completed == 3
+        assert profile.status == "suggested"
+        assert profile.confidence_score >= 0.65
+        assert part.default_origin_plant_id is None
+        assert part.default_destination_plant_id is None
+
+
 def test_driver_log_departure_names_load_by_destination_and_arrival_unloads(client, app):
     with app.app_context():
         create_user("driver1", "driver1@example.com", "driver")

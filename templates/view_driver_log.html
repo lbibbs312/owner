@@ -54,6 +54,8 @@
     .damage-photo-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,180px)); gap:10px; margin-top:10px; }
     .damage-photo-link { display:block; border:1px solid #fecdd3; border-radius:8px; overflow:hidden; background:#fff; }
     .damage-photo-thumb { display:block; width:100%; height:120px; object-fit:cover; }
+    .hot-proof-thumbs { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .hot-proof-thumb { display:block; width:96px; height:72px; object-fit:cover; border:1px solid #fecaca; border-radius:7px; background:#fff; }
     .evidence-caption { padding:6px 8px; color:#475569; font-size:.72rem; font-weight:900; }
     .route-log-table { width:100%; border-collapse:collapse; font-size:.83rem; margin-top:0; }
     .route-log-table th { padding:7px 10px; text-align:left; font-size:.65rem; font-weight:900; text-transform:uppercase; letter-spacing:.07em; color:#64748b; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
@@ -279,6 +281,38 @@
       </div>
     </div>
 
+    {% if hot_part_proof %}
+    <div class="report-section">
+      <div class="report-section-head red">Hot Part Proof</div>
+      <div class="report-section-body">
+        <div class="detail-pairs">
+          <p class="detail-pair"><span>Hot Part Number</span><strong>{{ hot_part_proof.hot_part_number }}</strong></p>
+          <p class="detail-pair"><span>Current Status</span><strong>{{ hot_part_proof.current_status }}</strong></p>
+          <p class="detail-pair"><span>Scan / Photo Proof</span><strong>{% if hot_part_proof.has_any_proof %}Recorded{% else %}No scan proof recorded{% endif %}</strong></p>
+          <p class="detail-pair"><span>Open Exception</span><strong>{{ hot_part_proof.open_exception or 'None' }}</strong></p>
+          <p class="detail-pair"><span>Last Event</span><strong>{{ hot_part_proof.last_event_timestamp|to_detroit_datetime if hot_part_proof.last_event_timestamp else 'No event yet' }}</strong></p>
+        </div>
+        {% if hot_part_proof.has_any_proof %}
+          <p class="detail mt-2">{{ hot_part_proof.proof_sentence }}</p>
+        {% else %}
+          <p class="empty-proof">No hot-part scan proof was recorded for this route.</p>
+        {% endif %}
+        <p class="detail">{{ hot_part_proof.narrative }}</p>
+        {% if hot_part_proof.photo_events %}
+          <div class="hot-proof-thumbs">
+            {% for event in hot_part_proof.photo_events %}
+              {% if event.photo %}
+                <a href="{{ url_for('manager.hot_part_photo', photo_id=event.photo.id) }}" target="_blank" rel="noopener">
+                  <img class="hot-proof-thumb" src="{{ url_for('manager.hot_part_photo', photo_id=event.photo.id) }}" alt="Hot part label photo {{ loop.index }}">
+                </a>
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% endif %}
     <div class="report-section">
       <div class="report-section-head">Cargo Scan Proof</div>
       <div class="report-section-body">
@@ -290,7 +324,11 @@
             </div>
           {% endfor %}
         {% else %}
-          <p class="empty-proof">No cargo scan proof was recorded for this route.</p>
+          {% if hot_part_proof and hot_part_proof.has_any_proof %}
+            <p class="empty-proof">No separate cargo scan proof was recorded; hot-part proof is shown above.</p>
+          {% else %}
+            <p class="empty-proof">No cargo scan proof was recorded for this route.</p>
+          {% endif %}
         {% endif %}
       </div>
     </div>

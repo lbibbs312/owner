@@ -56,8 +56,14 @@ def _resolve_part(raw_value, normalized, barcode_format=None):
     alias = PartAlias.query.filter_by(normalized_value=normalized).first()
     if alias:
         alias.last_seen_at = now
+        if not alias.raw_scan_value or alias.raw_scan_value == alias.normalized_value or raw_value != normalized:
+            alias.raw_scan_value = raw_value
+        if alias.raw_barcode_value == alias.normalized_value and raw_value != normalized:
+            alias.raw_barcode_value = raw_value
         if barcode_format and not alias.symbology:
             alias.symbology = barcode_format
+        if barcode_format and not alias.label_format:
+            alias.label_format = barcode_format
         part = alias.part
         part.last_seen_at = now
         part.seen_count = (part.seen_count or 0) + 1
@@ -84,8 +90,10 @@ def _resolve_part(raw_value, normalized, barcode_format=None):
 
     alias = PartAlias(
         part_id=part.id,
+        raw_scan_value=raw_value,
         raw_barcode_value=raw_value,
         normalized_value=normalized,
+        label_format=barcode_format,
         symbology=barcode_format,
         label_source="driver_scan",
         first_seen_at=now,
@@ -93,6 +101,15 @@ def _resolve_part(raw_value, normalized, barcode_format=None):
     )
     db.session.add(alias)
     return part, alias, created
+
+
+def resolve_or_create_part(raw_value, barcode_format=None):
+    raw = (raw_value or "").strip()
+    normalized = normalize_part_value(raw)
+    if not raw or not normalized:
+        return None, ""
+    part, _alias, _created = _resolve_part(raw, normalized, barcode_format)
+    return part, normalized
 
 
 def _expected_tokens(log, route):

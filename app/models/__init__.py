@@ -17,7 +17,19 @@ from app.models.damage import DamagePhoto, DamageReport
 from app.models.followup import OperationalFollowUp
 from app.models.plant_transfer import PlantTransfer, PlantTransferLine
 from app.models.search import SearchCorpus
-from app.models.part import PartAlias, PartLocationHistory, PartMaster, PartScanEvent, MovePart
+from app.models.part import (
+    ExternalDocument,
+    HotMove,
+    HotPartAlert,
+    HotPartEvent,
+    HotPartPhoto,
+    MovePart,
+    PartAlias,
+    PartLocationHistory,
+    PartMaster,
+    PartRouteProfile,
+    PartScanEvent,
+)
 
 __all__ = [
     "User",
@@ -43,4 +55,10 @@ __all__ = [
     "PartScanEvent",
     "MovePart",
     "PartLocationHistory",
+    "HotPartAlert",
+    "HotMove",
+    "HotPartPhoto",
+    "HotPartEvent",
+    "PartRouteProfile",
+    "ExternalDocument",
 ]

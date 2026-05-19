@@ -24,10 +24,11 @@ from app.services.database_status import database_status
 from app.extensions import db, socketio
 from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
-from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DriverLog, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, Task, User
+from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DriverLog, HotPartPhoto, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, Task, User
 from app.services.activity import record_activity
 from app.services.operations import build_exception_items
 from app.services.load_state import build_driver_log_route_context, route_problem_reason, secondary_not_dropped_reason, truck_issue_reason
+from app.services.hot_parts import build_route_hot_part_proof, ensure_hot_move_for_task
 from app.services.management_readout import build_management_narrative
 from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
 from app.services.role_session import restore_role_user
@@ -812,6 +813,14 @@ def damage_photo(photo_id):
     return send_from_directory(upload_path, photo.filename)
 
 
+@bp.route("/hot-part-photos/<int:photo_id>")
+def hot_part_photo(photo_id):
+    photo = HotPartPhoto.query.get_or_404(photo_id)
+    upload_root = current_app.config.get("HOT_PART_UPLOAD_FOLDER", "uploads/hot_part_photos")
+    upload_path = os.path.abspath(os.path.join(current_app.root_path, os.pardir, upload_root))
+    return send_from_directory(upload_path, photo.filename)
+
+
 @bp.route("/damage-reports/<int:report_id>")
 def view_damage_report(report_id):
     report = DamageReport.query.get_or_404(report_id)
@@ -1051,6 +1060,7 @@ def view_driver_log(log_id):
             .order_by(PartScanEvent.timestamp.asc(), PartScanEvent.id.asc())
             .all()
         )
+    hot_part_proof = build_route_hot_part_proof(day_logs, related_task)
     management_narrative = build_management_narrative(
         {
             "log": log,
@@ -1061,6 +1071,7 @@ def view_driver_log(log_id):
             "truck_context": truck_context,
             "related_task": related_task,
             "part_scan_events": part_scan_events,
+            "hot_part_proof": hot_part_proof,
         }
     )
     return render_template(
@@ -1080,6 +1091,7 @@ def view_driver_log(log_id):
         day_log_positions=day_log_positions,
         management_narrative=management_narrative,
         part_scan_events=part_scan_events,
+        hot_part_proof=hot_part_proof,
     )
 
 
@@ -1248,6 +1260,8 @@ def manage_task(task_id):
         task.details = request.form.get("details", "").strip()
         task.part_number = request.form.get("part_number", "").strip() or None
         task.is_hot = bool(request.form.get("is_hot"))
+        if task.is_hot:
+            ensure_hot_move_for_task(task, driver_id=task.assigned_to, created_by_id=current_user.id, source="dispatch")
         db.session.commit()
 
         assigned_driver = User.query.get(task.assigned_to) if task.assigned_to else None
@@ -1343,6 +1357,9 @@ def create_task_from_dashboard():
             status="pending",
         )
         db.session.add(new_task)
+        db.session.flush()
+        if new_task.is_hot:
+            ensure_hot_move_for_task(new_task, created_by_id=current_user.id, source="dispatch")
         db.session.commit()
         record_activity(
             user_id=current_user.id,

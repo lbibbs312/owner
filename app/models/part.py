@@ -32,9 +32,12 @@ class PartAlias(db.Model):
     __tablename__ = "part_alias"
 
     id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.String(80), nullable=False, default="lacksdrivers")
     part_id = db.Column(db.Integer, db.ForeignKey("part_master.id"), nullable=False)
+    raw_scan_value = db.Column(db.String(255), nullable=False, default="")
     raw_barcode_value = db.Column(db.String(255), nullable=False)
     normalized_value = db.Column(db.String(120), nullable=False, index=True)
+    label_format = db.Column(db.String(80), nullable=True)
     symbology = db.Column(db.String(80), nullable=True)
     label_source = db.Column(db.String(80), nullable=True)
     first_seen_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -111,3 +114,115 @@ class PartLocationHistory(db.Model):
     stop = db.relationship("DriverLog", backref="part_location_history")
     move = db.relationship("Task", backref="part_location_history")
     source_scan_event = db.relationship("PartScanEvent", backref="location_history")
+
+
+class HotPartAlert(db.Model):
+    __tablename__ = "hot_part_alert"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.String(80), nullable=False, default="lacksdrivers")
+    part_id = db.Column(db.Integer, db.ForeignKey("part_master.id"), nullable=True)
+    raw_part_number = db.Column(db.String(120), nullable=True)
+    priority = db.Column(db.String(30), nullable=False, default="hot")
+    source = db.Column(db.String(30), nullable=False, default="dispatch")
+    status = db.Column(db.String(30), nullable=False, default="active")
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    cleared_at = db.Column(db.DateTime, nullable=True)
+
+    part = db.relationship("PartMaster", backref="hot_part_alerts")
+    created_by_user = db.relationship("User", backref="created_hot_part_alerts")
+
+
+class HotMove(db.Model):
+    __tablename__ = "hot_move"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.String(80), nullable=False, default="lacksdrivers")
+    hot_part_alert_id = db.Column(db.Integer, db.ForeignKey("hot_part_alert.id"), nullable=True)
+    move_id = db.Column(db.Integer, db.ForeignKey("task.id"), nullable=True)
+    driver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    truck_id = db.Column(db.String(50), nullable=True)
+    status = db.Column(db.String(30), nullable=False, default="assigned")
+    accepted_at = db.Column(db.DateTime, nullable=True)
+    picked_up_at = db.Column(db.DateTime, nullable=True)
+    dropped_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+
+    alert = db.relationship("HotPartAlert", backref="hot_moves")
+    move = db.relationship("Task", backref="hot_moves")
+    driver = db.relationship("User", backref="hot_moves")
+
+
+class HotPartPhoto(db.Model):
+    __tablename__ = "hot_part_photo"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.String(80), nullable=False, default="lacksdrivers")
+    filename = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=True)
+    content_type = db.Column(db.String(100), nullable=True)
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    uploaded_by = db.relationship("User", backref="hot_part_photos")
+
+
+class HotPartEvent(db.Model):
+    __tablename__ = "hot_part_event"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.String(80), nullable=False, default="lacksdrivers")
+    hot_move_id = db.Column(db.Integer, db.ForeignKey("hot_move.id"), nullable=False)
+    part_id = db.Column(db.Integer, db.ForeignKey("part_master.id"), nullable=True)
+    event_type = db.Column(db.String(40), nullable=False)
+    raw_scan_value = db.Column(db.String(255), nullable=True)
+    normalized_scan_value = db.Column(db.String(120), nullable=True)
+    photo_id = db.Column(db.Integer, db.ForeignKey("hot_part_photo.id"), nullable=True)
+    driver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    truck_id = db.Column(db.String(50), nullable=True)
+    stop_id = db.Column(db.Integer, db.ForeignKey("driver_log.id"), nullable=True)
+    plant_id = db.Column(db.String(50), nullable=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_offline = db.Column(db.Boolean, nullable=False, default=False)
+    synced_at = db.Column(db.DateTime, nullable=True)
+
+    hot_move = db.relationship("HotMove", backref=db.backref("events", order_by="HotPartEvent.timestamp"))
+    part = db.relationship("PartMaster", backref="hot_part_events")
+    photo = db.relationship("HotPartPhoto", backref="hot_part_events")
+    driver = db.relationship("User", backref="hot_part_events")
+    stop = db.relationship("DriverLog", backref="hot_part_events")
+
+
+class PartRouteProfile(db.Model):
+    __tablename__ = "part_route_profile"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.String(80), nullable=False, default="lacksdrivers")
+    part_id = db.Column(db.Integer, db.ForeignKey("part_master.id"), nullable=False)
+    origin_plant_id = db.Column(db.String(50), nullable=True)
+    destination_plant_id = db.Column(db.String(50), nullable=True)
+    route_label = db.Column(db.String(120), nullable=True)
+    times_completed = db.Column(db.Integer, nullable=False, default=0)
+    times_exception = db.Column(db.Integer, nullable=False, default=0)
+    confidence_score = db.Column(db.Float, nullable=False, default=0.0)
+    status = db.Column(db.String(30), nullable=False, default="pending")
+    last_seen_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    part = db.relationship("PartMaster", backref="route_profiles")
+
+
+class ExternalDocument(db.Model):
+    __tablename__ = "external_document"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.String(80), nullable=False, default="lacksdrivers")
+    move_id = db.Column(db.Integer, db.ForeignKey("task.id"), nullable=True)
+    document_type = db.Column(db.String(30), nullable=False, default="other")
+    file_id = db.Column(db.String(255), nullable=False)
+    uploaded_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    notes = db.Column(db.Text, nullable=True)
+
+    move = db.relationship("Task", backref="external_documents")
+    uploaded_by_user = db.relationship("User", backref="external_documents")

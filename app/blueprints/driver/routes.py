@@ -47,6 +47,13 @@ from app.services.load_state import (
     truck_issue_reason,
 )
 from app.services.parts import record_part_scan as save_part_scan, scan_event_payload
+from app.services.hot_parts import (
+    build_hot_part_proof,
+    ensure_hot_move_for_task,
+    hot_part_event_payload,
+    record_hot_part_event,
+    save_hot_part_photo,
+)
 from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
 from app.services.role_session import restore_role_user
 from app.services.search_corpus import ingest_driver_log
@@ -55,6 +62,7 @@ from app.models import (
     DamagePhoto,
     DamageReport,
     DirectMessage,
+    HotMove,
     PartScanEvent,
     DriverLog,
     PlantTransfer,
@@ -149,6 +157,8 @@ DRIVER_ONLY_ENDPOINTS = {
     "new_damage_report",
     "view_damage_report",
     "damage_photo",
+    "record_hot_part_photo",
+    "record_hot_part_proof",
     "edit_damage_report",
     "delete_damage_report",
     "submit_damage_report",
@@ -3503,6 +3513,59 @@ def _get_driver_task_or_redirect(task_id, *, allow_open=True):
     return None
 
 
+def _current_hot_part_stop_context(driver_id):
+    route_date = _active_route_date_for_driver(driver_id)
+    open_log = (
+        _active_driver_logs_query()
+        .filter_by(driver_id=driver_id, date=route_date)
+        .filter(DriverLog.depart_time.is_(None))
+        .order_by(DriverLog.created_at.desc(), DriverLog.id.desc())
+        .first()
+    )
+    if open_log:
+        return open_log
+    return (
+        _active_driver_logs_query()
+        .filter_by(driver_id=driver_id, date=route_date)
+        .order_by(DriverLog.created_at.desc(), DriverLog.id.desc())
+        .first()
+    )
+
+
+def _claim_hot_task_for_driver(task):
+    changed = False
+    now = datetime.utcnow()
+    if task.assigned_to is None:
+        task.assigned_to = current_user.id
+        changed = True
+    if task.status == "pending":
+        task.status = "in-progress"
+        changed = True
+    if not task.accepted_at:
+        task.accepted_at = now
+        task.accepted_by_id = current_user.id
+        changed = True
+    return changed
+
+
+def _task_socket_payload(task):
+    return {
+        "task_id": task.id,
+        "title": task.title,
+        "status": task.status,
+        "assigned_driver_id": task.assigned_to,
+        "accepted_by_id": task.accepted_by_id,
+        "completed_by_id": task.completed_by_id,
+        "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+    }
+
+
+def _hot_part_context(task):
+    stop = _current_hot_part_stop_context(current_user.id)
+    hot_move = ensure_hot_move_for_task(task, driver_id=current_user.id)
+    return hot_move, stop
+
+
 @bp.route("/tasks/<int:task_id>")
 @login_required
 def view_task(task_id):
@@ -3521,12 +3584,123 @@ def view_task(task_id):
     else:
         hot_part_query = hot_part_query.filter(DriverLog.hot_parts.is_(True))
     hot_part_logs = hot_part_query.order_by(DriverLog.created_at.desc()).limit(8).all()
+    hot_move = None
+    hot_part_proof = None
+    if task.is_hot:
+        hot_move = HotMove.query.filter_by(move_id=task.id).order_by(HotMove.id.asc()).first()
+        hot_part_proof = build_hot_part_proof(hot_move, task=task)
     return render_template(
         "driver_task_detail.html",
         task=task,
         task_events=task_events,
         hot_part_logs=hot_part_logs,
+        hot_move=hot_move,
+        hot_part_proof=hot_part_proof,
     )
+
+
+@bp.route("/tasks/<int:task_id>/hot-proof", methods=["POST"])
+@login_required
+def record_hot_part_proof(task_id):
+    task = _get_driver_task_or_redirect(task_id)
+    if task is None:
+        return jsonify({"error": "That hot move is not assigned to you."}), 403
+    if not task.is_hot:
+        return jsonify({"error": "Hot part proof is only available for hot moves."}), 400
+
+    payload = request.get_json(silent=True) or request.form
+    event_type = (payload.get("event_type") or payload.get("action") or "").strip()
+    allowed = {"label_scanned", "picked_up", "dropped_off", "cant_find_part", "wrong_part", "delay_reported"}
+    if event_type not in allowed:
+        return jsonify({"error": "Choose a hot part proof action."}), 400
+
+    _claim_hot_task_for_driver(task)
+    if event_type == "dropped_off":
+        task.status = "completed"
+        task.completed_at = task.completed_at or datetime.utcnow()
+        task.completed_by_id = current_user.id
+
+    hot_move, stop = _hot_part_context(task)
+    try:
+        event = record_hot_part_event(
+            hot_move,
+            event_type,
+            driver_id=current_user.id,
+            stop_id=getattr(stop, "id", None),
+            plant_id=getattr(stop, "plant_name", None),
+            raw_scan_value=payload.get("raw_scan_value") or payload.get("value"),
+            barcode_format=payload.get("barcode_format"),
+            created_offline=str(payload.get("created_offline") or "").lower() in {"1", "true", "yes"},
+        )
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
+
+    record_activity(
+        user_id=current_user.id,
+        category="hot_part",
+        action=event_type,
+        title="Hot part proof recorded",
+        details=f"{task.part_number or task.title}: {event_type.replace('_', ' ')}",
+        target_type="hot_move",
+        target_id=hot_move.id,
+        commit=False,
+    )
+    db.session.commit()
+    socketio.emit("task_updated", _task_socket_payload(task))
+    proof = build_hot_part_proof(hot_move, task=task)
+    proof_payload = {
+        "hot_part_number": proof["hot_part_number"],
+        "current_status": proof["current_status"],
+        "has_scan_proof": proof["has_scan_proof"],
+        "has_photo_proof": proof["has_photo_proof"],
+        "proof_sentence": proof["proof_sentence"],
+        "narrative": proof["narrative"],
+        "open_exception": proof["open_exception"],
+    }
+    return jsonify({"event": hot_part_event_payload(event), "proof": proof_payload})
+
+
+@bp.route("/tasks/<int:task_id>/hot-proof-photo", methods=["POST"])
+@login_required
+def record_hot_part_photo(task_id):
+    task = _get_driver_task_or_redirect(task_id)
+    if task is None:
+        flash("That hot move is not assigned to you.", "danger")
+        return _task_redirect()
+    if not task.is_hot:
+        flash("Hot part photos are only available for hot moves.", "warning")
+        return _task_redirect()
+
+    _claim_hot_task_for_driver(task)
+    hot_move, stop = _hot_part_context(task)
+    try:
+        photo, event = save_hot_part_photo(
+            hot_move,
+            request.files.get("photo"),
+            uploaded_by_id=current_user.id,
+            stop_id=getattr(stop, "id", None),
+            plant_id=getattr(stop, "plant_name", None),
+        )
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+        return redirect(url_for("driver.view_task", task_id=task.id))
+
+    record_activity(
+        user_id=current_user.id,
+        category="hot_part",
+        action="photo_added",
+        title="Hot part photo proof recorded",
+        details=f"{task.part_number or task.title}: photo {photo.id}",
+        target_type="hot_move",
+        target_id=hot_move.id,
+        commit=False,
+    )
+    db.session.commit()
+    socketio.emit("task_updated", _task_socket_payload(task))
+    flash("Hot part photo proof saved.", "success")
+    return redirect(url_for("driver.view_task", task_id=task.id))
 
 
 @bp.route("/tasks/<int:task_id>/accept", methods=["POST"])
@@ -3542,6 +3716,15 @@ def accept_task(task_id):
         task.status = "in-progress"
         task.accepted_at = datetime.utcnow()
         task.accepted_by_id = current_user.id
+        if task.is_hot:
+            hot_move, stop = _hot_part_context(task)
+            record_hot_part_event(
+                hot_move,
+                "driver_accepted",
+                driver_id=current_user.id,
+                stop_id=getattr(stop, "id", None),
+                plant_id=getattr(stop, "plant_name", None),
+            )
         record_activity(
             user_id=current_user.id,
             category="task",
@@ -3616,6 +3799,16 @@ def complete_task(task_id):
         task.status = "completed"
         task.completed_at = datetime.utcnow()
         task.completed_by_id = current_user.id
+        if task.is_hot:
+            hot_move, stop = _hot_part_context(task)
+            if not any(event.event_type == "dropped_off" for event in hot_move.events):
+                record_hot_part_event(
+                    hot_move,
+                    "dropped_off",
+                    driver_id=current_user.id,
+                    stop_id=getattr(stop, "id", None),
+                    plant_id=getattr(stop, "plant_name", None),
+                )
         record_activity(
             user_id=current_user.id,
             category="task",

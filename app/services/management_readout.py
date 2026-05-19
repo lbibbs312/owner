@@ -176,6 +176,7 @@ def build_management_narrative(day_log):
     damage_reports = day_log.get("damage_reports") or []
     truck_context = day_log.get("truck_context") or {}
     part_scan_events = day_log.get("part_scan_events") or []
+    hot_part_proof = day_log.get("hot_part_proof")
 
     truck_id = truck_context.get("truck_id") or "Truck not set"
     stop_count = len(day_logs)
@@ -213,10 +214,22 @@ def build_management_narrative(day_log):
         else (
             "No cargo scan exceptions were recorded."
             if part_scan_events
-            else "No cargo scan proof was recorded for this route."
+            else (
+                "No separate cargo scan proof was recorded; hot-part proof was recorded for this route."
+                if hot_part_proof and hot_part_proof.get("has_any_proof")
+                else "No cargo scan proof was recorded for this route."
+            )
         )
     )
-    exception_summary = " ".join((delay_summary, damage_summary, flag_summary, scan_summary))
+    hot_part_summary = ""
+    if hot_part_proof:
+        hot_part_summary = hot_part_proof.get("proof_sentence") or "No hot-part scan proof was recorded for this route."
+        if hot_part_proof.get("open_exception"):
+            hot_part_summary = f"{hot_part_summary} Open exception: {hot_part_proof['open_exception']}."
+    exception_parts = [delay_summary, damage_summary, flag_summary, scan_summary]
+    if hot_part_summary:
+        exception_parts.append(hot_part_summary)
+    exception_summary = " ".join(exception_parts)
 
     action_items = []
     if open_log:
@@ -233,6 +246,8 @@ def build_management_narrative(day_log):
         action_items.append("Assign or close the open damage report.")
     elif open_damage_count > 1:
         action_items.append(f"Assign or close {_count_label(open_damage_count, 'open damage report')}.")
+    if hot_part_proof and hot_part_proof.get("open_exception"):
+        action_items.append("Review the hot-part exception with dispatch.")
     if not action_items:
         action_items.append("No immediate management action is flagged from this log.")
 
@@ -247,7 +262,7 @@ def build_management_narrative(day_log):
             {"label": "Damage reports", "text": damage_summary},
             {"label": "Maintenance flags", "text": flag_summary},
             {"label": "Cargo validation", "text": scan_summary},
-        ],
+        ] + ([{"label": "Hot Part Proof", "text": hot_part_summary}] if hot_part_summary else []),
         "action_items": action_items,
         "evidence_references": _evidence_references(day_logs, routes, delay_logs, damage_reports, open_log),
         "route_status": route_status,
