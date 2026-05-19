@@ -1,0 +1,34 @@
+<style>
+  .stop-photo-panel { border:2px solid #9f1239; border-radius:10px; background:#fff7f9; padding:14px; margin:14px 0 18px; }
+  .stop-photo-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:10px 0; }
+  .stop-photo-actions button { border:1px solid #9f1239; background:#9f1239; color:#fff; border-radius:8px; padding:12px 10px; font-weight:900; font-size:.95rem; }
+  .stop-photo-actions button.secondary { background:#fff; color:#9f1239; }
+  .stop-photo-status { margin-top:4px; color:#475569; font-size:.82rem; font-weight:800; min-height:1.2em; }
+  .stop-photo-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,160px)); gap:10px; margin-top:10px; }
+  .stop-photo-card { display:block; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; background:#fff; color:#0f172a; text-decoration:none; }
+  .stop-photo-card img { display:block; width:100%; height:96px; object-fit:cover; background:#e2e8f0; }
+  .stop-photo-card span { display:block; padding:6px 8px; color:#475569; font-size:.72rem; font-weight:900; }
+  .stop-photo-empty { color:#64748b; font-size:.86rem; font-weight:700; }
+</style>
+{% set photo_source_prefix = photo_source_prefix|default('stop') %}
+<section class="stop-photo-panel" data-stop-photo-panel data-upload-url="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}">
+  <h3 class="h6 mb-1">Add Picture To This Stop</h3>
+  <p class="text-muted small mb-2">Upload a saved gallery photo or take a new picture for this route stop.</p>
+  <div class="stop-photo-actions">
+    <button type="button" data-stop-photo-trigger data-source="{{ photo_source_prefix }}_gallery">Upload From Gallery</button>
+    <button class="secondary" type="button" data-stop-photo-trigger data-source="{{ photo_source_prefix }}_camera">Take New Photo</button>
+    <input class="d-none" type="file" accept="image/*" data-stop-photo-input="{{ photo_source_prefix }}_gallery">
+    <input class="d-none" type="file" accept="image/*" capture="environment" data-stop-photo-input="{{ photo_source_prefix }}_camera">
+  </div>
+  <div class="stop-photo-status" data-stop-photo-status aria-live="polite"></div>
+  <div class="stop-photo-grid" data-stop-photo-list>
+    {% for photo in log.photos %}
+      <a class="stop-photo-card" href="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" target="_blank" rel="noopener">
+        <img src="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" alt="Stop proof photo {{ loop.index }}">
+        <span>{{ (photo.source or 'photo')|replace('_', ' ')|title }} - {{ photo.original_filename or photo.filename }}</span>
+      </a>
+    {% else %}
+      <div class="stop-photo-empty" data-stop-photo-empty>No stop photos saved yet.</div>
+    {% endfor %}
+  </div>
+</section>

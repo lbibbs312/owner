@@ -92,6 +92,9 @@ Enter Detroit local time only if you need to manually set or correct departure. 
     </div>
     {% endif %}
     
+    {% set photo_source_prefix = 'edit' %}
+    {% include "_driver_log_photo_upload.html" %}
+
     <div class="d-flex gap-2 align-items-center">
       {{ form.submit(class="btn btn-primary", value="Save Changes") }}
       <a href="{{ url_for('driver.driver_logs') }}" class="btn btn-secondary">Back</a>
@@ -104,6 +107,7 @@ Enter Detroit local time only if you need to manually set or correct departure. 
   {% endif %}
 </div>
 <script src="{{ url_for('static', filename='js/driver-log-conditionals.js') }}"></script>
+<script src="{{ url_for('static', filename='js/driver-log-photos.js') }}"></script>
 <script>
 (function () {
   const fuelCheck = document.getElementById('fuelCheck');

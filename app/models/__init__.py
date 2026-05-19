@@ -8,7 +8,7 @@ resolve regardless of which model is imported first.
 from app.models.user import User
 from app.models.task import Task
 from app.models.trip import PreTrip, PostTrip, ShiftRecord
-from app.models.log import DriverLog
+from app.models.log import DriverLog, DriverLogPhoto
 from app.models.messaging import ChatMessage, Announcement, DirectMessage
 from app.models.knowledge import KnowledgeBaseEntry
 from app.models.activity import ActivityEvent
@@ -39,6 +39,7 @@ __all__ = [
     "PostTrip",
     "ShiftRecord",
     "DriverLog",
+    "DriverLogPhoto",
     "ChatMessage",
     "Announcement",
     "DirectMessage",

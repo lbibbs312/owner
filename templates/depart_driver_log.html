@@ -55,6 +55,9 @@
       <div class="form-text">Enter minutes only when this stop actually held you up.</div>
     </div>
 
+    {% set photo_source_prefix = 'departure' %}
+    {% include "_driver_log_photo_upload.html" %}
+
     <section class="cargo-scan-panel" aria-label="Cargo scan verification">
       <h3 class="h6 mb-1">Cargo Scan Verification</h3>
       <p class="text-muted small mb-2">Scan cargo at arrival, pickup, drop, and departure. Unknown parts are saved for manager confirmation instead of being lost.</p>
@@ -91,6 +94,7 @@
   </form>
 </div>
 
+<script src="{{ url_for('static', filename='js/driver-log-photos.js') }}"></script>
 <script>
 (function () {
   const gotLoaded = document.getElementById('gotLoaded');

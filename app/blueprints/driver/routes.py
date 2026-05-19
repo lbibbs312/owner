@@ -8,9 +8,10 @@ PRs of PR-5c.
 from datetime import datetime, date
 from functools import wraps
 import os
+from uuid import uuid4
 
 import pytz
-from flask import current_app, flash, jsonify, make_response, redirect, render_template, request, send_from_directory, session, url_for
+from flask import abort, current_app, flash, jsonify, make_response, redirect, render_template, request, send_from_directory, session, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import and_, func, or_
 from werkzeug.utils import secure_filename
@@ -68,6 +69,7 @@ from app.models import (
     HotMove,
     PartScanEvent,
     DriverLog,
+    DriverLogPhoto,
     PlantTransfer,
     PlantTransferLine,
     PostTrip,
@@ -139,6 +141,8 @@ DRIVER_ONLY_ENDPOINTS = {
     "clear_driver_log_hot_part",
     "depart_driver_log",
     "record_part_scan",
+    "record_driver_log_photo",
+    "driver_log_photo",
     "pickup_driver_log",
     "no_pickup_driver_log",
     "view_driver_log",
@@ -857,6 +861,48 @@ def _save_damage_photo(report, uploaded_file):
     )
     db.session.add(photo)
     return photo
+
+
+def _driver_log_photo_upload_path():
+    upload_root = current_app.config.get("DRIVER_LOG_PHOTO_UPLOAD_FOLDER", "uploads/driver_log_photos")
+    upload_path = os.path.abspath(os.path.join(current_app.root_path, os.pardir, upload_root))
+    os.makedirs(upload_path, exist_ok=True)
+    return upload_path
+
+
+def _save_driver_log_photo(log, uploaded_file, *, source="gallery", note=None, uploaded_by_id=None):
+    if not uploaded_file or not getattr(uploaded_file, "filename", ""):
+        raise ValueError("Choose a photo from your gallery or camera before saving proof.")
+    original = secure_filename(uploaded_file.filename) or "stop-photo"
+    name, ext = os.path.splitext(original)
+    filename = f"driver-log-{log.id}-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}-{uuid4().hex}{ext or '.jpg'}"
+    uploaded_file.save(os.path.join(_driver_log_photo_upload_path(), filename))
+    photo = DriverLogPhoto(
+        driver_log_id=log.id,
+        filename=filename,
+        original_filename=original,
+        content_type=getattr(uploaded_file, "mimetype", None) or getattr(uploaded_file, "content_type", None),
+        source=(source or "gallery")[:40],
+        note=(note or "").strip() or None,
+        uploaded_by_id=uploaded_by_id,
+        uploaded_at=datetime.utcnow(),
+    )
+    db.session.add(photo)
+    db.session.flush()
+    return photo
+
+
+def _driver_log_photo_payload(photo):
+    return {
+        "id": photo.id,
+        "url": url_for("driver.driver_log_photo", photo_id=photo.id),
+        "original_filename": photo.original_filename or photo.filename,
+        "source": (photo.source or "gallery").replace("_", " ").title(),
+    }
+
+
+def _photo_upload_wants_json():
+    return "application/json" in (request.headers.get("Accept") or "") or request.headers.get("X-Requested-With") == "fetch"
 
 
 def _save_pretrip_damage_report(pretrip, form):
@@ -2619,6 +2665,57 @@ def clear_driver_log_hot_part(log_id):
     _emit_driver_log_updated(log, "updated")
     flash("Hot part flag cleared for this stop.", "success")
     return redirect(url_for("driver.driver_logs"))
+
+
+@bp.route("/driver_logs/photos/<int:photo_id>")
+@login_required
+def driver_log_photo(photo_id):
+    photo = DriverLogPhoto.query.get_or_404(photo_id)
+    if not photo.log or photo.log.driver_id != current_user.id:
+        abort(403)
+    return send_from_directory(_driver_log_photo_upload_path(), photo.filename)
+
+
+@bp.route("/driver_logs/<int:log_id>/photos", methods=["POST"], strict_slashes=False)
+@login_required
+def record_driver_log_photo(log_id):
+    log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
+    if current_user.role == "driver" and log.driver_id != current_user.id:
+        if _photo_upload_wants_json():
+            return jsonify({"error": "Not authorized to upload proof for this stop."}), 403
+        flash("Not authorized to upload proof for this stop.", "danger")
+        return redirect(url_for("driver.driver_logs"))
+
+    try:
+        photo = _save_driver_log_photo(
+            log,
+            request.files.get("photo"),
+            source=request.form.get("source") or "gallery",
+            note=request.form.get("note"),
+            uploaded_by_id=current_user.id,
+        )
+    except ValueError as exc:
+        db.session.rollback()
+        if _photo_upload_wants_json():
+            return jsonify({"error": str(exc)}), 400
+        flash(str(exc), "danger")
+        return redirect(request.form.get("next") or url_for("driver.edit_driver_log", log_id=log.id))
+
+    record_activity(
+        user_id=current_user.id,
+        category="log_photo",
+        action="created",
+        title="Stop photo proof uploaded",
+        details=f"{_plant_label(log.plant_name)} stop photo: {photo.original_filename or photo.filename}",
+        target_type="driver_log_photo",
+        target_id=photo.id,
+        commit=False,
+    )
+    db.session.commit()
+    if _photo_upload_wants_json():
+        return jsonify({"photo": _driver_log_photo_payload(photo)})
+    flash("Stop photo proof saved.", "success")
+    return redirect(request.form.get("next") or url_for("driver.edit_driver_log", log_id=log.id))
 
 
 @bp.route("/driver_logs/<int:log_id>/part-scans", methods=["POST"], strict_slashes=False)

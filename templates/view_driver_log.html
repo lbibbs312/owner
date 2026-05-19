@@ -24,6 +24,7 @@
     .readout-narrative p { margin:0 0 8px; color:#1e293b; line-height:1.45; }
     .readout-narrative p:last-child { margin-bottom:0; }
     .readout-narrative strong { color:#0f172a; }
+    .readout-summary { margin:0; color:#0f172a; font-size:1rem; line-height:1.5; font-weight:800; }
     .readout-subhead { margin:0 0 6px; color:#475569; font-size:.7rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; }
     .readout-list { margin:0; padding-left:18px; color:#0f172a; font-size:.88rem; }
     .readout-list li { margin-bottom:5px; }
@@ -32,6 +33,8 @@
     .report-section-head { background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:10px 16px; font-size:.75rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; color:#475569; }
     .report-section-head.red { background:#fff1f2; color:#be123c; border-color:#fecdd3; }
     .report-section-head.amber { background:#fffbeb; color:#92400e; border-color:#fde68a; }
+    .report-section-head.blue { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+    .report-section-head.green { background:#f0fdf4; color:#166534; border-color:#bbf7d0; }
     .report-section-body { padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
     .support-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0; }
     .support-item { padding:4px 12px 4px 0; }
@@ -43,6 +46,14 @@
     .detail-pair span { color:#64748b; font-weight:800; }
     .detail-pair strong { color:#0f172a; font-weight:900; text-align:right; }
     .empty-proof { margin:0; color:#64748b; font-weight:700; }
+    .active-note { margin:0; color:#0f172a; line-height:1.45; font-weight:800; }
+    .severity-list { display:grid; gap:8px; }
+    .severity-item { border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:10px 12px; }
+    .severity-item strong { display:block; color:#0f172a; font-weight:900; }
+    .severity-item span { color:#475569; font-size:.8rem; font-weight:800; }
+    .severity-pill { display:inline-flex; margin-bottom:5px; padding:2px 7px; border-radius:999px; background:#e0f2fe; color:#075985 !important; font-size:.65rem !important; text-transform:uppercase; letter-spacing:.05em; }
+    .severity-pill.review { background:#fef3c7; color:#92400e !important; }
+    .severity-pill.critical { background:#fee2e2; color:#991b1b !important; }
     .exception-subhead { margin:2px 0 0; color:#334155; font-size:.72rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; }
     .delay-item { background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:10px 12px; }
     .delay-item .plant { font-weight:900; color:#0f172a; font-size:.875rem; }
@@ -61,12 +72,14 @@
     .route-log-table th { padding:7px 10px; text-align:left; font-size:.65rem; font-weight:900; text-transform:uppercase; letter-spacing:.07em; color:#64748b; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
     .route-log-table td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
     .route-log-table tr.current-stop td { background:#eff6ff; }
+    .route-log-table tr.active-stop td { background:#ecfeff; }
     .route-log-table tr.open-stop td { background:#fff1f2; }
     .rlt-route { font-weight:800; color:#0f172a; white-space:nowrap; }
     .rlt-load { font-size:.75rem; color:#475569; margin-top:3px; }
     .rlt-load-val { font-weight:900; }
     .current-stop-marker { display:inline-block; background:#2563eb; color:#fff; font-size:.6rem; font-weight:900; padding:1px 5px; border-radius:4px; margin-left:4px; text-transform:uppercase; vertical-align:middle; }
     .open-stop-marker { display:inline-block; background:#be123c; color:#fff; font-size:.6rem; font-weight:900; padding:1px 5px; border-radius:4px; margin-left:4px; text-transform:uppercase; vertical-align:middle; }
+    .active-stop-marker { display:inline-block; background:#0891b2; color:#fff; font-size:.6rem; font-weight:900; padding:1px 5px; border-radius:4px; margin-left:4px; text-transform:uppercase; vertical-align:middle; }
     @media (max-width:900px) {
       .readout-header { flex-direction:column; }
       .readout-grid, .support-grid, .detail-pairs { grid-template-columns:1fr; }
@@ -87,13 +100,14 @@
       .readout-header, .report-section-head { background:#eee !important; color:#000 !important; padding:5px 10px; }
       .readout-body, .report-section-body { padding:8px 10px; gap:6px; }
       .readout-grid { grid-template-columns:repeat(3,1fr); }
-      .delay-item, .damage-item { background:#fff !important; border:1px solid #999; border-radius:0; padding:5px 8px; }
+      .delay-item, .damage-item, .severity-item { background:#fff !important; border:1px solid #999; border-radius:0; padding:5px 8px; }
       .damage-photo-grid { grid-template-columns:repeat(3,1fr); }
       .damage-photo-thumb { height:1.1in; }
       .route-log-table { font-size:8.5pt; }
       .route-log-table th { font-size:7pt; padding:4px 6px; }
       .route-log-table td { padding:5px 6px; border-bottom:1px solid #ccc; }
       .route-log-table tr.current-stop td { background:#e8f0ff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .route-log-table tr.active-stop td { background:#e6fffb !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
       .route-log-table tr.open-stop td { background:#ffe8e8 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
       .status-chip { border:1px solid #111; background:#fff !important; color:#000 !important; }
     }
@@ -114,7 +128,7 @@
   {% if current_user.role == 'management' %}
     <div class="management-readout">
       <div class="readout-header">
-        <p class="readout-eyebrow">Management Readout</p>
+        <p class="readout-eyebrow">Route Summary</p>
       </div>
       <div class="readout-grid">
         <div class="readout-item"><span>Route Status</span><strong>{{ management_narrative.route_status }}</strong></div>
@@ -127,50 +141,60 @@
         </div>
         <div class="readout-item"><span>Date</span><strong>{{ log.date }}</strong></div>
         <div class="readout-item"><span>Truck</span><strong>{{ truck_context.truck_id if truck_context else 'Truck not set' }}</strong>{% if truck_context and truck_context.truck_meta %}<small>{{ truck_context.truck_meta }}</small>{% endif %}{% if truck_context and truck_context.odometer_warning %}<small class="readout-warning">{{ truck_context.odometer_warning }}</small>{% endif %}</div>
-        <div class="readout-item"><span>Total Stops</span><strong>{{ stop_count }}</strong></div>
-        <div class="readout-item"><span>Exceptions</span><strong>{{ delay_logs|length }} delay{{ 's' if delay_logs|length != 1 else '' }}, {{ damage_reports|length }} damage report{{ 's' if damage_reports|length != 1 else '' }}</strong></div>
+        <div class="readout-item"><span>Stops</span><strong>{{ management_narrative.completed_stop_count }} / {{ stop_count }} complete</strong></div>
+        <div class="readout-item"><span>Review / Critical</span><strong>{{ management_narrative.needs_review_items|length }} review{% if management_narrative.needs_review_items|length != 1 %}s{% endif %}, {{ management_narrative.critical_exception_count }} critical</strong></div>
       </div>
-      <div class="readout-body">
-        <div class="readout-narrative">
-          {% for line in management_narrative.narrative_lines %}
-            <p><strong>{{ line.label }}:</strong> {{ line.text }}</p>
-          {% endfor %}
-        </div>
-        <div>
-          <p class="readout-subhead">Action Items</p>
-          <ul class="readout-list">
-            {% for item in management_narrative.action_items %}<li>{{ item }}</li>{% endfor %}
-          </ul>
-        </div>
+      <div class="readout-body" style="display:block;">
+        <p class="readout-summary">{{ management_narrative.summary_sentence }}</p>
       </div>
     </div>
 
+    {% if management_narrative.current_activity %}
     <div class="report-section">
-      <div class="report-section-head">{% if management_narrative.open_stop %}Open Route Stop{% else %}Route Closeout{% endif %}</div>
+      <div class="report-section-head blue">Current Active Stop</div>
       <div class="report-section-body">
-        <div class="support-grid">
-          <div class="support-item">
-            <span>{% if management_narrative.open_stop %}Open Stop{% else %}Open Stop{% endif %}</span>
-            <strong>{% if management_narrative.open_stop %}Stop #{{ management_narrative.open_stop_position }} - {{ management_narrative.open_stop }}{% else %}None{% endif %}</strong>
-            <small>{% if management_narrative.open_stop %}This is the route-level stop that still needs closeout.{% else %}All stops have departure/load-out recorded.{% endif %}</small>
-          </div>
-          <div class="support-item">
-            <span>Closeout Status</span>
-            <strong>{% if management_narrative.open_stop %}<span class="status-chip open">Missing Departure</span>{% else %}<span class="status-chip done">Route completed</span>{% endif %}</strong>
-            <small>{% if management_narrative.open_stop %}Close this route-level stop before finalizing the route.{% else %}No route closeout action is pending.{% endif %}</small>
-          </div>
-          <div class="support-item">
-            <span>Required Action</span>
-            <strong>{% if management_narrative.open_stop %}Record departure/load-out{% else %}No route closeout action{% endif %}</strong>
-            <small>{% if management_narrative.open_stop %}Selected stop details are listed separately below.{% else %}Supporting evidence remains below.{% endif %}</small>
-          </div>
+        <p class="active-note"><strong>Current Active Stop: {{ management_narrative.current_activity.plant }}.</strong> {{ management_narrative.current_activity.detail }}</p>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if management_narrative.needs_review_items %}
+    <div class="report-section">
+      <div class="report-section-head amber">Needs Review</div>
+      <div class="report-section-body">
+        <div class="severity-list">
+          {% for item in management_narrative.needs_review_items %}
+            <div class="severity-item">
+              <span class="severity-pill review">{{ item.severity }}</span>
+              <strong>{{ item.title }}</strong>
+              <span>{{ item.text }}</span>
+            </div>
+          {% endfor %}
         </div>
       </div>
     </div>
+    {% endif %}
+
+    {% if management_narrative.critical_exception_items %}
+    <div class="report-section">
+      <div class="report-section-head red">Critical Exceptions</div>
+      <div class="report-section-body">
+        <div class="severity-list">
+          {% for item in management_narrative.critical_exception_items %}
+            <div class="severity-item">
+              <span class="severity-pill critical">{{ item.severity }}</span>
+              <strong>{{ item.title }}</strong>
+              <span>{{ item.text }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
 
     {% if day_logs %}
     <div class="report-section">
-      <div class="report-section-head">Full Day Route</div>
+      <div class="report-section-head">Full Route Table</div>
       <div style="overflow-x:auto;">
         <table class="route-log-table">
           <thead>
@@ -186,11 +210,13 @@
           <tbody>
             {% for dl in day_logs %}
             {% set r = (log_routes or {}).get(dl.id) %}
-            <tr class="{% if dl.id == log.id %}current-stop {% endif %}{% if not dl.depart_time %}open-stop{% endif %}">
+            {% set is_active_stop = management_narrative.current_activity and dl.id == management_narrative.current_activity.log_id %}
+            {% set is_open_exception = management_narrative.open_stop_exception and not dl.depart_time %}
+            <tr class="{% if dl.id == log.id %}current-stop {% endif %}{% if is_active_stop %}active-stop {% endif %}{% if is_open_exception %}open-stop{% endif %}">
               <td style="font-weight:900;color:#475569;">
                 {{ loop.index }}
                 {% if dl.id == log.id %}<span class="current-stop-marker">selected</span>{% endif %}
-                {% if not dl.depart_time %}<span class="open-stop-marker">open</span>{% endif %}
+                {% if is_active_stop %}<span class="active-stop-marker">active</span>{% elif is_open_exception %}<span class="open-stop-marker">critical</span>{% endif %}
               </td>
               <td>
                 {% if r %}
@@ -203,7 +229,7 @@
               </td>
               <td style="white-space:nowrap;">{{ dl.arrive_time|to_local_time if dl.arrive_time else '--' }}</td>
               <td style="white-space:nowrap;">
-                {% if dl.depart_time %}{{ dl.depart_time|to_12h_format }}{% else %}<span style="color:#be123c;font-weight:900;">Open</span>{% endif %}
+                {% if dl.depart_time %}{{ dl.depart_time|to_12h_format }}{% elif is_active_stop %}<span style="color:#0e7490;font-weight:900;">Active</span>{% else %}<span style="color:#be123c;font-weight:900;">Missing</span>{% endif %}
               </td>
               <td>
                 {% if dl.no_pickup %}<em style="color:#475569;">No Pickup</em>
@@ -224,16 +250,33 @@
     </div>
     {% endif %}
 
+    {% if driver_log_photos %}
     <div class="report-section">
-      <div class="report-section-head amber">Exceptions</div>
+      <div class="report-section-head blue">Stop Photo Proof</div>
       <div class="report-section-body">
-        <p class="exception-subhead">Delay Events ({{ delay_logs|length }})</p>
+        <div class="damage-photo-grid">
+          {% for photo in driver_log_photos %}
+            {% set photo_stop = photo.log %}
+            <a class="damage-photo-link" href="{{ url_for('manager.driver_log_photo', photo_id=photo.id) }}" target="_blank" rel="noopener">
+              <img class="damage-photo-thumb" src="{{ url_for('manager.driver_log_photo', photo_id=photo.id) }}" alt="Stop proof photo {{ loop.index }}">
+              <div class="evidence-caption">Stop #{{ day_log_positions.get(photo.driver_log_id, '?') }} - {{ photo_stop.plant_name if photo_stop else 'Route stop' }} - {{ (photo.source or 'photo')|replace('_', ' ')|title }}</div>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if management_narrative.has_delay_events or management_narrative.has_damage_reports %}
+    <div class="report-section">
+      <div class="report-section-head red">Damage / Delay</div>
+      <div class="report-section-body">
         {% if delay_logs %}
+          <p class="exception-subhead">Delay Events</p>
           {% for dl in delay_logs %}
           {% set delay_route = (log_routes or {}).get(dl.id) %}
-          {% set missed_second_stop = dl.downtime_reason and 'second-stop cargo' in dl.downtime_reason|lower %}
           <div class="delay-item">
-            <div class="plant">{% if missed_second_stop and management_narrative.open_stop %}Stop #{{ management_narrative.open_stop_position }} - {{ management_narrative.open_stop }}{% else %}Stop #{{ day_log_positions.get(dl.id, loop.index) }} - {{ delay_route.plant if delay_route else dl.plant_name }}{% endif %}</div>
+            <div class="plant">Stop #{{ day_log_positions.get(dl.id, loop.index) }} - {{ delay_route.plant if delay_route else dl.plant_name }}</div>
             <div class="detail">
               {% if dl.dock_wait_minutes %}Dock wait: {{ dl.dock_wait_minutes }} min{% endif %}
               {% if dl.dock_wait_minutes and dl.downtime_reason %} &middot; {% endif %}
@@ -241,12 +284,10 @@
             </div>
           </div>
           {% endfor %}
-        {% else %}
-          <p class="empty-proof">No delay events were reported for this route.</p>
         {% endif %}
 
-        <p class="exception-subhead">Damage Reports ({{ damage_reports|length }})</p>
         {% if damage_reports %}
+          <p class="exception-subhead">Damage Reports</p>
           {% for dr in damage_reports %}
           <div class="damage-item">
             <div class="plant">{{ dr.plant_name }} - {{ dr.stage|title }} move <span style="font-weight:700;font-size:.75rem;">[{{ dr.status|upper }}]</span></div>
@@ -254,32 +295,25 @@
             <div class="dmeta">Reported {{ dr.damage_time.strftime('%Y-%m-%d %H:%M') if dr.damage_time else '--' }}{% if dr.truck_number %} &middot; Truck {{ dr.truck_number }}{% endif %}{% if dr.trailer_number %} &middot; Trailer {{ dr.trailer_number }}{% endif %}</div>
           </div>
           {% endfor %}
-        {% else %}
-          <p class="empty-proof">No damage reports were filed for this route.</p>
+          {% set photo_count = namespace(value=0) %}
+          {% for dr in damage_reports %}
+            {% if dr.photos %}
+              <div class="damage-photo-grid">
+                {% for photo in dr.photos %}
+                  {% set photo_count.value = photo_count.value + 1 %}
+                  <a class="damage-photo-link" href="{{ url_for('manager.damage_photo', photo_id=photo.id) }}" target="_blank" rel="noopener">
+                    <img class="damage-photo-thumb" src="{{ url_for('manager.damage_photo', photo_id=photo.id) }}" alt="Damage proof photo for report {{ dr.id }}">
+                    <div class="evidence-caption">Report #{{ dr.id }} - {{ dr.plant_name or 'Other' }}</div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endfor %}
+          {% if photo_count.value == 0 %}<p class="empty-proof">No damage photo evidence is attached to these reports.</p>{% endif %}
         {% endif %}
       </div>
     </div>
-
-    <div class="report-section">
-      <div class="report-section-head red">Damage Evidence</div>
-      <div class="report-section-body">
-        {% set photo_count = namespace(value=0) %}
-        {% for dr in damage_reports %}
-          {% if dr.photos %}
-            <div class="damage-photo-grid">
-              {% for photo in dr.photos %}
-                {% set photo_count.value = photo_count.value + 1 %}
-                <a class="damage-photo-link" href="{{ url_for('manager.damage_photo', photo_id=photo.id) }}" target="_blank" rel="noopener">
-                  <img class="damage-photo-thumb" src="{{ url_for('manager.damage_photo', photo_id=photo.id) }}" alt="Damage proof photo for report {{ dr.id }}">
-                  <div class="evidence-caption">Report #{{ dr.id }} - {{ dr.plant_name or 'Other' }}</div>
-                </a>
-              {% endfor %}
-            </div>
-          {% endif %}
-        {% endfor %}
-        {% if photo_count.value == 0 %}<p class="empty-proof">No damage photo evidence is attached to these reports.</p>{% endif %}
-      </div>
-    </div>
+    {% endif %}
 
     {% if hot_part_proof %}
     <div class="report-section">
@@ -311,30 +345,24 @@
         {% endif %}
       </div>
     </div>
-
     {% endif %}
+
+    {% if management_narrative.cargo_review_events %}
     <div class="report-section">
-      <div class="report-section-head">Cargo Scan Proof</div>
+      <div class="report-section-head amber">Cargo Review</div>
       <div class="report-section-body">
-        {% if part_scan_events %}
-          {% for event in part_scan_events %}
-            <div class="delay-item">
-              <div class="plant">{{ event.scan_context|replace('_', ' ')|title }} - {{ event.normalized_value }}</div>
-              <div class="detail">{{ event.validation_status|replace('_', ' ')|title }}{% if event.validation_message %}: {{ event.validation_message }}{% endif %}</div>
-            </div>
-          {% endfor %}
-        {% else %}
-          {% if hot_part_proof and hot_part_proof.has_any_proof %}
-            <p class="empty-proof">No separate cargo scan proof was recorded; hot-part proof is shown above.</p>
-          {% else %}
-            <p class="empty-proof">No cargo scan proof was recorded for this route.</p>
-          {% endif %}
-        {% endif %}
+        {% for event in management_narrative.cargo_review_events %}
+          <div class="delay-item">
+            <div class="plant">{{ event.scan_context|replace('_', ' ')|title }} - {{ event.normalized_value }}</div>
+            <div class="detail">{{ event.validation_status|replace('_', ' ')|title }}{% if event.validation_message %}: {{ event.validation_message }}{% endif %}</div>
+          </div>
+        {% endfor %}
       </div>
     </div>
+    {% endif %}
 
     <div class="report-section">
-      <div class="report-section-head">Selected Stop Details</div>
+      <div class="report-section-head green">Signature / Audit Footer</div>
       <div class="report-section-body">
         <div class="detail-pairs">
           <p class="detail-pair"><span>Selected Stop</span><strong>Stop #{{ stop_position }} - {{ log_route.plant if log_route else log.plant_name }}</strong></p>
@@ -344,19 +372,18 @@
           {% if log_route %}
             <p class="detail-pair"><span>Selected Stop State</span><strong>{{ log_route.action }} | {{ log_route.state }}</strong></p>
             <p class="detail-pair"><span>Arriving With</span><strong>{{ log_route.arrive_cargo_desc }}</strong></p>
-            <p class="detail-pair"><span>Departing With</span><strong>{% if log_route.depart_desc is none %}Open stop{% elif log.no_pickup %}No Pickup{% else %}{{ log_route.depart_cargo_desc }}{% endif %}</strong></p>
+            <p class="detail-pair"><span>Departing With</span><strong>{% if log_route.depart_desc is none %}Pending{% elif log.no_pickup %}No Pickup{% else %}{{ log_route.depart_cargo_desc }}{% endif %}</strong></p>
           {% endif %}
-          <p class="detail-pair"><span>Route Open Stop</span><strong>{% if management_narrative.open_stop %}Stop #{{ management_narrative.open_stop_position }} - {{ management_narrative.open_stop }}{% else %}None{% endif %}</strong></p>
           <p class="detail-pair"><span>Maintenance</span><strong>{{ "Yes" if log.maintenance else "No" }}{% if log.maintenance and log.fuel_mileage %} - Odometer {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}{% if log.fuel_mileage and log.fuel_mileage >= 1000000 %} | Verify unusually high odometer entry{% endif %}</strong></p>
           <p class="detail-pair"><span>Fuel</span><strong>{{ "Yes" if log.fuel else "No" }}</strong></p>
           <p class="detail-pair"><span>Meeting</span><strong>{{ "Yes" if log.meeting else "No" }}</strong></p>
           <p class="detail-pair"><span>Stop Progress</span><strong>{% if log.depart_time %}Arrival and departure recorded{% else %}Driver is still at this selected stop{% endif %}{% if stop_position and stop_count %} | Route position {{ stop_position }} of {{ stop_count }}{% endif %}</strong></p>
           <p class="detail-pair"><span>Arrive Time</span><strong>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</strong></p>
-          <p class="detail-pair"><span>Depart Time</span><strong>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</strong></p>
+          <p class="detail-pair"><span>Depart Time</span><strong>{{ log.depart_time|to_12h_format if log.depart_time else 'Pending' }}</strong></p>
           <p class="detail-pair"><span>Parts</span><strong>{% if log.no_pickup %}No Pickup{% elif log.hot_parts %}Hot {{ log.part_number or '' }}{% else %}{{ log.part_number or 'N/A' }}{% endif %}</strong></p>
           <p class="detail-pair"><span>Move Context</span><strong>{% if related_task %}{% if related_task.is_hot %}Hot Part - {% endif %}{{ related_task.part_number or related_task.title }} | {{ related_task.status.replace('-', ' ')|title }}{% else %}No linked move{% endif %}</strong></p>
         </div>
-        <p class="text-muted small stop-help"><strong>Audit note:</strong> Selected stop details are separate from the route-level open stop.</p>
+        <p class="text-muted small stop-help"><strong>Audit note:</strong> Selected stop details are separate from the route summary and current activity sections.</p>
       </div>
     </div>
   {% else %}

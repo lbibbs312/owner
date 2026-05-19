@@ -33,3 +33,28 @@ class DriverLog(db.Model):
     @property
     def action_label(self):
         return "Depart" if not self.depart_time else "Edit"
+
+class DriverLogPhoto(db.Model):
+    __tablename__ = "driver_log_photo"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.String(80), nullable=False, default="lacksdrivers")
+    driver_log_id = db.Column(db.Integer, db.ForeignKey("driver_log.id"), nullable=False, index=True)
+    filename = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=True)
+    content_type = db.Column(db.String(100), nullable=True)
+    source = db.Column(db.String(40), nullable=False, default="gallery")
+    note = db.Column(db.Text, nullable=True)
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    log = db.relationship(
+        "DriverLog",
+        backref=db.backref(
+            "photos",
+            cascade="all, delete-orphan",
+            order_by="DriverLogPhoto.uploaded_at.asc()",
+        ),
+    )
+    uploaded_by = db.relationship("User", backref="driver_log_photos")
+

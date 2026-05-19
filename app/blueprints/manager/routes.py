@@ -25,7 +25,7 @@ from app.services.evidence_packet import build_damage_evidence_packet
 from app.extensions import db, socketio
 from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
-from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DriverLog, HotPartPhoto, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, Task, User
+from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DriverLog, DriverLogPhoto, HotPartPhoto, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, Task, User
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
 from app.services.operations import build_exception_items
@@ -857,6 +857,14 @@ def hot_part_photo(photo_id):
     return send_from_directory(upload_path, photo.filename)
 
 
+@bp.route("/driver-log-photos/<int:photo_id>")
+def driver_log_photo(photo_id):
+    photo = DriverLogPhoto.query.get_or_404(photo_id)
+    upload_root = current_app.config.get("DRIVER_LOG_PHOTO_UPLOAD_FOLDER", "uploads/driver_log_photos")
+    upload_path = os.path.abspath(os.path.join(current_app.root_path, os.pardir, upload_root))
+    return send_from_directory(upload_path, photo.filename)
+
+
 @bp.route("/damage-reports/<int:report_id>")
 def view_damage_report(report_id):
     report = DamageReport.query.get_or_404(report_id)
@@ -1155,7 +1163,13 @@ def view_driver_log(log_id):
 
     # Delay detail: only stops where the driver recorded a wait or downtime reason.
     delay_logs = [dl for dl in day_logs if (dl.dock_wait_minutes or 0) > 0 or dl.downtime_reason]
-    has_reported_delay = any((dl.dock_wait_minutes or 0) > 0 for dl in day_logs)
+    has_reported_delay = bool(delay_logs)
+    route_finalized = ActivityEvent.query.filter_by(
+        user_id=log.driver_id,
+        category="eod",
+        action="finalized",
+        target_type="end_of_day",
+    ).filter(ActivityEvent.details.contains(str(log.date))).first() is not None
 
     all_routes = _driver_log_route_context(day_logs)
     truck_context = _truck_context_for_driver(log.driver_id, log.date)
@@ -1165,6 +1179,14 @@ def view_driver_log(log_id):
             PartScanEvent.query
             .filter(PartScanEvent.stop_id.in_([day_log.id for day_log in day_logs]))
             .order_by(PartScanEvent.timestamp.asc(), PartScanEvent.id.asc())
+            .all()
+        )
+    driver_log_photos = []
+    if day_logs:
+        driver_log_photos = (
+            DriverLogPhoto.query
+            .filter(DriverLogPhoto.driver_log_id.in_([day_log.id for day_log in day_logs]))
+            .order_by(DriverLogPhoto.uploaded_at.asc(), DriverLogPhoto.id.asc())
             .all()
         )
     hot_part_proof = build_route_hot_part_proof(day_logs, related_task)
@@ -1179,6 +1201,7 @@ def view_driver_log(log_id):
             "related_task": related_task,
             "part_scan_events": part_scan_events,
             "hot_part_proof": hot_part_proof,
+            "route_finalized": route_finalized,
         }
     )
     return render_template(
@@ -1199,6 +1222,7 @@ def view_driver_log(log_id):
         management_narrative=management_narrative,
         part_scan_events=part_scan_events,
         hot_part_proof=hot_part_proof,
+        driver_log_photos=driver_log_photos,
     )
 
 

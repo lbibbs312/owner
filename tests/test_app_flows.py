@@ -16,6 +16,7 @@ def app(monkeypatch, tmp_path):
         TESTING=True,
         WTF_CSRF_ENABLED=False,
         DAMAGE_UPLOAD_FOLDER=str(tmp_path / "damage_uploads"),
+        DRIVER_LOG_PHOTO_UPLOAD_FOLDER=str(tmp_path / "driver_log_photo_uploads"),
     )
     with app.app_context():
         db.create_all()
@@ -1445,7 +1446,7 @@ def test_manager_driver_day_log_uses_management_readout_narrative(client, app):
             last_name="Bibbs",
         )
         create_user("manager1", "manager1@example.com", "management")
-        route_date = date(2026, 5, 19)
+        route_date = date(2026, 5, 18)
         pretrip = PreTrip(
             user_id=driver.id,
             truck_number="st4",
@@ -1515,35 +1516,33 @@ def test_manager_driver_day_log_uses_management_readout_narrative(client, app):
     assert page.status_code == 200
     assert "MOVEDEFENSE — ROUTE AUDIT".encode() in page.data
     assert b"Viewing stop #" not in page.data
-    assert b"Management Readout" in page.data
+    assert b"Route Summary" in page.data
+    assert b"Management Readout" not in page.data
     assert b"Driver Day Log" not in page.data
     assert b"Lamar Bibbs" in page.data
     assert b"No division" not in page.data
     assert b"Badge No badge" not in page.data
     assert b"Driver Day Summary" not in page.data
     assert b"Truck ID" not in page.data
-    assert b"2 of 3 stops are completed" in page.data
-    assert b"Stop #3 Paint East remains open" in page.data
-    assert b"Open Route Stop" in page.data
+    assert b"Lamar completed 2 of 3 stops." in page.data
+    assert b"Current Active Stop" in page.data
+    assert b"Current Active Stop: Paint East" in page.data
+    assert b"Open Route Stop" not in page.data
     assert b"Stop #3 - Paint East" in page.data
-    assert b"Damage Evidence" in page.data
-    assert b"Cargo Scan Proof" in page.data
-    assert b"Selected Stop Details" in page.data
+    assert b"Damage / Delay" in page.data
+    assert b"Damage Evidence" not in page.data
+    assert b"Cargo Scan Proof" not in page.data
+    assert b"Signature / Audit Footer" in page.data
     assert b"Selected Stop" in page.data
     assert b"Stop #1 - Raleigh East" in page.data
     assert b"Stop #3 - Paint East" in page.data
-    assert b"2 delay events were reported" in page.data
-    assert b"vehicle-related issue" in page.data
-    assert b"process/load-handling issue" in page.data
-    assert b"1 damage report was filed" in page.data
-    assert b"1 damage report remains open" in page.data
-    assert b"Close out the open Paint East stop." in page.data
-    assert b"Review why the second-stop cargo was not dropped." in page.data
+    assert b"2 delay events and 1 damage report need review" in page.data
+    assert b"Delay Event" in page.data
+    assert b"Damage Event" in page.data
+    assert b"second-stop cargo was not dropped" in page.data
     assert b"Review why forgot" not in page.data
-    assert b"Assign or close the open damage report." in page.data
     assert b"Evidence References" not in page.data
-    assert b"Full Day Route" in page.data
-    assert b"Exceptions" in page.data
+    assert b"Full Route Table" in page.data
     assert b"Open scuff report" in page.data
     assert f'/manager/damage-photos/{photo_id}'.encode() in page.data
     assert b"damage-proof.jpg" not in page.data
@@ -1552,6 +1551,121 @@ def test_manager_driver_day_log_uses_management_readout_narrative(client, app):
     photo_response = client.get(f"/manager/damage-photos/{photo_id}")
     assert photo_response.status_code == 200
     assert photo_response.data == b"fake image bytes"
+
+
+def test_manager_route_audit_treats_latest_open_stop_as_current_activity(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PartScanEvent
+
+        driver = create_user(
+            "route_audit_driver",
+            "route_audit_driver@example.com",
+            "driver",
+            first_name="Lamar",
+            last_name="Bibbs",
+        )
+        create_user("route_audit_manager", "route_audit_manager@example.com", "management")
+        route_date = date(2026, 5, 18)
+        stops = [
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="RE",
+                load_size="Raleigh East Load",
+                depart_load_size="Kraft Load",
+                arrive_time="2026-05-18 12:00:00",
+                depart_time="08:20",
+                created_at=datetime(2026, 5, 18, 8, 0),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="KP",
+                load_size="Kraft Load",
+                depart_load_size="Raleigh West Load",
+                arrive_time="2026-05-18 13:00:00",
+                depart_time="09:25",
+                created_at=datetime(2026, 5, 18, 9, 0),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="RW",
+                load_size="Raleigh West Load",
+                depart_load_size="Kraft Load",
+                arrive_time="2026-05-18 14:00:00",
+                depart_time="10:30",
+                created_at=datetime(2026, 5, 18, 10, 0),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="KP",
+                load_size="Kraft Load",
+                depart_load_size="Paint Central Load",
+                arrive_time="2026-05-18 15:00:00",
+                depart_time="11:40",
+                created_at=datetime(2026, 5, 18, 11, 0),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="PC",
+                load_size="Paint Central Load",
+                arrive_time="2026-05-18 19:07:00",
+                created_at=datetime(2026, 5, 18, 15, 7),
+            ),
+        ]
+        db.session.add_all(stops)
+        db.session.commit()
+        current_stop_id = stops[-1].id
+        db.session.add_all(
+            [
+                PartScanEvent(
+                    raw_value="PC-PENDING-100",
+                    normalized_value="100",
+                    stop_id=current_stop_id,
+                    driver_id=driver.id,
+                    plant_id="PC",
+                    scan_context="departure_scan",
+                    validation_status="pending_part",
+                    validation_message="Unknown part saved as a pending record for manager confirmation.",
+                ),
+                PartScanEvent(
+                    raw_value="PC-VERIFY-200",
+                    normalized_value="200",
+                    stop_id=current_stop_id,
+                    driver_id=driver.id,
+                    plant_id="PC",
+                    scan_context="pickup_scan",
+                    validation_status="needs_review",
+                    validation_message="Dispatcher should verify this part against the move.",
+                ),
+            ]
+        )
+        db.session.commit()
+
+    login(client, "route_audit_manager")
+    page = client.get(f"/manager/driver-logs/{current_stop_id}")
+
+    assert page.status_code == 200
+    assert b"Lamar completed 4 of 5 stops. He is currently at Paint Central getting loaded. No delay or damage events were reported today. Two cargo scans need manager confirmation." in page.data
+    assert b"Current Active Stop: Paint Central" in page.data
+    assert b"Driver arrived at 3:07pm and is getting loaded / awaiting departure." in page.data
+    assert b"Needs Review" in page.data
+    assert b"2 cargo scans require manager confirmation." in page.data
+    assert b"Cargo Review" in page.data
+    assert b"Damage Evidence" not in page.data
+    assert b"Damage Reports (0)" not in page.data
+    assert b"Delay Events (0)" not in page.data
+    assert b"Damage / Delay" not in page.data
+    assert b"Critical Exceptions" not in page.data
+    assert b"Open Route Stop" not in page.data
+    assert b"No damage reports were filed" not in page.data
+    assert b"No delay events were reported for this route" not in page.data
 
 
 def test_manager_driver_log_uses_plain_stop_progress_and_named_task(client, app):
@@ -1831,6 +1945,83 @@ def test_search_corpus_fts_sync_is_sqlite_only(client, app, monkeypatch):
         search_corpus._sync_fts_row(row)
 
 
+def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("photo_driver", "photo_driver@example.com", "driver")
+        create_user("photo_manager", "photo_manager@example.com", "management")
+        log = DriverLog(
+            driver_id=driver.id,
+            date=date.today(),
+            plant_name="PC",
+            load_size="Paint Central Load",
+            arrive_time="2026-05-19 19:07:00",
+        )
+        db.session.add(log)
+        db.session.commit()
+        log_id = log.id
+
+    login(client, "photo_driver")
+    edit_page = client.get(f"/edit_driver_log/{log_id}")
+    assert edit_page.status_code == 200
+    assert b"Add Picture To This Stop" in edit_page.data
+    assert b"Upload From Gallery" in edit_page.data
+    assert b'data-stop-photo-input="edit_gallery"' in edit_page.data
+    assert b'capture="environment" data-stop-photo-input="edit_camera"' in edit_page.data
+
+    first_upload = client.post(
+        f"/driver_logs/{log_id}/photos",
+        data={"source": "edit_gallery", "photo": (BytesIO(b"edit-gallery-photo"), "edit-gallery.jpg")},
+        headers={"Accept": "application/json"},
+    )
+    assert first_upload.status_code == 200
+    first_photo = first_upload.get_json()["photo"]
+    assert first_photo["source"] == "Edit Gallery"
+    driver_photo = client.get(first_photo["url"])
+    assert driver_photo.status_code == 200
+    assert driver_photo.data == b"edit-gallery-photo"
+
+    depart_page = client.get(f"/driver_logs/{log_id}/depart")
+    assert depart_page.status_code == 200
+    assert b"Add Picture To This Stop" in depart_page.data
+    assert b"Upload From Gallery" in depart_page.data
+    assert b'data-stop-photo-input="departure_gallery"' in depart_page.data
+    assert b"Upload Label Photo" not in depart_page.data
+    assert b"galleryScanImage" not in depart_page.data
+
+    second_upload = client.post(
+        f"/driver_logs/{log_id}/photos",
+        data={"source": "departure_gallery", "photo": (BytesIO(b"departure-gallery-photo"), "departure-gallery.png")},
+        headers={"Accept": "application/json"},
+    )
+    assert second_upload.status_code == 200
+    second_photo = second_upload.get_json()["photo"]
+    assert second_photo["source"] == "Departure Gallery"
+
+    with app.app_context():
+        from app.models import DriverLogPhoto
+
+        photos = DriverLogPhoto.query.order_by(DriverLogPhoto.id.asc()).all()
+        assert len(photos) == 2
+        first_photo_id = photos[0].id
+        second_photo_id = photos[1].id
+
+    client.get("/logout")
+    login(client, "photo_manager")
+    manager_page = client.get(f"/manager/driver-logs/{log_id}")
+    assert manager_page.status_code == 200
+    assert b"Stop Photo Proof" in manager_page.data
+    assert f"/manager/driver-log-photos/{first_photo_id}".encode() in manager_page.data
+    assert f"/manager/driver-log-photos/{second_photo_id}".encode() in manager_page.data
+    manager_photo = client.get(f"/manager/driver-log-photos/{second_photo_id}")
+    assert manager_photo.status_code == 200
+    assert manager_photo.data == b"departure-gallery-photo"
+
+
 def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_review(client, app):
     from datetime import date
 
@@ -1854,6 +2045,11 @@ def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_rev
     depart_page = client.get(f"/driver_logs/{log_id}/depart")
     assert depart_page.status_code == 200
     assert b"Scan Arriving Cargo" in depart_page.data
+    assert b"Add Picture To This Stop" in depart_page.data
+    assert b"Upload From Gallery" in depart_page.data
+    assert b'data-stop-photo-input="departure_gallery"' in depart_page.data
+    assert b"Upload Label Photo" not in depart_page.data
+    assert b"galleryScanImage" not in depart_page.data
     assert b"@zxing/browser" in depart_page.data
     assert b"Manager review / override note" in depart_page.data
 

@@ -35,14 +35,19 @@ def test_management_narrative_reports_completed_route_without_exceptions():
     )
 
     assert narrative["route_status"] == "Completed"
-    assert "The route was completed" in narrative["status_summary"]
-    assert narrative["exception_summary"] == (
-        "No delay events were reported. No damage reports were filed. "
-        "No maintenance, fuel, or meeting flags were recorded. "
-        "No cargo scan proof was recorded for this route."
+    assert "2 of 2 stops are completed" in narrative["status_summary"]
+    assert narrative["summary_sentence"] == (
+        "Lamar completed 2 of 2 stops. "
+        "The route has departure/load-out recorded for every stop. "
+        "No delay or damage events were reported today."
     )
+    assert narrative["exception_summary"] == "No delay or damage events were reported today."
     assert narrative["narrative_lines"][1] == {
-        "label": "Open stop",
+        "label": "Current activity",
         "text": "No open stops are visible; the route was completed.",
     }
-    assert narrative["action_items"] == ["No immediate management action is flagged from this log."]
+    assert narrative["action_items"] == []
+    assert narrative["needs_review_items"] == []
+    assert narrative["critical_exception_items"] == []
+    assert narrative["has_damage_reports"] is False
+    assert narrative["has_delay_events"] is False
