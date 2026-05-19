@@ -48,7 +48,8 @@ from app.services.load_state import (
     truck_issue_reason,
 )
 from app.services.parts import record_part_scan as save_part_scan, scan_event_payload
-from app.services.plant_time import forecast_for_stop
+from app.services.plant_time import forecast_for_stop, plant_time_forecast, route_stop_forecasts
+from app.services.report_summary import damage_report_count_label, damage_report_detail_label
 from app.services.hot_parts import (
     build_hot_part_proof,
     ensure_hot_move_for_task,
@@ -135,6 +136,7 @@ DRIVER_ONLY_ENDPOINTS = {
     "add_stop",
     "edit_driver_log",
     "delete_driver_log",
+    "clear_driver_log_hot_part",
     "depart_driver_log",
     "record_part_scan",
     "pickup_driver_log",
@@ -445,6 +447,7 @@ def _local_route_date_utc_bounds(route_date):
 def _driver_route_tasks(driver_id, route_date):
     day_start, day_end = _local_route_date_utc_bounds(route_date)
     return Task.query.filter(
+        Task.status != "declined",
         or_(
             Task.assigned_to == driver_id,
             Task.accepted_by_id == driver_id,
@@ -480,9 +483,41 @@ def _task_route_events_for_logs(logs, tasks=None):
     events = {log.id: [] for log in logs}
     for log in logs:
         for task in unique_tasks:
+            if task.status == "declined":
+                continue
             if _task_matches_log(task, log):
                 events[log.id].append(_task_route_summary(task))
     return {log_id: items for log_id, items in events.items() if items}
+
+
+def _next_load_eta_context(current_stop, current_stop_forecast, logs, route_date, now_local):
+    if current_stop_forecast and current_stop_forecast.get("estimate_minutes") is not None:
+        route = _driver_log_context_for(current_stop)
+        label = current_stop_forecast.get("remaining_label") or current_stop_forecast.get("estimate_label")
+        if current_stop.depart_time:
+            label = current_stop_forecast.get("estimate_label")
+        return {
+            "plant": route.get("plant") or _plant_label(current_stop.plant_name),
+            "estimate_label": label,
+            "ready_at_label": current_stop_forecast.get("ready_at_label"),
+            "status": current_stop_forecast.get("status"),
+            "confidence": current_stop_forecast.get("confidence"),
+        }
+
+    latest_log = logs[-1] if logs else None
+    if not latest_log:
+        return None
+    forecast = plant_time_forecast(latest_log.plant_name, anchor_date=route_date, now=now_local)
+    if forecast.get("estimate_minutes") is None:
+        return None
+    route = _driver_log_context_for(latest_log)
+    return {
+        "plant": route.get("plant") or _plant_label(latest_log.plant_name),
+        "estimate_label": forecast.get("estimate_label"),
+        "ready_at_label": "",
+        "status": None,
+        "confidence": forecast.get("confidence"),
+    }
 
 
 def _current_driver_task():
@@ -2546,6 +2581,46 @@ def delete_driver_log(log_id):
     return redirect(url_for("driver.driver_logs"))
 
 
+@bp.route("/driver_logs/<int:log_id>/clear-hot", methods=["POST"], strict_slashes=False)
+@login_required
+def clear_driver_log_hot_part(log_id):
+    log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
+    if not _can_driver_change_same_day(log.driver_id, log.date, "driver log", "clear hot part"):
+        return redirect(url_for("driver.driver_logs"))
+    if not log.hot_parts and not log.part_number:
+        flash("That stop is not marked as a hot part.", "info")
+        return redirect(url_for("driver.driver_logs"))
+
+    before_values = model_snapshot(log, DRIVER_LOG_AUDIT_FIELDS)
+    log.hot_parts = False
+    log.part_number = None
+    after_values = model_snapshot(log, DRIVER_LOG_AUDIT_FIELDS)
+    record_audit_event(
+        user_id=current_user.id,
+        target_type="driver_log",
+        target_id=log.id,
+        action="updated",
+        reason="Driver cleared an accidental hot-part flag.",
+        before_values=before_values,
+        after_values=after_values,
+        commit=False,
+    )
+    db.session.commit()
+    record_activity(
+        user_id=current_user.id,
+        category="log",
+        action="updated",
+        title="Hot part flag cleared",
+        details=f"{_plant_label(log.plant_name)} stop no longer marked hot.",
+        target_type="driver_log",
+        target_id=log.id,
+    )
+    ingest_driver_log(log, commit=True)
+    _emit_driver_log_updated(log, "updated")
+    flash("Hot part flag cleared for this stop.", "success")
+    return redirect(url_for("driver.driver_logs"))
+
+
 @bp.route("/driver_logs/<int:log_id>/part-scans", methods=["POST"], strict_slashes=False)
 @login_required
 def record_part_scan(log_id):
@@ -2809,7 +2884,8 @@ def view_driver_log(log_id):
 @login_required
 def driver_logs_print():
     local_tz = pytz.timezone("America/Detroit")
-    today_local_date = datetime.now(local_tz).date()
+    now_local = datetime.now(local_tz)
+    today_local_date = now_local.date()
     logs = sorted(
         _active_driver_logs_query().filter_by(driver_id=current_user.id, date=today_local_date).all(),
         key=_driver_log_sort_key,
@@ -2858,11 +2934,14 @@ def driver_logs_print():
         the_date=today_local_date,
         pretrips=pretrips,
         damage_reports=damage_reports_today,
+        damage_report_summary=damage_report_count_label(damage_reports_today),
+        damage_report_details=[damage_report_detail_label(report) for report in damage_reports_today],
         total_miles=_total_miles_for_pretrips(pretrips),
         parts_carried=parts_carried,
         exception_notes=exception_notes,
         log_issue_details=log_issue_details,
         route_task_events=_task_route_events_for_logs(logs),
+        stop_forecasts=route_stop_forecasts(logs, now=now_local),
         route_finalized=route_finalized,
         driver_signature=shift_record.driver_signature if shift_record else None,
         signature_timestamp=shift_record.signature_timestamp if shift_record else None,
@@ -3428,7 +3507,8 @@ def mobile_dashboard():
         if current_stop and not current_stop.depart_time
         else None
     )
-    stop_forecasts = {current_stop.id: current_stop_forecast} if current_stop_forecast else {}
+    stop_forecasts = route_stop_forecasts(todays_logs, now=now_local)
+    next_load_eta = _next_load_eta_context(current_stop, current_stop_forecast, todays_logs, route_date, now_local)
     if route_date == today_local_date:
         route_panel_title = "Today's Route"
     elif route_is_active:
@@ -3471,6 +3551,7 @@ def mobile_dashboard():
         current_stop=current_stop,
         stop_forecasts=stop_forecasts,
         current_stop_forecast=current_stop_forecast,
+        next_load_eta=next_load_eta,
         current_truck_number=current_truck_number,
         truck_maintenance_history=truck_maintenance_history,
         truck_issue_choices=TRUCK_ISSUE_CHOICES,
@@ -3898,6 +3979,7 @@ def decline_task(task_id):
         flash("Completed tasks cannot be declined.", "warning")
     else:
         task.status = "declined"
+        task.assigned_to = None
         record_activity(
             user_id=current_user.id,
             category="task",

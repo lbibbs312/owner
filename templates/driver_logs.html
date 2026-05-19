@@ -18,6 +18,10 @@
     .driver-log-table .actions-cell .btn { white-space:nowrap; line-height:1.1; }
     .driver-log-table .actions-cell form { margin:0; }
     .log-route-state { display:block; margin-top:3px; font-size:.72rem; color:#64748b; font-weight:700; line-height:1.25; }
+    .route-state { font-weight:900; }
+    .route-state.complete { color:#15803d; }
+    .route-state.open { color:#be123c; }
+    .route-state.no-pickup { color:#334155; }
     .route-warnings { display:grid; gap:4px; margin-top:6px; }
     .route-warning { display:inline-block; width:auto; max-width:100%; overflow-wrap:anywhere; border:1px solid #f59e0b; background:#fffbeb; color:#92400e; border-radius:6px; padding:3px 6px; font-size:.68rem; font-weight:800; line-height:1.2; }
     .route-warning.route-warning-danger { border-color:#fecaca; background:#fef2f2; color:#991b1b; }
@@ -136,7 +140,7 @@
                 <h3 class="route-card-title">{{ route.plant if route else log.plant_name }}</h3>
                 <div class="route-card-meta">
                   {{ log.driver.display_name }}{% if log.driver.employee_id %} - ID {{ log.driver.employee_id }}{% endif %}{% if log.driver.department %} - {{ log.driver.department }}{% endif %}
-                  {% if route %}<br>{{ route.action }} - {{ route.state }}{% if route.next_stop %}<br>First stop after departure: {{ route.next_stop }}{% endif %}{% endif %}
+                  {% if route %}<br>{{ route.action }} - <span class="route-state {{ 'no-pickup' if route.state == 'No pickup' else route.class }}">{{ route.state }}</span>{% if route.next_stop %}<br>First stop after departure: {{ route.next_stop }}{% endif %}{% endif %}
                   {% if log.plant_name in PLANT_ADDRESSES %}<br>{{ PLANT_ADDRESSES[log.plant_name] }}{% endif %}
                 </div>
               </div>
@@ -201,6 +205,11 @@
                   <a href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" class="btn btn-sm btn-success hover-btn">Depart / Load</a>
                 {% endif %}
                 {% if can_delete_log %}
+                  {% if log.hot_parts or log.part_number %}
+                    <form action="{{ url_for('driver.clear_driver_log_hot_part', log_id=log.id) }}" method="POST" onsubmit="return confirm('Clear the hot-part flag and part number from this stop?');">
+                      <button type="submit" class="btn btn-sm btn-outline-secondary hover-btn">Clear Hot</button>
+                    </form>
+                  {% endif %}
                   <form action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" method="POST" onsubmit="return confirm('Delete this driver log?');">
                     <button type="submit" class="btn btn-sm btn-outline-danger hover-btn">Delete</button>
                   </form>
@@ -244,7 +253,7 @@
             <td class="route-cell">
               <span class="fw-bold">{{ route.plant if route else log.plant_name }}</span>
               {% if route %}
-                <span class="log-route-state">{{ route.action }} · {{ route.state }}</span>
+                <span class="log-route-state">{{ route.action }} · <span class="route-state {{ 'no-pickup' if route.state == 'No pickup' else route.class }}">{{ route.state }}</span></span>
                 {% if route.warnings %}
                   <span class="route-warnings">
                     {% for warning in route.warnings %}
@@ -349,6 +358,11 @@
                     <a href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" class="btn btn-sm btn-success hover-btn">Depart / Load</a>
                   {% endif %}
                   {% if can_delete_log %}
+                    {% if log.hot_parts or log.part_number %}
+                      <form action="{{ url_for('driver.clear_driver_log_hot_part', log_id=log.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Clear the hot-part flag and part number from this stop?');">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary hover-btn">Clear Hot</button>
+                      </form>
+                    {% endif %}
                     <form action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this driver log?');">
                       <button type="submit" class="btn btn-sm btn-outline-danger hover-btn">Delete</button>
                     </form>

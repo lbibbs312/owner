@@ -31,6 +31,11 @@
     th:nth-child(6), td:nth-child(6) { width: 25%; }
     .route-leg { font-weight: 900; font-size: 9.5pt; }
     .route-sub { margin-top: 2px; color: #555; font-size: 8pt; }
+    .forecast-status { font-weight: 900; }
+    .forecast-status.ok { color: #166534; }
+    .forecast-status.warning { color: #92400e; }
+    .forecast-status.high { color: #991b1b; }
+    .forecast-status.muted { color: #555; }
     .cargo { font-weight: 900; }
     .badge { display: inline-block; border: 1px solid #111; padding: 1px 5px; font-size: 7pt; font-weight: 900; text-transform: uppercase; margin-bottom: 3px; }
     .badge.deviation { background: #111; color: #fff; }
@@ -80,12 +85,12 @@
   <div class="qa-grid">
     <div class="qa-box">
       <span class="qa-label">Total Mileage</span>
-      <div class="qa-value">{% if total_miles is not none %}{{ total_miles }} miles{% elif logs and logs[-1].depart_time is none %}Pending posttrip mileage{% else %}Not recorded{% endif %}</div>
+      <div class="qa-value">{% if logs and logs[-1].depart_time is none %}Pending posttrip mileage{% elif total_miles is not none %}{{ total_miles }} miles{% elif logs %}Pending posttrip mileage{% else %}Not recorded{% endif %}</div>
     </div>
     <div class="qa-box">
       <span class="qa-label">Incidents / Damage</span>
-      <div class="qa-value">{% if damage_reports %}{{ damage_reports|length }} report{{ 's' if damage_reports|length != 1 else '' }} filed{% else %}No in-route damage/incidents reported{% endif %}</div>
-      {% if damage_reports %}<div class="qa-note">{% for report in damage_reports %}#{{ report.id }} {{ report.plant_name }}{% if not loop.last %}; {% endif %}{% endfor %}</div>{% endif %}
+      <div class="qa-value">{{ damage_report_summary if damage_report_summary is defined else (damage_reports|length ~ ' report' ~ ('s' if damage_reports|length != 1 else '') ~ ' filed' if damage_reports else 'No in-route damage/incidents reported') }}</div>
+      {% if damage_report_details is defined and damage_report_details %}<div class="qa-note">{{ damage_report_details|join('; ') }}</div>{% elif damage_reports %}<div class="qa-note">{% for report in damage_reports %}#{{ report.id }} {{ report.plant_name }}{% if not loop.last %}; {% endif %}{% endfor %}</div>{% endif %}
     </div>
     <div class="qa-box">
       <span class="qa-label">Part References</span>
@@ -119,12 +124,19 @@
         {% set next_plant_name = next_route.plant if next_route else (next_log.plant_name if next_log else none) %}
         {% set transit_cargo = route.depart_cargo_desc if route and route.depart_cargo_desc is not none else (log.depart_load_size or '--') %}
         {% set issue = (log_issue_details or {}).get(log.id, {}) %}
+        {% set stop_forecast = (stop_forecasts or {}).get(log.id) %}
         <tr class="{% if not next_log %}final-row{% endif %}">
           <td>{{ loop.index }}</td>
           <td>
             {% if next_log %}
               <div class="route-leg">{{ plant_name }} &#8594; {{ next_plant_name }}</div>
-              <div class="route-sub">Movement segment</div>
+              <div class="route-sub">
+                {% if stop_forecast and stop_forecast.estimate_minutes is not none %}
+                  Stop forecast: <span class="forecast-status {{ stop_forecast.severity }}">{{ stop_forecast.status }}</span>
+                {% else %}
+                  Stop forecast pending
+                {% endif %}
+              </div>
             {% else %}
               <div class="route-leg">Final Location: {{ plant_name }}</div>
               <div class="route-sub">{% if route_finalized %}Route finalized{% else %}Route open / not finalized{% endif %}</div>

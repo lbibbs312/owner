@@ -673,6 +673,8 @@ def test_plant_load_forecast_uses_today_average_on_driver_and_manager_dashboards
     assert b"Today Average" in mobile.data
     assert b"1h 30m" in mobile.data
     assert b"Medium" in mobile.data
+    assert b"Kraft Plant next load pickup estimated" in mobile.data
+    assert b"Stop forecast" in mobile.data
 
     client.get("/logout")
     login(client, "manager1")
@@ -681,6 +683,60 @@ def test_plant_load_forecast_uses_today_average_on_driver_and_manager_dashboards
     assert b"Plant load forecasts" in manager.data
     assert b"Kraft Plant" in manager.data
     assert b"1h 30m" in manager.data
+
+
+def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DamageReport, DriverLog
+
+        driver = create_user("print_driver", "print-driver@example.com", "driver")
+        route_date = date.today()
+        db.session.add_all([
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="RE",
+                load_size="Empty",
+                depart_load_size="KP Load",
+                arrive_time="08:00",
+                depart_time="09:00",
+                created_at=datetime(2026, 5, 19, 8, 0),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="KP",
+                load_size="KP Load",
+                arrive_time="10:00",
+                created_at=datetime(2026, 5, 19, 10, 0),
+            ),
+            DamageReport(
+                reported_by_id=driver.id,
+                plant_name="RE",
+                stage="before",
+                description="Trailer scrape",
+            ),
+            DamageReport(
+                reported_by_id=driver.id,
+                plant_name="Other",
+                stage="before",
+                description="Incident note",
+            ),
+        ])
+        db.session.commit()
+
+    login(client, "print_driver")
+    page = client.get("/driver_logs_print")
+    assert page.status_code == 200
+    assert b"Pending posttrip mileage" in page.data
+    assert b"1 incident report, 1 damage report filed" in page.data
+    assert b"Incident - Other" in page.data
+    assert b"Damage - RE" in page.data
+    assert b"Stop forecast pending" in page.data
+    assert b"Movement segment" not in page.data
 
 
 def test_damage_evidence_packet_includes_timeline_hashes_related_records_and_warnings(client, app):
@@ -1246,6 +1302,18 @@ def test_driver_log_edit_and_depart_are_separate_actions(client, app):
     assert b"+ Add Missed Stop" not in edit_page.data
     assert b"Pickup" not in edit_page.data
     assert b"Depart Now" not in edit_page.data
+
+    list_page = client.get("/driver_logs")
+    assert b"Clear Hot" in list_page.data
+    cleared_hot = client.post(f"/driver_logs/{log_id}/clear-hot", follow_redirects=False)
+    assert cleared_hot.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        log = DriverLog.query.get(log_id)
+        assert log.hot_parts is False
+        assert log.part_number is None
 
     departed = client.post(
         f"/driver_logs/{log_id}/depart",

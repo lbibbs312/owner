@@ -295,22 +295,22 @@ def forecast_for_stop(log, *, now=None):
         notify_margin = 15 if getattr(log, "hot_parts", False) else 45
         if departure:
             if delay_minutes >= notify_margin:
-                status = f"Completed +{delay_minutes}m"
+                status = f"Behind +{delay_minutes}m"
                 severity = "high"
             elif delay_minutes >= warning_margin:
-                status = f"Completed +{delay_minutes}m"
+                status = f"Behind +{delay_minutes}m"
                 severity = "warning"
             else:
-                status = "Completed"
+                status = "On time"
                 severity = "ok"
         elif delay_minutes >= notify_margin:
-            status = "Notify dispatch"
+            status = f"Behind +{delay_minutes}m"
             severity = "high"
         elif delay_minutes >= warning_margin:
-            status = "Possible dock delay"
+            status = f"Behind +{delay_minutes}m"
             severity = "warning"
         elif delay_minutes > 0:
-            status = f"{delay_minutes}m over average"
+            status = f"Behind +{delay_minutes}m"
             severity = "warning"
         else:
             status = "On pace"

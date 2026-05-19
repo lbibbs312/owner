@@ -33,7 +33,8 @@ from app.services.load_state import build_driver_log_route_context, route_proble
 from app.services.hot_parts import build_route_hot_part_proof, ensure_hot_move_for_task
 from app.services.management_readout import build_management_narrative
 from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
-from app.services.plant_time import forecast_for_stop, plant_forecast_rows
+from app.services.plant_time import forecast_for_stop, plant_forecast_rows, route_stop_forecasts
+from app.services.report_summary import damage_report_count_label, damage_report_detail_label
 from app.services.role_session import restore_role_user
 from app.services.search_corpus import suggest_terms
 from app.blueprints.driver.routes import (
@@ -658,11 +659,14 @@ def _route_print_context(driver_id, route_date):
         "the_date": route_date,
         "pretrips": pretrips,
         "damage_reports": damage_reports,
+        "damage_report_summary": damage_report_count_label(damage_reports),
+        "damage_report_details": [damage_report_detail_label(report) for report in damage_reports],
         "total_miles": _total_miles_for_pretrips(pretrips),
         "parts_carried": parts_carried,
         "exception_notes": exception_notes,
         "log_issue_details": log_issue_details,
         "route_task_events": _task_route_events_for_logs(logs),
+        "stop_forecasts": route_stop_forecasts(logs),
         "driver_signature": signature_shift.driver_signature if signature_shift else None,
         "signature_timestamp": signature_shift.signature_timestamp if signature_shift else None,
     }

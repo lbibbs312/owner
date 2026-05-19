@@ -323,13 +323,13 @@ def build_driver_log_route_context(logs):
 
                 depart_cargo = cargo_display(depart_primary, depart_secondary)
                 if depart_secondary and depart_secondary != "Empty" and depart_primary and depart_primary != "Empty":
-                    action = "Loaded mixed cargo"
+                    action = "Loaded two stops"
                 elif depart_secondary and depart_secondary != "Empty":
-                    action = "Loaded secondary cargo"
+                    action = "Picked up another stop"
                 elif depart_primary == "Empty":
                     action = "Unloaded, departed empty" if unloaded_on_arrival else "Departed empty"
                 else:
-                    action = "Loaded"
+                    action = "Picked up load"
 
             deviation = bool(
                 current_primary_destination
