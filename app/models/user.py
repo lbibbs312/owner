@@ -52,7 +52,12 @@ class User(db.Model, UserMixin):
 
     @property
     def manager_label(self):
-        return f"{self.display_name} | {self.division_label} | Badge {self.badge_label}"
+        meta = []
+        if self.department:
+            meta.append(self.department)
+        if self.employee_id:
+            meta.append(f"Badge {self.employee_id}")
+        return " | ".join([self.display_name] + meta)
 
     def set_password(self, pwd):
         self.password_hash = generate_password_hash(pwd)

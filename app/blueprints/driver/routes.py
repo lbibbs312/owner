@@ -10,7 +10,7 @@ from functools import wraps
 import os
 
 import pytz
-from flask import current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
+from flask import current_app, flash, jsonify, make_response, redirect, render_template, request, send_from_directory, session, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import and_, func, or_
 from werkzeug.utils import secure_filename
@@ -46,6 +46,7 @@ from app.services.load_state import (
     secondary_load_value,
     truck_issue_reason,
 )
+from app.services.parts import record_part_scan as save_part_scan, scan_event_payload
 from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
 from app.services.role_session import restore_role_user
 from app.services.search_corpus import ingest_driver_log
@@ -54,6 +55,7 @@ from app.models import (
     DamagePhoto,
     DamageReport,
     DirectMessage,
+    PartScanEvent,
     DriverLog,
     PlantTransfer,
     PlantTransferLine,
@@ -124,6 +126,7 @@ DRIVER_ONLY_ENDPOINTS = {
     "edit_driver_log",
     "delete_driver_log",
     "depart_driver_log",
+    "record_part_scan",
     "pickup_driver_log",
     "no_pickup_driver_log",
     "view_driver_log",
@@ -145,6 +148,7 @@ DRIVER_ONLY_ENDPOINTS = {
     "damage_reports",
     "new_damage_report",
     "view_damage_report",
+    "damage_photo",
     "edit_damage_report",
     "delete_damage_report",
     "submit_damage_report",
@@ -2435,6 +2439,51 @@ def delete_driver_log(log_id):
     return redirect(url_for("driver.driver_logs"))
 
 
+@bp.route("/driver_logs/<int:log_id>/part-scans", methods=["POST"], strict_slashes=False)
+@login_required
+def record_part_scan(log_id):
+    log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
+    if current_user.role == "driver" and log.driver_id != current_user.id:
+        return jsonify({"error": "Not authorized to scan against this stop."}), 403
+    payload = request.get_json(silent=True) or request.form
+
+    def payload_float(name):
+        value = payload.get(name)
+        if value in (None, ""):
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    raw_value = payload.get("raw_value") or payload.get("value")
+    try:
+        event = save_part_scan(
+            log=log,
+            route=_driver_log_context_for(log),
+            raw_value=raw_value,
+            scan_context=payload.get("scan_context"),
+            barcode_format=payload.get("barcode_format"),
+            device_id=payload.get("device_id"),
+            gps_lat=payload_float("gps_lat"),
+            gps_lng=payload_float("gps_lng"),
+            created_offline=str(payload.get("created_offline") or "").lower() in {"1", "true", "yes"},
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    db.session.commit()
+    record_activity(
+        user_id=current_user.id,
+        category="part_scan",
+        action="created",
+        title="Cargo scan recorded",
+        details=f"{event.scan_context}: {event.normalized_value} at {_plant_label(log.plant_name)}",
+        target_type="part_scan_event",
+        target_id=event.id,
+    )
+    return jsonify({"scan": scan_event_payload(event)})
+
+
 @bp.route("/driver_logs/<int:log_id>/depart", methods=["GET", "POST"], strict_slashes=False)
 @login_required
 @_driver_route_guard("driver.driver_logs", "that departure page", "Driver Logs")
@@ -2449,21 +2498,59 @@ def depart_driver_log(log_id):
 
     form = DepartForm()
     route = _driver_log_context_for(log)
+
+    def render_depart_page():
+        part_scan_events = (
+            PartScanEvent.query
+            .filter_by(stop_id=log.id)
+            .order_by(PartScanEvent.timestamp.asc(), PartScanEvent.id.asc())
+            .all()
+        )
+        return render_template(
+            "depart_driver_log.html",
+            form=form,
+            log=log,
+            route=route,
+            part_scan_events=part_scan_events,
+        )
+
     if form.validate_on_submit():
         if form.got_loaded.data == "yes":
             if not form.destination.data:
                 flash("Please select where the primary load is going.", "danger")
-                return render_template("depart_driver_log.html", form=form, log=log, route=route)
+                return render_depart_page()
             departure_load = destination_load_value(form.destination.data)
         elif form.got_loaded.data == "no":
             departure_load = route.get("after_arrival_primary") or "Empty"
         else:
             flash("Please answer whether you got loaded.", "danger")
-            return render_template("depart_driver_log.html", form=form, log=log, route=route)
+            return render_depart_page()
 
         secondary_load = route.get("after_arrival_secondary") or None
         if form.secondary_destination.data:
             secondary_load = secondary_load_value(form.secondary_destination.data, form.secondary_load_type.data)
+
+        unresolved_scan = (
+            PartScanEvent.query
+            .filter_by(stop_id=log.id)
+            .filter(PartScanEvent.validation_status.in_(["unexpected", "missing", "missed_drop", "needs_review", "pending_part"]))
+            .first()
+        )
+        override_reason = (request.form.get("cargo_override_reason") or "").strip()
+        if unresolved_scan and not override_reason:
+            flash("Cargo scan validation needs review. Add a supervisor override reason before closing this stop.", "danger")
+            return render_depart_page()
+        if unresolved_scan and override_reason:
+            record_activity(
+                user_id=current_user.id,
+                category="part_scan",
+                action="override",
+                title="Cargo scan override recorded",
+                details=f"{unresolved_scan.normalized_value}: {override_reason}",
+                target_type="part_scan_event",
+                target_id=unresolved_scan.id,
+                commit=False,
+            )
 
         local_tz = pytz.timezone("America/Detroit")
         now_local = datetime.now(local_tz)
@@ -2471,7 +2558,7 @@ def depart_driver_log(log_id):
         timing_errors = _route_timing_errors(log.driver_id, log.date, log.plant_name, _arrival_hhmm_for_log(log), depart_time, exclude_log_id=log.id, check_previous=False)
         if timing_errors:
             flash(timing_errors[0], "danger")
-            return render_template("depart_driver_log.html", form=form, log=log, route=route)
+            return render_depart_page()
         log.depart_time = depart_time
         if form.dock_wait_minutes.data is not None:
             log.dock_wait_minutes = form.dock_wait_minutes.data
@@ -2493,7 +2580,8 @@ def depart_driver_log(log_id):
         flash(f"Departed {log.plant_name} with {cargo_display(log.depart_load_size, log.secondary_load)}.", "success")
         return redirect(url_for("driver.driver_logs"))
 
-    return render_template("depart_driver_log.html", form=form, log=log, route=route)
+    return render_depart_page()
+
 
 
 
@@ -2914,6 +3002,20 @@ def new_damage_report():
         return redirect(url_for("driver.view_damage_report", report_id=report.id))
     return render_template("damage_report_form.html", form=form, report=None, is_edit=False)
 
+
+
+
+@bp.route("/damage_reports/photos/<int:photo_id>")
+@login_required
+def damage_photo(photo_id):
+    photo = DamagePhoto.query.get_or_404(photo_id)
+    report = photo.damage_report
+    if current_user.role == "driver" and report.reported_by_id != current_user.id:
+        flash("Not authorized to access that damage photo.", "danger")
+        return redirect(url_for("driver.damage_reports"))
+    upload_root = current_app.config.get("DAMAGE_UPLOAD_FOLDER", "uploads/damage_photos")
+    upload_path = os.path.abspath(os.path.join(current_app.root_path, os.pardir, upload_root))
+    return send_from_directory(upload_path, photo.filename)
 
 @bp.route("/damage_reports/<int:report_id>")
 @login_required

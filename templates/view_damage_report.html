@@ -1,56 +1,123 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container-fluid py-4 responsive-workspace">
-  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <div>
-      <h1 class="h3 mb-1">Damage Report #{{ report.id }}</h1>
-      <p class="text-muted mb-0 small">Status: {{ report.status|title }}{% if route_finalized|default(false) %} - Route finalized{% endif %}</p>
+{% set photo_endpoint = 'manager.damage_photo' if manager_view|default(false) else 'driver.damage_photo' %}
+<style>
+  .damage-shell { max-width:1120px; margin:0 auto; }
+  .damage-head { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; flex-wrap:wrap; margin-bottom:16px; }
+  .damage-title h1 { margin:0; font-weight:900; }
+  .status-pill { display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; font-size:.75rem; font-weight:900; text-transform:uppercase; background:#fef3c7; color:#92400e; }
+  .status-pill.locked { background:#e2e8f0; color:#334155; }
+  .status-pill.open { background:#dcfce7; color:#166534; }
+  .action-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .more-actions summary { list-style:none; cursor:pointer; }
+  .more-actions summary::-webkit-details-marker { display:none; }
+  .damage-card { border:1px solid #e2e8f0; border-radius:10px; background:#fff; overflow:hidden; margin-bottom:16px; }
+  .damage-card h2 { margin:0; padding:12px 14px; background:#f8fafc; border-bottom:1px solid #e2e8f0; font-size:.9rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; color:#475569; }
+  .damage-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:0; }
+  .damage-field { padding:12px 14px; border-bottom:1px solid #f1f5f9; }
+  .damage-field span { display:block; color:#64748b; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+  .damage-field strong { display:block; margin-top:3px; color:#0f172a; font-weight:900; }
+  .damage-copy { padding:14px; margin:0; color:#0f172a; font-weight:700; }
+  .photo-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,360px)); gap:14px; padding:14px; }
+  .photo-card { border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; background:#fff; }
+  .photo-card a { display:block; }
+  .photo-card img { display:block; width:100%; max-height:360px; object-fit:contain; background:#f8fafc; }
+  .photo-meta { padding:9px 11px; display:flex; justify-content:space-between; gap:8px; color:#475569; font-size:.78rem; font-weight:800; }
+  .history-list { padding:14px; display:grid; gap:8px; }
+  .history-item { border-left:3px solid #cbd5e1; padding-left:10px; color:#334155; font-weight:700; }
+  @media (max-width:800px) { .damage-grid { grid-template-columns:1fr 1fr; } .photo-grid { grid-template-columns:1fr; } }
+  @media (max-width:520px) { .damage-grid { grid-template-columns:1fr; } }
+</style>
+
+<div class="container-fluid py-4 responsive-workspace damage-shell">
+  <div class="damage-head">
+    <div class="damage-title">
+      <h1 class="h3">Damage Report #{{ report.id }}</h1>
+      <p class="text-muted mb-0 small">
+        <span class="status-pill {% if route_finalized|default(false) or report.status != 'open' %}locked{% else %}open{% endif %}">
+          {% if route_finalized|default(false) %}Locked{% else %}{{ report.status|title }}{% endif %}
+        </span>
+        {% if route_finalized|default(false) %} Route finalized{% endif %}
+      </p>
     </div>
-    <div class="d-flex flex-wrap gap-2">
+    <div class="action-row">
       {% if manager_view|default(false) %}
         <a class="btn btn-outline-secondary" href="{{ url_for('manager.review_dashboard') }}">Review</a>
       {% else %}
         <a class="btn btn-outline-secondary" href="{{ url_for('driver.damage_reports') }}">History</a>
       {% endif %}
+      <button class="btn btn-outline-primary" type="button" onclick="window.print()">Print Evidence Packet</button>
       {% if can_modify|default(false) %}
         <a class="btn btn-primary" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Edit</a>
         <form method="POST" action="{{ url_for('driver.submit_damage_report', report_id=report.id) }}">
           <button class="btn btn-success" type="submit">Submit</button>
         </form>
-        <form method="POST" action="{{ url_for('driver.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Delete this damage report?');">
-          <button class="btn btn-outline-danger" type="submit">Delete</button>
-        </form>
+        <details class="more-actions">
+          <summary class="btn btn-outline-secondary">More Actions</summary>
+          <form class="mt-2" method="POST" action="{{ url_for('driver.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Delete this damage report?');">
+            <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
+          </form>
+        </details>
       {% endif %}
     </div>
   </div>
+
   {% if not can_modify|default(false) and not manager_view|default(false) %}
     <div class="alert alert-secondary small">This report is locked because it was submitted or the route was finalized.</div>
   {% endif %}
-  <div class="row g-3 mb-4">
-    <div class="col-sm-6 col-lg-3"><strong>Plant:</strong> {{ report.plant_name }}</div>
-    <div class="col-sm-6 col-lg-3"><strong>Truck:</strong> {{ report.truck_number or '' }}</div>
-    <div class="col-sm-6 col-lg-3"><strong>Trailer:</strong> {{ report.trailer_number or '' }}</div>
-    <div class="col-sm-6 col-lg-3"><strong>Stage:</strong> {{ report.stage }}</div>
-    <div class="col-sm-6 col-lg-3"><strong>Move:</strong> {{ report.move_reference or '' }}</div>
-    <div class="col-sm-6 col-lg-3"><strong>Reported:</strong> {{ report.created_at|to_detroit_datetime }}</div>
-    <div class="col-sm-6 col-lg-3"><strong>Driver:</strong> {{ report.reported_by.display_name }}</div>
-    <div class="col-sm-6 col-lg-3"><strong>Status:</strong> {{ report.status }}</div>
-  </div>
-  <h2 class="h5">Description</h2>
-  <p class="border rounded p-3 report-description">{{ report.description }}</p>
-  <h2 class="h5">Photos</h2>
-  <div class="row g-3">
-    {% for photo in report.photos %}
-      <div class="col-md-6 col-xl-4">
-        <div class="border rounded p-3 h-100">
-          <strong>{{ photo.stage|title }}</strong><br>
-          <span class="text-muted small">{{ photo.original_filename }}</span>
-          <img class="img-fluid rounded border mt-2" src="{{ url_for('manager.damage_photo', photo_id=photo.id) }}" alt="Damage photo {{ photo.id }}">
-        </div>
-      </div>
-    {% else %}
-      <div class="col-12 text-muted">No photo attached.</div>
-    {% endfor %}
-  </div>
+
+  <section class="damage-card">
+    <h2>Damage Summary</h2>
+    <div class="damage-grid">
+      <div class="damage-field"><span>Plant</span><strong>{{ report.plant_name }}</strong></div>
+      <div class="damage-field"><span>Stage</span><strong>{{ report.stage|title }}</strong></div>
+      <div class="damage-field"><span>Reported</span><strong>{{ report.damage_time|to_detroit_datetime if report.damage_time else report.created_at|to_detroit_datetime }}</strong></div>
+      <div class="damage-field"><span>Driver</span><strong>{{ report.reported_by.display_name }}</strong></div>
+      <div class="damage-field"><span>Truck</span><strong>{{ report.truck_number or 'Not set' }}</strong></div>
+      <div class="damage-field"><span>Trailer</span><strong>{{ report.trailer_number or 'Not set' }}</strong></div>
+      <div class="damage-field"><span>Move</span><strong>{{ report.move_reference or 'Not linked' }}</strong></div>
+      <div class="damage-field"><span>Status</span><strong>{{ 'Locked' if route_finalized|default(false) else report.status|title }}</strong></div>
+    </div>
+  </section>
+
+  <section class="damage-card">
+    <h2>Description</h2>
+    <p class="damage-copy report-description">{{ report.description }}</p>
+  </section>
+
+  <section class="damage-card">
+    <h2>Photo Evidence</h2>
+    <div class="photo-grid">
+      {% for photo in report.photos %}
+        <article class="photo-card">
+          <a href="{{ url_for(photo_endpoint, photo_id=photo.id) }}" target="_blank" rel="noopener">
+            <img src="{{ url_for(photo_endpoint, photo_id=photo.id) }}" alt="Damage proof photo {{ loop.index }} for report {{ report.id }}">
+          </a>
+          <div class="photo-meta"><span>Photo #{{ loop.index }}</span><span>{{ photo.stage|title }}</span></div>
+        </article>
+      {% else %}
+        <div class="text-muted">No photo attached.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="damage-card">
+    <h2>Manager Review</h2>
+    <div class="damage-grid">
+      <div class="damage-field"><span>Assigned To</span><strong>Unassigned</strong></div>
+      <div class="damage-field"><span>Follow-up Status</span><strong>{{ 'Open follow-up' if report.status != 'closed' else 'Closed' }}</strong></div>
+      <div class="damage-field"><span>Resolution Notes</span><strong>{{ 'Needs review' if report.status != 'closed' else 'Closed' }}</strong></div>
+      <div class="damage-field"><span>Lock State</span><strong>{{ 'Locked' if route_finalized|default(false) or report.status != 'open' else 'Editable by driver' }}</strong></div>
+    </div>
+  </section>
+
+  <section class="damage-card">
+    <h2>History</h2>
+    <div class="history-list">
+      <div class="history-item">Created {{ report.created_at|to_detroit_datetime if report.created_at else '' }}</div>
+      {% if report.status != 'open' %}<div class="history-item">Submitted and locked for driver edits.</div>{% endif %}
+      {% if route_finalized|default(false) %}<div class="history-item">Route finalized; evidence locked.</div>{% endif %}
+    </div>
+  </section>
 </div>
 {% endblock %}

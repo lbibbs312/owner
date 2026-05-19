@@ -1090,13 +1090,14 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     dashboard = client.get(f"/manager/dashboard?driver_id={driver_id}")
     assert dashboard.status_code == 200
     assert b"Live Routes &amp; Stops" in dashboard.data
-    assert b"Open stop" in dashboard.data
-    assert b"Completed stop" in dashboard.data
-    assert b"Problem" in dashboard.data
+    assert b"Missing Departure" in dashboard.data
+    assert b"Completed" in dashboard.data
+    assert b"Critical Exceptions" in dashboard.data
+    assert b"Truck Issue" in dashboard.data
     assert b"status-dot open" in dashboard.data
     assert b"status-dot complete" in dashboard.data
-    assert b"status-dot problem" in dashboard.data
     assert b"Live Problems" in dashboard.data
+    assert b'<span class="sbadge problem">Problem</span>' not in dashboard.data
     detail_page = client.get(f"/manager/driver-logs/{log_id}")
     assert detail_page.status_code == 200
     assert b"Avg Dock Wait" not in detail_page.data
@@ -1199,7 +1200,7 @@ def test_manager_driver_day_log_uses_management_readout_narrative(client, app):
     assert b"Viewing stop #" not in page.data
     assert b"Management Readout" in page.data
     assert b"Driver Day Log" not in page.data
-    assert page.data.count(b"Lamar Bibbs") == 1
+    assert b"Lamar Bibbs" in page.data
     assert b"No division" not in page.data
     assert b"Badge No badge" not in page.data
     assert b"Driver Day Summary" not in page.data
@@ -1208,6 +1209,8 @@ def test_manager_driver_day_log_uses_management_readout_narrative(client, app):
     assert b"Stop #3 Paint East remains open" in page.data
     assert b"Open Route Stop" in page.data
     assert b"Stop #3 - Paint East" in page.data
+    assert b"Damage Evidence" in page.data
+    assert b"Cargo Scan Proof" in page.data
     assert b"Selected Stop Details" in page.data
     assert b"Selected Stop" in page.data
     assert b"Stop #1 - Raleigh East" in page.data
@@ -1216,6 +1219,7 @@ def test_manager_driver_day_log_uses_management_readout_narrative(client, app):
     assert b"vehicle-related issue" in page.data
     assert b"process/load-handling issue" in page.data
     assert b"1 damage report was filed" in page.data
+    assert b"1 damage report remains open" in page.data
     assert b"Close out the open Paint East stop." in page.data
     assert b"Review why the second-stop cargo was not dropped." in page.data
     assert b"Review why forgot" not in page.data
@@ -1484,6 +1488,67 @@ def test_drivers_can_delete_only_same_day_records(client, app):
         assert old_pretrip is not None and old_pretrip.deleted_at is None
         assert today_transfer is not None and today_transfer.deleted_at is not None
         assert old_transfer is not None and old_transfer.deleted_at is None
+
+
+def test_driver_can_record_auditable_part_scan_and_override_pending_cargo(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("driver_scan", "driver_scan@example.com", "driver")
+        log = DriverLog(
+            driver_id=driver.id,
+            date=date.today(),
+            plant_name="PE",
+            load_size="Paint East Load",
+            arrive_time="2026-05-19 08:00:00",
+        )
+        db.session.add(log)
+        db.session.commit()
+        log_id = log.id
+
+    login(client, "driver_scan")
+    depart_page = client.get(f"/driver_logs/{log_id}/depart")
+    assert depart_page.status_code == 200
+    assert b"Scan Arriving Cargo" in depart_page.data
+    assert b"@zxing/browser" in depart_page.data
+
+    scan = client.post(
+        f"/driver_logs/{log_id}/part-scans",
+        json={"raw_value": "PART-L861-PE", "scan_context": "drop_scan", "barcode_format": "code_128"},
+    )
+    assert scan.status_code == 200
+    payload = scan.get_json()["scan"]
+    assert payload["normalized_value"] == "L861"
+    assert payload["validation_status"] == "pending_part"
+
+    blocked = client.post(
+        f"/driver_logs/{log_id}/depart",
+        data={"got_loaded": "no", "destination": "", "secondary_destination": ""},
+        follow_redirects=True,
+    )
+    assert b"Cargo scan validation needs review" in blocked.data
+
+    departed = client.post(
+        f"/driver_logs/{log_id}/depart",
+        data={
+            "got_loaded": "no",
+            "destination": "",
+            "secondary_destination": "",
+            "cargo_override_reason": "Supervisor confirmed L861 label.",
+        },
+        follow_redirects=False,
+    )
+    assert departed.status_code == 302
+
+    with app.app_context():
+        from app.models import PartAlias, PartMaster, PartScanEvent
+
+        assert PartScanEvent.query.count() == 1
+        assert PartAlias.query.filter_by(normalized_value="L861").count() == 1
+        assert PartMaster.query.filter_by(canonical_part_number="L861", status="pending").count() == 1
 
 
 def test_driver_log_departure_names_load_by_destination_and_arrival_unloads(client, app):

@@ -17,6 +17,7 @@ from app.models.damage import DamagePhoto, DamageReport
 from app.models.followup import OperationalFollowUp
 from app.models.plant_transfer import PlantTransfer, PlantTransferLine
 from app.models.search import SearchCorpus
+from app.models.part import PartAlias, PartLocationHistory, PartMaster, PartScanEvent, MovePart
 
 __all__ = [
     "User",
@@ -37,4 +38,9 @@ __all__ = [
     "PlantTransfer",
     "PlantTransferLine",
     "SearchCorpus",
+    "PartMaster",
+    "PartAlias",
+    "PartScanEvent",
+    "MovePart",
+    "PartLocationHistory",
 ]

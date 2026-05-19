@@ -180,6 +180,17 @@
   .problem-line { display:flex; align-items:center; gap:8px; margin-top:6px; max-width:280px; color:#7f1d1d; font-size:.72rem; line-height:1.25; font-weight:800; }
   .problem-thumb { width:42px; height:32px; object-fit:cover; border-radius:6px; border:1px solid #fecaca; background:#fff; flex:0 0 42px; }
   .problem-label { color:#be123c; text-transform:uppercase; letter-spacing:.04em; font-size:.62rem; display:block; }
+  .critical-list { display:grid; gap:8px; padding:12px 16px; }
+  .critical-row { display:grid; grid-template-columns:minmax(120px,.8fr) minmax(150px,1fr) minmax(0,2fr) auto; gap:10px; align-items:center; border:1px solid #fee2e2; background:#fff7f7; border-radius:10px; padding:9px 10px; color:#7f1d1d; text-decoration:none; }
+  .critical-row:hover { background:#fff1f2; color:#7f1d1d; }
+  .critical-type { font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; color:#be123c; }
+  .critical-stop { font-size:.82rem; font-weight:900; color:#0f172a; }
+  .critical-issue { font-size:.78rem; font-weight:800; color:#7f1d1d; }
+  .exception-chip-list { display:flex; flex-wrap:wrap; gap:5px; max-width:260px; }
+  .exception-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 7px; border-radius:999px; font-size:.64rem; font-weight:900; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; white-space:nowrap; }
+  .exception-chip.damage { background:#fff1f2; color:#be123c; border-color:#fecdd3; }
+  .exception-chip.missing { background:#fef3c7; color:#92400e; border-color:#fde68a; }
+  .exception-chip.truck { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
   @keyframes pulse-red { 70% { box-shadow:0 0 0 8px rgba(220,38,38,0); } 100% { box-shadow:0 0 0 0 rgba(220,38,38,0); } }
   @keyframes pulse-yellow { 70% { box-shadow:0 0 0 8px rgba(245,158,11,0); } 100% { box-shadow:0 0 0 0 rgba(245,158,11,0); } }
   .driver-filter-row { display:flex; flex-wrap:wrap; gap:7px; padding:12px 20px; border-bottom:1px solid #e2e8f0; background:#fff; }
@@ -281,6 +292,7 @@
   /* Responsive */
   @media (max-width:960px) {
     .mc-side { display:none; }
+    .critical-row { grid-template-columns:1fr; }
     .kpi-row  { grid-template-columns:1fr; }
     .mc-header { padding:13px 16px; flex-wrap:wrap; }
     .mc-body   { padding:14px 16px; }
@@ -642,10 +654,34 @@
           <p class="kpi-lbl">Live Problems</p>
           <div class="kpi-val">
             <span class="kpi-num">{{ live_problem_count }}</span>
-            <span class="kpi-tag"><span class="status-dot problem" aria-hidden="true"></span>Damage / truck</span>
+            <span class="kpi-tag"><span class="status-dot problem" aria-hidden="true"></span>Needs review</span>
           </div>
         </a>
         {% endif %}
+      </div>
+
+      <div class="panel {% if focus_panel == 'routes' %}focus-panel{% endif %}" id="criticalExceptionsPanel">
+        <div class="panel-top">
+          <h3>
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+            Critical Exceptions
+          </h3>
+          <span class="text-sm text-muted">Problems first, route rows below</span>
+        </div>
+        <div class="critical-list">
+          {% for item in critical_exceptions %}
+            <a class="critical-row" href="{{ item.url }}">
+              <span class="critical-type">{{ item.type }}</span>
+              <span class="critical-stop">{{ item.route_stop }}</span>
+              <span class="critical-issue">{{ item.issue }}</span>
+              {% if item.photo_url %}<img class="problem-thumb" src="{{ item.photo_url }}" alt="Damage proof">{% endif %}
+            </a>
+          {% else %}
+            <div class="empty-row"><span>No critical exceptions for this filter.</span></div>
+          {% endfor %}
+        </div>
       </div>
 
       {# Live route/stop panel #}
@@ -676,7 +712,8 @@
                 <th>Arrive</th>
                 <th>Depart</th>
                 {% if reported_delay_count %}<th>Delay</th>{% endif %}
-                <th>Status</th>
+                <th>Exceptions</th>
+                <th>Stop Status</th>
                 <th style="text-align:right;">Action</th>
               </tr>
             </thead>
@@ -698,18 +735,23 @@
                   <td class="align-middle whitespace-nowrap">{{ log.depart_time|to_12h_format if log.depart_time else '—' }}</td>
                   {% if reported_delay_count %}<td class="align-middle whitespace-nowrap">{{ row.dock_wait }}</td>{% endif %}
                   <td class="align-middle">
-                    <span class="status-signal"><span class="status-dot {{ row.status_key }}" aria-hidden="true"></span><span class="sbadge {{ row.status_key }}">{{ row.status }}</span></span>
-                    {% if row.problem %}
-                      <div class="problem-line">
-                        {% if row.problem.photo_url %}<img class="problem-thumb" src="{{ row.problem.photo_url }}" alt="Damage photo">{% endif %}
-                        <span><span class="problem-label">{{ row.problem.label }}</span>{{ row.problem.detail }}</span>
+                    {% if row.exceptions %}
+                      <div class="exception-chip-list">
+                        {% for item in row.exceptions %}
+                          <span class="exception-chip {% if 'Damage' in item.label %}damage{% elif 'Missing' in item.label %}missing{% elif 'Truck' in item.label %}truck{% endif %}" title="{{ item.detail }}">{{ item.label }}</span>
+                        {% endfor %}
                       </div>
+                    {% else %}
+                      <span class="text-muted text-sm">None</span>
                     {% endif %}
+                  </td>
+                  <td class="align-middle">
+                    <span class="status-signal"><span class="status-dot {{ row.status_key }}" aria-hidden="true"></span><span class="sbadge {{ row.status_key }}">{{ row.status }}</span></span>
                   </td>
                   <td class="align-middle" style="text-align:right;"><a class="btn-manage" href="{{ row.url }}">Open</a></td>
                 </tr>
               {% else %}
-                <tr class="empty-row"><td colspan="{{ 9 if reported_delay_count else 8 }}">No driver stops logged for this filter today.</td></tr>
+                <tr class="empty-row"><td colspan="{{ 10 if reported_delay_count else 9 }}">No driver stops logged for this filter today.</td></tr>
               {% endfor %}
             </tbody>
           </table>

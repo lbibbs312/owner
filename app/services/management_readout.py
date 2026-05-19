@@ -118,8 +118,10 @@ def _damage_summary(damage_reports):
         1 for report in damage_reports if (getattr(report, "status", "") or "").lower() != "closed"
     )
     summary = f"{_count_label(count, 'damage report')} {_was_were(count)} filed."
-    if open_count:
-        summary += f" {_count_label(open_count, 'report')} remains open and needs follow-up."
+    if open_count == 1:
+        summary += " 1 damage report remains open and needs follow-up."
+    elif open_count > 1:
+        summary += f" {open_count} damage reports remain open and need follow-up."
     return summary
 
 
@@ -173,6 +175,7 @@ def build_management_narrative(day_log):
     delay_logs = day_log.get("delay_logs") or []
     damage_reports = day_log.get("damage_reports") or []
     truck_context = day_log.get("truck_context") or {}
+    part_scan_events = day_log.get("part_scan_events") or []
 
     truck_id = truck_context.get("truck_id") or "Truck not set"
     stop_count = len(day_logs)
@@ -200,7 +203,20 @@ def build_management_narrative(day_log):
     delay_summary = _delay_summary(delay_logs)
     damage_summary = _damage_summary(damage_reports)
     flag_summary = _flag_summary(day_logs)
-    exception_summary = " ".join((delay_summary, damage_summary, flag_summary))
+    scan_issue_count = len([
+        event for event in part_scan_events
+        if getattr(event, "validation_status", "") in {"unexpected", "missing", "missed_drop", "needs_review", "pending_part"}
+    ])
+    scan_summary = (
+        f"{_count_label(scan_issue_count, 'cargo scan exception')} needs review."
+        if scan_issue_count
+        else (
+            "No cargo scan exceptions were recorded."
+            if part_scan_events
+            else "No cargo scan proof was recorded for this route."
+        )
+    )
+    exception_summary = " ".join((delay_summary, damage_summary, flag_summary, scan_summary))
 
     action_items = []
     if open_log:
@@ -230,6 +246,7 @@ def build_management_narrative(day_log):
             {"label": "Delay events", "text": delay_summary},
             {"label": "Damage reports", "text": damage_summary},
             {"label": "Maintenance flags", "text": flag_summary},
+            {"label": "Cargo validation", "text": scan_summary},
         ],
         "action_items": action_items,
         "evidence_references": _evidence_references(day_logs, routes, delay_logs, damage_reports, open_log),

@@ -9,7 +9,7 @@
     .move-chip { display:inline-flex; align-items:center; border-radius:999px; padding:3px 9px; margin-right:6px; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em; background:#dbeafe; color:#1d4ed8; }
     .move-chip.hot { background:#fee2e2; color:#991b1b; }
     .move-chip.done { background:#dcfce7; color:#166534; }
-    .stop-help { border-left:3px solid #93c5fd; padding-left:10px; }
+    .stop-help { display:block; width:100%; border-left:3px solid #93c5fd; padding-left:10px; writing-mode:horizontal-tb; white-space:normal; word-break:normal; overflow-wrap:normal; }
     .print-title { display:none; }
     .management-readout { margin:18px 0; border:1px solid #cbd5e1; border-radius:8px; background:#fff; overflow:hidden; }
     .readout-header { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding:16px 18px 12px; border-bottom:1px solid #e2e8f0; background:#f8fafc; }
@@ -54,6 +54,7 @@
     .damage-photo-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,180px)); gap:10px; margin-top:10px; }
     .damage-photo-link { display:block; border:1px solid #fecdd3; border-radius:8px; overflow:hidden; background:#fff; }
     .damage-photo-thumb { display:block; width:100%; height:120px; object-fit:cover; }
+    .evidence-caption { padding:6px 8px; color:#475569; font-size:.72rem; font-weight:900; }
     .route-log-table { width:100%; border-collapse:collapse; font-size:.83rem; margin-top:0; }
     .route-log-table th { padding:7px 10px; text-align:left; font-size:.65rem; font-weight:900; text-transform:uppercase; letter-spacing:.07em; color:#64748b; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
     .route-log-table td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
@@ -99,7 +100,7 @@
   {% if current_user.role == 'management' %}
     <div class="print-title">
       <h1>LACKSDRIVERS — ROUTE AUDIT</h1>
-      <p>{{ log.date }} &nbsp;|&nbsp; {{ stop_count }} stop{{ 's' if stop_count != 1 else '' }}</p>
+      <p>{{ log.date }} &nbsp;|&nbsp; Driver: {{ log.driver.display_name }} &nbsp;|&nbsp; Truck: {{ truck_context.truck_id if truck_context else 'Truck not set' }} &nbsp;|&nbsp; Route Status: {{ management_narrative.route_status }}</p>
     </div>
   {% endif %}
 
@@ -153,13 +154,13 @@
           </div>
           <div class="support-item">
             <span>Closeout Status</span>
-            <strong>{% if management_narrative.open_stop %}<span class="status-chip open">Open stop</span>{% else %}<span class="status-chip done">Route completed</span>{% endif %}</strong>
-            <small>{% if management_narrative.open_stop %}Driver still needs departure/load-out.{% else %}No open route closeout is visible.{% endif %}</small>
+            <strong>{% if management_narrative.open_stop %}<span class="status-chip open">Missing Departure</span>{% else %}<span class="status-chip done">Route completed</span>{% endif %}</strong>
+            <small>{% if management_narrative.open_stop %}Close this route-level stop before finalizing the route.{% else %}No route closeout action is pending.{% endif %}</small>
           </div>
           <div class="support-item">
             <span>Required Action</span>
             <strong>{% if management_narrative.open_stop %}Record departure/load-out{% else %}No route closeout action{% endif %}</strong>
-            <small>{% if management_narrative.open_stop %}Do not confuse this with the selected stop details below.{% else %}Supporting evidence remains below.{% endif %}</small>
+            <small>{% if management_narrative.open_stop %}Selected stop details are listed separately below.{% else %}Supporting evidence remains below.{% endif %}</small>
           </div>
         </div>
       </div>
@@ -228,8 +229,9 @@
         {% if delay_logs %}
           {% for dl in delay_logs %}
           {% set delay_route = (log_routes or {}).get(dl.id) %}
+          {% set missed_second_stop = dl.downtime_reason and 'second-stop cargo' in dl.downtime_reason|lower %}
           <div class="delay-item">
-            <div class="plant">Stop #{{ day_log_positions.get(dl.id, loop.index) }} - {{ delay_route.plant if delay_route else dl.plant_name }}</div>
+            <div class="plant">{% if missed_second_stop and management_narrative.open_stop %}Stop #{{ management_narrative.open_stop_position }} - {{ management_narrative.open_stop }}{% else %}Stop #{{ day_log_positions.get(dl.id, loop.index) }} - {{ delay_route.plant if delay_route else dl.plant_name }}{% endif %}</div>
             <div class="detail">
               {% if dl.dock_wait_minutes %}Dock wait: {{ dl.dock_wait_minutes }} min{% endif %}
               {% if dl.dock_wait_minutes and dl.downtime_reason %} &middot; {% endif %}
@@ -248,19 +250,47 @@
             <div class="plant">{{ dr.plant_name }} - {{ dr.stage|title }} move <span style="font-weight:700;font-size:.75rem;">[{{ dr.status|upper }}]</span></div>
             <div class="detail">{{ dr.description }}</div>
             <div class="dmeta">Reported {{ dr.damage_time.strftime('%Y-%m-%d %H:%M') if dr.damage_time else '--' }}{% if dr.truck_number %} &middot; Truck {{ dr.truck_number }}{% endif %}{% if dr.trailer_number %} &middot; Trailer {{ dr.trailer_number }}{% endif %}</div>
-            {% if dr.photos %}
-              <div class="damage-photo-grid">
-                {% for photo in dr.photos %}
-                  <a class="damage-photo-link" href="{{ url_for('manager.damage_photo', photo_id=photo.id) }}" target="_blank" rel="noopener">
-                    <img class="damage-photo-thumb" src="{{ url_for('manager.damage_photo', photo_id=photo.id) }}" alt="Damage photo for {{ dr.plant_name }} report {{ dr.id }}">
-                  </a>
-                {% endfor %}
-              </div>
-            {% endif %}
           </div>
           {% endfor %}
         {% else %}
           <p class="empty-proof">No damage reports were filed for this route.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="report-section">
+      <div class="report-section-head red">Damage Evidence</div>
+      <div class="report-section-body">
+        {% set photo_count = namespace(value=0) %}
+        {% for dr in damage_reports %}
+          {% if dr.photos %}
+            <div class="damage-photo-grid">
+              {% for photo in dr.photos %}
+                {% set photo_count.value = photo_count.value + 1 %}
+                <a class="damage-photo-link" href="{{ url_for('manager.damage_photo', photo_id=photo.id) }}" target="_blank" rel="noopener">
+                  <img class="damage-photo-thumb" src="{{ url_for('manager.damage_photo', photo_id=photo.id) }}" alt="Damage proof photo for report {{ dr.id }}">
+                  <div class="evidence-caption">Report #{{ dr.id }} - {{ dr.plant_name or 'Other' }}</div>
+                </a>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endfor %}
+        {% if photo_count.value == 0 %}<p class="empty-proof">No damage photo evidence is attached to these reports.</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="report-section">
+      <div class="report-section-head">Cargo Scan Proof</div>
+      <div class="report-section-body">
+        {% if part_scan_events %}
+          {% for event in part_scan_events %}
+            <div class="delay-item">
+              <div class="plant">{{ event.scan_context|replace('_', ' ')|title }} - {{ event.normalized_value }}</div>
+              <div class="detail">{{ event.validation_status|replace('_', ' ')|title }}{% if event.validation_message %}: {{ event.validation_message }}{% endif %}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="empty-proof">No cargo scan proof was recorded for this route.</p>
         {% endif %}
       </div>
     </div>
@@ -288,7 +318,7 @@
           <p class="detail-pair"><span>Parts</span><strong>{% if log.no_pickup %}No Pickup{% elif log.hot_parts %}Hot {{ log.part_number or '' }}{% else %}{{ log.part_number or 'N/A' }}{% endif %}</strong></p>
           <p class="detail-pair"><span>Move Context</span><strong>{% if related_task %}{% if related_task.is_hot %}Hot Part - {% endif %}{{ related_task.part_number or related_task.title }} | {{ related_task.status.replace('-', ' ')|title }}{% else %}No linked move{% endif %}</strong></p>
         </div>
-        <p class="text-muted small stop-help"><strong>How to read it:</strong> This section describes the selected stop only. The route-level open stop is shown above so Stop #1 and Stop #{{ management_narrative.open_stop_position or stop_position }} are not mixed together.</p>
+        <p class="text-muted small stop-help"><strong>Audit note:</strong> Selected stop details are separate from the route-level open stop.</p>
       </div>
     </div>
   {% else %}

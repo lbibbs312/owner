@@ -24,10 +24,10 @@ from app.services.database_status import database_status
 from app.extensions import db, socketio
 from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
-from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DriverLog, OperationalFollowUp, PlantTransfer, PreTrip, Task, User
+from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DriverLog, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, Task, User
 from app.services.activity import record_activity
 from app.services.operations import build_exception_items
-from app.services.load_state import build_driver_log_route_context, truck_issue_reason
+from app.services.load_state import build_driver_log_route_context, route_problem_reason, secondary_not_dropped_reason, truck_issue_reason
 from app.services.management_readout import build_management_narrative
 from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
 from app.services.role_session import restore_role_user
@@ -409,35 +409,139 @@ def _driver_log_route_context(logs):
     return build_driver_log_route_context(logs)
 
 
-def _live_problem_for_log(log):
-    damage_report = DamageReport.query.filter(
-        DamageReport.status != "closed",
-        db.or_(
-            DamageReport.driver_log_id == log.id,
-            db.and_(
-                DamageReport.reported_by_id == log.driver_id,
-                DamageReport.driver_log_id.is_(None),
-                db.func.date(DamageReport.created_at) == log.date,
+def _damage_matches_log(report, log, route):
+    if report.driver_log_id == log.id:
+        return True
+    if report.driver_log_id is not None:
+        return False
+    report_plant = (report.plant_name or "").strip().lower()
+    if not report_plant or report_plant == "other":
+        return False
+    route_plant = (route or {}).get("plant") or ""
+    candidates = {
+        (log.plant_name or "").strip().lower(),
+        route_plant.strip().lower(),
+        _plant_label(log.plant_name).strip().lower(),
+    }
+    return report_plant in candidates
+
+
+def _damage_report_summary(report):
+    photo = report.photos[0] if report.photos else None
+    plant = report.plant_name or "Other"
+    return {
+        "type": "Damage Open" if (report.status or "").lower() != "closed" else "Damage Submitted",
+        "label": "Damage Open" if (report.status or "").lower() != "closed" else "Damage Submitted",
+        "detail": f"{plant} - {report.stage or 'move'} move - {report.description or 'Damage report'}",
+        "photo_url": url_for("manager.damage_photo", photo_id=photo.id) if photo else None,
+        "url": url_for("manager.view_damage_report", report_id=report.id),
+    }
+
+
+def _live_exceptions_for_log(log, route=None):
+    route = route or {}
+    exceptions = []
+    damage_reports = (
+        DamageReport.query
+        .filter(
+            DamageReport.status != "closed",
+            db.or_(
+                DamageReport.driver_log_id == log.id,
+                db.and_(
+                    DamageReport.reported_by_id == log.driver_id,
+                    DamageReport.driver_log_id.is_(None),
+                    db.func.date(DamageReport.created_at) == log.date,
+                ),
             ),
         )
-    ).order_by(DamageReport.created_at.desc()).first()
-    if damage_report:
-        photo = damage_report.photos[0] if damage_report.photos else None
-        return {
-            "label": "Damage report",
-            "detail": damage_report.description or "Open damage report",
-            "photo_url": url_for("manager.damage_photo", photo_id=photo.id) if photo else None,
-        }
+        .order_by(DamageReport.created_at.desc())
+        .all()
+    )
+    for report in damage_reports:
+        if _damage_matches_log(report, log, route):
+            exceptions.append(_damage_report_summary(report))
 
     truck_issue = truck_issue_reason(log)
     if log.maintenance or truck_issue:
-        return {
-            "label": "Truck issue",
+        exceptions.append({
+            "type": "Truck Issue",
+            "label": "Truck Issue",
             "detail": truck_issue or "Maintenance issue checked by driver",
             "photo_url": None,
-        }
-    return None
+            "url": url_for("manager.view_driver_log", log_id=log.id),
+        })
 
+    cargo_issue = secondary_not_dropped_reason(log) or route_problem_reason(log)
+    if cargo_issue:
+        exceptions.append({
+            "type": "Cargo Mismatch",
+            "label": "Cargo Mismatch",
+            "detail": cargo_issue,
+            "photo_url": None,
+            "url": url_for("manager.view_driver_log", log_id=log.id),
+        })
+
+    if not log.depart_time:
+        exceptions.append({
+            "type": "Missing Departure",
+            "label": "Missing Departure",
+            "detail": f"Stop #{route.get('stop_number') or ''} {route.get('plant') or _plant_label(log.plant_name)} needs departure/load-out.",
+            "photo_url": None,
+            "url": url_for("manager.view_driver_log", log_id=log.id),
+        })
+
+    return exceptions
+
+
+def _critical_exception_rows(live_stop_rows, todays_logs):
+    rows = []
+    seen = set()
+    for row in live_stop_rows:
+        for item in row["exceptions"]:
+            key = (row["log"].id, item["label"], item["detail"])
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append({
+                "type": item["label"],
+                "route_stop": f"Stop #{row['stop_number']} {row['route'].get('plant') or _plant_label(row['log'].plant_name)}",
+                "driver": row["driver"].display_name,
+                "issue": item["detail"],
+                "url": item["url"],
+                "photo_url": item.get("photo_url"),
+            })
+
+    route_level_reports = (
+        DamageReport.query
+        .filter(
+            DamageReport.status != "closed",
+            DamageReport.driver_log_id.is_(None),
+            db.func.date(DamageReport.created_at) == date.today(),
+        )
+        .order_by(DamageReport.created_at.desc())
+        .all()
+    )
+    log_driver_ids = {log.driver_id for log in todays_logs}
+    for report in route_level_reports:
+        if report.reported_by_id not in log_driver_ids:
+            continue
+        report_plant = (report.plant_name or "").strip().lower()
+        if report_plant and report_plant != "other":
+            continue
+        key = ("damage", report.id)
+        if key in seen:
+            continue
+        seen.add(key)
+        summary = _damage_report_summary(report)
+        rows.append({
+            "type": summary["label"],
+            "route_stop": report.plant_name or "Route-level",
+            "driver": report.reported_by.display_name if report.reported_by else "Driver",
+            "issue": summary["detail"],
+            "url": summary["url"],
+            "photo_url": summary.get("photo_url"),
+        })
+    return rows[:8]
 
 def _exception_key(item):
     return ":".join(
@@ -477,9 +581,10 @@ def _live_stop_rows(logs):
         key = (log.driver_id, log.date)
         counts[key] = counts.get(key, 0) + 1
         route = routes.get(log.id, {})
-        live_problem = _live_problem_for_log(log)
-        status_key = "problem" if live_problem else "open" if not log.depart_time else "complete"
-        status = "Problem" if live_problem else "Open stop" if not log.depart_time else "Completed stop"
+        route["stop_number"] = counts[key]
+        exceptions = _live_exceptions_for_log(log, route)
+        status_key = "open" if not log.depart_time else "complete"
+        status = "Missing Departure" if not log.depart_time else "Completed"
         rows.append({
             "log": log,
             "route": route,
@@ -489,7 +594,7 @@ def _live_stop_rows(logs):
             "status_key": status_key,
             "cargo": route.get("depart_cargo_desc") or route.get("arrive_cargo_desc") or log.depart_load_size or log.load_size or "--",
             "dock_wait": f"{log.dock_wait_minutes} min" if (log.dock_wait_minutes or 0) > 0 else "--",
-            "problem": live_problem,
+            "exceptions": exceptions,
             "url": url_for("manager.view_driver_log", log_id=log.id),
         })
     return list(reversed(rows))
@@ -760,7 +865,8 @@ def manager_dashboard():
         dispatch_rows = [row for row in dispatch_rows if row["division"] == division_filter]
 
     reported_delay_count = len([log for log in todays_logs if (log.dock_wait_minutes or 0) > 0])
-    live_problem_count = len([row for row in live_stop_rows if row["status_key"] == "problem"])
+    critical_exceptions = _critical_exception_rows(live_stop_rows, live_logs)
+    live_problem_count = len(critical_exceptions)
 
     active_driver_ids = {log.driver_id for log in todays_logs}
     active_drivers = [driver for driver in drivers if driver.id in active_driver_ids]
@@ -778,6 +884,7 @@ def manager_dashboard():
         active_driver_count=len(active_drivers),
         reported_delay_count=reported_delay_count,
         live_problem_count=live_problem_count,
+        critical_exceptions=critical_exceptions,
         has_drivers=bool(drivers),
         today=today,
         database_status=database_status(current_app.config.get("SQLALCHEMY_DATABASE_URI", "")),
@@ -936,6 +1043,14 @@ def view_driver_log(log_id):
 
     all_routes = _driver_log_route_context(day_logs)
     truck_context = _truck_context_for_driver(log.driver_id, log.date)
+    part_scan_events = []
+    if day_logs:
+        part_scan_events = (
+            PartScanEvent.query
+            .filter(PartScanEvent.stop_id.in_([day_log.id for day_log in day_logs]))
+            .order_by(PartScanEvent.timestamp.asc(), PartScanEvent.id.asc())
+            .all()
+        )
     management_narrative = build_management_narrative(
         {
             "log": log,
@@ -945,6 +1060,7 @@ def view_driver_log(log_id):
             "damage_reports": damage_reports,
             "truck_context": truck_context,
             "related_task": related_task,
+            "part_scan_events": part_scan_events,
         }
     )
     return render_template(
@@ -963,6 +1079,7 @@ def view_driver_log(log_id):
         day_logs=day_logs,
         day_log_positions=day_log_positions,
         management_narrative=management_narrative,
+        part_scan_events=part_scan_events,
     )
 
 

@@ -1,110 +1,174 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container-fluid py-4">
-  <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
-    <div>
-      <h1 class="h3 mb-1">Manager Review</h1>
-      <p class="text-muted mb-0">{{ exceptions|length }} exception{{ 's' if exceptions|length != 1 else '' }} active this week</p>
-    </div>
-    <div class="d-flex gap-2 flex-wrap">
+<style>
+  body.mgr-active .navbar, body.mgr-active #fullscreenOverlay { display:none !important; }
+  body.mgr-active .container.mt-4.fade-in { max-width:none; margin:0 !important; padding:0 !important; animation:none; opacity:1; }
+  .review-shell { min-height:100vh; display:flex; background:#f8fafc; color:#0f172a; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; }
+  .review-side { width:256px; flex:0 0 256px; min-height:100vh; background:#0f172a; color:#cbd5e1; display:flex; flex-direction:column; }
+  .review-brand { padding:22px 20px; border-bottom:1px solid rgba(148,163,184,.12); }
+  .review-brand h1 { margin:0; color:#fff; font-size:1.12rem; font-weight:900; }
+  .review-brand p { margin:4px 0 0; color:#60a5fa; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.07em; }
+  .review-nav { padding:14px 10px; display:grid; gap:4px; }
+  .review-nav a { color:#94a3b8; text-decoration:none; padding:11px 14px; border-radius:12px; font-weight:800; font-size:.85rem; }
+  .review-nav a.active { background:rgba(37,99,235,.18); color:#60a5fa; }
+  .review-main { flex:1; min-width:0; height:100vh; overflow:auto; }
+  .review-header { background:#fff; border-bottom:1px solid #e2e8f0; padding:18px 28px; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+  .review-header h2 { margin:0; font-size:1.5rem; font-weight:900; letter-spacing:-.02em; }
+  .review-header p { margin:4px 0 0; color:#64748b; font-size:.84rem; font-weight:700; }
+  .review-body { padding:22px 28px; display:grid; gap:18px; }
+  .metric-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+  .metric { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; }
+  .metric span { display:block; color:#64748b; font-size:.64rem; font-weight:900; text-transform:uppercase; letter-spacing:.07em; }
+  .metric strong { display:block; margin-top:5px; color:#0f172a; font-size:1.65rem; line-height:1; font-weight:900; }
+  .review-panel { background:#fff; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden; }
+  .review-panel-head { padding:13px 16px; border-bottom:1px solid #e2e8f0; background:#f8fafc; display:flex; justify-content:space-between; gap:10px; align-items:center; }
+  .review-panel-head h3 { margin:0; color:#0f172a; font-size:.95rem; font-weight:900; }
+  .review-panel-head span { color:#64748b; font-size:.72rem; font-weight:800; }
+  .exception-table { width:100%; border-collapse:collapse; min-width:820px; }
+  .exception-table th { padding:10px 12px; background:#f8fafc; border-bottom:1px solid #e2e8f0; color:#64748b; font-size:.64rem; font-weight:900; text-transform:uppercase; letter-spacing:.07em; text-align:left; }
+  .exception-table td { padding:11px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+  .exception-table tr:last-child td { border-bottom:0; }
+  .priority { display:inline-flex; padding:3px 8px; border-radius:999px; font-size:.66rem; font-weight:900; text-transform:uppercase; }
+  .priority.high { background:#fee2e2; color:#991b1b; }
+  .priority.medium { background:#fef3c7; color:#92400e; }
+  .priority.followup { background:#e0e7ff; color:#3730a3; }
+  .priority.low { background:#f1f5f9; color:#475569; }
+  .issue-main { color:#0f172a; font-weight:900; }
+  .issue-detail { margin-top:2px; color:#64748b; font-size:.78rem; font-weight:700; }
+  .review-actions { display:flex; justify-content:flex-end; gap:6px; flex-wrap:wrap; }
+  .review-actions form { margin:0; }
+  .more-actions summary { cursor:pointer; list-style:none; }
+  .more-actions summary::-webkit-details-marker { display:none; }
+  .foldout { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:0; overflow:hidden; }
+  .foldout summary { padding:12px 14px; cursor:pointer; font-weight:900; color:#0f172a; background:#f8fafc; }
+  .foldout-body { padding:14px; }
+  .damage-mini-list { display:grid; gap:8px; }
+  .damage-mini-list a { text-decoration:none; color:#0f172a; border:1px solid #e2e8f0; border-radius:10px; padding:9px 11px; display:flex; justify-content:space-between; gap:12px; }
+  @media (max-width:960px) { .review-side { display:none; } .metric-grid { grid-template-columns:1fr 1fr; } .review-header, .review-body { padding:16px; } }
+  @media (max-width:560px) { .metric-grid { grid-template-columns:1fr; } }
+</style>
+<script>document.body.classList.add('mgr-active');</script>
+
+<div class="review-shell">
+  <aside class="review-side">
+    <div class="review-brand"><h1>LacksDrivers</h1><p>Ops Console</p></div>
+    <nav class="review-nav">
+      <a href="{{ url_for('manager.manager_dashboard') }}">Dispatch Dashboard</a>
+      <a class="active" href="{{ url_for('manager.review_dashboard') }}">Manager Review</a>
+      <a href="{{ url_for('manager.driver_logs') }}">Route Logs</a>
+      <a href="{{ url_for('manager.audit_history') }}">Audit History</a>
+    </nav>
+  </aside>
+
+  <main class="review-main">
+    <header class="review-header">
+      <div>
+        <h2>Manager Review</h2>
+        <p>{{ exceptions|length }} active exception{{ 's' if exceptions|length != 1 else '' }} this week</p>
+      </div>
       <a class="btn btn-outline-secondary" href="{{ url_for('manager.audit_history') }}">Audit History</a>
-    </div>
-  </div>
+    </header>
 
-  <div class="row g-3 mb-4">
-    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Active Exceptions</div><div class="display-6">{{ metrics.active_count }}</div></div></div>
-    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">High Priority</div><div class="display-6">{{ metrics.high_count }}</div></div></div>
-    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Truck / Damage</div><div class="display-6">{{ metrics.truck_damage_count }}</div></div></div>
-    <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Open Follow-ups</div><div class="display-6">{{ metrics.followup_count }}</div></div></div>
-  </div>
+    <div class="review-body">
+      <section class="metric-grid" aria-label="Exception summary">
+        <div class="metric"><span>Active Exceptions</span><strong>{{ metrics.active_count }}</strong></div>
+        <div class="metric"><span>High Priority</span><strong>{{ metrics.high_count }}</strong></div>
+        <div class="metric"><span>Truck / Damage</span><strong>{{ metrics.truck_damage_count }}</strong></div>
+        <div class="metric"><span>Open Follow-ups</span><strong>{{ metrics.followup_count }}</strong></div>
+      </section>
 
-  <div class="row g-4">
-    <div class="col-lg-8">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h2 class="h5 mb-0">Exceptions</h2>
-      </div>
-      <div class="table-responsive">
-        <table class="table table-sm align-middle">
-          <thead><tr><th>Priority</th><th>Type</th><th>Record</th><th>Details</th><th></th></tr></thead>
-          <tbody>
-            {% for item in exceptions %}
-              <tr>
-                <td><span class="badge text-bg-{{ 'danger' if item.severity == 'high' else 'warning' if item.severity == 'medium' else 'success' if item.severity == 'followup' else 'secondary' }}">{{ item.severity|title }}</span></td>
-                <td>{{ item.category }}</td>
-                <td>{{ item.label }}</td>
-                <td>{{ item.detail }}</td>
-                <td class="text-end">
-                  <div class="d-flex gap-1 justify-content-end flex-wrap">
-                    {% if item.url %}<a class="btn btn-sm btn-outline-primary" href="{{ item.url }}">Open</a>{% endif %}
-                    <form method="POST" action="{{ url_for('manager.mark_exception_reviewed') }}">
-                      <input type="hidden" name="review_key" value="{{ item.review_key }}">
-                      <input type="hidden" name="target_type" value="{{ item.target_type }}">
-                      <input type="hidden" name="target_id" value="{{ item.target_id }}">
-                      <input type="hidden" name="category" value="{{ item.category }}">
-                      <input type="hidden" name="label" value="{{ item.label }}">
-                      <input type="hidden" name="review_action" value="reviewed">
-                      <button class="btn btn-sm btn-outline-success" type="submit">Complete</button>
-                    </form>
-                    <form method="POST" action="{{ url_for('manager.mark_exception_reviewed') }}">
-                      <input type="hidden" name="review_key" value="{{ item.review_key }}">
-                      <input type="hidden" name="target_type" value="{{ item.target_type }}">
-                      <input type="hidden" name="target_id" value="{{ item.target_id }}">
-                      <input type="hidden" name="category" value="{{ item.category }}">
-                      <input type="hidden" name="label" value="{{ item.label }}">
-                      <input type="hidden" name="review_action" value="deleted">
-                      <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
-                    </form>
-                  </div>
-                </td>
-              </tr>
-            {% else %}
-              <tr><td colspan="5" class="text-muted">No active exceptions.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <section class="review-panel">
+        <div class="review-panel-head"><h3>Exception Inbox</h3><span>View, resolve, or escalate from the row</span></div>
+        <div class="table-responsive">
+          <table class="exception-table">
+            <thead><tr><th>Priority</th><th>Type</th><th>Route / Stop</th><th>Issue</th><th>Owner</th><th>Age</th><th></th></tr></thead>
+            <tbody>
+              {% for item in exceptions %}
+                <tr>
+                  <td><span class="priority {{ item.severity }}">{{ item.severity|title }}</span></td>
+                  <td>{{ item.category }}</td>
+                  <td><div class="issue-main">{{ item.label }}</div><div class="issue-detail">{{ item.target_type|replace('_', ' ')|title }} #{{ item.target_id }}</div></td>
+                  <td>{{ item.detail }}</td>
+                  <td>{{ item.owner if item.owner is defined else 'Unassigned' }}</td>
+                  <td>{{ item.age if item.age is defined else 'Open' }}</td>
+                  <td class="text-end">
+                    <div class="review-actions">
+                      {% if item.url %}<a class="btn btn-sm btn-outline-primary" href="{{ item.url }}">View</a>{% endif %}
+                      <form method="POST" action="{{ url_for('manager.mark_exception_reviewed') }}">
+                        <input type="hidden" name="review_key" value="{{ item.review_key }}">
+                        <input type="hidden" name="target_type" value="{{ item.target_type }}">
+                        <input type="hidden" name="target_id" value="{{ item.target_id }}">
+                        <input type="hidden" name="category" value="{{ item.category }}">
+                        <input type="hidden" name="label" value="{{ item.label }}">
+                        <input type="hidden" name="review_action" value="reviewed">
+                        <button class="btn btn-sm btn-outline-success" type="submit">Resolve</button>
+                      </form>
+                      <a class="btn btn-sm btn-outline-warning" href="#add-followup">Escalate</a>
+                      <details class="more-actions">
+                        <summary class="btn btn-sm btn-outline-secondary">More</summary>
+                        <form class="mt-1" method="POST" action="{{ url_for('manager.mark_exception_reviewed') }}">
+                          <input type="hidden" name="review_key" value="{{ item.review_key }}">
+                          <input type="hidden" name="target_type" value="{{ item.target_type }}">
+                          <input type="hidden" name="target_id" value="{{ item.target_id }}">
+                          <input type="hidden" name="category" value="{{ item.category }}">
+                          <input type="hidden" name="label" value="{{ item.label }}">
+                          <input type="hidden" name="review_action" value="deleted">
+                          <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                        </form>
+                      </details>
+                    </div>
+                  </td>
+                </tr>
+              {% else %}
+                <tr><td colspan="7" class="text-muted">No active exceptions.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-    <div class="col-lg-4">
-      <h2 class="h5">Add Follow-up</h2>
-      <form method="POST" class="border rounded p-3 mb-4">
-        {{ form.hidden_tag() }}
-        <div class="mb-3">{{ form.kind.label(class="form-label") }}{{ form.kind(class="form-select") }}</div>
-        <div class="mb-3">{{ form.plant_name.label(class="form-label") }}{{ form.plant_name(class="form-select") }}</div>
-        <div class="mb-3">{{ form.details.label(class="form-label") }}{{ form.details(class="form-control", rows="4") }}</div>
-        {{ form.submit(class="btn btn-primary w-100") }}
-      </form>
+      <details class="foldout" id="add-followup">
+        <summary>Add Follow-up</summary>
+        <div class="foldout-body">
+          <form method="POST" class="row g-3">
+            {{ form.hidden_tag() }}
+            <div class="col-md-3">{{ form.kind.label(class="form-label") }}{{ form.kind(class="form-select") }}</div>
+            <div class="col-md-3">{{ form.plant_name.label(class="form-label") }}{{ form.plant_name(class="form-select") }}</div>
+            <div class="col-md-4">{{ form.details.label(class="form-label") }}{{ form.details(class="form-control", rows="2") }}</div>
+            <div class="col-md-2 d-flex align-items-end">{{ form.submit(class="btn btn-primary w-100") }}</div>
+          </form>
+        </div>
+      </details>
 
-      <div class="alert alert-light border small mb-4">Manager follow-ups now appear in the Exceptions table with Follow-up priority until completed.</div>
-
-      <h2 class="h5">Exception History</h2>
-      <div class="list-group mb-4">
-        {% for event in exception_history %}
-          <div class="list-group-item">
-            <div class="d-flex justify-content-between gap-2">
-              <strong>{{ event.title }}</strong>
-              <span class="badge text-bg-{{ 'danger' if event.action == 'deleted' else 'success' }}">{{ event.action|title }}</span>
+      <details class="foldout">
+        <summary>Exception History</summary>
+        <div class="foldout-body list-group list-group-flush">
+          {% for event in exception_history %}
+            <div class="list-group-item px-0">
+              <div class="d-flex justify-content-between gap-2"><strong>{{ event.title }}</strong><span class="badge text-bg-{{ 'danger' if event.action == 'deleted' else 'success' }}">{{ event.action|title }}</span></div>
+              <div class="small text-muted">{{ event.created_at|to_detroit_datetime if event.created_at else '' }}</div>
+              <div class="small">{{ event.details }}</div>
             </div>
-            <div class="small text-muted">{{ event.created_at|to_detroit_datetime if event.created_at else '' }}</div>
-            <div class="small">{{ event.details }}</div>
-          </div>
-        {% else %}
-          <div class="list-group-item text-muted">No completed or deleted exceptions yet.</div>
-        {% endfor %}
-      </div>
+          {% else %}
+            <div class="text-muted">No completed or deleted exceptions yet.</div>
+          {% endfor %}
+        </div>
+      </details>
 
-      <h2 class="h5">Damage Flags</h2>
-      <div class="list-group">
-        {% for report in damage_reports %}
-          <a class="list-group-item list-group-item-action" href="{{ url_for('manager.view_damage_report', report_id=report.id) }}">
-            <strong>{{ report.plant_name }}</strong> <span class="text-muted">{{ report.stage }}</span><br>
-            <span class="small">{{ report.truck_number or 'Truck not set' }} / {{ report.trailer_number or 'Trailer not set' }}</span>
-          </a>
-        {% else %}
-          <div class="list-group-item text-muted">No damage reports.</div>
-        {% endfor %}
-      </div>
+      <details class="foldout">
+        <summary>Damage Flags</summary>
+        <div class="foldout-body damage-mini-list">
+          {% for report in damage_reports %}
+            <a href="{{ url_for('manager.view_damage_report', report_id=report.id) }}">
+              <span><strong>{{ report.plant_name }}</strong> {{ report.stage|title }} move</span>
+              <span class="text-muted small">{{ report.truck_number or 'Truck not set' }} / {{ report.trailer_number or 'Trailer not set' }}</span>
+            </a>
+          {% else %}
+            <div class="text-muted">No damage reports.</div>
+          {% endfor %}
+        </div>
+      </details>
     </div>
-  </div>
+  </main>
 </div>
 {% endblock %}
