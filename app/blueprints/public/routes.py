@@ -5,7 +5,7 @@ from sqlalchemy import text
 from app.blueprints.public import bp
 from app.extensions import db
 from app.models import Announcement
-from app.config import is_sqlite_database_uri, runtime_requires_persistent_db
+from app.services.database_status import database_status
 
 
 @bp.route("/")
@@ -34,17 +34,14 @@ def healthz():
 def readyz():
     try:
         db.session.execute(text("SELECT 1"))
-        bind = db.session.get_bind()
-        dialect = bind.dialect.name if bind is not None else "unknown"
-        database_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
-        sqlite_database = dialect == "sqlite" or is_sqlite_database_uri(database_uri)
-        unsafe_runtime = runtime_requires_persistent_db() and sqlite_database
-        status_code = 503 if unsafe_runtime else 200
+        status = database_status(current_app.config.get("SQLALCHEMY_DATABASE_URI", ""))
         return jsonify(
-            status="degraded" if unsafe_runtime else "ok",
+            status="ok" if status["ready"] else "degraded",
             db="ok",
-            dialect=dialect,
-            persistent=not sqlite_database,
-        ), status_code
+            dialect=status["dialect"],
+            persistent=status["persistent"],
+            schema="ok" if status["schema_ready"] else "missing_tables",
+            missing_tables=status["missing_tables"],
+        ), 200 if status["ready"] else 503
     except Exception as exc:  # pragma: no cover - surface DB connectivity failures
         return jsonify(status="degraded", db=str(exc)), 503

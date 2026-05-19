@@ -396,9 +396,18 @@ def _task_route_summary(task):
     }
 
 
+def _local_route_date_utc_bounds(route_date):
+    local_tz = pytz.timezone("America/Detroit")
+    start_local = local_tz.localize(datetime.combine(route_date, datetime.min.time()))
+    end_local = local_tz.localize(datetime.combine(route_date, datetime.max.time()))
+    return (
+        start_local.astimezone(pytz.utc).replace(tzinfo=None),
+        end_local.astimezone(pytz.utc).replace(tzinfo=None),
+    )
+
+
 def _driver_route_tasks(driver_id, route_date):
-    day_start = datetime.combine(route_date, datetime.min.time())
-    day_end = datetime.combine(route_date, datetime.max.time())
+    day_start, day_end = _local_route_date_utc_bounds(route_date)
     return Task.query.filter(
         or_(
             Task.assigned_to == driver_id,

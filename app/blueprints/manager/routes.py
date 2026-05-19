@@ -17,7 +17,7 @@ from flask_login import current_user
 from sqlalchemy import or_
 
 from app.blueprints.manager import bp
-from app.config import is_sqlite_database_uri
+from app.services.database_status import database_status
 from app.extensions import db, socketio
 from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
@@ -72,22 +72,6 @@ def _active_pretrips_query():
 
 def _active_plant_transfers_query():
     return PlantTransfer.query.filter(PlantTransfer.deleted_at.is_(None))
-
-
-def _database_runtime_status():
-    database_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
-    try:
-        bind = db.session.get_bind()
-        dialect = bind.dialect.name if bind is not None else "unknown"
-    except Exception:
-        dialect = "unavailable"
-    sqlite_database = dialect == "sqlite" or is_sqlite_database_uri(database_uri)
-    return {
-        "dialect": dialect,
-        "persistent": not sqlite_database,
-        "label": "Persistent database" if not sqlite_database else "SQLite local database",
-        "warning": sqlite_database,
-    }
 
 
 def _latest_pretrip_for_driver(driver_id, target_date=None):
@@ -697,7 +681,7 @@ def manager_dashboard():
         has_drivers=bool(drivers),
         today=today,
         manager_division=_division_for_user(current_user),
-        database_status=_database_runtime_status(),
+        database_status=database_status(current_app.config.get("SQLALCHEMY_DATABASE_URI", "")),
     )
 
 

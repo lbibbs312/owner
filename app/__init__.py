@@ -15,6 +15,7 @@ import os
 from flask import Flask
 
 from app.config import get_config
+from app.cli import register_cli_commands
 from app.extensions import init_extensions
 from app.services.plant_addresses import register_context_processors
 from app.services.template_filters import register_template_filters
@@ -32,6 +33,7 @@ def create_app(config_class=None):
     init_extensions(app)
     register_template_filters(app)
     register_context_processors(app)
+    register_cli_commands(app)
     _register_blueprints(app)
     return app
 

@@ -2,6 +2,7 @@ import importlib
 import runpy
 
 import pytest
+from sqlalchemy import inspect, text
 
 
 def _reload_config(monkeypatch, **values):
@@ -81,3 +82,41 @@ def test_render_rejects_development_entrypoint(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Refusing to run python lacksdrivers.py on Render"):
         runpy.run_path("lacksdrivers.py", run_name="__main__")
+
+
+def test_readyz_reports_missing_schema(monkeypatch):
+    monkeypatch.setenv("FLASK_ENV", "testing")
+    from app import create_app
+
+    app = create_app()
+    response = app.test_client().get("/readyz")
+
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["status"] == "degraded"
+    assert payload["schema"] == "missing_tables"
+    assert "driver_log" in payload["missing_tables"]
+
+
+def test_deploy_db_bootstraps_empty_database_and_stamps_head(monkeypatch):
+    monkeypatch.setenv("FLASK_ENV", "testing")
+    from app import create_app
+    from app.extensions import db
+
+    app = create_app()
+    result = app.test_cli_runner().invoke(args=["deploy-db"])
+
+    assert result.exit_code == 0, result.output
+    assert "Database schema ready" in result.output
+    with app.app_context():
+        tables = set(inspect(db.engine).get_table_names())
+        assert "user" in tables
+        assert "driver_log" in tables
+        assert db.session.execute(text("SELECT version_num FROM alembic_version")).scalar() == "4f6a7b8c9d01"
+
+    response = app.test_client().get("/readyz")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["schema"] == "ok"
+    assert payload["missing_tables"] == []

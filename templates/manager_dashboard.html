@@ -604,10 +604,10 @@
       </div>
     </header>
 
-    {% if database_status and database_status.warning %}
+    {% if database_status and (database_status.warning or not database_status.schema_ready) %}
       <div class="db-alert">
-        <strong>Database warning: {{ database_status.label }}</strong>
-        <span>Safe for local testing only. Company use requires Postgres/persistent storage.</span>
+        <strong>Database warning: {{ database_status.label }}{% if not database_status.schema_ready %} / missing schema{% endif %}</strong>
+        <span>{% if not database_status.schema_ready %}Required tables are missing; run deploy-db before company use.{% else %}Safe for local testing only. Company use requires Postgres/persistent storage.{% endif %}</span>
       </div>
     {% endif %}
 

@@ -47,8 +47,8 @@ def upgrade():
         batch_op.drop_column('shift_hours')
 
     with op.batch_alter_table('pretrip', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('oil_system_status', sa.Enum('operational', 'damaged', 'missing', 'leaking', name='oil_system_enum'), nullable=True))
-        batch_op.add_column(sa.Column('tires_status', sa.Enum('operational', 'damaged', 'missing', 'leaking', name='tires_enum'), nullable=True))
+        batch_op.add_column(sa.Column('oil_system_status', sa.String(length=20), nullable=True))
+        batch_op.add_column(sa.Column('tires_status', sa.String(length=20), nullable=True))
         batch_op.drop_column('fuel_leak_status')
         batch_op.drop_column('cab_doors_windows_status')
         batch_op.drop_column('tires_ok_status')
