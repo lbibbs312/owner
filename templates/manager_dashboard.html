@@ -114,6 +114,8 @@
 
   /* ── Table ── */
   .tbl-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .tbl-wrap.live-stops-scroll { max-height:min(62vh,680px); overflow:auto; overscroll-behavior:contain; }
+  .tbl-wrap.live-stops-scroll table.dtbl thead th { position:sticky; top:0; z-index:2; }
   table.dtbl { width:100%; border-collapse:collapse; min-width:720px; }
   table.dtbl th { padding:11px 14px; text-align:left; font-size:.63rem; font-weight:900;
                   text-transform:uppercase; letter-spacing:.07em; color:#64748b;
@@ -701,7 +703,7 @@
             <a class="{% if selected_driver_id == driver.id %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division=division_filter, driver_id=driver.id, focus='routes') }}">{{ driver.display_name }}</a>
           {% endfor %}
         </div>
-        <div class="tbl-wrap">
+        <div class="tbl-wrap live-stops-scroll" tabindex="0" aria-label="Scrollable live route stops">
           <table class="dtbl" id="liveStopsTable">
             <thead>
               <tr>
