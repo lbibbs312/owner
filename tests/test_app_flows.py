@@ -879,6 +879,284 @@ def test_manager_route_print_calculates_mileage_from_start_and_end_odometer(clie
     assert b"Correct mileage before approving route" not in response.data
 
 
+def test_manager_route_review_regression_multistop_secondary_cargo_is_normal(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PostTrip, PreTrip, ShiftRecord
+
+        driver = create_user("cargo_cycle_driver", "cargo-cycle@example.com", "driver", first_name="Lamar")
+        create_user("cargo_cycle_manager", "cargo-cycle-manager@example.com", "management")
+        route_date = date.today()
+        logs = [
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="Helios",
+                load_size="Empty",
+                depart_load_size="Raleigh East Load",
+                secondary_load="PPL Load",
+                arrive_time="2026-05-19 08:00:00",
+                depart_time="08:20",
+                created_at=datetime(2026, 5, 19, 8, 0),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="RE",
+                load_size="Raleigh East Load",
+                depart_load_size="Empty",
+                secondary_load="PPL Load",
+                arrive_time="2026-05-19 09:00:00",
+                depart_time="09:15",
+                created_at=datetime(2026, 5, 19, 9, 0),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="PPL",
+                load_size="Empty",
+                depart_load_size="Empty",
+                arrive_time="2026-05-19 10:00:00",
+                depart_time="10:15",
+                created_at=datetime(2026, 5, 19, 10, 0),
+            ),
+        ]
+        db.session.add_all(logs)
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st2", start_mileage=379386)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime(2026, 5, 19, 7, 30)),
+            PostTrip(pretrip_id=pretrip.id, end_mileage=379423, miles_driven=37),
+        ])
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "cargo_cycle_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+
+    assert response.status_code == 200
+    assert b"Raleigh East Load" in response.data
+    assert b"PPL Load" in response.data
+    assert b"later cargo activity" not in response.data
+    assert b"Route needs review: final cargo unload" not in response.data
+    assert b"Cargo route issue" not in response.data
+
+
+def test_manager_route_review_regression_current_open_stop_and_completed_rows(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PostTrip, PreTrip, ShiftRecord
+
+        driver = create_user("open_stop_driver", "open-stop@example.com", "driver", first_name="Lamar")
+        create_user("open_stop_manager", "open-stop-manager@example.com", "management")
+        route_date = date.today()
+        logs = [
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="RE",
+                load_size="Empty",
+                depart_load_size="Empty",
+                arrive_time="2026-05-19 08:00:00",
+                depart_time="08:15",
+                created_at=datetime(2026, 5, 19, 8, 0),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="Helios",
+                load_size="Empty",
+                depart_load_size="Paint Central Load",
+                arrive_time="2026-05-19 09:00:00",
+                depart_time="09:20",
+                created_at=datetime(2026, 5, 19, 9, 0),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="PC",
+                load_size="Paint Central Load",
+                depart_load_size=None,
+                arrive_time="2026-05-19 10:00:00",
+                created_at=datetime(2026, 5, 19, 10, 0),
+            ),
+        ]
+        db.session.add_all(logs)
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st2", start_mileage=1000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime(2026, 5, 19, 7, 30)),
+            PostTrip(pretrip_id=pretrip.id, end_mileage=1020, miles_driven=20),
+        ])
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "open_stop_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+
+    assert response.status_code == 200
+    assert b"Current Active Stop" in response.data
+    assert b"Paint Central" in response.data
+    assert b"Awaiting departure" in response.data
+    assert b"Correction required" not in response.data
+    assert b"<td>Completed</td>" in response.data
+    assert response.data.count(b"<td>Active</td>") == 0
+    assert b"<td>Current</td>" in response.data or b"<td>Open</td>" in response.data
+
+
+def test_manager_route_review_regression_missing_posttrip_is_pending_not_correction(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("pending_mileage_driver", "pending-mileage@example.com", "driver", first_name="Lamar")
+        create_user("pending_mileage_manager", "pending-mileage-manager@example.com", "management")
+        route_date = date.today()
+        db.session.add(DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="RE",
+            load_size="Empty",
+            depart_load_size="Empty",
+            arrive_time="2026-05-19 08:00:00",
+            depart_time="08:15",
+            created_at=datetime(2026, 5, 19, 8, 0),
+        ))
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st2", start_mileage=379386)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add(ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime(2026, 5, 19, 7, 30)))
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "pending_mileage_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+
+    assert response.status_code == 200
+    assert b"Pending posttrip mileage" in response.data
+    assert b"Mileage pending PostTrip" in response.data
+    assert b"Mileage conflict / correction required" not in response.data
+    assert b"Correct route mileage before approving route" not in response.data
+    assert b"Mileage needs correction" not in response.data
+
+
+def test_manager_route_review_regression_phantom_scans_excluded_but_real_scans_identified(client, app):
+    from datetime import date, datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PartScanEvent, PostTrip, PreTrip, ShiftRecord
+
+        driver = create_user("scan_scope_driver", "scan-scope@example.com", "driver", first_name="Lamar")
+        create_user("scan_scope_manager", "scan-scope-manager@example.com", "management")
+        route_date = date.today()
+        old_date = route_date - timedelta(days=3)
+        current_log = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="PC",
+            load_size="Paint Central Load",
+            depart_load_size="Empty",
+            arrive_time="2026-05-19 08:00:00",
+            depart_time="08:15",
+            created_at=datetime(2026, 5, 19, 8, 0),
+        )
+        old_log = DriverLog(
+            driver_id=driver.id,
+            date=old_date,
+            plant_name="PC",
+            load_size="Paint Central Load",
+            depart_load_size="Empty",
+            arrive_time="2026-05-16 08:00:00",
+            depart_time="08:15",
+            created_at=datetime(2026, 5, 16, 8, 0),
+        )
+        db.session.add_all([current_log, old_log])
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st2", start_mileage=1000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime(2026, 5, 19, 7, 30)),
+            PostTrip(pretrip_id=pretrip.id, end_mileage=1010, miles_driven=10),
+            PartScanEvent(raw_value="CURRENT-SCAN-111", normalized_value="CUR111", stop_id=current_log.id, driver_id=driver.id, plant_id="PC", scan_context="drop_scan", validation_status="needs_review"),
+            PartScanEvent(raw_value="OLD-TEST-SCAN-222", normalized_value="OLD222", stop_id=old_log.id, driver_id=driver.id, plant_id="PC", scan_context="drop_scan", validation_status="needs_review"),
+            PartScanEvent(raw_value="ORPHAN-SCAN-333", normalized_value="ORP333", stop_id=None, driver_id=driver.id, plant_id="PC", scan_context="drop_scan", validation_status="needs_review"),
+        ])
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "scan_scope_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+
+    assert response.status_code == 200
+    assert b"Pending Scan Evidence" in response.data
+    assert b"CUR111" in response.data
+    assert b"OLD222" not in response.data
+    assert b"ORP333" not in response.data
+    assert b"OLD-TEST-SCAN" not in response.data
+    assert b"ORPHAN-SCAN" not in response.data
+
+
+def test_manager_route_review_regression_missing_stop_photo_file_blocks_approval(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, DriverLogPhoto, PostTrip, PreTrip, ShiftRecord
+
+        driver = create_user("photo_scope_driver", "photo-scope@example.com", "driver", first_name="Lamar")
+        create_user("photo_scope_manager", "photo-scope-manager@example.com", "management")
+        route_date = date.today()
+        log = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="PC",
+            load_size="Paint Central Load",
+            depart_load_size="Empty",
+            arrive_time="2026-05-19 08:00:00",
+            depart_time="08:15",
+            created_at=datetime(2026, 5, 19, 8, 0),
+        )
+        db.session.add(log)
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st2", start_mileage=1000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime(2026, 5, 19, 7, 30)),
+            PostTrip(pretrip_id=pretrip.id, end_mileage=1010, miles_driven=10),
+            DriverLogPhoto(
+                driver_log_id=log.id,
+                filename="missing-stop-proof.jpg",
+                original_filename="missing-stop-proof.jpg",
+                content_type="image/jpeg",
+                source="departure_gallery",
+                note="unbalanced load needs manager review",
+                uploaded_by_id=driver.id,
+                uploaded_at=datetime(2026, 5, 19, 12, 0),
+            ),
+        ])
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "photo_scope_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+
+    assert response.status_code == 200
+    assert b"Photo / Damage / Safety Review" in response.data
+    assert b"Photo record exists but file failed to render. Review in system before approval." in response.data
+    assert b"Photo ID #" in response.data
+    assert b"Cargo safety photo needs classification" in response.data
+
+
+
 def test_manager_route_review_separates_route_truck_mileage_from_extra_dvir(client, app):
     from datetime import date, datetime
 

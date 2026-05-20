@@ -104,6 +104,15 @@
     </div>
   </div>
 
+  {% if route_state and route_state.current_activity %}
+  <div class="section">
+    <h2>Current Active Stop</h2>
+    <div class="section-body">
+      <p><strong>Current Active Stop: {{ route_state.current_activity.plant }}.</strong> {{ route_state.current_activity.detail }} <span class="delay-status {{ route_state.current_activity.forecast_class }}">{{ route_state.current_activity.forecast_status }}</span></p>
+    </div>
+  </div>
+  {% endif %}
+
   {% if approval_blockers %}
   <div class="section blocked-section">
     <h2>Approval Blocked By</h2>
@@ -241,16 +250,16 @@
       <table>
         <thead><tr><th>Stop</th><th>Status</th><th>Plant</th><th>Arrive</th><th>Depart</th><th>Cargo Out</th><th>Notes</th></tr></thead>
         <tbody>
-          {% for log in logs %}
-            {% set route = (log_routes or {}).get(log.id) %}
+          {% for row in route_state.rows %}
+            {% set log = row.log %}
             <tr>
-              <td>{{ loop.index }}</td>
-              <td>{{ 'Active' if log.depart_time else 'Open' }}</td>
-              <td>{{ route.plant if route else log.plant_name }}</td>
+              <td>{{ row.index }}</td>
+              <td>{{ row.status }}</td>
+              <td>{{ row.plant }}</td>
               <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
               <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
-              <td>{{ route.depart_cargo_desc if route and route.depart_cargo_desc is not none else (log.depart_load_size or '--') }}</td>
-              <td>{{ route.action if route else 'Logged stop' }}{% if log.photos %}; {{ log.photos|length }} photo proof{{ 's' if log.photos|length != 1 else '' }}{% endif %}</td>
+              <td>{{ row.cargo_out }}</td>
+              <td>{{ row.note }}{% if log.photos %}; {{ log.photos|length }} photo proof{{ 's' if log.photos|length != 1 else '' }}{% endif %}</td>
             </tr>
           {% endfor %}
         </tbody>
