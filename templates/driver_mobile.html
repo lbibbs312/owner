@@ -459,13 +459,14 @@
             {% endif %}
           </div>
         {% else %}
-          {% if next_load_eta %}
-            <div class="eyebrow"><span class="bolt"></span>Next Pickup Estimate</div>
-            <h1>{{ next_load_eta.plant }}</h1>
-            <p>{{ next_load_eta.plant }} next load pickup estimated {{ next_load_eta.estimate_label }}{% if next_load_eta.ready_at_label %}, around {{ next_load_eta.ready_at_label }}{% endif %}.</p>
+          {% if next_load_prediction %}
+            <div class="eyebrow"><span class="bolt"></span>{{ next_load_prediction.title }}</div>
+            <h1>{{ next_load_prediction.predicted_load_label if next_load_prediction.is_known else 'Awaiting load intent' }}</h1>
+            <p>{% if next_load_prediction.is_known %}Likely destination: {{ next_load_prediction.display_destination }}. Basis: {{ next_load_prediction.reason_text }}{% else %}Next load is unknown. {{ next_load_prediction.required_driver_action }}{% endif %}</p>
             <div class="task-meta">
-              {% if next_load_eta.status %}<span class="badge progress">{{ next_load_eta.status }}</span>{% endif %}
-              {% if next_load_eta.confidence %}<span class="badge">{{ next_load_eta.confidence }}</span>{% endif %}
+              {% if next_load_prediction.status %}<span class="badge progress">{{ next_load_prediction.status }}</span>{% endif %}
+              <span class="badge">Confidence: {{ next_load_prediction.confidence_label }}</span>
+              <span class="badge">Source: {{ next_load_prediction.source_label }}</span>
             </div>
           {% else %}
             <div class="eyebrow"><span class="bolt"></span>Ready For Dispatch</div>
@@ -560,6 +561,7 @@
           <div class="forecast-stat"><span>Confidence</span><strong>{{ fs.confidence }}</strong></div>
         </div>
         <p class="forecast-note">Basis: {{ fs.basis }}{% if fs.severity in ['warning', 'high'] %}. Record a dock delay reason if the stop is still waiting.{% endif %}</p>
+        {% if next_load_prediction %}<p class="forecast-note">Required: {{ next_load_prediction.required_driver_action }}{% if next_load_prediction.delay_reason_required %} {{ next_load_prediction.delay_reason_text }}{% endif %}</p>{% endif %}
       </section>
       {% endif %}
 

@@ -49,6 +49,7 @@ from app.services.load_state import (
     truck_issue_reason,
 )
 from app.services.parts import record_part_scan as save_part_scan, scan_event_payload
+from app.services.next_load_prediction import build_next_load_prediction
 from app.services.plant_time import forecast_for_stop, plant_time_forecast, route_stop_forecasts
 from app.services.report_summary import damage_report_count_label, damage_report_detail_label
 from app.services.hot_parts import (
@@ -3742,7 +3743,16 @@ def mobile_dashboard():
         else None
     )
     stop_forecasts = route_stop_forecasts(todays_logs, now=now_local)
-    next_load_eta = _next_load_eta_context(current_stop, current_stop_forecast, todays_logs, route_date, now_local)
+    next_load_prediction = build_next_load_prediction(
+        current_stop=current_stop,
+        driver_id=current_user.id,
+        current_cargo_state=current_load_after_logs(todays_logs),
+        active_dispatch_task=active_task,
+        route_date=route_date,
+        timing_forecast=current_stop_forecast,
+        now=now_local,
+    ).to_dict() if current_stop else None
+    next_load_eta = next_load_prediction
     if route_date == today_local_date:
         route_panel_title = "Today's Route"
     elif route_is_active:
@@ -3786,6 +3796,7 @@ def mobile_dashboard():
         stop_forecasts=stop_forecasts,
         current_stop_forecast=current_stop_forecast,
         next_load_eta=next_load_eta,
+        next_load_prediction=next_load_prediction,
         current_truck_number=current_truck_number,
         truck_maintenance_history=truck_maintenance_history,
         truck_issue_choices=TRUCK_ISSUE_CHOICES,

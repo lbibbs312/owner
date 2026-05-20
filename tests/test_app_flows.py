@@ -674,7 +674,9 @@ def test_plant_load_forecast_uses_today_average_on_driver_and_manager_dashboards
     assert b"Today Average" in mobile.data
     assert b"1h 30m" in mobile.data
     assert b"Medium" in mobile.data
-    assert b"Kraft Plant next load pickup estimated" in mobile.data
+    assert b"Next Load Estimate" in mobile.data
+    assert b"Raleigh East Load" in mobile.data
+    assert b"historical pattern" in mobile.data
     assert b"Stop forecast" in mobile.data
 
     client.get("/logout")
@@ -877,6 +879,278 @@ def test_manager_route_print_calculates_mileage_from_start_and_end_odometer(clie
     assert b"7 miles" in response.data
     assert b"122,007 miles is outside normal route range" not in response.data
     assert b"Correct mileage before approving route" not in response.data
+
+
+def test_next_load_prediction_unknown_does_not_promote_actual_cargo(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("intent_unknown_driver", "intent-unknown@example.com", "driver", first_name="Lamar")
+        create_user("intent_unknown_manager", "intent-unknown-manager@example.com", "management")
+        route_date = date.today()
+        current = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="PC",
+            load_size="Empty",
+            depart_load_size=None,
+            arrive_time=f"{route_date.isoformat()} 14:00:00",
+            created_at=datetime(2026, 5, 20, 14, 0),
+        )
+        db.session.add(current)
+        db.session.commit()
+        driver_id = driver.id
+        current_id = current.id
+
+    login(client, "intent_unknown_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+
+    assert response.status_code == 200
+    assert b"Final Approval Not Yet Available" in response.data
+    assert b"Current Active Stop: Paint Central" in response.data
+    assert b"Next Load Unknown" in response.data
+    assert b"Scan shipper barcode or select destination before departure" in response.data
+    assert b"Raleigh East Load" not in response.data
+    with app.app_context():
+        from app.models import DriverLog
+
+        assert DriverLog.query.get(current_id).depart_load_size is None
+
+
+def test_next_load_prediction_uses_dispatch_task_without_actual_cargo(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, Task
+
+        driver = create_user("intent_task_driver", "intent-task@example.com", "driver", first_name="Lamar")
+        create_user("intent_task_manager", "intent-task-manager@example.com", "management")
+        route_date = date.today()
+        current = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="PC",
+            load_size="Empty",
+            arrive_time=f"{route_date.isoformat()} 14:00:00",
+            created_at=datetime(2026, 5, 20, 14, 0),
+        )
+        task = Task(title="PC to RE", part_number="DISPATCH-1", status="in-progress", assigned_to=driver.id)
+        db.session.add_all([current, task])
+        db.session.commit()
+        driver_id = driver.id
+        current_id = current.id
+
+    login(client, "intent_task_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+
+    assert response.status_code == 200
+    assert b"Next Load Confirmed" in response.data
+    assert b"Raleigh East Load" in response.data
+    assert b"dispatch task" in response.data
+    assert b"Confirm loaded and record departure before this becomes actual cargo" in response.data
+    with app.app_context():
+        from app.models import DriverLog
+
+        assert DriverLog.query.get(current_id).depart_load_size is None
+
+
+def test_next_load_prediction_uses_active_hot_move_without_actual_cargo(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, HotMove, Task
+
+        driver = create_user("intent_hot_move_driver", "intent-hot-move@example.com", "driver", first_name="Lamar")
+        create_user("intent_hot_move_manager", "intent-hot-move-manager@example.com", "management")
+        route_date = date.today()
+        current = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="PC",
+            load_size="Empty",
+            arrive_time=f"{route_date.isoformat()} 14:00:00",
+            created_at=datetime(2026, 5, 20, 14, 0),
+        )
+        task = Task(title="PC to RE", part_number="HOT-1", status="pending")
+        db.session.add_all([current, task])
+        db.session.flush()
+        db.session.add(HotMove(move_id=task.id, driver_id=driver.id, truck_id="st4", status="accepted"))
+        db.session.commit()
+        driver_id = driver.id
+        current_id = current.id
+
+    login(client, "intent_hot_move_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+
+    assert response.status_code == 200
+    assert b"Next Load Confirmed" in response.data
+    assert b"Raleigh East Load" in response.data
+    assert b"dispatch task" in response.data
+    with app.app_context():
+        from app.models import DriverLog
+
+        assert DriverLog.query.get(current_id).depart_load_size is None
+
+
+def test_next_load_prediction_uses_manifest_scan_without_actual_cargo(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PartMaster, PartScanEvent
+
+        driver = create_user("intent_manifest_driver", "intent-manifest@example.com", "driver", first_name="Lamar")
+        create_user("intent_manifest_manager", "intent-manifest-manager@example.com", "management")
+        route_date = date.today()
+        current = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="PC",
+            load_size="Empty",
+            arrive_time=f"{route_date.isoformat()} 14:00:00",
+            created_at=datetime(2026, 5, 20, 14, 0),
+        )
+        part = PartMaster(canonical_part_number="SHIPPER-103", default_origin_plant_id="PC", default_destination_plant_id="RE", status="active")
+        db.session.add_all([current, part])
+        db.session.flush()
+        db.session.add(PartScanEvent(
+            raw_value="SHIPPER 1030001",
+            normalized_value="SHIPPER1030001",
+            part_id=part.id,
+            stop_id=current.id,
+            driver_id=driver.id,
+            plant_id="PC",
+            scan_context="shipper_scan",
+            validation_status="valid",
+            validation_message="Ship To: Raleigh East",
+        ))
+        db.session.commit()
+        driver_id = driver.id
+        current_id = current.id
+
+    login(client, "intent_manifest_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+
+    assert response.status_code == 200
+    assert b"Next Load Confirmed" in response.data
+    assert b"Raleigh East Load" in response.data
+    assert b"manifest scan" in response.data
+    assert b"Confidence</strong><span>High" in response.data
+    with app.app_context():
+        from app.models import DriverLog
+
+        assert DriverLog.query.get(current_id).depart_load_size is None
+
+
+def test_next_load_prediction_uses_plant_rule_as_estimate(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PlantPredictionRule
+
+        driver = create_user("intent_rule_driver", "intent-rule@example.com", "driver", first_name="Lamar")
+        create_user("intent_rule_manager", "intent-rule-manager@example.com", "management")
+        route_date = date.today()
+        current = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="PC",
+            load_size="Empty",
+            arrive_time=f"{route_date.isoformat()} 14:00:00",
+            created_at=datetime(2026, 5, 20, 14, 0),
+        )
+        rule = PlantPredictionRule(plant_id="PC", predicted_destination_plant_id="RE", confidence="medium", active=True)
+        db.session.add_all([current, rule])
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "intent_rule_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+
+    assert response.status_code == 200
+    assert b"Next Load Estimate" in response.data
+    assert b"Raleigh East Load" in response.data
+    assert b"plant rule" in response.data
+    assert b"Predictions do not become actual cargo until confirmed" in response.data
+
+
+def test_next_load_prediction_uses_historical_pattern_and_requires_delay_reason(client, app):
+    from datetime import date, datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("intent_history_driver", "intent-history@example.com", "driver", first_name="Lamar")
+        create_user("intent_history_manager", "intent-history-manager@example.com", "management")
+        route_date = date.today()
+        history = []
+        for offset in range(1, 4):
+            sample_date = route_date - timedelta(days=offset)
+            history.append(DriverLog(
+                driver_id=driver.id,
+                date=sample_date,
+                plant_name="PC",
+                load_size="Empty",
+                depart_load_size="Raleigh East Load",
+                arrive_time="08:00",
+                depart_time="08:30",
+                created_at=datetime(2026, 5, 17, 8, offset),
+            ))
+        route_logs = [
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="KP",
+                load_size="Empty",
+                depart_load_size="Raleigh East Load",
+                arrive_time=f"{route_date.isoformat()} 12:00:00",
+                depart_time="12:20",
+                created_at=datetime(2026, 5, 20, 12, 0),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="RE",
+                load_size="Raleigh East Load",
+                depart_load_size="Empty",
+                no_pickup=True,
+                arrive_time=f"{route_date.isoformat()} 13:00:00",
+                depart_time="13:20",
+                created_at=datetime(2026, 5, 20, 13, 0),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="PC",
+                load_size="Empty",
+                depart_load_size=None,
+                arrive_time=f"{route_date.isoformat()} 14:00:00",
+                created_at=datetime(2026, 5, 20, 14, 0),
+            ),
+        ]
+        db.session.add_all(history + route_logs)
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "intent_history_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+
+    assert response.status_code == 200
+    assert b"The previous cargo cycle appears complete" in response.data
+    assert b"currently at Paint Central awaiting departure/load-out" in response.data
+    assert b"Next Load Estimate" in response.data
+    assert b"Raleigh East Load" in response.data
+    assert b"historical pattern" in response.data
+    assert b"Confidence</strong><span>Medium" in response.data
+    assert b"Driver delay reason missing" in response.data
+    assert b"Add delay reason for Paint Central before final approval" in response.data
 
 
 def test_manager_route_review_regression_multistop_secondary_cargo_is_normal(client, app):

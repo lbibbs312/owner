@@ -34,13 +34,14 @@ from app.services.load_state import build_driver_log_route_context, route_proble
 from app.services.cargo_reconciliation_service import reconcile_cargo
 from app.services.media_attachment_service import upload_file_path
 from app.services.mileage_service import calculate_mileage_record
+from app.services.next_load_prediction import build_next_load_prediction
 from app.services.route_state_service import build_route_state
 from app.services.scan_scope_service import route_stop_ids
 from app.services.hot_parts import build_route_hot_part_proof, ensure_hot_move_for_task
 from app.services.management_readout import build_management_narrative
 from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
 from app.services.plant_time import forecast_for_stop, plant_forecast_rows, route_stop_forecasts
-from app.services.report_summary import damage_report_count_label, damage_report_detail_label
+from app.services.report_summary import damage_report_count_label, damage_report_detail_label, damage_report_kind
 from app.services.role_session import restore_role_user
 from app.services.search_corpus import suggest_terms
 from app.services.simple_pdf import LETTER, SimplePdf
@@ -676,6 +677,17 @@ def _route_print_context(driver_id, route_date):
     signature_shift = _shift_record_for_driver_date(driver.id, route_date, require_signature=True)
     route_truck_context = _manager_route_truck_context(driver.id, route_date, pretrips)
     mileage_review = _manager_mileage_review(pretrips, logs, route_truck_context)
+    current_stop = next((log for log in reversed(logs) if not log.depart_time), None) or (logs[-1] if logs else None)
+    stop_forecasts = route_stop_forecasts(logs)
+    current_stop_forecast = stop_forecasts.get(current_stop.id) if current_stop else None
+    next_load_prediction = build_next_load_prediction(
+        current_stop=current_stop,
+        driver_id=driver.id,
+        truck_id=route_truck_context.get("label"),
+        current_cargo_state=None,
+        route_date=route_date,
+        timing_forecast=current_stop_forecast,
+    ).to_dict() if current_stop else None
     return {
         "driver": driver,
         "logs": logs,
@@ -692,7 +704,8 @@ def _route_print_context(driver_id, route_date):
         "exception_notes": exception_notes,
         "log_issue_details": log_issue_details,
         "route_task_events": _task_route_events_for_logs(logs),
-        "stop_forecasts": route_stop_forecasts(logs),
+        "stop_forecasts": stop_forecasts,
+        "next_load_prediction": next_load_prediction,
         "driver_signature": signature_shift.driver_signature if signature_shift else None,
         "signature_timestamp": signature_shift.signature_timestamp if signature_shift else None,
         "route_finalized": _route_finalized_for_driver_date(driver.id, route_date),
@@ -1112,12 +1125,15 @@ def _manager_delay_review(logs, log_routes, stop_forecasts):
         if (log.dock_wait_minutes or 0) > 0 or log.downtime_reason or (forecast and forecast.get("severity") in {"warning", "high"}):
             plant = route.get("plant") or _plant_label(log.plant_name)
             forecast_label, forecast_class = _manager_delay_forecast_label(forecast)
+            requires_reason = bool(forecast and forecast.get("severity") in {"warning", "high"} and not log.depart_time and not log.downtime_reason)
             rows.append({
                 "plant": plant,
                 "dock_wait": f"{log.dock_wait_minutes} min" if (log.dock_wait_minutes or 0) > 0 else (forecast.get("elapsed_label") if forecast else "--"),
-                "reason": log.downtime_reason or "No driver delay reason recorded.",
+                "reason": "Driver delay reason missing." if requires_reason else (log.downtime_reason or "No driver delay reason recorded."),
                 "forecast": forecast_label,
                 "forecast_class": forecast_class,
+                "requires_reason": requires_reason,
+                "action": f"Add delay reason for {plant} before final approval." if requires_reason else "",
             })
     return rows
 
@@ -1141,17 +1157,44 @@ def _manager_data_quality(logs, log_routes, mileage_quality_item, driver_signatu
     return items
 
 
-def _manager_required_actions(data_quality_items, photo_reviews, cargo_review, route_finalized, logs, driver_signature):
+def _manager_damage_report_rows(damage_reports):
+    rows = []
+    for report in damage_reports or []:
+        stop = report.driver_log
+        photo_count = len(report.photos or [])
+        rows.append({
+            "id": report.id,
+            "type": damage_report_kind(report).title(),
+            "stop": _plant_label(stop.plant_name) if stop else _plant_label(report.plant_name),
+            "status": (report.status or "open").replace("_", " ").title(),
+            "note": report.description or "No driver note recorded.",
+            "photo_attached": "Yes" if photo_count else "No",
+            "photo_count": photo_count,
+        })
+    return rows
+
+
+def _manager_required_actions(data_quality_items, photo_reviews, cargo_review, route_finalized, logs, driver_signature, delay_review_rows=None, next_load_prediction=None):
     actions = []
     mileage_item = next((item for item in data_quality_items if item["label"] == "Mileage"), None)
     if mileage_item and mileage_item.get("blocks_approval"):
-        actions.append(mileage_item.get("action") or "Correct route mileage before approving route.")
+        active_open_stop = bool(logs) and any(not log.depart_time for log in logs)
+        if active_open_stop and mileage_item.get("status") == "Pending":
+            actions.append("Record PostTrip mileage after route close before final approval.")
+        else:
+            actions.append(mileage_item.get("action") or "Correct route mileage before approving route.")
     for review in photo_reviews:
         if "safety" in review["review_type"].lower() or review["summary"]["label"] == "Cargo Photo Proof":
             actions.append(f"Review/classify {review['plant']} cargo photo.")
             break
     if cargo_review["issues"] or cargo_review["pending_scan_count"]:
         actions.append("Confirm cargo movement and pending scan review.")
+    for row in delay_review_rows or []:
+        if row.get("requires_reason"):
+            actions.append(row.get("action") or f"Add delay reason for {row['plant']} before final approval.")
+            break
+    if next_load_prediction and next_load_prediction.get("required_driver_action") and not all(log.depart_time for log in logs):
+        actions.append(next_load_prediction["required_driver_action"])
     all_departed = bool(logs) and all(log.depart_time for log in logs)
     if all_departed and not route_finalized:
         actions.append("Finalize route after confirming final unload.")
@@ -1165,8 +1208,17 @@ def _manager_required_actions(data_quality_items, photo_reviews, cargo_review, r
 def _manager_approval_blockers(data_quality_items, photo_reviews, cargo_review, route_finalized, logs, driver_signature):
     blockers = []
     mileage_item = next((item for item in data_quality_items if item["label"] == "Mileage"), None)
-    if mileage_item and mileage_item.get("blocks_approval"):
+    all_departed = bool(logs) and all(log.depart_time for log in logs)
+    active_open_stop = bool(logs) and not all_departed
+
+    if active_open_stop:
+        open_stop = next((log for log in reversed(logs) if not log.depart_time), logs[-1])
+        blockers.append({"label": "Active stop still open", "detail": f"{_plant_label(open_stop.plant_name)} is awaiting departure/load-out."})
+        if mileage_item and mileage_item.get("blocks_approval"):
+            blockers.append({"label": "PostTrip mileage not yet due", "detail": "PostTrip mileage is pending until the route is closed."})
+    elif mileage_item and mileage_item.get("blocks_approval"):
         blockers.append({"label": mileage_item.get("blocker_label") or "Mileage conflict / correction required", "detail": mileage_item["detail"]})
+
     if cargo_review.get("pending_scan_count"):
         blockers.append({"label": cargo_review["pending_scan_label"], "detail": "Final cargo approval is blocked until scans are confirmed."})
     if cargo_review.get("issues"):
@@ -1175,12 +1227,13 @@ def _manager_approval_blockers(data_quality_items, photo_reviews, cargo_review, 
         if "safety" in review["review_type"].lower() or review["summary"]["label"] == "Cargo Photo Proof":
             blockers.append({"label": "Cargo safety photo needs classification", "detail": f"{review['plant']} photo proof requires manager classification."})
             break
-    all_departed = bool(logs) and all(log.depart_time for log in logs)
     if all_departed and not route_finalized:
         blockers.append({"label": "Route not finalized", "detail": "Final stop appears complete, but the route is still open."})
     if not driver_signature:
-        blockers.append({"label": "Driver signature missing", "detail": "Driver route signature has not been captured."})
-    blockers.append({"label": "Manager signature pending", "detail": "Manager review signature is required before approval."})
+        label = "Driver signature pending route close" if active_open_stop else "Driver signature missing"
+        detail = "Driver signature is pending until route close." if active_open_stop else "Driver route signature has not been captured."
+        blockers.append({"label": label, "detail": detail})
+    blockers.append({"label": "Manager signature pending", "detail": "Manager review signature is required before final approval."})
     return blockers
 
 
@@ -1250,9 +1303,13 @@ def _manager_blocker_phrase(blockers):
             detail = blocker.get("detail") or ""
             plant = detail.split(" photo", 1)[0] if " photo" in detail else "Cargo safety"
             labels.append(f"one {plant} cargo-safety photo requiring classification")
+        elif label == "Active stop still open":
+            labels.append("active stop still open")
+        elif label == "PostTrip mileage not yet due":
+            labels.append("PostTrip mileage pending route close")
         elif label == "Route not finalized":
             labels.append("route finalization")
-        elif label in {"Driver signature missing", "Manager signature pending"}:
+        elif label in {"Driver signature missing", "Driver signature pending route close", "Manager signature pending"}:
             signature_blocked = True
         elif label == "Mileage pending PostTrip":
             labels.append("pending posttrip mileage")
@@ -1271,7 +1328,7 @@ def _manager_blocker_phrase(blockers):
     return ", ".join(labels[:-1]) + f", and {labels[-1]}"
 
 
-def _manager_summary_sentence(driver, logs, log_routes, route_status, damage_reports, photo_reviews, total_miles, data_quality_items, approval_blockers=None, mileage_review=None, cargo_review=None):
+def _manager_summary_sentence(driver, logs, log_routes, route_status, damage_reports, photo_reviews, total_miles, data_quality_items, approval_blockers=None, mileage_review=None, cargo_review=None, route_state=None, next_load_prediction=None):
     name = _driver_short_name(driver)
     approval_blockers = approval_blockers or []
     route_truck = (mileage_review or {}).get("route_truck_label") or ""
@@ -1283,7 +1340,18 @@ def _manager_summary_sentence(driver, logs, log_routes, route_status, damage_rep
     final_cargo = cargo_state.get("final_cargo") or {}
     final_unload_log = final_cargo.get("log")
     final_unload_plant = final_cargo.get("plant")
-    if final_unload_plant and last_stop_plant and final_unload_plant != last_stop_plant:
+    current_activity = (route_state or {}).get("current_activity")
+    active_summary_covers_approval = False
+    if current_activity and final_unload_plant and last_stop_plant and final_unload_plant != last_stop_plant:
+        active_summary_covers_approval = True
+        prediction = next_load_prediction or {}
+        prediction_sentence = ""
+        if prediction.get("is_known"):
+            prediction_sentence = f" Next load estimate: {prediction.get('predicted_load_label')} to {prediction.get('display_destination')} ({prediction.get('confidence_label')} via {prediction.get('source_label')})."
+        else:
+            prediction_sentence = " Next load is unknown until a shipper scan, dispatch task, plant rule, or driver confirmation is recorded."
+        parts.append(f"The previous cargo cycle appears complete. {name} is currently at {current_activity['plant']} awaiting departure/load-out.{prediction_sentence} Final route approval is unavailable until the active stop is closed, PostTrip mileage is recorded, and signatures are captured.")
+    elif final_unload_plant and last_stop_plant and final_unload_plant != last_stop_plant:
         final_unload_index = logs.index(final_unload_log) if final_unload_log in logs else -1
         post_unload_logs = logs[final_unload_index + 1:] if final_unload_index >= 0 else []
         later_cargo_issues = cargo_state.get("later_cargo_issues") or []
@@ -1304,13 +1372,18 @@ def _manager_summary_sentence(driver, logs, log_routes, route_status, damage_rep
     elif route_status == "Finalized":
         parts.append("The route has been finalized.")
 
+    active_open_stop = route_status == "Active" and any(blocker["label"] == "Active stop still open" for blocker in approval_blockers)
     mileage_issue = next((item for item in data_quality_items if item["label"] == "Mileage"), None)
     if mileage_issue and mileage_issue["status"] == "Needs correction":
         parts.append(f"Mileage needs correction before approval: {mileage_issue['detail']}")
-    elif mileage_issue and mileage_issue["status"] == "Pending":
-        parts.append("Mileage pending PostTrip review.")
-    if approval_blockers:
-        parts.append(f"Approval is blocked by {_manager_blocker_phrase(approval_blockers)}.")
+    elif mileage_issue and mileage_issue["status"] == "Pending" and not active_summary_covers_approval:
+        parts.append("PostTrip mileage is pending route close." if active_open_stop else "Mileage pending PostTrip review.")
+    if approval_blockers and not active_summary_covers_approval:
+        blocker_phrase = _manager_blocker_phrase(approval_blockers)
+        if active_open_stop:
+            parts.append(f"Final approval is not yet available because {blocker_phrase}.")
+        else:
+            parts.append(f"Approval is blocked by {blocker_phrase}.")
     elif damage_reports:
         parts.append(damage_report_count_label(damage_reports) + ".")
     elif photo_reviews:
@@ -1332,13 +1405,15 @@ def _manager_route_review_context(ctx):
     photo_reviews = _manager_photo_reviews(logs, log_routes)
     cargo_review = _manager_cargo_review(logs, log_routes, ctx.get("part_scan_events") or [], stop_forecasts)
     delay_review_rows = _manager_delay_review(logs, log_routes, stop_forecasts)
+    next_load_prediction = ctx.get("next_load_prediction")
+    damage_report_rows = _manager_damage_report_rows(ctx.get("damage_reports") or [])
     route_truck_context = ctx.get("route_truck_context") or _manager_route_truck_context(ctx["driver"].id, ctx["the_date"], ctx.get("pretrips") or [])
     mileage_review = ctx.get("mileage_review") or _manager_mileage_review(ctx.get("pretrips") or [], logs, route_truck_context)
     data_quality_items = _manager_data_quality(logs, log_routes, mileage_review["quality_item"], ctx.get("driver_signature"), route_finalized)
     approval_blockers = _manager_approval_blockers(data_quality_items, photo_reviews, cargo_review, route_finalized, logs, ctx.get("driver_signature"))
-    required_actions = _manager_required_actions(data_quality_items, photo_reviews, cargo_review, route_finalized, logs, ctx.get("driver_signature"))
+    required_actions = _manager_required_actions(data_quality_items, photo_reviews, cargo_review, route_finalized, logs, ctx.get("driver_signature"), delay_review_rows, next_load_prediction)
     review_status = _manager_review_status(required_actions, data_quality_items, photo_reviews, cargo_review, route_finalized, logs)
-    manager_summary = _manager_summary_sentence(ctx["driver"], logs, log_routes, route_status, ctx.get("damage_reports") or [], photo_reviews, mileage_review.get("total_miles"), data_quality_items, approval_blockers, mileage_review, cargo_review)
+    manager_summary = _manager_summary_sentence(ctx["driver"], logs, log_routes, route_status, ctx.get("damage_reports") or [], photo_reviews, mileage_review.get("total_miles"), data_quality_items, approval_blockers, mileage_review, cargo_review, route_state, next_load_prediction)
     return {
         **ctx,
         "review_status": review_status,
@@ -1348,9 +1423,12 @@ def _manager_route_review_context(ctx):
         "required_actions": required_actions,
         "approval_blockers": approval_blockers,
         "approval_blocked": bool(approval_blockers),
+        "approval_blocker_title": "Final Approval Not Yet Available" if route_status == "Active" else "Approval Blocked By",
         "data_quality_items": data_quality_items,
         "photo_reviews": photo_reviews,
+        "damage_report_rows": damage_report_rows,
         "cargo_review": cargo_review,
+        "next_load_prediction": next_load_prediction,
         "delay_review_rows": delay_review_rows,
         "truck_label": route_truck_context["label"],
         "route_truck_context": route_truck_context,
@@ -1383,10 +1461,15 @@ def _build_manager_route_review_pdf(review):
         pdf.text(36, y, "Current Active Stop", size=11, bold=True)
         y -= 14
         y = pdf.multiline_text(44, y, f"Current Active Stop: {current_activity['plant']}. {current_activity['detail']} {current_activity['forecast_status']}", width_chars=92, size=8, leading=10, max_lines=2)
+        prediction = review.get("next_load_prediction") or {}
+        if prediction:
+            y = pdf.multiline_text(44, y, f"{prediction.get('title')}: {prediction.get('predicted_load_label')}. Confidence: {prediction.get('confidence_label')}. Basis: {prediction.get('reason_text')}", width_chars=92, size=8, leading=10, max_lines=3)
+            if prediction.get("delay_reason_required"):
+                y = pdf.multiline_text(44, y, prediction.get("delay_reason_text"), width_chars=92, size=8, leading=10, max_lines=2, bold=True)
         y -= 12
 
     if review.get("approval_blockers"):
-        pdf.text(36, y, "Approval Blocked By", size=11, bold=True, color=(176, 0, 32))
+        pdf.text(36, y, review.get("approval_blocker_title") or "Approval Blocked By", size=11, bold=True, color=(176, 0, 32))
         y -= 14
         blocker_rows = [[item["label"], item["detail"]] for item in review["approval_blockers"]]
         y = pdf.table(36, y, [180, 360], 22, ["Blocker", "Detail"], blocker_rows[:6], font_size=7, header_gray=0.86)
@@ -1438,10 +1521,14 @@ def _build_manager_route_review_pdf(review):
         y = pdf.table(36, y, [140, 120, 130, 150], 20, ["Stop", "Load / Dock", "Plant Avg", "Status"], timing_rows, font_size=7)
     y -= 18
 
-    if review["photo_reviews"]:
+    if review.get("photo_reviews") or review.get("damage_report_rows"):
         y = _pdf_new_page_if_needed(pdf, y, 260)
         pdf.text(36, y, "Photo / Damage / Safety Review", size=11, bold=True)
         y -= 16
+        if review.get("damage_report_rows"):
+            damage_rows = [[f"#{row['id']}", row["type"], row["stop"], row["status"], row["photo_attached"], row["note"]] for row in review["damage_report_rows"][:5]]
+            y = pdf.table(36, y, [45, 70, 105, 75, 55, 190], 22, ["Incident", "Type", "Stop", "Status", "Photo", "Driver note"], damage_rows, font_size=6)
+            y -= 12
         for row in review["photo_reviews"][:3]:
             y = _pdf_new_page_if_needed(pdf, y, 230)
             photo_id = f"Photo ID #{row['photo_id']}" if row.get("photo_id") else "Photo ID unavailable"

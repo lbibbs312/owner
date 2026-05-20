@@ -18,6 +18,7 @@ from app.models.draft import DraftEntry
 from app.models.followup import OperationalFollowUp
 from app.models.plant_transfer import PlantTransfer, PlantTransferLine
 from app.models.search import SearchCorpus
+from app.models.load_intent import LoadIntent, PlantPredictionRule, PlantTimeSample
 from app.models.part import (
     ExternalDocument,
     HotMove,
@@ -64,4 +65,7 @@ __all__ = [
     "HotPartEvent",
     "PartRouteProfile",
     "ExternalDocument",
+    "LoadIntent",
+    "PlantPredictionRule",
+    "PlantTimeSample",
 ]

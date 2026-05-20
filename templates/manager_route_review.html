@@ -109,13 +109,21 @@
     <h2>Current Active Stop</h2>
     <div class="section-body">
       <p><strong>Current Active Stop: {{ route_state.current_activity.plant }}.</strong> {{ route_state.current_activity.detail }} <span class="delay-status {{ route_state.current_activity.forecast_class }}">{{ route_state.current_activity.forecast_status }}</span></p>
+      {% if next_load_prediction %}
+        <div class="audit-grid">
+          <div class="audit-item {{ 'clean' if next_load_prediction.confidence == 'confirmed' else ('needs-review' if next_load_prediction.is_known else 'warning') }}"><strong>{{ next_load_prediction.title }}</strong><span>{{ next_load_prediction.predicted_load_label }}</span><small>{{ next_load_prediction.reason_text }}</small></div>
+          <div class="audit-item"><strong>Confidence</strong><span>{{ next_load_prediction.confidence_label }}</span><small>Source: {{ next_load_prediction.source_label }}</small></div>
+          <div class="audit-item"><strong>Pickup Timing</strong><span>{{ next_load_prediction.status }}</span><small>Elapsed {{ next_load_prediction.elapsed_label }}; plant average {{ next_load_prediction.plant_average_label }}{% if next_load_prediction.ready_at_label %}; ready {{ next_load_prediction.ready_at_label }}{% endif %}</small></div>
+          <div class="audit-item warning"><strong>Required Driver Action</strong><span>{{ next_load_prediction.required_driver_action }}</span><small>{% if next_load_prediction.delay_reason_required %}{{ next_load_prediction.delay_reason_text }}{% else %}Predictions do not become actual cargo until confirmed.{% endif %}</small></div>
+        </div>
+      {% endif %}
     </div>
   </div>
   {% endif %}
 
   {% if approval_blockers %}
   <div class="section blocked-section">
-    <h2>Approval Blocked By</h2>
+    <h2>{{ approval_blocker_title or 'Approval Blocked By' }}</h2>
     <div class="section-body">
       <ul class="blocked-list">
         {% for blocker in approval_blockers %}<li>{{ blocker.label }}{% if blocker.detail %}: <span>{{ blocker.detail }}</span>{% endif %}</li>{% endfor %}
@@ -203,7 +211,20 @@
     <h2>Photo / Damage / Safety Review</h2>
     <div class="section-body">
       {% if not damage_reports and photo_reviews %}<p><strong>No formal damage report was filed. Cargo/photo proof requires manager classification.</strong></p>{% endif %}
-      {% if damage_reports %}<p><strong>{{ damage_report_summary }}.</strong> {{ damage_report_details|join('; ') }}</p>{% endif %}
+      {% if damage_reports %}<p><strong>{{ damage_report_summary }}.</strong></p>{% endif %}
+      {% if damage_report_rows %}
+        <table>
+          <thead><tr><th>Incident</th><th>Type</th><th>Stop</th><th>Status</th><th>Photo Attached</th><th>Driver Note</th><th>Manager Classification</th></tr></thead>
+          <tbody>
+            {% for row in damage_report_rows %}
+              <tr>
+                <td>#{{ row.id }}</td><td>{{ row.type }}</td><td>{{ row.stop }}</td><td>{{ row.status }}</td><td>{{ row.photo_attached }}</td><td>{{ row.note }}</td>
+                <td>[ ] Cargo loading issue<br>[ ] Damage event<br>[ ] Safety concern<br>[ ] Plant follow-up<br>[ ] Driver coaching</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
       {% if photo_reviews %}
       <div class="photo-grid">
         {% for review in photo_reviews %}
@@ -237,7 +258,7 @@
     <h2>Delay / Dock Time Review</h2>
     <div class="section-body">
       <table><thead><tr><th>Stop</th><th>Dock Time</th><th>Load-Time Status</th><th>Reason</th></tr></thead><tbody>
-      {% for row in delay_review_rows %}<tr><td>{{ row.plant }}</td><td>{{ row.dock_wait }}</td><td><span class="delay-status {{ row.forecast_class }}">{{ row.forecast }}</span></td><td>{{ row.reason }}</td></tr>{% endfor %}
+      {% for row in delay_review_rows %}<tr><td>{{ row.plant }}</td><td>{{ row.dock_wait }}</td><td><span class="delay-status {{ row.forecast_class }}">{{ row.forecast }}</span></td><td>{{ row.reason }}{% if row.requires_reason %}<br><strong>{{ row.action }}</strong>{% endif %}</td></tr>{% endfor %}
       </tbody></table>
     </div>
   </div>
