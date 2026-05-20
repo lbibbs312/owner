@@ -794,13 +794,13 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
     assert b"Manager Route Review" in response.data
     assert b"Driver Route Audit Sheet" not in response.data
     assert b"Review Status" in response.data
-    assert b"Needs Review" in response.data
-    assert b"Lamar has 6 recorded stops for this route" in response.data
-    assert b"The route appears complete but is not finalized" in response.data
+    assert b"Correction Required" in response.data
+    assert b"Lamar has 6 recorded stop events" in response.data
+    assert b"The route appears operationally complete but is not ready for approval" in response.data
     assert b"Mileage needs correction before approval" in response.data
     assert b"One Paint Central cargo-safety photo requires manager classification" in response.data
     assert b"No formal damage report was filed" in response.data
-    assert b"Correct mileage before approving route" in response.data
+    assert b"Correct route mileage before approving route" in response.data
     assert b"Review/classify Paint Central cargo photo" in response.data
     assert b"Finalize route after confirming final unload" in response.data
     assert b"Collect missing signatures" in response.data
@@ -811,13 +811,14 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
     assert b"The load is unbalanced. This is what causes skids to tip over." in response.data
     assert b"Uploaded 5:34pm EDT" in response.data
     assert b"Scan records" in response.data
-    assert b"Cargo Review" in response.data
+    assert b"Cargo / Manifest Review" in response.data
     assert b"Clean" in response.data
     assert b"Manifest linked" in response.data
     assert b"Not yet linked" in response.data
-    assert b"No actual manifest or shipper record is linked" in response.data
-    assert b"Cargo path" in response.data
-    assert b"Appears complete" in response.data
+    assert b"No shipper/manifest record is linked" in response.data
+    assert b"Recorded cargo path" in response.data
+    assert b"No mismatch detected" in response.data
+    assert b"Appears complete" not in response.data
     assert b"Picked Up / Departed With" not in response.data
     assert b"Manifest Linked: Yes" not in response.data
     assert b"Scan records are attached to this route." not in response.data
@@ -832,7 +833,7 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
     assert pdf.status_code == 200
     assert pdf.headers["Content-Type"] == "application/pdf"
     assert b"Manager Route Review" in pdf.data
-    assert b"Review Status: Needs Review" in pdf.data
+    assert b"Review Status: Correction Required" in pdf.data
 
 
 def test_manager_route_print_calculates_mileage_from_start_and_end_odometer(client, app):
@@ -880,6 +881,99 @@ def test_manager_route_print_calculates_mileage_from_start_and_end_odometer(clie
     assert b"Correct mileage before approving route" not in response.data
 
 
+def test_manager_route_review_separates_route_truck_mileage_from_extra_dvir(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, DriverLogPhoto, PartScanEvent, PostTrip, PreTrip, ShiftRecord
+
+        driver = create_user("st2_route_driver", "st2-route@example.com", "driver", first_name="Lamar", last_name="Bibbs")
+        create_user("st2_route_manager", "st2-route-manager@example.com", "management")
+        route_date = date.today()
+        plants = ["RW", "H", "RE", "PPL", "PC", "RE", "KP", "RW", "PC", "PPL", "RE"]
+        logs = []
+        for index, plant in enumerate(plants, start=1):
+            logs.append(DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name=plant,
+                load_size="Route Load" if index % 2 else "Empty",
+                depart_load_size="Route Load" if index < len(plants) else "Empty",
+                no_pickup=index in {1, 11},
+                arrive_time=f"2026-05-19 {8 + index:02d}:00:00",
+                depart_time=f"{8 + index:02d}:15",
+                created_at=datetime(2026, 5, 19, 8 + index, 0),
+            ))
+        db.session.add_all(logs)
+        db.session.flush()
+
+        route_pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st2", start_mileage=121970)
+        separate_pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st4", start_mileage=0)
+        db.session.add_all([route_pretrip, separate_pretrip])
+        db.session.flush()
+        db.session.add_all([
+            ShiftRecord(user_id=driver.id, pretrip_id=route_pretrip.id, start_time=datetime(2026, 5, 19, 12, 0)),
+            PostTrip(pretrip_id=route_pretrip.id, end_mileage=122007, miles_driven=37),
+            PostTrip(pretrip_id=separate_pretrip.id, end_mileage=121970),
+            PartScanEvent(raw_value="PC-PENDING-100", normalized_value="100", stop_id=logs[4].id, driver_id=driver.id, plant_id="PC", scan_context="departure_scan", validation_status="pending_part"),
+            PartScanEvent(raw_value="PC-VERIFY-200", normalized_value="200", stop_id=logs[4].id, driver_id=driver.id, plant_id="PC", scan_context="pickup_scan", validation_status="needs_review"),
+        ])
+        upload_dir = os.path.abspath(app.config["DRIVER_LOG_PHOTO_UPLOAD_FOLDER"])
+        os.makedirs(upload_dir, exist_ok=True)
+        filename = "paint-central-st2-proof.jpg"
+        with open(os.path.join(upload_dir, filename), "wb") as fh:
+            fh.write(b"cargo-photo")
+        db.session.add(DriverLogPhoto(
+            driver_log_id=logs[4].id,
+            filename=filename,
+            original_filename="paint-central-st2-proof.jpg",
+            content_type="image/jpeg",
+            source="departure_gallery",
+            note="load is unbalanced and needs review",
+            uploaded_by_id=driver.id,
+            uploaded_at=datetime(2026, 5, 19, 21, 34),
+        ))
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "st2_route_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+
+    assert response.status_code == 200
+    assert b"<strong>Truck:</strong> st2" in response.data
+    assert b"<strong>Mileage:</strong> 37 miles" in response.data
+    assert b"Lamar has 11 recorded stop events" in response.data
+    assert b"Route truck st2 shows 37 miles" in response.data
+    assert b"Separate DVIR mileage issue found for st4" in response.data
+    assert b"Separate DVIR" in response.data
+    assert b"121,970 mi" in response.data
+    assert b"Mileage conflict / correction required" not in response.data
+    assert b"Approval Blocked By" in response.data
+    assert b"2 scans need manager confirmation" in response.data
+    assert b"Cargo status" in response.data
+    assert b"Needs Review" in response.data
+    assert b"Recorded cargo path has no detected mismatch, but cargo review is not complete until pending scans are confirmed" in response.data
+    assert b"Cargo movement is based on driver route entries and scan records only. No shipper/manifest record is linked" in response.data
+    assert b"Final cargo approval" in response.data
+    assert b"Blocked until scans are confirmed" in response.data
+    assert b"Photo ID #" in response.data
+    assert b"[ ] Cargo loading issue" in response.data
+    assert b"Manager Notes - Internal" in response.data
+    assert b"Approval unavailable until blocked items are resolved" in response.data
+    assert b"Approve route - unavailable" in response.data
+    assert b"Route Detail Table" in response.data
+    assert response.data.count(b"<tr>") >= 11
+
+    pdf = client.get(f"/manager/driver-logs/route-attachment?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert pdf.status_code == 200
+    assert b"Approval Blocked By" in pdf.data
+    assert b"Route Detail Appendix" in pdf.data
+    assert b"Photo ID #" in pdf.data
+    assert b"Separate DVIR" in pdf.data
+    assert b"st4" in pdf.data
+
+
 def test_manager_route_review_resolves_post_unload_non_cargo_stops(client, app):
     from datetime import date, datetime
 
@@ -903,7 +997,7 @@ def test_manager_route_review_resolves_post_unload_non_cargo_stops(client, app):
     login(client, "noncargo_manager")
     response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
     assert response.status_code == 200
-    assert b"Route complete: final cargo unload at Raleigh East 4:43pm" in response.data
+    assert b"Operational route appears complete: final cargo unload at Raleigh East 4:43pm" in response.data
     assert b"Subsequent stops were non-cargo" in response.data
     assert b"Paint Central drop/no pickup" in response.data
     assert b"Ryder Rentals maintenance" in response.data
@@ -2291,8 +2385,8 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
 
     manager_print_missing_file = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
     assert manager_print_missing_file.status_code == 200
-    assert b"Photo record exists, but image file could not be loaded into this PDF" in manager_print_missing_file.data
-    assert b"Review photo in system before approval" in manager_print_missing_file.data
+    assert b"Photo record exists but file failed to render" in manager_print_missing_file.data
+    assert b"Review in system before approval" in manager_print_missing_file.data
 
     client.get("/logout")
     login(client, "photo_driver")
@@ -2379,7 +2473,7 @@ def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_rev
     manager_print = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
     assert manager_print.status_code == 200
     assert b"Cargo / Manifest Review" in manager_print.data
-    assert b"Cargo Review" in manager_print.data
+    assert b"Cargo status" in manager_print.data
     assert b"Needs Review" in manager_print.data
     assert b"Scan records" in manager_print.data
     assert b"Attached" in manager_print.data

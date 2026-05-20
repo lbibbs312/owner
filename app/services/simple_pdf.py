@@ -158,6 +158,39 @@ def _png_data_url_to_rgb(data_url):
     return width, height, bytes(rgb)
 
 
+def _jpeg_dimensions(jpeg_bytes):
+    if not jpeg_bytes.startswith(b"\xff\xd8"):
+        return None
+    pos = 2
+    sof_markers = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
+    while pos + 4 < len(jpeg_bytes):
+        if jpeg_bytes[pos] != 0xFF:
+            pos += 1
+            continue
+        while pos < len(jpeg_bytes) and jpeg_bytes[pos] == 0xFF:
+            pos += 1
+        if pos >= len(jpeg_bytes):
+            break
+        marker = jpeg_bytes[pos]
+        pos += 1
+        if marker in {0xD8, 0xD9}:
+            continue
+        if marker == 0xDA or pos + 2 > len(jpeg_bytes):
+            break
+        segment_len = struct.unpack(">H", jpeg_bytes[pos : pos + 2])[0]
+        if segment_len < 2 or pos + segment_len > len(jpeg_bytes):
+            break
+        if marker in sof_markers and segment_len >= 7:
+            height = struct.unpack(">H", jpeg_bytes[pos + 3 : pos + 5])[0]
+            width = struct.unpack(">H", jpeg_bytes[pos + 5 : pos + 7])[0]
+            components = jpeg_bytes[pos + 7] if pos + 7 < len(jpeg_bytes) else 3
+            if width and height and components in {1, 3}:
+                return width, height, "/DeviceGray" if components == 1 else "/DeviceRGB"
+            return None
+        pos += segment_len
+    return None
+
+
 class SimplePdf:
     def __init__(self, title="MoveDefense Document", pagesize=LETTER):
         self.title = title
@@ -211,7 +244,36 @@ class SimplePdf:
                 "name": name,
                 "width": image_width,
                 "height": image_height,
+                "color_space": "/DeviceRGB",
+                "filter": "/FlateDecode",
                 "stream": zlib.compress(rgb_bytes),
+            }
+        )
+        self.current.append(f"q {w:.2f} 0 0 {h:.2f} {x:.2f} {y:.2f} cm /{name} Do Q")
+        return True
+
+    def image_file(self, path, x, y, w, h):
+        try:
+            with open(path, "rb") as fh:
+                image_bytes = fh.read()
+        except OSError:
+            return False
+        if image_bytes.startswith(b"\x89PNG"):
+            data_url = "data:image/png;base64," + base64.b64encode(image_bytes).decode("ascii")
+            return self.image_png_data_url(data_url, x, y, w, h)
+        jpeg = _jpeg_dimensions(image_bytes)
+        if jpeg is None:
+            return False
+        image_width, image_height, color_space = jpeg
+        name = f"Im{len(self.images) + 1}"
+        self.images.append(
+            {
+                "name": name,
+                "width": image_width,
+                "height": image_height,
+                "color_space": color_space,
+                "filter": "/DCTDecode",
+                "stream": image_bytes,
             }
         )
         self.current.append(f"q {w:.2f} 0 0 {h:.2f} {x:.2f} {y:.2f} cm /{name} Do Q")
@@ -253,8 +315,8 @@ class SimplePdf:
             stream = image["stream"].decode("latin-1")
             objects.append(
                 f"<< /Type /XObject /Subtype /Image /Width {image['width']} "
-                f"/Height {image['height']} /ColorSpace /DeviceRGB /BitsPerComponent 8 "
-                f"/Filter /FlateDecode /Length {len(image['stream'])} >>\n"
+                f"/Height {image['height']} /ColorSpace {image.get('color_space', '/DeviceRGB')} /BitsPerComponent 8 "
+                f"/Filter {image.get('filter', '/FlateDecode')} /Length {len(image['stream'])} >>\n"
                 f"stream\n{stream}\nendstream"
             )
         xobject_resources = ""

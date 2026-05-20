@@ -25,6 +25,11 @@
     .action-section { border-color:#b45309; background:#fffbeb; }
     .action-section h2 { background:#fef3c7; color:#92400e; border-bottom-color:#b45309; }
     .action-section .section-body { background:#fffbeb; }
+    .blocked-section { border-color:#b91c1c; background:#fef2f2; }
+    .blocked-section h2 { background:#fee2e2; color:#991b1b; border-bottom-color:#b91c1c; }
+    .blocked-list { margin:0; padding-left:0.18in; font-weight:900; color:#7f1d1d; }
+    .decision-disabled { color:#777; text-decoration:line-through; }
+    .decision-warning { color:#991b1b; font-weight:900; margin:0 0 0.06in; }
     .actions { margin:0; padding-left:0.18in; font-size:9.5pt; line-height:1.35; font-weight:900; color:#78350f; }
     .qa-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:0.07in; }
     .qa-item { border:1px solid #cbd5e1; padding:0.06in; min-height:0.42in; }
@@ -83,7 +88,7 @@
       <strong>Driver:</strong> {{ driver.display_name }}<br>
       <strong>Truck:</strong> {{ truck_label }}<br>
       <strong>Mileage:</strong> {{ mileage_review.label }}<br>
-      <strong>Total Stops:</strong> {{ logs|length if logs else 0 }}<br>
+      <strong>Stop Events:</strong> {{ logs|length if logs else 0 }}<br>
       <strong>Route Status:</strong> {{ route_status }}
     </div>
   </div>
@@ -99,6 +104,17 @@
     </div>
   </div>
 
+  {% if approval_blockers %}
+  <div class="section blocked-section">
+    <h2>Approval Blocked By</h2>
+    <div class="section-body">
+      <ul class="blocked-list">
+        {% for blocker in approval_blockers %}<li>{{ blocker.label }}{% if blocker.detail %}: <span>{{ blocker.detail }}</span>{% endif %}</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="section">
     <h2>Mileage Review</h2>
     <div class="section-body">
@@ -107,10 +123,10 @@
       </div>
       {% if mileage_review.rows %}
       <table>
-        <thead><tr><th>Truck / PreTrip</th><th>Start Odometer</th><th>End Odometer</th><th>Calculated Route Miles</th><th>Status</th></tr></thead>
+        <thead><tr><th>Scope</th><th>Truck / PreTrip</th><th>Start Odometer</th><th>End Odometer</th><th>Calculated Route Miles</th><th>Status</th></tr></thead>
         <tbody>
           {% for row in mileage_review.rows %}
-            <tr><td>{{ row.truck }}</td><td>{{ row.start }}</td><td>{{ row.end }}</td><td>{{ row.miles }}</td><td>{{ row.detail }}</td></tr>
+            <tr><td>{{ row.scope }}</td><td>{{ row.truck }}</td><td>{{ row.start }}</td><td>{{ row.end }}</td><td>{{ row.miles }}</td><td>{{ row.detail }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -174,18 +190,19 @@
           <div class="photo-card">
             {% if review.photo_url %}
               <img src="{{ review.photo_url }}" alt="Cargo photo proof" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';">
-              <div class="photo-missing{% if not review.photo_load_warning %} hidden{% endif %}">Photo record exists, but image file could not be loaded into this PDF. Review photo in system before approval.</div>
+              <div class="photo-missing{% if not review.photo_load_warning %} hidden{% endif %}">Photo record exists but file failed to render. Review in system before approval.</div>
             {% else %}
-              <div class="photo-missing">Photo record exists, but image file could not be loaded into this PDF. Review photo in system before approval.</div>
+              <div class="photo-missing">Photo record exists but file failed to render. Review in system before approval.</div>
             {% endif %}
             <strong>{{ review.plant }} - {{ review.review_type }}</strong><br>
-            <span class="muted">Uploaded {{ review.uploaded_label }}</span><br>
+            <span class="muted">{% if review.photo_id %}Photo ID #{{ review.photo_id }} · {% endif %}Uploaded {{ review.uploaded_label }}</span><br>
             {% if review.display_note %}<span>Driver note: "{{ review.display_note }}"</span>{% else %}<span>No driver note recorded.</span>{% endif %}
             <div class="check-grid">
               <span>[ ] No issue</span><span>[ ] Cargo loading issue</span>
               <span>[ ] Damage event</span><span>[ ] Safety concern</span>
               <span>[ ] Plant follow-up required</span><span>[ ] Driver coaching required</span>
             </div>
+            <strong>Manager notes:</strong>
             <div class="notes-box"></div>
           </div>
         {% endfor %}
@@ -211,12 +228,13 @@
     <h2>Route Detail Table</h2>
     <div class="section-body">
       <table>
-        <thead><tr><th>Stop</th><th>Plant</th><th>Arrive</th><th>Depart</th><th>Cargo Out</th><th>Notes</th></tr></thead>
+        <thead><tr><th>Stop</th><th>Status</th><th>Plant</th><th>Arrive</th><th>Depart</th><th>Cargo Out</th><th>Notes</th></tr></thead>
         <tbody>
           {% for log in logs %}
             {% set route = (log_routes or {}).get(log.id) %}
             <tr>
               <td>{{ loop.index }}</td>
+              <td>{{ 'Active' if log.depart_time else 'Open' }}</td>
               <td>{{ route.plant if route else log.plant_name }}</td>
               <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
               <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
@@ -233,9 +251,11 @@
   <div class="section">
     <h2>Manager Decision</h2>
     <div class="section-body">
+      {% if approval_blocked %}<p class="decision-warning">Approval unavailable until blocked items are resolved.</p>{% endif %}
       <div class="decision-grid">
-        <span>[ ] Approve route</span>
+        <span class="{% if approval_blocked %}decision-disabled{% endif %}">[ ] Approve route{% if approval_blocked %} - unavailable{% endif %}</span>
         <span>[ ] Return to driver for correction</span>
+        {% if approval_blocked %}<span>[ ] Manager review required</span>{% endif %}
         <span>[ ] Escalate to safety</span>
         <span>[ ] Escalate to maintenance</span>
         <span>[ ] Escalate to plant manager</span>

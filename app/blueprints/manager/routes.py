@@ -26,7 +26,7 @@ from app.services.evidence_packet import build_damage_evidence_packet
 from app.extensions import db, socketio
 from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
-from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DriverLog, DriverLogPhoto, HotPartPhoto, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, Task, User
+from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DriverLog, DriverLogPhoto, HotPartPhoto, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, ShiftRecord, Task, User
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
 from app.services.operations import build_exception_items
@@ -668,7 +668,8 @@ def _route_print_context(driver_id, route_date):
         if photo_review:
             exception_notes.append(f"{photo_review['label']}: {photo_review['detail']}")
     signature_shift = _shift_record_for_driver_date(driver.id, route_date, require_signature=True)
-    mileage_review = _manager_mileage_review(pretrips, logs)
+    route_truck_context = _manager_route_truck_context(driver.id, route_date, pretrips)
+    mileage_review = _manager_mileage_review(pretrips, logs, route_truck_context)
     return {
         "driver": driver,
         "logs": logs,
@@ -680,6 +681,7 @@ def _route_print_context(driver_id, route_date):
         "damage_report_details": [damage_report_detail_label(report) for report in damage_reports],
         "total_miles": mileage_review["total_miles"],
         "mileage_review": mileage_review,
+        "route_truck_context": route_truck_context,
         "parts_carried": parts_carried,
         "exception_notes": exception_notes,
         "log_issue_details": log_issue_details,
@@ -718,12 +720,99 @@ def _driver_short_name(driver):
     return raw_name[:1].upper() + raw_name[1:] if raw_name else "Driver"
 
 
-def _manager_truck_label(pretrips):
-    latest = pretrips[-1] if pretrips else None
-    if not latest:
+def _pretrip_sort_key(pretrip):
+    return (
+        pretrip.pretrip_date or date.min,
+        pretrip.created_at or datetime.min,
+        pretrip.id or 0,
+    )
+
+
+def _manager_pretrip_truck_label(pretrip):
+    if not pretrip:
         return "Not recorded"
-    parts = [part for part in (latest.truck_number, latest.trailer_number) if part]
-    return " / ".join(parts) if parts else "Not recorded"
+    return pretrip.truck_number or f"PreTrip #{pretrip.id}"
+
+
+def _manager_shift_records_for_driver_date(driver_id, route_date):
+    records = []
+    seen = set()
+
+    def add_record(shift):
+        if shift and shift.id not in seen:
+            records.append(shift)
+            seen.add(shift.id)
+
+    for shift in (
+        ShiftRecord.query.join(PreTrip, ShiftRecord.pretrip_id == PreTrip.id)
+        .filter(ShiftRecord.user_id == driver_id, PreTrip.pretrip_date == route_date)
+        .order_by(ShiftRecord.start_time.asc(), ShiftRecord.id.asc())
+        .all()
+    ):
+        add_record(shift)
+
+    local_tz = pytz.timezone("America/Detroit")
+    for shift in (
+        ShiftRecord.query.filter(ShiftRecord.user_id == driver_id)
+        .order_by(ShiftRecord.start_time.asc(), ShiftRecord.id.asc())
+        .limit(50)
+        .all()
+    ):
+        if not shift.start_time:
+            continue
+        start_time = shift.start_time
+        if start_time.tzinfo is None:
+            start_time = pytz.utc.localize(start_time)
+        if start_time.astimezone(local_tz).date() == route_date:
+            add_record(shift)
+    return records
+
+
+def _manager_route_truck_context(driver_id, route_date, pretrips):
+    sorted_pretrips = sorted(pretrips, key=_pretrip_sort_key)
+    by_id = {pretrip.id: pretrip for pretrip in sorted_pretrips}
+    shift_records = _manager_shift_records_for_driver_date(driver_id, route_date)
+    route_ids = []
+    for shift in shift_records:
+        if shift.pretrip_id in by_id and shift.pretrip_id not in route_ids:
+            route_ids.append(shift.pretrip_id)
+
+    source = "shift-linked" if route_ids else "same-day-dvir"
+    if not route_ids:
+        route_ids = [pretrip.id for pretrip in sorted_pretrips]
+        if len(route_ids) > 1:
+            source = "ambiguous-multiple-dvir"
+        elif route_ids:
+            source = "single-dvir"
+
+    route_pretrips = [by_id[pretrip_id] for pretrip_id in route_ids if pretrip_id in by_id]
+    route_trucks = []
+    for pretrip in route_pretrips:
+        label = _manager_pretrip_truck_label(pretrip)
+        if label and label not in route_trucks:
+            route_trucks.append(label)
+    separate_pretrips = [pretrip for pretrip in sorted_pretrips if pretrip.id not in set(route_ids)]
+
+    if len(route_trucks) > 1:
+        label = "Multiple trucks: " + ", ".join(route_trucks)
+    elif route_trucks:
+        label = route_trucks[0]
+    else:
+        label = "Not recorded"
+
+    return {
+        "label": label,
+        "route_pretrip_ids": set(route_ids),
+        "route_trucks": route_trucks,
+        "multiple_trucks": len(route_trucks) > 1,
+        "separate_pretrips": separate_pretrips,
+        "source": source,
+    }
+
+
+def _manager_truck_label(pretrips):
+    latest = sorted(pretrips, key=_pretrip_sort_key)[-1] if pretrips else None
+    return _manager_pretrip_truck_label(latest)
 
 
 def _manager_mileage_label(value, suffix="mi"):
@@ -736,72 +825,95 @@ def _manager_mileage_label(value, suffix="mi"):
     return f"{formatted} {suffix}" if suffix else formatted
 
 
-def _manager_mileage_review(pretrips, logs):
+def _manager_mileage_review(pretrips, logs, route_truck_context=None):
     rows = []
-    issue_details = []
-    pending = False
-    completed = False
-    total_miles = 0
-    sorted_pretrips = sorted(
-        pretrips,
-        key=lambda pretrip: (
-            pretrip.pretrip_date or date.min,
-            pretrip.created_at or datetime.min,
-            pretrip.id or 0,
-        ),
-    )
+    route_issue_details = []
+    separate_issue_details = []
+    route_pending = False
+    route_completed = False
+    route_total_miles = 0
+    sorted_pretrips = sorted(pretrips, key=_pretrip_sort_key)
+    route_ids = set((route_truck_context or {}).get("route_pretrip_ids") or [pretrip.id for pretrip in sorted_pretrips])
+    route_label = (route_truck_context or {}).get("label") or _manager_truck_label(sorted_pretrips)
 
     for index, pretrip in enumerate(sorted_pretrips, start=1):
         posttrip = pretrip.posttrip
         start_mileage = pretrip.start_mileage
         end_mileage = posttrip.end_mileage if posttrip else None
-        truck_label = " / ".join(part for part in (pretrip.truck_number, pretrip.trailer_number) if part) or f"PreTrip #{pretrip.id}"
+        truck_label = _manager_pretrip_truck_label(pretrip)
+        is_route_truck = pretrip.id in route_ids
+        scope = "Route truck" if is_route_truck else "Separate DVIR"
         status = "Pending"
         row_detail = "PostTrip end mileage missing."
         miles_driven = None
 
         if end_mileage is None:
-            pending = True
+            if is_route_truck:
+                route_pending = True
         elif start_mileage is None or start_mileage <= 0:
-            status = "Needs correction"
+            status = "Needs correction" if is_route_truck else "Separate issue"
             row_detail = "Start mileage missing or zero."
-            issue_details.append(
-                f"{truck_label}: start mileage is missing or zero; end odometer {_manager_mileage_label(end_mileage)} cannot be used as route miles."
-            )
+            detail = f"{truck_label}: start mileage is missing or zero; end odometer {_manager_mileage_label(end_mileage)} cannot be used as route miles."
+            if is_route_truck:
+                route_issue_details.append(detail)
+            else:
+                separate_issue_details.append(detail)
         else:
             miles_driven = end_mileage - start_mileage
-            total_miles += miles_driven
-            completed = True
             status = "Recorded"
             row_detail = "Calculated from start and end odometer."
+            if is_route_truck:
+                route_total_miles += miles_driven
+                route_completed = True
             if miles_driven < 0 or miles_driven > 1000:
-                status = "Needs correction"
-                row_detail = "Route mileage is outside normal range."
-                issue_details.append(f"{truck_label}: {miles_driven:,} miles is outside normal route range.")
+                status = "Needs correction" if is_route_truck else "Separate issue"
+                row_detail = "Route mileage is outside normal range." if is_route_truck else "Separate DVIR mileage is outside normal range."
+                detail = f"{truck_label}: {miles_driven:,} miles is outside normal route range."
+                if is_route_truck:
+                    route_issue_details.append(detail)
+                else:
+                    separate_issue_details.append(detail)
 
         rows.append({
             "checkpoint": f"PreTrip {index}",
+            "scope": scope,
             "truck": truck_label,
             "start": _manager_mileage_label(start_mileage),
             "end": _manager_mileage_label(end_mileage),
             "miles": _manager_mileage_label(miles_driven, "miles") if miles_driven is not None else status,
             "status": status,
             "detail": row_detail,
+            "blocks_approval": bool(is_route_truck and status in {"Needs correction", "Pending"}),
         })
 
-    if issue_details:
-        quality_item = {"label": "Mileage", "status": "Needs correction", "detail": issue_details[0]}
+    route_mileage_label = _manager_mileage_label(route_total_miles, "miles") if route_completed else "Pending posttrip mileage"
+    if route_issue_details:
+        if route_truck_context and route_truck_context.get("multiple_trucks"):
+            detail = f"Route uses multiple trucks: {', '.join(route_truck_context['route_trucks'])}. {route_issue_details[0]}"
+        else:
+            detail = route_issue_details[0]
+        quality_item = {"label": "Mileage", "status": "Needs correction", "detail": detail, "blocks_approval": True}
         label = "Needs correction"
-        total_value = total_miles if completed else None
-    elif pending or not completed:
+        total_value = route_total_miles if route_completed else None
+    elif route_pending or not route_completed:
         detail = "PostTrip end mileage has not been recorded." if logs or pretrips else "No route mileage records were found."
-        quality_item = {"label": "Mileage", "status": "Pending", "detail": detail}
+        quality_item = {"label": "Mileage", "status": "Pending", "detail": detail, "blocks_approval": True}
         label = "Pending posttrip mileage" if logs or pretrips else "Not recorded"
         total_value = None
+    elif separate_issue_details:
+        separate_trucks = []
+        for row in rows:
+            if row["scope"] == "Separate DVIR" and row["status"] == "Separate issue" and row["truck"] not in separate_trucks:
+                separate_trucks.append(row["truck"])
+        separate_label = ", ".join(separate_trucks) or "another truck"
+        detail = f"Route truck {route_label} shows {route_mileage_label}. Separate DVIR mileage issue found for {separate_label} and requires correction."
+        quality_item = {"label": "Separate DVIR mileage", "status": "Separate issue", "detail": detail, "blocks_approval": False}
+        label = route_mileage_label
+        total_value = route_total_miles
     else:
-        quality_item = {"label": "Mileage", "status": "Normal", "detail": f"{total_miles:,} miles recorded."}
-        label = _manager_mileage_label(total_miles, "miles")
-        total_value = total_miles
+        quality_item = {"label": "Mileage", "status": "Normal", "detail": f"Route truck {route_label} shows {route_mileage_label}.", "blocks_approval": False}
+        label = route_mileage_label
+        total_value = route_total_miles
 
     return {
         "label": label,
@@ -809,7 +921,12 @@ def _manager_mileage_review(pretrips, logs):
         "detail": quality_item["detail"],
         "rows": rows,
         "total_miles": total_value,
+        "route_miles_label": route_mileage_label,
+        "route_truck_label": route_label,
+        "route_issue_details": route_issue_details,
+        "separate_issue_details": separate_issue_details,
         "quality_item": quality_item,
+        "blocks_approval": bool(quality_item.get("blocks_approval")),
     }
 
 
@@ -839,6 +956,14 @@ def _clean_manager_driver_note(note):
     return text
 
 
+def _driver_log_photo_file_path(photo):
+    if not photo:
+        return None
+    upload_root = current_app.config.get("DRIVER_LOG_PHOTO_UPLOAD_FOLDER", "uploads/driver_log_photos")
+    path = os.path.abspath(os.path.join(current_app.root_path, os.pardir, upload_root, photo.filename))
+    return path if os.path.isfile(path) else None
+
+
 def _manager_photo_reviews(logs, log_routes):
     rows = []
     for log in logs:
@@ -858,6 +983,8 @@ def _manager_photo_reviews(logs, log_routes):
             "summary": summary,
             "photo": latest,
             "thumbnail": summary.get("thumbnail"),
+            "photo_id": getattr(photo_for_url, "id", None),
+            "photo_path": _driver_log_photo_file_path(photo_for_url),
             "note": note,
             "display_note": _clean_manager_driver_note(note),
             "review_type": review_type,
@@ -908,18 +1035,31 @@ def _manager_cargo_review(logs, log_routes, part_scan_events):
     cargo_status = "Needs Review" if needs_review else "Clean"
     scan_records_attached = bool(part_scan_events)
     manifest_linked = False
-    cargo_path = "Needs review" if issues else "Appears complete"
     pending_items = f"{pending_count} scan{'s' if pending_count != 1 else ''} need manager confirmation" if pending_count else "None"
+    pending_reason = f"{pending_count} scan{'s' if pending_count != 1 else ''} require manager confirmation." if pending_count else "No pending scan confirmations."
     mismatches = f"{len(failed_scans)} scan validation issue{'s' if len(failed_scans) != 1 else ''}" if failed_scans else "None"
     unexpected_cargo = f"{len(unexpected_scans)} unexpected scan{'s' if len(unexpected_scans) != 1 else ''}" if unexpected_scans else "No"
+    if issues:
+        path_value = "Needs review"
+        path_detail = "; ".join(issues[:2])
+        path_class = "needs-review"
+    elif pending_count:
+        path_value = "No mismatch detected"
+        path_detail = "Recorded cargo path has no detected mismatch, but cargo review is not complete until pending scans are confirmed."
+        path_class = "warning"
+    else:
+        path_value = "No mismatch detected"
+        path_detail = "Recorded cargo path has no detected mismatch from entered stop data."
+        path_class = "clean"
+    final_approval = "Blocked" if needs_review else "Ready"
     summary_rows = [
-        {"label": "Cargo Review", "value": cargo_status, "detail": "Manager confirmation required." if needs_review else "Cargo movement reads clean.", "class": "needs-review" if needs_review else "clean"},
-        {"label": "Manifest linked", "value": "Not yet linked", "detail": "No actual manifest or shipper record is linked.", "class": "warning"},
+        {"label": "Cargo status", "value": cargo_status, "detail": "Manager confirmation required." if needs_review else "No cargo review blockers detected.", "class": "needs-review" if needs_review else "clean"},
+        {"label": "Reason", "value": pending_items if pending_count else ("Route issue" if issues else "None"), "detail": pending_reason if pending_count else ("; ".join(issues[:2]) if issues else "No pending cargo reason."), "class": "needs-review" if needs_review else "clean"},
+        {"label": "Recorded cargo path", "value": path_value, "detail": path_detail, "class": path_class},
+        {"label": "Manifest linked", "value": "Not yet linked", "detail": "Cargo movement is based on driver route entries and scan records only. No shipper/manifest record is linked.", "class": "warning"},
         {"label": "Scan records", "value": "Attached" if scan_records_attached else "None", "detail": "Scans are saved on this route." if scan_records_attached else "No cargo scans saved.", "class": "ok" if scan_records_attached else "muted"},
-        {"label": "Cargo path", "value": cargo_path, "detail": "No cargo movement mismatch detected." if not issues else "; ".join(issues[:2]), "class": "clean" if not issues else "needs-review"},
-        {"label": "Pending items", "value": pending_items, "detail": "No cargo follow-up needed." if pending_items == "None" else "Manager must confirm scan/cargo status.", "class": "clean" if pending_items == "None" else "needs-review"},
+        {"label": "Final cargo approval", "value": final_approval, "detail": "Blocked until scans are confirmed." if pending_count else ("Blocked until cargo issues are resolved." if needs_review else "Cargo review can be approved."), "class": "needs-review" if needs_review else "clean"},
         {"label": "Mismatches", "value": mismatches, "detail": "No scan mismatches detected." if mismatches == "None" else "Review failed or unexpected scans.", "class": "clean" if mismatches == "None" else "needs-review"},
-        {"label": "Still onboard after destination", "value": "Yes" if still_onboard else "No", "detail": "Cargo appears left onboard at its destination." if still_onboard else "No destination cargo is flagged onboard.", "class": "needs-review" if still_onboard else "clean"},
         {"label": "Unexpected cargo", "value": unexpected_cargo, "detail": "No unexpected cargo scans." if unexpected_cargo == "No" else "Unexpected scan requires manager review.", "class": "clean" if unexpected_cargo == "No" else "needs-review"},
     ]
     return {
@@ -930,12 +1070,14 @@ def _manager_cargo_review(logs, log_routes, part_scan_events):
         "manifest_label": "Not yet linked",
         "scan_review_status": "Needs manager confirmation" if pending_count else ("Recorded" if part_scan_events else "No scan records linked"),
         "pending_scan_count": pending_count,
+        "pending_scan_label": pending_items,
+        "pending_scan_reason": pending_reason,
         "status": cargo_status,
         "status_class": "needs-review" if needs_review else "clean",
         "summary_rows": summary_rows,
         "detail_needed": needs_review,
+        "approval_detail": pending_reason if pending_count else ("; ".join(issues[:2]) if issues else ""),
     }
-
 
 def _manager_delay_forecast_label(forecast):
     if not forecast:
@@ -990,8 +1132,11 @@ def _manager_data_quality(logs, log_routes, mileage_quality_item, driver_signatu
 
 def _manager_required_actions(data_quality_items, photo_reviews, cargo_review, route_finalized, logs, driver_signature):
     actions = []
-    if any(item["label"] == "Mileage" and item["status"] != "Normal" for item in data_quality_items):
-        actions.append("Correct mileage before approving route.")
+    mileage_item = next((item for item in data_quality_items if item["label"] in {"Mileage", "Separate DVIR mileage"}), None)
+    if mileage_item and mileage_item.get("blocks_approval"):
+        actions.append("Correct route mileage before approving route.")
+    elif mileage_item and mileage_item["status"] == "Separate issue":
+        actions.append("Correct separate DVIR mileage issue outside this route approval.")
     for review in photo_reviews:
         if "safety" in review["review_type"].lower() or review["summary"]["label"] == "Cargo Photo Proof":
             actions.append(f"Review/classify {review['plant']} cargo photo.")
@@ -1008,11 +1153,33 @@ def _manager_required_actions(data_quality_items, photo_reviews, cargo_review, r
     return actions
 
 
+def _manager_approval_blockers(data_quality_items, photo_reviews, cargo_review, route_finalized, logs, driver_signature):
+    blockers = []
+    mileage_item = next((item for item in data_quality_items if item["label"] in {"Mileage", "Separate DVIR mileage"}), None)
+    if mileage_item and mileage_item.get("blocks_approval"):
+        blockers.append({"label": "Mileage conflict / correction required", "detail": mileage_item["detail"]})
+    if cargo_review.get("pending_scan_count"):
+        blockers.append({"label": cargo_review["pending_scan_label"], "detail": "Final cargo approval is blocked until scans are confirmed."})
+    if cargo_review.get("issues"):
+        blockers.append({"label": "Cargo route issue", "detail": "; ".join(cargo_review["issues"][:2])})
+    for review in photo_reviews:
+        if "safety" in review["review_type"].lower() or review["summary"]["label"] == "Cargo Photo Proof":
+            blockers.append({"label": "Cargo safety photo needs classification", "detail": f"{review['plant']} photo proof requires manager classification."})
+            break
+    all_departed = bool(logs) and all(log.depart_time for log in logs)
+    if all_departed and not route_finalized:
+        blockers.append({"label": "Route not finalized", "detail": "Final stop appears complete, but the route is still open."})
+    if not driver_signature:
+        blockers.append({"label": "Driver signature missing", "detail": "Driver route signature has not been captured."})
+    blockers.append({"label": "Manager signature pending", "detail": "Manager review signature is required before approval."})
+    return blockers
+
+
 def _manager_review_status(required_actions, data_quality_items, photo_reviews, cargo_review, route_finalized, logs):
-    correction_labels = {"Missing departure"}
+    correction_labels = {"Missing departure", "Mileage"}
     if any(item["label"] in correction_labels and item["status"] in {"Needs correction", "Correction required"} for item in data_quality_items):
         return "Correction Required"
-    if photo_reviews or cargo_review["issues"] or cargo_review["pending_scan_count"] or any(item["status"] in {"Missing", "Finalization required", "Pending"} for item in data_quality_items):
+    if photo_reviews or cargo_review["issues"] or cargo_review["pending_scan_count"] or any(item["status"] in {"Missing", "Finalization required", "Pending", "Separate issue"} for item in data_quality_items):
         return "Needs Review"
     if route_finalized:
         return "Clean"
@@ -1081,9 +1248,21 @@ def _manager_post_unload_stop_label(log, route):
     return f"{plant} non-cargo stop"
 
 
-def _manager_summary_sentence(driver, logs, log_routes, route_status, damage_reports, photo_reviews, total_miles, data_quality_items):
+def _manager_blocker_phrase(blockers):
+    labels = [blocker["label"] for blocker in blockers]
+    if not labels:
+        return ""
+    if len(labels) == 1:
+        return labels[0]
+    if len(labels) == 2:
+        return f"{labels[0]} and {labels[1]}"
+    return ", ".join(labels[:-1]) + f", and {labels[-1]}"
+
+
+def _manager_summary_sentence(driver, logs, log_routes, route_status, damage_reports, photo_reviews, total_miles, data_quality_items, approval_blockers=None, mileage_review=None, cargo_review=None):
     name = _driver_short_name(driver)
-    parts = [f"{name} has {len(logs)} recorded stop{'s' if len(logs) != 1 else ''} for this route."]
+    approval_blockers = approval_blockers or []
+    parts = [f"{name} has {len(logs)} recorded stop event{'s' if len(logs) != 1 else ''}."]
     final_route = log_routes.get(logs[-1].id, {}) if logs else {}
     last_stop_plant = final_route.get("plant") or (_plant_label(logs[-1].plant_name) if logs else None)
     final_unload_log = next((log for log in reversed(logs) if (log_routes.get(log.id) or {}).get("unloaded_on_arrival")), None)
@@ -1099,23 +1278,29 @@ def _manager_summary_sentence(driver, logs, log_routes, route_status, damage_rep
         unload_stamp = f" {unload_time}" if unload_time else ""
         if post_unload_logs and not post_unload_cargo:
             post_labels = "; ".join(_manager_post_unload_stop_label(log, log_routes.get(log.id, {})) for log in post_unload_logs)
-            parts.append(f"Route complete: final cargo unload at {final_unload_plant}{unload_stamp}. Subsequent stops were non-cargo ({post_labels}).")
+            parts.append(f"Operational route appears complete: final cargo unload at {final_unload_plant}{unload_stamp}. Subsequent stops were non-cargo ({post_labels}).")
         elif post_unload_cargo:
             cargo_plants = ", ".join((log_routes.get(log.id, {}) or {}).get("plant") or _plant_label(log.plant_name) for log in post_unload_cargo)
             parts.append(f"Route needs review: final cargo unload at {final_unload_plant}{unload_stamp}, but later cargo activity was recorded at {cargo_plants}.")
         else:
-            parts.append(f"Route complete: final cargo unload at {final_unload_plant}{unload_stamp}.")
+            parts.append(f"Operational route appears complete: final cargo unload at {final_unload_plant}{unload_stamp}.")
     elif route_status == "Finalization Required":
-        parts.append("The route appears complete but is not finalized.")
+        parts.append("The route appears operationally complete but is not ready for approval.")
     elif route_status == "Active":
         parts.append("The route is active and still in progress.")
     elif route_status == "Finalized":
         parts.append("The route has been finalized.")
-    mileage_issue = next((item for item in data_quality_items if item["label"] == "Mileage"), None)
-    if mileage_issue and mileage_issue["status"] == "Needs correction":
-        parts.append("Mileage needs correction before approval.")
+    mileage_issue = next((item for item in data_quality_items if item["label"] in {"Mileage", "Separate DVIR mileage"}), None)
+    if mileage_issue and mileage_issue["status"] == "Separate issue":
+        parts.append(mileage_issue["detail"])
+    elif mileage_issue and mileage_issue["status"] == "Needs correction":
+        parts.append(f"Mileage needs correction before approval: {mileage_issue['detail']}")
     elif mileage_issue and mileage_issue["status"] == "Pending":
         parts.append("Mileage is pending posttrip review.")
+    if cargo_review and cargo_review.get("pending_scan_count"):
+        parts.append(cargo_review["pending_scan_reason"])
+    if approval_blockers:
+        parts.append(f"Approval is blocked by {_manager_blocker_phrase(approval_blockers)}.")
     if damage_reports:
         parts.append(damage_report_count_label(damage_reports) + ".")
     elif photo_reviews:
@@ -1126,7 +1311,6 @@ def _manager_summary_sentence(driver, logs, log_routes, route_status, damage_rep
     else:
         parts.append("No formal damage report was filed.")
     return " ".join(parts)
-
 
 def _manager_route_review_context(ctx):
     logs = ctx.get("logs") or []
@@ -1144,24 +1328,36 @@ def _manager_route_review_context(ctx):
     photo_reviews = _manager_photo_reviews(logs, log_routes)
     cargo_review = _manager_cargo_review(logs, log_routes, ctx.get("part_scan_events") or [])
     delay_review_rows = _manager_delay_review(logs, log_routes, ctx.get("stop_forecasts") or {})
-    mileage_review = ctx.get("mileage_review") or _manager_mileage_review(ctx.get("pretrips") or [], logs)
+    route_truck_context = ctx.get("route_truck_context") or _manager_route_truck_context(ctx["driver"].id, ctx["the_date"], ctx.get("pretrips") or [])
+    mileage_review = ctx.get("mileage_review") or _manager_mileage_review(ctx.get("pretrips") or [], logs, route_truck_context)
     data_quality_items = _manager_data_quality(logs, log_routes, mileage_review["quality_item"], ctx.get("driver_signature"), route_finalized)
+    approval_blockers = _manager_approval_blockers(data_quality_items, photo_reviews, cargo_review, route_finalized, logs, ctx.get("driver_signature"))
     required_actions = _manager_required_actions(data_quality_items, photo_reviews, cargo_review, route_finalized, logs, ctx.get("driver_signature"))
     review_status = _manager_review_status(required_actions, data_quality_items, photo_reviews, cargo_review, route_finalized, logs)
-    manager_summary = _manager_summary_sentence(ctx["driver"], logs, log_routes, route_status, ctx.get("damage_reports") or [], photo_reviews, mileage_review.get("total_miles"), data_quality_items)
+    manager_summary = _manager_summary_sentence(ctx["driver"], logs, log_routes, route_status, ctx.get("damage_reports") or [], photo_reviews, mileage_review.get("total_miles"), data_quality_items, approval_blockers, mileage_review, cargo_review)
     return {
         **ctx,
         "review_status": review_status,
         "route_status": route_status,
         "manager_summary": manager_summary,
         "required_actions": required_actions,
+        "approval_blockers": approval_blockers,
+        "approval_blocked": bool(approval_blockers),
         "data_quality_items": data_quality_items,
         "photo_reviews": photo_reviews,
         "cargo_review": cargo_review,
         "delay_review_rows": delay_review_rows,
-        "truck_label": _manager_truck_label(ctx.get("pretrips") or []),
+        "truck_label": route_truck_context["label"],
+        "route_truck_context": route_truck_context,
         "mileage_review": mileage_review,
     }
+
+
+def _pdf_new_page_if_needed(pdf, y, min_y=90):
+    if y < min_y:
+        pdf.add_page()
+        return 748
+    return y
 
 
 def _build_manager_route_review_pdf(review):
@@ -1172,47 +1368,115 @@ def _build_manager_route_review_pdf(review):
     pdf.text(330, 734, f"Driver: {review['driver'].display_name}", size=9)
     pdf.text(330, 720, f"Truck: {review['truck_label']}", size=9)
     pdf.text(330, 706, f"Mileage: {review['mileage_review']['label']}", size=9)
-    y = 690
-    y = pdf.multiline_text(36, y, review["manager_summary"], width_chars=95, size=9, leading=11, max_lines=4)
-    y -= 16
+    pdf.text(330, 692, f"Stop events: {len(review.get('logs') or [])}", size=9)
+    y = 676
+    y = pdf.multiline_text(36, y, review["manager_summary"], width_chars=96, size=9, leading=11, max_lines=5)
+    y -= 12
+
+    if review.get("approval_blockers"):
+        pdf.text(36, y, "Approval Blocked By", size=11, bold=True, color=(176, 0, 32))
+        y -= 14
+        blocker_rows = [[item["label"], item["detail"]] for item in review["approval_blockers"]]
+        y = pdf.table(36, y, [180, 360], 22, ["Blocker", "Detail"], blocker_rows[:6], font_size=7, header_gray=0.86)
+        y -= 16
+
+    y = _pdf_new_page_if_needed(pdf, y, 180)
     pdf.text(36, y, "Mileage Review", size=11, bold=True)
     y -= 14
     mileage_rows = [[review["mileage_review"]["status"], review["mileage_review"]["label"], review["mileage_review"]["detail"]]]
     y = pdf.table(36, y, [110, 130, 300], 22, ["Status", "Route Miles", "Detail"], mileage_rows, font_size=7)
     if review["mileage_review"].get("rows"):
         y -= 8
-        odometer_rows = [[row["truck"], row["start"], row["end"], row["miles"]] for row in review["mileage_review"]["rows"][:3]]
-        y = pdf.table(36, y, [150, 120, 120, 150], 20, ["Truck", "Start", "End", "Calculated"], odometer_rows, font_size=7)
+        odometer_rows = [[row["scope"], row["truck"], row["start"], row["end"], row["miles"], row["detail"]] for row in review["mileage_review"]["rows"][:6]]
+        y = pdf.table(36, y, [80, 90, 80, 80, 80, 130], 22, ["Scope", "Truck", "Start", "End", "Miles", "Status"], odometer_rows, font_size=7)
     y -= 16
+
+    y = _pdf_new_page_if_needed(pdf, y, 170)
     pdf.text(36, y, "Required Actions", size=11, bold=True)
     y -= 14
     for idx, action in enumerate(review["required_actions"], start=1):
-        y = pdf.multiline_text(44, y, f"{idx}. {action}", width_chars=85, size=8, leading=10, max_lines=2)
+        y = pdf.multiline_text(44, y, f"{idx}. {action}", width_chars=88, size=8, leading=10, max_lines=2)
     y -= 12
+
+    y = _pdf_new_page_if_needed(pdf, y, 170)
     pdf.text(36, y, "Data Quality Review", size=11, bold=True)
     y -= 14
     quality_rows = [[item["label"], item["status"], item["detail"]] for item in review["data_quality_items"]] or [["Route", "Clean", "No data quality issues flagged."]]
-    y = pdf.table(36, y, [110, 110, 320], 22, ["Check", "Status", "Detail"], quality_rows[:5], font_size=7)
+    y = pdf.table(36, y, [110, 110, 320], 22, ["Check", "Status", "Detail"], quality_rows[:6], font_size=7)
     y -= 18
-    pdf.text(36, y, "Cargo Review", size=11, bold=True)
+
+    y = _pdf_new_page_if_needed(pdf, y, 190)
+    pdf.text(36, y, "Cargo / Manifest Review", size=11, bold=True)
     y -= 14
     cargo_rows = [[row["label"], row["value"], row["detail"]] for row in review["cargo_review"]["summary_rows"]]
-    y = pdf.table(36, y, [120, 120, 300], 20, ["Audit", "Status", "Detail"], cargo_rows[:8], font_size=7)
+    y = pdf.table(36, y, [125, 125, 290], 22, ["Audit", "Status", "Detail"], cargo_rows[:8], font_size=7)
     y -= 18
+
     if review["photo_reviews"]:
+        y = _pdf_new_page_if_needed(pdf, y, 260)
         pdf.text(36, y, "Photo / Damage / Safety Review", size=11, bold=True)
-        y -= 14
-        photo_rows = [[row["plant"], row["review_type"], row["display_note"] or row["summary"]["detail"]] for row in review["photo_reviews"]]
-        y = pdf.table(36, y, [95, 130, 315], 26, ["Stop", "Review", "Driver Note"], photo_rows[:4], font_size=7)
-        y -= 12
-    if y < 190:
-        pdf.add_page()
-        y = 748
+        y -= 16
+        for row in review["photo_reviews"][:3]:
+            y = _pdf_new_page_if_needed(pdf, y, 230)
+            photo_id = f"Photo ID #{row['photo_id']}" if row.get("photo_id") else "Photo ID unavailable"
+            pdf.text(36, y, f"{row['plant']} - {row['review_type']} ({photo_id})", size=9, bold=True)
+            y -= 12
+            image_y = y - 78
+            image_drawn = bool(row.get("photo_path")) and pdf.image_file(row["photo_path"], 36, image_y, 96, 72)
+            if not image_drawn:
+                pdf.rect(36, image_y, 96, 72)
+                pdf.multiline_text(42, image_y + 46, "Photo record exists but file failed to render. Review in system before approval.", width_chars=22, size=6, leading=8, max_lines=4, bold=True)
+            pdf.text(146, y, f"Uploaded: {row['uploaded_label']}", size=8, bold=True)
+            pdf.multiline_text(146, y - 12, f"Driver note: {row['display_note'] or 'No driver note recorded.'}", width_chars=68, size=7, leading=9, max_lines=3)
+            checks = "[ ] No issue   [ ] Cargo loading issue   [ ] Damage event   [ ] Safety concern"
+            pdf.multiline_text(146, y - 44, checks, width_chars=78, size=7, leading=9, max_lines=2)
+            pdf.text(146, y - 68, "[ ] Plant follow-up required   [ ] Driver coaching required", size=7)
+            pdf.text(146, y - 86, "Manager notes:", size=7, bold=True)
+            pdf.rect(146, y - 126, 390, 34)
+            y -= 146
+        y -= 4
+
+    pdf.add_page()
+    y = 748
+    pdf.text(36, y, "Route Detail Appendix", size=12, bold=True)
+    y -= 14
+    pdf.text(36, y, f"{len(review.get('logs') or [])} recorded stop event(s). Active route records are listed below.", size=8)
+    y -= 12
+    route_rows = []
+    for idx, log in enumerate(review.get("logs") or [], start=1):
+        route = (review.get("log_routes") or {}).get(log.id, {})
+        route_rows.append([
+            str(idx),
+            "Active" if log.depart_time else "Open",
+            route.get("plant") or _plant_label(log.plant_name),
+            _manager_time_label(log.arrive_time) or "--",
+            _manager_time_label(log.depart_time) or "--",
+            route.get("depart_cargo_desc") if route.get("depart_cargo_desc") is not None else (log.depart_load_size or "--"),
+            route.get("action") or "Logged stop",
+        ])
+    y = pdf.table(36, y, [30, 55, 95, 55, 55, 120, 130], 22, ["#", "Status", "Plant", "Arrive", "Depart", "Cargo Out", "Notes"], route_rows[:18], font_size=6)
+    y -= 18
+
+    y = _pdf_new_page_if_needed(pdf, y, 185)
     pdf.text(36, y, "Manager Decision", size=11, bold=True)
-    y -= 16
-    decisions = ["Approve route", "Return to driver for correction", "Escalate to safety", "Escalate to maintenance", "Escalate to plant manager", "Data-entry correction only"]
+    y -= 14
+    if review.get("approval_blocked"):
+        pdf.text(44, y, "Approval unavailable until blocked items are resolved.", size=8, bold=True, color=(176, 0, 32))
+        y -= 14
+        decisions = [
+            "[ ] Approve route - unavailable",
+            "[ ] Return to driver for correction",
+            "[ ] Manager review required",
+            "[ ] Escalate to safety",
+            "[ ] Escalate to maintenance",
+            "[ ] Escalate to plant manager",
+            "[ ] Mark as data-entry correction only",
+        ]
+    else:
+        decisions = ["[ ] Approve route", "[ ] Return to driver for correction", "[ ] Escalate to safety", "[ ] Escalate to maintenance", "[ ] Escalate to plant manager", "[ ] Data-entry correction only"]
     for decision in decisions:
-        pdf.text(44, y, f"[ ] {decision}", size=8)
+        color = (110, 110, 110) if "Approve route - unavailable" in decision else None
+        pdf.text(44, y, decision, size=8, color=color)
         y -= 12
     y -= 6
     pdf.text(36, y, "Manager notes:", size=8, bold=True)
@@ -1225,7 +1489,6 @@ def _build_manager_route_review_pdf(review):
     if review.get("driver_signature"):
         pdf.text(36, 42, "Driver e-signature captured", size=8)
     return pdf.build()
-
 
 def _requested_url():
     return request.full_path if request.query_string else request.path
