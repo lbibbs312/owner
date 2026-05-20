@@ -797,14 +797,16 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
     assert b"Needs Review" in response.data
     assert b"Lamar has 6 recorded stops for this route" in response.data
     assert b"The route appears complete but is not finalized" in response.data
-    assert b"Mileage is invalid and must be corrected before approval" in response.data
+    assert b"Mileage needs correction before approval" in response.data
     assert b"One Paint Central cargo-safety photo requires manager classification" in response.data
     assert b"No formal damage report was filed" in response.data
     assert b"Correct mileage before approving route" in response.data
     assert b"Review/classify Paint Central cargo photo" in response.data
     assert b"Finalize route after confirming final unload" in response.data
     assert b"Collect missing signatures" in response.data
-    assert b"121,970 miles is outside normal route range" in response.data
+    assert b"start mileage is missing or zero" in response.data
+    assert b"end odometer 121,970 mi cannot be used as route miles" in response.data
+    assert b"121,970 miles is outside normal route range" not in response.data
     assert b"Cargo safety review" in response.data
     assert b"The load is unbalanced. This is what causes skids to tip over." in response.data
     assert b"Uploaded 5:34pm EDT" in response.data
@@ -831,6 +833,51 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
     assert pdf.headers["Content-Type"] == "application/pdf"
     assert b"Manager Route Review" in pdf.data
     assert b"Review Status: Needs Review" in pdf.data
+
+
+def test_manager_route_print_calculates_mileage_from_start_and_end_odometer(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PostTrip, PreTrip
+
+        driver = create_user("mileage_driver", "mileage-driver@example.com", "driver", first_name="Lamar")
+        create_user("mileage_manager", "mileage-manager@example.com", "management")
+        route_date = date.today()
+        pretrip = PreTrip(
+            user_id=driver.id,
+            pretrip_date=route_date,
+            truck_number="ST2",
+            start_mileage=122000,
+        )
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            PostTrip(pretrip_id=pretrip.id, end_mileage=122007, miles_driven=7),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="RE",
+                load_size="Empty",
+                arrive_time="2026-05-19 08:00:00",
+                depart_time="08:20",
+                created_at=datetime(2026, 5, 19, 8, 0),
+            ),
+        ])
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "mileage_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+
+    assert response.status_code == 200
+    assert b"Mileage Review" in response.data
+    assert b"122,000 mi" in response.data
+    assert b"122,007 mi" in response.data
+    assert b"7 miles" in response.data
+    assert b"122,007 miles is outside normal route range" not in response.data
+    assert b"Correct mileage before approving route" not in response.data
 
 
 def test_manager_route_review_resolves_post_unload_non_cargo_stops(client, app):

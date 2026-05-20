@@ -44,7 +44,6 @@ from app.blueprints.driver.routes import (
     _build_pretrip_pdf,
     _plant_transfer_copy_sets,
     _shift_record_for_driver_date,
-    _total_miles_for_pretrips,
     _task_route_events_for_logs,
     _stop_photo_review_summary,
 )
@@ -669,6 +668,7 @@ def _route_print_context(driver_id, route_date):
         if photo_review:
             exception_notes.append(f"{photo_review['label']}: {photo_review['detail']}")
     signature_shift = _shift_record_for_driver_date(driver.id, route_date, require_signature=True)
+    mileage_review = _manager_mileage_review(pretrips, logs)
     return {
         "driver": driver,
         "logs": logs,
@@ -678,7 +678,8 @@ def _route_print_context(driver_id, route_date):
         "damage_reports": damage_reports,
         "damage_report_summary": damage_report_count_label(damage_reports),
         "damage_report_details": [damage_report_detail_label(report) for report in damage_reports],
-        "total_miles": _total_miles_for_pretrips(pretrips),
+        "total_miles": mileage_review["total_miles"],
+        "mileage_review": mileage_review,
         "parts_carried": parts_carried,
         "exception_notes": exception_notes,
         "log_issue_details": log_issue_details,
@@ -725,16 +726,91 @@ def _manager_truck_label(pretrips):
     return " / ".join(parts) if parts else "Not recorded"
 
 
-def _mileage_quality_item(total_miles):
-    if total_miles is None:
-        return {"label": "Mileage", "status": "Pending", "detail": "Posttrip mileage has not been recorded."}
+def _manager_mileage_label(value, suffix="mi"):
+    if value is None:
+        return "--"
     try:
-        miles = int(total_miles)
+        formatted = f"{int(value):,}"
     except (TypeError, ValueError):
-        return {"label": "Mileage", "status": "Needs correction", "detail": f"Mileage value {total_miles} is not numeric."}
-    if miles < 0 or miles > 1000:
-        return {"label": "Mileage", "status": "Needs correction", "detail": f"{miles:,} miles is outside normal route range."}
-    return {"label": "Mileage", "status": "Normal", "detail": f"{miles:,} miles recorded."}
+        return str(value)
+    return f"{formatted} {suffix}" if suffix else formatted
+
+
+def _manager_mileage_review(pretrips, logs):
+    rows = []
+    issue_details = []
+    pending = False
+    completed = False
+    total_miles = 0
+    sorted_pretrips = sorted(
+        pretrips,
+        key=lambda pretrip: (
+            pretrip.pretrip_date or date.min,
+            pretrip.created_at or datetime.min,
+            pretrip.id or 0,
+        ),
+    )
+
+    for index, pretrip in enumerate(sorted_pretrips, start=1):
+        posttrip = pretrip.posttrip
+        start_mileage = pretrip.start_mileage
+        end_mileage = posttrip.end_mileage if posttrip else None
+        truck_label = " / ".join(part for part in (pretrip.truck_number, pretrip.trailer_number) if part) or f"PreTrip #{pretrip.id}"
+        status = "Pending"
+        row_detail = "PostTrip end mileage missing."
+        miles_driven = None
+
+        if end_mileage is None:
+            pending = True
+        elif start_mileage is None or start_mileage <= 0:
+            status = "Needs correction"
+            row_detail = "Start mileage missing or zero."
+            issue_details.append(
+                f"{truck_label}: start mileage is missing or zero; end odometer {_manager_mileage_label(end_mileage)} cannot be used as route miles."
+            )
+        else:
+            miles_driven = end_mileage - start_mileage
+            total_miles += miles_driven
+            completed = True
+            status = "Recorded"
+            row_detail = "Calculated from start and end odometer."
+            if miles_driven < 0 or miles_driven > 1000:
+                status = "Needs correction"
+                row_detail = "Route mileage is outside normal range."
+                issue_details.append(f"{truck_label}: {miles_driven:,} miles is outside normal route range.")
+
+        rows.append({
+            "checkpoint": f"PreTrip {index}",
+            "truck": truck_label,
+            "start": _manager_mileage_label(start_mileage),
+            "end": _manager_mileage_label(end_mileage),
+            "miles": _manager_mileage_label(miles_driven, "miles") if miles_driven is not None else status,
+            "status": status,
+            "detail": row_detail,
+        })
+
+    if issue_details:
+        quality_item = {"label": "Mileage", "status": "Needs correction", "detail": issue_details[0]}
+        label = "Needs correction"
+        total_value = total_miles if completed else None
+    elif pending or not completed:
+        detail = "PostTrip end mileage has not been recorded." if logs or pretrips else "No route mileage records were found."
+        quality_item = {"label": "Mileage", "status": "Pending", "detail": detail}
+        label = "Pending posttrip mileage" if logs or pretrips else "Not recorded"
+        total_value = None
+    else:
+        quality_item = {"label": "Mileage", "status": "Normal", "detail": f"{total_miles:,} miles recorded."}
+        label = _manager_mileage_label(total_miles, "miles")
+        total_value = total_miles
+
+    return {
+        "label": label,
+        "status": quality_item["status"],
+        "detail": quality_item["detail"],
+        "rows": rows,
+        "total_miles": total_value,
+        "quality_item": quality_item,
+    }
 
 
 def _manager_uploaded_label(stamp):
@@ -893,11 +969,8 @@ def _manager_delay_review(logs, log_routes, stop_forecasts):
     return rows
 
 
-def _manager_data_quality(logs, log_routes, total_miles, driver_signature, route_finalized):
-    items = []
-    mileage_item = _mileage_quality_item(total_miles)
-    if mileage_item["status"] != "Normal":
-        items.append(mileage_item)
+def _manager_data_quality(logs, log_routes, mileage_quality_item, driver_signature, route_finalized):
+    items = [mileage_quality_item]
     all_departed = bool(logs) and all(log.depart_time for log in logs)
     if all_departed and not route_finalized:
         items.append({"label": "Route status", "status": "Finalization required", "detail": "Final stop appears completed, but the route is still marked open."})
@@ -1039,8 +1112,10 @@ def _manager_summary_sentence(driver, logs, log_routes, route_status, damage_rep
     elif route_status == "Finalized":
         parts.append("The route has been finalized.")
     mileage_issue = next((item for item in data_quality_items if item["label"] == "Mileage"), None)
-    if mileage_issue and mileage_issue["status"] != "Normal":
-        parts.append("Mileage is invalid and must be corrected before approval.")
+    if mileage_issue and mileage_issue["status"] == "Needs correction":
+        parts.append("Mileage needs correction before approval.")
+    elif mileage_issue and mileage_issue["status"] == "Pending":
+        parts.append("Mileage is pending posttrip review.")
     if damage_reports:
         parts.append(damage_report_count_label(damage_reports) + ".")
     elif photo_reviews:
@@ -1069,10 +1144,11 @@ def _manager_route_review_context(ctx):
     photo_reviews = _manager_photo_reviews(logs, log_routes)
     cargo_review = _manager_cargo_review(logs, log_routes, ctx.get("part_scan_events") or [])
     delay_review_rows = _manager_delay_review(logs, log_routes, ctx.get("stop_forecasts") or {})
-    data_quality_items = _manager_data_quality(logs, log_routes, ctx.get("total_miles"), ctx.get("driver_signature"), route_finalized)
+    mileage_review = ctx.get("mileage_review") or _manager_mileage_review(ctx.get("pretrips") or [], logs)
+    data_quality_items = _manager_data_quality(logs, log_routes, mileage_review["quality_item"], ctx.get("driver_signature"), route_finalized)
     required_actions = _manager_required_actions(data_quality_items, photo_reviews, cargo_review, route_finalized, logs, ctx.get("driver_signature"))
     review_status = _manager_review_status(required_actions, data_quality_items, photo_reviews, cargo_review, route_finalized, logs)
-    manager_summary = _manager_summary_sentence(ctx["driver"], logs, log_routes, route_status, ctx.get("damage_reports") or [], photo_reviews, ctx.get("total_miles"), data_quality_items)
+    manager_summary = _manager_summary_sentence(ctx["driver"], logs, log_routes, route_status, ctx.get("damage_reports") or [], photo_reviews, mileage_review.get("total_miles"), data_quality_items)
     return {
         **ctx,
         "review_status": review_status,
@@ -1084,6 +1160,7 @@ def _manager_route_review_context(ctx):
         "cargo_review": cargo_review,
         "delay_review_rows": delay_review_rows,
         "truck_label": _manager_truck_label(ctx.get("pretrips") or []),
+        "mileage_review": mileage_review,
     }
 
 
@@ -1094,8 +1171,18 @@ def _build_manager_route_review_pdf(review):
     pdf.text(330, 748, f"Date: {review['the_date']}", size=9, bold=True)
     pdf.text(330, 734, f"Driver: {review['driver'].display_name}", size=9)
     pdf.text(330, 720, f"Truck: {review['truck_label']}", size=9)
-    y = 704
+    pdf.text(330, 706, f"Mileage: {review['mileage_review']['label']}", size=9)
+    y = 690
     y = pdf.multiline_text(36, y, review["manager_summary"], width_chars=95, size=9, leading=11, max_lines=4)
+    y -= 16
+    pdf.text(36, y, "Mileage Review", size=11, bold=True)
+    y -= 14
+    mileage_rows = [[review["mileage_review"]["status"], review["mileage_review"]["label"], review["mileage_review"]["detail"]]]
+    y = pdf.table(36, y, [110, 130, 300], 22, ["Status", "Route Miles", "Detail"], mileage_rows, font_size=7)
+    if review["mileage_review"].get("rows"):
+        y -= 8
+        odometer_rows = [[row["truck"], row["start"], row["end"], row["miles"]] for row in review["mileage_review"]["rows"][:3]]
+        y = pdf.table(36, y, [150, 120, 120, 150], 20, ["Truck", "Start", "End", "Calculated"], odometer_rows, font_size=7)
     y -= 16
     pdf.text(36, y, "Required Actions", size=11, bold=True)
     y -= 14

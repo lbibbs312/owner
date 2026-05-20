@@ -82,6 +82,7 @@
       <strong>Date:</strong> {{ the_date }}<br>
       <strong>Driver:</strong> {{ driver.display_name }}<br>
       <strong>Truck:</strong> {{ truck_label }}<br>
+      <strong>Mileage:</strong> {{ mileage_review.label }}<br>
       <strong>Total Stops:</strong> {{ logs|length if logs else 0 }}<br>
       <strong>Route Status:</strong> {{ route_status }}
     </div>
@@ -95,6 +96,25 @@
     <div>
       <div class="status-label">Manager Summary</div>
       <div class="summary">{{ manager_summary }}</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Mileage Review</h2>
+    <div class="section-body">
+      <div class="audit-grid">
+        <div class="audit-item {{ 'needs-review' if mileage_review.status == 'Needs correction' else ('warning' if mileage_review.status == 'Pending' else 'clean') }}"><strong>Total Route Mileage</strong><span>{{ mileage_review.label }}</span><small>{{ mileage_review.detail }}</small></div>
+      </div>
+      {% if mileage_review.rows %}
+      <table>
+        <thead><tr><th>Truck / PreTrip</th><th>Start Odometer</th><th>End Odometer</th><th>Calculated Route Miles</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for row in mileage_review.rows %}
+            <tr><td>{{ row.truck }}</td><td>{{ row.start }}</td><td>{{ row.end }}</td><td>{{ row.miles }}</td><td>{{ row.detail }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
     </div>
   </div>
 
