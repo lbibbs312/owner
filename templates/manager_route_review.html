@@ -227,7 +227,7 @@
         <div>
           <p><strong>Driver Signature</strong></p>
           <div class="sig-line">{% if driver_signature %}<img src="{{ driver_signature }}" alt="Driver signature">{% endif %}</div>
-          <small class="muted">{% if signature_timestamp %}Signed {{ signature_timestamp.strftime('%m/%d/%Y %I:%M %p') }} UTC{% else %}Not yet signed{% endif %}</small>
+          <small class="muted">{% if signature_timestamp %}Signed {{ signature_timestamp|to_detroit_datetime }}{% else %}Not yet signed{% endif %}</small>
         </div>
         <div>
           <p><strong>Manager Signature</strong></p>

@@ -1510,7 +1510,13 @@ def _build_pretrip_pdf(pretrip):
 
 def _signature_timestamp_label(signature_timestamp):
     if signature_timestamp:
-        return f"Signed {signature_timestamp.strftime('%m/%d/%Y %I:%M %p')} UTC"
+        stamp = signature_timestamp
+        if stamp.tzinfo is None:
+            stamp = pytz.utc.localize(stamp)
+        else:
+            stamp = stamp.astimezone(pytz.utc)
+        local_stamp = stamp.astimezone(pytz.timezone("America/Detroit"))
+        return f"Signed {local_stamp.strftime('%Y-%m-%d %I:%M%p').lower().replace(' 0', ' ')} {local_stamp.strftime('%Z')}"
     return "Timestamp unavailable"
 
 
@@ -3215,8 +3221,7 @@ def end_of_day_summary():
     if form.validate_on_submit():
         sig_data = (form.driver_signature.data or "").strip()
         if not sig_data.startswith("data:image/"):
-            flash("Sign the route before submitting so the printout can show your signature.", "warning")
-            return redirect(url_for("driver.end_of_day_summary"))
+            return redirect(url_for("driver.end_of_day_summary", signature_required=1) + "#signatureSection")
 
         signature_shift = (
             ShiftRecord.query.filter_by(user_id=current_user.id, end_time=None)

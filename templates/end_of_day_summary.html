@@ -156,18 +156,23 @@
     {% endif %}
 
     <hr class="mt-4">
+    <section id="signatureSection" class="route-signature-section">
     <h4 class="mb-1">Driver Signature</h4>
     <p class="text-muted small mb-2">Sign below, then tap <strong>Sign &amp; Submit</strong> to finalize your route.</p>
+    <div id="signatureWarning" class="alert alert-warning py-2 px-3 mb-2{% if not request.args.get('signature_required') %} d-none{% endif %}" role="alert">
+      Sign in the Driver Signature box, then tap Sign &amp; Submit.
+    </div>
 
     {{ form.driver_signature(id="driverSigData") }}
 
-    <div class="border rounded mb-2" style="display:inline-block; touch-action:none;">
-      <canvas id="sigCanvas" width="480" height="160"
+    <div id="signatureCanvasWrap" class="border rounded mb-2" style="display:inline-block; touch-action:none;">
+      <canvas id="sigCanvas" width="480" height="160" tabindex="0"
               style="display:block; background:#fff; cursor:crosshair; border-radius:4px;"></canvas>
     </div>
     <br>
     <button type="button" class="btn btn-outline-secondary btn-sm me-2" id="sigClear">Clear</button>
     <button type="button" class="btn btn-success" id="sigSubmit">Sign &amp; Submit</button>
+    </section>
   </form>
 </div>
 <script>
@@ -176,6 +181,9 @@
   const ctx = canvas.getContext('2d');
   const sigData = document.getElementById('driverSigData');
   const form = canvas.closest('form');
+  const signatureSection = document.getElementById('signatureSection');
+  const signatureWarning = document.getElementById('signatureWarning');
+  const signatureCanvasWrap = document.getElementById('signatureCanvasWrap');
   let drawing = false;
   let hasInk = false;
 
@@ -201,6 +209,8 @@
     e.preventDefault();
     drawing = true;
     hasInk = true;
+    signatureWarning.classList.add('d-none');
+    signatureCanvasWrap.classList.remove('border-warning');
     if (e.pointerId !== undefined && canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
     const p = pos(e);
     ctx.beginPath();
@@ -243,15 +253,24 @@
     return Boolean(sigData.value && sigData.value.startsWith('data:image/'));
   }
 
+  function showSignatureWarning() {
+    signatureWarning.classList.remove('d-none');
+    signatureCanvasWrap.classList.add('border-warning');
+    signatureSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    canvas.focus({ preventScroll: true });
+  }
+
   document.getElementById('sigClear').addEventListener('click', function () {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     sigData.value = '';
     hasInk = false;
+    signatureWarning.classList.add('d-none');
+    signatureCanvasWrap.classList.remove('border-warning');
   });
 
   document.getElementById('sigSubmit').addEventListener('click', function () {
     if (!syncSignature()) {
-      alert('Please sign before submitting.');
+      showSignatureWarning();
       return;
     }
     form.submit();
@@ -260,9 +279,13 @@
   form.addEventListener('submit', function (e) {
     if (!syncSignature()) {
       e.preventDefault();
-      alert('Please sign before submitting.');
+      showSignatureWarning();
     }
   });
+
+  if (!signatureWarning.classList.contains('d-none')) {
+    window.setTimeout(showSignatureWarning, 50);
+  }
 })();
 </script>
 {% endblock %}

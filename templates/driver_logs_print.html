@@ -270,7 +270,7 @@
       </div>
       <div class="sig-ts">
         {% if signature_timestamp %}
-          Signed {{ signature_timestamp.strftime('%m/%d/%Y %I:%M %p') }} UTC
+          Signed {{ signature_timestamp|to_detroit_datetime }}
         {% elif driver_signature %}
           Timestamp unavailable
         {% else %}

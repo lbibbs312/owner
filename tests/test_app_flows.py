@@ -2965,6 +2965,9 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
     assert signature_page.status_code == 200
     assert b"pointerdown" in signature_page.data
     assert b"form.addEventListener('submit'" in signature_page.data
+    assert b"signatureSection" in signature_page.data
+    assert b"showSignatureWarning" in signature_page.data
+    assert b"Please sign before submitting" not in signature_page.data
 
     response = client.post(
         "/end_of_day_summary",
@@ -2983,12 +2986,18 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
 
     unsigned = client.post("/end_of_day_summary", data={}, follow_redirects=False)
     assert unsigned.status_code == 302
-    assert unsigned.headers["Location"].endswith("/end_of_day_summary")
+    assert unsigned.headers["Location"].endswith("/end_of_day_summary?signature_required=1#signatureSection")
+
+    unsigned_page = client.get("/end_of_day_summary?signature_required=1")
+    assert unsigned_page.status_code == 200
+    assert b"Sign in the Driver Signature box" in unsigned_page.data
+    assert b"swal({ title: \"Warning\"" not in unsigned_page.data
 
     driver_print = client.get("/driver_logs_print")
     assert driver_print.status_code == 200
     assert signature.encode() in driver_print.data
     assert b"Not yet signed" not in driver_print.data
+    assert b" UTC" not in driver_print.data
 
     driver_pdf = client.get("/driver_logs_print/attachment")
     assert driver_pdf.status_code == 200
@@ -2998,6 +3007,7 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
     eod_print = client.get("/end_of_day_print")
     assert eod_print.status_code == 200
     assert signature.encode() in eod_print.data
+    assert b" UTC" not in eod_print.data
 
     eod_pdf = client.get("/end_of_day_print/attachment")
     assert eod_pdf.status_code == 200
@@ -3010,6 +3020,7 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
     assert manager_print.status_code == 200
     assert signature.encode() in manager_print.data
     assert b"Not yet signed" not in manager_print.data
+    assert b" UTC" not in manager_print.data
 
     manager_pdf = client.get(f"/manager/driver-logs/route-attachment?driver_id={driver_id}&date={date.today().isoformat()}")
     assert manager_pdf.status_code == 200
