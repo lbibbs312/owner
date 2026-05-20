@@ -36,7 +36,8 @@ from app.services.media_attachment_service import upload_file_path
 from app.services.mileage_service import calculate_mileage_record
 from app.services.next_load_prediction import build_next_load_prediction
 from app.services.route_state_service import build_route_state
-from app.services.scan_scope_service import route_stop_ids
+from app.services.scan_scope_service import route_scope_id, route_stop_ids
+from app.services.case_grouping import build_followup_cases, same_plant_intelligence, same_vehicle_intelligence
 from app.services.hot_parts import build_route_hot_part_proof, ensure_hot_move_for_task
 from app.services.management_readout import build_management_narrative
 from app.services.plant_addresses import PLANT_LABELS, plant_label as _plant_label
@@ -461,7 +462,7 @@ def _damage_report_summary(report):
     }
 
 
-def _live_exceptions_for_log(log, route=None):
+def _live_exceptions_for_log(log, route=None, *, is_current_active=False, route_finalized=False):
     route = route or {}
     exceptions = []
     damage_reports = (
@@ -516,7 +517,7 @@ def _live_exceptions_for_log(log, route=None):
             "url": url_for("manager.view_driver_log", log_id=log.id),
         })
 
-    if not log.depart_time:
+    if not log.depart_time and (route_finalized or not is_current_active):
         exceptions.append({
             "type": "Missing Departure",
             "label": "Missing Departure",
@@ -612,23 +613,27 @@ def _live_stop_rows(logs):
     routes = _driver_log_route_context(sorted_logs)
     counts = {}
     rows = []
+    latest_by_route = {}
+    for candidate in sorted_logs:
+        latest_by_route[(candidate.driver_id, candidate.date)] = candidate.id
     for log in sorted_logs:
         key = (log.driver_id, log.date)
         counts[key] = counts.get(key, 0) + 1
         route = routes.get(log.id, {})
         route["stop_number"] = counts[key]
-        exceptions = _live_exceptions_for_log(log, route)
+        is_current_active = bool(not log.depart_time and latest_by_route.get(key) == log.id)
+        exceptions = _live_exceptions_for_log(log, route, is_current_active=is_current_active)
         forecast = forecast_for_stop(log) if not log.depart_time else None
-        if forecast and forecast["severity"] in {"warning", "high"}:
+        if forecast and forecast["severity"] in {"warning", "high"} and not is_current_active:
             exceptions.append({
-                "type": "Dock Forecast",
-                "label": "Dock Forecast",
+                "type": "Timing Status",
+                "label": "Timing Status",
                 "detail": f"{forecast['status']}: elapsed {forecast['elapsed_label']} vs estimate {forecast['estimate_label']}.",
                 "photo_url": None,
                 "url": url_for("manager.view_driver_log", log_id=log.id),
             })
         status_key = "open" if not log.depart_time else "complete"
-        status = "Missing Departure" if not log.depart_time else "Completed"
+        status = "Current Active Stop" if is_current_active else ("Missing Departure" if not log.depart_time else "Completed")
         rows.append({
             "log": log,
             "route": route,
@@ -724,11 +729,20 @@ def _route_finalized_for_driver_date(driver_id, route_date):
 
 def _part_scan_events_for_logs(logs):
     log_ids = route_stop_ids(logs)
-    if not log_ids:
+    scope_id = route_scope_id(logs)
+    if not log_ids and not scope_id:
         return []
+    filters = []
+    if scope_id:
+        filters.append(PartScanEvent.route_id == scope_id)
+    if log_ids:
+        filters.extend([
+            PartScanEvent.stop_id.in_(log_ids),
+            PartScanEvent.driver_log_id.in_(log_ids),
+        ])
     return (
         PartScanEvent.query
-        .filter(PartScanEvent.stop_id.in_(log_ids))
+        .filter(or_(*filters))
         .order_by(PartScanEvent.timestamp.asc(), PartScanEvent.id.asc())
         .all()
     )
@@ -1146,8 +1160,9 @@ def _manager_data_quality(logs, log_routes, mileage_quality_item, driver_signatu
     for index, log in enumerate(logs):
         route = log_routes.get(log.id, {})
         plant = route.get("plant") or _plant_label(log.plant_name)
-        if not log.depart_time and index < len(logs) - 1:
-            items.append({"label": "Missing departure", "status": "Correction required", "detail": f"{plant} is missing departure even though a later stop exists."})
+        if not log.depart_time and (route_finalized or index < len(logs) - 1):
+            reason = "the route is being finalized" if route_finalized else "a later stop exists"
+            items.append({"label": "Missing Departure", "status": "Correction required", "detail": f"{plant} is missing departure because {reason}."})
         if log.arrive_time and log.depart_time:
             # Keep detailed time math out of this lightweight report until arrival/departure formats are normalized.
             pass
@@ -1238,7 +1253,7 @@ def _manager_approval_blockers(data_quality_items, photo_reviews, cargo_review, 
 
 
 def _manager_review_status(required_actions, data_quality_items, photo_reviews, cargo_review, route_finalized, logs):
-    correction_labels = {"Missing departure", "Mileage"}
+    correction_labels = {"Missing departure", "Missing Departure", "Mileage"}
     if any(item["label"] in correction_labels and item["status"] in {"Needs correction", "Correction required"} for item in data_quality_items):
         return "Correction Required"
     if photo_reviews or cargo_review["issues"] or cargo_review["pending_scan_count"] or any(item["status"] in {"Missing", "Finalization required", "Pending", "Separate issue"} for item in data_quality_items):
@@ -1414,6 +1429,13 @@ def _manager_route_review_context(ctx):
     required_actions = _manager_required_actions(data_quality_items, photo_reviews, cargo_review, route_finalized, logs, ctx.get("driver_signature"), delay_review_rows, next_load_prediction)
     review_status = _manager_review_status(required_actions, data_quality_items, photo_reviews, cargo_review, route_finalized, logs)
     manager_summary = _manager_summary_sentence(ctx["driver"], logs, log_routes, route_status, ctx.get("damage_reports") or [], photo_reviews, mileage_review.get("total_miles"), data_quality_items, approval_blockers, mileage_review, cargo_review, route_state, next_load_prediction)
+    followup_cases = build_followup_cases(anchor=ctx["the_date"])
+    current_log = route_state.get("current_activity", {}).get("log") if route_state.get("current_activity") else None
+    route_truck = route_truck_context.get("label") if route_truck_context else ""
+    manager_intelligence = []
+    if current_log:
+        manager_intelligence.extend(same_plant_intelligence(current_log, stop_forecasts.get(current_log.id), logs))
+    manager_intelligence.extend(same_vehicle_intelligence(route_truck, followup_cases))
     return {
         **ctx,
         "review_status": review_status,
@@ -1433,6 +1455,8 @@ def _manager_route_review_context(ctx):
         "truck_label": route_truck_context["label"],
         "route_truck_context": route_truck_context,
         "mileage_review": mileage_review,
+        "followup_cases": followup_cases,
+        "manager_intelligence": manager_intelligence,
     }
 
 
@@ -1693,10 +1717,12 @@ def review_dashboard():
         "high_count": len([item for item in exceptions if item["severity"] == "high"]),
         "truck_damage_count": len([item for item in exceptions if item["category"] in {"Truck issue", "Damage flag"}]),
         "followup_count": len([item for item in exceptions if item["severity"] == "followup"]),
+        "unassigned_issue_count": len([item for item in exceptions if item["severity"] != "followup" and item.get("category") in {"Truck issue", "Damage flag"}]),
     }
     followups = OperationalFollowUp.query.order_by(OperationalFollowUp.created_at.desc()).limit(20).all()
     damage_reports = DamageReport.query.order_by(DamageReport.created_at.desc()).limit(10).all()
     plant_forecasts = plant_forecast_rows(date.today())[:8]
+    followup_cases = build_followup_cases(anchor=date.today())
     exception_history = (
         ActivityEvent.query.filter_by(category="exception")
         .order_by(ActivityEvent.created_at.desc())
@@ -1711,6 +1737,7 @@ def review_dashboard():
         followups=followups,
         damage_reports=damage_reports,
         plant_forecasts=plant_forecasts,
+        followup_cases=followup_cases,
         exception_history=exception_history,
     )
 
@@ -1954,6 +1981,7 @@ def manager_dashboard():
 
     reported_delay_count = len([log for log in todays_logs if (log.dock_wait_minutes or 0) > 0])
     critical_exceptions = _critical_exception_rows(live_stop_rows, live_logs)
+    followup_cases = build_followup_cases(anchor=today)
     live_problem_count = len(critical_exceptions)
 
     active_driver_ids = {log.driver_id for log in todays_logs}
@@ -1973,6 +2001,7 @@ def manager_dashboard():
         reported_delay_count=reported_delay_count,
         live_problem_count=live_problem_count,
         critical_exceptions=critical_exceptions,
+        followup_cases=followup_cases,
         plant_forecasts=plant_forecast_rows(today)[:6],
         has_drivers=bool(drivers),
         today=today,
@@ -2130,14 +2159,7 @@ def view_driver_log(log_id):
 
     all_routes = _driver_log_route_context(day_logs)
     truck_context = _truck_context_for_driver(log.driver_id, log.date)
-    part_scan_events = []
-    if day_logs:
-        part_scan_events = (
-            PartScanEvent.query
-            .filter(PartScanEvent.stop_id.in_([day_log.id for day_log in day_logs]))
-            .order_by(PartScanEvent.timestamp.asc(), PartScanEvent.id.asc())
-            .all()
-        )
+    part_scan_events = _part_scan_events_for_logs(day_logs)
     driver_log_photos = []
     if day_logs:
         driver_log_photos = (

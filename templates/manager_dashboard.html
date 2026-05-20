@@ -203,17 +203,17 @@
   .live-route-stack { display:grid; gap:3px; }
   .live-route-main { font-weight:900; color:#0f172a; }
   .live-route-sub { font-size:.72rem; color:#64748b; font-weight:700; }
-  .forecast-cell { display:grid; gap:3px; min-width:130px; }
-  .forecast-main { font-weight:900; color:#0f172a; white-space:nowrap; }
-  .forecast-sub { color:#64748b; font-size:.7rem; font-weight:700; }
-  .forecast-state { display:inline-flex; width:max-content; border-radius:999px; padding:2px 7px; font-size:.62rem; font-weight:900; text-transform:uppercase; background:#f1f5f9; color:#475569; }
-  .forecast-state.ok { background:#dcfce7; color:#166534; }
-  .forecast-state.warning { background:#fef3c7; color:#92400e; }
-  .forecast-state.high { background:#fee2e2; color:#991b1b; }
-  .plant-forecast-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; margin:10px 0 0; }
-  .plant-forecast-card { border:1px solid #e2e8f0; border-radius:10px; padding:9px 10px; background:#f8fafc; }
-  .plant-forecast-card strong { display:block; font-size:.86rem; }
-  .plant-forecast-card span { display:block; color:#64748b; font-size:.72rem; margin-top:2px; }
+  .timing-cell { display:grid; gap:3px; min-width:130px; }
+  .timing-main { font-weight:900; color:#0f172a; white-space:nowrap; }
+  .timing-sub { color:#64748b; font-size:.7rem; font-weight:700; }
+  .timing-state { display:inline-flex; width:max-content; border-radius:999px; padding:2px 7px; font-size:.62rem; font-weight:900; text-transform:uppercase; background:#f1f5f9; color:#475569; }
+  .timing-state.ok { background:#dcfce7; color:#166534; }
+  .timing-state.warning { background:#fef3c7; color:#92400e; }
+  .timing-state.high { background:#fee2e2; color:#991b1b; }
+  .plant-timing-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; margin:10px 0 0; }
+  .plant-timing-card { border:1px solid #e2e8f0; border-radius:10px; padding:9px 10px; background:#f8fafc; }
+  .plant-timing-card strong { display:block; font-size:.86rem; }
+  .plant-timing-card span { display:block; color:#64748b; font-size:.72rem; margin-top:2px; }
 
   /* Manage button */
   .btn-manage { background:#fff; border:1px solid #cbd5e1; color:#334155;
@@ -699,6 +699,25 @@
         </div>
       </div>
 
+
+      {% if followup_cases %}
+      <div class="panel {% if focus_panel == 'routes' %}focus-panel{% endif %}">
+        <div class="panel-top">
+          <h3>Grouped Management Cases</h3>
+          <span class="text-sm text-muted">Related history only, not route evidence</span>
+        </div>
+        <div class="critical-list">
+          {% for case in followup_cases %}
+            <div class="critical-row">
+              <span class="critical-type">{{ case.case_type|replace('_', ' ')|title }}</span>
+              <span class="critical-stop">{{ case.title }}</span>
+              <span class="critical-issue">{{ case.summary }} {{ case.metrics|join('; ') }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
       {# Live route/stop panel #}
       <div class="panel {% if focus_panel == 'routes' %}focus-panel{% endif %}" id="liveRoutesPanel">
         <div class="panel-top">
@@ -717,11 +736,17 @@
           {% endfor %}
         </div>
         {% if plant_forecasts %}
-        <div class="plant-forecast-strip" aria-label="Plant load forecasts">
-          {% for forecast in plant_forecasts %}
-            <div class="plant-forecast-card">
-              <strong>{{ forecast.plant }}</strong>
-              <span>{{ forecast.estimate_label }} avg - {{ forecast.confidence }}</span>
+        <div class="plant-timing-strip" aria-label="Plant load timing">
+          {% for timing in plant_forecasts %}
+            <div class="plant-timing-card">
+              <strong>{{ timing.plant }}</strong>
+              {% if timing.estimate_minutes is none %}
+                <span>No timing history yet</span>
+              {% else %}
+                <span>Pickup estimate {{ timing.estimate_label }} - {{ 'Low confidence' if timing.today_count < 2 else timing.confidence }}</span>
+                <span>Based on {{ timing.today_count }} load{{ 's' if timing.today_count != 1 else '' }} today</span>
+                <span>30-day average: {{ timing.history_average_label }}</span>
+              {% endif %}
             </div>
           {% endfor %}
         </div>
@@ -737,7 +762,7 @@
                 <th>Arrive</th>
                 <th>Depart</th>
                 {% if reported_delay_count %}<th>Delay</th>{% endif %}
-                <th>Forecast</th>
+                <th>Pickup Estimate</th>
                 <th>Exceptions</th>
                 <th>Stop Status</th>
                 <th style="text-align:right;">Action</th>
@@ -761,14 +786,14 @@
                   <td class="align-middle whitespace-nowrap">{{ log.depart_time|to_12h_format if log.depart_time else '—' }}</td>
                   {% if reported_delay_count %}<td class="align-middle whitespace-nowrap">{{ row.dock_wait }}</td>{% endif %}
                   <td class="align-middle">
-                    <div class="forecast-cell">
+                    <div class="timing-cell">
                       {% if row.forecast %}
-                        <span class="forecast-main">{{ row.forecast.estimate_label }}</span>
-                        <span class="forecast-sub">{% if row.forecast.ready_at_label %}Ready {{ row.forecast.ready_at_label }}{% else %}{{ row.forecast.confidence }}{% endif %}</span>
-                        <span class="forecast-state {{ row.forecast.severity }}">{{ row.forecast.status }}</span>
+                        <span class="timing-main">{{ row.forecast.estimate_label }}</span>
+                        <span class="timing-sub">{% if row.forecast.ready_at_label %}Ready estimate {{ row.forecast.ready_at_label }}{% else %}{{ row.forecast.confidence }}{% endif %}</span>
+                        <span class="timing-state {{ row.forecast.severity }}">{{ row.forecast.status }}</span>
                       {% else %}
-                        <span class="forecast-main">Complete</span>
-                        <span class="forecast-sub">No active wait</span>
+                        <span class="timing-main">Complete</span>
+                        <span class="timing-sub">No active wait</span>
                       {% endif %}
                     </div>
                   </td>

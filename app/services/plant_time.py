@@ -243,7 +243,7 @@ def plant_time_forecast(plant_id, *, anchor_date=None, now=None, exclude_log_id=
         basis = f"30-day history {format_minutes(history_average)} from {len(history_samples)} load(s)"
     else:
         estimate = None
-        basis = "No usable completed stop samples"
+        basis = "No timing history yet"
 
     values = [sample["minutes"] for sample in today_samples if sample["minutes"] is not None]
     return {

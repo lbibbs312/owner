@@ -47,10 +47,10 @@
   .damage-mini-row a { flex:1; min-width:0; text-decoration:none; color:#0f172a; border:1px solid #e2e8f0; border-radius:10px; padding:9px 11px; display:flex; justify-content:space-between; gap:12px; }
   .damage-mini-row form { margin:0; display:flex; align-items:stretch; }
   .damage-mini-row button { white-space:nowrap; }
-  .forecast-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:9px; }
-  .forecast-card { border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; background:#fff; }
-  .forecast-card strong { display:block; color:#0f172a; font-size:.92rem; }
-  .forecast-card span { display:block; color:#64748b; font-size:.75rem; font-weight:700; margin-top:3px; }
+  .timing-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:9px; }
+  .timing-card { border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; background:#fff; }
+  .timing-card strong { display:block; color:#0f172a; font-size:.92rem; }
+  .timing-card span { display:block; color:#64748b; font-size:.75rem; font-weight:700; margin-top:3px; }
   @media (max-width:960px) { .review-side { display:none; } .metric-grid { grid-template-columns:1fr 1fr; } .review-header, .review-body { padding:16px; } }
   @media (max-width:560px) { .metric-grid { grid-template-columns:1fr; } }
 </style>
@@ -82,23 +82,46 @@
         <div class="metric"><span>High Priority</span><strong>{{ metrics.high_count }}</strong></div>
         <div class="metric"><span>Truck / Damage</span><strong>{{ metrics.truck_damage_count }}</strong></div>
         <div class="metric"><span>Open Follow-ups</span><strong>{{ metrics.followup_count }}</strong></div>
+        <div class="metric"><span>Unassigned Issues</span><strong>{{ metrics.unassigned_issue_count }}</strong></div>
       </section>
 
       <details class="foldout" open>
-        <summary>Plant Load Forecasts</summary>
-        <div class="foldout-body forecast-list">
-          {% for forecast in plant_forecasts %}
-            <div class="forecast-card">
-              <strong>{{ forecast.plant }}</strong>
-              <span>Estimated ready: {{ forecast.estimate_label }}</span>
-              <span>Today: {{ forecast.today_average_label }} from {{ forecast.today_count }} load{{ 's' if forecast.today_count != 1 else '' }}</span>
-              <span>30-day: {{ forecast.history_average_label }} - {{ forecast.confidence }}</span>
+        <summary>Plant Load Timing</summary>
+        <div class="foldout-body timing-list">
+          {% for timing in plant_forecasts %}
+            <div class="timing-card">
+              <strong>{{ timing.plant }}</strong>
+              {% if timing.estimate_minutes is none %}
+                <span>No timing history yet</span>
+              {% else %}
+                <span>Pickup estimate: {{ timing.estimate_label }}</span>
+                <span>{{ 'Low confidence' if timing.today_count < 2 else timing.confidence }}</span>
+                <span>Based on {{ timing.today_count }} load{{ 's' if timing.today_count != 1 else '' }} today</span>
+                <span>30-day average: {{ timing.history_average_label }}</span>
+              {% endif %}
             </div>
           {% else %}
-            <div class="text-muted">No completed plant-time samples yet.</div>
+            <div class="text-muted">No timing history yet.</div>
           {% endfor %}
         </div>
       </details>
+
+
+      {% if followup_cases %}
+      <section class="review-panel">
+        <div class="review-panel-head"><h3>Grouped Management Cases</h3><span>Related history, not route evidence</span></div>
+        <div class="table-responsive">
+          <table class="exception-table">
+            <thead><tr><th>Case</th><th>Summary</th><th>Signals</th><th>Owner</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for case in followup_cases %}
+                <tr><td>{{ case.title }}</td><td>{{ case.summary }}</td><td>{{ case.metrics|join('; ') }}</td><td>{{ case.owner }}</td><td>{{ case.status }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      {% endif %}
 
       <section class="review-panel">
         <div class="review-panel-head"><h3>Exception Inbox</h3><span>View, resolve, or escalate from the row</span></div>

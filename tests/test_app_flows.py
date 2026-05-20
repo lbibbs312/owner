@@ -617,7 +617,7 @@ def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
     assert b"focus-panel" in dashboard.data
 
 
-def test_plant_load_forecast_uses_today_average_on_driver_and_manager_dashboards(client, app):
+def test_plant_load_timing_uses_today_average_on_driver_and_manager_dashboards(client, app):
     from datetime import date, datetime
 
     with app.app_context():
@@ -625,10 +625,10 @@ def test_plant_load_forecast_uses_today_average_on_driver_and_manager_dashboards
         from app.models import DriverLog
 
         driver = create_user(
-            "forecast_driver",
-            "forecast@example.com",
+            "timing_driver",
+            "timing@example.com",
             "driver",
-            first_name="Forecast",
+            first_name="Timing",
             last_name="Driver",
         )
         create_user("manager1", "manager1@example.com", "management")
@@ -667,25 +667,27 @@ def test_plant_load_forecast_uses_today_average_on_driver_and_manager_dashboards
         db.session.commit()
         driver_id = driver.id
 
-    login(client, "forecast_driver")
+    login(client, "timing_driver")
     mobile = client.get("/mobile")
     assert mobile.status_code == 200
-    assert b"Kraft Plant Load Forecast" in mobile.data
+    assert b"Kraft Plant Load Timing" in mobile.data
     assert b"Today Average" in mobile.data
     assert b"1h 30m" in mobile.data
     assert b"Medium" in mobile.data
     assert b"Next Load Estimate" in mobile.data
     assert b"Raleigh East Load" in mobile.data
     assert b"historical pattern" in mobile.data
-    assert b"Stop forecast" in mobile.data
+    assert b"Timing status" in mobile.data
+    assert b"forecast" not in mobile.data.lower()
 
     client.get("/logout")
     login(client, "manager1")
     manager = client.get(f"/manager/dashboard?driver_id={driver_id}&focus=routes")
     assert manager.status_code == 200
-    assert b"Plant load forecasts" in manager.data
+    assert b"Plant load timing" in manager.data
     assert b"Kraft Plant" in manager.data
     assert b"1h 30m" in manager.data
+    assert b"forecast" not in manager.data.lower()
 
 
 def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, app):
@@ -738,7 +740,7 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
     assert b"1 incident report, 1 damage report filed" in page.data
     assert b"Incident - Other" in page.data
     assert b"Damage - RE" in page.data
-    assert b"Stop forecast pending" not in page.data
+    assert b"Timing status pending" not in page.data
     assert b"Movement segment" not in page.data
     assert b"Plant Legend" in page.data
     assert b"PPL = PPL" in page.data
@@ -1277,7 +1279,7 @@ def test_manager_route_review_regression_current_open_stop_and_completed_rows(cl
     assert response.status_code == 200
     assert b"Current Active Stop" in response.data
     assert b"Paint Central" in response.data
-    assert b"Awaiting departure" in response.data
+    assert b"Awaiting load-out/departure" in response.data
     assert b"Correction required" not in response.data
     assert b"<td>Completed</td>" in response.data
     assert response.data.count(b"<td>Active</td>") == 0
@@ -2929,7 +2931,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert b"Photo proof review" in driver_print.data
     assert b"Uploaded " in driver_print.data
     assert b" UTC" not in driver_print.data
-    assert b"Stop forecast pending" not in driver_print.data
+    assert b"Timing status pending" not in driver_print.data
 
     with app.app_context():
         from app.models import DriverLogPhoto
@@ -2958,7 +2960,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert b"Photo / Damage / Safety Review" in manager_print.data
     assert b"Departing load proof from gallery" in manager_print.data
     assert b"height:2.15in" in manager_print.data
-    assert b"Stop forecast pending" not in manager_print.data
+    assert b"Timing status pending" not in manager_print.data
 
     manager_page = client.get(f"/manager/driver-logs/{log_id}")
     assert manager_page.status_code == 200
@@ -4526,3 +4528,162 @@ def test_manager_trim_dashboard_removed_and_live_dispatch_filters_driver(client,
     assert b"Live Routes &amp; Stops" in dashboard.data
     assert b"Trim DC" in dashboard.data
     assert b"Stop 1" in dashboard.data
+
+
+def test_active_stop_is_current_not_missing_departure(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("active_pc", "active-pc@example.com", "driver")
+        create_user("manager_active_pc", "manager-active-pc@example.com", "management")
+        route_date = date.today()
+        db.session.add(DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="PC",
+            load_size="Empty",
+            arrive_time="08:00",
+            created_at=datetime(2026, 5, 20, 8, 0),
+        ))
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "manager_active_pc")
+    dashboard = client.get(f"/manager/dashboard?driver_id={driver_id}&focus=routes")
+    assert dashboard.status_code == 200
+    assert b"Current Active Stop" in dashboard.data
+    assert b"Missing Departure" not in dashboard.data
+    assert b"Missing time" not in dashboard.data
+
+    route_review = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert route_review.status_code == 200
+    assert b"Current Active Stop" in route_review.data
+    assert b"Awaiting load-out/departure" in route_review.data
+    assert b"Pickup estimate:" in route_review.data
+
+
+def test_finalized_route_with_missing_departure_requires_correction(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ActivityEvent, DriverLog
+
+        driver = create_user("final_missing", "final-missing@example.com", "driver")
+        create_user("manager_final_missing", "manager-final-missing@example.com", "management")
+        route_date = date.today()
+        db.session.add_all([
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="PC",
+                load_size="Empty",
+                arrive_time="08:00",
+                created_at=datetime(2026, 5, 20, 8, 0),
+            ),
+            ActivityEvent(
+                user_id=driver.id,
+                category="eod",
+                action="finalized",
+                title="Route finalized",
+                details=f"Route finalized for {route_date}",
+                target_type="end_of_day",
+            ),
+        ])
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "manager_final_missing")
+    route_review = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert route_review.status_code == 200
+    assert b"Missing Departure" in route_review.data
+    assert b"Correction required" in route_review.data
+
+
+def test_route_report_excludes_same_plant_scan_from_other_route(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PartScanEvent
+
+        current_driver = create_user("scan_current", "scan-current@example.com", "driver")
+        other_driver = create_user("scan_other", "scan-other@example.com", "driver")
+        create_user("scan_manager", "scan-manager@example.com", "management")
+        route_date = date.today()
+        current_log = DriverLog(
+            driver_id=current_driver.id,
+            date=route_date,
+            plant_name="PC",
+            load_size="Empty",
+            arrive_time="08:00",
+            depart_time="08:30",
+            created_at=datetime(2026, 5, 20, 8, 0),
+        )
+        old_log = DriverLog(
+            driver_id=other_driver.id,
+            date=route_date,
+            plant_name="PC",
+            load_size="Empty",
+            arrive_time="09:00",
+            depart_time="09:30",
+            created_at=datetime(2026, 5, 20, 9, 0),
+        )
+        db.session.add_all([current_log, old_log])
+        db.session.flush()
+        db.session.add(PartScanEvent(
+            raw_value="OLD-PC-SCAN",
+            normalized_value="OLD-PC-SCAN",
+            stop_id=old_log.id,
+            driver_log_id=old_log.id,
+            driver_id=other_driver.id,
+            plant_id="PC",
+            scan_context="manual_entry",
+            validation_status="needs_review",
+        ))
+        db.session.commit()
+        driver_id = current_driver.id
+
+    login(client, "scan_manager")
+    page = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert page.status_code == 200
+    assert b"OLD-PC-SCAN" not in page.data
+
+
+def test_repeated_plant_and_truck_issues_roll_up_to_cases(client, app):
+    from datetime import date, datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PostTrip, PreTrip
+
+        driver = create_user("case_driver", "case-driver@example.com", "driver")
+        create_user("case_manager", "case-manager@example.com", "management")
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        db.session.add_all([
+            DriverLog(driver_id=driver.id, date=today, plant_name="PC", load_size="Empty", arrive_time="08:00", depart_time="08:20", dock_wait_minutes=59, created_at=datetime(2026, 5, 20, 8, 0)),
+            DriverLog(driver_id=driver.id, date=today, plant_name="PC", load_size="Empty", arrive_time="09:00", depart_time="09:20", dock_wait_minutes=42, created_at=datetime(2026, 5, 20, 9, 0)),
+            DriverLog(driver_id=driver.id, date=today, plant_name="PC", load_size="Empty", arrive_time="10:00", depart_time="10:20", dock_wait_minutes=25, created_at=datetime(2026, 5, 20, 10, 0)),
+            DriverLog(driver_id=driver.id, date=today, plant_name="RE", load_size="Empty", arrive_time="11:00", depart_time="11:30", maintenance=True, downtime_reason="Truck issue: CEL light", created_at=datetime(2026, 5, 20, 11, 0)),
+            DriverLog(driver_id=driver.id, date=yesterday, plant_name="RE", load_size="Empty", arrive_time="11:00", depart_time="11:30", maintenance=True, downtime_reason="Truck issue: Belt issue", created_at=datetime(2026, 5, 19, 11, 0)),
+        ])
+        pretrip_today = PreTrip(user_id=driver.id, pretrip_date=today, truck_number="st4")
+        pretrip_yesterday = PreTrip(user_id=driver.id, pretrip_date=yesterday, truck_number="st4")
+        db.session.add_all([pretrip_today, pretrip_yesterday])
+        db.session.flush()
+        db.session.add_all([
+            PostTrip(pretrip_id=pretrip_today.id, end_mileage=1010),
+            PostTrip(pretrip_id=pretrip_yesterday.id, end_mileage=1000),
+        ])
+        db.session.commit()
+
+    login(client, "case_manager")
+    page = client.get("/manager/review")
+    assert page.status_code == 200
+    assert b"Paint Central delay pattern today" in page.data
+    assert b"Paint Central has 3 delayed stops today" in page.data
+    assert b"Truck st4 has 2 related maintenance reports this week" in page.data

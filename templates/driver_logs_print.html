@@ -31,11 +31,11 @@
     th:nth-child(6), td:nth-child(6) { width: 25%; }
     .route-leg { font-weight: 900; font-size: 9.5pt; }
     .route-sub { margin-top: 2px; color: #555; font-size: 8pt; }
-    .forecast-status { font-weight: 900; }
-    .forecast-status.ok { color: #166534; }
-    .forecast-status.warning { color: #92400e; }
-    .forecast-status.high { color: #991b1b; }
-    .forecast-status.muted { color: #555; }
+    .timing-status { font-weight: 900; }
+    .timing-status.ok { color: #166534; }
+    .timing-status.warning { color: #92400e; }
+    .timing-status.high { color: #991b1b; }
+    .timing-status.muted { color: #555; }
     .cargo { font-weight: 900; }
     .badge { display: inline-block; border: 1px solid #111; padding: 1px 5px; font-size: 7pt; font-weight: 900; text-transform: uppercase; margin-bottom: 3px; }
     .badge.deviation { background: #111; color: #fff; }
@@ -142,7 +142,7 @@
             {% if next_log %}
               <div class="route-leg">{{ plant_name }} &#8594; {{ next_plant_name }}</div>
               {% if stop_forecast and stop_forecast.estimate_minutes is not none %}
-                <div class="route-sub">Stop forecast: <span class="forecast-status {{ stop_forecast.severity }}">{{ stop_forecast.status }}</span></div>
+                <div class="route-sub">Timing status: <span class="timing-status {{ stop_forecast.severity }}">{{ stop_forecast.status }}</span></div>
               {% endif %}
             {% else %}
               <div class="route-leg">Final Location: {{ plant_name }}</div>

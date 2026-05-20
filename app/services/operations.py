@@ -1,6 +1,6 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
-from app.models import DamageReport, DriverLog, OperationalFollowUp, PlantTransfer, PreTrip, Task
+from app.models import ActivityEvent, DamageReport, DriverLog, OperationalFollowUp, PlantTransfer, PreTrip, Task
 from app.services.load_state import route_problem_reason, truck_issue_reason
 from app.services.plant_time import forecast_for_stop
 
@@ -52,10 +52,25 @@ def build_exception_items(anchor=None, dock_delay_minutes=30):
         PreTrip.pretrip_date < week_end,
     ).all()
     pretrip_keys = {(pretrip.user_id, pretrip.pretrip_date) for pretrip in pretrips}
+    latest_log_ids = {}
+    for candidate in sorted(logs, key=lambda item: (item.date or date.min, item.arrive_time or "", item.created_at or datetime.min, item.id or 0)):
+        latest_log_ids[(candidate.driver_id, candidate.date)] = candidate.id
+    finalized_keys = {
+        (event.user_id, marker)
+        for event in ActivityEvent.query.filter_by(category="eod", action="finalized", target_type="end_of_day").all()
+        for marker in [next((part.strip() for part in (event.details or "").split() if part.strip().count("-") == 2), "")]
+        if marker
+    }
     for log in logs:
         label = f"{_driver_label(log.driver)} at {log.plant_name} on {log.date}"
-        if _blank(log.arrive_time) or _blank(log.depart_time):
-            items.append({"severity": "medium", "category": "Missing time", "label": label, "detail": "Arrival or departure time is missing.", "target_type": "driver_log", "target_id": log.id})
+        if _blank(log.arrive_time):
+            items.append({"severity": "medium", "category": "Missing time", "label": label, "detail": "Arrival time is missing.", "target_type": "driver_log", "target_id": log.id})
+        missing_departure = _blank(log.depart_time) and (
+            latest_log_ids.get((log.driver_id, log.date)) != log.id
+            or (log.driver_id, str(log.date)) in finalized_keys
+        )
+        if missing_departure:
+            items.append({"severity": "medium", "category": "Missing Departure", "label": label, "detail": "Departure/load-out is missing and needs manager review.", "target_type": "driver_log", "target_id": log.id})
         if (log.driver_id, log.date) not in pretrip_keys:
             items.append({"severity": "high", "category": "No pre-trip", "label": label, "detail": "Driver log exists without a same-day DVIR/pre-trip.", "target_type": "driver_log", "target_id": log.id})
         truck_issue = truck_issue_reason(log)
@@ -68,9 +83,11 @@ def build_exception_items(anchor=None, dock_delay_minutes=30):
             items.append({"severity": "high", "category": "Delayed dock time", "label": label, "detail": f"Dock wait recorded at {log.dock_wait_minutes} minutes.", "target_type": "driver_log", "target_id": log.id})
         if not log.depart_time:
             forecast = forecast_for_stop(log)
-            if forecast["severity"] in {"warning", "high"}:
+            current_active = latest_log_ids.get((log.driver_id, log.date)) == log.id
+            abnormal_elapsed = (forecast.get("elapsed_minutes") or 0) > 240
+            if forecast["severity"] in {"warning", "high"} and (not current_active or abnormal_elapsed):
                 severity = "high" if forecast["severity"] == "high" else "medium"
-                items.append({"severity": severity, "category": "Dock forecast", "label": label, "detail": f"{forecast['status']}: elapsed {forecast['elapsed_label']} vs plant estimate {forecast['estimate_label']}.", "target_type": "driver_log", "target_id": log.id})
+                items.append({"severity": severity, "category": "Timing Status", "label": label, "detail": f"{forecast['status']}: elapsed {forecast['elapsed_label']} vs plant estimate {forecast['estimate_label']}.", "target_type": "driver_log", "target_id": log.id})
 
     open_hot_tasks = Task.query.filter(Task.is_hot.is_(True), Task.status.in_(["pending", "in-progress"])).all()
     for task in open_hot_tasks:

@@ -20,10 +20,10 @@ def build_route_state(logs, log_routes=None, stop_forecasts=None, route_finalize
         forecast = stop_forecasts.get(log.id, {})
         plant = _plant(log, route)
         is_open = not bool(getattr(log, "depart_time", None))
-        is_current = bool(current_open_log and current_open_log.id == log.id)
+        is_current = bool(current_open_log and current_open_log.id == log.id and not route_finalized)
         if is_current:
             status = "Current"
-            note = "Awaiting departure"
+            note = "Awaiting load-out/departure"
         elif is_open:
             status = "Open"
             note = "Missing departure"
@@ -45,7 +45,7 @@ def build_route_state(logs, log_routes=None, stop_forecasts=None, route_finalize
         })
 
     current_activity = None
-    if current_open_log:
+    if current_open_log and not route_finalized:
         route = log_routes.get(current_open_log.id, {})
         forecast = stop_forecasts.get(current_open_log.id, {})
         plant = _plant(current_open_log, route)
@@ -55,7 +55,8 @@ def build_route_state(logs, log_routes=None, stop_forecasts=None, route_finalize
             "status": "Current Active Stop",
             "forecast_status": forecast.get("status") or "On pace",
             "forecast_class": forecast.get("severity") or "ok",
-            "detail": f"Awaiting departure at {plant}.",
+            "detail": "Awaiting load-out/departure",
+            "pickup_estimate": f"Pickup estimate: ready around {forecast.get('ready_at_label')}" if forecast.get("ready_at_label") else "Pickup estimate: timing history pending",
         }
 
     if route_finalized:

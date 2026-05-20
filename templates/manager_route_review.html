@@ -108,7 +108,13 @@
   <div class="section">
     <h2>Current Active Stop</h2>
     <div class="section-body">
-      <p><strong>Current Active Stop: {{ route_state.current_activity.plant }}.</strong> {{ route_state.current_activity.detail }} <span class="delay-status {{ route_state.current_activity.forecast_class }}">{{ route_state.current_activity.forecast_status }}</span></p>
+      <p><strong>Current Active Stop: {{ route_state.current_activity.plant }}.</strong> {{ route_state.current_activity.detail }}.</p>
+      <p>{{ route_state.current_activity.pickup_estimate }}. <span class="delay-status {{ route_state.current_activity.forecast_class }}">{{ route_state.current_activity.forecast_status }}</span></p>
+      {% if manager_intelligence %}
+        <div class="audit-grid">
+          {% for item in manager_intelligence %}<div class="audit-item warning"><strong>Manager Intelligence</strong><span>{{ item }}</span><small>Related history only. Not route evidence.</small></div>{% endfor %}
+        </div>
+      {% endif %}
       {% if next_load_prediction %}
         <div class="audit-grid">
           <div class="audit-item {{ 'clean' if next_load_prediction.confidence == 'confirmed' else ('needs-review' if next_load_prediction.is_known else 'warning') }}"><strong>{{ next_load_prediction.title }}</strong><span>{{ next_load_prediction.predicted_load_label }}</span><small>{{ next_load_prediction.reason_text }}</small></div>
@@ -150,6 +156,23 @@
       {% endif %}
     </div>
   </div>
+
+  {% if followup_cases %}
+  <div class="section">
+    <h2>Related Management Cases</h2>
+    <div class="section-body">
+      <p><strong>Related history only. These cases do not become route evidence unless a record is tied to this route, stop, driver log, driver, truck, or shift/date.</strong></p>
+      <table>
+        <thead><tr><th>Case</th><th>Summary</th><th>Signals</th><th>Owner</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for case in followup_cases %}
+            <tr><td>{{ case.title }}</td><td>{{ case.summary }}</td><td>{{ case.metrics|join('; ') }}</td><td>{{ case.owner }}</td><td>{{ case.status }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
 
   {% if required_actions %}
   <div class="section action-section">

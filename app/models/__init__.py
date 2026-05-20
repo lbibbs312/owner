@@ -13,6 +13,7 @@ from app.models.messaging import ChatMessage, Announcement, DirectMessage
 from app.models.knowledge import KnowledgeBaseEntry
 from app.models.activity import ActivityEvent
 from app.models.audit import AuditEvent
+from app.models.case import CaseEvent, ExceptionEvent, FollowupCase
 from app.models.damage import DamagePhoto, DamageReport
 from app.models.draft import DraftEntry
 from app.models.followup import OperationalFollowUp
@@ -47,6 +48,9 @@ __all__ = [
     "KnowledgeBaseEntry",
     "ActivityEvent",
     "AuditEvent",
+    "ExceptionEvent",
+    "FollowupCase",
+    "CaseEvent",
     "DamagePhoto",
     "DamageReport",
     "DraftEntry",
