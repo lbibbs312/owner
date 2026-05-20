@@ -798,26 +798,24 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
     assert b"Lamar has 6 recorded stop events" in response.data
     assert b"The route appears operationally complete but is not ready for approval" in response.data
     assert b"Mileage needs correction before approval" in response.data
-    assert b"One Paint Central cargo-safety photo requires manager classification" in response.data
+    assert b"one Paint Central cargo-safety photo requiring classification" in response.data
     assert b"No formal damage report was filed" in response.data
     assert b"Correct route mileage before approving route" in response.data
     assert b"Review/classify Paint Central cargo photo" in response.data
     assert b"Finalize route after confirming final unload" in response.data
     assert b"Collect missing signatures" in response.data
-    assert b"start mileage is missing or zero" in response.data
-    assert b"end odometer 121,970 mi cannot be used as route miles" in response.data
+    assert b"Beginning odometer is missing or zero" in response.data
+    assert b"ending odometer 121,970 mi cannot be used as route miles" in response.data
     assert b"121,970 miles is outside normal route range" not in response.data
     assert b"Cargo safety review" in response.data
     assert b"The load is unbalanced. This is what causes skids to tip over." in response.data
     assert b"Uploaded 5:34pm EDT" in response.data
-    assert b"Scan records" in response.data
     assert b"Cargo / Manifest Review" in response.data
     assert b"Clean" in response.data
     assert b"Manifest linked" in response.data
-    assert b"Not yet linked" in response.data
+    assert b"No" in response.data
     assert b"No shipper/manifest record is linked" in response.data
-    assert b"Recorded cargo path" in response.data
-    assert b"No mismatch detected" in response.data
+    assert b"No cargo mismatch was detected from driver-entered route data" in response.data
     assert b"Appears complete" not in response.data
     assert b"Picked Up / Departed With" not in response.data
     assert b"Manifest Linked: Yes" not in response.data
@@ -886,7 +884,7 @@ def test_manager_route_review_separates_route_truck_mileage_from_extra_dvir(clie
 
     with app.app_context():
         from app.extensions import db
-        from app.models import DriverLog, DriverLogPhoto, PartScanEvent, PostTrip, PreTrip, ShiftRecord
+        from app.models import DriverLog, DriverLogPhoto, PostTrip, PreTrip, ShiftRecord
 
         driver = create_user("st2_route_driver", "st2-route@example.com", "driver", first_name="Lamar", last_name="Bibbs")
         create_user("st2_route_manager", "st2-route-manager@example.com", "management")
@@ -908,16 +906,14 @@ def test_manager_route_review_separates_route_truck_mileage_from_extra_dvir(clie
         db.session.add_all(logs)
         db.session.flush()
 
-        route_pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st2", start_mileage=121970)
-        separate_pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st4", start_mileage=0)
+        route_pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st2", start_mileage=379386)
+        separate_pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st4", start_mileage=121970)
         db.session.add_all([route_pretrip, separate_pretrip])
         db.session.flush()
         db.session.add_all([
             ShiftRecord(user_id=driver.id, pretrip_id=route_pretrip.id, start_time=datetime(2026, 5, 19, 12, 0)),
-            PostTrip(pretrip_id=route_pretrip.id, end_mileage=122007, miles_driven=37),
-            PostTrip(pretrip_id=separate_pretrip.id, end_mileage=121970),
-            PartScanEvent(raw_value="PC-PENDING-100", normalized_value="100", stop_id=logs[4].id, driver_id=driver.id, plant_id="PC", scan_context="departure_scan", validation_status="pending_part"),
-            PartScanEvent(raw_value="PC-VERIFY-200", normalized_value="200", stop_id=logs[4].id, driver_id=driver.id, plant_id="PC", scan_context="pickup_scan", validation_status="needs_review"),
+            PostTrip(pretrip_id=route_pretrip.id, end_mileage=379423, miles_driven=37),
+            PostTrip(pretrip_id=separate_pretrip.id, end_mileage=122007, miles_driven=37),
         ])
         upload_dir = os.path.abspath(app.config["DRIVER_LOG_PHOTO_UPLOAD_FOLDER"])
         os.makedirs(upload_dir, exist_ok=True)
@@ -945,18 +941,22 @@ def test_manager_route_review_separates_route_truck_mileage_from_extra_dvir(clie
     assert b"<strong>Mileage:</strong> 37 miles" in response.data
     assert b"Lamar has 11 recorded stop events" in response.data
     assert b"Route truck st2 shows 37 miles" in response.data
-    assert b"Separate DVIR mileage issue found for st4" in response.data
-    assert b"Separate DVIR" in response.data
-    assert b"121,970 mi" in response.data
+    assert b"Multiple trucks" not in response.data
+    assert b"st4" not in response.data
+    assert b"Separate DVIR" not in response.data
+    assert b"379,386 mi" in response.data
+    assert b"379,423 mi" in response.data
     assert b"Mileage conflict / correction required" not in response.data
     assert b"Approval Blocked By" in response.data
-    assert b"2 scans need manager confirmation" in response.data
+    assert b"2 scans need manager confirmation" not in response.data
+    assert b"pending cargo scan" not in response.data
+    assert b"Pending Scan Evidence" not in response.data
     assert b"Cargo status" in response.data
-    assert b"Needs Review" in response.data
-    assert b"Recorded cargo path has no detected mismatch, but cargo review is not complete until pending scans are confirmed" in response.data
-    assert b"Cargo movement is based on driver route entries and scan records only. No shipper/manifest record is linked" in response.data
+    assert b"No cargo mismatch was detected from driver-entered route data" in response.data
+    assert b"Cargo verification source: driver route entries + scan records only" in response.data
     assert b"Final cargo approval" in response.data
-    assert b"Blocked until scans are confirmed" in response.data
+    assert b"Blocked until scans are confirmed" not in response.data
+    assert b"Picked Up / Departed With" not in response.data
     assert b"Photo ID #" in response.data
     assert b"[ ] Cargo loading issue" in response.data
     assert b"Manager Notes - Internal" in response.data
@@ -970,8 +970,64 @@ def test_manager_route_review_separates_route_truck_mileage_from_extra_dvir(clie
     assert b"Approval Blocked By" in pdf.data
     assert b"Route Detail Appendix" in pdf.data
     assert b"Photo ID #" in pdf.data
-    assert b"Separate DVIR" in pdf.data
-    assert b"st4" in pdf.data
+    assert b"Separate DVIR" not in pdf.data
+    assert b"st4" not in pdf.data
+
+
+def test_manager_route_review_labels_confirmed_multi_truck_route(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PostTrip, PreTrip, ShiftRecord
+
+        driver = create_user("multi_truck_driver", "multi-truck@example.com", "driver", first_name="Route", last_name="Driver")
+        create_user("multi_truck_manager", "multi-truck-manager@example.com", "management")
+        route_date = date.today()
+        db.session.add_all([
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="RE",
+                load_size="Full",
+                depart_load_size="Full",
+                arrive_time="2026-05-19 08:00:00",
+                depart_time="08:10",
+                created_at=datetime(2026, 5, 19, 8, 0),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="PC",
+                load_size="Empty",
+                depart_load_size="Empty",
+                arrive_time="2026-05-19 09:00:00",
+                depart_time="09:10",
+                created_at=datetime(2026, 5, 19, 9, 0),
+            ),
+        ])
+        first_pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st2", start_mileage=1000)
+        second_pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st4", start_mileage=2000)
+        db.session.add_all([first_pretrip, second_pretrip])
+        db.session.flush()
+        db.session.add_all([
+            ShiftRecord(user_id=driver.id, pretrip_id=first_pretrip.id, start_time=datetime(2026, 5, 19, 7, 30)),
+            ShiftRecord(user_id=driver.id, pretrip_id=second_pretrip.id, start_time=datetime(2026, 5, 19, 11, 30)),
+            PostTrip(pretrip_id=first_pretrip.id, end_mileage=1010, miles_driven=10),
+            PostTrip(pretrip_id=second_pretrip.id, end_mileage=2015, miles_driven=15),
+        ])
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "multi_truck_manager")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+
+    assert response.status_code == 200
+    assert b"<strong>Truck:</strong> Multiple trucks: st2, st4" in response.data
+    assert b"<strong>Mileage:</strong> 25 miles" in response.data
+    assert b"Route truck" in response.data
+    assert b"Separate DVIR" not in response.data
+
 
 
 def test_manager_route_review_resolves_post_unload_non_cargo_stops(client, app):
@@ -997,8 +1053,8 @@ def test_manager_route_review_resolves_post_unload_non_cargo_stops(client, app):
     login(client, "noncargo_manager")
     response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
     assert response.status_code == 200
-    assert b"Operational route appears complete: final cargo unload at Raleigh East 4:43pm" in response.data
-    assert b"Subsequent stops were non-cargo" in response.data
+    assert b"The route appears operationally complete but is not ready for approval. Final cargo unload was at Raleigh East 4:43pm" in response.data
+    assert b"subsequent stops were non-cargo" in response.data
     assert b"Paint Central drop/no pickup" in response.data
     assert b"Ryder Rentals maintenance" in response.data
     assert b"Final cargo unload appears" not in response.data
@@ -1240,6 +1296,9 @@ def test_pretrip_create_and_print_route(client, app):
     assert manager_pretrip.status_code == 200
     assert b"Working" in manager_pretrip.data
     assert b"Blank" not in manager_pretrip.data
+    assert b"PreTrip Damage Evidence" in manager_pretrip.data
+    assert b"Scratch on bumper" in manager_pretrip.data
+    assert b"/manager/damage-photos/" in manager_pretrip.data
     client.get("/logout")
     login(client, "driver1")
 
@@ -1263,7 +1322,15 @@ def test_pretrip_create_and_print_route(client, app):
     assert b"Edit PreTrip Before Printing" in printable.data
     assert b"Review the DVIR first" in printable.data
     assert b"Driver One" in printable.data
+    assert b"PreTrip Damage Evidence" in printable.data
+    assert b"Scratch on bumper" in printable.data
+    assert b"/damage_reports/photos/" in printable.data
     assert "&#10003;".encode() in printable.data
+
+    pdf = client.get(f"/pretrip_printable/{pretrip_id}/attachment")
+    assert pdf.status_code == 200
+    assert b"PreTrip Damage Evidence" in pdf.data
+    assert b"Photo ID #" in pdf.data
 
     activity = client.get("/recent_activity")
     assert activity.status_code == 200
@@ -2475,12 +2542,16 @@ def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_rev
     assert b"Cargo / Manifest Review" in manager_print.data
     assert b"Cargo status" in manager_print.data
     assert b"Needs Review" in manager_print.data
-    assert b"Scan records" in manager_print.data
-    assert b"Attached" in manager_print.data
+    assert b"Verification level" in manager_print.data
+    assert b"Route-entered + scans only" in manager_print.data
     assert b"Manifest linked" in manager_print.data
-    assert b"Not yet linked" in manager_print.data
-    assert b"1 scan need manager confirmation" in manager_print.data
-    assert b"Picked Up / Departed With" in manager_print.data
+    assert b"No" in manager_print.data
+    assert b"1 scan needs manager confirmation" in manager_print.data
+    assert b"Pending Scan Evidence" in manager_print.data
+    assert b"Drop Scan" in manager_print.data
+    assert b"pending part" in manager_print.data
+    assert b"L861" in manager_print.data
+    assert b"Picked Up / Departed With" not in manager_print.data
 
 
 def test_driver_hot_part_proof_one_tap_flags_missing_scan_for_manager(client, app):

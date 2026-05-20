@@ -138,6 +138,25 @@
       color: #b00020;
       font-weight: 800;
     }
+    .evidence-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.08in;
+      margin-top: 0.06in;
+    }
+    .evidence-photo {
+      border: 1px solid #000;
+      padding: 0.04in;
+      break-inside: avoid;
+    }
+    .evidence-photo img {
+      width: 100%;
+      height: 1.35in;
+      object-fit: contain;
+      display: block;
+      border: 1px solid #999;
+      margin-bottom: 0.03in;
+    }
     hr {
       border: 0;
       border-top: 1px solid #000;
@@ -329,6 +348,31 @@
     <strong>Remarks:</strong><br>
     {{ pretrip.damage_report or "" }}
   </div>
+
+
+  {% set damage_photo_endpoint = 'manager.damage_photo' if current_user.role == 'management' else 'driver.damage_photo' %}
+  {% set evidence_reports = pretrip_damage_reports|default([]) %}
+  {% if evidence_reports %}
+    <div class="section-header">PreTrip Damage Evidence</div>
+    <div class="remarks-block">
+      {% for report in evidence_reports %}
+        <strong>Report #{{ report.id }}:</strong> {{ report.description }}<br>
+        {% if report.photos %}
+          <div class="evidence-grid">
+            {% for photo in report.photos %}
+              <div class="evidence-photo">
+                <img src="{{ url_for(damage_photo_endpoint, photo_id=photo.id) }}" alt="PreTrip damage photo {{ photo.id }}">
+                <strong>Photo ID #{{ photo.id }}</strong><br>
+                {{ photo.original_filename or photo.filename }}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          Damage report exists without a photo attachment.<br>
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% endif %}
 
   <div class="remarks-block">
     <strong>Shop Remarks:</strong><br>

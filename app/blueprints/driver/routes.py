@@ -966,6 +966,28 @@ def _save_pretrip_damage_report(pretrip, form):
 
 
 
+def _pretrip_damage_reports(pretrip):
+    if not pretrip or not getattr(pretrip, "id", None):
+        return []
+    return (
+        DamageReport.query.filter(
+            DamageReport.reported_by_id == pretrip.user_id,
+            DamageReport.move_reference == f"PreTrip #{pretrip.id}",
+        )
+        .order_by(DamageReport.created_at.asc(), DamageReport.id.asc())
+        .all()
+    )
+
+
+def _damage_photo_file_path(photo):
+    if not photo:
+        return None
+    upload_root = current_app.config.get("DAMAGE_UPLOAD_FOLDER", "uploads/damage_photos")
+    path = os.path.abspath(os.path.join(current_app.root_path, os.pardir, upload_root, photo.filename))
+    return path if os.path.isfile(path) else None
+
+
+
 def _damage_report_date(report):
     stamp = report.damage_time or report.created_at or datetime.utcnow()
     if stamp.tzinfo is None:
@@ -1505,6 +1527,36 @@ def _build_pretrip_pdf(pretrip):
     )
     pdf.text(36, 92, "Driver Signature: ____________________________", size=10)
     pdf.text(335, 92, "Date: __________________", size=10)
+
+    evidence_reports = _pretrip_damage_reports(pretrip)
+    if evidence_reports:
+        pdf.add_page()
+        y = 748
+        pdf.text(36, y, "PreTrip Damage Evidence", size=14, bold=True)
+        y -= 20
+        pdf.text(36, y, f"PreTrip #{pretrip.id} / Truck {pretrip.truck_number or 'not set'}", size=9)
+        y -= 18
+        for report in evidence_reports[:4]:
+            pdf.text(36, y, f"Damage Report #{report.id}: {report.description}", size=9, bold=True, color=PDF_ALERT_RED)
+            y -= 14
+            if report.photos:
+                for photo in report.photos[:2]:
+                    image_y = y - 80
+                    image_drawn = bool(_damage_photo_file_path(photo)) and pdf.image_file(_damage_photo_file_path(photo), 36, image_y, 120, 80)
+                    if not image_drawn:
+                        pdf.rect(36, image_y, 120, 80)
+                        pdf.multiline_text(42, image_y + 48, "Photo record exists but file failed to render. Review in system before approval.", width_chars=28, size=7, leading=9, max_lines=4, bold=True)
+                    pdf.text(170, y - 8, f"Photo ID #{photo.id}", size=8, bold=True)
+                    pdf.text(170, y - 22, f"File: {photo.original_filename or photo.filename}", size=8)
+                    pdf.text(170, y - 36, f"Uploaded: {photo.uploaded_at}", size=8)
+                    y -= 98
+                    if y < 120:
+                        pdf.add_page()
+                        y = 748
+            else:
+                pdf.text(44, y, "Damage report exists without photo attachment.", size=8, bold=True)
+                y -= 18
+            y -= 8
     return pdf.build()
 
 
@@ -1870,6 +1922,7 @@ def view_pretrip(pretrip_id):
         pretrip=pt,
         readonly=(current_user.role == "management"),
         today_local_date=_today_local_date(),
+        pretrip_damage_reports=_pretrip_damage_reports(pt),
     )
 
 
@@ -2024,6 +2077,7 @@ def pretrip_printable(pretrip_id):
         ephemeral_driver=ephemeral_driver,
         ephemeral_date=ephemeral_date,
         email_mode=False,
+        pretrip_damage_reports=_pretrip_damage_reports(pt),
     )
 
 

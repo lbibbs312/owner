@@ -164,13 +164,24 @@
           <div class="audit-item {{ item.class }}"><strong>{{ item.label }}</strong><span>{{ item.value }}</span><small>{{ item.detail }}</small></div>
         {% endfor %}
       </div>
-      {% if cargo_review.detail_needed %}
-        <p><strong>Cargo detail rows are shown because this route needs cargo review.</strong></p>
+      {% if cargo_review.pending_scan_rows %}
+        <h3 class="h6 text-uppercase text-muted">Pending Scan Evidence</h3>
         <table>
-          <thead><tr><th>Stop</th><th>Picked Up / Departed With</th><th>Dropped</th><th>On Arrival</th></tr></thead>
+          <thead><tr><th>Scan</th><th>Stop</th><th>Context</th><th>Status</th><th>Value</th><th>Time</th></tr></thead>
           <tbody>
-            {% for row in cargo_review.movement_rows %}
-              <tr><td>{{ row.plant }}</td><td>{{ row.picked_up }}</td><td>{{ row.dropped }}</td><td>{{ row.onboard }}</td></tr>
+            {% for row in cargo_review.pending_scan_rows %}
+              <tr><td>#{{ row.id }}</td><td>{{ row.stop }}</td><td>{{ row.context }}</td><td>{{ row.status }}</td><td>{{ row.value }}</td><td>{{ row.time }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+      {% if cargo_review.timing_rows %}
+        <h3 class="h6 text-uppercase text-muted">Timing Intelligence</h3>
+        <table>
+          <thead><tr><th>Stop</th><th>Load / Dock Time</th><th>Plant Average</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for row in cargo_review.timing_rows %}
+              <tr><td>{{ row.plant }}</td><td>{{ row.actual }}</td><td>{{ row.average }}</td><td><span class="delay-status {{ row.class }}">{{ row.status }}</span></td></tr>
             {% endfor %}
           </tbody>
         </table>

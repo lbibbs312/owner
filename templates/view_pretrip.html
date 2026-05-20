@@ -37,6 +37,33 @@
     {% endif %}
   </p>
 
+
+  {% set damage_photo_endpoint = 'manager.damage_photo' if current_user.role == 'management' else 'driver.damage_photo' %}
+  {% set evidence_reports = pretrip_damage_reports|default([]) %}
+  {% if evidence_reports %}
+    <div class="border rounded p-3 mb-3">
+      <h3 class="h6 text-uppercase text-muted">PreTrip Damage Evidence</h3>
+      {% for report in evidence_reports %}
+        <div class="mb-3{% if not loop.last %} border-bottom pb-3{% endif %}">
+          <p class="mb-1"><strong>Report #{{ report.id }}:</strong> {{ report.description }}</p>
+          <p class="text-muted small mb-2">{{ report.created_at|to_detroit_datetime if report.created_at else '' }}{% if report.truck_number %} - Truck {{ report.truck_number }}{% endif %}{% if report.trailer_number %} - Trailer {{ report.trailer_number }}{% endif %}</p>
+          {% if report.photos %}
+            <div class="d-flex flex-wrap gap-2">
+              {% for photo in report.photos %}
+                <a href="{{ url_for(damage_photo_endpoint, photo_id=photo.id) }}" target="_blank" rel="noopener" class="d-inline-block border rounded p-1 bg-light">
+                  <img src="{{ url_for(damage_photo_endpoint, photo_id=photo.id) }}" alt="PreTrip damage photo {{ photo.id }}" style="width:150px;height:110px;object-fit:cover;display:block;">
+                  <span class="d-block small text-muted mt-1">Photo ID #{{ photo.id }}</span>
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-warning mb-0">Damage report exists without a photo attachment.</p>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
   <p>
     <strong>Oil System Status:</strong>
     {% if pretrip.oil_system_status == 'leaking' %}
