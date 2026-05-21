@@ -22,6 +22,7 @@
   function controlsFor(form) {
     return Array.from(form.elements || []).filter((control) => {
       if (!control.name || control.disabled) return false;
+      if (control.dataset && control.dataset.noAutosave === 'true') return false;
       const type = (control.type || '').toLowerCase();
       if (['button', 'submit', 'reset', 'file', 'password'].includes(type)) return false;
       if (control.name === 'csrf_token') return false;

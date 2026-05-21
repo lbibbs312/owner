@@ -163,7 +163,7 @@
       Sign in the Driver Signature box, then tap Sign &amp; Submit.
     </div>
 
-    {{ form.driver_signature(id="driverSigData") }}
+    {{ form.driver_signature(id="driverSigData", data_no_autosave="true") }}
 
     <div id="signatureCanvasWrap" class="border rounded mb-2" style="display:inline-block; touch-action:none;">
       <canvas id="sigCanvas" width="480" height="160" tabindex="0"
@@ -171,7 +171,7 @@
     </div>
     <br>
     <button type="button" class="btn btn-outline-secondary btn-sm me-2" id="sigClear">Clear</button>
-    <button type="button" class="btn btn-success" id="sigSubmit">Sign &amp; Submit</button>
+    <button type="submit" class="btn btn-success" id="sigSubmit">Sign &amp; Submit</button>
     </section>
   </form>
 </div>
@@ -192,6 +192,7 @@
   ctx.lineWidth = 2.5;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  const blankSignatureData = canvas.toDataURL('image/png');
 
   function pos(e) {
     const r = canvas.getBoundingClientRect();
@@ -249,7 +250,13 @@
   }
 
   function syncSignature() {
-    if (hasInk) sigData.value = canvas.toDataURL('image/png');
+    const drawnSignatureData = canvas.toDataURL('image/png');
+    const hasDrawnPixels = hasInk || drawnSignatureData !== blankSignatureData;
+    if (hasDrawnPixels) {
+      sigData.value = drawnSignatureData;
+      sigData.dispatchEvent(new Event('input', { bubbles: true }));
+      sigData.dispatchEvent(new Event('change', { bubbles: true }));
+    }
     return Boolean(sigData.value && sigData.value.startsWith('data:image/'));
   }
 
@@ -266,14 +273,6 @@
     hasInk = false;
     signatureWarning.classList.add('d-none');
     signatureCanvasWrap.classList.remove('border-warning');
-  });
-
-  document.getElementById('sigSubmit').addEventListener('click', function () {
-    if (!syncSignature()) {
-      showSignatureWarning();
-      return;
-    }
-    form.submit();
   });
 
   form.addEventListener('submit', function (e) {

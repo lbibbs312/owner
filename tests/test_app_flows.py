@@ -3733,6 +3733,9 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
     assert b"form.addEventListener('submit'" in signature_page.data
     assert b"signatureSection" in signature_page.data
     assert b"showSignatureWarning" in signature_page.data
+    assert b"blankSignatureData" in signature_page.data
+    assert b'data-no-autosave="true"' in signature_page.data
+    assert b"form.submit()" not in signature_page.data
     assert b"Please sign before submitting" not in signature_page.data
 
     response = client.post(
