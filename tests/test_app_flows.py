@@ -122,6 +122,37 @@ def test_driver_entry_forms_load_autosave(client, app):
     assert b'data-autosave-key="damage-report-new"' in damage_page.data
     assert b"js/autosave-drafts.js" in damage_page.data
 
+
+def test_new_driver_log_ignores_stale_hidden_cargo(client, app):
+    with app.app_context():
+        driver = create_user("stale_cargo_driver", "stale-cargo@example.com")
+        driver_id = driver.id
+
+    login(client, "stale_cargo_driver")
+    page = client.get("/new_driving_log")
+    assert page.status_code == 200
+    assert b'name="load_size" value="Empty" data-no-autosave="true"' in page.data
+
+    response = client.post(
+        "/new_driving_log",
+        data={
+            "plant_name": "RE",
+            "load_size": "Kraft Plant Load",
+            "secondary_load": "PPL Load",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        log = DriverLog.query.filter_by(driver_id=driver_id).one()
+        assert log.plant_name == "RE"
+        assert log.load_size == "Empty"
+        assert log.secondary_load is None
+
+
 def test_registration_uses_manager_pin(client, app):
     response = client.post(
         "/register",

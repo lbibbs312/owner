@@ -2482,7 +2482,7 @@ def new_driving_log():
             flash(f"Close the open stop at {_plant_label(open_stop.plant_name)} before creating the next stop.", "warning")
             return redirect(url_for("driver.driver_logs"))
 
-        arrival_load = current_load_value if current_load_value != "Empty" else (form.load_size.data or "Empty")
+        arrival_load = current_load_value or "Empty"
         arrival_secondary_load = current_secondary_value or None
         reason_parts = []
 
