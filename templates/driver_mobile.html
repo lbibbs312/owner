@@ -474,8 +474,13 @@
             <p>You have no pending driver tasks right now. Create a driver log or open the task queue.</p>
           {% endif %}
           <div class="hero-actions">
-            <a class="button primary" href="{{ url_for('driver.new_driving_log') }}">Create Driver Log</a>
-            <a class="button ghost" href="{{ url_for('driver.list_tasks') }}">View Tasks</a>
+            {% if route_context and route_context.current_stop %}
+              <a class="button primary" href="{{ url_for('driver.depart_driver_log', log_id=route_context.current_stop.id) }}">Record Departure</a>
+              <a class="button ghost" href="{{ url_for('driver.pickup_driver_log', log_id=route_context.current_stop.id) }}">Select Destination</a>
+            {% else %}
+              <a class="button primary" href="{{ url_for('driver.new_driving_log') }}">Create Driver Log</a>
+              <a class="button ghost" href="{{ url_for('driver.list_tasks') }}">View Tasks</a>
+            {% endif %}
           </div>
         {% endif %}
       </section>
@@ -518,10 +523,17 @@
 
       <section class="quick-grid">
         {% if active_task %}
-          <a class="quick-card" href="{{ url_for('driver.new_driving_log') }}">
-            <div class="quick-icon">DL</div>
-            <div><strong>Create Driver Log</strong><span>Record plant arrival, load, and parts</span></div>
-          </a>
+          {% if route_context and route_context.current_stop %}
+            <a class="quick-card" href="{{ url_for('driver.depart_driver_log', log_id=route_context.current_stop.id) }}">
+              <div class="quick-icon">DL</div>
+              <div><strong>Record Departure</strong><span>Close current stop before adding another</span></div>
+            </a>
+          {% else %}
+            <a class="quick-card" href="{{ url_for('driver.new_driving_log') }}">
+              <div class="quick-icon">DL</div>
+              <div><strong>Create Driver Log</strong><span>Record plant arrival, load, and parts</span></div>
+            </a>
+          {% endif %}
         {% else %}
           <a class="quick-card" href="{{ url_for('driver.new_plant_transfer') }}">
             <div class="quick-icon">PT</div>

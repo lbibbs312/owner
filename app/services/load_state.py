@@ -47,7 +47,7 @@ def _prefixed_reason(log, prefix):
 
 
 def is_empty_load(value):
-    return _norm(value) in {"", "empty"}
+    return _norm(value) in {"", "empty", "none", "no load", "no pickup", "no-pickup", "n/a", "na", "--", "null"}
 
 
 def is_legacy_size_load(value):
@@ -98,6 +98,11 @@ def load_display(value):
     return _clean(value)
 
 
+def normalize_cargo_value(value):
+    """Return the canonical cargo label used by route-state services."""
+    return load_display(value)
+
+
 def cargo_display(primary_load, secondary_load=None):
     primary = load_display(primary_load)
     secondary = load_display(secondary_load)
@@ -107,6 +112,104 @@ def cargo_display(primary_load, secondary_load=None):
     if secondary and secondary != "Empty":
         parts.append(secondary)
     return " + ".join(parts) if parts else "Empty"
+
+
+def normalized_cargo_items(primary_load=None, secondary_load=None):
+    """Return normalized non-empty cargo labels for comparison/reporting."""
+    items = []
+    for value in (primary_load, secondary_load):
+        for part in _clean(value).split("+"):
+            label = normalize_cargo_value(part)
+            if label and label != "Empty" and label not in items:
+                items.append(label)
+    return tuple(items)
+
+
+def cargo_delta_for_stop(log, route=None):
+    """Summarize cargo movement at a stop from route context without guessing.
+
+    This keeps actual cargo separate from next-load predictions. It only reports
+    cargo as delivered or picked up when the route context or log values make
+    that movement explicit.
+    """
+    route = route or {}
+    arrived = normalized_cargo_items(
+        route.get("arrive_desc") if route.get("arrive_desc") is not None else getattr(log, "load_size", None),
+        route.get("arrive_secondary_desc") if route.get("arrive_secondary_desc") is not None else None,
+    )
+    departed = normalized_cargo_items(
+        route.get("depart_desc") if route.get("depart_desc") is not None else getattr(log, "depart_load_size", None),
+        route.get("depart_secondary_desc") if route.get("depart_secondary_desc") is not None else getattr(log, "secondary_load", None),
+    )
+
+    delivered = []
+    if route.get("unloaded_on_arrival"):
+        delivered.extend(normalized_cargo_items(route.get("arrive_desc")))
+    if route.get("secondary_dropped_on_arrival"):
+        delivered.extend(normalized_cargo_items(route.get("arrive_secondary_desc")))
+
+    delivered_set = set(delivered)
+    picked_up = [item for item in departed if item not in arrived or item in delivered_set]
+    retained = [item for item in departed if item in arrived and item not in delivered_set]
+    removed = [item for item in arrived if item not in departed and item not in delivered_set]
+
+    return {
+        "plant": route.get("plant") or plant_label(getattr(log, "plant_name", None)),
+        "arrived": arrived,
+        "departed": departed,
+        "delivered": tuple(dict.fromkeys(delivered)),
+        "picked_up": tuple(dict.fromkeys(picked_up)),
+        "retained": tuple(dict.fromkeys(retained)),
+        "removed": tuple(dict.fromkeys(removed)),
+        "open": not bool(getattr(log, "depart_time", None)),
+    }
+
+
+def classify_stop_role(log, route=None, *, is_current_open=False, is_final_stop=False):
+    """Classify a stop's cargo role from explicit cargo deltas."""
+    delta = cargo_delta_for_stop(log, route)
+    if is_current_open and delta["open"]:
+        return "current_open"
+    if getattr(log, "maintenance", False) or getattr(log, "fuel", False) or getattr(log, "meeting", False) or truck_issue_reason(log):
+        return "service_stop"
+    if is_final_stop:
+        return "final_stop"
+    if delta["open"]:
+        return "current_open"
+    has_delivery = bool(delta["delivered"] or delta["removed"])
+    has_pickup = bool(delta["picked_up"])
+    if has_delivery and has_pickup:
+        return "mixed_transfer"
+    if has_delivery:
+        return "multi_stop_drop" if delta["retained"] else "drop_only"
+    if has_pickup:
+        return "pickup_origin"
+    if getattr(log, "no_pickup", False) or not delta["departed"]:
+        return "no_pickup"
+    if delta["retained"]:
+        return "multi_stop_drop"
+    return "no_pickup"
+
+
+def stop_role_details(log, route=None, *, is_current_open=False, is_final_stop=False):
+    delta = cargo_delta_for_stop(log, route)
+    role = classify_stop_role(log, route, is_current_open=is_current_open, is_final_stop=is_final_stop)
+    cargo_added = tuple(delta["picked_up"])
+    cargo_removed = tuple(dict.fromkeys(delta["delivered"] + delta["removed"]))
+    cargo_retained = tuple(delta["retained"])
+    return {
+        "stop_role": role,
+        "cargo_added": cargo_added,
+        "cargo_removed": cargo_removed,
+        "cargo_retained": cargo_retained,
+        "arrival_cargo": " + ".join(delta["arrived"]) if delta["arrived"] else "Empty",
+        "departure_cargo": " + ".join(delta["departed"]) if delta["departed"] else "Empty",
+        "train_pickup_timing": bool(
+            not delta["open"]
+            and role in {"pickup_origin", "mixed_transfer"}
+            and cargo_added
+        ),
+    }
 
 
 def is_load_for_plant(load_value, plant_name):

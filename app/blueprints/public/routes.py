@@ -1,9 +1,10 @@
-from flask import current_app, jsonify, render_template, send_from_directory
-from flask_login import login_required
+from flask import abort, current_app, jsonify, render_template, send_from_directory
+from flask_login import current_user, login_required
 
 from app.blueprints.public import bp
 from app.models import Announcement
 from app.services.database_status import database_status
+from app.services.route_context import build_route_context
 
 
 @bp.route("/")
@@ -42,3 +43,17 @@ def readyz():
         ), 200 if status["ready"] else 503
     except Exception as exc:  # pragma: no cover - surface DB connectivity failures
         return jsonify(status="degraded", db=str(exc)), 503
+
+
+@bp.route("/debug/route-context/<path:route_id>")
+@login_required
+def debug_route_context(route_id):
+    debug_enabled = bool(
+        current_app.config.get("DEBUG")
+        or current_app.config.get("TESTING")
+        or current_app.config.get("ENABLE_ROUTE_CONTEXT_DEBUG")
+    )
+    if current_user.role != "management" or not debug_enabled:
+        abort(404)
+    snapshot = build_route_context(route_id=route_id)
+    return jsonify(snapshot.to_dict())

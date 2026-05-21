@@ -6,6 +6,7 @@ from flask import g, has_request_context
 import pytz
 
 from app.models import AuditEvent, DriverLog
+from app.services.load_state import build_driver_log_route_context, cargo_delta_for_stop, classify_stop_role, is_empty_load
 from app.services.plant_addresses import PLANT_LABELS, plant_label
 
 
@@ -83,20 +84,70 @@ def stop_minutes(log):
     return int((departure - arrival).total_seconds() // 60)
 
 
-def _action_type(log):
+def _action_type(log, route=None):
     if getattr(log, "hot_parts", False):
         return "hot_part"
-    inbound = (getattr(log, "load_size", None) or "").strip().lower()
-    outbound = (getattr(log, "depart_load_size", None) or "").strip().lower()
-    inbound_loaded = bool(inbound and inbound != "empty")
-    outbound_loaded = bool(outbound and outbound != "empty")
-    if inbound_loaded and outbound_loaded:
+    role = classify_stop_role(log, route)
+    if role == "mixed_transfer":
         return "mixed"
-    if outbound_loaded:
+    if role == "pickup_origin":
         return "load"
-    if inbound_loaded:
+    if role in {"drop_only", "multi_stop_drop"}:
         return "unload"
-    return "load"
+    if role == "current_open":
+        delta = cargo_delta_for_stop(log, route)
+        if delta["arrived"] and delta["departed"]:
+            return "mixed"
+        if delta["departed"]:
+            return "load"
+        if delta["arrived"]:
+            return "unload"
+    return "non_cargo"
+
+
+def plant_time_sample_eligibility(log, *, route=None, edited_log_ids=None):
+    edited_log_ids = edited_log_ids or set()
+    arrival = arrival_local_dt(log)
+    departure = depart_local_dt(log)
+    minutes = stop_minutes(log)
+    role = classify_stop_role(log, route)
+    action_type = _action_type(log, route)
+    delta = cargo_delta_for_stop(log, route)
+    has_cargo_activity = bool(delta["delivered"] or delta["picked_up"] or delta["removed"] or delta["retained"])
+    excluded_reason = None
+
+    if not getattr(log, "depart_time", None):
+        excluded_reason = "Departure missing"
+    elif arrival is None or departure is None:
+        excluded_reason = "Arrival/departure time invalid"
+    elif minutes is None or minutes < 0:
+        excluded_reason = "Departure before arrival"
+    elif minutes < MIN_SAMPLE_MINUTES:
+        excluded_reason = "Under 3 minutes"
+    elif minutes > MAX_SAMPLE_MINUTES:
+        excluded_reason = "Over 6 hours"
+    elif getattr(log, "maintenance", False):
+        excluded_reason = "Maintenance stop"
+    elif getattr(log, "fuel", False):
+        excluded_reason = "Fuel stop"
+    elif getattr(log, "meeting", False):
+        excluded_reason = "Meeting stop"
+    elif getattr(log, "id", None) in edited_log_ids:
+        excluded_reason = "Manually corrected"
+    elif role not in {"pickup_origin", "mixed_transfer"}:
+        excluded_reason = f"Not pickup-origin stop: {role}"
+    elif not delta["picked_up"]:
+        excluded_reason = "No new cargo picked up"
+    elif not has_cargo_activity and is_empty_load(getattr(log, "load_size", None)) and is_empty_load(getattr(log, "depart_load_size", None)):
+        excluded_reason = "No cargo movement"
+
+    return {
+        "included": excluded_reason is None,
+        "training_eligible": excluded_reason is None,
+        "excluded_reason": excluded_reason,
+        "stop_role": role,
+        "action_type": action_type,
+    }
 
 
 def _edited_driver_log_ids(log_ids):
@@ -114,30 +165,12 @@ def _edited_driver_log_ids(log_ids):
     }
 
 
-def stop_time_sample(log, *, edited_log_ids=None):
+def stop_time_sample(log, *, edited_log_ids=None, route=None):
     edited_log_ids = edited_log_ids or set()
     arrival = arrival_local_dt(log)
     departure = depart_local_dt(log)
     minutes = stop_minutes(log)
-    excluded_reason = None
-    if not getattr(log, "depart_time", None):
-        excluded_reason = "Departure missing"
-    elif arrival is None or departure is None:
-        excluded_reason = "Arrival/departure time invalid"
-    elif minutes is None or minutes < 0:
-        excluded_reason = "Departure before arrival"
-    elif minutes < MIN_SAMPLE_MINUTES:
-        excluded_reason = "Under 3 minutes"
-    elif minutes > MAX_SAMPLE_MINUTES:
-        excluded_reason = "Over 6 hours"
-    elif getattr(log, "maintenance", False):
-        excluded_reason = "Maintenance stop"
-    elif getattr(log, "fuel", False):
-        excluded_reason = "Fuel stop"
-    elif getattr(log, "meeting", False):
-        excluded_reason = "Meeting stop"
-    elif log.id in edited_log_ids:
-        excluded_reason = "Manually corrected"
+    eligibility = plant_time_sample_eligibility(log, route=route, edited_log_ids=edited_log_ids)
 
     return {
         "log": log,
@@ -147,9 +180,11 @@ def stop_time_sample(log, *, edited_log_ids=None):
         "departure": departure,
         "minutes": minutes,
         "minutes_label": format_minutes(minutes) if minutes is not None else "--",
-        "action_type": _action_type(log),
-        "included": excluded_reason is None,
-        "excluded_reason": excluded_reason,
+        "action_type": eligibility["action_type"],
+        "stop_role": eligibility["stop_role"],
+        "training_eligible": eligibility["training_eligible"],
+        "included": eligibility["included"],
+        "excluded_reason": eligibility["excluded_reason"],
     }
 
 
@@ -180,12 +215,13 @@ def _recent_sample_groups(anchor_date, history_days=RECENT_HISTORY_DAYS):
         .all()
     )
     edited_ids = _edited_driver_log_ids([log.id for log in logs])
+    routes = build_driver_log_route_context(logs)
     groups = defaultdict(list)
     for log in logs:
         plant_id = _plant_code(getattr(log, "plant_name", None))
         if not plant_id:
             continue
-        groups[plant_id].append(stop_time_sample(log, edited_log_ids=edited_ids))
+        groups[plant_id].append(stop_time_sample(log, edited_log_ids=edited_ids, route=routes.get(log.id)))
 
     result = dict(groups)
     if cache is not None:

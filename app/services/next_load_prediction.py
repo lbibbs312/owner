@@ -8,7 +8,7 @@ import re
 import pytz
 
 from app.models import DriverLog, HotMove, PartScanEvent, PlantPredictionRule, Task
-from app.services.load_state import destination_from_load, destination_load_value
+from app.services.load_state import build_driver_log_route_context, destination_from_load, destination_load_value, stop_role_details
 from app.services.plant_addresses import PLANT_LABELS, plant_label
 from app.services.plant_time import forecast_for_stop
 
@@ -339,8 +339,24 @@ def _historical_destination(pickup, route_date, current_stop=None, history_days=
     )
     if current_stop is not None and getattr(current_stop, "id", None):
         query = query.filter(DriverLog.id != current_stop.id)
+    logs = query.all()
+    route_keys = {(log.driver_id, log.date) for log in logs}
+    context_logs = []
+    for candidate_driver_id, candidate_date in route_keys:
+        context_logs.extend(
+            DriverLog.query.filter(
+                DriverLog.deleted_at.is_(None),
+                DriverLog.driver_id == candidate_driver_id,
+                DriverLog.date == candidate_date,
+            ).all()
+        )
+    routes = build_driver_log_route_context(context_logs)
     counts = Counter()
-    for log in query.all():
+    for log in logs:
+        route = routes.get(log.id, {})
+        role = stop_role_details(log, route)
+        if not role["train_pickup_timing"]:
+            continue
         destination = destination_from_load(log.depart_load_size)
         if destination:
             counts[destination] += 1

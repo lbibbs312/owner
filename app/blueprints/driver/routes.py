@@ -50,6 +50,7 @@ from app.services.load_state import (
 )
 from app.services.parts import record_part_scan as save_part_scan, scan_event_payload
 from app.services.next_load_prediction import build_next_load_prediction
+from app.services.route_context import build_route_context
 from app.services.plant_time import forecast_for_stop, plant_time_forecast, route_stop_forecasts
 from app.services.report_summary import damage_report_count_label, damage_report_detail_label
 from app.services.hot_parts import (
@@ -234,6 +235,29 @@ def _current_driver_load(driver_id, route_date=None):
         return current_load_after_logs([])
     logs = _active_driver_logs_query().filter_by(driver_id=driver_id, date=route_date).all()
     return current_load_after_logs(logs)
+
+
+def _sync_next_open_stop_arrival_cargo(log):
+    if not log or not log.driver_id or not log.date:
+        return None
+    logs = sorted(
+        _active_driver_logs_query().filter_by(driver_id=log.driver_id, date=log.date).all(),
+        key=_driver_log_sort_key,
+    )
+    current_index = next((index for index, item in enumerate(logs) if item.id == log.id), None)
+    if current_index is None or current_index + 1 >= len(logs):
+        return None
+    next_log = logs[current_index + 1]
+    if next_log.depart_time:
+        return None
+    expected = current_load_after_logs(logs[: current_index + 1])
+    expected_primary = expected.get("value") or "Empty"
+    expected_secondary = expected.get("secondary_value") or None
+    if next_log.load_size == expected_primary and (next_log.secondary_load or None) == expected_secondary:
+        return None
+    next_log.load_size = expected_primary
+    next_log.secondary_load = expected_secondary
+    return next_log
 
 
 def _driver_log_context_for(log):
@@ -1593,7 +1617,7 @@ def _draw_signature_pdf_block(pdf, driver_signature=None, signature_timestamp=No
     pdf.text(330, 52, "Manager review signature", size=8)
 
 
-def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, signature_timestamp=None):
+def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, signature_timestamp=None, route_context=None):
     pdf = SimplePdf("Driver Route Sheet", LETTER)
     pdf.text(36, 748, f"Driver Route Sheet - {the_date}", size=15, bold=True)
     if driver:
@@ -1603,21 +1627,22 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
         if driver.employee_id:
             info_parts.append(f"Badge: {driver.employee_id}")
         pdf.text(36, 730, "  |  ".join(info_parts), size=9)
-    routes = _driver_log_route_context(logs)
+    route_context = route_context or build_route_context(driver_id=getattr(logs[0], "driver_id", None), route_date=getattr(logs[0], "date", None)) if logs else None
+    snapshot_rows = {row.get("log_id"): row for row in (route_context.rows if route_context else [])}
+    routes = (route_context.log_routes if route_context else _driver_log_route_context(logs))
     rows = []
     for log in logs:
         route = routes.get(log.id, {})
-        status = route.get("action") or ("Open" if not log.depart_time else "Complete")
-        if route.get("next_stop"):
-            status = f"{status}; first stop {route.get('next_stop')}"
+        snapshot = snapshot_rows.get(log.id, {})
+        status = snapshot.get("note") or route.get("action") or ("Open" if not log.depart_time else "Complete")
         rows.append([
-            route.get("plant") or log.plant_name,
+            snapshot.get("plant") or route.get("plant") or log.plant_name,
             _arrival_utc_to_local_hhmm(log.arrive_time) or "--",
             _format_hhmm_12h(log.depart_time) or "--",
-            route.get("arrive_cargo_desc") or route.get("arrive_desc") or load_display(log.load_size),
-            route.get("depart_cargo_desc") if route.get("depart_cargo_desc") is not None else "--",
+            snapshot.get("cargo_in") or route.get("arrive_cargo_desc") or route.get("arrive_desc") or load_display(log.load_size),
+            snapshot.get("cargo_out") or (route.get("depart_cargo_desc") if route.get("depart_cargo_desc") is not None else "--"),
             ("No Pickup " if log.no_pickup else "") + (("HOT " if log.hot_parts else "") + (log.part_number or "")).strip(),
-            status,
+            f"{snapshot.get('status', '')}: {status}" if snapshot else status,
         ])
     pdf.table(36, 710, [70, 58, 58, 110, 110, 105, 65], 24, ["Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Parts", "Status"], rows or [["No logs", "", "", "", "", "", ""]], font_size=7)
     _draw_signature_pdf_block(pdf, driver_signature, signature_timestamp)
@@ -2989,6 +3014,7 @@ def depart_driver_log(log_id):
         log.depart_load_size = departure_load
         log.secondary_load = secondary_load or None
         log.no_pickup = departure_load == "Empty" and not log.secondary_load
+        _sync_next_open_stop_arrival_cargo(log)
         db.session.commit()
         record_activity(
             user_id=current_user.id,
@@ -3030,6 +3056,7 @@ def no_pickup_driver_log(log_id):
     log.no_pickup = True
     log.depart_load_size = "Empty"
     log.depart_time = depart_time
+    _sync_next_open_stop_arrival_cargo(log)
     db.session.commit()
     record_activity(
         user_id=current_user.id,
@@ -3080,6 +3107,7 @@ def pickup_driver_log(log_id):
         log.fuel = form.fuel.data
         log.fuel_mileage = _form_mileage_value(form)
         log.meeting = form.meeting.data
+        _sync_next_open_stop_arrival_cargo(log)
         db.session.commit()
         record_activity(
             user_id=current_user.id,
@@ -3127,6 +3155,7 @@ def driver_logs_print():
         user_id=current_user.id, pretrip_date=today_local_date
     ).all()
     log_routes = _driver_log_route_context(logs)
+    route_context = build_route_context(driver_id=current_user.id, route_date=today_local_date, now=now_local)
     damage_reports_today = _today_damage_reports(current_user.id, today_local_date)
     parts_carried = sorted({log.part_number for log in logs if log.part_number})
     exception_notes = []
@@ -3148,6 +3177,12 @@ def driver_logs_print():
         photo_review = _stop_photo_review_summary(log, plant_name)
         if photo_review:
             exception_notes.append(f"{photo_review['label']}: {photo_review['detail']}")
+    for issue in route_context.true_exceptions or []:
+        label = issue.get("label") or "Route review item"
+        detail = issue.get("detail") or ""
+        note = f"{label}: {detail}" if detail else label
+        if note not in exception_notes:
+            exception_notes.append(note)
     route_finalized = ActivityEvent.query.filter_by(
         user_id=current_user.id,
         category="eod",
@@ -3177,7 +3212,9 @@ def driver_logs_print():
         exception_notes=exception_notes,
         log_issue_details=log_issue_details,
         route_task_events=_task_route_events_for_logs(logs),
-        stop_forecasts=route_stop_forecasts(logs, now=now_local),
+        stop_forecasts=route_context.stop_timing,
+        route_state=route_context.route_state,
+        route_context=route_context,
         route_finalized=route_finalized,
         driver_signature=shift_record.driver_signature if shift_record else None,
         signature_timestamp=shift_record.signature_timestamp if shift_record else None,
@@ -3194,6 +3231,7 @@ def driver_logs_attachment():
         driver_id=current_user.id, date=today_local_date
     ).all()
     shift_record = _shift_record_for_driver_date(current_user.id, today_local_date, require_signature=True)
+    route_context = build_route_context(driver_id=current_user.id, route_date=today_local_date)
     return _document_attachment_response(
         pdf_bytes=_build_driver_logs_pdf(
             logs,
@@ -3201,6 +3239,7 @@ def driver_logs_attachment():
             driver=current_user,
             driver_signature=shift_record.driver_signature if shift_record else None,
             signature_timestamp=shift_record.signature_timestamp if shift_record else None,
+            route_context=route_context,
         ),
         filename=f"driver-logs-{today_local_date}.pdf",
         target_type="driver_log",
@@ -3734,16 +3773,17 @@ def mobile_dashboard():
         _active_driver_logs_query().filter_by(driver_id=current_user.id, date=route_date).all(),
         key=_driver_log_sort_key,
     )
-    todays_log_routes = _driver_log_route_context(todays_logs)
+    route_context = build_route_context(driver_id=current_user.id, route_date=route_date, now=now_local)
+    todays_log_routes = route_context.log_routes
     route_task_events = _task_route_events_for_logs(todays_logs, _driver_route_tasks(current_user.id, route_date))
-    current_stop = next((l for l in reversed(todays_logs) if not l.depart_time), None) or (todays_logs[-1] if todays_logs else None)
+    current_stop = route_context.current_stop or (todays_logs[-1] if todays_logs else None)
     current_stop_forecast = (
         forecast_for_stop(current_stop, now=now_local)
         if current_stop and not current_stop.depart_time
         else None
     )
-    stop_forecasts = route_stop_forecasts(todays_logs, now=now_local)
-    next_load_prediction = build_next_load_prediction(
+    stop_forecasts = route_context.stop_timing
+    next_load_prediction = route_context.next_load_prediction or build_next_load_prediction(
         current_stop=current_stop,
         driver_id=current_user.id,
         current_cargo_state=current_load_after_logs(todays_logs),
@@ -3793,6 +3833,8 @@ def mobile_dashboard():
         todays_log_routes=todays_log_routes,
         route_task_events=route_task_events,
         current_stop=current_stop,
+        route_state=route_context.route_state,
+        route_context=route_context,
         stop_forecasts=stop_forecasts,
         current_stop_forecast=current_stop_forecast,
         next_load_eta=next_load_eta,

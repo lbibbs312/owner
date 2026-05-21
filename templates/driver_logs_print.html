@@ -145,8 +145,8 @@
                 <div class="route-sub">Timing status: <span class="timing-status {{ stop_forecast.severity }}">{{ stop_forecast.status }}</span></div>
               {% endif %}
             {% else %}
-              <div class="route-leg">Final Location: {{ plant_name }}</div>
-              <div class="route-sub">{% if route_finalized %}Route finalized{% else %}Route open / not finalized{% endif %}</div>
+              <div class="route-leg">{% if route_finalized %}Finalized Stop: {{ plant_name }}{% elif not log.depart_time %}Current Stop: {{ plant_name }}{% else %}Route Stop: {{ plant_name }}{% endif %}</div>
+              <div class="route-sub">{% if route_finalized %}Route finalized{% elif not log.depart_time %}Awaiting departure / load intent{% else %}Route open / not finalized{% endif %}</div>
             {% endif %}
           </td>
           <td>
@@ -185,7 +185,7 @@
                 {% endif %}
               {% endif %}
             {% else %}
-              <p class="detail-line"><strong>{{ plant_name }}:</strong> Final location.</p>
+              <p class="detail-line"><strong>{{ plant_name }}:</strong> {% if route_finalized %}Finalized route stop.{% elif not log.depart_time %}Awaiting departure / load intent.{% else %}Route stop recorded.{% endif %}</p>
               {% if route and route.unloaded_on_arrival %}
                 <p class="detail-line">Final unload completed.</p>
               {% endif %}

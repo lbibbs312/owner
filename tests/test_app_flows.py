@@ -4259,7 +4259,8 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"Ryder time" in ryder_page.data
     assert b"rental R-18" in ryder_page.data
 
-    assert page.data.count(b"Create Driver Log") == 1
+    assert page.data.count(b"Create Driver Log") == 0
+    assert b"Record Departure" in page.data
     assert b"Start Shift" not in page.data
     assert b"End Shift" not in page.data
 
@@ -4687,3 +4688,190 @@ def test_repeated_plant_and_truck_issues_roll_up_to_cases(client, app):
     assert b"Paint Central delay pattern today" in page.data
     assert b"Paint Central has 3 delayed stops today" in page.data
     assert b"Truck st4 has 2 related maintenance reports this week" in page.data
+
+
+
+def test_pickup_origin_stop_roles_gate_plant_timing_samples(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+        from app.services.load_state import build_driver_log_route_context, stop_role_details
+        from app.services.plant_time import stop_time_sample
+
+        driver = create_user("role_driver", "role-driver@example.com", "driver")
+        route_date = date(2026, 5, 20)
+        logs = [
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="H", load_size="Empty", depart_load_size="Raleigh East Load", secondary_load="PPL Load", arrive_time="08:00", depart_time="08:20", created_at=datetime(2026, 5, 20, 8, 0)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="RE", load_size="Raleigh East Load", depart_load_size="PPL Load", arrive_time="08:30", depart_time="08:45", created_at=datetime(2026, 5, 20, 8, 30)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="PPL", load_size="PPL Load", depart_load_size="Empty", no_pickup=True, arrive_time="09:00", depart_time="09:15", created_at=datetime(2026, 5, 20, 9, 0)),
+        ]
+        db.session.add_all(logs)
+        db.session.commit()
+        routes = build_driver_log_route_context(logs)
+
+        helios = stop_role_details(logs[0], routes[logs[0].id])
+        raleigh = stop_role_details(logs[1], routes[logs[1].id])
+        ppl = stop_role_details(logs[2], routes[logs[2].id])
+
+        assert helios["stop_role"] == "pickup_origin"
+        assert set(helios["cargo_added"]) == {"Raleigh East Load", "PPL Load"}
+        assert raleigh["stop_role"] == "multi_stop_drop"
+        assert ppl["stop_role"] == "drop_only"
+        assert stop_time_sample(logs[0], route=routes[logs[0].id])["included"] is True
+        assert stop_time_sample(logs[1], route=routes[logs[1].id])["included"] is False
+        assert stop_time_sample(logs[2], route=routes[logs[2].id])["included"] is False
+
+
+def test_no_pickup_correction_syncs_next_open_stop_arrival_cargo(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.blueprints.driver.routes import _sync_next_open_stop_arrival_cargo
+        from app.extensions import db
+        from app.models import DriverLog
+        from app.services.load_state import build_driver_log_route_context
+
+        driver = create_user("kp_sync_driver", "kp-sync@example.com", "driver")
+        route_date = date(2026, 5, 20)
+        raleigh = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="RE",
+            load_size="Empty",
+            depart_load_size="Kraft Plant Load",
+            arrive_time="19:05",
+            depart_time="20:15",
+            hot_parts=True,
+            part_number="P3503210",
+            created_at=datetime(2026, 5, 20, 19, 5),
+        )
+        kraft = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="KP",
+            load_size="Kraft Plant Load",
+            depart_load_size="Empty",
+            no_pickup=True,
+            arrive_time="20:35",
+            depart_time="20:36",
+            created_at=datetime(2026, 5, 20, 20, 35),
+        )
+        paint_central = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="PC",
+            load_size="Kraft Plant Load",
+            arrive_time="20:44",
+            created_at=datetime(2026, 5, 20, 20, 44),
+        )
+        db.session.add_all([raleigh, kraft, paint_central])
+        db.session.commit()
+
+        changed = _sync_next_open_stop_arrival_cargo(kraft)
+        assert changed.id == paint_central.id
+        assert paint_central.load_size == "Empty"
+        assert paint_central.secondary_load is None
+
+        routes = build_driver_log_route_context([raleigh, kraft, paint_central])
+        assert routes[paint_central.id]["arrive_cargo_desc"] == "Empty"
+        assert routes[paint_central.id]["after_arrival_primary"] == "Empty"
+
+
+def test_route_context_golden_route_current_open_stop_is_not_final_or_missing(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+        from app.services.route_context import build_route_context
+
+        driver = create_user("lamar_context", "lamar-context@example.com", "driver", first_name="Lamar")
+        route_date = date(2026, 5, 20)
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st4", start_mileage=1000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add(ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime(2026, 5, 20, 7, 0)))
+        logs = [
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="RE", load_size="Empty", depart_load_size="Empty", no_pickup=True, arrive_time="08:00", depart_time="08:10", created_at=datetime(2026, 5, 20, 8, 0)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="H", load_size="Empty", depart_load_size="Raleigh East Load", secondary_load="PPL Load", arrive_time="08:20", depart_time="08:40", created_at=datetime(2026, 5, 20, 8, 20)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="RE", load_size="Raleigh East Load", depart_load_size="PPL Load", arrive_time="09:00", depart_time="09:10", created_at=datetime(2026, 5, 20, 9, 0)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="PPL", load_size="PPL Load", depart_load_size="Empty", no_pickup=True, arrive_time="09:30", depart_time="09:40", created_at=datetime(2026, 5, 20, 9, 30)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="PC", load_size="Empty", depart_load_size="Raleigh East Load", arrive_time="10:00", depart_time="10:20", created_at=datetime(2026, 5, 20, 10, 0)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="RE", load_size="Raleigh East Load", depart_load_size="Empty", no_pickup=True, arrive_time="10:45", depart_time="10:55", created_at=datetime(2026, 5, 20, 10, 45)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="RW", load_size="Empty", depart_load_size="Empty", no_pickup=True, maintenance=True, arrive_time="11:10", depart_time="11:20", created_at=datetime(2026, 5, 20, 11, 10)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="PC", load_size="Empty", depart_load_size="PPL Load", arrive_time="12:00", depart_time="12:20", created_at=datetime(2026, 5, 20, 12, 0)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="PPL", load_size="PPL Load", depart_load_size="Empty", no_pickup=True, arrive_time="12:40", depart_time="12:50", created_at=datetime(2026, 5, 20, 12, 40)),
+            DriverLog(driver_id=driver.id, date=route_date, plant_name="RE", load_size="Empty", arrive_time="2026-05-20 23:05:00", created_at=datetime(2026, 5, 20, 23, 5)),
+        ]
+        db.session.add_all(logs)
+        db.session.commit()
+
+        snapshot = build_route_context(driver_id=driver.id, route_date=route_date, truck_id="st4")
+        assert snapshot.route_status == "active"
+        assert snapshot.current_stop.id == logs[-1].id
+        assert snapshot.current_stop_status == "current"
+        assert snapshot.current_activity_label == "Awaiting departure / load intent"
+        assert snapshot.previous_cargo_cycle_status == "complete"
+        assert snapshot.current_cargo["cargo_display"] == "Empty"
+        assert snapshot.next_load_intent_status == "unknown"
+        assert snapshot.posttrip_status == "not due until route close"
+        assert snapshot.signature_status == "pending route close"
+        assert snapshot.approval_status == "final approval not available while route active"
+        current_row = snapshot.rows[-1]
+        assert current_row["status"] == "Current"
+        assert current_row["stop_role"] == "current_open"
+        assert "Missing Departure" not in {row["status"] for row in snapshot.rows if row["log_id"] == logs[-1].id}
+
+
+def test_current_open_stop_wording_parity_across_rendered_surfaces(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("render_context_driver", "render-context@example.com", "driver", first_name="Lamar")
+        create_user("render_context_manager", "render-context-manager@example.com", "management")
+        route_date = date.today()
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=route_date, truck_number="st4", start_mileage=1000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add(ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime.utcnow()))
+        db.session.add(DriverLog(driver_id=driver.id, date=route_date, plant_name="RE", load_size="Empty", arrive_time=f"{route_date.isoformat()} 19:05:00", created_at=datetime.utcnow()))
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "render_context_driver")
+    mobile = client.get("/mobile")
+    assert mobile.status_code == 200
+    assert b"Record Departure" in mobile.data
+    assert b"Final Location" not in mobile.data
+    assert b"forecast" not in mobile.data.lower()
+    client.get("/logout")
+
+    login(client, "render_context_manager")
+    manager = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={route_date.isoformat()}")
+    assert manager.status_code == 200
+    assert b"Current Active Stop" in manager.data
+    assert b"Final Location" not in manager.data
+    assert b"forecast" not in manager.data.lower()
+    dashboard = client.get(f"/manager/dashboard?driver_id={driver_id}&focus=routes")
+    assert dashboard.status_code == 200
+    assert b"Current Active Stop" in dashboard.data
+    assert b"Missing Departure" not in dashboard.data
+    assert b"forecast" not in dashboard.data.lower()
+
+    debug = client.get(f"/debug/route-context/driver:{driver_id}:date:{route_date.isoformat()}")
+    assert debug.status_code == 200
+    payload = debug.get_json()
+    assert payload["route_status"] == "active"
+    assert payload["current_stop_status"] == "current"
+    assert payload["route_id"].startswith(f"driver:{driver_id}:date:{route_date.isoformat()}:truck:st4")
+    assert payload["rows"][-1]["status"] == "Current"
+
+    client.get("/logout")
+    login(client, "render_context_driver")
+    denied_debug = client.get(f"/debug/route-context/driver:{driver_id}:date:{route_date.isoformat()}")
+    assert denied_debug.status_code == 404

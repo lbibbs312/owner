@@ -35,6 +35,7 @@ from app.services.cargo_reconciliation_service import reconcile_cargo
 from app.services.media_attachment_service import upload_file_path
 from app.services.mileage_service import calculate_mileage_record
 from app.services.next_load_prediction import build_next_load_prediction
+from app.services.route_context import build_route_context
 from app.services.route_state_service import build_route_state
 from app.services.scan_scope_service import route_scope_id, route_stop_ids
 from app.services.case_grouping import build_followup_cases, same_plant_intelligence, same_vehicle_intelligence
@@ -610,30 +611,31 @@ def _active_exception_items():
 
 def _live_stop_rows(logs):
     sorted_logs = sorted(logs, key=_driver_log_sort_key)
-    routes = _driver_log_route_context(sorted_logs)
     counts = {}
     rows = []
-    latest_by_route = {}
-    for candidate in sorted_logs:
-        latest_by_route[(candidate.driver_id, candidate.date)] = candidate.id
+    contexts = {}
     for log in sorted_logs:
         key = (log.driver_id, log.date)
+        if key not in contexts:
+            contexts[key] = build_route_context(driver_id=log.driver_id, route_date=log.date)
         counts[key] = counts.get(key, 0) + 1
-        route = routes.get(log.id, {})
+        route_context = contexts[key]
+        snapshot_row = next((item for item in route_context.rows if item.get("log_id") == log.id), {})
+        route = snapshot_row.get("route") or {}
         route["stop_number"] = counts[key]
-        is_current_active = bool(not log.depart_time and latest_by_route.get(key) == log.id)
+        is_current_active = snapshot_row.get("status") == "Current"
         exceptions = _live_exceptions_for_log(log, route, is_current_active=is_current_active)
-        forecast = forecast_for_stop(log) if not log.depart_time else None
-        if forecast and forecast["severity"] in {"warning", "high"} and not is_current_active:
+        timing = snapshot_row.get("timing") or (forecast_for_stop(log) if not log.depart_time else None)
+        if timing and timing.get("severity") in {"warning", "high"} and not is_current_active:
             exceptions.append({
                 "type": "Timing Status",
                 "label": "Timing Status",
-                "detail": f"{forecast['status']}: elapsed {forecast['elapsed_label']} vs estimate {forecast['estimate_label']}.",
+                "detail": f"{timing['status']}: elapsed {timing['elapsed_label']} vs estimate {timing['estimate_label']}.",
                 "photo_url": None,
                 "url": url_for("manager.view_driver_log", log_id=log.id),
             })
-        status_key = "open" if not log.depart_time else "complete"
-        status = "Current Active Stop" if is_current_active else ("Missing Departure" if not log.depart_time else "Completed")
+        status = "Current Active Stop" if is_current_active else snapshot_row.get("status", "Completed")
+        status_key = snapshot_row.get("status_key") or ("open" if not log.depart_time else "complete")
         rows.append({
             "log": log,
             "route": route,
@@ -641,9 +643,9 @@ def _live_stop_rows(logs):
             "driver": log.driver,
             "status": status,
             "status_key": status_key,
-            "cargo": route.get("depart_cargo_desc") or route.get("arrive_cargo_desc") or log.depart_load_size or log.load_size or "--",
+            "cargo": snapshot_row.get("cargo_out") or snapshot_row.get("cargo_in") or log.depart_load_size or log.load_size or "--",
             "dock_wait": f"{log.dock_wait_minutes} min" if (log.dock_wait_minutes or 0) > 0 else "--",
-            "forecast": forecast,
+            "forecast": timing,
             "exceptions": exceptions,
             "url": url_for("manager.view_driver_log", log_id=log.id),
         })
@@ -685,14 +687,20 @@ def _route_print_context(driver_id, route_date):
     current_stop = next((log for log in reversed(logs) if not log.depart_time), None) or (logs[-1] if logs else None)
     stop_forecasts = route_stop_forecasts(logs)
     current_stop_forecast = stop_forecasts.get(current_stop.id) if current_stop else None
-    next_load_prediction = build_next_load_prediction(
+    route_context = build_route_context(
+        driver_id=driver.id,
+        route_date=route_date,
+        truck_id=route_truck_context.get("label"),
+        now=None,
+    )
+    next_load_prediction = route_context.next_load_prediction or (build_next_load_prediction(
         current_stop=current_stop,
         driver_id=driver.id,
         truck_id=route_truck_context.get("label"),
         current_cargo_state=None,
         route_date=route_date,
         timing_forecast=current_stop_forecast,
-    ).to_dict() if current_stop else None
+    ).to_dict() if current_stop else None)
     return {
         "driver": driver,
         "logs": logs,
@@ -711,6 +719,7 @@ def _route_print_context(driver_id, route_date):
         "route_task_events": _task_route_events_for_logs(logs),
         "stop_forecasts": stop_forecasts,
         "next_load_prediction": next_load_prediction,
+        "route_context": route_context,
         "driver_signature": signature_shift.driver_signature if signature_shift else None,
         "signature_timestamp": signature_shift.signature_timestamp if signature_shift else None,
         "route_finalized": _route_finalized_for_driver_date(driver.id, route_date),
@@ -1414,7 +1423,8 @@ def _manager_route_review_context(ctx):
     log_routes = ctx.get("log_routes") or {}
     route_finalized = bool(ctx.get("route_finalized"))
     stop_forecasts = ctx.get("stop_forecasts") or {}
-    route_state = build_route_state(logs, log_routes, stop_forecasts, route_finalized)
+    route_context = ctx.get("route_context")
+    route_state = route_context.route_state if route_context else build_route_state(logs, log_routes, stop_forecasts, route_finalized)
     route_status = route_state["route_status"]
     all_departed = route_state["all_departed"]
     photo_reviews = _manager_photo_reviews(logs, log_routes)
@@ -1441,7 +1451,8 @@ def _manager_route_review_context(ctx):
         "review_status": review_status,
         "route_status": route_status,
         "route_state": route_state,
-        "manager_summary": manager_summary,
+        "route_context": route_context,
+        "manager_summary": (route_context.report_summary_sentence if route_context and route_context.current_stop else manager_summary),
         "required_actions": required_actions,
         "approval_blockers": approval_blockers,
         "approval_blocked": bool(approval_blockers),
