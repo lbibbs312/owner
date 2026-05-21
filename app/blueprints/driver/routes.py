@@ -72,6 +72,7 @@ from app.models import (
     PartScanEvent,
     DriverLog,
     DriverLogPhoto,
+    DraftEntry,
     PlantTransfer,
     PlantTransferLine,
     PostTrip,
@@ -778,6 +779,37 @@ def _shift_record_for_driver_date(driver_id, route_date, *, require_signature=Fa
         if start_time.astimezone(local_tz).date() == route_date:
             return shift
     return None
+
+
+def _valid_signature_data(value):
+    signature = (value or "").strip()
+    return signature if signature.startswith("data:image/") else ""
+
+
+def _end_of_day_draft_signature():
+    draft_key = f"movedefense:draft:v1:{current_user.id}:/end_of_day_summary:end-of-day-{current_user.id}"
+    draft = DraftEntry.query.filter_by(user_id=current_user.id, draft_key=draft_key).first()
+    payload = draft.payload if draft else None
+    if not isinstance(payload, dict):
+        return ""
+
+    for field_name in ("driver_signature", "driverSigData"):
+        entry = payload.get(field_name)
+        if isinstance(entry, dict):
+            signature = _valid_signature_data(entry.get("value"))
+            if signature:
+                return signature
+        else:
+            signature = _valid_signature_data(entry)
+            if signature:
+                return signature
+
+    for entry in payload.values():
+        candidate = entry.get("value") if isinstance(entry, dict) else entry
+        signature = _valid_signature_data(candidate)
+        if signature:
+            return signature
+    return ""
 
 
 def _record_eod_finalized(today_local_date, logs, pretrips, plant_transfers):
@@ -3322,28 +3354,35 @@ def end_of_day_summary():
     form = EndOfDayForm()
     today_local_date, logs, pretrips_today, plant_transfers_today = _get_today_eod_records()
     if form.validate_on_submit():
-        sig_data = (form.driver_signature.data or "").strip()
-        if not sig_data.startswith("data:image/"):
-            return redirect(url_for("driver.end_of_day_summary", signature_required=1) + "#signatureSection")
+        signature_shift = None
+        sig_data = _valid_signature_data(form.driver_signature.data) or _end_of_day_draft_signature()
+        if not sig_data:
+            signature_shift = _shift_record_for_driver_date(current_user.id, today_local_date, require_signature=True)
+            sig_data = _valid_signature_data(signature_shift.driver_signature if signature_shift else None)
 
-        signature_shift = (
-            ShiftRecord.query.filter_by(user_id=current_user.id, end_time=None)
-            .order_by(ShiftRecord.start_time.desc())
-            .first()
-        ) or _shift_record_for_driver_date(current_user.id, today_local_date)
-        if signature_shift is None:
-            signature_shift = ShiftRecord(
-                user_id=current_user.id,
-                pretrip_id=pretrips_today[0].id if pretrips_today else None,
-                start_time=datetime.utcnow(),
-                week_ending=None,
-            )
-            db.session.add(signature_shift)
-        signature_shift.driver_signature = sig_data
-        signature_shift.signature_timestamp = datetime.utcnow()
+        if sig_data:
+            signature_shift = signature_shift or (
+                ShiftRecord.query.filter_by(user_id=current_user.id, end_time=None)
+                .order_by(ShiftRecord.start_time.desc())
+                .first()
+            ) or _shift_record_for_driver_date(current_user.id, today_local_date)
+            if signature_shift is None:
+                signature_shift = ShiftRecord(
+                    user_id=current_user.id,
+                    pretrip_id=pretrips_today[0].id if pretrips_today else None,
+                    start_time=datetime.utcnow(),
+                    week_ending=None,
+                )
+                db.session.add(signature_shift)
+            signature_shift.driver_signature = sig_data
+            signature_shift.signature_timestamp = datetime.utcnow()
+            flash("Route signed and finalized. Review the signed printout before saving or printing.", "success")
+        else:
+            current_app.logger.warning("EOD finalized without captured driver signature for user_id=%s", current_user.id)
+            flash("Route finalized. Driver signature was not captured and remains pending for manager review.", "warning")
+
         db.session.commit()
         _record_eod_finalized(today_local_date, logs, pretrips_today, plant_transfers_today)
-        flash("Route signed and finalized. Review the signed printout before saving or printing.", "success")
         return redirect(url_for("driver.driver_logs_print"))
 
     drivers_logs = {current_user.display_name: logs}

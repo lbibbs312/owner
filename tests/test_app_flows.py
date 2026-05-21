@@ -3755,12 +3755,12 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
 
     unsigned = client.post("/end_of_day_summary", data={}, follow_redirects=False)
     assert unsigned.status_code == 302
-    assert unsigned.headers["Location"].endswith("/end_of_day_summary?signature_required=1#signatureSection")
+    assert unsigned.headers["Location"].endswith("/driver_logs_print")
 
-    unsigned_page = client.get("/end_of_day_summary?signature_required=1")
-    assert unsigned_page.status_code == 200
-    assert b"Sign in the Driver Signature box" in unsigned_page.data
-    assert b"swal({ title: \"Warning\"" not in unsigned_page.data
+    warning_page = client.get("/end_of_day_summary?signature_required=1")
+    assert warning_page.status_code == 200
+    assert b"Sign in the Driver Signature box" in warning_page.data
+    assert b"swal({ title: \"Warning\"" not in warning_page.data
 
     driver_print = client.get("/driver_logs_print")
     assert driver_print.status_code == 200
@@ -3795,6 +3795,89 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
     assert manager_pdf.status_code == 200
     assert manager_pdf.headers["Content-Type"] == "application/pdf"
     assert b"Driver e-signature captured" in manager_pdf.data
+
+
+def test_end_of_day_can_finalize_without_signature_when_capture_fails(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("driver2", "driver2@example.com", "driver")
+        route_date = date.today()
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="RE",
+                load_size="Empty",
+                depart_load_size="Empty",
+                depart_time="17:15",
+                arrive_time=f"{route_date.isoformat()} 17:00:00",
+            )
+        )
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "driver2")
+    response = client.post("/end_of_day_summary", data={}, follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/driver_logs_print")
+
+    with app.app_context():
+        from app.models import ActivityEvent, ShiftRecord
+
+        assert ActivityEvent.query.filter_by(user_id=driver_id, category="eod", action="finalized").count() == 1
+        assert all(not shift.driver_signature for shift in ShiftRecord.query.filter_by(user_id=driver_id).all())
+
+    print_page = client.get("/driver_logs_print")
+    assert print_page.status_code == 200
+    assert b"Not yet signed" in print_page.data
+
+
+def test_end_of_day_recovers_signature_from_autosave_draft(client, app):
+    from datetime import date
+
+    signature = "data:image/png;base64,recoveredsignature"
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DraftEntry, DriverLog
+
+        driver = create_user("driver3", "driver3@example.com", "driver")
+        route_date = date.today()
+        draft_key = f"movedefense:draft:v1:{driver.id}:/end_of_day_summary:end-of-day-{driver.id}"
+        db.session.add_all([
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="RE",
+                load_size="Empty",
+                depart_load_size="Empty",
+                depart_time="17:15",
+                arrive_time=f"{route_date.isoformat()} 17:00:00",
+            ),
+            DraftEntry(
+                user_id=driver.id,
+                draft_key=draft_key,
+                path="/end_of_day_summary",
+                payload={"driver_signature": {"type": "hidden", "value": signature}},
+            ),
+        ])
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "driver3")
+    response = client.post("/end_of_day_summary", data={}, follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/driver_logs_print")
+
+    with app.app_context():
+        from app.models import ShiftRecord
+
+        saved_shift = ShiftRecord.query.filter_by(user_id=driver_id).one()
+        assert saved_shift.driver_signature == signature
+        assert saved_shift.signature_timestamp is not None
 
 
 def test_pretrip_printout_highlights_defects_and_written_remarks(client, app):
