@@ -199,6 +199,16 @@ def _today_local_date():
     return datetime.now(pytz.timezone("America/Detroit")).date()
 
 
+def _selected_log_date_from_request():
+    date_str = request.args.get("date")
+    if date_str:
+        try:
+            return datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    return _today_local_date()
+
+
 def _can_driver_change_same_day(record_user_id, record_date, record_label, action):
     if current_user.role != "driver":
         flash("Driver credentials required.", "warning")
@@ -2409,15 +2419,7 @@ def mark_plant_transfer_printed(transfer_id):
 @bp.route("/driver_logs", methods=["GET"])
 @login_required
 def driver_logs():
-    date_str = request.args.get("date")
-    try:
-        search_date = (
-            datetime.strptime(date_str, "%Y-%m-%d").date()
-            if date_str
-            else _today_local_date()
-        )
-    except ValueError:
-        search_date = _today_local_date()
+    search_date = _selected_log_date_from_request()
 
     if current_user.role == "management":
         all_drivers = User.query.filter_by(role="driver").all()
@@ -3187,17 +3189,17 @@ def view_driver_log(log_id):
 def driver_logs_print():
     local_tz = pytz.timezone("America/Detroit")
     now_local = datetime.now(local_tz)
-    today_local_date = now_local.date()
+    selected_date = _selected_log_date_from_request()
     logs = sorted(
-        _active_driver_logs_query().filter_by(driver_id=current_user.id, date=today_local_date).all(),
+        _active_driver_logs_query().filter_by(driver_id=current_user.id, date=selected_date).all(),
         key=_driver_log_sort_key,
     )
     pretrips = _active_pretrips_query().filter_by(
-        user_id=current_user.id, pretrip_date=today_local_date
+        user_id=current_user.id, pretrip_date=selected_date
     ).all()
     log_routes = _driver_log_route_context(logs)
-    route_context = build_route_context(driver_id=current_user.id, route_date=today_local_date, now=now_local)
-    damage_reports_today = _today_damage_reports(current_user.id, today_local_date)
+    route_context = build_route_context(driver_id=current_user.id, route_date=selected_date, now=now_local)
+    damage_reports_today = _today_damage_reports(current_user.id, selected_date)
     parts_carried = sorted({log.part_number for log in logs if log.part_number})
     exception_notes = []
     log_issue_details = {}
@@ -3229,21 +3231,21 @@ def driver_logs_print():
         category="eod",
         action="finalized",
         target_type="end_of_day",
-    ).filter(ActivityEvent.details.contains(str(today_local_date))).first() is not None
+    ).filter(ActivityEvent.details.contains(str(selected_date))).first() is not None
     record_activity(
         user_id=current_user.id,
         category="print",
         action="logs_printed",
         title="Driver logs printed",
-        details=f"Printed {len(logs)} log(s) for {today_local_date}.",
+        details=f"Printed {len(logs)} log(s) for {selected_date}.",
         target_type="driver_log",
     )
-    shift_record = _shift_record_for_driver_date(current_user.id, today_local_date, require_signature=True)
+    shift_record = _shift_record_for_driver_date(current_user.id, selected_date, require_signature=True)
     return render_template(
         "driver_logs_print.html",
         logs=logs,
         log_routes=log_routes,
-        the_date=today_local_date,
+        the_date=selected_date,
         pretrips=pretrips,
         damage_reports=damage_reports_today,
         damage_report_summary=damage_report_count_label(damage_reports_today),
@@ -3259,6 +3261,7 @@ def driver_logs_print():
         route_finalized=route_finalized,
         driver_signature=shift_record.driver_signature if shift_record else None,
         signature_timestamp=shift_record.signature_timestamp if shift_record else None,
+        attachment_url=url_for("driver.driver_logs_attachment", date=selected_date.isoformat()),
         email_mode=False,
     )
 
@@ -3266,23 +3269,22 @@ def driver_logs_print():
 @bp.route("/driver_logs_print/attachment")
 @login_required
 def driver_logs_attachment():
-    local_tz = pytz.timezone("America/Detroit")
-    today_local_date = datetime.now(local_tz).date()
+    selected_date = _selected_log_date_from_request()
     logs = _active_driver_logs_query().filter_by(
-        driver_id=current_user.id, date=today_local_date
+        driver_id=current_user.id, date=selected_date
     ).all()
-    shift_record = _shift_record_for_driver_date(current_user.id, today_local_date, require_signature=True)
-    route_context = build_route_context(driver_id=current_user.id, route_date=today_local_date)
+    shift_record = _shift_record_for_driver_date(current_user.id, selected_date, require_signature=True)
+    route_context = build_route_context(driver_id=current_user.id, route_date=selected_date)
     return _document_attachment_response(
         pdf_bytes=_build_driver_logs_pdf(
             logs,
-            today_local_date,
+            selected_date,
             driver=current_user,
             driver_signature=shift_record.driver_signature if shift_record else None,
             signature_timestamp=shift_record.signature_timestamp if shift_record else None,
             route_context=route_context,
         ),
-        filename=f"driver-logs-{today_local_date}.pdf",
+        filename=f"driver-logs-{selected_date}.pdf",
         target_type="driver_log",
         title="Driver Logs PDF downloaded",
     )

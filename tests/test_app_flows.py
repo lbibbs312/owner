@@ -1091,7 +1091,7 @@ def test_next_load_prediction_uses_historical_pattern_and_requires_delay_reason(
 
         driver = create_user("intent_history_driver", "intent-history@example.com", "driver", first_name="Lamar")
         create_user("intent_history_manager", "intent-history-manager@example.com", "management")
-        route_date = date.today()
+        route_date = date.today() - timedelta(days=1)
         history = []
         for offset in range(1, 4):
             sample_date = route_date - timedelta(days=offset)
@@ -1142,7 +1142,7 @@ def test_next_load_prediction_uses_historical_pattern_and_requires_delay_reason(
         driver_id = driver.id
 
     login(client, "intent_history_manager")
-    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+    response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={route_date.isoformat()}")
 
     assert response.status_code == 200
     assert b"The previous cargo cycle appears complete" in response.data
@@ -3029,7 +3029,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
 
 
 def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_review(client, app):
-    from datetime import date
+    from datetime import date, datetime
 
     with app.app_context():
         from app.extensions import db
@@ -3037,12 +3037,14 @@ def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_rev
 
         driver = create_user("driver_scan", "driver_scan@example.com", "driver")
         create_user("scan_manager", "scan-manager@example.com", "management")
+        route_date = date.today()
         log = DriverLog(
             driver_id=driver.id,
-            date=date.today(),
+            date=route_date,
             plant_name="PE",
             load_size="Paint East Load",
-            arrive_time="2026-05-19 08:00:00",
+            arrive_time=f"{route_date.isoformat()} 04:00:00",
+            created_at=datetime(2026, 5, 20, 8, 0),
         )
         db.session.add(log)
         db.session.commit()
@@ -3672,6 +3674,45 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
     unread = client.get("/count_unread").get_json()
     assert unread["action_count"] >= 3
     assert unread["unread_count"] >= unread["action_count"]
+
+
+def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, app):
+    from datetime import date
+
+    selected_date = date(2026, 5, 20)
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("dated_print_driver", "dated-print@example.com", "driver")
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=selected_date,
+                plant_name="RE",
+                load_size="Empty",
+                depart_load_size="No Pickup",
+                arrive_time="2026-05-20 21:12:00",
+                depart_time="22:00",
+            )
+        )
+        db.session.commit()
+
+    login(client, "dated_print_driver")
+    logs_page = client.get(f"/driver_logs?date={selected_date.isoformat()}")
+    assert logs_page.status_code == 200
+    assert b"Print / Save PDF" in logs_page.data
+    assert f"/driver_logs_print?date={selected_date.isoformat()}".encode() in logs_page.data
+    assert f"/driver_logs_print/attachment?date={selected_date.isoformat()}".encode() in logs_page.data
+
+    print_page = client.get(f"/driver_logs_print?date={selected_date.isoformat()}")
+    assert print_page.status_code == 200
+    assert b"Raleigh East" in print_page.data
+    assert selected_date.isoformat().encode() in print_page.data
+
+    pdf_response = client.get(f"/driver_logs_print/attachment?date={selected_date.isoformat()}")
+    assert pdf_response.status_code == 200
+    assert pdf_response.headers["Content-Type"] == "application/pdf"
 
 
 def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client, app):
