@@ -4724,6 +4724,88 @@ def test_pickup_origin_stop_roles_gate_plant_timing_samples(client, app):
         assert stop_time_sample(logs[2], route=routes[logs[2].id])["included"] is False
 
 
+def test_edit_departed_stop_can_clear_departure_cargo_and_sync_current_stop(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("kp_edit_driver", "kp-edit@example.com", "driver")
+        route_date = date.today()
+        raleigh = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="RE",
+            load_size="Empty",
+            depart_load_size="Kraft Plant Load",
+            arrive_time="19:05",
+            depart_time="20:15",
+            created_at=datetime(2026, 5, 20, 19, 5),
+        )
+        kraft = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="KP",
+            load_size="Kraft Plant Load",
+            depart_load_size="Empty",
+            no_pickup=True,
+            arrive_time="20:35",
+            depart_time="20:36",
+            created_at=datetime(2026, 5, 20, 20, 35),
+        )
+        paint_central = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="PC",
+            load_size="Kraft Plant Load",
+            depart_load_size="Kraft Plant Load",
+            arrive_time="20:44",
+            depart_time="20:45",
+            created_at=datetime(2026, 5, 20, 20, 44),
+        )
+        current_re = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="RE",
+            load_size="Kraft Plant Load",
+            arrive_time="21:12",
+            created_at=datetime(2026, 5, 20, 21, 12),
+        )
+        db.session.add_all([raleigh, kraft, paint_central, current_re])
+        db.session.commit()
+        paint_id = paint_central.id
+        current_id = current_re.id
+
+    login(client, "kp_edit_driver")
+    response = client.post(
+        f"/edit_driver_log/{paint_id}",
+        data={
+            "plant_name": "PC",
+            "load_size": "Empty",
+            "departure_destination": "",
+            "secondary_departure_dest": "",
+            "secondary_departure_type": "load",
+            "arrive_time": "8:44pm",
+            "depart_time": "8:45pm",
+            "edit_reason": "corrected stale KP cargo",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        paint = DriverLog.query.get(paint_id)
+        current = DriverLog.query.get(current_id)
+        assert paint.load_size == "Empty"
+        assert paint.depart_load_size == "Empty"
+        assert paint.no_pickup is True
+        assert current.load_size == "Empty"
+        assert current.secondary_load is None
+
+
 def test_no_pickup_correction_syncs_next_open_stop_arrival_cargo(client, app):
     from datetime import date, datetime
 

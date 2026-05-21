@@ -247,17 +247,20 @@ def _sync_next_open_stop_arrival_cargo(log):
     current_index = next((index for index, item in enumerate(logs) if item.id == log.id), None)
     if current_index is None or current_index + 1 >= len(logs):
         return None
-    next_log = logs[current_index + 1]
-    if next_log.depart_time:
-        return None
-    expected = current_load_after_logs(logs[: current_index + 1])
-    expected_primary = expected.get("value") or "Empty"
-    expected_secondary = expected.get("secondary_value") or None
-    if next_log.load_size == expected_primary and (next_log.secondary_load or None) == expected_secondary:
-        return None
-    next_log.load_size = expected_primary
-    next_log.secondary_load = expected_secondary
-    return next_log
+    changed = []
+    for next_index in range(current_index + 1, len(logs)):
+        next_log = logs[next_index]
+        if next_log.depart_time:
+            continue
+        expected = current_load_after_logs(logs[:next_index])
+        expected_primary = expected.get("value") or "Empty"
+        expected_secondary = expected.get("secondary_value") or None
+        if next_log.load_size == expected_primary and (next_log.secondary_load or None) == expected_secondary:
+            continue
+        next_log.load_size = expected_primary
+        next_log.secondary_load = expected_secondary
+        changed.append(next_log)
+    return changed[-1] if changed else None
 
 
 def _driver_log_context_for(log):
@@ -2625,6 +2628,7 @@ def edit_driver_log(log_id):
         issue_code, issue_notes = _split_truck_issue_text(truck_issue_reason(log) or route_problem_reason(log))
         form.truck_issue.data = issue_code
         form.truck_issue_notes.data = issue_notes
+        form.departure_destination.data = destination_from_load(log.depart_load_size) or ""
         form.secondary_departure_dest.data = destination_from_load(log.secondary_load) or ""
         form.secondary_departure_type.data = load_type_from_load(log.secondary_load)
     if form.validate_on_submit():
@@ -2661,6 +2665,7 @@ def edit_driver_log(log_id):
         log.fuel = form.fuel.data
         log.fuel_mileage = _form_mileage_value(form)
         log.meeting = form.meeting.data
+        departure_dest = form.departure_destination.data
         sec_dest = form.secondary_departure_dest.data
         log.secondary_load = secondary_load_value(sec_dest, form.secondary_departure_type.data) if sec_dest else None
 
@@ -2668,6 +2673,10 @@ def edit_driver_log(log_id):
             log.arrive_time = _local_hhmm_to_arrival_utc(arrive_time, log.date)
         if depart_time:
             log.depart_time = depart_time
+        if log.depart_time:
+            log.depart_load_size = destination_load_value(departure_dest) if departure_dest else "Empty"
+            log.no_pickup = log.depart_load_size == "Empty" and not log.secondary_load
+            _sync_next_open_stop_arrival_cargo(log)
 
         after_values = model_snapshot(log, DRIVER_LOG_AUDIT_FIELDS)
         record_audit_event(

@@ -42,7 +42,7 @@
           <div class="stop-photo-image-link stop-photo-missing">
             <span>Photo file missing - {{ (photo.source or 'photo')|replace('_', ' ')|title }}</span>
             {% if photo.note %}<small>Reason: {{ photo.note }}</small>{% endif %}
-            <small>Delete this missing proof record and upload the photo again.</small>
+            <small>Photo record exists but the file could not render. Manager review required.</small>
           </div>
         {% endif %}
         <form method="POST" action="{{ photo_delete_url }}" onsubmit="return confirm('Delete this stop photo proof?');">

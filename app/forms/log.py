@@ -58,6 +58,11 @@ class DriverLogForm(FlaskForm):
         validators=[Optional()],
         validate_choice=False,
     )
+    departure_destination = SelectField(
+        "Departed With",
+        choices=[("", "No pickup / empty")] + [(code, label) for code, label in PLANT_LABELS.items()],
+        validators=[Optional()],
+    )
     secondary_departure_dest = SelectField(
         "Also loaded for (second stop)",
         choices=[("", "None / not applicable")] + [(code, label) for code, label in PLANT_LABELS.items()],
