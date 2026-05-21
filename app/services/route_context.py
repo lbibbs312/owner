@@ -449,7 +449,7 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
     else:
         summary = f"{name} has {len(logs)} recorded stop event{'s' if len(logs) != 1 else ''}."
 
-    legacy_route_status = "Finalized" if route_finalized else ("Active" if current_open or (logs and not all_departed) else ("Finalization Required" if all_departed else "No Route"))
+    legacy_route_status = "Finalized" if route_finalized else ("Active" if current_open or (logs and not all_departed) else ("Completed" if all_departed else "No Route"))
     route_state = {
         "route_status": legacy_route_status,
         "rows": rows,

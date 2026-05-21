@@ -114,6 +114,7 @@
     </div>
   </div>
 
+  {% set route_completed = route_context and route_context.route_status == 'completed' %}
   {% if logs %}
     <table>
       <thead>
@@ -145,8 +146,8 @@
                 <div class="route-sub">Timing status: <span class="timing-status {{ stop_forecast.severity }}">{{ stop_forecast.status }}</span></div>
               {% endif %}
             {% else %}
-              <div class="route-leg">{% if route_finalized %}Finalized Stop: {{ plant_name }}{% elif not log.depart_time %}Current Stop: {{ plant_name }}{% else %}Route Stop: {{ plant_name }}{% endif %}</div>
-              <div class="route-sub">{% if route_finalized %}Route finalized{% elif not log.depart_time %}Awaiting departure / load intent{% else %}Route open / not finalized{% endif %}</div>
+              <div class="route-leg">{% if route_finalized %}Finalized Stop: {{ plant_name }}{% elif not log.depart_time %}Current Stop: {{ plant_name }}{% else %}Route End: {{ plant_name }}{% endif %}</div>
+              <div class="route-sub">{% if route_finalized %}Route finalized{% elif not log.depart_time %}Awaiting departure / load intent{% elif route_completed %}Route completed / awaiting final review{% else %}Route completed / not finalized{% endif %}</div>
             {% endif %}
           </td>
           <td>
@@ -185,7 +186,7 @@
                 {% endif %}
               {% endif %}
             {% else %}
-              <p class="detail-line"><strong>{{ plant_name }}:</strong> {% if route_finalized %}Finalized route stop.{% elif not log.depart_time %}Awaiting departure / load intent.{% else %}Route stop recorded.{% endif %}</p>
+              <p class="detail-line"><strong>{{ plant_name }}:</strong> {% if route_finalized %}Finalized route stop.{% elif not log.depart_time %}Awaiting departure / load intent.{% elif route_completed %}Completed final stop.{% else %}Route stop recorded.{% endif %}</p>
               {% if route and route.unloaded_on_arrival %}
                 <p class="detail-line">Final unload completed.</p>
               {% endif %}

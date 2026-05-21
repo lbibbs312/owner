@@ -3824,7 +3824,7 @@ def mobile_dashboard():
     route_context = build_route_context(driver_id=current_user.id, route_date=route_date, now=now_local)
     todays_log_routes = route_context.log_routes
     route_task_events = _task_route_events_for_logs(todays_logs, _driver_route_tasks(current_user.id, route_date))
-    current_stop = route_context.current_stop or (todays_logs[-1] if todays_logs else None)
+    current_stop = route_context.current_stop
     current_stop_forecast = (
         forecast_for_stop(current_stop, now=now_local)
         if current_stop and not current_stop.depart_time
@@ -3841,7 +3841,11 @@ def mobile_dashboard():
         now=now_local,
     ).to_dict() if current_stop else None
     next_load_eta = next_load_prediction
-    if route_date == today_local_date:
+    if route_context.route_status == "completed" and route_date == today_local_date:
+        route_panel_title = "Route Complete"
+    elif route_context.route_status == "finalized" and route_date == today_local_date:
+        route_panel_title = "Route Finalized"
+    elif route_date == today_local_date:
         route_panel_title = "Today's Route"
     elif route_is_active:
         route_panel_title = "Active Route"

@@ -1165,7 +1165,7 @@ def _manager_data_quality(logs, log_routes, mileage_quality_item, driver_signatu
     items = [mileage_quality_item]
     all_departed = bool(logs) and all(log.depart_time for log in logs)
     if all_departed and not route_finalized:
-        items.append({"label": "Route status", "status": "Finalization required", "detail": "Final stop appears completed, but the route is still marked open."})
+        items.append({"label": "Route status", "status": "Ready for final review", "detail": "All recorded stops are closed. Route is awaiting final review."})
     for index, log in enumerate(logs):
         route = log_routes.get(log.id, {})
         plant = route.get("plant") or _plant_label(log.plant_name)
@@ -1252,7 +1252,7 @@ def _manager_approval_blockers(data_quality_items, photo_reviews, cargo_review, 
             blockers.append({"label": "Cargo safety photo needs classification", "detail": f"{review['plant']} photo proof requires manager classification."})
             break
     if all_departed and not route_finalized:
-        blockers.append({"label": "Route not finalized", "detail": "Final stop appears complete, but the route is still open."})
+        blockers.append({"label": "Route awaiting final review", "detail": "All recorded stops are closed. Manager review/signature is still pending."})
     if not driver_signature:
         label = "Driver signature pending route close" if active_open_stop else "Driver signature missing"
         detail = "Driver signature is pending until route close." if active_open_stop else "Driver route signature has not been captured."
@@ -1265,7 +1265,7 @@ def _manager_review_status(required_actions, data_quality_items, photo_reviews, 
     correction_labels = {"Missing departure", "Missing Departure", "Mileage"}
     if any(item["label"] in correction_labels and item["status"] in {"Needs correction", "Correction required"} for item in data_quality_items):
         return "Correction Required"
-    if photo_reviews or cargo_review["issues"] or cargo_review["pending_scan_count"] or any(item["status"] in {"Missing", "Finalization required", "Pending", "Separate issue"} for item in data_quality_items):
+    if photo_reviews or cargo_review["issues"] or cargo_review["pending_scan_count"] or any(item["status"] in {"Missing", "Finalization required", "Ready for final review", "Pending", "Separate issue"} for item in data_quality_items):
         return "Needs Review"
     if route_finalized:
         return "Clean"
@@ -1383,14 +1383,14 @@ def _manager_summary_sentence(driver, logs, log_routes, route_status, damage_rep
         unload_stamp = f" {unload_time}" if unload_time else ""
         if post_unload_logs and not later_cargo_issues:
             post_labels = "; ".join(_manager_post_unload_stop_label(log, log_routes.get(log.id, {})) for log in post_unload_logs)
-            parts.append(f"The route appears operationally complete but is not ready for approval. Final cargo unload was at {final_unload_plant}{unload_stamp}; subsequent stops were non-cargo ({post_labels}).")
+            parts.append(f"The route is complete and awaiting final review. Final cargo unload was at {final_unload_plant}{unload_stamp}; subsequent stops were non-cargo ({post_labels}).")
         elif later_cargo_issues:
             cargo_plants = ", ".join(later_cargo_issues)
             parts.append(f"Route needs review: final cargo unload at {final_unload_plant}{unload_stamp}, but later cargo activity was recorded at {cargo_plants}.")
         else:
-            parts.append(f"The route appears operationally complete but is not ready for approval. Final cargo unload was at {final_unload_plant}{unload_stamp}.")
-    elif route_status == "Finalization Required":
-        parts.append("The route appears operationally complete but is not ready for approval.")
+            parts.append(f"The route is complete and awaiting final review. Final cargo unload was at {final_unload_plant}{unload_stamp}.")
+    elif route_status in {"Completed", "Finalization Required"}:
+        parts.append("The route is complete and awaiting final review.")
     elif route_status == "Active":
         parts.append("The route is active and still in progress.")
     elif route_status == "Finalized":

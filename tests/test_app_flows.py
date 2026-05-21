@@ -800,7 +800,7 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
     assert b"Review Status" in response.data
     assert b"Correction Required" in response.data
     assert b"Lamar has 6 recorded stop events" in response.data
-    assert b"The route appears operationally complete but is not ready for approval" in response.data
+    assert b"The route is complete and awaiting final review" in response.data
     assert b"Mileage needs correction before approval" in response.data
     assert b"one Paint Central cargo-safety photo requiring classification" in response.data
     assert b"No formal damage report was filed" in response.data
@@ -1607,7 +1607,7 @@ def test_manager_route_review_resolves_post_unload_non_cargo_stops(client, app):
     login(client, "noncargo_manager")
     response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
     assert response.status_code == 200
-    assert b"The route appears operationally complete but is not ready for approval. Final cargo unload was at Raleigh East 4:43pm" in response.data
+    assert b"The route is complete and awaiting final review. Final cargo unload was at Raleigh East 4:43pm" in response.data
     assert b"subsequent stops were non-cargo" in response.data
     assert b"Paint Central drop/no pickup" in response.data
     assert b"Ryder Rentals maintenance" in response.data
@@ -4350,6 +4350,75 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"Start Shift" not in page.data
     assert b"End Shift" not in page.data
 
+
+
+def test_completed_posttrip_route_shows_ended_across_driver_and_manager_surfaces(client, app):
+    from datetime import date, datetime
+
+    route_date = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PostTrip, PreTrip
+
+        driver = create_user("completed_route_driver", "completed-route@example.com", "driver", first_name="Lamar")
+        create_user("completed_route_manager", "completed-route-manager@example.com", "management")
+        pretrip = PreTrip(user_id=driver.id, truck_number="st4", pretrip_date=route_date, start_mileage=244914)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add(PostTrip(pretrip_id=pretrip.id, end_mileage=244951, miles_driven=37))
+        rows = [
+            ("RE", "13:47", "13:47", "Empty", "Empty", True),
+            ("H", "14:04", "14:18", "Empty", "Raleigh East Load + PPL Load", False),
+            ("RE", "14:21", "14:25", "Raleigh East Load + PPL Load", "PPL Load", False),
+            ("PPL", "15:15", "15:24", "PPL Load", "Empty", True),
+            ("PC", "15:28", "17:00", "Empty", "Raleigh East Load", False),
+            ("RE", "17:13", "17:38", "Raleigh East Load", "Empty", True),
+            ("Ryder", "17:47", "17:52", "Empty", "Empty", True),
+            ("PC", "17:57", "18:21", "Empty", "PPL Load", False),
+            ("PPL", "18:39", "18:53", "PPL Load", "Empty", True),
+            ("RE", "19:05", "20:15", "Empty", "Kraft Plant Load", False),
+            ("KP", "20:35", "20:36", "Kraft Plant Load", "Empty", True),
+            ("PC", "20:44", "20:45", "Empty", "Empty", True),
+            ("RE", "21:12", "22:00", "Empty", "Empty", True),
+        ]
+        for plant, arrive, depart, cargo_in, cargo_out, no_pickup in rows:
+            db.session.add(DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name=plant,
+                arrive_time=f"{route_date.isoformat()} {arrive}:00",
+                depart_time=depart,
+                load_size=cargo_in,
+                depart_load_size=cargo_out,
+                no_pickup=no_pickup,
+            ))
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "completed_route_driver")
+    mobile = client.get("/mobile")
+    assert mobile.status_code == 200
+    assert b"Route Complete" in mobile.data
+    assert b"Ready To Finalize" in mobile.data
+    assert b"here now" not in mobile.data
+    assert b"Likely destination" not in mobile.data
+    assert b"Source: historical pattern" not in mobile.data
+    assert b"Paint Central" in mobile.data
+    assert b"Out: No Pickup" in mobile.data
+
+    driver_print = client.get("/driver_logs_print")
+    assert driver_print.status_code == 200
+    assert b"Route completed / awaiting final review" in driver_print.data
+    assert b"Route open / not finalized" not in driver_print.data
+
+    client.get("/logout")
+    login(client, "completed_route_manager")
+    manager_review = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={route_date.isoformat()}")
+    assert manager_review.status_code == 200
+    assert b"Route Status:</strong> Completed" in manager_review.data
+    assert b"The route is complete and awaiting final review" in manager_review.data
+    assert b"still marked open" not in manager_review.data
+    assert b"Current Active Stop" not in manager_review.data
 
 
 def test_mobile_dashboard_route_panel_falls_back_to_latest_route_when_today_is_empty(client, app):

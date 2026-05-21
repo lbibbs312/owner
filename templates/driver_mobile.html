@@ -459,7 +459,12 @@
             {% endif %}
           </div>
         {% else %}
-          {% if next_load_prediction %}
+          {% set route_done = route_context and route_context.route_status in ['completed', 'finalized'] and todays_logs %}
+          {% if route_done %}
+            <div class="eyebrow"><span class="bolt"></span>{{ 'Route Finalized' if route_context.route_status == 'finalized' else 'Route Complete' }}</div>
+            <h1>{{ 'Route Finalized' if route_context.route_status == 'finalized' else 'Ready To Finalize' }}</h1>
+            <p>All recorded stops are closed. Review the route, mileage, photos, and signatures before final approval.</p>
+          {% elif next_load_prediction %}
             <div class="eyebrow"><span class="bolt"></span>{{ next_load_prediction.title }}</div>
             <h1>{{ next_load_prediction.predicted_load_label if next_load_prediction.is_known else 'Awaiting load intent' }}</h1>
             <p>{% if next_load_prediction.is_known %}Likely destination: {{ next_load_prediction.display_destination }}. Basis: {{ next_load_prediction.reason_text }}{% else %}Next load is unknown. {{ next_load_prediction.required_driver_action }}{% endif %}</p>
@@ -477,6 +482,9 @@
             {% if route_context and route_context.current_stop %}
               <a class="button primary" href="{{ url_for('driver.depart_driver_log', log_id=route_context.current_stop.id) }}">Record Departure</a>
               <a class="button ghost" href="{{ url_for('driver.pickup_driver_log', log_id=route_context.current_stop.id) }}">Select Destination</a>
+            {% elif route_done %}
+              <a class="button primary" href="{{ url_for('driver.end_of_day_summary') }}">Finalize Route</a>
+              <a class="button ghost" href="{{ url_for('driver.driver_logs_print') }}">Print Route</a>
             {% else %}
               <a class="button primary" href="{{ url_for('driver.new_driving_log') }}">Create Driver Log</a>
               <a class="button ghost" href="{{ url_for('driver.list_tasks') }}">View Tasks</a>
