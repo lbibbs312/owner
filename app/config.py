@@ -5,6 +5,7 @@ is deployed on Render with SQLite or without a database URL, it fails fast
 instead of accepting driver route data into a disposable container file.
 """
 import os
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -21,6 +22,41 @@ _RENDER_ENV_VARS = (
 
 def _env_bool(name, default=False):
     return os.environ.get(name, str(default)).lower() == "true"
+
+
+def _normalize_host(value):
+    raw_value = (value or "").strip().rstrip("/")
+    if not raw_value:
+        return ""
+
+    parsed_value = raw_value if "://" in raw_value else f"//{raw_value}"
+    parsed = urlparse(parsed_value)
+    return (parsed.netloc or parsed.path).lower()
+
+
+def _env_csv(name):
+    return tuple(
+        host
+        for host in (_normalize_host(item) for item in os.environ.get(name, "").split(","))
+        if host
+    )
+
+
+def _public_url():
+    return (
+        os.environ.get("APP_URL")
+        or os.environ.get("BASE_URL")
+        or os.environ.get("PUBLIC_URL")
+        or ""
+    ).rstrip("/")
+
+
+def _canonical_host():
+    explicit_host = _normalize_host(os.environ.get("CANONICAL_HOST"))
+    if explicit_host:
+        return explicit_host
+
+    return _normalize_host(_public_url())
 
 
 def _normalize_database_uri(uri):
@@ -67,6 +103,11 @@ class BaseConfig:
     )
     SOCKETIO_PING_INTERVAL = int(os.environ.get("SOCKETIO_PING_INTERVAL", "25"))
     SOCKETIO_PING_TIMEOUT = int(os.environ.get("SOCKETIO_PING_TIMEOUT", "20"))
+    APP_URL = _public_url()
+    BASE_URL = os.environ.get("BASE_URL", APP_URL).rstrip("/")
+    PUBLIC_URL = os.environ.get("PUBLIC_URL", APP_URL).rstrip("/")
+    CANONICAL_HOST = _canonical_host()
+    REDIRECT_HOSTS = _env_csv("REDIRECT_HOSTS")
 
 
 class DevConfig(BaseConfig):

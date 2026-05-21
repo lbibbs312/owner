@@ -18,6 +18,11 @@ def _reload_config(monkeypatch, **values):
         "ENABLE_SOCKETIO",
         "SOCKETIO_ASYNC_MODE",
         "SOCKETIO_PATH",
+        "APP_URL",
+        "BASE_URL",
+        "PUBLIC_URL",
+        "CANONICAL_HOST",
+        "REDIRECT_HOSTS",
     ]:
         monkeypatch.delenv(key, raising=False)
     for key, value in values.items():
@@ -142,3 +147,54 @@ def test_deploy_db_bootstraps_empty_database_and_stamps_head(monkeypatch):
     assert payload["status"] == "ok"
     assert payload["schema"] == "ok"
     assert payload["missing_tables"] == []
+
+
+def test_public_url_config_normalizes_move_defense_hosts(monkeypatch):
+    config = _reload_config(
+        monkeypatch,
+        APP_URL="https://movedefense.com/",
+        REDIRECT_HOSTS="https://lacksdrivers.com, www.lacksdrivers.com/",
+    )
+
+    assert config.BaseConfig.APP_URL == "https://movedefense.com"
+    assert config.BaseConfig.BASE_URL == "https://movedefense.com"
+    assert config.BaseConfig.PUBLIC_URL == "https://movedefense.com"
+    assert config.BaseConfig.CANONICAL_HOST == "movedefense.com"
+    assert config.BaseConfig.REDIRECT_HOSTS == ("lacksdrivers.com", "www.lacksdrivers.com")
+
+
+def test_legacy_domain_redirect_preserves_path_and_query(monkeypatch):
+    config = _reload_config(
+        monkeypatch,
+        FLASK_ENV="testing",
+        APP_URL="https://movedefense.com",
+        CANONICAL_HOST="movedefense.com",
+        REDIRECT_HOSTS="lacksdrivers.com,www.lacksdrivers.com",
+    )
+    from app import create_app
+
+    app = create_app(config.TestConfig)
+    response = app.test_client().get(
+        "/driver/logs?date=2026-05-20",
+        headers={"Host": "www.lacksdrivers.com"},
+    )
+
+    assert response.status_code == 308
+    assert response.headers["Location"] == "https://movedefense.com/driver/logs?date=2026-05-20"
+
+
+def test_non_legacy_hosts_are_not_redirected(monkeypatch):
+    config = _reload_config(
+        monkeypatch,
+        FLASK_ENV="testing",
+        APP_URL="https://movedefense.com",
+        CANONICAL_HOST="movedefense.com",
+        REDIRECT_HOSTS="lacksdrivers.com,www.lacksdrivers.com",
+    )
+    from app import create_app
+
+    app = create_app(config.TestConfig)
+    response = app.test_client().get("/healthz", headers={"Host": "lacksdrivers-com.onrender.com"})
+
+    assert response.status_code == 200
+    assert response.get_json() == {"status": "ok"}

@@ -11,8 +11,9 @@ Templates and static files remain at the repo root for now; the
 into ``app/templates`` and ``app/static``.
 """
 import os
+from urllib.parse import urlunsplit
 
-from flask import Flask
+from flask import Flask, redirect, request
 
 from app.config import get_config
 from app.cli import register_cli_commands
@@ -34,8 +35,29 @@ def create_app(config_class=None):
     register_template_filters(app)
     register_context_processors(app)
     register_cli_commands(app)
+    _register_legacy_domain_redirect(app)
     _register_blueprints(app)
     return app
+
+
+def _register_legacy_domain_redirect(app):
+    @app.before_request
+    def redirect_legacy_domain():
+        canonical_host = (app.config.get("CANONICAL_HOST") or "").lower()
+        redirect_hosts = set(app.config.get("REDIRECT_HOSTS") or ())
+        request_host = (request.host or "").split(":", 1)[0].lower()
+
+        if not canonical_host or request_host not in redirect_hosts:
+            return None
+
+        target_url = urlunsplit((
+            "https",
+            canonical_host,
+            request.path,
+            request.query_string.decode("utf-8", "ignore"),
+            "",
+        ))
+        return redirect(target_url, code=308)
 
 
 def _register_blueprints(app):
