@@ -58,7 +58,7 @@ from app.blueprints.driver.routes import (
 )
 
 
-TRIM_PLANTS = ("Trim DC", "PPL", "DC")
+TRIM_PLANTS = ()
 PART_TOKEN_RE = re.compile(r"\b[A-Z]*\d[A-Z0-9-]{3,}\b", re.IGNORECASE)
 
 
