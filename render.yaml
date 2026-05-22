@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: lacksdrivers-com
+    name: movedefense-customer
     env: python
-    plan: free
-    branch: main
+    plan: standard
+    branch: movedefense-template
     autoDeploy: true
 
     buildCommand: pip install -e .
@@ -20,16 +20,16 @@ services:
       - key: ENABLE_SOCKETIO
         value: "false"
       - key: APP_URL
-        value: "https://movedefense.com"
+        value: "https://movedefense-customer.onrender.com"
       - key: BASE_URL
-        value: "https://movedefense.com"
+        value: "https://movedefense-customer.onrender.com"
       - key: PUBLIC_URL
-        value: "https://movedefense.com"
+        value: "https://movedefense-customer.onrender.com"
       - key: CANONICAL_HOST
-        value: "movedefense.com"
-      - key: REDIRECT_HOSTS
-        value: "lacksdrivers.com,www.lacksdrivers.com"
+        value: "movedefense-customer.onrender.com"
       - key: SECRET_KEY
         sync: false
       - key: SQLALCHEMY_DATABASE_URI
+        sync: false
+      - key: MANAGER_REGISTRATION_PIN
         sync: false
