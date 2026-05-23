@@ -6,8 +6,13 @@ from flask_login import current_user, login_required, login_user, logout_user
 
 from app.blueprints.auth import bp
 from app.extensions import db, login_manager
-from app.forms.auth import LoginForm, RegistrationForm
+from app.forms.auth import LoginForm, PasswordResetForm, PasswordResetRequestForm, RegistrationForm
 from app.models import User
+from app.services.password_reset import (
+    clear_password_reset_token,
+    create_password_reset_token,
+    send_password_reset_email,
+)
 from app.services.role_session import clear_role_logins, remember_role_login, restore_role_user
 
 
@@ -107,6 +112,43 @@ def register():
             flash("Registration successful! Please log in.", "success")
             return redirect(url_for("auth.login"))
     return render_template("register.html", form=form)
+
+
+@bp.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if current_user.is_authenticated:
+        return _redirect_authenticated_user()
+    form = PasswordResetRequestForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user:
+            token = create_password_reset_token(user)
+            send_password_reset_email(user, token)
+        flash(
+            "If an account exists for that email, password reset instructions have been sent.",
+            "info",
+        )
+        return redirect(url_for("auth.login"))
+    return render_template("forgot_password.html", form=form)
+
+
+@bp.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return _redirect_authenticated_user()
+    user = User.query.filter_by(reset_password_token=token).first()
+    if not user or not user.password_reset_token_is_valid(token):
+        flash("That password reset link is invalid or expired.", "danger")
+        return redirect(url_for("auth.forgot_password"))
+
+    form = PasswordResetForm()
+    if form.validate_on_submit():
+        user.set_password(form.password.data)
+        clear_password_reset_token(user)
+        db.session.commit()
+        flash("Your password has been updated. Please log in.", "success")
+        return redirect(url_for("auth.login"))
+    return render_template("reset_password.html", form=form)
 
 
 @bp.route("/login", methods=["GET", "POST"])

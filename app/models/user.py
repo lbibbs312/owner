@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -16,6 +18,8 @@ class User(db.Model, UserMixin):
     employee_id = db.Column(db.String(32), nullable=True)
     shift = db.Column(db.String(16), nullable=True)
     department = db.Column(db.String(32), nullable=True)
+    reset_password_token = db.Column(db.String(128), unique=True, nullable=True)
+    reset_password_expires_at = db.Column(db.DateTime, nullable=True)
 
     tasks = db.relationship(
         "Task",
@@ -64,3 +68,13 @@ class User(db.Model, UserMixin):
 
     def check_password(self, pwd):
         return check_password_hash(self.password_hash, pwd)
+
+    def password_reset_token_is_valid(self, token):
+        if not self.reset_password_token or self.reset_password_token != token:
+            return False
+        if not self.reset_password_expires_at:
+            return False
+        expires_at = self.reset_password_expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        return expires_at > datetime.now(timezone.utc)

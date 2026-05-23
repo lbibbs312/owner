@@ -23,6 +23,19 @@ class RegistrationForm(FlaskForm):
     submit = SubmitField("Register")
 
 
+class PasswordResetRequestForm(FlaskForm):
+    email = StringField("Email", validators=[DataRequired(), Email()])
+    submit = SubmitField("Send Reset Link")
+
+
+class PasswordResetForm(FlaskForm):
+    password = PasswordField("New Password", validators=[DataRequired(), Length(min=6)])
+    confirm_password = PasswordField(
+        "Confirm New Password", validators=[DataRequired(), EqualTo("password")]
+    )
+    submit = SubmitField("Update Password")
+
+
 class LoginForm(FlaskForm):
     login_name = StringField("Username or Email", validators=[DataRequired()])
     password = PasswordField("Password", validators=[DataRequired()])

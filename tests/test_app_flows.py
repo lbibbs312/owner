@@ -188,6 +188,66 @@ def test_password_hash_column_fits_werkzeug_hashes(app):
         assert len(user.password_hash) <= column_length
 
 
+def test_forgot_password_generates_reset_token_without_account_enumeration(client, app):
+    with app.app_context():
+        user = create_user("reset_driver", "reset@example.com", "driver")
+        user_id = user.id
+
+    response = client.post(
+        "/forgot-password",
+        data={"email": "reset@example.com"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/login")
+    with app.app_context():
+        from app.extensions import db
+        from app.models import User
+
+        user = db.session.get(User, user_id)
+        assert user.reset_password_token
+        assert user.reset_password_expires_at
+
+    unknown = client.post(
+        "/forgot-password",
+        data={"email": "unknown@example.com"},
+        follow_redirects=False,
+    )
+    assert unknown.status_code == 302
+    assert unknown.headers["Location"].endswith("/login")
+
+
+def test_reset_password_updates_password_and_consumes_token(client, app):
+    with app.app_context():
+        from app.models import User
+        from app.services.password_reset import create_password_reset_token
+
+        user = create_user("reset_driver", "reset@example.com", "driver", password="oldpass1")
+        user_id = user.id
+        token = create_password_reset_token(user)
+
+    response = client.post(
+        f"/reset-password/{token}",
+        data={"password": "newpass1", "confirm_password": "newpass1"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/login")
+    with app.app_context():
+        from app.extensions import db
+        from app.models import User
+
+        user = db.session.get(User, user_id)
+        assert user.reset_password_token is None
+        assert user.reset_password_expires_at is None
+        assert user.check_password("newpass1")
+
+    assert login(client, "reset_driver", "oldpass1").status_code == 200
+    assert login(client, "reset_driver", "newpass1").status_code == 302
+
+
 def test_login_redirects_by_role(client, app):
     with app.app_context():
         create_user(

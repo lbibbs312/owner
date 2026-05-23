@@ -108,6 +108,13 @@ class BaseConfig:
     PUBLIC_URL = os.environ.get("PUBLIC_URL", APP_URL).rstrip("/")
     CANONICAL_HOST = _canonical_host()
     REDIRECT_HOSTS = _env_csv("REDIRECT_HOSTS")
+    PASSWORD_RESET_EXPIRATION_MINUTES = int(os.environ.get("PASSWORD_RESET_EXPIRATION_MINUTES", "60"))
+    SMTP_HOST = os.environ.get("SMTP_HOST", "")
+    SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+    SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
+    SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+    SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USERNAME or "no-reply@movedefense.com")
+    SMTP_USE_TLS = _env_bool("SMTP_USE_TLS", True)
 
 
 class DevConfig(BaseConfig):
