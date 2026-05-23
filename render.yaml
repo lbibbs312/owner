@@ -2,6 +2,7 @@ services:
   - type: web
     name: movedefense-customer
     env: python
+    repo: https://github.com/lbibbs312/owner
     plan: standard
     branch: movedefense-template
     autoDeploy: true
@@ -30,6 +31,21 @@ services:
       - key: SECRET_KEY
         sync: false
       - key: SQLALCHEMY_DATABASE_URI
-        sync: false
+        fromDatabase:
+          name: movedefense-customer-db
+          property: connectionString
+      - key: DATABASE_URL
+        fromDatabase:
+          name: movedefense-customer-db
+          property: connectionString
       - key: MANAGER_REGISTRATION_PIN
         sync: false
+
+
+databases:
+  - name: movedefense-customer-db
+    databaseName: movedefense_customer
+    user: movedefense_customer_user
+    plan: basic-256mb
+    region: oregon
+    postgresMajorVersion: "18"
