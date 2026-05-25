@@ -57,12 +57,8 @@ dev = [
 ]
 
 [tool.setuptools]
-# This is currently a flat-layout app (lacksdrivers.py at root). The packaging
-# is mostly here so dev tooling (ruff, mypy, pytest) has a config root. The
-# upcoming app-factory refactor will move code into an `app/` package; at that
-# point switch to:
-#   packages = ["app"]
-py-modules = ["lacksdrivers", "forms", "models", "manager_routes", "manager_bp", "driver_bp", "db_setup"]
+packages = ["app"]
+py-modules = ["lacksdrivers", "wsgi"]
 
 [tool.ruff]
 line-length = 100
