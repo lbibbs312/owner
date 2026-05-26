@@ -26,3 +26,10 @@ Definition of done:
 - No empty report sections.
 - No contradictory report statements.
 - Generated PDF is manually reviewed before final response.
+
+## Patch Discipline
+- Use the built-in `apply_patch` tool for small, direct edits whenever it can target this checkout.
+- Keep patch paths relative to this repo root; confirm with `git rev-parse --show-toplevel` before editing from a nested worktree.
+- Do not hand-write broad unified diffs with guessed hunk line numbers. Split edits into small hunks, or use exact text replacement.
+- If the built-in patch tool rejects valid repo paths, use `codex-replace-exact` for precise single-file replacements.
+- If a shell fallback for a real unified diff is unavoidable, run `codex-safe-apply-patch` instead of raw `git apply`; it checks the exact patch before touching files.
