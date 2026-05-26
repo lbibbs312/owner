@@ -73,7 +73,7 @@
 </head>
 <body>
   <button class="print-btn" onclick="window.print()">Print / Save Manager Review</button>
-  <a class="email-btn" href="{{ attachment_url }}">Download Manager Review PDF</a>
+  <a class="email-btn" href="{{ url_for('manager.driver_route_print', driver_id=driver.id, date=the_date.isoformat(), autoprint=1) }}">Save PDF</a>
   {% if csv_url is defined %}<a class="email-btn" href="{{ csv_url }}">CSV Export</a>{% endif %}
   {% if sheets_url is defined %}<a class="email-btn" href="{{ sheets_url }}">Sheets Export</a>{% endif %}
   <p class="print-guidance muted">Use Letter paper, portrait orientation, and disable browser headers/footers if available.</p>
@@ -341,5 +341,14 @@
       </div>
     </div>
   </div>
+{% if request.args.get('autoprint') %}
+<script>
+  window.addEventListener("load", function () {
+    window.setTimeout(function () {
+      window.print();
+    }, 150);
+  });
+</script>
+{% endif %}
 </body>
 </html>

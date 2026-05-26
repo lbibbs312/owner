@@ -127,7 +127,7 @@
     <div class="alert alert-light border d-flex flex-wrap align-items-center gap-2 mb-3">
       <strong>Manager review:</strong>
       <a class="btn btn-sm btn-outline-primary" href="{{ url_for('manager.driver_route_print', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d')) }}">Manager Route Review</a>
-      <a class="btn btn-sm btn-outline-success" href="{{ url_for('manager.driver_route_attachment', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d')) }}">Download Manager Review PDF</a>
+      <a class="btn btn-sm btn-outline-success" href="{{ url_for('manager.driver_route_print', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d'), autoprint=1) }}">Save Manager Review PDF</a>
       <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('manager.driver_route_export', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d'), type='csv') }}">CSV</a>
       <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('manager.driver_route_export', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d'), type='sheets') }}">Sheets</a>
     </div>
@@ -141,8 +141,8 @@
       <a href="{{ url_for('driver.new_driving_log') }}" class="btn btn-primary hover-btn">Record Current Stop</a>
       <a href="{{ url_for('driver.add_stop') }}" class="btn btn-outline-primary hover-btn">Add Missed Stop</a>
       {% if logs %}
-        <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d')) }}" class="btn btn-success hover-btn">Print / Save PDF</a>
-        <a href="{{ url_for('driver.driver_logs_attachment', date=search_date.strftime('%Y-%m-%d')) }}" class="btn btn-outline-success hover-btn">Download PDF</a>
+        <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d')) }}" class="btn btn-success hover-btn">Print Route Record</a>
+        <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d'), autoprint=1) }}" class="btn btn-outline-success hover-btn">Save Route PDF</a>
       {% endif %}
     </div>
   {% endif %}

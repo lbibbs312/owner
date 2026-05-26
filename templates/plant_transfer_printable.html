@@ -53,8 +53,8 @@
     {% if current_user.role == 'driver' and transfer.user_id == current_user.id %}
       <a class="edit-btn" href="{{ url_for('driver.edit_plant_transfer', transfer_id=transfer.id) }}">Edit Before Printing</a>
     {% endif %}
-    <button class="print-btn" type="button" onclick="markPrintedAndPrint()">Print {{ 'All Copies' if requested_copy == 'all' else 'Selected Copy' }}</button>
-    <a class="email-btn" href="{{ url_for(transfer_attachment_endpoint, transfer_id=transfer.id, copy=requested_copy) }}">Download PDF Attachment</a>
+    <button class="print-btn" type="button" onclick="markPrintedAndPrint()">Print Document</button>
+    <a class="email-btn" href="{{ url_for(transfer_print_endpoint, transfer_id=transfer.id, copy=requested_copy, autoprint=1) }}">Save PDF</a>
     <a class="back-btn" href="{{ url_for(transfer_view_endpoint, transfer_id=transfer.id) }}">Back</a>
     <div class="w-100"></div>
     <span><strong>Copy needed:</strong></span>
@@ -127,6 +127,13 @@
     }
     window.print();
   }
+  {% if request.args.get('autoprint') %}
+  window.addEventListener("load", function () {
+    window.setTimeout(function () {
+      markPrintedAndPrint();
+    }, 150);
+  });
+  {% endif %}
 </script>
 </body>
 </html>

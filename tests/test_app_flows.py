@@ -2363,7 +2363,7 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
 
     filtered_logs = client.get(f"/manager/driver-logs?driver_id={driver_id}&date={date.today().isoformat()}")
     assert b"Manager Route Review" in filtered_logs.data
-    assert b"Download Manager Review PDF" in filtered_logs.data
+    assert b"Save Manager Review PDF" in filtered_logs.data
     assert b"CSV" in filtered_logs.data
     assert b"Sheets" in filtered_logs.data
     route_print = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
@@ -3792,9 +3792,9 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     login(client, "dated_print_driver")
     logs_page = client.get(f"/driver_logs?date={selected_date.isoformat()}")
     assert logs_page.status_code == 200
-    assert b"Print / Save PDF" in logs_page.data
+    assert b"Print Route Record" in logs_page.data
     assert f"/driver_logs_print?date={selected_date.isoformat()}".encode() in logs_page.data
-    assert f"/driver_logs_print/attachment?date={selected_date.isoformat()}".encode() in logs_page.data
+    assert f"/driver_logs_print?date={selected_date.isoformat()}&amp;autoprint=1".encode() in logs_page.data
 
     print_page = client.get(f"/driver_logs_print?date={selected_date.isoformat()}")
     assert print_page.status_code == 200

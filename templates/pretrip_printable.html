@@ -205,6 +205,7 @@
 {% set pretrip_attachment_endpoint = 'manager.pretrip_attachment' if current_user.role == 'management' else 'driver.pretrip_attachment' %}
 {% set pretrip_view_endpoint = 'manager.view_pretrip' if current_user.role == 'management' else 'driver.view_pretrip' %}
 {% set pretrip_mark_endpoint = 'manager.mark_pretrip_printed' if current_user.role == 'management' else 'driver.mark_pretrip_printed' %}
+{% set pretrip_print_endpoint = 'manager.pretrip_printable' if current_user.role == 'management' else 'driver.pretrip_printable' %}
 {% macro defect_item(flag, label) -%}
   <div class="checkbox-line{% if flag %} defect-marked{% endif %}">
     [{{ "X" if flag else " " }}] {{ label }}
@@ -214,8 +215,8 @@
     {% if current_user.role == 'driver' and pretrip.user_id == current_user.id %}
       <a class="edit-btn" href="{{ url_for('driver.edit_pretrip_entry', pretrip_id=pretrip.id) }}">Edit PreTrip Before Printing</a>
     {% endif %}
-    <button class="print-btn" type="button" onclick="markPrintedAndPrint()">Print / Save as PDF</button>
-    <a class="email-btn" href="{{ url_for(pretrip_attachment_endpoint, pretrip_id=pretrip.id) }}">Download PDF Attachment</a>
+    <button class="print-btn" type="button" onclick="markPrintedAndPrint()">Print Document</button>
+    <a class="email-btn" href="{{ url_for(pretrip_print_endpoint, pretrip_id=pretrip.id, autoprint=1) }}">Save PDF</a>
     <a class="back-btn" href="{{ url_for(pretrip_view_endpoint, pretrip_id=pretrip.id) }}">Back to PreTrip</a>
   </div>
   <p class="print-guidance">Review the DVIR first. Use Edit PreTrip if anything is wrong, then print on Letter paper in portrait orientation.</p>
@@ -402,6 +403,13 @@
     }
     window.print();
   }
+  {% if request.args.get('autoprint') %}
+  window.addEventListener("load", function () {
+    window.setTimeout(function () {
+      markPrintedAndPrint();
+    }, 150);
+  });
+  {% endif %}
 </script>
 </body>
 </html>
