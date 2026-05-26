@@ -8,6 +8,9 @@
   .status-pill { display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; font-size:.75rem; font-weight:900; text-transform:uppercase; background:#fef3c7; color:#92400e; }
   .status-pill.locked { background:#e2e8f0; color:#334155; }
   .status-pill.open { background:#dcfce7; color:#166534; }
+  .no-print, .screen-only { }
+  .document-header { display:none; }
+  @media print { .no-print, .screen-only, .print-controls, .helper-text, .form-hint, .button-row, nav, header.app-nav, .navbar, #fullscreenOverlay { display:none !important; } .document-header { display:flex; justify-content:space-between; border-bottom:2px solid #111; padding-bottom:8px; margin-bottom:12px; } .damage-card { break-inside:avoid; } }
   .action-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .more-actions summary { list-style:none; cursor:pointer; }
   .more-actions summary::-webkit-details-marker { display:none; }
@@ -40,21 +43,21 @@
         {% if route_finalized|default(false) %} Route finalized{% endif %}
       </p>
     </div>
-    <div class="action-row">
+    <div class="action-row print-controls no-print">
       {% if manager_view|default(false) %}
         <a class="btn btn-outline-secondary" href="{{ url_for('manager.review_dashboard') }}">Review</a>
       {% else %}
         <a class="btn btn-outline-secondary" href="{{ url_for('driver.damage_reports') }}">History</a>
       {% endif %}
-      <button class="btn btn-outline-primary" type="button" onclick="window.print()">Print Report</button>
+      <button class="btn btn-outline-primary" type="button" onclick="window.print()">Print Document</button>
       {% if manager_view|default(false) %}
-        <a class="btn btn-primary" href="{{ url_for('manager.damage_evidence_packet', report_id=report.id) }}">Generate Evidence Packet</a>
+        <a class="btn btn-primary" href="{{ url_for('manager.damage_evidence_packet', report_id=report.id) }}">Evidence Packet</a>
         <form method="POST" action="{{ url_for('manager.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Delete this damage report?');">
           <input type="hidden" name="next" value="{{ url_for('manager.review_dashboard') }}">
           <button class="btn btn-outline-danger" type="submit">Delete Report</button>
         </form>
       {% else %}
-        <a class="btn btn-primary" href="{{ url_for('driver.damage_evidence_packet', report_id=report.id) }}">Generate Evidence Packet</a>
+        <a class="btn btn-primary" href="{{ url_for('driver.damage_evidence_packet', report_id=report.id) }}">Evidence Packet</a>
       {% endif %}
       {% if can_modify|default(false) %}
         <a class="btn btn-primary" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Edit</a>
@@ -75,8 +78,13 @@
     <div class="alert alert-secondary small">This report is locked because it was submitted or the route was finalized.</div>
   {% endif %}
 
-  <section class="damage-card">
-    <h2>Damage Summary</h2>
+  <header class="document-header print-only">
+    <div><h1>Damage Report</h1><div><strong>Driver:</strong> {{ report.reported_by.display_name }}</div><div><strong>Date:</strong> {{ report.damage_time|to_detroit_datetime if report.damage_time else report.created_at|to_detroit_datetime }}</div></div>
+    <div><strong>Document No:</strong> EVIDENCE-REPORT-{{ "%03d"|format(report.id) }}<br><strong>Generated:</strong> {{ report.created_at|to_detroit_datetime if report.created_at else '' }}<br><strong>Page</strong> 1 of 1</div>
+  </header>
+
+  <section class="damage-card official-print-document">
+    <h2>1. Damage Summary</h2>
     <div class="damage-grid">
       <div class="damage-field"><span>Plant</span><strong>{{ report.plant_name }}</strong></div>
       <div class="damage-field"><span>Stage</span><strong>{{ report.stage|title }}</strong></div>
@@ -90,12 +98,12 @@
   </section>
 
   <section class="damage-card">
-    <h2>Description</h2>
+    <h2>2. Description</h2>
     <p class="damage-copy report-description">{{ report.description }}</p>
   </section>
 
   <section class="damage-card">
-    <h2>Photo Evidence</h2>
+    <h2>3. Photo Evidence</h2>
     <div class="photo-grid">
       {% for photo in report.photos %}
         <article class="photo-card">
@@ -111,7 +119,7 @@
   </section>
 
   <section class="damage-card">
-    <h2>Manager Review</h2>
+    <h2>4. Manager Review</h2>
     <div class="damage-grid">
       <div class="damage-field"><span>Assigned To</span><strong>Unassigned</strong></div>
       <div class="damage-field"><span>Follow-up Status</span><strong>{{ 'Open follow-up' if report.status != 'closed' else 'Closed' }}</strong></div>
@@ -121,7 +129,7 @@
   </section>
 
   <section class="damage-card">
-    <h2>History</h2>
+    <h2>5. History</h2>
     <div class="history-list">
       <div class="history-item">Created {{ report.created_at|to_detroit_datetime if report.created_at else '' }}</div>
       {% if report.status != 'open' %}<div class="history-item">Submitted and locked for driver edits.</div>{% endif %}

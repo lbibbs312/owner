@@ -29,6 +29,15 @@ from app.forms.user import ProfileForm
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
 from app.services.evidence_packet import build_damage_evidence_packet
+from app.services.document_numbers import (
+    document_meta,
+    eod_document_number,
+    evidence_document_number,
+    generated_at_label,
+    pretrip_document_number,
+    route_document_number,
+    transfer_document_number,
+)
 from app.services.simple_pdf import LANDSCAPE_LETTER, LETTER, SimplePdf
 from app.services.load_state import (
     MIN_PLANT_TRANSFER_MINUTES,
@@ -87,6 +96,61 @@ PLANT_TRANSFER_LINE_COUNT = 20
 DRIVER_LOG_AUDIT_FIELDS = ["plant_name", "load_size", "depart_load_size", "secondary_load", "downtime_reason", "part_number", "hot_parts", "arrive_time", "depart_time", "dock_wait_minutes", "maintenance", "fuel", "fuel_mileage", "meeting"]
 PLANT_TRANSFER_AUDIT_FIELDS = ["transfer_number", "transfer_date", "ship_to", "ship_from", "trailer_number", "driver_name", "driver_initials", "transfer_time", "loaded_by"]
 RYDER_CLOSING_ACTIONS = {"fixed", "left", "rental"}
+
+
+def _first_record_id(records):
+    return records[0].id if records else None
+
+
+def _truck_from_pretrips(pretrips):
+    first = pretrips[0] if pretrips else None
+    return first.truck_number if first else None
+
+
+def _pretrip_document_meta(pretrip, page="1 of 1"):
+    return document_meta("DAILY VEHICLE INSPECTION REPORT", pretrip_document_number(pretrip), page=page)
+
+
+def _route_document_meta(route_date, driver, logs, pretrips, page="1 of 1"):
+    return document_meta(
+        "DRIVER ROUTE AUDIT SHEET",
+        route_document_number(route_date, driver=driver, truck=_truck_from_pretrips(pretrips), route_id=_first_record_id(logs)),
+        page=page,
+    )
+
+
+def _eod_document_meta(route_date, driver, logs, page="1 of 1"):
+    return document_meta(
+        "END OF DAY ROUTE RECORD",
+        eod_document_number(route_date, driver=driver, route_id=_first_record_id(logs)),
+        page=page,
+    )
+
+
+def _transfer_document_meta(transfer, page="1 of 1"):
+    return document_meta("PLANT TRANSFER", transfer_document_number(transfer), page=page)
+
+
+def _evidence_document_meta(report, page="1 of 1"):
+    return document_meta("DAMAGE EVIDENCE PACKET", evidence_document_number(report), page=page)
+
+
+def _draw_pdf_header(pdf, title, document_no, generated_at, page_label, *, driver=None, truck=None, date_value=None):
+    pdf.text(36, 764, title, size=12, bold=True)
+    pdf.text(36, 748, f"Document No: {document_no}", size=8, bold=True)
+    pdf.text(260, 748, f"Generated: {generated_at}", size=8)
+    pdf.text(500, 748, f"Page {page_label}", size=8)
+    meta = []
+    if driver:
+        meta.append(f"Driver: {driver}")
+    if truck:
+        meta.append(f"Truck: {truck}")
+    if date_value:
+        meta.append(f"Date: {date_value}")
+    if meta:
+        pdf.text(36, 734, " | ".join(meta), size=8)
+    pdf.line(36, 726, 576, 726, width=0.8)
+
 RYDER_OUTCOME_LABELS = {
     "headed": "Headed to Ryder",
     "fixed": "Fixed at Ryder",
@@ -1510,10 +1574,23 @@ def _log_freight_summary(log, transfers):
 
 
 def _build_pretrip_pdf(pretrip):
+    evidence_reports = _pretrip_damage_reports(pretrip)
+    total_pages = 2 if evidence_reports else 1
+    meta = _pretrip_document_meta(pretrip, page=f"1 of {total_pages}")
     pdf = SimplePdf("PreTrip DVIR", LETTER)
-    y = 748
-    pdf.text(205, y, "DAILY VEHICLE INSPECTION REPORT", size=14, bold=True)
-    y -= 28
+    _draw_pdf_header(
+        pdf,
+        meta["title"],
+        meta["document_no"],
+        meta["generated_at"],
+        meta["page"],
+        driver=pretrip.driver.display_name if pretrip.driver else None,
+        truck=pretrip.truck_number,
+        date_value=pretrip.pretrip_date,
+    )
+    y = 704
+    pdf.text(36, y, "1. Vehicle / Shift Info", size=10, bold=True)
+    y -= 18
     pdf.text(36, y, f"Truck/Tractor No: {pretrip.truck_number or ''}", size=10, bold=True)
     pdf.text(265, y, f"Trailer No: {pretrip.trailer_number or ''}", size=10)
     pdf.text(445, y, f"Date: {pretrip.pretrip_date or ''}", size=10)
@@ -1526,6 +1603,8 @@ def _build_pretrip_pdf(pretrip):
         mileage = f"{pretrip.start_mileage or 0} - {pretrip.posttrip.end_mileage} (Total {total})"
     pdf.text(360, y, f"Mileage: {mileage}", size=10)
     y -= 25
+    pdf.text(36, y, "2. Power Unit Inspection / 3. In-Cab Inspection / 4. Engine Compartment / 5. Exterior", size=9, bold=True)
+    y -= 12
     rows = [
         ["Oil System", pretrip.oil_system_status or ""],
         ["Tires OK", _yes_no(pretrip.tires_ok)],
@@ -1553,21 +1632,22 @@ def _build_pretrip_pdf(pretrip):
         ["Brakes", _yes_no(pretrip.brakes)],
         ["Towed No Defects", _yes_no(pretrip.towed_no_defects)],
     ]
-    left = rows[:13]
-    right = rows[13:]
+    numbered_rows = [[f"{idx}. {row[0]}", row[1]] for idx, row in enumerate(rows, start=1)]
+    left = numbered_rows[:13]
+    right = numbered_rows[13:]
     y = pdf.table(
         36,
         y,
         [150, 80, 150, 80],
         18,
-        ["Item", "Status", "Item", "Status"],
+        ["Item #", "Status", "Item #", "Status"],
         [l + r for l, r in zip(left, right)],
         font_size=8,
     )
     marked_defects = _pretrip_marked_defects(pretrip)
     if marked_defects:
         y -= 14
-        pdf.text(36, y, "Defects Marked", size=10, bold=True, color=PDF_ALERT_RED)
+        pdf.text(36, y, "6. Defects / Remarks - Defects Marked", size=10, bold=True, color=PDF_ALERT_RED)
         pdf.multiline_text(
             42,
             y - 14,
@@ -1583,7 +1663,7 @@ def _build_pretrip_pdf(pretrip):
     y = 210
     remarks = (pretrip.damage_report or "").strip()
     remarks_color = PDF_ALERT_RED if remarks else None
-    pdf.text(36, y, "Damage / Remarks", size=10, bold=True, color=remarks_color)
+    pdf.text(36, y, "6. Defects / Remarks", size=10, bold=True, color=remarks_color)
     pdf.rect(36, y - 70, 540, 60)
     pdf.multiline_text(
         42,
@@ -1595,16 +1675,18 @@ def _build_pretrip_pdf(pretrip):
         max_lines=5,
         color=remarks_color,
     )
+    pdf.text(36, 112, "7. Driver Signature", size=10, bold=True)
     pdf.text(36, 92, "Driver Signature: ____________________________", size=10)
     pdf.text(335, 92, "Date: __________________", size=10)
 
-    evidence_reports = _pretrip_damage_reports(pretrip)
     if evidence_reports:
         pdf.add_page()
-        y = 748
-        pdf.text(36, y, "PreTrip Damage Evidence", size=14, bold=True)
+        meta = _pretrip_document_meta(pretrip, page=f"2 of {total_pages}")
+        _draw_pdf_header(pdf, meta["title"], meta["document_no"], meta["generated_at"], meta["page"], driver=pretrip.driver.display_name if pretrip.driver else None, truck=pretrip.truck_number, date_value=pretrip.pretrip_date)
+        y = 704
+        pdf.text(36, y, "8. PreTrip Damage Evidence", size=14, bold=True)
         y -= 20
-        pdf.text(36, y, f"PreTrip #{pretrip.id} / Truck {pretrip.truck_number or 'not set'}", size=9)
+        pdf.text(36, y, f"PreTrip #{pretrip.id} / Truck {pretrip.truck_number or ''}", size=9)
         y -= 18
         for report in evidence_reports[:4]:
             pdf.text(36, y, f"Damage Report #{report.id}: {report.description}", size=9, bold=True, color=PDF_ALERT_RED)
@@ -1663,24 +1745,43 @@ def _draw_signature_pdf_block(pdf, driver_signature=None, signature_timestamp=No
 
 
 def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, signature_timestamp=None, route_context=None):
+    route_context = route_context or build_route_context(driver_id=getattr(logs[0], "driver_id", None), route_date=getattr(logs[0], "date", None)) if logs else None
+    routes = (route_context.log_routes if route_context else _driver_log_route_context(logs))
+    pretrips = _active_pretrips_query().filter_by(user_id=getattr(driver, "id", None), pretrip_date=the_date).all() if driver else []
+    truck = _truck_from_pretrips(pretrips)
+    meta = _route_document_meta(the_date, driver, logs, pretrips)
     pdf = SimplePdf("Driver Route Sheet", LETTER)
-    pdf.text(36, 748, f"Driver Route Sheet - {the_date}", size=15, bold=True)
+    _draw_pdf_header(
+        pdf,
+        "DRIVER ROUTE AUDIT SHEET",
+        meta["document_no"],
+        meta["generated_at"],
+        meta["page"],
+        driver=driver.display_name if driver else None,
+        truck=truck,
+        date_value=the_date,
+    )
+    y = 710
+    pdf.text(36, y, "1. Route Summary", size=11, bold=True)
+    y -= 14
     if driver:
         info_parts = [driver.display_name]
         if driver.shift:
             info_parts.append(f"Shift: {driver.shift}")
         if driver.employee_id:
             info_parts.append(f"Badge: {driver.employee_id}")
-        pdf.text(36, 730, "  |  ".join(info_parts), size=9)
-    route_context = route_context or build_route_context(driver_id=getattr(logs[0], "driver_id", None), route_date=getattr(logs[0], "date", None)) if logs else None
+        pdf.text(44, y, " | ".join(info_parts), size=8)
+        y -= 14
+    pdf.text(36, y, "2. Numbered Route Legs", size=11, bold=True)
+    y -= 12
     snapshot_rows = {row.get("log_id"): row for row in (route_context.rows if route_context else [])}
-    routes = (route_context.log_routes if route_context else _driver_log_route_context(logs))
     rows = []
-    for log in logs:
+    for idx, log in enumerate(logs, start=1):
         route = routes.get(log.id, {})
         snapshot = snapshot_rows.get(log.id, {})
         status = snapshot.get("note") or route.get("action") or ("Open" if not log.depart_time else "Complete")
         rows.append([
+            str(idx),
             snapshot.get("plant") or route.get("plant") or log.plant_name,
             _arrival_utc_to_local_hhmm(log.arrive_time) or "--",
             _format_hhmm_12h(log.depart_time) or "--",
@@ -1689,22 +1790,27 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
             ("No Pickup " if log.no_pickup else "") + (("HOT " if log.hot_parts else "") + (log.part_number or "")).strip(),
             f"{snapshot.get('status', '')}: {status}" if snapshot else status,
         ])
-    pdf.table(36, 710, [70, 58, 58, 110, 110, 105, 65], 24, ["Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Parts", "Status"], rows or [["No logs", "", "", "", "", "", ""]], font_size=7)
+    y = pdf.table(36, y, [32, 64, 52, 52, 90, 90, 90, 70], 24, ["Leg #", "Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Parts", "Status"], rows or [["--", "No logs", "", "", "", "", "", ""]], font_size=6)
+    y -= 18
+    pdf.text(36, y, "3. Signatures", size=11, bold=True)
     _draw_signature_pdf_block(pdf, driver_signature, signature_timestamp)
     return pdf.build()
 
 
 def _build_eod_pdf(the_date, logs, plant_transfers, driver_signature=None, signature_timestamp=None):
+    meta = _eod_document_meta(the_date, current_user, logs)
     pdf = SimplePdf("End of Day", LETTER)
-    pdf.text(36, 748, f"End of Day - {the_date}", size=15, bold=True)
+    _draw_pdf_header(pdf, "END OF DAY ROUTE RECORD", meta["document_no"], meta["generated_at"], meta["page"], driver=current_user.display_name, date_value=the_date)
+    y = 710
     routes = _driver_log_route_context(logs)
     log_rows = []
-    for log in logs:
+    for idx, log in enumerate(logs, start=1):
         route = routes.get(log.id, {})
         cargo_out = route.get("depart_cargo_desc") if route.get("depart_cargo_desc") is not None else "--"
         if route.get("next_stop"):
             cargo_out = f"{cargo_out}; first stop {route.get('next_stop')}"
         log_rows.append([
+            str(idx),
             route.get("plant") or log.plant_name,
             _arrival_utc_to_local_hhmm(log.arrive_time) or "--",
             _format_hhmm_12h(log.depart_time) or "--",
@@ -1712,13 +1818,16 @@ def _build_eod_pdf(the_date, logs, plant_transfers, driver_signature=None, signa
             cargo_out,
             ("No Pickup " if log.no_pickup else "") + (("HOT " if log.hot_parts else "") + (log.part_number or "")).strip(),
         ])
-    y = pdf.table(36, 710, [70, 58, 58, 120, 120, 150], 24, ["Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Parts"], log_rows or [["No logs", "", "", "", "", ""]], font_size=7)
+    pdf.text(36, y, "1. Route Detail Table", size=11, bold=True)
+    y -= 12
+    y = pdf.table(36, y, [36, 65, 55, 55, 115, 125, 105], 24, ["Stop #", "Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Parts"], log_rows or [["--", "No logs", "", "", "", "", ""]], font_size=7)
     y -= 34
-    pdf.text(36, y, "Plant Transfers", size=12, bold=True)
+    pdf.text(36, y, "2. Plant Transfers", size=12, bold=True)
     y -= 14
     transfer_rows = []
-    for transfer in plant_transfers:
+    for idx, transfer in enumerate(plant_transfers, start=1):
         transfer_rows.append([
+            str(idx),
             transfer.transfer_number or transfer.id,
             transfer.ship_from,
             transfer.ship_to,
@@ -1726,7 +1835,7 @@ def _build_eod_pdf(the_date, logs, plant_transfers, driver_signature=None, signa
             transfer.driver_name or transfer.driver.display_name,
             len(transfer.lines),
         ])
-    pdf.table(36, y, [60, 80, 80, 80, 150, 50], 22, ["No.", "From", "To", "Trailer", "Driver", "Lines"], transfer_rows or [["No transfers", "", "", "", "", ""]], font_size=8)
+    pdf.table(36, y, [35, 55, 75, 75, 75, 145, 50], 22, ["Item #", "No.", "From", "To", "Trailer", "Driver", "Lines"], transfer_rows or [["--", "No transfers", "", "", "", "", ""]], font_size=7)
     _draw_signature_pdf_block(pdf, driver_signature, signature_timestamp)
     return pdf.build()
 
@@ -1755,13 +1864,17 @@ def _build_plant_transfer_pdf(transfer, requested_copy):
     for idx, copy_set in enumerate(copy_sets):
         if idx:
             pdf.add_page(LANDSCAPE_LETTER)
-        pdf.text(340, 566, "CLIENT COMPANY", size=8, bold=True)
+        meta = _transfer_document_meta(transfer, page=f"{idx + 1} of {len(copy_sets)}")
+        pdf.text(36, 588, f"Document No: {meta['document_no']}", size=8, bold=True)
+        pdf.text(250, 588, f"Generated: {meta['generated_at']}", size=8)
+        pdf.text(650, 588, f"Page {meta['page']}", size=8)
+        pdf.text(340, 566, "LACKS INDUSTRIES INC.", size=8, bold=True)
         pdf.text(310, 548, "PLANT TRANSFER", size=18, bold=True)
         pdf.text(650, 552, f"No. {transfer.transfer_number or transfer.id}", size=10, bold=True)
         pdf.text(36, 530, f"SHIP TO: {transfer.ship_to}", size=9, bold=True)
         pdf.text(300, 530, f"SHIP FROM: {transfer.ship_from}", size=9, bold=True)
         pdf.text(610, 530, f"DATE: {transfer.transfer_date}", size=9, bold=True)
-        pdf.text(620, 588, copy_set["label"], size=9, bold=True)
+        pdf.text(620, 574, copy_set["label"], size=9, bold=True)
         table_rows = []
         for left, right in rows:
             table_rows.append([
@@ -1994,6 +2107,7 @@ def view_pretrip(pretrip_id):
         readonly=(current_user.role == "management"),
         today_local_date=_today_local_date(),
         pretrip_damage_reports=_pretrip_damage_reports(pt),
+        document_meta=_pretrip_document_meta(pt),
     )
 
 
@@ -2149,6 +2263,7 @@ def pretrip_printable(pretrip_id):
         ephemeral_date=ephemeral_date,
         email_mode=False,
         pretrip_damage_reports=_pretrip_damage_reports(pt),
+        document_meta=_pretrip_document_meta(pt),
     )
 
 
@@ -2376,6 +2491,7 @@ def plant_transfer_printable(transfer_id):
         all_copy_sets=all_copy_sets,
         requested_copy=requested_copy,
         email_mode=False,
+        document_meta=_transfer_document_meta(transfer, page=f"1 of {len(copy_sets)}"),
     )
 
 
@@ -3261,6 +3377,7 @@ def driver_logs_print():
         route_finalized=route_finalized,
         driver_signature=shift_record.driver_signature if shift_record else None,
         signature_timestamp=shift_record.signature_timestamp if shift_record else None,
+        document_meta=_route_document_meta(selected_date, current_user, logs, pretrips),
         attachment_url=url_for("driver.driver_logs_attachment", date=selected_date.isoformat()),
         email_mode=False,
     )
@@ -3436,6 +3553,7 @@ def end_of_day_print():
         log_routes=_driver_log_route_context(logs),
         driver_signature=signature_shift.driver_signature if signature_shift else None,
         signature_timestamp=signature_shift.signature_timestamp if signature_shift else None,
+        document_meta=_eod_document_meta(today_local_date, current_user, logs),
         email_mode=False,
     )
 
@@ -3571,6 +3689,7 @@ def damage_evidence_packet(report_id):
         "damage_evidence_packet.html",
         packet=packet,
         manager_view=False,
+        document_meta=_evidence_document_meta(report, page="1 of 5"),
         back_url=url_for("driver.view_damage_report", report_id=report.id),
     )
 

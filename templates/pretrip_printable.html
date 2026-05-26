@@ -37,6 +37,12 @@
       color: #444;
       font-size: 9pt;
     }
+    .no-print, .screen-only { }
+    .print-controls { margin: 0 auto 0.12in; max-width: 7.6in; }
+    .document-header { display:flex; justify-content:space-between; gap:0.16in; border-bottom:2px solid #000; padding-bottom:0.06in; margin-bottom:0.08in; }
+    .document-header h1 { margin:0; font-size:13pt; text-transform:uppercase; }
+    .document-meta { text-align:right; font-size:8pt; line-height:1.35; }
+    .document-number { font-weight:800; }
     .print-actions {
       display: flex;
       flex-wrap: wrap;
@@ -180,11 +186,20 @@
       color: #444;
       font-size: 9pt;
     }
-    .print-actions,
+      .no-print,
+      .screen-only,
+      .print-controls,
+      .helper-text,
+      .form-hint,
+      .button-row,
+      nav,
+      header.app-nav,
+      .print-actions,
       .print-btn,
       .edit-btn,
+      .email-btn,
       .back-btn {
-        display: none;
+        display: none !important;
       }
       .print-container {
         width: 100%;
@@ -201,24 +216,41 @@
 </head>
 <body>
 
-<div class="print-container">
+{% set document_meta = document_meta|default({'title': 'DAILY VEHICLE INSPECTION REPORT', 'document_no': 'DVIR-' ~ pretrip.id, 'generated_at': '', 'page': '1 of 1'}) %}
 {% set pretrip_attachment_endpoint = 'manager.pretrip_attachment' if current_user.role == 'management' else 'driver.pretrip_attachment' %}
 {% set pretrip_view_endpoint = 'manager.view_pretrip' if current_user.role == 'management' else 'driver.view_pretrip' %}
 {% set pretrip_mark_endpoint = 'manager.mark_pretrip_printed' if current_user.role == 'management' else 'driver.mark_pretrip_printed' %}
+{% set pretrip_print_endpoint = 'manager.pretrip_printable' if current_user.role == 'management' else 'driver.pretrip_printable' %}
 {% macro defect_item(flag, label) -%}
   <div class="checkbox-line{% if flag %} defect-marked{% endif %}">
     [{{ "X" if flag else " " }}] {{ label }}
   </div>
 {%- endmacro %}
-<div class="print-actions">
+<div class="print-controls no-print">
+  <div class="print-actions">
     {% if current_user.role == 'driver' and pretrip.user_id == current_user.id %}
       <a class="edit-btn" href="{{ url_for('driver.edit_pretrip_entry', pretrip_id=pretrip.id) }}">Edit PreTrip Before Printing</a>
     {% endif %}
-    <button class="print-btn" type="button" onclick="markPrintedAndPrint()">Print / Save as PDF</button>
-    <a class="email-btn" href="{{ url_for(pretrip_attachment_endpoint, pretrip_id=pretrip.id) }}">Download PDF Attachment</a>
+    <button class="print-btn" type="button" onclick="markPrintedAndPrint()">Print Document</button>
+    <a class="email-btn" href="{{ url_for(pretrip_print_endpoint, pretrip_id=pretrip.id, autoprint=1) }}">Save PDF</a>
     <a class="back-btn" href="{{ url_for(pretrip_view_endpoint, pretrip_id=pretrip.id) }}">Back to PreTrip</a>
   </div>
-  <p class="print-guidance">Review the DVIR first. Use Edit PreTrip if anything is wrong, then print on Letter paper in portrait orientation.</p>
+</div>
+
+<main class="print-container official-print-document">
+  <header class="document-header print-only">
+    <div>
+      <h1>{{ document_meta.title }}</h1>
+      <div><strong>Driver:</strong> {{ pretrip.driver.display_name if pretrip.driver else current_user.display_name }}</div>
+      <div><strong>Truck:</strong> {{ pretrip.truck_number or '' }}{% if pretrip.trailer_number %} / Trailer {{ pretrip.trailer_number }}{% endif %}</div>
+      <div><strong>Date:</strong> {{ pretrip.pretrip_date.strftime('%m/%d/%Y') if pretrip.pretrip_date else '' }}</div>
+    </div>
+    <div class="document-meta">
+      <div class="document-number">Document No: {{ document_meta.document_no }}</div>
+      <div class="generated-at">Generated: {{ document_meta.generated_at }}</div>
+      <div class="page-number">Page {{ document_meta.page }}</div>
+    </div>
+  </header>
 
   <h2>Daily Vehicle Inspection Report</h2>
 
@@ -251,7 +283,7 @@
     <strong>Shift:</strong> {{ pretrip.shift }}
   </p>
 
-  <div class="section-header">Power Unit</div>
+  <div class="section-header">2. Power Unit Inspection</div>
   <div class="flex-row">
     <!-- General Condition -->
     <div class="column">
@@ -323,7 +355,7 @@
   </div>
 
   <!-- Towed Unit(s) -->
-  <div class="section-header">Towed Unit(s)</div>
+  <div class="section-header">5. Towed Unit(s)</div>
   <div class="towed-block"><div class="towed-grid">
     {{ defect_item(pretrip.towed_bodydoors, "Body/Doors") }}
     {{ defect_item(pretrip.towed_tiedowns, "Tie-Downs") }}
@@ -345,7 +377,7 @@
 
   {% set has_written_remarks = pretrip.damage_report and pretrip.damage_report|trim %}
   <div class="remarks-block{% if has_written_remarks %} remarks-written{% endif %}">
-    <strong>Remarks:</strong><br>
+    <strong>6. Defects / Remarks:</strong><br>
     {{ pretrip.damage_report or "" }}
   </div>
 
@@ -353,7 +385,7 @@
   {% set damage_photo_endpoint = 'manager.damage_photo' if current_user.role == 'management' else 'driver.damage_photo' %}
   {% set evidence_reports = pretrip_damage_reports|default([]) %}
   {% if evidence_reports %}
-    <div class="section-header">PreTrip Damage Evidence</div>
+    <div class="section-header">8. PreTrip Damage Evidence</div>
     <div class="remarks-block">
       {% for report in evidence_reports %}
         <strong>Report #{{ report.id }}:</strong> {{ report.description }}<br>
@@ -386,10 +418,10 @@
   </div>
 
   <div class="remarks-block">
-    <strong>Reporting Driver:</strong> {{ current_user.display_name if current_user else "" }}<br>
+    <strong>7. Driver Signature - Reporting Driver:</strong> {{ current_user.display_name if current_user else "" }}<br>
     <strong>Reviewing Driver:</strong> ________ (Emp. No: ____) Date: ________
   </div>
-</div>
+</main>
 <script>
   async function markPrintedAndPrint() {
     try {
@@ -402,6 +434,13 @@
     }
     window.print();
   }
+  {% if request.args.get('autoprint') %}
+  window.addEventListener("load", function () {
+    window.setTimeout(function () {
+      markPrintedAndPrint();
+    }, 150);
+  });
+  {% endif %}
 </script>
 </body>
 </html>

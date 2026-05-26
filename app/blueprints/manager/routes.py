@@ -23,6 +23,14 @@ from sqlalchemy import or_
 from app.blueprints.manager import bp
 from app.services.database_status import database_status
 from app.services.evidence_packet import build_damage_evidence_packet
+from app.services.document_numbers import (
+    document_meta,
+    evidence_document_number,
+    generated_at_label,
+    manager_review_document_number,
+    pretrip_document_number,
+    transfer_document_number,
+)
 from app.extensions import db, socketio
 from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
@@ -59,6 +67,53 @@ from app.blueprints.driver.routes import (
 
 
 TRIM_PLANTS = ("Trim DC", "PPL", "DC")
+
+
+def _first_record_id(records):
+    return records[0].id if records else None
+
+
+def _manager_review_document_meta(review, page="1 of 1"):
+    return document_meta(
+        "MANAGER ROUTE REVIEW",
+        manager_review_document_number(
+            review["the_date"],
+            driver=review.get("driver"),
+            truck=review.get("truck_label"),
+            route_id=_first_record_id(review.get("logs") or []),
+        ),
+        page=page,
+    )
+
+
+def _pretrip_document_meta(pretrip, page="1 of 1"):
+    return document_meta("DAILY VEHICLE INSPECTION REPORT", pretrip_document_number(pretrip), page=page)
+
+
+def _transfer_document_meta(transfer, page="1 of 1"):
+    return document_meta("PLANT TRANSFER", transfer_document_number(transfer), page=page)
+
+
+def _evidence_document_meta(report, page="1 of 1"):
+    return document_meta("DAMAGE EVIDENCE PACKET", evidence_document_number(report), page=page)
+
+
+def _draw_pdf_header(pdf, title, document_no, generated_at, page_label, *, driver=None, truck=None, date_value=None):
+    pdf.text(36, 764, title, size=12, bold=True)
+    pdf.text(36, 748, f"Document No: {document_no}", size=8, bold=True)
+    pdf.text(260, 748, f"Generated: {generated_at}", size=8)
+    pdf.text(500, 748, f"Page {page_label}", size=8)
+    meta = []
+    if driver:
+        meta.append(f"Driver: {driver}")
+    if truck:
+        meta.append(f"Truck: {truck}")
+    if date_value:
+        meta.append(f"Date: {date_value}")
+    if meta:
+        pdf.text(36, 734, " | ".join(meta), size=8)
+    pdf.line(36, 726, 576, 726, width=0.8)
+
 PART_TOKEN_RE = re.compile(r"\b[A-Z]*\d[A-Z0-9-]{3,}\b", re.IGNORECASE)
 
 
@@ -634,7 +689,7 @@ def _live_stop_rows(logs):
                 "photo_url": None,
                 "url": url_for("manager.view_driver_log", log_id=log.id),
             })
-        status = "Current Active Stop" if is_current_active else snapshot_row.get("status", "Completed")
+        status = "1. Current Active Stop" if is_current_active else snapshot_row.get("status", "Completed")
         status_key = snapshot_row.get("status_key") or ("open" if not log.depart_time else "complete")
         rows.append({
             "log": log,
@@ -1479,15 +1534,22 @@ def _pdf_new_page_if_needed(pdf, y, min_y=90):
 
 
 def _build_manager_route_review_pdf(review):
+    meta = _manager_review_document_meta(review, page="1 of 2")
     pdf = SimplePdf("Manager Route Review", LETTER)
-    pdf.text(36, 748, "Manager Route Review", size=16, bold=True)
-    pdf.text(36, 730, f"Review Status: {review['review_status']}", size=11, bold=True)
-    pdf.text(330, 748, f"Date: {review['the_date']}", size=9, bold=True)
-    pdf.text(330, 734, f"Driver: {review['driver'].display_name}", size=9)
-    pdf.text(330, 720, f"Truck: {review['truck_label']}", size=9)
-    pdf.text(330, 706, f"Mileage: {review['mileage_review']['label']}", size=9)
-    pdf.text(330, 692, f"Stop events: {len(review.get('logs') or [])}", size=9)
-    y = 676
+    _draw_pdf_header(
+        pdf,
+        "Manager Route Review",
+        meta["document_no"],
+        meta["generated_at"],
+        meta["page"],
+        driver=review["driver"].display_name,
+        truck=review["truck_label"],
+        date_value=review["the_date"],
+    )
+    y = 704
+    pdf.text(36, y, f"Review Status: {review['review_status']}", size=11, bold=True)
+    pdf.text(330, y, f"Mileage: {review['mileage_review']['label']}", size=9)
+    y -= 22
     y = pdf.multiline_text(36, y, review["manager_summary"], width_chars=96, size=9, leading=11, max_lines=5)
     y -= 12
 
@@ -1511,7 +1573,7 @@ def _build_manager_route_review_pdf(review):
         y -= 16
 
     y = _pdf_new_page_if_needed(pdf, y, 180)
-    pdf.text(36, y, "Mileage Review", size=11, bold=True)
+    pdf.text(36, y, "3. Mileage Review", size=11, bold=True)
     y -= 14
     mileage_rows = [[review["mileage_review"]["status"], review["mileage_review"]["label"], review["mileage_review"]["detail"]]]
     y = pdf.table(36, y, [110, 130, 300], 22, ["Status", "Route Miles", "Detail"], mileage_rows, font_size=7)
@@ -1522,21 +1584,21 @@ def _build_manager_route_review_pdf(review):
     y -= 16
 
     y = _pdf_new_page_if_needed(pdf, y, 170)
-    pdf.text(36, y, "Required Actions", size=11, bold=True)
+    pdf.text(36, y, "4. Required Actions", size=11, bold=True)
     y -= 14
     for idx, action in enumerate(review["required_actions"], start=1):
         y = pdf.multiline_text(44, y, f"{idx}. {action}", width_chars=88, size=8, leading=10, max_lines=2)
     y -= 12
 
     y = _pdf_new_page_if_needed(pdf, y, 170)
-    pdf.text(36, y, "Data Quality Review", size=11, bold=True)
+    pdf.text(36, y, "5. Data Quality Review", size=11, bold=True)
     y -= 14
     quality_rows = [[item["label"], item["status"], item["detail"]] for item in review["data_quality_items"]] or [["Route", "Clean", "No data quality issues flagged."]]
     y = pdf.table(36, y, [110, 110, 320], 22, ["Check", "Status", "Detail"], quality_rows[:6], font_size=7)
     y -= 18
 
     y = _pdf_new_page_if_needed(pdf, y, 190)
-    pdf.text(36, y, "Cargo / Manifest Review", size=11, bold=True)
+    pdf.text(36, y, "6. Cargo / Manifest Review", size=11, bold=True)
     y -= 14
     cargo_rows = [[row["label"], row["value"], row["detail"]] for row in review["cargo_review"]["summary_rows"]]
     y = pdf.table(36, y, [125, 125, 290], 22, ["Audit", "Status", "Detail"], cargo_rows[:8], font_size=7)
@@ -1558,7 +1620,7 @@ def _build_manager_route_review_pdf(review):
 
     if review.get("photo_reviews") or review.get("damage_report_rows"):
         y = _pdf_new_page_if_needed(pdf, y, 260)
-        pdf.text(36, y, "Photo / Damage / Safety Review", size=11, bold=True)
+        pdf.text(36, y, "7. Photo Proof / Damage Review", size=11, bold=True)
         y -= 16
         if review.get("damage_report_rows"):
             damage_rows = [[f"#{row['id']}", row["type"], row["stop"], row["status"], row["photo_attached"], row["note"]] for row in review["damage_report_rows"][:5]]
@@ -1585,8 +1647,10 @@ def _build_manager_route_review_pdf(review):
         y -= 4
 
     pdf.add_page()
-    y = 748
-    pdf.text(36, y, "Route Detail Appendix", size=12, bold=True)
+    meta = _manager_review_document_meta(review, page="2 of 2")
+    _draw_pdf_header(pdf, "Manager Route Review", meta["document_no"], meta["generated_at"], meta["page"], driver=review["driver"].display_name, truck=review["truck_label"], date_value=review["the_date"])
+    y = 704
+    pdf.text(36, y, "8. Route Detail Table", size=12, bold=True)
     y -= 14
     pdf.text(36, y, f"{len(review.get('logs') or [])} recorded stop event(s). Route records are listed below.", size=8)
     y -= 12
@@ -1602,11 +1666,11 @@ def _build_manager_route_review_pdf(review):
             row["cargo_out"],
             row["note"],
         ])
-    y = pdf.table(36, y, [30, 55, 95, 55, 55, 120, 130], 22, ["#", "Status", "Plant", "Arrive", "Depart", "Cargo Out", "Notes"], route_rows[:18], font_size=6)
+    y = pdf.table(36, y, [30, 55, 95, 55, 55, 120, 130], 22, ["Stop #", "Status", "Plant", "Arrive", "Depart", "Cargo Out", "Notes"], route_rows[:18], font_size=6)
     y -= 18
 
     y = _pdf_new_page_if_needed(pdf, y, 185)
-    pdf.text(36, y, "Manager Decision", size=11, bold=True)
+    pdf.text(36, y, "9. Signatures / Manager Decision", size=11, bold=True)
     y -= 14
     if review.get("approval_blocked"):
         pdf.text(44, y, "Approval unavailable until blocked items are resolved.", size=8, bold=True, color=(176, 0, 32))
@@ -1940,6 +2004,7 @@ def damage_evidence_packet(report_id):
         "damage_evidence_packet.html",
         packet=packet,
         manager_view=True,
+        document_meta=_evidence_document_meta(report, page="1 of 5"),
         back_url=url_for("manager.view_damage_report", report_id=report.id),
     )
 
@@ -2073,6 +2138,7 @@ def driver_route_print():
     return render_template(
         "manager_route_review.html",
         **ctx,
+        document_meta=_manager_review_document_meta(ctx),
         attachment_url=url_for("manager.driver_route_attachment", driver_id=driver_id, date=route_date.isoformat()),
         csv_url=url_for("manager.driver_route_export", driver_id=driver_id, date=route_date.isoformat(), type="csv"),
         sheets_url=url_for("manager.driver_route_export", driver_id=driver_id, date=route_date.isoformat(), type="sheets"),
@@ -2234,6 +2300,7 @@ def view_pretrip(pretrip_id):
         readonly=True,
         today_local_date=date.today(),
         pretrip_damage_reports=_pretrip_damage_reports(pretrip),
+        document_meta=_pretrip_document_meta(pretrip),
     )
 
 
@@ -2247,6 +2314,7 @@ def pretrip_printable(pretrip_id):
         ephemeral_date=None,
         email_mode=False,
         pretrip_damage_reports=_pretrip_damage_reports(pretrip),
+        document_meta=_pretrip_document_meta(pretrip),
     )
 
 
@@ -2312,6 +2380,7 @@ def plant_transfer_printable(transfer_id):
         all_copy_sets=all_copy_sets,
         requested_copy=requested_copy,
         email_mode=False,
+        document_meta=_transfer_document_meta(transfer, page=f"1 of {len(copy_sets)}"),
     )
 
 

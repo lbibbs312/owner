@@ -7,6 +7,13 @@
     @page { size: Letter portrait; margin: 0.35in; }
     * { box-sizing: border-box; }
     body { margin:0; padding:1rem; font-family:Arial, sans-serif; font-size:9pt; color:#111; background:#fff; }
+    .no-print, .screen-only { }
+    .print-controls { margin-bottom:0.12in; }
+    .official-print-document { width:100%; }
+    .document-header { display:flex; justify-content:space-between; gap:0.2in; border-bottom:2px solid #111; padding-bottom:0.08in; margin-bottom:0.12in; }
+    .document-header h1 { margin:0; font-size:16pt; text-transform:uppercase; }
+    .document-meta { text-align:right; font-size:8pt; line-height:1.35; }
+    .document-number { font-weight:900; }
     .print-btn, .email-btn { display:inline-block; margin:0 0 0.12in; padding:8px 14px; border:0; color:#fff; text-decoration:none; font-size:10pt; line-height:1.1; }
     .print-btn { background:#0d6efd; cursor:pointer; }
     .email-btn { background:#198754; }
@@ -68,15 +75,32 @@
     .sig-line { border-bottom:1.5px solid #111; height:0.42in; display:flex; align-items:flex-end; }
     .sig-line img { max-height:0.38in; max-width:100%; }
     .muted { color:#555; }
-    @media print { body { padding:0; } .print-btn, .email-btn, .print-guidance { display:none; } * { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+    @media print { body { padding:0; } .no-print, .screen-only, .print-controls, .helper-text, .form-hint, .button-row, nav, header.app-nav, .print-btn, .email-btn, .print-guidance { display:none !important; } * { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
   </style>
 </head>
 <body>
-  <button class="print-btn" onclick="window.print()">Print / Save Manager Review</button>
-  <a class="email-btn" href="{{ attachment_url }}">Download Manager Review PDF</a>
+  {% set document_meta = document_meta|default({'title': 'MANAGER ROUTE REVIEW', 'document_no': 'MGR-REVIEW-' ~ the_date, 'generated_at': '', 'page': '1 of 1'}) %}
+  <div class="print-controls no-print">
+  <button class="print-btn" onclick="window.print()">Print Document</button>
+  <a class="email-btn" href="{{ url_for('manager.driver_route_print', driver_id=driver.id, date=the_date.isoformat(), autoprint=1) }}">Save PDF</a>
   {% if csv_url is defined %}<a class="email-btn" href="{{ csv_url }}">CSV Export</a>{% endif %}
   {% if sheets_url is defined %}<a class="email-btn" href="{{ sheets_url }}">Sheets Export</a>{% endif %}
-  <p class="print-guidance muted">Use Letter paper, portrait orientation, and disable browser headers/footers if available.</p>
+  </div>
+
+  <main class="official-print-document">
+  <header class="document-header print-only">
+    <div>
+      <h1>{{ document_meta.title }}</h1>
+      <div><strong>Date:</strong> {{ the_date }}</div>
+      <div><strong>Driver:</strong> {{ driver.display_name }}</div>
+      <div><strong>Truck:</strong> {{ truck_label }}</div>
+    </div>
+    <div class="document-meta">
+      <div class="document-number">Document No: {{ document_meta.document_no }}</div>
+      <div class="generated-at">Generated: {{ document_meta.generated_at }}</div>
+      <div class="page-number">Page {{ document_meta.page }}</div>
+    </div>
+  </header>
 
   <div class="sheet-head">
     <div>
@@ -106,7 +130,7 @@
 
   {% if route_state and route_state.current_activity %}
   <div class="section">
-    <h2>Current Active Stop</h2>
+    <h2>1. Current Active Stop</h2>
     <div class="section-body">
       <p><strong>Current Active Stop: {{ route_state.current_activity.plant }}.</strong> {{ route_state.current_activity.detail }}.</p>
       <p>{{ route_state.current_activity.pickup_estimate }}. <span class="delay-status {{ route_state.current_activity.forecast_class }}">{{ route_state.current_activity.forecast_status }}</span></p>
@@ -139,7 +163,7 @@
   {% endif %}
 
   <div class="section">
-    <h2>Mileage Review</h2>
+    <h2>3. Mileage Review</h2>
     <div class="section-body">
       <div class="audit-grid">
         <div class="audit-item {{ 'needs-review' if mileage_review.status == 'Needs correction' else ('warning' if mileage_review.status == 'Pending' else 'clean') }}"><strong>Total Route Mileage</strong><span>{{ mileage_review.label }}</span><small>{{ mileage_review.detail }}</small></div>
@@ -159,7 +183,7 @@
 
   {% if followup_cases %}
   <div class="section">
-    <h2>Related Management Cases</h2>
+    <h2>4. Related Management Cases</h2>
     <div class="section-body">
       <p><strong>Related history only. These cases do not become route evidence unless a record is tied to this route, stop, driver log, driver, truck, or shift/date.</strong></p>
       <table>
@@ -176,7 +200,7 @@
 
   {% if required_actions %}
   <div class="section action-section">
-    <h2>Required Actions</h2>
+    <h2>5. Required Actions</h2>
     <div class="section-body">
       <ol class="actions">
         {% for action in required_actions %}<li>{{ action }}</li>{% endfor %}
@@ -187,7 +211,7 @@
 
   {% if data_quality_items %}
   <div class="section">
-    <h2>Data Quality Review</h2>
+    <h2>6. Data Quality Review</h2>
     <div class="section-body qa-grid">
       {% for item in data_quality_items %}
         <div class="qa-item"><strong>{{ item.label }}</strong><span>{{ item.status }}</span><small>{{ item.detail }}</small></div>
@@ -197,7 +221,7 @@
   {% endif %}
 
   <div class="section">
-    <h2>Cargo / Manifest Review</h2>
+    <h2>7. Cargo / Manifest Review</h2>
     <div class="section-body">
       <div class="audit-grid">
         {% for item in cargo_review.summary_rows %}
@@ -231,7 +255,7 @@
 
   {% if photo_reviews or damage_reports %}
   <div class="section">
-    <h2>Photo / Damage / Safety Review</h2>
+    <h2>8. Photo / Damage / Safety Review</h2>
     <div class="section-body">
       {% if not damage_reports and photo_reviews %}<p><strong>No formal damage report was filed. Cargo/photo proof requires manager classification.</strong></p>{% endif %}
       {% if damage_reports %}<p><strong>{{ damage_report_summary }}.</strong></p>{% endif %}
@@ -278,7 +302,7 @@
 
   {% if delay_review_rows %}
   <div class="section">
-    <h2>Delay / Dock Time Review</h2>
+    <h2>9. Delay / Dock Time Review</h2>
     <div class="section-body">
       <table><thead><tr><th>Stop</th><th>Dock Time</th><th>Load-Time Status</th><th>Reason</th></tr></thead><tbody>
       {% for row in delay_review_rows %}<tr><td>{{ row.plant }}</td><td>{{ row.dock_wait }}</td><td><span class="delay-status {{ row.forecast_class }}">{{ row.forecast }}</span></td><td>{{ row.reason }}{% if row.requires_reason %}<br><strong>{{ row.action }}</strong>{% endif %}</td></tr>{% endfor %}
@@ -289,10 +313,10 @@
 
   {% if logs %}
   <div class="section">
-    <h2>Route Detail Table</h2>
+    <h2>10. Route Detail Table</h2>
     <div class="section-body">
       <table>
-        <thead><tr><th>Stop</th><th>Status</th><th>Plant</th><th>Arrive</th><th>Depart</th><th>Cargo Out</th><th>Notes</th></tr></thead>
+        <thead><tr><th>Stop #</th><th>Status</th><th>Plant</th><th>Arrive</th><th>Depart</th><th>Cargo Out</th><th>Notes</th></tr></thead>
         <tbody>
           {% for row in route_state.rows %}
             {% set log = row.log %}
@@ -313,7 +337,7 @@
   {% endif %}
 
   <div class="section">
-    <h2>Manager Decision</h2>
+    <h2>11. Signatures / Manager Decision</h2>
     <div class="section-body">
       {% if approval_blocked %}<p class="decision-warning">Approval unavailable until blocked items are resolved.</p>{% endif %}
       <div class="decision-grid">
@@ -341,5 +365,15 @@
       </div>
     </div>
   </div>
+</main>
+{% if request.args.get('autoprint') %}
+<script>
+  window.addEventListener("load", function () {
+    window.setTimeout(function () {
+      window.print();
+    }, 150);
+  });
+</script>
+{% endif %}
 </body>
 </html>

@@ -7,6 +7,10 @@
     @page { size: Letter landscape; margin: 0.35in; }
     * { box-sizing: border-box; }
     body { margin: 0; padding: 0.2in; font-family: Arial, sans-serif; font-size: 9pt; color: #000; background: #fff; }
+    .no-print, .screen-only { }
+    .print-controls { }
+    .document-meta-row { display:flex; justify-content:space-between; font-size:7.5pt; border-bottom:1px solid #000; padding-bottom:2px; margin-bottom:0.06in; }
+    .document-number { font-weight:900; }
     .screen-actions { display: flex; flex-wrap: wrap; gap: 0.08in; margin-bottom: 0.15in; align-items: center; }
     .screen-actions a, .screen-actions button { border: 0; padding: 8px 14px; color: #fff; text-decoration: none; cursor: pointer; font-size: 10pt; }
     .edit-btn { background: #8b1538; }
@@ -37,7 +41,11 @@
     .retention { text-align: center; font-size: 7.5pt; margin-top: 0.08in; }
     @media print {
       body { padding: 0; }
-      .screen-actions { display: none; }
+      .no-print, .screen-only { }
+    .print-controls { }
+    .document-meta-row { display:flex; justify-content:space-between; font-size:7.5pt; border-bottom:1px solid #000; padding-bottom:2px; margin-bottom:0.06in; }
+    .document-number { font-weight:900; }
+    .no-print, .screen-only, .print-controls, .helper-text, .form-hint, .button-row, nav, header.app-nav, .screen-actions { display: none !important; }
       .copy-page { width: 100%; min-height: auto; margin: 0; border: none; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
@@ -49,12 +57,13 @@
 {% set transfer_view_endpoint = 'manager.view_plant_transfer' if current_user.role == 'management' else 'driver.view_plant_transfer' %}
 {% set transfer_print_endpoint = 'manager.plant_transfer_printable' if current_user.role == 'management' else 'driver.plant_transfer_printable' %}
 {% set transfer_mark_endpoint = 'manager.mark_plant_transfer_printed' if current_user.role == 'management' else 'driver.mark_plant_transfer_printed' %}
-<div class="screen-actions">
+{% set document_meta = document_meta|default({'title': 'PLANT TRANSFER', 'document_no': 'PLANT-TRANSFER-' ~ transfer.id, 'generated_at': '', 'page': '1 of 1'}) %}
+<div class="screen-actions print-controls no-print">
     {% if current_user.role == 'driver' and transfer.user_id == current_user.id %}
       <a class="edit-btn" href="{{ url_for('driver.edit_plant_transfer', transfer_id=transfer.id) }}">Edit Before Printing</a>
     {% endif %}
-    <button class="print-btn" type="button" onclick="markPrintedAndPrint()">Print {{ 'All Copies' if requested_copy == 'all' else 'Selected Copy' }}</button>
-    <a class="email-btn" href="{{ url_for(transfer_attachment_endpoint, transfer_id=transfer.id, copy=requested_copy) }}">Download PDF Attachment</a>
+    <button class="print-btn" type="button" onclick="markPrintedAndPrint()">Print Document</button>
+    <a class="email-btn" href="{{ url_for(transfer_print_endpoint, transfer_id=transfer.id, copy=requested_copy, autoprint=1) }}">Save PDF</a>
     <a class="back-btn" href="{{ url_for(transfer_view_endpoint, transfer_id=transfer.id) }}">Back</a>
     <div class="w-100"></div>
     <span><strong>Copy needed:</strong></span>
@@ -71,7 +80,8 @@
   </div>
 
   {% for copy in copy_sets %}
-    <section class="copy-page {{ copy.class }}">
+    <section class="copy-page official-print-document {{ copy.class }}">
+      <div class="document-meta-row"><span class="document-number">Document No: {{ document_meta.document_no }}</span><span class="generated-at">Generated: {{ document_meta.generated_at }}</span><span class="page-number">Page {{ loop.index }} of {{ copy_sets|length }}</span></div>
       <div class="copy-label">{{ copy.label }}</div>
       <div class="title">
         <div class="company">LACKS INDUSTRIES INC.</div>
@@ -108,7 +118,7 @@
       <div class="footer-grid">
         <div class="line-field"><strong>TRAILER NO.:</strong> {{ transfer.trailer_number or '' }}</div>
         <div class="line-field"><strong>DRIVER:</strong> {{ transfer.driver_name or transfer.driver.display_name }}</div>
-        <div class="line-field"><strong>TIME:</strong> {{ transfer.transfer_time|display_time if transfer.transfer_time else '' }}</div>
+        <div class="line-field"><strong>INITIALS:</strong> {{ transfer.driver_initials or '' }}<br><strong>TIME:</strong> {{ transfer.transfer_time|display_time if transfer.transfer_time else '' }}</div>
         <div class="line-field"><strong>LOADED BY:</strong> {{ transfer.loaded_by or '' }}</div>
       </div>
       <div class="retention">MAT-C - Plant Transfer &nbsp; | &nbsp; Ret: 1 mo. after the mo. of creation &nbsp; | &nbsp; Effective Date: 1/1/10</div>
@@ -127,6 +137,13 @@
     }
     window.print();
   }
+  {% if request.args.get('autoprint') %}
+  window.addEventListener("load", function () {
+    window.setTimeout(function () {
+      markPrintedAndPrint();
+    }, 150);
+  });
+  {% endif %}
 </script>
 </body>
 </html>

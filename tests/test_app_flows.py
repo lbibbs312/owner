@@ -49,6 +49,26 @@ def login(client, login_name, password="password1"):
     )
 
 
+BANNED_PRINT_PHRASES = (
+    b"Review the DVIR first",
+    b"Use Edit PreTrip",
+    b"Print / Save as PDF",
+    b"Download PDF Attachment",
+    b"Use Letter paper",
+    b"disable browser headers",
+    b"Edit Gallery",
+    b"Delete Photo",
+    b"Debug",
+    b"Forecast",
+)
+
+
+def assert_official_record_output(data):
+    assert b"Document No:" in data
+    assert b"Generated:" in data
+    for phrase in BANNED_PRINT_PHRASES:
+        assert phrase not in data
+
 
 def test_autosave_draft_round_trip_is_user_scoped(client, app):
     with app.app_context():
@@ -773,6 +793,7 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
     assert b"Damage - RE" in page.data
     assert b"Timing status pending" not in page.data
     assert b"Movement segment" not in page.data
+    assert_official_record_output(page.data)
     assert b"Plant Legend" in page.data
     assert b"PPL = PPL" in page.data
     assert b"RE = Raleigh East" in page.data
@@ -861,12 +882,16 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
     assert b"Collecting samples" not in response.data
     assert b"No baseline" not in response.data
     assert b"No in-route damage/incidents reported" not in response.data
+    assert_official_record_output(response.data)
 
     pdf = client.get(f"/manager/driver-logs/route-attachment?driver_id={driver_id}&date={date.today().isoformat()}")
     assert pdf.status_code == 200
     assert pdf.headers["Content-Type"] == "application/pdf"
     assert b"Manager Route Review" in pdf.data
+    assert b"Document No:" in pdf.data
+    assert b"Generated:" in pdf.data
     assert b"Review Status: Correction Required" in pdf.data
+    assert_official_record_output(pdf.data)
 
 
 def test_manager_route_print_calculates_mileage_from_start_and_end_odometer(client, app):
@@ -1553,8 +1578,9 @@ def test_manager_route_review_separates_route_truck_mileage_from_extra_dvir(clie
     pdf = client.get(f"/manager/driver-logs/route-attachment?driver_id={driver_id}&date={date.today().isoformat()}")
     assert pdf.status_code == 200
     assert b"Approval Blocked By" in pdf.data
-    assert b"Route Detail Appendix" in pdf.data
+    assert b"Route Detail Table" in pdf.data
     assert b"Photo ID #" in pdf.data
+    assert_official_record_output(pdf.data)
     assert b"Separate DVIR" not in pdf.data
     assert b"st4" not in pdf.data
 
@@ -1737,8 +1763,8 @@ def test_damage_evidence_packet_includes_timeline_hashes_related_records_and_war
     login(client, "manager1")
     report_page = client.get(f"/manager/damage-reports/{report_id}")
     assert report_page.status_code == 200
-    assert b"Print Report" in report_page.data
-    assert b"Generate Evidence Packet" in report_page.data
+    assert b"Print Document" in report_page.data
+    assert b"Evidence Packet" in report_page.data
 
     packet = client.get(f"/manager/damage-reports/{report_id}/evidence-packet")
     assert packet.status_code == 200
@@ -1753,6 +1779,7 @@ def test_damage_evidence_packet_includes_timeline_hashes_related_records_and_war
     assert expected_hash in packet.data
     assert b"Verify odometer entry" in packet.data
     assert b"No manager/auditor signature field is stored" in packet.data
+    assert_official_record_output(packet.data)
 
 
 def test_driver_profile_cannot_change_role(client, app):
@@ -1905,15 +1932,22 @@ def test_pretrip_create_and_print_route(client, app):
     assert printable.status_code == 200
     assert b"Daily Vehicle Inspection Report" in printable.data
     assert b"Edit PreTrip Before Printing" in printable.data
-    assert b"Review the DVIR first" in printable.data
+    assert b"Document No:" in printable.data
+    assert b"Generated:" in printable.data
+    assert b"Review the DVIR first" not in printable.data
+    assert b"Use Edit PreTrip" not in printable.data
+    assert b"print on Letter paper" not in printable.data
     assert b"Driver One" in printable.data
     assert b"PreTrip Damage Evidence" in printable.data
     assert b"Scratch on bumper" in printable.data
     assert b"/damage_reports/photos/" in printable.data
     assert "&#10003;".encode() in printable.data
+    assert_official_record_output(printable.data)
 
     pdf = client.get(f"/pretrip_printable/{pretrip_id}/attachment")
     assert pdf.status_code == 200
+    assert b"Document No:" in pdf.data
+    assert b"Generated:" in pdf.data
     assert b"PreTrip Damage Evidence" in pdf.data
     assert b"Photo ID #" in pdf.data
 
@@ -2303,7 +2337,7 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
 
     filtered_logs = client.get(f"/manager/driver-logs?driver_id={driver_id}&date={date.today().isoformat()}")
     assert b"Manager Route Review" in filtered_logs.data
-    assert b"Download Manager Review PDF" in filtered_logs.data
+    assert b"Save Manager Review PDF" in filtered_logs.data
     assert b"CSV" in filtered_logs.data
     assert b"Sheets" in filtered_logs.data
     route_print = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
@@ -2952,11 +2986,11 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert driver_detail.status_code == 200
     assert b"Stop Photo Proof" in driver_detail.data
     assert b"Loaded seal photo from gallery" in driver_detail.data
-    assert b"Delete Photo" in driver_detail.data
+    assert b"Remove Photo" in driver_detail.data
 
     driver_print = client.get("/driver_logs_print")
     assert driver_print.status_code == 200
-    assert b"Stop Photo Proof" in driver_print.data
+    assert b"7. Photo Proof" in driver_print.data
     assert b"Loaded seal photo from gallery" in driver_print.data
     assert b"Departing load proof from gallery" in driver_print.data
     assert b"Photo proof review" in driver_print.data
@@ -3000,7 +3034,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert b"Two stop photo proofs were attached" in manager_page.data
     assert b"Latest proof from Paint Central says: Departing load proof from gallery" in manager_page.data
     assert b"Loaded seal photo from gallery" in manager_page.data
-    assert b"Delete Photo" in manager_page.data
+    assert b"Remove Photo" in manager_page.data
     assert f"/manager/driver-log-photos/{first_photo_id}".encode() in manager_page.data
     assert f"/manager/driver-log-photos/{second_photo_id}".encode() in manager_page.data
     manager_photo = client.get(f"/manager/driver-log-photos/{second_photo_id}")
@@ -3045,7 +3079,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     driver_edit_missing_file = client.get(f"/edit_driver_log/{log_id}")
     assert driver_edit_missing_file.status_code == 200
     assert b"Photo file missing" in driver_edit_missing_file.data
-    assert b"Delete Photo" in driver_edit_missing_file.data
+    assert b"Remove Photo" in driver_edit_missing_file.data
 
     driver_delete = client.post(
         f"/driver_logs/photos/{second_photo_id}/delete",
@@ -3683,15 +3717,18 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
     assert print_response.status_code == 200
     assert b"5:45pm" in print_response.data
     assert b"17:45" not in print_response.data
+    assert_official_record_output(print_response.data)
 
     eod_print = client.get("/end_of_day_print")
     assert eod_print.status_code == 200
     assert b"5:45pm" in eod_print.data
     assert b"17:45" not in eod_print.data
+    assert_official_record_output(eod_print.data)
 
     eod_attachment = client.get("/end_of_day_print/attachment")
     assert eod_attachment.status_code == 200
     assert eod_attachment.headers["Content-Type"] == "application/pdf"
+    assert_official_record_output(eod_attachment.data)
 
     eod_response = client.post("/submit_end_of_day", follow_redirects=False)
     assert eod_response.status_code == 302
@@ -3732,9 +3769,9 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     login(client, "dated_print_driver")
     logs_page = client.get(f"/driver_logs?date={selected_date.isoformat()}")
     assert logs_page.status_code == 200
-    assert b"Print / Save PDF" in logs_page.data
+    assert b"Print Route Record" in logs_page.data
     assert f"/driver_logs_print?date={selected_date.isoformat()}".encode() in logs_page.data
-    assert f"/driver_logs_print/attachment?date={selected_date.isoformat()}".encode() in logs_page.data
+    assert f"/driver_logs_print?date={selected_date.isoformat()}&amp;autoprint=1".encode() in logs_page.data
 
     print_page = client.get(f"/driver_logs_print?date={selected_date.isoformat()}")
     assert print_page.status_code == 200
@@ -4205,6 +4242,7 @@ def test_plant_transfer_flow_and_eod_includes_transfer(client, app):
     assert b"GAUGE-1" in printable.data
     assert b"1:30pm" in printable.data
     assert b"13:30" not in printable.data
+    assert_official_record_output(printable.data)
 
     attachment = client.get(f"/plant_transfers/{transfer_id}/attachment?copy=blue")
     assert attachment.status_code == 200
@@ -4212,6 +4250,7 @@ def test_plant_transfer_flow_and_eod_includes_transfer(client, app):
     assert attachment.headers["Content-Disposition"].startswith("attachment;")
     assert attachment.headers["Content-Disposition"].endswith('.pdf"')
     assert attachment.data.startswith(b"%PDF")
+    assert_official_record_output(attachment.data)
 
     mark_printed = client.post(f"/plant_transfers/{transfer_id}/mark_printed")
     assert mark_printed.status_code == 200

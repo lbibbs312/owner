@@ -22,6 +22,12 @@
       color: #000;
       background: #fff;
     }
+    .no-print, .screen-only { }
+    .print-controls { margin-bottom:0.12in; }
+    .document-header { display:flex; justify-content:space-between; gap:0.18in; border-bottom:2px solid #000; padding-bottom:0.08in; margin-bottom:0.12in; }
+    .document-header h1 { margin:0; font-size:14pt; text-transform:uppercase; }
+    .document-meta { text-align:right; font-size:8pt; line-height:1.35; }
+    .document-number { font-weight:900; }
     .print-container {
       width: 100%;
       margin: 0;
@@ -133,10 +139,16 @@
       color: #444;
       font-size: 9pt;
     }
-    .print-btn {
-        display: none;
+    .no-print, .screen-only, .print-controls, .helper-text, .form-hint, .button-row, nav, header.app-nav, .print-btn, .email-btn, .print-guidance {
+        display: none !important;
       }
-      .print-container {
+      .no-print, .screen-only { }
+    .print-controls { margin-bottom:0.12in; }
+    .document-header { display:flex; justify-content:space-between; gap:0.18in; border-bottom:2px solid #000; padding-bottom:0.08in; margin-bottom:0.12in; }
+    .document-header h1 { margin:0; font-size:14pt; text-transform:uppercase; }
+    .document-meta { text-align:right; font-size:8pt; line-height:1.35; }
+    .document-number { font-weight:900; }
+    .print-container {
         width: 100%;
         border: none;
         padding: 0;
@@ -151,18 +163,25 @@
 </head>
 <body>
 
-<div class="print-container">
-<button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
-  <a class="email-btn" href="{{ url_for('driver.end_of_day_attachment') }}">Download PDF Attachment</a>
-  <p class="print-guidance">Use Letter paper, portrait orientation, and disable browser headers/footers if your print dialog offers that option.</p>
+{% set document_meta = document_meta|default({'title': 'END OF DAY ROUTE RECORD', 'document_no': 'EOD-' ~ the_date, 'generated_at': '', 'page': '1 of 1'}) %}
+<div class="print-controls no-print">
+<button class="print-btn" onclick="window.print()">Print Document</button>
+  <a class="email-btn" href="{{ url_for('driver.end_of_day_print', autoprint=1) }}">Save PDF</a>
+</div>
 
-  <h2>End of Day - {{ the_date }}</h2>
+<main class="print-container official-print-document">
+  <header class="document-header print-only">
+    <div><h1>{{ document_meta.title }}</h1><div><strong>Date:</strong> {{ the_date }}</div><div><strong>Driver:</strong> {{ current_user.display_name }}</div></div>
+    <div class="document-meta"><div class="document-number">Document No: {{ document_meta.document_no }}</div><div class="generated-at">Generated: {{ document_meta.generated_at }}</div><div class="page-number">Page {{ document_meta.page }}</div></div>
+  </header>
+
+  <h2>1. End of Day - {{ the_date }}</h2>
 
   {% if drivers_logs[current_user.display_name] %}
     <table>
       <thead>
         <tr>
-          <th>Plant</th>
+          <th>Stop #</th><th>Plant</th>
           <th>Arrive</th>
           <th>Depart</th>
           <th>Cargo In</th>
@@ -175,7 +194,7 @@
         {% for log in drivers_logs[current_user.display_name] %}
         {% set route = (log_routes or {}).get(log.id) %}
         <tr>
-          <td>{{ route.plant if route else log.plant_name }}</td>
+          <td>{{ loop.index }}</td><td>{{ route.plant if route else log.plant_name }}</td>
           <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
           <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
           <td>{{ route.arrive_cargo_desc if route else log.load_size }}</td>
@@ -198,7 +217,7 @@
   {% set start_mi = today_pretrip.start_mileage if today_pretrip else none %}
   {% set end_mi = today_pretrip.posttrip.end_mileage if (today_pretrip and today_pretrip.posttrip) else none %}
   {% if start_mi or fuel_logs %}
-  <div class="section-title">Mileage Summary</div>
+  <div class="section-title">2. Mileage Summary</div>
   <table style="width:auto;min-width:320px;max-width:520px;margin-top:4pt;">
     <thead><tr><th>Checkpoint</th><th>Odometer</th><th>Notes</th></tr></thead>
     <tbody>
@@ -227,7 +246,7 @@
   </table>
   {% endif %}
 
-  <div class="section-title">Plant Transfers</div>
+  <div class="section-title">3. Plant Transfers</div>
   {% if drivers_plant_transfers[current_user.display_name] %}
     <table>
       <thead>
@@ -257,6 +276,7 @@
     <p>No Plant Transfers for today.</p>
   {% endif %}
 
+  <div class="section-title">4. Signatures</div>
   <div class="sig-block">
     <div class="sig-col">
       <div class="sig-label">Driver Signature</div>
@@ -281,7 +301,16 @@
       <div class="sig-ts">&nbsp;</div>
     </div>
   </div>
-</div>
+</main>
 
+{% if request.args.get('autoprint') %}
+<script>
+  window.addEventListener("load", function () {
+    window.setTimeout(function () {
+      window.print();
+    }, 150);
+  });
+</script>
+{% endif %}
 </body>
 </html>

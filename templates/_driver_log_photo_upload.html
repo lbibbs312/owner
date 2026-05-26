@@ -35,19 +35,19 @@
         {% if photo.file_available %}
           <a class="stop-photo-image-link" href="{{ photo_url }}" target="_blank" rel="noopener">
             <img src="{{ photo_url }}" alt="Stop proof photo {{ loop.index }}">
-            <span>{{ (photo.source or 'photo')|replace('_', ' ')|title }} - {{ photo.original_filename or photo.filename }}</span>
+            <span>Photo Proof - {{ photo.original_filename or photo.filename }}</span>
             {% if photo.note %}<small>Reason: {{ photo.note }}</small>{% endif %}
           </a>
         {% else %}
           <div class="stop-photo-image-link stop-photo-missing">
-            <span>Photo file missing - {{ (photo.source or 'photo')|replace('_', ' ')|title }}</span>
+            <span>Photo file missing - Photo Proof</span>
             {% if photo.note %}<small>Reason: {{ photo.note }}</small>{% endif %}
             <small>Photo record exists but the file could not render. Manager review required.</small>
           </div>
         {% endif %}
         <form method="POST" action="{{ photo_delete_url }}" onsubmit="return confirm('Delete this stop photo proof?');">
           <input type="hidden" name="next" value="{{ request.full_path }}">
-          <button class="stop-photo-delete" type="submit">Delete Photo</button>
+          <button class="stop-photo-delete" type="submit">Remove Photo</button>
         </form>
       </div>
     {% else %}
