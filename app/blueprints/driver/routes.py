@@ -3354,8 +3354,8 @@ def driver_logs_print():
     pretrips = _active_pretrips_query().filter_by(
         user_id=current_user.id, pretrip_date=selected_date
     ).all()
-    log_routes = _driver_log_route_context(logs)
     route_context = build_route_context(driver_id=current_user.id, route_date=selected_date, now=now_local)
+    log_routes = route_context.log_routes if route_context else _driver_log_route_context(logs)
     damage_reports_today = _today_damage_reports(current_user.id, selected_date)
     parts_carried = sorted({log.part_number for log in logs if log.part_number})
     exception_notes = []

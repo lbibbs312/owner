@@ -295,6 +295,7 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
         route = log_routes.get(log.id)
         if route is None:
             continue
+        route.update(stop_role_details(log, route))
         route.update(build_stop_summary(
             route, log,
             is_first=(index == 0),

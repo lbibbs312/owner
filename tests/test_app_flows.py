@@ -847,7 +847,10 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
     assert b"Timing status pending" not in page.data
     assert b"Wait Time" in page.data
     assert b"Raleigh East: Wait 15 min" in page.data
-    assert b"Wait time:</strong> Wait 15 min" in page.data
+    assert b"<strong>Raleigh East:</strong> Pickup." in page.data
+    assert b"Loaded Kraft Plant Load." in page.data
+    assert b"Wait 15 min." in page.data
+    assert b"Wait time:</strong> Wait 15 min" not in page.data
     assert b"Movement segment" not in page.data
     assert_official_record_output(page.data)
     assert b"Plant Legend" in page.data
@@ -3620,7 +3623,7 @@ def test_mixed_cargo_deviation_preserves_primary_and_drops_hot_part(client, app)
     assert b"Deviation" in print_page.data
 
 
-def test_depart_second_stop_can_be_regular_load_and_finalized_route_shows_first_stop(client, app):
+def test_depart_second_stop_can_be_regular_load_and_finalized_route_shows_canonical_stop_summaries(client, app):
     with app.app_context():
         create_user("driver1", "driver1@example.com", "driver")
 
@@ -3686,7 +3689,11 @@ def test_depart_second_stop_can_be_regular_load_and_finalized_route_shows_first_
     )
     assert finalized.status_code == 200
     assert b"Trim DC Load + Helios Load" in finalized.data
-    assert b"First stop after departure: Helios" in finalized.data
+    assert b"Loaded Trim DC Load." in finalized.data
+    assert b"Loaded Helios Load." in finalized.data
+    assert b"Delivered Helios Load." in finalized.data
+    assert b"Continuing with Trim DC Load." in finalized.data
+    assert b"First stop after departure" not in finalized.data
     assert b"Route finalized" in finalized.data
 
 
