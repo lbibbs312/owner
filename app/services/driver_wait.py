@@ -4,12 +4,13 @@ import pytz
 from flask_login import current_user
 from sqlalchemy import or_
 
-from app.models import DriverLog
+from app.models import DriverLog, PreTrip, ShiftRecord
 from app.services.plant_addresses import plant_label
 
 
 DETROIT_TZ = pytz.timezone("America/Detroit")
 UTC_FORMATS = ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S")
+ACTIVE_WAIT_MAX_SECONDS = 18 * 60 * 60
 
 
 def arrival_local_datetime(log):
@@ -65,10 +66,48 @@ def wait_label_for_log(log, now=None):
     return f"{prefix} {minutes} min"
 
 
+def _shift_route_date(shift):
+    if not shift:
+        return None
+    if shift.pretrip and shift.pretrip.pretrip_date:
+        return shift.pretrip.pretrip_date
+    if not shift.start_time:
+        return None
+    start_time = shift.start_time
+    if start_time.tzinfo is None:
+        start_time = pytz.utc.localize(start_time)
+    return start_time.astimezone(DETROIT_TZ).date()
+
+
+def _active_route_date_for_driver(driver_id, today_local_date):
+    open_shift = (
+        ShiftRecord.query.filter_by(user_id=driver_id, end_time=None)
+        .order_by(ShiftRecord.start_time.desc())
+        .first()
+    )
+    shift_date = _shift_route_date(open_shift)
+    if shift_date:
+        return shift_date
+    pretrips = (
+        PreTrip.query.filter_by(user_id=driver_id, deleted_at=None)
+        .order_by(PreTrip.created_at.desc(), PreTrip.id.desc())
+        .limit(20)
+        .all()
+    )
+    open_pretrip = next((pretrip for pretrip in pretrips if not pretrip.posttrip), None)
+    return open_pretrip.pretrip_date if open_pretrip and open_pretrip.pretrip_date else today_local_date
+
+
 def active_driver_wait_status(driver_id, now=None):
+    now = now or datetime.now(DETROIT_TZ)
+    if now.tzinfo is None:
+        now = DETROIT_TZ.localize(now)
+    else:
+        now = now.astimezone(DETROIT_TZ)
+    route_date = _active_route_date_for_driver(driver_id, now.date())
     log = (
         DriverLog.query
-        .filter_by(driver_id=driver_id, deleted_at=None)
+        .filter_by(driver_id=driver_id, date=route_date, deleted_at=None)
         .filter(or_(DriverLog.depart_time.is_(None), DriverLog.depart_time == ""))
         .order_by(DriverLog.date.desc(), DriverLog.created_at.desc(), DriverLog.id.desc())
         .first()
@@ -76,7 +115,7 @@ def active_driver_wait_status(driver_id, now=None):
     if not log:
         return None
     seconds = elapsed_wait_seconds(log, now=now)
-    if seconds is None:
+    if seconds is None or seconds > ACTIVE_WAIT_MAX_SECONDS:
         return None
     minutes = seconds // 60
     arrival = arrival_local_datetime(log)

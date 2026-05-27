@@ -38,7 +38,7 @@ from app.services.document_numbers import (
     route_document_number,
     transfer_document_number,
 )
-from app.services.driver_wait import elapsed_wait_minutes, wait_label_for_log
+from app.services.driver_wait import elapsed_wait_minutes, elapsed_wait_seconds, wait_label_for_log
 from app.services.simple_pdf import LANDSCAPE_LETTER, LETTER, SimplePdf
 from app.services.load_state import (
     MIN_PLANT_TRANSFER_MINUTES,
@@ -51,11 +51,13 @@ from app.services.load_state import (
     current_load_after_logs,
     destination_from_load,
     destination_load_value,
+    is_service_stop,
     is_load_for_plant,
     load_display,
     load_type_from_load,
     route_problem_reason,
     secondary_load_value,
+    service_stop_label,
     truck_issue_reason,
 )
 from app.services.parts import record_part_scan as save_part_scan, scan_event_payload
@@ -3090,12 +3092,13 @@ def depart_driver_log(log_id):
 
     form = DepartForm()
     route = _driver_log_context_for(log)
+    service_stop = is_service_stop(log)
+    service_label = service_stop_label(log) if service_stop else ""
 
     def render_depart_page():
-        auto_wait_minutes = _auto_wait_minutes_for_departure(
-            log,
-            datetime.now(pytz.timezone("America/Detroit")),
-        )
+        now_local = datetime.now(pytz.timezone("America/Detroit"))
+        auto_wait_seconds = elapsed_wait_seconds(log, now=now_local)
+        auto_wait_minutes = None if auto_wait_seconds is None else auto_wait_seconds // 60
         part_scan_events = (
             PartScanEvent.query
             .filter_by(stop_id=log.id)
@@ -3108,13 +3111,16 @@ def depart_driver_log(log_id):
             log=log,
             route=route,
             auto_wait_minutes=auto_wait_minutes,
+            auto_wait_seconds=auto_wait_seconds,
+            service_stop=service_stop,
+            service_stop_label=service_label,
             part_scan_events=part_scan_events,
         )
 
     if form.validate_on_submit():
         primary_unloaded = None
         primary_unload_reason = None
-        if route.get("arrived_at_primary_destination"):
+        if not service_stop and route.get("arrived_at_primary_destination"):
             primary_unloaded = form.unloaded_on_departure.data
             if primary_unloaded not in {"yes", "no"}:
                 flash("Please answer whether you got unloaded.", "danger")
@@ -3127,7 +3133,7 @@ def depart_driver_log(log_id):
 
         secondary_dropped = None
         secondary_drop_reason = None
-        if route.get("arrived_at_secondary_destination"):
+        if not service_stop and route.get("arrived_at_secondary_destination"):
             secondary_dropped = form.secondary_dropped_on_departure.data
             if secondary_dropped not in {"yes", "no"}:
                 flash("Please answer whether you dropped off the second-stop cargo.", "danger")
@@ -3142,7 +3148,9 @@ def depart_driver_log(log_id):
         if primary_unloaded == "yes":
             after_unload_primary = "Empty"
 
-        if form.got_loaded.data == "yes":
+        if service_stop:
+            departure_load = route.get("after_arrival_primary") or load_display(log.load_size) or "Empty"
+        elif form.got_loaded.data == "yes":
             if not form.destination.data:
                 flash("Please select where the primary load is going.", "danger")
                 return render_depart_page()
@@ -3154,10 +3162,11 @@ def depart_driver_log(log_id):
             return render_depart_page()
 
         secondary_load = route.get("after_arrival_secondary") or None
-        if secondary_dropped == "yes":
-            secondary_load = None
-        if form.secondary_destination.data:
-            secondary_load = secondary_load_value(form.secondary_destination.data, form.secondary_load_type.data)
+        if not service_stop:
+            if secondary_dropped == "yes":
+                secondary_load = None
+            if form.secondary_destination.data:
+                secondary_load = secondary_load_value(form.secondary_destination.data, form.secondary_load_type.data)
 
         unresolved_scan = (
             PartScanEvent.query
@@ -3203,7 +3212,7 @@ def depart_driver_log(log_id):
         log.depart_load_size = departure_load
         log.secondary_load = secondary_load or None
         _set_departure_unload_reasons(log, primary_unload_reason, secondary_drop_reason)
-        log.no_pickup = departure_load == "Empty" and not log.secondary_load
+        log.no_pickup = False if service_stop else departure_load == "Empty" and not log.secondary_load
         _sync_next_open_stop_arrival_cargo(log)
         db.session.commit()
         record_activity(

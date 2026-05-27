@@ -127,7 +127,7 @@ class DepartForm(FlaskForm):
     got_loaded = SelectField(
         "Did you get loaded?",
         choices=YES_NO_CHOICES,
-        validators=[DataRequired()],
+        validators=[Optional()],
     )
     destination = SelectField(
         "Primary destination",

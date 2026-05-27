@@ -13,7 +13,7 @@
   .scan-row span { color:#64748b; font-size:.78rem; font-weight:700; }
 </style>
 <div class="container">
-  <h2 class="mt-3">Depart / Load {{ log.plant_name }}</h2>
+  <h2 class="mt-3">{{ 'Close ' ~ service_stop_label if service_stop else 'Depart / Load' }} {{ log.plant_name }}</h2>
   <p class="text-muted">
     Closing this stop with: <strong>{{ route.arrive_cargo_desc if route else log.load_size }}</strong>
     {% if route and route.unloaded_on_arrival %}&nbsp;·&nbsp; Primary unloaded{% endif %}
@@ -25,13 +25,19 @@
   <form method="POST" action="" id="departForm" data-autosave="true" data-autosave-key="driver-log-depart-{{ log.id }}">
     {{ form.hidden_tag() }}
 
-    <div class="alert alert-info border fw-semibold" data-wait-timer data-wait-minutes="{{ auto_wait_minutes if auto_wait_minutes is not none else 0 }}">
+    <div class="alert alert-info border fw-semibold" data-wait-timer data-wait-minutes="{{ auto_wait_minutes if auto_wait_minutes is not none else 0 }}" data-wait-seconds="{{ auto_wait_seconds if auto_wait_seconds is not none else 0 }}">
       Wait clock started at arrival: {{ log.arrive_time|to_local_time if log.arrive_time else '--' }}.
-      Current wait: <span data-wait-label>{{ auto_wait_minutes if auto_wait_minutes is not none else 0 }} min</span>.
+      Current wait: <span data-wait-label>{{ auto_wait_minutes if auto_wait_minutes is not none else 0 }}:{{ "%02d"|format((auto_wait_seconds or 0) % 60) }}</span>.
       It will be saved automatically when this stop is closed.
     </div>
 
-    {% if route and route.arrived_at_primary_destination %}
+    {% if service_stop %}
+    <div class="alert alert-warning border fw-semibold">
+      {{ service_stop_label }}: cargo questions are skipped. Closing this stop keeps the truck cargo as {{ route.after_arrival_cargo if route else log.load_size }}.
+    </div>
+    {% endif %}
+
+    {% if not service_stop and route and route.arrived_at_primary_destination %}
     <div class="border rounded p-3 mb-3">
       <div class="mb-3">
         {{ form.unloaded_on_departure.label(class="form-label") }}
@@ -44,7 +50,7 @@
     </div>
     {% endif %}
 
-    {% if route and route.arrived_at_secondary_destination %}
+    {% if not service_stop and route and route.arrived_at_secondary_destination %}
     <div class="border rounded p-3 mb-3">
       <div class="mb-3">
         {{ form.secondary_dropped_on_departure.label(class="form-label") }}
@@ -57,6 +63,7 @@
     </div>
     {% endif %}
 
+    {% if not service_stop %}
     <div class="mb-3">
       {{ form.got_loaded.label(class="form-label") }}
       {{ form.got_loaded(class="form-select", id="gotLoaded") }}
@@ -80,18 +87,18 @@
       {{ form.secondary_load_type.label(class="form-label") }}
       {{ form.secondary_load_type(class="form-select") }}
     </div>
+    {% endif %}
 
     {% set photo_source_prefix = 'departure' %}
     {% include "_driver_log_photo_upload.html" %}
 
+    {% if not service_stop %}
     <section class="cargo-scan-panel" aria-label="Cargo scan verification">
       <h3 class="h6 mb-1">Cargo Scan Verification</h3>
-      <p class="text-muted small mb-2">Scan cargo at arrival, pickup, drop, and departure. Unknown parts are saved for manager confirmation instead of being lost.</p>
+      <p class="text-muted small mb-2">Scan cargo coming off this stop or leaving with you. Unknown parts are saved for manager confirmation instead of being lost.</p>
       <div class="scan-actions">
-        <button type="button" data-scan-context="arrival_scan">Scan Arriving Cargo</button>
-        <button type="button" data-scan-context="pickup_scan">Scan Picked-Up Cargo</button>
-        <button type="button" data-scan-context="drop_scan">Scan Dropped Cargo</button>
-        <button type="button" data-scan-context="departure_scan">Scan Departing Cargo</button>
+        <button type="button" data-scan-context="drop_scan">Scan Unloaded / Dropped Cargo</button>
+        <button type="button" data-scan-context="departure_scan">Scan Loaded / Departing Cargo</button>
       </div>
       <div class="input-group input-group-sm" style="max-width:520px;">
         <input class="form-control" id="manualScanValue" autocomplete="off" placeholder="Manual barcode / part fallback">
@@ -114,8 +121,13 @@
         <textarea class="form-control" id="cargoOverrideReason" name="cargo_override_reason" rows="2" placeholder="Optional. If a scan looks wrong, close the stop and leave a note for manager review."></textarea>
       </div>
     </section>
+    {% endif %}
 
-    {{ form.submit(class="btn btn-success hover-btn") }}
+    {% if service_stop %}
+      <button class="btn btn-success hover-btn" type="submit">Close Service Stop</button>
+    {% else %}
+      {{ form.submit(class="btn btn-success hover-btn") }}
+    {% endif %}
     <a href="{{ url_for('driver.driver_logs') }}" class="btn btn-secondary ms-2">Cancel</a>
   </form>
 </div>
@@ -133,7 +145,13 @@
   const secondaryReasonPanel = document.getElementById('secondaryReasonPanel');
   const waitTimer = document.querySelector('[data-wait-timer]');
   const waitLabel = document.querySelector('[data-wait-label]');
+  function formatElapsed(totalSeconds) {
+    const seconds = Math.max(0, totalSeconds);
+    const minutes = Math.floor(seconds / 60);
+    return minutes + ':' + String(seconds % 60).padStart(2, '0');
+  }
   function syncDestination() {
+    if (!gotLoaded || !destinationPanel || !secondaryDestination || !secondaryLoadTypePanel) return;
     destinationPanel.classList.toggle('d-none', gotLoaded.value !== 'yes');
     secondaryLoadTypePanel.classList.toggle('d-none', !secondaryDestination.value);
     if (unloadReasonPanel && unloadedOnDeparture) {
@@ -143,19 +161,25 @@
       secondaryReasonPanel.classList.toggle('d-none', secondaryDroppedOnDeparture.value !== 'no');
     }
   }
-  gotLoaded.addEventListener('change', syncDestination);
-  secondaryDestination.addEventListener('change', syncDestination);
+  if (gotLoaded) gotLoaded.addEventListener('change', syncDestination);
+  if (secondaryDestination) secondaryDestination.addEventListener('change', syncDestination);
   if (unloadedOnDeparture) unloadedOnDeparture.addEventListener('change', syncDestination);
   if (secondaryDroppedOnDeparture) secondaryDroppedOnDeparture.addEventListener('change', syncDestination);
   syncDestination();
 
   if (waitTimer && waitLabel) {
     const startedAt = Date.now();
+    const initialSeconds = parseInt(waitTimer.dataset.waitSeconds || '', 10);
     const initialMinutes = parseInt(waitTimer.dataset.waitMinutes || '0', 10) || 0;
+    const startSeconds = Number.isFinite(initialSeconds) ? initialSeconds : initialMinutes * 60;
+    function refreshWait() {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      waitLabel.textContent = formatElapsed(startSeconds + elapsed);
+    }
+    refreshWait();
     setInterval(function () {
-      const elapsed = Math.floor((Date.now() - startedAt) / 60000);
-      waitLabel.textContent = (initialMinutes + elapsed) + ' min';
-    }, 30000);
+      refreshWait();
+    }, 1000);
   }
 
 
@@ -250,7 +274,7 @@
   }
 
   scanButtons.forEach(button => button.addEventListener('click', () => startScanner(button.dataset.scanContext)));
-  manualBtn.addEventListener('click', async () => {
+  if (manualBtn) manualBtn.addEventListener('click', async () => {
     try {
       await saveScan(manualInput.value, 'manual_entry', 'manual');
       manualInput.value = '';
@@ -259,7 +283,7 @@
       scannerStage.classList.add('open');
     }
   });
-  stopScannerBtn.addEventListener('click', stopScanner);
+  if (stopScannerBtn) stopScannerBtn.addEventListener('click', stopScanner);
 })();
 </script>
 {% endblock %}

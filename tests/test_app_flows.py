@@ -668,6 +668,58 @@ def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
     assert b"focus-panel" in dashboard.data
 
 
+def test_service_stop_closes_without_cargo_questions_and_preserves_load(client, app):
+    from datetime import date, datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+        from app.services.load_state import build_driver_log_route_context, current_load_after_logs
+
+        driver = create_user("service_stop_driver", "service-stop@example.com", "driver")
+        route_date = date.today()
+        log = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="Ryder Rentals",
+            load_size="Raleigh East Load",
+            arrive_time=(datetime.utcnow() - timedelta(minutes=9)).strftime("%Y-%m-%d %H:%M:%S"),
+            maintenance=True,
+            downtime_reason="Truck issue: CEL light",
+            fuel_mileage=123456,
+        )
+        db.session.add(log)
+        db.session.commit()
+        log_id = log.id
+
+    login(client, "service_stop_driver")
+    page = client.get(f"/driver_logs/{log_id}/depart")
+    assert page.status_code == 200
+    assert b"Close Maintenance stop" in page.data
+    assert b"cargo questions are skipped" in page.data
+    assert b"Did you get loaded?" not in page.data
+    assert b"Did you get unloaded?" not in page.data
+    assert b"Cargo Scan Verification" not in page.data
+
+    departed = client.post(f"/driver_logs/{log_id}/depart", data={}, follow_redirects=False)
+    assert departed.status_code == 302
+
+    with app.app_context():
+        saved = DriverLog.query.get(log_id)
+        assert saved.depart_time is not None
+        assert saved.depart_load_size == "Raleigh East Load"
+        assert saved.no_pickup is False
+        assert saved.dock_wait_minutes >= 9
+
+        routes = build_driver_log_route_context([saved])
+        route = routes[saved.id]
+        assert route["service_stop"] is True
+        assert route["action"] == "Maintenance stop"
+        assert route["unloaded_on_arrival"] is False
+        assert route["unload_blocked"] is False
+        assert current_load_after_logs([saved])["value"] == "Raleigh East Load"
+
+
 def test_plant_load_timing_uses_today_average_on_driver_and_manager_dashboards(client, app):
     from datetime import date, datetime
 
@@ -2029,6 +2081,34 @@ def test_first_driver_log_is_start_location_not_pickup(client, app):
     assert b"Kraft Plant" in next_page.data
 
 
+def test_stale_open_stop_does_not_show_as_active_wait_clock(client, app):
+    from datetime import date, datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("stale_wait_driver", "stale-wait@example.com", "driver")
+        old_date = date.today() - timedelta(days=5)
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=old_date,
+                plant_name="RE",
+                load_size="Empty",
+                arrive_time=f"{old_date.isoformat()} 21:15:00",
+                created_at=datetime.combine(old_date, datetime.min.time()),
+            )
+        )
+        db.session.commit()
+
+    login(client, "stale_wait_driver")
+    page = client.get("/mobile")
+    assert page.status_code == 200
+    assert b"Active Stop Wait" not in page.data
+    assert b"data-active-wait-seconds" not in page.data
+
+
 def test_driver_cannot_create_next_log_until_open_stop_is_departed(client, app):
     with app.app_context():
         create_user("driver1", "driver1@example.com", "driver")
@@ -3132,7 +3212,10 @@ def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_rev
     login(client, "driver_scan")
     depart_page = client.get(f"/driver_logs/{log_id}/depart")
     assert depart_page.status_code == 200
-    assert b"Scan Arriving Cargo" in depart_page.data
+    assert b"Scan Unloaded / Dropped Cargo" in depart_page.data
+    assert b"Scan Loaded / Departing Cargo" in depart_page.data
+    assert b"Scan Arriving Cargo" not in depart_page.data
+    assert b"Scan Picked-Up Cargo" not in depart_page.data
     assert b"Add Picture To This Stop" in depart_page.data
     assert b"Upload From Gallery" in depart_page.data
     assert b'data-stop-photo-input="departure_gallery"' in depart_page.data

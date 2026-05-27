@@ -14,6 +14,7 @@ TRUCK_ISSUE_PREFIX = "Truck issue:"
 DETROIT_TZ = pytz.timezone("America/Detroit")
 UTC_TZ = pytz.utc
 MIN_PLANT_TRANSFER_MINUTES = 3
+SERVICE_STOP_TERMS = ("ryder", "fuel", "gas", "service", "truck stop")
 
 
 def _clean(value):
@@ -165,12 +166,37 @@ def cargo_delta_for_stop(log, route=None):
     }
 
 
+def is_service_stop(log):
+    """Return whether this route stop is for fuel, maintenance, meeting, or service."""
+    plant_text = f"{getattr(log, 'plant_name', '')} {plant_label(getattr(log, 'plant_name', ''))}".lower()
+    return bool(
+        getattr(log, "maintenance", False)
+        or getattr(log, "fuel", False)
+        or getattr(log, "meeting", False)
+        or truck_issue_reason(log)
+        or any(term in plant_text for term in SERVICE_STOP_TERMS)
+    )
+
+
+def service_stop_label(log):
+    if getattr(log, "fuel", False):
+        return "Fuel stop"
+    if getattr(log, "maintenance", False) or truck_issue_reason(log):
+        return "Maintenance stop"
+    if getattr(log, "meeting", False):
+        return "Meeting stop"
+    plant_text = f"{getattr(log, 'plant_name', '')} {plant_label(getattr(log, 'plant_name', ''))}".lower()
+    if "ryder" in plant_text:
+        return "Ryder service stop"
+    return "Service stop"
+
+
 def classify_stop_role(log, route=None, *, is_current_open=False, is_final_stop=False):
     """Classify a stop's cargo role from explicit cargo deltas."""
     delta = cargo_delta_for_stop(log, route)
     if is_current_open and delta["open"]:
         return "current_open"
-    if getattr(log, "maintenance", False) or getattr(log, "fuel", False) or getattr(log, "meeting", False) or truck_issue_reason(log):
+    if is_service_stop(log):
         return "service_stop"
     if is_final_stop:
         return "final_stop"
@@ -318,9 +344,10 @@ def current_load_after_logs(logs):
                 current_secondary_value = load_display(open_secondary_raw)
             continue
 
-        if current_primary_destination and current_primary_destination == plant and not unload_not_completed(log):
+        service_stop = is_service_stop(log)
+        if current_primary_destination and current_primary_destination == plant and not service_stop and not unload_not_completed(log):
             current_primary_destination = None
-        if current_secondary_destination and current_secondary_destination == plant and not secondary_not_dropped(log):
+        if current_secondary_destination and current_secondary_destination == plant and not service_stop and not secondary_not_dropped(log):
             current_secondary_destination = None
             current_secondary_value = ""
 
@@ -336,7 +363,7 @@ def current_load_after_logs(logs):
         if depart_secondary_destination:
             current_secondary_destination = depart_secondary_destination
             current_secondary_value = load_display(depart_secondary_raw)
-        elif current_secondary_destination and current_secondary_destination == plant and not secondary_not_dropped(log):
+        elif current_secondary_destination and current_secondary_destination == plant and not service_stop and not secondary_not_dropped(log):
             current_secondary_destination = None
             current_secondary_value = ""
 
@@ -361,6 +388,7 @@ def build_driver_log_route_context(logs):
             plant = _plant_code(log.plant_name) or "Unknown"
             completed = bool(log.depart_time)
             arrival_destination = destination_from_load(log.load_size)
+            service_stop = is_service_stop(log)
 
             if arrival_destination:
                 current_primary_destination = arrival_destination
@@ -371,10 +399,10 @@ def build_driver_log_route_context(logs):
             arrive_secondary = current_secondary_value
             arrived_at_primary_destination = bool(current_primary_destination and current_primary_destination == plant)
             arrived_at_secondary_destination = bool(current_secondary_destination and current_secondary_destination == plant)
-            primary_unload_blocked = arrived_at_primary_destination and completed and unload_not_completed(log)
-            secondary_drop_blocked = arrived_at_secondary_destination and completed and secondary_not_dropped(log)
-            unloaded_on_arrival = arrived_at_primary_destination and completed and not primary_unload_blocked
-            secondary_dropped_on_arrival = arrived_at_secondary_destination and completed and not secondary_drop_blocked
+            primary_unload_blocked = arrived_at_primary_destination and completed and not service_stop and unload_not_completed(log)
+            secondary_drop_blocked = arrived_at_secondary_destination and completed and not service_stop and secondary_not_dropped(log)
+            unloaded_on_arrival = arrived_at_primary_destination and completed and not service_stop and not primary_unload_blocked
+            secondary_dropped_on_arrival = arrived_at_secondary_destination and completed and not service_stop and not secondary_drop_blocked
 
             after_primary_destination = None if unloaded_on_arrival else current_primary_destination
             after_secondary_destination = None if secondary_dropped_on_arrival else current_secondary_destination
@@ -387,7 +415,9 @@ def build_driver_log_route_context(logs):
                 depart_primary = None
                 depart_secondary = None
                 depart_cargo = None
-                if unloaded_on_arrival and secondary_dropped_on_arrival:
+                if service_stop:
+                    action = service_stop_label(log)
+                elif unloaded_on_arrival and secondary_dropped_on_arrival:
                     action = "Unloaded + secondary dropped"
                 elif unloaded_on_arrival:
                     action = "Unloaded"
@@ -425,7 +455,9 @@ def build_driver_log_route_context(logs):
                     next_secondary_value = after_secondary_value
 
                 depart_cargo = cargo_display(depart_primary, depart_secondary)
-                if depart_secondary and depart_secondary != "Empty" and depart_primary and depart_primary != "Empty":
+                if service_stop:
+                    action = service_stop_label(log)
+                elif depart_secondary and depart_secondary != "Empty" and depart_primary and depart_primary != "Empty":
                     action = "Loaded two stops"
                 elif depart_secondary and depart_secondary != "Empty":
                     action = "Picked up another stop"
@@ -491,6 +523,8 @@ def build_driver_log_route_context(logs):
                 "after_arrival_cargo": cargo_display(after_primary, after_secondary),
                 "primary_destination": current_primary_destination,
                 "secondary_destination": current_secondary_destination,
+                "service_stop": service_stop,
+                "service_stop_label": service_stop_label(log) if service_stop else "",
                 "deviation": deviation,
                 "warnings": warnings,
             }
