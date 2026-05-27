@@ -1,12 +1,13 @@
 {% if active_driver_wait %}
 {% set show_wait_action = active_wait_show_action|default(true) %}
-<section class="driver-active-wait" data-active-wait-minutes="{{ active_driver_wait.minutes }}" aria-label="Active stop wait clock">
+<section class="driver-active-wait" data-active-wait-minutes="{{ active_driver_wait.minutes }}" data-active-wait-seconds="{{ active_driver_wait.seconds }}" aria-label="Active stop wait clock">
   <div class="driver-active-wait-main">
     <span class="driver-active-wait-label">Active Stop Wait</span>
     <strong>{{ active_driver_wait.plant }}</strong>
   </div>
   <div class="driver-active-wait-time">
-    <span data-active-wait-label>{{ active_driver_wait.minutes }}</span> min
+    <span data-active-wait-label>{{ active_driver_wait.minutes }}:{{ "%02d"|format(active_driver_wait.seconds % 60) }}</span>
+    <span class="driver-active-wait-unit">elapsed</span>
   </div>
   {% if show_wait_action %}
     <a class="driver-active-wait-action" href="{{ url_for('driver.depart_driver_log', log_id=active_driver_wait.log_id) }}">Depart / Load</a>

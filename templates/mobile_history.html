@@ -27,7 +27,8 @@
     .driver-active-wait-main { min-width:0; display:grid; gap:2px; }
     .driver-active-wait-label { color:#fde68a; font-size:.63rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; }
     .driver-active-wait-main strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.88rem; }
-    .driver-active-wait-time { font-variant-numeric:tabular-nums; font-size:1rem; font-weight:950; color:#fef3c7; }
+    .driver-active-wait-time { display:grid; gap:1px; text-align:center; font-variant-numeric:tabular-nums; font-size:1rem; font-weight:950; color:#fef3c7; }
+    .driver-active-wait-unit { color:#fde68a; font-size:.58rem; font-weight:900; text-transform:uppercase; }
     .driver-active-wait-action { grid-column:1 / -1; display:grid; place-items:center; min-height:34px; border-radius:10px; background:#fbbf24; color:#111827; font-size:.75rem; font-weight:950; text-transform:uppercase; }
     .side-nav { display:none; }
     .bottom-nav { position:fixed; left:50%; bottom:0; transform:translateX(-50%); width:min(480px,100vw); height:var(--nav-height); background:rgba(9,13,18,.96); backdrop-filter:blur(16px); border-top:1px solid var(--line); display:grid; grid-template-columns:repeat(4,1fr); gap:4px; padding:9px 12px max(10px, env(safe-area-inset-bottom)); z-index:20; }
@@ -83,6 +84,6 @@
     <a class="nav-link active" href="{{ url_for('driver.driver_logs') }}"><strong>DL</strong><span>Logs</span></a>
     <a class="nav-link" href="{{ url_for('driver.profile') }}"><strong>DR</strong><span>Driver</span></a>
   </nav>
-  <script src="{{ url_for('static', filename='js/driver-active-wait.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/driver-active-wait.js', v='2') }}"></script>
 </body>
 </html>

@@ -2024,6 +2024,8 @@ def test_first_driver_log_is_start_location_not_pickup(client, app):
     assert b"Start Shift Location" not in next_page.data
     assert b"Active Stop Wait" in next_page.data
     assert b"data-active-wait-minutes" in next_page.data
+    assert b"data-active-wait-seconds" in next_page.data
+    assert b"driver-active-wait.js?v=2" in next_page.data
     assert b"Kraft Plant" in next_page.data
 
 
@@ -4429,6 +4431,8 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"Active Stop Wait" in page.data
     assert b"Raleigh East" in page.data
     assert b"data-active-wait-minutes" in page.data
+    assert b"data-active-wait-seconds" in page.data
+    assert b"driver-active-wait.js?v=2" in page.data
     assert b"Save Ryder Status" in page.data
     assert b"CEL light" in page.data
     assert b"Need tow" in page.data

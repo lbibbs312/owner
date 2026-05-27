@@ -243,11 +243,19 @@
       text-overflow: ellipsis;
     }
     .driver-active-wait-time {
-      min-width: 86px;
+      display: grid;
+      gap: 1px;
+      min-width: 96px;
       text-align: center;
       font-size: 1rem;
       font-weight: 900;
       font-variant-numeric: tabular-nums;
+    }
+    .driver-active-wait-unit {
+      color: #fde68a;
+      font-size: .58rem;
+      font-weight: 900;
+      text-transform: uppercase;
     }
     .driver-active-wait-action {
       color: #111827;
@@ -554,7 +562,7 @@
     };
   </script>
   <script src="{{ url_for('static', filename='js/autosave-drafts.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/driver-active-wait.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/driver-active-wait.js', v='2') }}"></script>
   {% endif %}
 
   <!-- OneSignal, SweetAlert, etc. (if used) -->

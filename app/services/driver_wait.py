@@ -30,7 +30,7 @@ def arrival_local_datetime(log):
     return DETROIT_TZ.localize(datetime.combine(log.date, parsed_time))
 
 
-def elapsed_wait_minutes(log, now=None):
+def elapsed_wait_seconds(log, now=None):
     arrival = arrival_local_datetime(log)
     if not arrival:
         return None
@@ -39,7 +39,14 @@ def elapsed_wait_minutes(log, now=None):
         now = DETROIT_TZ.localize(now)
     else:
         now = now.astimezone(DETROIT_TZ)
-    return max(0, int((now - arrival).total_seconds() // 60))
+    return max(0, int((now - arrival).total_seconds()))
+
+
+def elapsed_wait_minutes(log, now=None):
+    seconds = elapsed_wait_seconds(log, now=now)
+    if seconds is None:
+        return None
+    return seconds // 60
 
 
 def wait_minutes_for_log(log, now=None):
@@ -68,15 +75,17 @@ def active_driver_wait_status(driver_id, now=None):
     )
     if not log:
         return None
-    minutes = elapsed_wait_minutes(log, now=now)
-    if minutes is None:
+    seconds = elapsed_wait_seconds(log, now=now)
+    if seconds is None:
         return None
+    minutes = seconds // 60
     arrival = arrival_local_datetime(log)
     return {
         "log": log,
         "log_id": log.id,
         "plant": plant_label(log.plant_name),
         "minutes": minutes,
+        "seconds": seconds,
         "arrival_label": arrival.strftime("%I:%M%p").lower().lstrip("0") if arrival else "",
     }
 
