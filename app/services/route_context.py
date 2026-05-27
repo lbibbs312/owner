@@ -10,11 +10,13 @@ from sqlalchemy import or_
 from app.extensions import db
 from app.models import ActivityEvent, DamageReport, DriverLog, DriverLogPhoto, LoadIntent, PartScanEvent, PlantTimeSample, PreTrip, ShiftRecord, User
 from app.services.cargo_reconciliation_service import reconcile_cargo
+from app.services.driver_wait import wait_label_for_log
 from app.services.load_state import build_driver_log_route_context, current_load_after_logs, route_problem_reason, stop_role_details, truck_issue_reason
 from app.services.next_load_prediction import build_next_load_prediction
 from app.services.plant_addresses import plant_label
 from app.services.plant_time import route_stop_forecasts
 from app.services.scan_scope_service import route_scope_id, route_stop_ids
+from app.services.stop_summary import build_stop_summary
 
 DETROIT_TZ = pytz.timezone("America/Detroit")
 ROUTE_ID_RE = re.compile(r"driver:(?P<driver_id>\d+):date:(?P<route_date>\d{4}-\d{2}-\d{2})(?::truck:(?P<truck_id>[^:]+))?(?::shift:(?P<shift_id>\d+))?")
@@ -288,6 +290,19 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
     all_departed = bool(logs) and all(getattr(log, "depart_time", None) for log in logs)
     open_logs = [log for log in logs if not getattr(log, "depart_time", None)]
     current_open = open_logs[-1] if open_logs and open_logs[-1].id == logs[-1].id and not route_finalized else None
+
+    for index, log in enumerate(logs):
+        route = log_routes.get(log.id)
+        if route is None:
+            continue
+        route.update(build_stop_summary(
+            route, log,
+            is_first=(index == 0),
+            is_last=(index == len(logs) - 1),
+            route_finalized=route_finalized,
+            wait_label=wait_label_for_log(log),
+            current_open=bool(current_open and current_open.id == log.id),
+        ))
 
     rows = []
     for index, log in enumerate(logs, start=1):

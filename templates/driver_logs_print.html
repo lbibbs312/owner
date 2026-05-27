@@ -181,6 +181,7 @@
         {% set transit_cargo = route.depart_cargo_desc if route and route.depart_cargo_desc is not none else (log.depart_load_size or '--') %}
         {% set issue = (log_issue_details or {}).get(log.id, {}) %}
         {% set stop_forecast = (stop_forecasts or {}).get(log.id) %}
+        {% set purpose = route.stop_purpose if route else none %}
         <tr class="{% if not next_log %}final-row{% endif %}">
           <td>{{ loop.index }}</td>
           <td>
@@ -190,17 +191,11 @@
                 <div class="route-sub">Timing status: <span class="timing-status {{ stop_forecast.severity }}">{{ stop_forecast.status }}</span></div>
               {% endif %}
             {% else %}
-              <div class="route-leg">{% if route_finalized %}Finalized Stop: {{ plant_name }}{% elif not log.depart_time %}Current Stop: {{ plant_name }}{% else %}Route End: {{ plant_name }}{% endif %}</div>
+              <div class="route-leg">{% if route_finalized %}Finalized Stop: {{ plant_name }}{% elif not log.depart_time %}Current Stop: {{ plant_name }}{% elif purpose == 'shift_end' %}Shift End: {{ plant_name }}{% else %}Route End: {{ plant_name }}{% endif %}</div>
               <div class="route-sub">{% if route_finalized %}Route finalized{% elif not log.depart_time %}Awaiting departure / load intent{% elif route_completed %}Route completed / awaiting final review{% else %}Route completed / not finalized{% endif %}</div>
             {% endif %}
           </td>
-          <td>
-            {% if next_log %}
-              {{ log.depart_time|to_12h_format if log.depart_time else '--' }}
-            {% else %}
-              --
-            {% endif %}
-          </td>
+          <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
           <td>
             {% if next_log %}
               {{ next_log.arrive_time|to_local_time if next_log.arrive_time else '--' }}
@@ -216,43 +211,21 @@
             {% endif %}
           </td>
           <td>
-            {% if next_log %}
-              {% if route and route.deviation %}<span class="badge deviation">Deviation</span>{% endif %}
-              {% if log.no_pickup %}
-                <p class="detail-line"><strong>{{ plant_name }}:</strong> No pickup recorded; departed empty.</p>
-              {% else %}
-                <p class="detail-line"><strong>{{ plant_name }}:</strong> {{ route.action if route else ('At stop - needs departure' if not log.depart_time else 'Departed stop') }}</p>
-                {% if route and route.depart_cargo_desc is not none and route.depart_cargo_desc != 'Empty' %}
-                  <p class="detail-line">Departed with {{ route.depart_cargo_desc }}.</p>
-                {% endif %}
-                {% if route and route.next_stop %}
-                  <p class="detail-line">First stop after departure: {{ route.next_stop }}.</p>
-                {% endif %}
-              {% endif %}
-            {% else %}
-              <p class="detail-line"><strong>{{ plant_name }}:</strong> {% if route_finalized %}Finalized route stop.{% elif not log.depart_time %}Awaiting departure / load intent.{% elif route_completed %}Completed final stop.{% else %}Route stop recorded.{% endif %}</p>
-              {% if route and route.unloaded_on_arrival %}
-                <p class="detail-line">Final unload completed.</p>
-              {% endif %}
-              {% if route and route.secondary_dropped_on_arrival %}
-                <p class="detail-line">Final second-stop cargo drop completed.</p>
-              {% endif %}
-              {% if route and route.unload_blocked %}
-                <p class="detail-line issue">Final unload not completed: {{ route.unload_reason }}</p>
-              {% elif route and route.secondary_drop_blocked %}
-                <p class="detail-line issue">Final second-stop cargo not dropped: {{ route.secondary_drop_reason }}</p>
-              {% elif not log.depart_time %}
-                <p class="detail-line">Final stop remains open.</p>
-              {% else %}
-                <p class="detail-line">Stop departed at {{ log.depart_time|to_12h_format }}.</p>
-                <p class="detail-line">End of shift after completed stop.</p>
-              {% endif %}
+            {% if route and route.deviation %}
+              <span class="badge deviation">Deviation</span>
+              {% if route.deviation_reason %}<div class="muted">{{ route.deviation_reason }}.</div>{% endif %}
             {% endif %}
-            {% if log.no_pickup and not next_log %}<p class="detail-line">No pickup recorded; departed empty.</p>{% endif %}
-            {% if route and route.unload_blocked %}<p class="detail-line issue">Unload issue: {{ route.unload_reason }}</p>{% endif %}
-            {% if route and route.secondary_drop_blocked %}<p class="detail-line issue">Second-stop cargo issue: {{ route.secondary_drop_reason }}</p>{% endif %}
-            {% set wait_label = wait_label_for_log(log) %}
-            {% if wait_label %}<p class="detail-line"><strong>Wait time:</strong> {{ wait_label }}.</p>{% endif %}
+            {% if route and route.summary_lines %}
+              {% for line in route.summary_lines %}
+                {% if loop.first %}
+                  <p class="detail-line"><strong>{{ plant_name }}:</strong>{{ line[(plant_name|length + 1):] }}</p>
+                {% else %}
+                  <p class="detail-line">{{ line }}</p>
+                {% endif %}
+              {% endfor %}
+            {% else %}
+              <p class="detail-line"><strong>{{ plant_name }}:</strong> {% if not log.depart_time %}Awaiting departure / load intent.{% else %}Stop recorded.{% endif %}</p>
+            {% endif %}
             {% if log.maintenance or issue.truck %}<p class="detail-line issue">Truck issue: {{ issue.truck or 'Maintenance marked' }}{% if log.fuel_mileage %}; odometer {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</p>{% endif %}
             {% if issue.route %}<p class="detail-line issue">Route issue: {{ issue.route }}</p>{% endif %}
             {% if log.hot_parts or log.part_number %}<p class="detail-line muted">{% if log.hot_parts %}HOT {% endif %}{{ log.part_number or '' }}</p>{% endif %}
