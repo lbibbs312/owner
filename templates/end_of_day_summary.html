@@ -59,6 +59,7 @@
             <th>Depart</th>
             <th>Cargo In</th>
             <th>Cargo Out</th>
+            <th>Wait</th>
           </tr>
         </thead>
         <tbody>
@@ -73,6 +74,7 @@
               {% if route and route.depart_desc is none %}--{% elif route %}{{ route.depart_cargo_desc }}{% else %}{{ log.depart_load_size or '--' }}{% endif %}
               {% if route and route.next_stop %}<br><small class="text-muted">First stop after departure: {{ route.next_stop }}</small>{% endif %}
             </td>
+            <td>{{ wait_label_for_log(log) or '--' }}</td>
           </tr>
           {% endfor %}
         </tbody>

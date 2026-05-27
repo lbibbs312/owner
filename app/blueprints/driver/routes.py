@@ -38,6 +38,7 @@ from app.services.document_numbers import (
     route_document_number,
     transfer_document_number,
 )
+from app.services.driver_wait import elapsed_wait_minutes, wait_label_for_log
 from app.services.simple_pdf import LANDSCAPE_LETTER, LETTER, SimplePdf
 from app.services.load_state import (
     MIN_PLANT_TRANSFER_MINUTES,
@@ -994,10 +995,7 @@ def _set_departure_unload_reasons(log, primary_reason=None, secondary_reason=Non
 
 
 def _auto_wait_minutes_for_departure(log, now_local):
-    arrival = _arrival_local_dt_for_log(log)
-    if not arrival:
-        return None
-    return max(0, int((now_local - arrival).total_seconds() // 60))
+    return elapsed_wait_minutes(log, now=now_local)
 
 
 def _save_damage_photo(report, uploaded_file):
@@ -1809,10 +1807,11 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
             _format_hhmm_12h(log.depart_time) or "--",
             snapshot.get("cargo_in") or route.get("arrive_cargo_desc") or route.get("arrive_desc") or load_display(log.load_size),
             snapshot.get("cargo_out") or (route.get("depart_cargo_desc") if route.get("depart_cargo_desc") is not None else "--"),
+            wait_label_for_log(log) or "--",
             ("No Pickup " if log.no_pickup else "") + (("HOT " if log.hot_parts else "") + (log.part_number or "")).strip(),
             f"{snapshot.get('status', '')}: {status}" if snapshot else status,
         ])
-    y = pdf.table(36, y, [32, 64, 52, 52, 90, 90, 90, 70], 24, ["Leg #", "Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Parts", "Status"], rows or [["--", "No logs", "", "", "", "", "", ""]], font_size=6)
+    y = pdf.table(36, y, [28, 56, 44, 44, 78, 78, 54, 78, 72], 24, ["Leg #", "Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Wait", "Parts", "Status"], rows or [["--", "No logs", "", "", "", "", "", "", ""]], font_size=6)
     y -= 18
     pdf.text(36, y, "3. Signatures", size=11, bold=True)
     _draw_signature_pdf_block(pdf, driver_signature, signature_timestamp)
@@ -1838,11 +1837,12 @@ def _build_eod_pdf(the_date, logs, plant_transfers, driver_signature=None, signa
             _format_hhmm_12h(log.depart_time) or "--",
             route.get("arrive_cargo_desc") or route.get("arrive_desc") or load_display(log.load_size),
             cargo_out,
+            wait_label_for_log(log) or "--",
             ("No Pickup " if log.no_pickup else "") + (("HOT " if log.hot_parts else "") + (log.part_number or "")).strip(),
         ])
     pdf.text(36, y, "1. Route Detail Table", size=11, bold=True)
     y -= 12
-    y = pdf.table(36, y, [36, 65, 55, 55, 115, 125, 105], 24, ["Stop #", "Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Parts"], log_rows or [["--", "No logs", "", "", "", "", ""]], font_size=7)
+    y = pdf.table(36, y, [32, 58, 48, 48, 100, 108, 62, 92], 24, ["Stop #", "Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Wait", "Parts"], log_rows or [["--", "No logs", "", "", "", "", "", ""]], font_size=7)
     y -= 34
     pdf.text(36, y, "2. Plant Transfers", size=12, bold=True)
     y -= 14

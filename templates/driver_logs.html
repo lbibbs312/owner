@@ -211,7 +211,8 @@
               {% if log.hot_parts %}<span class="route-chip danger">Hot {{ log.part_number or '' }}</span>{% elif log.part_number %}<span class="route-chip">{{ log.part_number }}</span>{% endif %}
               <span class="route-chip {% if log.maintenance %}danger{% else %}ok{% endif %}">Truck {{ 'Issue' if log.maintenance else 'OK' }}{% if log.maintenance and log.fuel_mileage %} - {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>
               {% if log.fuel %}<span class="route-chip">Fuel{% if log.fuel_mileage %} - {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>{% endif %}
-              {% if log.dock_wait_minutes %}<span class="route-chip danger">Dock {{ log.dock_wait_minutes }} min</span>{% endif %}
+              {% set wait_label = wait_label_for_log(log) %}
+              {% if wait_label %}<span class="route-chip danger">{{ wait_label }}</span>{% endif %}
               {% if log.meeting %}<span class="route-chip">Meeting</span>{% endif %}
               {% for event in (route_task_events or {}).get(log.id, []) %}
                 <span class="route-chip task-chip {% if event.is_hot %}danger{% elif event.completed_at %}ok{% else %}warn{% endif %}">{{ event.kind_label }}: {{ event.label }} - {{ event.status }}{% if event.completed_at %} / Unloaded{% endif %}</span>

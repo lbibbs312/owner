@@ -607,7 +607,7 @@ def test_driver_mobile_shows_full_parts_queue_and_route_task_events(client, app)
     assert b"Hot Part: P-HOT-1" in route_page.data
     assert b"Accepted" in route_page.data
     assert b"Unloaded" in route_page.data
-    assert b"Dock 12 min" in route_page.data
+    assert b"Wait 12 min" in route_page.data
 
 
 def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
@@ -759,6 +759,7 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
                 depart_load_size="KP Load",
                 arrive_time="08:00",
                 depart_time="09:00",
+                dock_wait_minutes=15,
                 created_at=datetime(2026, 5, 19, 8, 0),
             ),
             DriverLog(
@@ -792,6 +793,9 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
     assert b"Incident - Other" in page.data
     assert b"Damage - RE" in page.data
     assert b"Timing status pending" not in page.data
+    assert b"Wait Time" in page.data
+    assert b"Raleigh East: Wait 15 min" in page.data
+    assert b"Wait time:</strong> Wait 15 min" in page.data
     assert b"Movement segment" not in page.data
     assert_official_record_output(page.data)
     assert b"Plant Legend" in page.data
@@ -800,6 +804,10 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
     assert b"DC = Distribution Center" in page.data
     assert b"KP = Kraft Plant" in page.data
     assert b"PC = Paint Central" in page.data
+
+    attachment = client.get("/driver_logs_print/attachment")
+    assert attachment.status_code == 200
+    assert b"Wait 15 min" in attachment.data
 
 
 def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
@@ -2014,6 +2022,9 @@ def test_first_driver_log_is_start_location_not_pickup(client, app):
     next_page = client.get("/new_driving_log")
     assert b"Record Next Stop" in next_page.data
     assert b"Start Shift Location" not in next_page.data
+    assert b"Active Stop Wait" in next_page.data
+    assert b"data-active-wait-minutes" in next_page.data
+    assert b"Kraft Plant" in next_page.data
 
 
 def test_driver_cannot_create_next_log_until_open_stop_is_departed(client, app):
@@ -3753,23 +3764,27 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
 
         log = DriverLog.query.filter_by(plant_name="RE").one()
         log.depart_time = "17:45"
+        log.dock_wait_minutes = 12
         db.session.commit()
 
     print_response = client.get("/driver_logs_print")
     assert print_response.status_code == 200
     assert b"5:45pm" in print_response.data
+    assert b"Wait 12 min" in print_response.data
     assert b"17:45" not in print_response.data
     assert_official_record_output(print_response.data)
 
     eod_print = client.get("/end_of_day_print")
     assert eod_print.status_code == 200
     assert b"5:45pm" in eod_print.data
+    assert b"Wait 12 min" in eod_print.data
     assert b"17:45" not in eod_print.data
     assert_official_record_output(eod_print.data)
 
     eod_attachment = client.get("/end_of_day_print/attachment")
     assert eod_attachment.status_code == 200
     assert eod_attachment.headers["Content-Type"] == "application/pdf"
+    assert b"Wait 12 min" in eod_attachment.data
     assert_official_record_output(eod_attachment.data)
 
     eod_response = client.post("/submit_end_of_day", follow_redirects=False)
@@ -4411,6 +4426,9 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"Parts Queue" not in page.data
     assert b"RW to KP" in page.data
     assert b"Ryder Service" in page.data
+    assert b"Active Stop Wait" in page.data
+    assert b"Raleigh East" in page.data
+    assert b"data-active-wait-minutes" in page.data
     assert b"Save Ryder Status" in page.data
     assert b"CEL light" in page.data
     assert b"Need tow" in page.data
@@ -4423,6 +4441,7 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     history = client.get("/mobile/history")
     assert history.status_code == 200
     assert b"Reports" in history.data
+    assert b"Active Stop Wait" in history.data
     assert b"TRX" not in history.data
 
     day_report = client.get(f"/mobile/history/{past_date.isoformat()}")
@@ -4446,6 +4465,8 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     today_report = client.get(f"/mobile/history/{date.today().isoformat()}")
     assert today_report.status_code == 200
     assert b"Raleigh East" in today_report.data
+    assert b"Active Stop Wait" in today_report.data
+    assert b"Active wait" in today_report.data
     assert b"Edit" in today_report.data
     assert b"Pickup" not in today_report.data
     assert b"Depart / Load" in today_report.data

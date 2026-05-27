@@ -211,8 +211,71 @@
       pointer-events: auto;
       margin-top: .75rem !important;
     }
+    .driver-active-wait {
+      position: sticky;
+      top: 0;
+      z-index: 1030;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 16px;
+      background: #111827;
+      color: #f8fafc;
+      border-bottom: 2px solid #f59e0b;
+      box-shadow: 0 8px 24px rgba(15,23,42,.18);
+    }
+    .driver-active-wait-main {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+    .driver-active-wait-label {
+      color: #fbbf24;
+      font-size: .72rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .driver-active-wait-main strong {
+      font-size: .95rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .driver-active-wait-time {
+      min-width: 86px;
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+    }
+    .driver-active-wait-action {
+      color: #111827;
+      background: #fbbf24;
+      border: 1px solid #f59e0b;
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: .78rem;
+      font-weight: 900;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .driver-active-wait-action:hover {
+      color: #111827;
+      background: #fcd34d;
+    }
     .report-description {
       white-space: pre-wrap;
+    }
+    @media (max-width: 575.98px) {
+      .driver-active-wait {
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding: 9px 12px;
+      }
+      .driver-active-wait-action {
+        grid-column: 1 / -1;
+        text-align: center;
+      }
     }
     @media (min-width: 1200px) {
       #pageContent > .container.mt-4.fade-in {
@@ -337,6 +400,10 @@
         </div>
       </div>
     </nav>
+
+    {% if current_user.is_authenticated and current_user.role == "driver" %}
+      {% include "_driver_active_wait_banner.html" %}
+    {% endif %}
 
     {% if current_user.is_authenticated and current_user.role == "management" %}
       {% with messages = get_flashed_messages(with_categories=True) %}
@@ -487,6 +554,7 @@
     };
   </script>
   <script src="{{ url_for('static', filename='js/autosave-drafts.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/driver-active-wait.js') }}"></script>
   {% endif %}
 
   <!-- OneSignal, SweetAlert, etc. (if used) -->

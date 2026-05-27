@@ -29,6 +29,12 @@
     .mini-btn.success { background:rgba(16,185,129,.14); color:#a7f3d0; border-color:rgba(16,185,129,.26); }
     .mini-btn.danger { background:rgba(244,63,94,.14); color:#fecdd3; border-color:rgba(244,63,94,.28); }
     .section-title { margin:18px 4px 8px; font-size:1rem; }
+    .driver-active-wait { margin:12px 0 0; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 12px; align-items:center; padding:10px 12px; border:1px solid rgba(245,158,11,.34); border-radius:12px; background:rgba(245,158,11,.12); }
+    .driver-active-wait-main { min-width:0; display:grid; gap:2px; }
+    .driver-active-wait-label { color:#fde68a; font-size:.63rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; }
+    .driver-active-wait-main strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.88rem; }
+    .driver-active-wait-time { font-variant-numeric:tabular-nums; font-size:1rem; font-weight:950; color:#fef3c7; }
+    .driver-active-wait-action { grid-column:1 / -1; display:grid; place-items:center; min-height:34px; border-radius:10px; background:#fbbf24; color:#111827; font-size:.75rem; font-weight:950; text-transform:uppercase; }
     .side-nav { display:none; }
     .bottom-nav { position:fixed; left:50%; bottom:0; transform:translateX(-50%); width:min(480px,100vw); height:var(--nav-height); background:rgba(9,13,18,.96); backdrop-filter:blur(16px); border-top:1px solid var(--line); display:grid; grid-template-columns:repeat(4,1fr); gap:4px; padding:9px 12px max(10px, env(safe-area-inset-bottom)); z-index:20; }
     .nav-link { display:grid; place-items:center; gap:4px; color:#64748b; font-size:.67rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
@@ -44,6 +50,8 @@
       <a class="back" href="{{ url_for('driver.mobile_history') }}">Back Reports</a>
       <h1>{{ report_date.strftime('%b %d, %Y') }}</h1>
       <p class="sub">Daily report history for {{ current_user.display_name }}.</p>
+      {% set active_wait_show_action = false %}
+      {% include "_driver_active_wait_banner.html" %}
     </header>
 
     <h2 class="section-title">Plant Transfers</h2>
@@ -92,7 +100,7 @@
             <div>
               {% set route = report.route %}
               <p class="title">{{ route.plant if route else log.plant_name }}</p>
-              <p class="meta">Arrive {{ log.arrive_time|to_local_time if log.arrive_time else '--' }} - Depart {{ log.depart_time|to_12h_format if log.depart_time else '--' }} - In {{ route.arrive_cargo_desc if route else log.load_size }} - Out {% if route and route.depart_desc is none %}--{% elif route %}{{ route.depart_cargo_desc }}{% else %}{{ log.depart_load_size or '--' }}{% endif %}{% if route and route.next_stop %} - First stop {{ route.next_stop }}{% endif %}{% if log.no_pickup %} - No Pickup{% endif %}{% if log.part_number %} - {{ log.part_number }}{% endif %}</p>
+              <p class="meta">Arrive {{ log.arrive_time|to_local_time if log.arrive_time else '--' }} - Depart {{ log.depart_time|to_12h_format if log.depart_time else '--' }} - In {{ route.arrive_cargo_desc if route else log.load_size }} - Out {% if route and route.depart_desc is none %}--{% elif route %}{{ route.depart_cargo_desc }}{% else %}{{ log.depart_load_size or '--' }}{% endif %}{% if route and route.next_stop %} - First stop {{ route.next_stop }}{% endif %}{% if wait_label_for_log(log) %} - {{ wait_label_for_log(log) }}{% endif %}{% if log.no_pickup %} - No Pickup{% endif %}{% if log.part_number %} - {{ log.part_number }}{% endif %}</p>
               {% for event in (route_task_events or {}).get(log.id, []) %}
                 <p class="meta">{{ event.kind_label }} {{ event.label }} - {{ event.status }}{% if event.accepted_at %} - Accepted {{ event.accepted_at|to_detroit_datetime }}{% endif %}{% if event.completed_at %} - Unloaded {{ event.completed_at|to_detroit_datetime }}{% endif %}</p>
               {% endfor %}
@@ -137,5 +145,6 @@
     <a class="nav-link active" href="{{ url_for('driver.driver_logs') }}"><strong>DL</strong><span>Logs</span></a>
     <a class="nav-link" href="{{ url_for('driver.profile') }}"><strong>DR</strong><span>Driver</span></a>
   </nav>
+  <script src="{{ url_for('static', filename='js/driver-active-wait.js') }}"></script>
 </body>
 </html>

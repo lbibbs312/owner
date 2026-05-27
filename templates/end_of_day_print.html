@@ -186,6 +186,7 @@
           <th>Depart</th>
           <th>Cargo In</th>
           <th>Cargo Out</th>
+          <th>Wait</th>
           <th class="downtime-col">Parts</th>
           <th>Status</th>
         </tr>
@@ -202,6 +203,7 @@
             {% if route and route.depart_desc is none %}--{% elif route %}{{ route.depart_cargo_desc }}{% else %}{{ log.depart_load_size or '--' }}{% endif %}
             {% if route and route.next_stop %}<br><small>First stop after departure: {{ route.next_stop }}</small>{% endif %}
           </td>
+          <td>{{ wait_label_for_log(log) or '--' }}</td>
           <td>{% if log.no_pickup %}No Pickup {% endif %}{% if log.hot_parts %}HOT {% endif %}{{ log.part_number or "" }}</td>
           <td>{% if route %}{{ route.action }}{% else %}{{ 'Open' if not log.depart_time else 'Complete' }}{% endif %}</td>
         </tr>

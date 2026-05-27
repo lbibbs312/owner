@@ -58,6 +58,8 @@
                 {% else %}
                   --
                 {% endif %}
+                &nbsp;|&nbsp;
+                Wait: {{ wait_label_for_log(log) or '--' }}
                 <br>
                 Maintenance: {{ "Yes" if log.maintenance else "No" }}, 
                 Fuel: {{ "Yes" if log.fuel else "No" }}, 
