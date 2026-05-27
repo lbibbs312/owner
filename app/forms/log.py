@@ -112,6 +112,18 @@ class DriverLogForm(FlaskForm):
 
 class DepartForm(FlaskForm):
     """Close a stop by recording whether a destination load was picked up."""
+    unloaded_on_departure = SelectField(
+        "Did you get unloaded?",
+        choices=YES_NO_CHOICES,
+        validators=[Optional()],
+    )
+    unload_reason = TextAreaField("Why was it not unloaded?", validators=[Optional()])
+    secondary_dropped_on_departure = SelectField(
+        "Did you drop off the second-stop cargo?",
+        choices=YES_NO_CHOICES,
+        validators=[Optional()],
+    )
+    secondary_unload_reason = TextAreaField("Why was the second-stop cargo not dropped?", validators=[Optional()])
     got_loaded = SelectField(
         "Did you get loaded?",
         choices=YES_NO_CHOICES,

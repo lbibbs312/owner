@@ -25,10 +25,42 @@
   <form method="POST" action="" id="departForm" data-autosave="true" data-autosave-key="driver-log-depart-{{ log.id }}">
     {{ form.hidden_tag() }}
 
+    <div class="alert alert-info border fw-semibold" data-wait-timer data-wait-minutes="{{ auto_wait_minutes if auto_wait_minutes is not none else 0 }}">
+      Wait clock started at arrival: {{ log.arrive_time|to_local_time if log.arrive_time else '--' }}.
+      Current wait: <span data-wait-label>{{ auto_wait_minutes if auto_wait_minutes is not none else 0 }} min</span>.
+      It will be saved automatically when this stop is closed.
+    </div>
+
+    {% if route and route.arrived_at_primary_destination %}
+    <div class="border rounded p-3 mb-3">
+      <div class="mb-3">
+        {{ form.unloaded_on_departure.label(class="form-label") }}
+        {{ form.unloaded_on_departure(class="form-select", id="unloadedOnDeparture") }}
+      </div>
+      <div id="unloadReasonPanel" class="mb-0 d-none">
+        {{ form.unload_reason.label(class="form-label") }}
+        {{ form.unload_reason(class="form-control", rows="3") }}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if route and route.arrived_at_secondary_destination %}
+    <div class="border rounded p-3 mb-3">
+      <div class="mb-3">
+        {{ form.secondary_dropped_on_departure.label(class="form-label") }}
+        {{ form.secondary_dropped_on_departure(class="form-select", id="secondaryDroppedOnDeparture") }}
+      </div>
+      <div id="secondaryReasonPanel" class="mb-0 d-none">
+        {{ form.secondary_unload_reason.label(class="form-label") }}
+        {{ form.secondary_unload_reason(class="form-control", rows="3") }}
+      </div>
+    </div>
+    {% endif %}
+
     <div class="mb-3">
       {{ form.got_loaded.label(class="form-label") }}
       {{ form.got_loaded(class="form-select", id="gotLoaded") }}
-      {% if route and route.after_arrival_primary != 'Empty' %}
+      {% if route and route.after_arrival_primary != 'Empty' and not route.arrived_at_primary_destination %}
         <div class="form-text">Choosing No keeps {{ route.after_arrival_primary }} in the truck.</div>
       {% endif %}
     </div>
@@ -47,12 +79,6 @@
     <div class="mb-3 d-none" id="secondaryLoadTypePanel">
       {{ form.secondary_load_type.label(class="form-label") }}
       {{ form.secondary_load_type(class="form-select") }}
-    </div>
-
-    <div class="mb-3">
-      {{ form.dock_wait_minutes.label(class="form-label") }}
-      {{ form.dock_wait_minutes(class="form-control", min="0", placeholder="Minutes waiting/loading at dock") }}
-      <div class="form-text">Enter minutes only when this stop actually held you up.</div>
     </div>
 
     {% set photo_source_prefix = 'departure' %}
@@ -101,13 +127,36 @@
   const destinationPanel = document.getElementById('destinationPanel');
   const secondaryDestination = document.getElementById('secondaryDestination');
   const secondaryLoadTypePanel = document.getElementById('secondaryLoadTypePanel');
+  const unloadedOnDeparture = document.getElementById('unloadedOnDeparture');
+  const unloadReasonPanel = document.getElementById('unloadReasonPanel');
+  const secondaryDroppedOnDeparture = document.getElementById('secondaryDroppedOnDeparture');
+  const secondaryReasonPanel = document.getElementById('secondaryReasonPanel');
+  const waitTimer = document.querySelector('[data-wait-timer]');
+  const waitLabel = document.querySelector('[data-wait-label]');
   function syncDestination() {
     destinationPanel.classList.toggle('d-none', gotLoaded.value !== 'yes');
     secondaryLoadTypePanel.classList.toggle('d-none', !secondaryDestination.value);
+    if (unloadReasonPanel && unloadedOnDeparture) {
+      unloadReasonPanel.classList.toggle('d-none', unloadedOnDeparture.value !== 'no');
+    }
+    if (secondaryReasonPanel && secondaryDroppedOnDeparture) {
+      secondaryReasonPanel.classList.toggle('d-none', secondaryDroppedOnDeparture.value !== 'no');
+    }
   }
   gotLoaded.addEventListener('change', syncDestination);
   secondaryDestination.addEventListener('change', syncDestination);
+  if (unloadedOnDeparture) unloadedOnDeparture.addEventListener('change', syncDestination);
+  if (secondaryDroppedOnDeparture) secondaryDroppedOnDeparture.addEventListener('change', syncDestination);
   syncDestination();
+
+  if (waitTimer && waitLabel) {
+    const startedAt = Date.now();
+    const initialMinutes = parseInt(waitTimer.dataset.waitMinutes || '0', 10) || 0;
+    setInterval(function () {
+      const elapsed = Math.floor((Date.now() - startedAt) / 60000);
+      waitLabel.textContent = (initialMinutes + elapsed) + ' min';
+    }, 30000);
+  }
 
 
   const scanEndpoint = {{ url_for('driver.record_part_scan', log_id=log.id)|tojson }};

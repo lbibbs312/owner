@@ -310,12 +310,6 @@ def current_load_after_logs(logs):
             current_primary_destination = None
 
         plant = _plant_code(log.plant_name)
-        if current_primary_destination and current_primary_destination == plant and not unload_not_completed(log):
-            current_primary_destination = None
-        if current_secondary_destination and current_secondary_destination == plant and not secondary_not_dropped(log):
-            current_secondary_destination = None
-            current_secondary_value = ""
-
         if not log.depart_time:
             open_secondary_raw = getattr(log, "secondary_load", None)
             open_secondary_destination = destination_from_load(open_secondary_raw)
@@ -323,6 +317,12 @@ def current_load_after_logs(logs):
                 current_secondary_destination = open_secondary_destination
                 current_secondary_value = load_display(open_secondary_raw)
             continue
+
+        if current_primary_destination and current_primary_destination == plant and not unload_not_completed(log):
+            current_primary_destination = None
+        if current_secondary_destination and current_secondary_destination == plant and not secondary_not_dropped(log):
+            current_secondary_destination = None
+            current_secondary_value = ""
 
         if log.depart_load_size is not None:
             depart_destination = destination_from_load(log.depart_load_size)
@@ -371,10 +371,10 @@ def build_driver_log_route_context(logs):
             arrive_secondary = current_secondary_value
             arrived_at_primary_destination = bool(current_primary_destination and current_primary_destination == plant)
             arrived_at_secondary_destination = bool(current_secondary_destination and current_secondary_destination == plant)
-            primary_unload_blocked = arrived_at_primary_destination and unload_not_completed(log)
-            secondary_drop_blocked = arrived_at_secondary_destination and secondary_not_dropped(log)
-            unloaded_on_arrival = arrived_at_primary_destination and not primary_unload_blocked
-            secondary_dropped_on_arrival = arrived_at_secondary_destination and not secondary_drop_blocked
+            primary_unload_blocked = arrived_at_primary_destination and completed and unload_not_completed(log)
+            secondary_drop_blocked = arrived_at_secondary_destination and completed and secondary_not_dropped(log)
+            unloaded_on_arrival = arrived_at_primary_destination and completed and not primary_unload_blocked
+            secondary_dropped_on_arrival = arrived_at_secondary_destination and completed and not secondary_drop_blocked
 
             after_primary_destination = None if unloaded_on_arrival else current_primary_destination
             after_secondary_destination = None if secondary_dropped_on_arrival else current_secondary_destination
@@ -479,9 +479,11 @@ def build_driver_log_route_context(logs):
                 "state": "No pickup" if log.no_pickup else ("Completed" if completed else "Open"),
                 "class": "complete" if completed else "open",
                 "unloaded_on_arrival": unloaded_on_arrival,
+                "arrived_at_primary_destination": arrived_at_primary_destination,
                 "unload_blocked": primary_unload_blocked,
                 "unload_reason": unload_not_completed_reason(log),
                 "secondary_dropped_on_arrival": secondary_dropped_on_arrival,
+                "arrived_at_secondary_destination": arrived_at_secondary_destination,
                 "secondary_drop_blocked": secondary_drop_blocked,
                 "secondary_drop_reason": secondary_not_dropped_reason(log),
                 "after_arrival_primary": after_primary,

@@ -611,7 +611,7 @@ def test_driver_mobile_shows_full_parts_queue_and_route_task_events(client, app)
 
 
 def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
-    from datetime import date, datetime
+    from datetime import date, datetime, timedelta
 
     with app.app_context():
         from app.extensions import db
@@ -632,7 +632,7 @@ def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
             date=date.today(),
             plant_name="KP",
             load_size="Empty",
-            arrive_time=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            arrive_time=(datetime.utcnow() - timedelta(minutes=17)).strftime("%Y-%m-%d %H:%M:%S"),
         )
         db.session.add(log)
         db.session.commit()
@@ -641,7 +641,7 @@ def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
     login(client, "driver1")
     departed = client.post(
         f"/driver_logs/{log_id}/depart",
-        data={"got_loaded": "no", "destination": "", "dock_wait_minutes": "17"},
+        data={"got_loaded": "no", "destination": ""},
         follow_redirects=False,
     )
     assert departed.status_code == 302
@@ -650,7 +650,7 @@ def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
         from app.models import DriverLog
 
         saved = DriverLog.query.get(log_id)
-        assert saved.dock_wait_minutes == 17
+        assert saved.dock_wait_minutes >= 17
         assert saved.depart_load_size == "Empty"
 
     client.get("/logout")
@@ -663,7 +663,7 @@ def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
     assert b"Trim Division" not in dashboard.data
     assert b"Plastics Division" not in dashboard.data
     assert b"Delay" in dashboard.data
-    assert b"17 min" in dashboard.data
+    assert b"17 min" in dashboard.data or b"18 min" in dashboard.data
     assert b"focus=delays" not in dashboard.data
     assert b"focus-panel" in dashboard.data
 
@@ -3139,7 +3139,7 @@ def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_rev
 
     departed = client.post(
         f"/driver_logs/{log_id}/depart",
-        data={"got_loaded": "no", "destination": "", "secondary_destination": ""},
+        data={"unloaded_on_departure": "yes", "got_loaded": "no", "destination": "", "secondary_destination": ""},
         follow_redirects=False,
     )
     assert departed.status_code == 302
@@ -3402,10 +3402,11 @@ def test_driver_log_departure_names_load_by_destination_and_arrival_unloads(clie
     arrival_page = client.get("/new_driving_log")
     assert b"In truck now" in arrival_page.data
     assert b"Helios Load" in arrival_page.data
+    assert b"Did you get unloaded?" not in arrival_page.data
 
     arrived_helios = client.post(
         "/new_driving_log",
-        data={"plant_name": "Helios", "load_size": "Helios Load", "unloaded_on_arrival": "yes"},
+        data={"plant_name": "Helios", "load_size": "Helios Load"},
         follow_redirects=False,
     )
     assert arrived_helios.status_code == 302
@@ -3414,7 +3415,26 @@ def test_driver_log_departure_names_load_by_destination_and_arrival_unloads(clie
         from app.models import DriverLog
 
         helios_log = DriverLog.query.filter_by(plant_name="Helios").one()
+        helios_id = helios_log.id
         assert helios_log.load_size == "Helios Load"
+        assert helios_log.downtime_reason is None
+
+    helios_depart_page = client.get(f"/driver_logs/{helios_id}/depart")
+    assert b"Did you get unloaded?" in helios_depart_page.data
+    assert b"Current wait:" in helios_depart_page.data
+
+    assert client.post(
+        f"/driver_logs/{helios_id}/depart",
+        data={"unloaded_on_departure": "yes", "got_loaded": "no", "destination": ""},
+        follow_redirects=False,
+    ).status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        helios_log = DriverLog.query.get(helios_id)
+        assert helios_log.depart_load_size == "Empty"
+        assert helios_log.dock_wait_minutes is not None
         assert helios_log.downtime_reason is None
 
     print_page = client.get("/driver_logs_print")
@@ -3470,8 +3490,20 @@ def test_mixed_cargo_deviation_preserves_primary_and_drops_hot_part(client, app)
             "plant_name": "Helios",
             "load_size": "Trim DC Load",
             "secondary_load": "Helios Hot Part",
-            "secondary_dropped_on_arrival": "yes",
         },
+        follow_redirects=False,
+    ).status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        helios_id = DriverLog.query.filter_by(plant_name="Helios").one().id
+
+    helios_depart_page = client.get(f"/driver_logs/{helios_id}/depart")
+    assert b"Did you drop off the second-stop cargo?" in helios_depart_page.data
+    assert client.post(
+        f"/driver_logs/{helios_id}/depart",
+        data={"secondary_dropped_on_departure": "yes", "got_loaded": "no", "destination": ""},
         follow_redirects=False,
     ).status_code == 302
 
@@ -3536,8 +3568,18 @@ def test_depart_second_stop_can_be_regular_load_and_finalized_route_shows_first_
             "plant_name": "Helios",
             "load_size": "Trim DC Load",
             "secondary_load": "Helios Load",
-            "secondary_dropped_on_arrival": "yes",
         },
+        follow_redirects=False,
+    ).status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        helios_id = DriverLog.query.filter_by(plant_name="Helios").one().id
+
+    assert client.post(
+        f"/driver_logs/{helios_id}/depart",
+        data={"secondary_dropped_on_departure": "yes", "got_loaded": "no", "destination": ""},
         follow_redirects=False,
     ).status_code == 302
 

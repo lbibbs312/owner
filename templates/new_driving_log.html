@@ -50,7 +50,7 @@
   </div>
   {% endif %}
 
-  <form method="POST" action="" id="arrivalForm" data-autosave="true" data-autosave-key="driver-log-arrival" data-load-destination="{{ active_destination or '' }}" data-secondary-destination="{{ active_secondary_destination or '' }}">
+  <form method="POST" action="" id="arrivalForm" data-autosave="true" data-autosave-key="driver-log-arrival">
     {{ form.hidden_tag() }}
     <input type="hidden" name="load_size" value="{{ active_load }}" data-no-autosave="true">
     <input type="hidden" name="secondary_load" value="{{ active_secondary }}" data-no-autosave="true">
@@ -58,28 +58,6 @@
     <div class="mb-3">
       <label class="form-label" for="arrivalPlant">{{ 'Start location' if not has_today_logs else form.plant_name.label.text }}</label>
       {{ form.plant_name(class="form-select", id="arrivalPlant") }}
-    </div>
-
-    <div id="unloadPanel" class="border rounded p-3 mb-3 d-none">
-      <div class="mb-3">
-        {{ form.unloaded_on_arrival.label(class="form-label") }}
-        {{ form.unloaded_on_arrival(class="form-select", id="unloadedOnArrival") }}
-      </div>
-      <div id="unloadReasonPanel" class="mb-0 d-none">
-        {{ form.unload_reason.label(class="form-label") }}
-        {{ form.unload_reason(class="form-control", rows="3") }}
-      </div>
-    </div>
-
-    <div id="secondaryUnloadPanel" class="border rounded p-3 mb-3 d-none">
-      <div class="mb-3">
-        {{ form.secondary_dropped_on_arrival.label(class="form-label") }}
-        {{ form.secondary_dropped_on_arrival(class="form-select", id="secondaryDroppedOnArrival") }}
-      </div>
-      <div id="secondaryReasonPanel" class="mb-0 d-none">
-        {{ form.secondary_unload_reason.label(class="form-label") }}
-        {{ form.secondary_unload_reason(class="form-control", rows="3") }}
-      </div>
     </div>
 
     <div class="mb-3 form-check">
@@ -111,38 +89,6 @@
 <script src="{{ url_for('static', filename='js/driver-log-conditionals.js') }}"></script>
 <script>
 (function () {
-  const form = document.getElementById('arrivalForm');
-  const plant = document.getElementById('arrivalPlant');
-  const unloadPanel = document.getElementById('unloadPanel');
-  const unloaded = document.getElementById('unloadedOnArrival');
-  const reasonPanel = document.getElementById('unloadReasonPanel');
-  const secondaryUnloadPanel = document.getElementById('secondaryUnloadPanel');
-  const secondaryDropped = document.getElementById('secondaryDroppedOnArrival');
-  const secondaryReasonPanel = document.getElementById('secondaryReasonPanel');
-  const destination = form.dataset.loadDestination;
-  const secondaryDestination = form.dataset.secondaryDestination;
-
-  function syncUnloadPanel() {
-    const isDestination = destination && plant.value === destination;
-    unloadPanel.classList.toggle('d-none', !isDestination);
-    if (!isDestination) {
-      unloaded.value = '';
-      reasonPanel.classList.add('d-none');
-    }
-
-    const isSecondaryDestination = secondaryDestination && plant.value === secondaryDestination;
-    secondaryUnloadPanel.classList.toggle('d-none', !isSecondaryDestination);
-    if (!isSecondaryDestination) {
-      secondaryDropped.value = '';
-      secondaryReasonPanel.classList.add('d-none');
-    }
-  }
-
-  function syncReasonPanel() {
-    reasonPanel.classList.toggle('d-none', unloaded.value !== 'no');
-    secondaryReasonPanel.classList.toggle('d-none', secondaryDropped.value !== 'no');
-  }
-
   const fuelCheck = document.getElementById('fuelCheck');
   const maintenanceCheck = document.getElementById('maintenanceCheck');
   const fuelMileagePanel = document.getElementById('fuelMileagePanel');
@@ -153,12 +99,6 @@
   if (fuelCheck) fuelCheck.addEventListener('change', syncFuelMileage);
   if (maintenanceCheck) maintenanceCheck.addEventListener('change', syncFuelMileage);
   syncFuelMileage();
-
-  plant.addEventListener('change', syncUnloadPanel);
-  unloaded.addEventListener('change', syncReasonPanel);
-  secondaryDropped.addEventListener('change', syncReasonPanel);
-  syncUnloadPanel();
-  syncReasonPanel();
 })();
 
 {% if pending_ryder_event %}

@@ -978,6 +978,28 @@ def _preserved_non_truck_reasons(log):
     prefixes = (UNLOAD_NOT_COMPLETED_PREFIX,) + SECONDARY_NOT_DROPPED_PREFIXES
     return [part for part in _reason_parts_from_text(log.downtime_reason) if part.startswith(prefixes)]
 
+
+def _preserved_non_unload_reasons(log):
+    prefixes = (UNLOAD_NOT_COMPLETED_PREFIX,) + SECONDARY_NOT_DROPPED_PREFIXES
+    return [part for part in _reason_parts_from_text(log.downtime_reason) if not part.startswith(prefixes)]
+
+
+def _set_departure_unload_reasons(log, primary_reason=None, secondary_reason=None):
+    reason_parts = _preserved_non_unload_reasons(log)
+    if primary_reason:
+        reason_parts.append(f"{UNLOAD_NOT_COMPLETED_PREFIX} {primary_reason}")
+    if secondary_reason:
+        reason_parts.append(f"{SECONDARY_NOT_DROPPED_PREFIX} {secondary_reason}")
+    log.downtime_reason = "; ".join(reason_parts) or None
+
+
+def _auto_wait_minutes_for_departure(log, now_local):
+    arrival = _arrival_local_dt_for_log(log)
+    if not arrival:
+        return None
+    return max(0, int((now_local - arrival).total_seconds() // 60))
+
+
 def _save_damage_photo(report, uploaded_file):
     if not uploaded_file or not uploaded_file.filename:
         return None
@@ -2600,33 +2622,6 @@ def new_driving_log():
 
         arrival_load = current_load_value or "Empty"
         arrival_secondary_load = current_secondary_value or None
-        reason_parts = []
-
-        if is_load_for_plant(arrival_load, form.plant_name.data):
-            unloaded = form.unloaded_on_arrival.data
-            if unloaded not in {"yes", "no"}:
-                flash("Please answer whether you unloaded the destination load.", "danger")
-                return _render_new_driving_log(form, current_load)
-            if unloaded == "no":
-                reason = (form.unload_reason.data or "").strip()
-                if not reason:
-                    flash("Please enter why the load was not unloaded.", "danger")
-                    return _render_new_driving_log(form, current_load)
-                reason_parts.append(f"{UNLOAD_NOT_COMPLETED_PREFIX} {reason}")
-
-        if arrival_secondary_load and is_load_for_plant(arrival_secondary_load, form.plant_name.data):
-            dropped = form.secondary_dropped_on_arrival.data
-            if dropped not in {"yes", "no"}:
-                flash("Please answer whether you dropped off the second-stop cargo.", "danger")
-                return _render_new_driving_log(form, current_load)
-            if dropped == "yes":
-                arrival_secondary_load = None
-            else:
-                reason = (form.secondary_unload_reason.data or "").strip()
-                if not reason:
-                    flash("Please enter why the second-stop cargo was not dropped off.", "danger")
-                    return _render_new_driving_log(form, current_load)
-                reason_parts.append(f"{SECONDARY_NOT_DROPPED_PREFIX} {reason}")
 
         now_utc = datetime.utcnow()
         arrive_time_str = now_utc.strftime("%Y-%m-%d %H:%M:%S")
@@ -2636,10 +2631,9 @@ def new_driving_log():
             plant_name=form.plant_name.data,
             load_size=arrival_load,
             secondary_load=arrival_secondary_load,
-            downtime_reason=_compose_downtime_reason(reason_parts, _form_truck_issue_text(form), form.maintenance.data),
+            downtime_reason=_compose_downtime_reason([], _form_truck_issue_text(form), form.maintenance.data),
             part_number=_form_hot_part_number(form),
             hot_parts=bool(form.hot_parts.data),
-            dock_wait_minutes=form.dock_wait_minutes.data,
             arrive_time=arrive_time_str,
             maintenance=form.maintenance.data,
             fuel=form.fuel.data,
@@ -3098,6 +3092,10 @@ def depart_driver_log(log_id):
     route = _driver_log_context_for(log)
 
     def render_depart_page():
+        auto_wait_minutes = _auto_wait_minutes_for_departure(
+            log,
+            datetime.now(pytz.timezone("America/Detroit")),
+        )
         part_scan_events = (
             PartScanEvent.query
             .filter_by(stop_id=log.id)
@@ -3109,22 +3107,55 @@ def depart_driver_log(log_id):
             form=form,
             log=log,
             route=route,
+            auto_wait_minutes=auto_wait_minutes,
             part_scan_events=part_scan_events,
         )
 
     if form.validate_on_submit():
+        primary_unloaded = None
+        primary_unload_reason = None
+        if route.get("arrived_at_primary_destination"):
+            primary_unloaded = form.unloaded_on_departure.data
+            if primary_unloaded not in {"yes", "no"}:
+                flash("Please answer whether you got unloaded.", "danger")
+                return render_depart_page()
+            if primary_unloaded == "no":
+                primary_unload_reason = (form.unload_reason.data or "").strip()
+                if not primary_unload_reason:
+                    flash("Please enter why the load was not unloaded.", "danger")
+                    return render_depart_page()
+
+        secondary_dropped = None
+        secondary_drop_reason = None
+        if route.get("arrived_at_secondary_destination"):
+            secondary_dropped = form.secondary_dropped_on_departure.data
+            if secondary_dropped not in {"yes", "no"}:
+                flash("Please answer whether you dropped off the second-stop cargo.", "danger")
+                return render_depart_page()
+            if secondary_dropped == "no":
+                secondary_drop_reason = (form.secondary_unload_reason.data or "").strip()
+                if not secondary_drop_reason:
+                    flash("Please enter why the second-stop cargo was not dropped off.", "danger")
+                    return render_depart_page()
+
+        after_unload_primary = route.get("after_arrival_primary") or "Empty"
+        if primary_unloaded == "yes":
+            after_unload_primary = "Empty"
+
         if form.got_loaded.data == "yes":
             if not form.destination.data:
                 flash("Please select where the primary load is going.", "danger")
                 return render_depart_page()
             departure_load = destination_load_value(form.destination.data)
         elif form.got_loaded.data == "no":
-            departure_load = route.get("after_arrival_primary") or "Empty"
+            departure_load = after_unload_primary
         else:
             flash("Please answer whether you got loaded.", "danger")
             return render_depart_page()
 
         secondary_load = route.get("after_arrival_secondary") or None
+        if secondary_dropped == "yes":
+            secondary_load = None
         if form.secondary_destination.data:
             secondary_load = secondary_load_value(form.secondary_destination.data, form.secondary_load_type.data)
 
@@ -3168,10 +3199,10 @@ def depart_driver_log(log_id):
             flash(timing_errors[0], "danger")
             return render_depart_page()
         log.depart_time = depart_time
-        if form.dock_wait_minutes.data is not None:
-            log.dock_wait_minutes = form.dock_wait_minutes.data
+        log.dock_wait_minutes = _auto_wait_minutes_for_departure(log, now_local)
         log.depart_load_size = departure_load
         log.secondary_load = secondary_load or None
+        _set_departure_unload_reasons(log, primary_unload_reason, secondary_drop_reason)
         log.no_pickup = departure_load == "Empty" and not log.secondary_load
         _sync_next_open_stop_arrival_cargo(log)
         db.session.commit()
@@ -3215,6 +3246,7 @@ def no_pickup_driver_log(log_id):
     log.no_pickup = True
     log.depart_load_size = "Empty"
     log.depart_time = depart_time
+    log.dock_wait_minutes = _auto_wait_minutes_for_departure(log, now_local)
     _sync_next_open_stop_arrival_cargo(log)
     db.session.commit()
     record_activity(
@@ -3260,7 +3292,7 @@ def pickup_driver_log(log_id):
         log.depart_load_size = destination_load_value(form.plant_name.data)
         log.hot_parts = bool(form.hot_parts.data)
         log.part_number = _form_hot_part_number(form) or (log.part_number if log.hot_parts else None)
-        log.dock_wait_minutes = form.dock_wait_minutes.data or log.dock_wait_minutes
+        log.dock_wait_minutes = _auto_wait_minutes_for_departure(log, now_local)
         log.maintenance = form.maintenance.data
         log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), _form_truck_issue_text(form), form.maintenance.data)
         log.fuel = form.fuel.data
