@@ -2,6 +2,7 @@ from datetime import datetime
 
 from flask import flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user
+from sqlalchemy import or_
 
 from app.blueprints.manager import bp
 from app.extensions import db
@@ -191,11 +192,26 @@ def _request_or_404(request_id):
 @bp.route("/move-requests")
 def move_requests():
     selected_status = request.args.get("status", "active")
+    location_filter = (request.args.get("location") or request.args.get("plant") or "").strip()
+    origin_filter = (request.args.get("origin") or "").strip()
+    destination_filter = (request.args.get("destination") or "").strip()
     query = MoveRequest.query
     if selected_status == "active":
         query = query.filter(MoveRequest.status.notin_(["completed", "cancelled"]))
     elif selected_status != "all":
         query = query.filter_by(status=selected_status)
+    if location_filter:
+        like = f"%{location_filter}%"
+        query = query.filter(
+            or_(
+                MoveRequest.origin_location_text.ilike(like),
+                MoveRequest.destination_location_text.ilike(like),
+            )
+        )
+    if origin_filter:
+        query = query.filter(MoveRequest.origin_location_text.ilike(f"%{origin_filter}%"))
+    if destination_filter:
+        query = query.filter(MoveRequest.destination_location_text.ilike(f"%{destination_filter}%"))
     requests = query.order_by(MoveRequest.requested_at.desc(), MoveRequest.id.desc()).all()
     drivers, _ = _driver_choices()
     return render_template(
@@ -205,6 +221,9 @@ def move_requests():
         acknowledgements=_latest_move_request_events(requests, "acknowledged"),
         plant_transfer_choices=_plant_transfer_choices(),
         selected_status=selected_status,
+        location_filter=location_filter,
+        origin_filter=origin_filter,
+        destination_filter=destination_filter,
     )
 
 

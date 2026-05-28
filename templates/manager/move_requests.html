@@ -50,6 +50,14 @@
   {% endfor %}
 </div>
 
+{% if location_filter or origin_filter or destination_filter %}
+  <div class="queue-filter" aria-label="Active location filters">
+    {% if location_filter %}<a class="active" href="{{ url_for('manager.move_requests', status=selected_status) }}">Location: {{ location_filter }} ×</a>{% endif %}
+    {% if origin_filter %}<a class="active" href="{{ url_for('manager.move_requests', status=selected_status) }}">Origin: {{ origin_filter }} ×</a>{% endif %}
+    {% if destination_filter %}<a class="active" href="{{ url_for('manager.move_requests', status=selected_status) }}">Destination: {{ destination_filter }} ×</a>{% endif %}
+  </div>
+{% endif %}
+
 <div class="queue-table table-responsive">
   <table class="table table-hover align-middle">
     <thead>

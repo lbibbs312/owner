@@ -64,6 +64,7 @@ from app.services.parts import record_part_scan as save_part_scan, scan_event_pa
 from app.services.next_load_prediction import build_next_load_prediction
 from app.services.route_context import build_route_context
 from app.services.floor_operations import build_floor_operations_snapshot, assigned_move_queue, route_next_action
+from app.services.route_map import build_driver_route_map_context
 from app.services.plant_time import forecast_for_stop, plant_time_forecast, route_stop_forecasts
 from app.services.report_summary import damage_report_count_label, damage_report_detail_label
 from app.services.hot_parts import (
@@ -4044,10 +4045,16 @@ def mobile_dashboard():
         has_high_issue=open_damage_count > 0,
         missing_document=departed_today and not has_transfer_today,
     )
+    route_map = build_driver_route_map_context(
+        driver=current_user,
+        date=route_date,
+        selected_stop_id=current_stop.id if current_stop else None,
+    )
 
     return render_template(
         "driver_mobile.html",
         floor=floor,
+        route_map=route_map,
         assigned_requests=assigned_requests,
         driver_next_action=driver_next_action,
         active_task=active_task,

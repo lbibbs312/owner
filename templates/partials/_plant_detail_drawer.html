@@ -1,0 +1,41 @@
+{% if route_map %}
+  {% for plant in route_map.plants %}
+    <div class="route-map-detail-source" hidden data-route-map-detail="plant-{{ plant.plant_key }}">
+      <div class="drawer-kicker">Plant / location · {{ plant.short_code or 'No current data' }}</div>
+      <h3>{{ plant.label or 'No current data' }}</h3>
+      <div class="drawer-badges">
+        <span class="route-status-badge status-{{ plant.worst_status }}">{{ plant.worst_status|replace('_', ' ')|title }}</span>
+      </div>
+      <dl class="drawer-facts">
+        <div><dt>Today route stops</dt><dd>{{ plant.related_stop_ids|length }}</dd></div>
+        <div><dt>Active stops</dt><dd>{{ plant.active_stop_count }}</dd></div>
+        <div><dt>Open move requests</dt><dd>{{ plant.open_request_count }}</dd></div>
+        <div><dt>Waiting / backlog</dt><dd>{{ plant.waiting_count }}</dd></div>
+        <div><dt>Blocked / review</dt><dd>{{ plant.blocked_count }}</dd></div>
+        <div><dt>Completed today</dt><dd>{{ plant.completed_today_count }}</dd></div>
+        <div><dt>Related issues</dt><dd>{% if plant.blocked_count %}{{ plant.blocked_count }} need attention{% else %}No open issues{% endif %}</dd></div>
+        <div><dt>Timing metrics</dt><dd>{% if plant.waiting_count %}Waiting tracked from open stops{% else %}Not tracked yet{% endif %}</dd></div>
+      </dl>
+      {% if not plant.related_stop_ids and not plant.related_move_request_ids and not plant.related_plant_transfer_ids %}
+        <p class="drawer-note">No current data.</p>
+      {% endif %}
+      <div class="drawer-actions">
+        {% if plant.move_queue_url %}
+          <a href="{{ plant.move_queue_url }}">View related Move Queue</a>
+        {% else %}
+          <button type="button" disabled>View related Move Queue <span>Not wired yet.</span></button>
+        {% endif %}
+        {% if plant.active_moves_url %}
+          <a href="{{ plant.active_moves_url }}">View related Active Moves</a>
+        {% else %}
+          <button type="button" disabled>View related Active Moves <span>Not wired yet.</span></button>
+        {% endif %}
+        {% if plant.timing_url %}
+          <a href="{{ plant.timing_url }}">View plant timing history</a>
+        {% else %}
+          <button type="button" disabled>View plant timing history <span>Not wired yet.</span></button>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+{% endif %}
