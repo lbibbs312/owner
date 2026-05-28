@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .queue-header { display:flex; justify-content:space-between; gap:1rem; align-items:flex-start; flex-wrap:wrap; margin-bottom:1rem; }
+  .queue-header h1 { margin:0; font-size:1.65rem; font-weight:900; color:#0f172a; }
+  .queue-header p { margin:.25rem 0 0; color:#64748b; }
+  .queue-actions { display:flex; gap:.5rem; flex-wrap:wrap; }
+  .queue-filter { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
+  .queue-filter a { border:1px solid #cbd5e1; border-radius:999px; padding:.45rem .8rem; text-decoration:none; color:#334155; font-weight:800; font-size:.85rem; background:#fff; }
+  .queue-filter a.active { background:#0f172a; color:#fff; border-color:#0f172a; }
+  .queue-table { background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; }
+  .queue-table table { margin:0; min-width:1420px; }
+  .queue-table th { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:#64748b; background:#f8fafc; white-space:nowrap; }
+  .queue-table td { vertical-align:top; font-size:.86rem; }
+  .request-summary { max-width:260px; white-space:normal; color:#334155; }
+  .muted-small { color:#64748b; font-size:.78rem; }
+  .pill { display:inline-flex; align-items:center; border-radius:999px; padding:.25rem .55rem; font-size:.72rem; font-weight:900; border:1px solid transparent; white-space:nowrap; }
+  .pill.priority-hot, .pill.priority-safety, .pill.status-blocked, .pill.status-cancelled { background:#ffe4e6; color:#be123c; border-color:#fecdd3; }
+  .pill.priority-high { background:#fef3c7; color:#92400e; border-color:#fde68a; }
+  .pill.priority-low { background:#e0f2fe; color:#075985; border-color:#bae6fd; }
+  .pill.priority-normal { background:#e2e8f0; color:#334155; border-color:#cbd5e1; }
+  .pill.status-open { background:#dbeafe; color:#1d4ed8; border-color:#bfdbfe; }
+  .pill.status-assigned, .pill.status-in_progress { background:#e0e7ff; color:#3730a3; border-color:#c7d2fe; }
+  .pill.status-completed { background:#dcfce7; color:#047857; border-color:#bbf7d0; }
+  .row-actions { display:grid; gap:.5rem; min-width:270px; }
+  .assign-row { display:grid; grid-template-columns:1fr; gap:.35rem; }
+  .assign-row .form-select, .assign-row .form-control { font-size:.78rem; min-height:34px; }
+  .button-row { display:flex; gap:.35rem; flex-wrap:wrap; }
+  .button-row .btn { font-size:.76rem; font-weight:800; }
+  @media (max-width:900px) {
+    .queue-header { display:block; }
+    .queue-actions { margin-top:.75rem; }
+  }
+</style>
+
+<div class="queue-header">
+  <div>
+    <h1>Move Request Queue</h1>
+    <p>Intake, assign, block, close, and link incoming move requests without changing driver logs or official records.</p>
+  </div>
+  <div class="queue-actions">
+    <a class="btn btn-primary" href="{{ url_for('manager.new_move_request') }}">New Request</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('manager.manager_dashboard') }}">Dashboard</a>
+  </div>
+</div>
+
+<div class="queue-filter">
+  {% for value, label in [('active', 'Active'), ('open', 'Open'), ('assigned', 'Assigned'), ('blocked', 'Blocked'), ('completed', 'Completed'), ('cancelled', 'Cancelled'), ('all', 'All')] %}
+    <a class="{{ 'active' if selected_status == value else '' }}" href="{{ url_for('manager.move_requests', status=value) }}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+<div class="queue-table table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>Request #</th>
+        <th>Source</th>
+        <th>Original Request</th>
+        <th>Requested By</th>
+        <th>Requested Time</th>
+        <th>Origin</th>
+        <th>Destination</th>
+        <th>Cargo / Part</th>
+        <th>Quantity</th>
+        <th>Due Time</th>
+        <th>Priority</th>
+        <th>Status</th>
+        <th>Assigned Driver / Equipment</th>
+        <th>Linked Records</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for req in move_requests %}
+        <tr>
+          <td><strong>{{ req.display_number }}</strong></td>
+          <td>{{ req.source.replace('_', ' ')|title }}</td>
+          <td class="request-summary">{{ req.raw_text }}</td>
+          <td>{{ req.requested_by or '' }}</td>
+          <td>
+            {{ req.requested_at|to_detroit_datetime if req.requested_at else '' }}
+          </td>
+          <td>{{ req.origin_location_text or '' }}</td>
+          <td>{{ req.destination_location_text or '' }}</td>
+          <td>
+            {{ req.cargo_part_display }}
+          </td>
+          <td>{{ req.quantity_display }}</td>
+          <td>
+            {{ req.due_time_text or '' }}
+            {% if req.due_at %}<div class="muted-small">{{ req.due_at|to_detroit_datetime }}</div>{% endif %}
+          </td>
+          <td><span class="pill priority-{{ req.priority }}">{{ req.priority.replace('_', ' ')|title }}</span></td>
+          <td><span class="pill status-{{ req.status }}">{{ req.status.replace('_', ' ')|title }}</span></td>
+          <td>
+            {{ req.assigned_display }}
+            {% if req.equipment_display %}<div class="muted-small">{{ req.equipment_display }}</div>{% endif %}
+          </td>
+          <td>
+            {% if req.linked_driver_log %}
+              <a href="{{ url_for('manager.view_driver_log', log_id=req.linked_driver_log_id) }}">Driver Log #{{ req.linked_driver_log_id }}</a><br>
+            {% endif %}
+            {% if req.linked_route_id %}
+              <span>Route {{ req.linked_route_id }}</span><br>
+            {% endif %}
+            {% if req.linked_plant_transfer %}
+              <a href="{{ url_for('manager.view_plant_transfer', transfer_id=req.linked_plant_transfer_id) }}">Plant Transfer #{{ req.linked_plant_transfer.transfer_number or req.linked_plant_transfer_id }}</a>
+            {% endif %}
+          </td>
+          <td>
+            <div class="row-actions">
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('manager.edit_move_request', request_id=req.id) }}">Edit Request</a>
+              <form method="POST" action="{{ url_for('manager.assign_move_request', request_id=req.id) }}" class="assign-row">
+                <select class="form-select" name="assigned_driver_id" aria-label="Assigned driver">
+                  <option value="0">Unassigned</option>
+                  {% for driver in drivers %}
+                    <option value="{{ driver.id }}" {% if req.assigned_driver_id == driver.id %}selected{% endif %}>{{ driver.manager_label }}</option>
+                  {% endfor %}
+                </select>
+                <input class="form-control" name="assigned_driver_text" value="{{ req.assigned_driver_text or '' }}" placeholder="Manual driver">
+                <input class="form-control" name="equipment_text" value="{{ req.equipment_text or req.equipment_id or '' }}" placeholder="Equipment">
+                <button class="btn btn-sm btn-secondary" type="submit">Assign Request</button>
+              </form>
+              <div class="button-row">
+                <form method="POST" action="{{ url_for('manager.mark_move_request_blocked', request_id=req.id) }}">
+                  <button class="btn btn-sm btn-warning" type="submit">Mark Blocked</button>
+                </form>
+                <form method="POST" action="{{ url_for('manager.mark_move_request_completed', request_id=req.id) }}">
+                  <button class="btn btn-sm btn-success" type="submit">Mark Completed</button>
+                </form>
+                <form method="POST" action="{{ url_for('manager.cancel_move_request', request_id=req.id) }}">
+                  <button class="btn btn-sm btn-outline-danger" type="submit">Cancel Request</button>
+                </form>
+              </div>
+            </div>
+          </td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="15" class="text-muted py-4 text-center">No move requests in this queue.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -67,6 +67,11 @@ def evidence_document_number(report):
     return f"EVIDENCE-REPORT-{_record_token(report.id)}"
 
 
+def move_request_number(move_request):
+    created = getattr(move_request, "requested_at", None) or getattr(move_request, "created_at", None)
+    return f"MOVE-REQ-{_date_token(created)}-{_record_token(getattr(move_request, 'id', None))}"
+
+
 def document_meta(title, document_no, *, generated_at=None, page="1 of 1", revision=None):
     return {
         "title": title,

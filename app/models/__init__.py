@@ -18,6 +18,7 @@ from app.models.damage import DamagePhoto, DamageReport
 from app.models.draft import DraftEntry
 from app.models.followup import OperationalFollowUp
 from app.models.plant_transfer import PlantTransfer, PlantTransferLine
+from app.models.move_request import MoveRequest
 from app.models.search import SearchCorpus
 from app.models.load_intent import LoadIntent, PlantPredictionRule, PlantTimeSample
 from app.models.part import (
@@ -57,6 +58,7 @@ __all__ = [
     "OperationalFollowUp",
     "PlantTransfer",
     "PlantTransferLine",
+    "MoveRequest",
     "SearchCorpus",
     "PartMaster",
     "PartAlias",

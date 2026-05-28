@@ -1,0 +1,342 @@
+from datetime import datetime
+
+from flask import flash, jsonify, redirect, render_template, request, url_for
+from flask_login import current_user
+
+from app.blueprints.manager import bp
+from app.extensions import db
+from app.forms.move_request import MoveRequestForm
+from app.models import DriverLog, MoveRequest, PlantTransfer, User
+from app.services.activity import record_activity
+from app.services.audit import model_snapshot, record_audit_event
+from app.services.document_numbers import move_request_number
+from app.services.move_request_parser import parse_move_request_text
+from app.services.plant_addresses import plant_label as _plant_label
+
+
+MOVE_REQUEST_AUDIT_FIELDS = [
+    "request_number",
+    "source",
+    "raw_text",
+    "requested_by",
+    "requested_at",
+    "request_type",
+    "priority",
+    "origin_location_text",
+    "destination_location_text",
+    "cargo_text",
+    "part_number",
+    "quantity_value",
+    "quantity_unit",
+    "quantity_text",
+    "due_at",
+    "due_time_text",
+    "notes",
+    "status",
+    "blocked_reason",
+    "closed_reason",
+    "assigned_driver_id",
+    "assigned_driver_text",
+    "equipment_id",
+    "equipment_text",
+    "linked_driver_log_id",
+    "linked_route_id",
+    "linked_plant_transfer_id",
+    "linked_document_id",
+    "parsed_confidence",
+    "parse_warnings",
+]
+
+
+def _clean_text(value):
+    text = (value or "").strip()
+    return text or None
+
+
+def _zero_to_none(value):
+    return value or None
+
+
+def _driver_choices():
+    drivers = User.query.filter_by(role="driver").order_by(User.last_name, User.first_name, User.username).all()
+    return drivers, [(0, "Unassigned")] + [(driver.id, driver.manager_label) for driver in drivers]
+
+
+def _driver_log_choices():
+    logs = DriverLog.query.order_by(DriverLog.created_at.desc()).limit(100).all()
+    choices = [(0, "No linked driver log")]
+    for log in logs:
+        driver = log.driver.display_name if log.driver else f"Driver {log.driver_id}"
+        plant = _plant_label(log.plant_name)
+        choices.append((log.id, f"Log #{log.id} / {log.date} / {driver} / {plant}"))
+    return choices
+
+
+def _plant_transfer_choices():
+    transfers = (
+        PlantTransfer.query.filter(PlantTransfer.deleted_at.is_(None))
+        .order_by(PlantTransfer.created_at.desc())
+        .limit(100)
+        .all()
+    )
+    choices = [(0, "No linked plant transfer")]
+    for transfer in transfers:
+        transfer_no = transfer.transfer_number or transfer.id
+        choices.append((transfer.id, f"Transfer {transfer_no} / {transfer.ship_from} to {transfer.ship_to}"))
+    return choices
+
+
+def _prepare_form_choices(form):
+    drivers, driver_choices = _driver_choices()
+    form.assigned_driver_id.choices = driver_choices
+    form.linked_driver_log_id.choices = _driver_log_choices()
+    form.linked_plant_transfer_id.choices = _plant_transfer_choices()
+    if form.assigned_driver_id.data is None:
+        form.assigned_driver_id.data = 0
+    if form.linked_driver_log_id.data is None:
+        form.linked_driver_log_id.data = 0
+    if form.linked_plant_transfer_id.data is None:
+        form.linked_plant_transfer_id.data = 0
+    return drivers
+
+
+def _apply_suggestions(form, parse_result):
+    for field_name, value in parse_result.get("suggestions", {}).items():
+        if hasattr(form, field_name):
+            getattr(form, field_name).data = value
+    form.parsed_confidence.data = parse_result.get("confidence") or ""
+    form.parse_warnings.data = "\n".join(parse_result.get("warnings") or [])
+
+
+def _set_move_request_fields(move_request, form):
+    move_request.source = form.source.data
+    move_request.raw_text = form.raw_text.data.strip()
+    move_request.requested_by = _clean_text(form.requested_by.data)
+    move_request.requested_at = form.requested_at.data or datetime.utcnow()
+    move_request.request_type = form.request_type.data
+    move_request.priority = form.priority.data
+    move_request.origin_location_text = _clean_text(form.origin_location_text.data)
+    move_request.destination_location_text = _clean_text(form.destination_location_text.data)
+    move_request.cargo_text = _clean_text(form.cargo_text.data)
+    move_request.part_number = _clean_text(form.part_number.data)
+    move_request.quantity_value = form.quantity_value.data
+    move_request.quantity_unit = _clean_text(form.quantity_unit.data)
+    move_request.quantity_text = _clean_text(form.quantity_text.data)
+    move_request.due_at = form.due_at.data
+    move_request.due_time_text = _clean_text(form.due_time_text.data)
+    move_request.notes = _clean_text(form.notes.data)
+    move_request.status = form.status.data
+    move_request.blocked_reason = _clean_text(form.blocked_reason.data)
+    move_request.closed_reason = _clean_text(form.closed_reason.data)
+    move_request.assigned_driver_id = _zero_to_none(form.assigned_driver_id.data)
+    move_request.assigned_driver_text = _clean_text(form.assigned_driver_text.data)
+    move_request.equipment_id = _clean_text(form.equipment_id.data)
+    move_request.equipment_text = _clean_text(form.equipment_text.data)
+    move_request.linked_driver_log_id = _zero_to_none(form.linked_driver_log_id.data)
+    move_request.linked_route_id = _clean_text(form.linked_route_id.data)
+    move_request.linked_plant_transfer_id = _zero_to_none(form.linked_plant_transfer_id.data)
+    move_request.linked_document_id = form.linked_document_id.data
+    move_request.parsed_confidence = _clean_text(form.parsed_confidence.data)
+    move_request.parse_warnings = _clean_text(form.parse_warnings.data)
+    move_request.updated_by_id = current_user.id
+
+
+def _record_move_request_activity(move_request, *, action, title, details, before_values):
+    after_values = model_snapshot(move_request, MOVE_REQUEST_AUDIT_FIELDS)
+    record_audit_event(
+        user_id=current_user.id,
+        target_type="move_request",
+        target_id=move_request.id,
+        action=action,
+        reason=details,
+        before_values=before_values,
+        after_values=after_values,
+        commit=False,
+    )
+    record_activity(
+        user_id=current_user.id,
+        category="move_request",
+        action=action,
+        title=title,
+        details=details,
+        target_type="move_request",
+        target_id=move_request.id,
+        commit=False,
+    )
+
+
+def _request_or_404(request_id):
+    return MoveRequest.query.get_or_404(request_id)
+
+
+@bp.route("/move-requests")
+def move_requests():
+    selected_status = request.args.get("status", "active")
+    query = MoveRequest.query
+    if selected_status == "active":
+        query = query.filter(MoveRequest.status.notin_(["completed", "cancelled"]))
+    elif selected_status != "all":
+        query = query.filter_by(status=selected_status)
+    requests = query.order_by(MoveRequest.requested_at.desc(), MoveRequest.id.desc()).all()
+    drivers, _ = _driver_choices()
+    return render_template(
+        "manager/move_requests.html",
+        move_requests=requests,
+        drivers=drivers,
+        selected_status=selected_status,
+    )
+
+
+@bp.route("/move-requests/parse", methods=["POST"])
+def parse_move_request():
+    raw_text = request.form.get("raw_text") if request.form else None
+    if request.is_json:
+        raw_text = (request.get_json(silent=True) or {}).get("raw_text")
+    return jsonify(parse_move_request_text(raw_text))
+
+
+@bp.route("/move-requests/new", methods=["GET", "POST"])
+def new_move_request():
+    form = MoveRequestForm()
+    _prepare_form_choices(form)
+    parse_result = None
+
+    if request.method == "POST" and request.form.get("form_action") == "parse":
+        parse_result = parse_move_request_text(form.raw_text.data)
+        _apply_suggestions(form, parse_result)
+    elif form.validate_on_submit():
+        move_request = MoveRequest(created_by_id=current_user.id)
+        _set_move_request_fields(move_request, form)
+        db.session.add(move_request)
+        db.session.flush()
+        move_request.request_number = move_request_number(move_request)
+        _record_move_request_activity(
+            move_request,
+            action="created",
+            title="Move request created",
+            details=f"Created {move_request.display_number}.",
+            before_values={},
+        )
+        db.session.commit()
+        flash("Move request created.", "success")
+        return redirect(url_for("manager.move_requests"))
+
+    return render_template(
+        "manager/move_request_form.html",
+        form=form,
+        move_request=None,
+        parse_result=parse_result,
+    )
+
+
+@bp.route("/move-requests/<int:request_id>/edit", methods=["GET", "POST"])
+def edit_move_request(request_id):
+    move_request = _request_or_404(request_id)
+    form = MoveRequestForm(obj=move_request if request.method == "GET" else None)
+    _prepare_form_choices(form)
+    parse_result = None
+
+    if request.method == "POST" and request.form.get("form_action") == "parse":
+        parse_result = parse_move_request_text(form.raw_text.data)
+        _apply_suggestions(form, parse_result)
+    elif form.validate_on_submit():
+        before_values = model_snapshot(move_request, MOVE_REQUEST_AUDIT_FIELDS)
+        _set_move_request_fields(move_request, form)
+        _record_move_request_activity(
+            move_request,
+            action="updated",
+            title="Move request updated",
+            details=f"Updated {move_request.display_number}.",
+            before_values=before_values,
+        )
+        db.session.commit()
+        flash("Move request updated.", "success")
+        return redirect(url_for("manager.move_requests"))
+
+    return render_template(
+        "manager/move_request_form.html",
+        form=form,
+        move_request=move_request,
+        parse_result=parse_result,
+    )
+
+
+@bp.route("/move-requests/<int:request_id>/assign", methods=["POST"])
+def assign_move_request(request_id):
+    move_request = _request_or_404(request_id)
+    before_values = model_snapshot(move_request, MOVE_REQUEST_AUDIT_FIELDS)
+    driver_id = request.form.get("assigned_driver_id", type=int) or None
+    move_request.assigned_driver_id = driver_id
+    move_request.assigned_driver_text = _clean_text(request.form.get("assigned_driver_text"))
+    move_request.equipment_id = _clean_text(request.form.get("equipment_id"))
+    move_request.equipment_text = _clean_text(request.form.get("equipment_text"))
+    if move_request.status in {"open", "blocked"}:
+        move_request.status = "assigned"
+    move_request.updated_by_id = current_user.id
+    _record_move_request_activity(
+        move_request,
+        action="assigned",
+        title="Move request assigned",
+        details=f"Assigned {move_request.display_number}.",
+        before_values=before_values,
+    )
+    db.session.commit()
+    flash("Move request assigned.", "success")
+    return redirect(url_for("manager.move_requests"))
+
+
+@bp.route("/move-requests/<int:request_id>/mark-blocked", methods=["POST"])
+def mark_move_request_blocked(request_id):
+    move_request = _request_or_404(request_id)
+    before_values = model_snapshot(move_request, MOVE_REQUEST_AUDIT_FIELDS)
+    move_request.status = "blocked"
+    move_request.blocked_reason = _clean_text(request.form.get("blocked_reason")) or move_request.blocked_reason or "Marked blocked from queue."
+    move_request.updated_by_id = current_user.id
+    _record_move_request_activity(
+        move_request,
+        action="blocked",
+        title="Move request blocked",
+        details=f"Blocked {move_request.display_number}: {move_request.blocked_reason}",
+        before_values=before_values,
+    )
+    db.session.commit()
+    flash("Move request marked blocked.", "warning")
+    return redirect(url_for("manager.move_requests"))
+
+
+@bp.route("/move-requests/<int:request_id>/mark-completed", methods=["POST"])
+def mark_move_request_completed(request_id):
+    move_request = _request_or_404(request_id)
+    before_values = model_snapshot(move_request, MOVE_REQUEST_AUDIT_FIELDS)
+    move_request.status = "completed"
+    move_request.closed_reason = _clean_text(request.form.get("closed_reason")) or move_request.closed_reason or "Marked completed from queue."
+    move_request.updated_by_id = current_user.id
+    _record_move_request_activity(
+        move_request,
+        action="completed",
+        title="Move request completed",
+        details=f"Completed {move_request.display_number}: {move_request.closed_reason}",
+        before_values=before_values,
+    )
+    db.session.commit()
+    flash("Move request marked completed.", "success")
+    return redirect(url_for("manager.move_requests"))
+
+
+@bp.route("/move-requests/<int:request_id>/cancel", methods=["POST"])
+def cancel_move_request(request_id):
+    move_request = _request_or_404(request_id)
+    before_values = model_snapshot(move_request, MOVE_REQUEST_AUDIT_FIELDS)
+    move_request.status = "cancelled"
+    move_request.closed_reason = _clean_text(request.form.get("closed_reason")) or move_request.closed_reason or "Cancelled from queue."
+    move_request.updated_by_id = current_user.id
+    _record_move_request_activity(
+        move_request,
+        action="cancelled",
+        title="Move request cancelled",
+        details=f"Cancelled {move_request.display_number}: {move_request.closed_reason}",
+        before_values=before_values,
+    )
+    db.session.commit()
+    flash("Move request cancelled.", "warning")
+    return redirect(url_for("manager.move_requests"))

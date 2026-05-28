@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .request-form-shell { max-width:1100px; margin:0 auto; }
+  .request-form-head { display:flex; justify-content:space-between; gap:1rem; align-items:flex-start; flex-wrap:wrap; margin-bottom:1rem; }
+  .request-form-head h1 { margin:0; font-size:1.55rem; font-weight:900; color:#0f172a; }
+  .request-form-head p { margin:.25rem 0 0; color:#64748b; }
+  .request-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:1rem; margin-bottom:1rem; }
+  .request-card h2 { font-size:1rem; font-weight:900; margin:0 0 .8rem; color:#0f172a; }
+  .field-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:1rem; }
+  .field-grid.cols-3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+  .field-grid .full { grid-column:1 / -1; }
+  .form-label { font-weight:800; color:#475569; font-size:.82rem; }
+  .parse-result { border:1px solid #bfdbfe; background:#eff6ff; color:#1e3a8a; border-radius:12px; padding:.8rem; margin:.8rem 0 0; }
+  .button-row { display:flex; gap:.6rem; justify-content:flex-end; flex-wrap:wrap; }
+  @media (max-width:800px) {
+    .field-grid, .field-grid.cols-3 { grid-template-columns:1fr; }
+  }
+</style>
+
+<div class="request-form-shell">
+  <div class="request-form-head">
+    <div>
+      <h1>{{ 'Edit Move Request' if move_request else 'New Move Request' }}</h1>
+      <p>{{ move_request.display_number if move_request else 'Create a durable intake record from the original request.' }}</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('manager.move_requests') }}">Back to Queue</a>
+  </div>
+
+  <form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="request-card">
+      <h2>Original Request / Message</h2>
+      <div class="mb-3">
+        {{ form.raw_text.label(class="form-label") }}
+        {{ form.raw_text(class="form-control", rows="5", placeholder="Paste the original text, email sentence, radio note, or phone-call summary.") }}
+        {% for error in form.raw_text.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="button-row">
+        <button class="btn btn-outline-primary" type="submit" name="form_action" value="parse">Suggest Fields</button>
+      </div>
+      {% if parse_result %}
+        <div class="parse-result">
+          <strong>Parser suggestions applied for review.</strong>
+          <div>Confidence: {{ parse_result.confidence }}</div>
+          {% if parse_result.warnings %}
+            <div>Warnings: {{ parse_result.warnings|join('; ') }}</div>
+          {% endif %}
+        </div>
+      {% elif form.parsed_confidence.data %}
+        <div class="parse-result">
+          <strong>Saved parser context:</strong> {{ form.parsed_confidence.data }}
+          {% if form.parse_warnings.data %}<div>{{ form.parse_warnings.data }}</div>{% endif %}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="request-card">
+      <h2>Request Details</h2>
+      <div class="field-grid cols-3">
+        <div>
+          {{ form.source.label(class="form-label") }}
+          {{ form.source(class="form-select") }}
+        </div>
+        <div>
+          {{ form.request_type.label(class="form-label") }}
+          {{ form.request_type(class="form-select") }}
+        </div>
+        <div>
+          {{ form.priority.label(class="form-label") }}
+          {{ form.priority(class="form-select") }}
+        </div>
+        <div>
+          {{ form.requested_by.label(class="form-label") }}
+          {{ form.requested_by(class="form-control") }}
+        </div>
+        <div>
+          {{ form.requested_at.label(class="form-label") }}
+          {{ form.requested_at(class="form-control") }}
+        </div>
+        <div>
+          {{ form.status.label(class="form-label") }}
+          {{ form.status(class="form-select") }}
+        </div>
+        <div>
+          {{ form.origin_location_text.label(class="form-label") }}
+          {{ form.origin_location_text(class="form-control") }}
+        </div>
+        <div>
+          {{ form.destination_location_text.label(class="form-label") }}
+          {{ form.destination_location_text(class="form-control") }}
+        </div>
+        <div>
+          {{ form.due_time_text.label(class="form-label") }}
+          {{ form.due_time_text(class="form-control", placeholder="e.g. tonight at 7pm") }}
+        </div>
+        <div class="full">
+          {{ form.cargo_text.label(class="form-label") }}
+          {{ form.cargo_text(class="form-control") }}
+        </div>
+        <div>
+          {{ form.part_number.label(class="form-label") }}
+          {{ form.part_number(class="form-control") }}
+        </div>
+        <div>
+          {{ form.quantity_value.label(class="form-label") }}
+          {{ form.quantity_value(class="form-control") }}
+        </div>
+        <div>
+          {{ form.quantity_unit.label(class="form-label") }}
+          {{ form.quantity_unit(class="form-control") }}
+        </div>
+        <div>
+          {{ form.quantity_text.label(class="form-label") }}
+          {{ form.quantity_text(class="form-control") }}
+        </div>
+        <div>
+          {{ form.due_at.label(class="form-label") }}
+          {{ form.due_at(class="form-control") }}
+        </div>
+        <div class="full">
+          {{ form.notes.label(class="form-label") }}
+          {{ form.notes(class="form-control", rows="3") }}
+        </div>
+      </div>
+    </div>
+
+    <div class="request-card">
+      <h2>Assignment</h2>
+      <div class="field-grid">
+        <div>
+          {{ form.assigned_driver_id.label(class="form-label") }}
+          {{ form.assigned_driver_id(class="form-select") }}
+        </div>
+        <div>
+          {{ form.assigned_driver_text.label(class="form-label") }}
+          {{ form.assigned_driver_text(class="form-control", placeholder="Manual driver if not in app") }}
+        </div>
+        <div>
+          {{ form.equipment_id.label(class="form-label") }}
+          {{ form.equipment_id(class="form-control") }}
+        </div>
+        <div>
+          {{ form.equipment_text.label(class="form-label") }}
+          {{ form.equipment_text(class="form-control") }}
+        </div>
+      </div>
+    </div>
+
+    <div class="request-card">
+      <h2>Links</h2>
+      <div class="field-grid">
+        <div>
+          {{ form.linked_driver_log_id.label(class="form-label") }}
+          {{ form.linked_driver_log_id(class="form-select") }}
+        </div>
+        <div>
+          {{ form.linked_route_id.label(class="form-label") }}
+          {{ form.linked_route_id(class="form-control") }}
+        </div>
+        <div>
+          {{ form.linked_plant_transfer_id.label(class="form-label") }}
+          {{ form.linked_plant_transfer_id(class="form-select") }}
+        </div>
+        <div>
+          {{ form.linked_document_id.label(class="form-label") }}
+          {{ form.linked_document_id(class="form-control") }}
+        </div>
+      </div>
+    </div>
+
+    <div class="request-card">
+      <h2>Resolution</h2>
+      <div class="field-grid">
+        <div>
+          {{ form.blocked_reason.label(class="form-label") }}
+          {{ form.blocked_reason(class="form-control", rows="3") }}
+        </div>
+        <div>
+          {{ form.closed_reason.label(class="form-label") }}
+          {{ form.closed_reason(class="form-control", rows="3") }}
+        </div>
+      </div>
+    </div>
+
+    <div class="button-row mb-4">
+      <a class="btn btn-outline-secondary" href="{{ url_for('manager.move_requests') }}">Cancel</a>
+      <button class="btn btn-primary" type="submit" name="form_action" value="save">Save Request</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

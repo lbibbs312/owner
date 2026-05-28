@@ -521,6 +521,164 @@ def test_manager_assigns_task_and_driver_updates_status(client, app):
         assert open_task.status == "completed"
 
 
+def test_manager_move_request_queue_create_edit_and_actions(client, app):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ActivityEvent, AuditEvent, MoveRequest
+
+        driver = create_user(
+            "queue_driver",
+            "queue-driver@example.com",
+            "driver",
+            first_name="Queue",
+            last_name="Driver",
+            employee_id="Q1",
+        )
+        manager = create_user("queue_manager", "queue-manager@example.com", "management")
+        driver_id = driver.id
+        manager_id = manager.id
+
+    login(client, "queue_manager")
+    queue_page = client.get("/manager/move-requests")
+    assert queue_page.status_code == 200
+    assert b"Move Request Queue" in queue_page.data
+    assert b"New Request" in queue_page.data
+
+    created = client.post(
+        "/manager/move-requests/new",
+        data={
+            "raw_text": "PMT has 10 skids for the DC please",
+            "source": "text",
+            "requested_by": "Production",
+            "requested_at": "2026-05-27T13:35",
+            "request_type": "move",
+            "priority": "normal",
+            "origin_location_text": "PMT",
+            "destination_location_text": "DC",
+            "cargo_text": "",
+            "part_number": "",
+            "quantity_value": "10",
+            "quantity_unit": "skids",
+            "quantity_text": "10 skids",
+            "due_time_text": "",
+            "notes": "Confirmed by supervisor.",
+            "status": "open",
+            "assigned_driver_id": "0",
+            "assigned_driver_text": "",
+            "equipment_id": "",
+            "equipment_text": "",
+            "linked_driver_log_id": "0",
+            "linked_route_id": "",
+            "linked_plant_transfer_id": "0",
+            "linked_document_id": "",
+            "parsed_confidence": "high",
+            "parse_warnings": "",
+        },
+        follow_redirects=False,
+    )
+    assert created.status_code == 302
+
+    with app.app_context():
+        req = MoveRequest.query.one()
+        assert req.request_number == "MOVE-REQ-20260527-001"
+        assert req.created_by_id == manager_id
+        assert req.origin_location_text == "PMT"
+        assert req.destination_location_text == "DC"
+        assert req.quantity_text == "10 skids"
+        request_id = req.id
+        assert ActivityEvent.query.filter_by(target_type="move_request", target_id=request_id, action="created").count() == 1
+        assert AuditEvent.query.filter_by(target_type="move_request", target_id=request_id, action="created").count() == 1
+
+    page = client.get("/manager/move-requests")
+    assert b"MOVE-REQ-20260527-001" in page.data
+    assert b"PMT has 10 skids for the DC please" in page.data
+    assert b"Production" in page.data
+    assert b"PMT" in page.data
+    assert b"DC" in page.data
+    assert b"10 skids" in page.data
+
+    edit_page = client.get(f"/manager/move-requests/{request_id}/edit")
+    assert edit_page.status_code == 200
+    assert b"Original Request / Message" in edit_page.data
+
+    edited = client.post(
+        f"/manager/move-requests/{request_id}/edit",
+        data={
+            "raw_text": "PMT has 10 skids for the DC please",
+            "source": "text",
+            "requested_by": "Production Lead",
+            "requested_at": "2026-05-27T13:35",
+            "request_type": "move",
+            "priority": "high",
+            "origin_location_text": "PMT",
+            "destination_location_text": "DC",
+            "cargo_text": "",
+            "part_number": "P1234",
+            "quantity_value": "10",
+            "quantity_unit": "skids",
+            "quantity_text": "10 skids",
+            "due_time_text": "today",
+            "notes": "Updated priority.",
+            "status": "open",
+            "assigned_driver_id": "0",
+            "assigned_driver_text": "",
+            "equipment_id": "",
+            "equipment_text": "",
+            "linked_driver_log_id": "0",
+            "linked_route_id": "route-manual-1",
+            "linked_plant_transfer_id": "0",
+            "linked_document_id": "",
+            "parsed_confidence": "high",
+            "parse_warnings": "",
+        },
+        follow_redirects=False,
+    )
+    assert edited.status_code == 302
+
+    assigned = client.post(
+        f"/manager/move-requests/{request_id}/assign",
+        data={"assigned_driver_id": str(driver_id), "equipment_text": "ST4"},
+        follow_redirects=False,
+    )
+    assert assigned.status_code == 302
+
+    blocked = client.post(
+        f"/manager/move-requests/{request_id}/mark-blocked",
+        data={"blocked_reason": "Waiting on trailer."},
+        follow_redirects=False,
+    )
+    assert blocked.status_code == 302
+
+    completed = client.post(
+        f"/manager/move-requests/{request_id}/mark-completed",
+        data={"closed_reason": "Moved by driver."},
+        follow_redirects=False,
+    )
+    assert completed.status_code == 302
+
+    cancelled = client.post(
+        f"/manager/move-requests/{request_id}/cancel",
+        data={"closed_reason": "Cancelled after completion for correction test."},
+        follow_redirects=False,
+    )
+    assert cancelled.status_code == 302
+
+    with app.app_context():
+        req = MoveRequest.query.get(request_id)
+        assert req.updated_by_id == manager_id
+        assert req.priority == "high"
+        assert req.part_number == "P1234"
+        assert req.linked_route_id == "route-manual-1"
+        assert req.assigned_driver_id == driver_id
+        assert req.equipment_text == "ST4"
+        assert req.blocked_reason == "Waiting on trailer."
+        assert req.status == "cancelled"
+        assert req.closed_reason == "Cancelled after completion for correction test."
+        for action in ["updated", "assigned", "blocked", "completed", "cancelled"]:
+            assert ActivityEvent.query.filter_by(target_type="move_request", target_id=request_id, action=action).count() == 1
+            assert AuditEvent.query.filter_by(target_type="move_request", target_id=request_id, action=action).count() == 1
+
+
 def test_driver_mobile_shows_full_parts_queue_and_route_task_events(client, app):
     from datetime import date, datetime
 
