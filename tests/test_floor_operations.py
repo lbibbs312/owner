@@ -195,3 +195,47 @@ def test_next_action_in_progress_operational_substate(app):
     # Cargo unknown -> Confirm cargo takes priority.
     req2 = _mk(user.id, status="in_progress", assigned_driver_id=user.id, linked_route_id="R-2")
     assert next_action_for_request(req2) == "Confirm cargo"
+
+
+# --- Dashboard integration --------------------------------------------------
+
+@pytest.fixture()
+def client(app):
+    return app.test_client()
+
+
+def _login(client, username):
+    return client.post(
+        "/login", data={"login_name": username, "password": "password1"}, follow_redirects=False
+    )
+
+
+def test_manager_dashboard_renders_move_queue_and_request(client, app):
+    with app.app_context():
+        manager = _user("boss", "management")
+        _move_request(manager.id, priority="hot", origin_location_text="Raleigh East",
+                      destination_location_text="Plastic West", cargo_text="HDPE")
+
+    _login(client, "boss")
+    resp = client.get("/manager/dashboard")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Move Queue" in body
+    assert "Floor Operations" in body
+    assert "Production Flow Map" in body
+    # The seeded request and its derived data surface on the dashboard.
+    assert "Raleigh East" in body
+    assert "Plastic West" in body
+
+
+def test_driver_dashboard_survives_no_assigned_requests(client, app):
+    with app.app_context():
+        _user("trucker", "driver")
+
+    _login(client, "trucker")
+    resp = client.get("/mobile")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Assigned Move Queue" in body
+    assert "No assigned moves" in body
+    assert "Next Action" in body

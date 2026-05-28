@@ -675,6 +675,14 @@
         {% endif %}
       </div>
 
+      {# Operations console: Move Queue -> Floor Operations -> Production Flow Map (above live routes) #}
+      {% if floor %}
+        {% include "partials/_move_queue_summary.html" %}
+        {% include "partials/_floor_operations_snapshot.html" %}
+        {% set link_endpoint = 'manager.move_requests' %}
+        {% include "partials/_production_flow_map.html" %}
+      {% endif %}
+
       <div class="panel {% if focus_panel == 'routes' %}focus-panel{% endif %}" id="criticalExceptionsPanel">
         <div class="panel-top">
           <h3>

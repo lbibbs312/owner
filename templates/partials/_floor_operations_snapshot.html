@@ -1,0 +1,22 @@
+{# Floor Operations cards. Expects `floor`. Optional:
+   - card_keys: list to filter which cards render (default all 8)
+   - heading: panel heading (default "Floor Operations") #}
+{% set _cards = floor.floor_cards if card_keys is not defined or not card_keys
+   else floor.floor_cards | selectattr('key', 'in', card_keys) | list %}
+<div class="ops-panel">
+  <div class="ops-head">
+    <h3>{{ heading if heading is defined else "Floor Operations" }}</h3>
+    <span class="ops-sub">{{ floor.date }}</span>
+  </div>
+  <div class="ops-body">
+    <div class="fo-grid">
+      {% for card in _cards %}
+      <div class="fo-card tone-{{ card.tone }}">
+        <span class="fo-num">{{ card.count }}</span>
+        <span class="fo-lbl">{{ card.label }}</span>
+        <span class="fo-hint">{{ card.hint }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>

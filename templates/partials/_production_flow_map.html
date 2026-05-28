@@ -1,0 +1,46 @@
+{# Production Flow Map — facility/process view (NOT GPS). Expects `floor`.
+   Optional `link_endpoint` (e.g. "manager.move_requests") makes nodes/lanes
+   link to the filtered queue; omit it for a read-only (driver) map. #}
+<div class="ops-panel">
+  <div class="ops-head">
+    <h3>Production Flow Map</h3>
+    <span class="ops-sub">Facility &amp; lanes &middot; not GPS</span>
+  </div>
+  <div class="ops-body">
+    {% if floor.map_nodes %}
+    <div class="flow-section-label">Locations</div>
+    <div class="flow-nodes">
+      {% for n in floor.map_nodes %}
+      {%- set node_body %}
+        <span class="fn-dot st-{{ n.worst_status }}"></span>
+        <span class="fn-label">{{ n.label }}</span>
+        <span class="fn-counts">{{ n.open_request_count }} open &middot; {{ n.active_move_count }} active{% if n.blocked_count %} &middot; {{ n.blocked_count }} blocked{% endif %}{% if n.waiting_count %} &middot; {{ n.waiting_count }} waiting{% endif %}{% if n.completed_today_count %} &middot; {{ n.completed_today_count }} done{% endif %}</span>
+      {% endset -%}
+      {% if link_endpoint is defined and link_endpoint %}
+        <a class="flow-node" href="{{ url_for(link_endpoint, location=n.key) }}">{{ node_body }}</a>
+      {% else %}
+        <div class="flow-node">{{ node_body }}</div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% if floor.map_edges %}
+    <div class="flow-section-label">Lanes</div>
+    <div class="flow-lanes">
+      {% for e in floor.map_edges %}
+      {%- set lane_body %}
+        <span class="fl-route"><span class="st-dot st-{{ e.worst_status }}"></span>{{ e.origin_label }} <span class="mq-arrow">&rarr;</span> {{ e.destination_label }}</span>
+        <span class="fl-counts">{{ e.open_count }} open &middot; {{ e.active_count }} active &middot; {{ e.completed_count }} done</span>
+      {% endset -%}
+      {% if link_endpoint is defined and link_endpoint %}
+        <a class="flow-lane" href="{{ url_for(link_endpoint, origin=e.origin_key, destination=e.destination_key) }}">{{ lane_body }}</a>
+      {% else %}
+        <div class="flow-lane">{{ lane_body }}</div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% else %}
+    <p class="ops-empty">No current data. Move locations and lanes will appear here as requests are created.</p>
+    {% endif %}
+  </div>
+</div>

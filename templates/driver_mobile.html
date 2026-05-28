@@ -400,6 +400,59 @@
     .rp-footer a { display: block; text-align: center; padding: 9px; border-radius: 12px; background: rgba(127,29,45,.18); border: 1px solid rgba(243,199,207,.22); font-size: .76rem; font-weight: 900; color: #f8fafc; }
     .rp-footer a:hover { background: rgba(127,29,45,.28); border-color: rgba(243,199,207,.36); }
     .rp-footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    /* ---- Read-only operations console components (mirrors static/css/style.css) ---- */
+    .ops-console { display:flex; flex-direction:column; gap:0; margin:6px 0 4px; }
+    .ops-panel { background:#fff; border:1px solid #e2e8f0; border-radius:16px; margin-bottom:14px; overflow:hidden; color:#0f172a; }
+    .ops-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 16px; border-bottom:1px solid #e2e8f0; background:#f8fafc; }
+    .ops-head h3 { margin:0; font-size:.9rem; font-weight:900; color:#0f172a; }
+    .ops-sub { color:#64748b; font-size:.7rem; font-weight:800; }
+    .ops-body { padding:13px 16px; }
+    .ops-next { padding-top:14px; padding-bottom:14px; }
+    .ops-empty { margin:0; color:#64748b; font-size:.82rem; font-weight:600; text-align:center; padding:12px 6px; }
+    .ops-tag { display:inline-flex; align-items:center; padding:2px 8px; border-radius:999px; font-size:.6rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; }
+    .tone-info { background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
+    .tone-warn { background:#fffbeb; border-color:#fde68a; color:#92400e; }
+    .tone-danger { background:#fff1f2; border-color:#fecdd3; color:#be123c; }
+    .tone-good { background:#ecfdf5; border-color:#a7f3d0; color:#047857; }
+    .tone-muted { background:#f1f5f9; border-color:#e2e8f0; color:#475569; }
+    .cw-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; }
+    .cw-lbl { display:block; font-size:.6rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; color:#64748b; }
+    .cw-val { display:block; margin-top:2px; font-size:.85rem; font-weight:800; color:#0f172a; }
+    .mq-list { display:flex; flex-direction:column; gap:8px; }
+    .mq-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:11px; background:#fff; }
+    .mq-row-main { min-width:0; }
+    .mq-row-top { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .mq-id { font-family:'JetBrains Mono',monospace; font-weight:800; color:#0f172a; font-size:.76rem; }
+    .mq-route { margin-top:3px; font-weight:800; color:#0f172a; font-size:.84rem; }
+    .mq-meta { margin-top:2px; color:#64748b; font-size:.72rem; font-weight:600; }
+    .mq-arrow { color:#2563eb; font-weight:900; }
+    .mq-side { display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex:0 0 auto; }
+    .fo-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+    .fo-card { display:flex; flex-direction:column; gap:2px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:11px; background:#fff; }
+    .fo-num { font-size:1.3rem; font-weight:900; line-height:1; color:#0f172a; }
+    .fo-lbl { font-size:.68rem; font-weight:900; color:#0f172a; }
+    .fo-hint { font-size:.62rem; font-weight:600; color:#64748b; }
+    .flow-section-label { font-size:.6rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; color:#64748b; margin:2px 0 7px; }
+    .flow-nodes { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:8px; margin-bottom:12px; }
+    .flow-node { display:flex; flex-direction:column; gap:3px; padding:9px 11px; border:1px solid #e2e8f0; border-radius:11px; background:#fff; text-decoration:none; color:inherit; }
+    .fn-label { font-weight:800; color:#0f172a; font-size:.8rem; }
+    .fn-counts { color:#64748b; font-size:.66rem; font-weight:600; }
+    .fn-dot, .st-dot { width:9px; height:9px; border-radius:999px; display:inline-block; background:#cbd5e1; }
+    .st-dot { margin-right:6px; vertical-align:middle; }
+    .st-blocked { background:#dc2626; } .st-waiting { background:#f59e0b; } .st-active { background:#2563eb; }
+    .st-open { background:#0ea5e9; } .st-completed { background:#10b981; } .st-none { background:#cbd5e1; }
+    .flow-lanes { display:flex; flex-direction:column; gap:7px; }
+    .flow-lane { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 11px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; text-decoration:none; color:inherit; }
+    .fl-route { font-weight:800; color:#0f172a; font-size:.78rem; }
+    .fl-counts { color:#64748b; font-size:.68rem; font-weight:700; white-space:nowrap; }
+    .next-action { display:inline-flex; align-items:center; padding:4px 11px; border-radius:999px; font-size:.72rem; font-weight:800; white-space:nowrap; border:1px solid transparent; }
+    .na-info { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+    .na-action { background:#fef3c7; color:#92400e; border-color:#fde68a; }
+    .na-watch { background:#e0f2fe; color:#075985; border-color:#bae6fd; }
+    .na-danger { background:#fee2e2; color:#991b1b; border-color:#fecaca; }
+    .na-good { background:#ecfdf5; color:#047857; border-color:#a7f3d0; }
+    .na-muted { background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
   </style>
 </head>
 <body>
@@ -500,6 +553,63 @@
           </div>
         {% endif %}
       </section>
+
+      {# ---- Read-only operations console (capture actions below stay intact) ---- #}
+      {% if floor %}
+      {% from "partials/_next_action.html" import next_action_chip %}
+      <section class="ops-console">
+
+        <div class="ops-panel">
+          <div class="ops-head"><h3>Next Action</h3></div>
+          <div class="ops-body ops-next">{{ next_action_chip(driver_next_action) }}</div>
+        </div>
+
+        {% if route_context and route_context.current_stop %}
+        {% set cs = route_context.current_stop %}
+        <div class="ops-panel">
+          <div class="ops-head"><h3>Current Work</h3><span class="ops-sub">{{ route_panel_title }}</span></div>
+          <div class="ops-body cw-grid">
+            <div><span class="cw-lbl">Stop</span><span class="cw-val">{{ cs.plant_name }}</span></div>
+            <div><span class="cw-lbl">Status</span><span class="cw-val">{{ (route_context.current_stop_status or 'open')|title }}</span></div>
+            <div><span class="cw-lbl">Arrived</span><span class="cw-val">{{ cs.arrive_time|display_time or '—' }}</span></div>
+            <div><span class="cw-lbl">Wait</span><span class="cw-val">{{ wait_label_for_log(cs) or '—' }}</span></div>
+            <div><span class="cw-lbl">Cargo</span><span class="cw-val">{{ cargo_state_for_log(cs).label }}{% if cs.load_size %} ({{ cs.load_size }}){% endif %}</span></div>
+            <div><span class="cw-lbl">Equipment</span><span class="cw-val">{{ current_truck_number or '—' }}</span></div>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="ops-panel">
+          <div class="ops-head"><h3>Assigned Move Queue</h3><span class="ops-sub">{{ assigned_requests|length }}</span></div>
+          <div class="ops-body">
+            {% if assigned_requests %}
+            <div class="mq-list">
+              {% for r in assigned_requests %}
+              <div class="mq-row">
+                <div class="mq-row-main">
+                  <div class="mq-row-top">
+                    <span class="mq-id">{{ r.number }}</span>
+                    <span class="ops-tag tone-{{ 'danger' if r.is_hot else 'muted' }}">{{ r.priority_label }}</span>
+                    <span class="ops-tag">{{ r.status_label }}</span>
+                  </div>
+                  <div class="mq-route">{{ r.origin }} <span class="mq-arrow">&rarr;</span> {{ r.destination }}</div>
+                  <div class="mq-meta">{{ r.cargo }}{% if r.due_label %} &middot; due {{ r.due_label }}{% endif %}</div>
+                </div>
+                <div class="mq-side">{{ next_action_chip(r.next_action) }}</div>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <p class="ops-empty">No assigned moves right now.</p>
+            {% endif %}
+          </div>
+        </div>
+
+        {% set card_keys = ['hot_or_urgent', 'blocked_or_no_parts', 'loading_now', 'unloading_now', 'waiting_over_limit', 'on_road'] %}
+        {% include "partials/_floor_operations_snapshot.html" %}
+        {% include "partials/_production_flow_map.html" %}
+      </section>
+      {% endif %}
 
       {% if task_queue %}
       <section class="list">
