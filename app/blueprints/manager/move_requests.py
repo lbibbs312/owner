@@ -6,7 +6,7 @@ from flask_login import current_user
 from app.blueprints.manager import bp
 from app.extensions import db
 from app.forms.move_request import MoveRequestForm
-from app.models import DriverLog, MoveRequest, PlantTransfer, User
+from app.models import ActivityEvent, DriverLog, ExternalDocument, MoveRequest, PlantTransfer, User
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
 from app.services.document_numbers import move_request_number
@@ -100,6 +100,25 @@ def _prepare_form_choices(form):
     return drivers
 
 
+def _latest_move_request_events(move_requests, action):
+    request_ids = [move_request.id for move_request in move_requests]
+    if not request_ids:
+        return {}
+    events = (
+        ActivityEvent.query.filter(
+            ActivityEvent.target_type == "move_request",
+            ActivityEvent.action == action,
+            ActivityEvent.target_id.in_(request_ids),
+        )
+        .order_by(ActivityEvent.created_at.desc(), ActivityEvent.id.desc())
+        .all()
+    )
+    latest = {}
+    for event in events:
+        latest.setdefault(event.target_id, event)
+    return latest
+
+
 def _apply_suggestions(form, parse_result):
     for field_name, value in parse_result.get("suggestions", {}).items():
         if hasattr(form, field_name):
@@ -183,6 +202,8 @@ def move_requests():
         "manager/move_requests.html",
         move_requests=requests,
         drivers=drivers,
+        acknowledgements=_latest_move_request_events(requests, "acknowledged"),
+        plant_transfer_choices=_plant_transfer_choices(),
         selected_status=selected_status,
     )
 
@@ -282,6 +303,75 @@ def assign_move_request(request_id):
     )
     db.session.commit()
     flash("Move request assigned.", "success")
+    return redirect(url_for("manager.move_requests"))
+
+
+@bp.route("/move-requests/<int:request_id>/acknowledge", methods=["POST"])
+def acknowledge_move_request(request_id):
+    move_request = _request_or_404(request_id)
+    before_values = model_snapshot(move_request, MOVE_REQUEST_AUDIT_FIELDS)
+    acknowledged_by_text = _clean_text(request.form.get("acknowledged_by_text")) or current_user.display_name
+    move_request.updated_by_id = current_user.id
+    _record_move_request_activity(
+        move_request,
+        action="acknowledged",
+        title="Move request acknowledged",
+        details=f"Acknowledged {move_request.display_number} by {acknowledged_by_text}.",
+        before_values=before_values,
+    )
+    db.session.commit()
+    flash("Move request acknowledged.", "success")
+    return redirect(url_for("manager.move_requests"))
+
+
+@bp.route("/move-requests/<int:request_id>/link-evidence", methods=["POST"])
+def link_move_request_evidence(request_id):
+    move_request = _request_or_404(request_id)
+    before_values = model_snapshot(move_request, MOVE_REQUEST_AUDIT_FIELDS)
+    plant_transfer_id = request.form.get("linked_plant_transfer_id", type=int) or None
+    linked_document_id = request.form.get("linked_document_id", type=int) or None
+
+    transfer = None
+    if plant_transfer_id:
+        transfer = (
+            PlantTransfer.query.filter(
+                PlantTransfer.deleted_at.is_(None),
+                PlantTransfer.id == plant_transfer_id,
+            )
+            .first()
+        )
+        if not transfer:
+            flash("Selected plant transfer was not found.", "danger")
+            return redirect(url_for("manager.move_requests"))
+
+    document = None
+    if linked_document_id:
+        document = ExternalDocument.query.get(linked_document_id)
+        if not document:
+            flash("Selected document was not found.", "danger")
+            return redirect(url_for("manager.move_requests"))
+
+    move_request.linked_plant_transfer_id = plant_transfer_id
+    move_request.linked_document_id = linked_document_id
+    move_request.updated_by_id = current_user.id
+
+    linked_labels = []
+    if transfer:
+        linked_labels.append(f"Plant Transfer {transfer.transfer_number or transfer.id}")
+    if document:
+        linked_labels.append(f"Document #{document.id}")
+    if not linked_labels:
+        linked_labels.append("No linked evidence")
+
+    _record_move_request_activity(
+        move_request,
+        action="evidence_linked",
+        title="Move request evidence linked",
+        details=f"Linked evidence for {move_request.display_number}: {', '.join(linked_labels)}.",
+        before_values=before_values,
+    )
+    db.session.commit()
+    flash("Move request evidence link updated.", "success")
     return redirect(url_for("manager.move_requests"))
 
 

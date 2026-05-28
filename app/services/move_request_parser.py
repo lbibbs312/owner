@@ -4,6 +4,7 @@ import re
 _QUANTITY_RE = re.compile(r"\b(?P<value>\d+(?:\.\d+)?)\s*(?P<unit>skids?|pallets?|crates?|racks?|boxes?|coils?|trailers?|packs?)\b", re.IGNORECASE)
 _PART_RE = re.compile(r"\b(?P<part>[A-Z]{1,4}\d{2,}[A-Z0-9-]*)\b", re.IGNORECASE)
 _EQUIPMENT_RE = re.compile(r"\b(?P<equipment>[A-Z]{1,4}\d{1,})\b", re.IGNORECASE)
+MISSING_QUANTITY_WARNING = "Quantity not found. Confirm amount from document or driver."
 
 
 def _clean(value):
@@ -47,7 +48,7 @@ def _suggest_part(suggestions, text):
 
 def _parse_has_for(suggestions, text):
     match = re.search(
-        r"^(?P<origin>.+?)\s+has\s+(?P<cargo>.+?)\s+for\s+(?:the\s+)?(?P<destination>.+?)(?:\s+please)?$",
+        r"^(?P<origin>.+?)\s+has\s+(?P<cargo>.+?)\s+for\s+(?:the\s+)?(?P<destination>.+?)(?:\s+please(?:\s+(?P<trailing>.*))?)?$",
         text,
         re.IGNORECASE,
     )
@@ -71,7 +72,6 @@ def _parse_has_for(suggestions, text):
         suggestions["quantity_text"] = f"{value} {unit}"
     elif cargo:
         suggestions["cargo_text"] = cargo
-        suggestions["quantity_text"] = cargo
     return True
 
 
@@ -160,6 +160,9 @@ def parse_move_request_text(raw_text):
     _suggest_quantity(suggestions, text)
     _suggest_part(suggestions, text)
 
+    if suggestions.get("request_type") == "move" and "quantity_text" not in suggestions:
+        suggestions["quantity_text"] = None
+        warnings.append(MISSING_QUANTITY_WARNING)
     if suggestions.get("request_type") == "move" and not suggestions.get("destination_location_text"):
         warnings.append("Destination was not confidently parsed.")
     if "request_type" not in suggestions:

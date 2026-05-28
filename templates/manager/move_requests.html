@@ -92,7 +92,16 @@
             {% if req.due_at %}<div class="muted-small">{{ req.due_at|to_detroit_datetime }}</div>{% endif %}
           </td>
           <td><span class="pill priority-{{ req.priority }}">{{ req.priority.replace('_', ' ')|title }}</span></td>
-          <td><span class="pill status-{{ req.status }}">{{ req.status.replace('_', ' ')|title }}</span></td>
+          <td>
+            <span class="pill status-{{ req.status }}">{{ req.status.replace('_', ' ')|title }}</span>
+            {% set acknowledgement = acknowledgements.get(req.id) %}
+            {% if acknowledgement %}
+              <div class="muted-small">
+                Ack {{ acknowledgement.created_at|to_detroit_datetime }}
+                {% if acknowledgement.user %}by {{ acknowledgement.user.display_name }}{% endif %}
+              </div>
+            {% endif %}
+          </td>
           <td>
             {{ req.assigned_display }}
             {% if req.equipment_display %}<div class="muted-small">{{ req.equipment_display }}</div>{% endif %}
@@ -105,7 +114,10 @@
               <span>Route {{ req.linked_route_id }}</span><br>
             {% endif %}
             {% if req.linked_plant_transfer %}
-              <a href="{{ url_for('manager.view_plant_transfer', transfer_id=req.linked_plant_transfer_id) }}">Plant Transfer #{{ req.linked_plant_transfer.transfer_number or req.linked_plant_transfer_id }}</a>
+              <a href="{{ url_for('manager.view_plant_transfer', transfer_id=req.linked_plant_transfer_id) }}">Plant Transfer #{{ req.linked_plant_transfer.transfer_number or req.linked_plant_transfer_id }}</a><br>
+            {% endif %}
+            {% if req.linked_document_id %}
+              <span>Document #{{ req.linked_document_id }}</span>
             {% endif %}
           </td>
           <td>
@@ -121,6 +133,19 @@
                 <input class="form-control" name="assigned_driver_text" value="{{ req.assigned_driver_text or '' }}" placeholder="Manual driver">
                 <input class="form-control" name="equipment_text" value="{{ req.equipment_text or req.equipment_id or '' }}" placeholder="Equipment">
                 <button class="btn btn-sm btn-secondary" type="submit">Assign Request</button>
+              </form>
+              <form method="POST" action="{{ url_for('manager.acknowledge_move_request', request_id=req.id) }}" class="assign-row">
+                <input class="form-control" name="acknowledged_by_text" placeholder="Ack by (optional)">
+                <button class="btn btn-sm btn-outline-secondary" type="submit">Acknowledge Request</button>
+              </form>
+              <form method="POST" action="{{ url_for('manager.link_move_request_evidence', request_id=req.id) }}" class="assign-row">
+                <select class="form-select" name="linked_plant_transfer_id" aria-label="Linked plant transfer">
+                  {% for value, label in plant_transfer_choices %}
+                    <option value="{{ value }}" {% if (req.linked_plant_transfer_id or 0) == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+                <input class="form-control" name="linked_document_id" value="{{ req.linked_document_id or '' }}" placeholder="Document ID">
+                <button class="btn btn-sm btn-outline-secondary" type="submit">Link Evidence</button>
               </form>
               <div class="button-row">
                 <form method="POST" action="{{ url_for('manager.mark_move_request_blocked', request_id=req.id) }}">

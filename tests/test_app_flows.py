@@ -679,6 +679,140 @@ def test_manager_move_request_queue_create_edit_and_actions(client, app):
             assert AuditEvent.query.filter_by(target_type="move_request", target_id=request_id, action=action).count() == 1
 
 
+def test_phase1a_group_chat_request_acknowledgement_and_transfer_link(client, app):
+    from datetime import date
+
+    missing_quantity_warning = "Quantity not found. Confirm amount from document or driver."
+    raw_text = "PW has parts for RE please P0916"
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ActivityEvent, AuditEvent, MoveRequest, PlantTransfer, PlantTransferLine
+
+        driver = create_user("phase1a_driver", "phase1a-driver@example.com", "driver")
+        manager = create_user("phase1a_manager", "phase1a-manager@example.com", "management")
+        transfer = PlantTransfer(
+            user_id=driver.id,
+            transfer_number="809716",
+            transfer_date=date(2026, 5, 28),
+            ship_from="1018",
+            ship_to="3036",
+            trailer_number="stl1",
+            driver_name="Phase 1A Driver",
+            transfer_time="14:36",
+            loaded_by="stl1",
+        )
+        transfer.lines.append(
+            PlantTransferLine(
+                line_number=1,
+                side="left",
+                part_number="P0916165188",
+                quantity="1",
+                remarks="Visible item line related to P0916 request.",
+            )
+        )
+        db.session.add(transfer)
+        db.session.commit()
+        transfer_id = transfer.id
+        manager_id = manager.id
+
+    login(client, "phase1a_manager")
+    parse_response = client.post("/manager/move-requests/parse", data={"raw_text": raw_text})
+    assert parse_response.status_code == 200
+    parsed = parse_response.get_json()
+    assert parsed["suggestions"]["request_type"] == "move"
+    assert parsed["suggestions"]["origin_location_text"] == "PW"
+    assert parsed["suggestions"]["destination_location_text"] == "RE"
+    assert parsed["suggestions"]["cargo_text"] == "parts"
+    assert parsed["suggestions"]["part_number"] == "P0916"
+    assert parsed["suggestions"]["priority"] == "normal"
+    assert parsed["suggestions"]["quantity_text"] is None
+    assert parsed["warnings"] == [missing_quantity_warning]
+
+    created = client.post(
+        "/manager/move-requests/new",
+        data={
+            "raw_text": raw_text,
+            "source": "text",
+            "requested_by": "Group Chat",
+            "requested_at": "2026-05-28T14:20",
+            "request_type": "move",
+            "priority": "normal",
+            "origin_location_text": "PW",
+            "destination_location_text": "RE",
+            "cargo_text": "parts",
+            "part_number": "P0916",
+            "quantity_value": "",
+            "quantity_unit": "",
+            "quantity_text": "",
+            "due_time_text": "",
+            "notes": "Transfer document later supplied site, LP, item, and quantity details.",
+            "status": "open",
+            "assigned_driver_id": "0",
+            "assigned_driver_text": "",
+            "equipment_id": "",
+            "equipment_text": "",
+            "linked_driver_log_id": "0",
+            "linked_route_id": "",
+            "linked_plant_transfer_id": "0",
+            "linked_document_id": "",
+            "parsed_confidence": "high",
+            "parse_warnings": missing_quantity_warning,
+        },
+        follow_redirects=False,
+    )
+    assert created.status_code == 302
+
+    with app.app_context():
+        req = MoveRequest.query.filter_by(raw_text=raw_text).one()
+        request_id = req.id
+        assert req.quantity_text is None
+        assert req.parse_warnings == missing_quantity_warning
+        assert ActivityEvent.query.filter_by(
+            target_type="move_request", target_id=request_id, action="created"
+        ).count() == 1
+
+    acknowledged = client.post(
+        f"/manager/move-requests/{request_id}/acknowledge",
+        data={"acknowledged_by_text": "Dispatch group chat"},
+        follow_redirects=False,
+    )
+    assert acknowledged.status_code == 302
+
+    linked = client.post(
+        f"/manager/move-requests/{request_id}/link-evidence",
+        data={"linked_plant_transfer_id": str(transfer_id), "linked_document_id": ""},
+        follow_redirects=False,
+    )
+    assert linked.status_code == 302
+
+    with app.app_context():
+        req = MoveRequest.query.get(request_id)
+        assert req.linked_plant_transfer_id == transfer_id
+        ack_event = ActivityEvent.query.filter_by(
+            target_type="move_request", target_id=request_id, action="acknowledged"
+        ).one()
+        assert ack_event.user_id == manager_id
+        assert "Dispatch group chat" in ack_event.details
+        assert ack_event.created_at is not None
+        link_event = ActivityEvent.query.filter_by(
+            target_type="move_request", target_id=request_id, action="evidence_linked"
+        ).one()
+        assert "Plant Transfer 809716" in link_event.details
+        assert AuditEvent.query.filter_by(
+            target_type="move_request", target_id=request_id, action="acknowledged"
+        ).count() == 1
+        assert AuditEvent.query.filter_by(
+            target_type="move_request", target_id=request_id, action="evidence_linked"
+        ).count() == 1
+
+    queue_page = client.get("/manager/move-requests")
+    assert queue_page.status_code == 200
+    assert b"PW has parts for RE please P0916" in queue_page.data
+    assert b"Plant Transfer #809716" in queue_page.data
+    assert b"Ack " in queue_page.data
+
+
 def test_driver_mobile_shows_full_parts_queue_and_route_task_events(client, app):
     from datetime import date, datetime
 
@@ -3244,7 +3378,9 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
 
     driver_print = client.get("/driver_logs_print")
     assert driver_print.status_code == 200
-    assert b"7. Photo Proof" in driver_print.data
+    assert b"3. Photo Proof" in driver_print.data
+    assert b"4. Plant Legend" in driver_print.data
+    assert b"5. Signatures" in driver_print.data
     assert b"Loaded seal photo from gallery" in driver_print.data
     assert b"Departing load proof from gallery" in driver_print.data
     assert b"Photo proof review" in driver_print.data
@@ -4019,9 +4155,18 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
 
     print_response = client.get("/driver_logs_print")
     assert print_response.status_code == 200
+    assert b"Driver Route Sheet" in print_response.data
+    assert b"Driver Route Audit Sheet" not in print_response.data
     assert b"5:45pm" in print_response.data
     assert b"Wait 12 min" in print_response.data
     assert b"17:45" not in print_response.data
+    assert b"2. Stop Timeline" in print_response.data
+    assert b"Stop #" in print_response.data
+    assert b"Stop / Movement" in print_response.data
+    assert b"3. Plant Legend" in print_response.data
+    assert b"4. Signatures" in print_response.data
+    assert b"Leg #" not in print_response.data
+    assert b"9. Signatures" not in print_response.data
     assert_official_record_output(print_response.data)
 
     eod_print = client.get("/end_of_day_print")
@@ -4088,6 +4233,11 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     pdf_response = client.get(f"/driver_logs_print/attachment?date={selected_date.isoformat()}")
     assert pdf_response.status_code == 200
     assert pdf_response.headers["Content-Type"] == "application/pdf"
+    assert b"DRIVER ROUTE SHEET" in pdf_response.data
+    assert b"DRIVER ROUTE AUDIT SHEET" not in pdf_response.data
+    assert b"2. Stop Timeline" in pdf_response.data
+    assert b"Stop #" in pdf_response.data
+    assert b"Leg #" not in pdf_response.data
 
 
 def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client, app):

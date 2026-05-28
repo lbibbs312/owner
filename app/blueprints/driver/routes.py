@@ -116,7 +116,7 @@ def _pretrip_document_meta(pretrip, page="1 of 1"):
 
 def _route_document_meta(route_date, driver, logs, pretrips, page="1 of 1"):
     return document_meta(
-        "DRIVER ROUTE AUDIT SHEET",
+        "DRIVER ROUTE SHEET",
         route_document_number(route_date, driver=driver, truck=_truck_from_pretrips(pretrips), route_id=_first_record_id(logs)),
         page=page,
     )
@@ -1775,7 +1775,7 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
     pdf = SimplePdf("Driver Route Sheet", LETTER)
     _draw_pdf_header(
         pdf,
-        "DRIVER ROUTE AUDIT SHEET",
+        "DRIVER ROUTE SHEET",
         meta["document_no"],
         meta["generated_at"],
         meta["page"],
@@ -1794,7 +1794,7 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
             info_parts.append(f"Badge: {driver.employee_id}")
         pdf.text(44, y, " | ".join(info_parts), size=8)
         y -= 14
-    pdf.text(36, y, "2. Numbered Route Legs", size=11, bold=True)
+    pdf.text(36, y, "2. Stop Timeline", size=11, bold=True)
     y -= 12
     snapshot_rows = {row.get("log_id"): row for row in (route_context.rows if route_context else [])}
     rows = []
@@ -1813,7 +1813,7 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
             ("No Pickup " if log.no_pickup else "") + (("HOT " if log.hot_parts else "") + (log.part_number or "")).strip(),
             f"{snapshot.get('status', '')}: {status}" if snapshot else status,
         ])
-    y = pdf.table(36, y, [28, 56, 44, 44, 78, 78, 54, 78, 72], 24, ["Leg #", "Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Wait", "Parts", "Status"], rows or [["--", "No logs", "", "", "", "", "", "", ""]], font_size=6)
+    y = pdf.table(36, y, [28, 56, 44, 44, 78, 78, 54, 78, 72], 24, ["Stop #", "Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Wait", "Parts", "Status"], rows or [["--", "No logs", "", "", "", "", "", "", ""]], font_size=6)
     y -= 18
     pdf.text(36, y, "3. Signatures", size=11, bold=True)
     _draw_signature_pdf_block(pdf, driver_signature, signature_timestamp)

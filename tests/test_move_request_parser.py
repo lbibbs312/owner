@@ -3,6 +3,9 @@ import pytest
 from app.services.move_request_parser import parse_move_request_text
 
 
+MISSING_QUANTITY_WARNING = "Quantity not found. Confirm amount from document or driver."
+
+
 @pytest.mark.parametrize(
     ("raw_text", "expected"),
     [
@@ -25,8 +28,20 @@ from app.services.move_request_parser import parse_move_request_text
                 "origin_location_text": "Trim 52DC",
                 "destination_location_text": "RW",
                 "cargo_text": "pack",
-                "quantity_text": "pack",
+                "quantity_text": None,
                 "priority": "normal",
+            },
+        ),
+        (
+            "PW has parts for RE please P0916",
+            {
+                "request_type": "move",
+                "origin_location_text": "PW",
+                "destination_location_text": "RE",
+                "cargo_text": "parts",
+                "part_number": "P0916",
+                "priority": "normal",
+                "quantity_text": None,
             },
         ),
         (
@@ -68,3 +83,9 @@ def test_parse_move_request_text_examples(raw_text, expected):
     assert result["confidence"] in {"medium", "high"}
     for field, value in expected.items():
         assert result["suggestions"][field] == value
+
+
+def test_parse_move_request_text_warns_when_quantity_must_come_from_document():
+    result = parse_move_request_text("PW has parts for RE please P0916")
+
+    assert result["warnings"] == [MISSING_QUANTITY_WARNING]

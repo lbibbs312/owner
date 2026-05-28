@@ -3,7 +3,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Driver Route Audit Sheet</title>
+  <title>Driver Route Sheet</title>
   <style>
     @page { size: Letter portrait; margin: 0.35in; }
     * { box-sizing: border-box; }
@@ -52,6 +52,7 @@
     .task-note { border-left: 4px solid #2563eb; background: #eff6ff; color: #111; padding: 3px 5px; margin-top: 3px; font-size: 8pt; }
     .task-note.hot { border-left-color: #dc2626; background: #fee2e2; }
     .task-note.done { border-left-color: #16a34a; background: #dcfce7; }
+    .section-title { margin: 0.12in 0 0.04in; font-size: 10pt; }
     .photo-proof-section { margin-top: 0.14in; break-inside: avoid; }
     .photo-proof-section h3 { margin: 0 0 0.06in; font-size: 10pt; }
     .photo-proof-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.1in; }
@@ -82,7 +83,7 @@
 </head>
 <body>
 <div class="print-page">
-  {% set document_meta = document_meta|default({'title': 'DRIVER ROUTE AUDIT SHEET', 'document_no': 'ROUTE-' ~ the_date, 'generated_at': '', 'page': '1 of 1'}) %}
+  {% set document_meta = document_meta|default({'title': 'DRIVER ROUTE SHEET', 'document_no': 'ROUTE-' ~ the_date, 'generated_at': '', 'page': '1 of 1'}) %}
   <div class="print-controls no-print">
   <button class="print-btn" onclick="window.print()">Print Document</button>
   <a class="email-btn" href="{{ url_for('driver.driver_logs_print', date=the_date.isoformat(), autoprint=1) }}">Save PDF</a>
@@ -106,7 +107,7 @@
 
   <div class="sheet-head">
     <div>
-      <h2>1. Driver Route Audit Sheet</h2>
+      <h2>1. Driver Route Sheet</h2>
       <div class="muted">Chronological route record with cargo, stop actions, exceptions, and verification totals.</div>
     </div>
     <div class="sheet-meta">
@@ -135,9 +136,13 @@
       {% if logs %}
         <div class="qa-note">
           {% set printed_wait = namespace(value=0) %}
-          {% for wait_log in logs %}
-            {% set wait_label = wait_label_for_log(wait_log) %}
-            {% if wait_label %}{% if printed_wait.value %}; {% endif %}{{ ((log_routes or {}).get(wait_log.id) or {}).get('plant') or wait_log.plant_name }}: {{ wait_label }}{% set printed_wait.value = printed_wait.value + 1 %}{% endif %}
+          {% for wait_log in logs -%}
+            {% set wait_label = wait_label_for_log(wait_log) -%}
+            {% if wait_label -%}
+              {%- if printed_wait.value %}; {% endif -%}
+              {{ ((log_routes or {}).get(wait_log.id) or {}).get('plant') or wait_log.plant_name }}: {{ wait_label }}
+              {%- set printed_wait.value = printed_wait.value + 1 -%}
+            {% endif -%}
           {% endfor %}
         </div>
       {% endif %}
@@ -158,13 +163,16 @@
     </div>
   </div>
 
+  {% set section_no = namespace(value=2) %}
   {% set route_completed = route_context and route_context.route_status == 'completed' %}
   {% if logs %}
+    <h3 class="section-title">{{ section_no.value }}. Stop Timeline</h3>
+    {% set section_no.value = section_no.value + 1 %}
     <table>
       <thead>
         <tr>
-          <th>Leg #</th>
-          <th>Route</th>
+          <th>Stop #</th>
+          <th>Stop / Movement</th>
           <th>Depart</th>
           <th>Arrive</th>
           <th>Transit Cargo</th>
@@ -244,7 +252,8 @@
     {% endfor %}
     {% if photo_proof_count.value %}
       <div class="photo-proof-section">
-        <h3>7. Photo Proof</h3>
+        <h3>{{ section_no.value }}. Photo Proof</h3>
+        {% set section_no.value = section_no.value + 1 %}
         <div class="photo-proof-grid">
           {% for proof_log in logs %}
             {% set proof_route = (log_routes or {}).get(proof_log.id) %}
@@ -269,18 +278,19 @@
       </div>
     {% endif %}
     <div class="plant-legend">
-      <strong>8. Plant Legend</strong>
+      <strong>{{ section_no.value }}. Plant Legend</strong>
       <span>PPL = PPL</span>
       <span>RE = Raleigh East</span>
       <span>DC = Distribution Center</span>
       <span>KP = Kraft Plant</span>
       <span>PC = Paint Central</span>
     </div>
+    {% set section_no.value = section_no.value + 1 %}
   {% else %}
-    <p>No logs found for today.</p>
+    <p>No logs found for selected date.</p>
   {% endif %}
 
-  <h3>9. Signatures</h3>
+  <h3>{{ section_no.value }}. Signatures</h3>
     <div class="sig-block">
     <div class="sig-col">
       <div class="sig-label">Driver Signature</div>
