@@ -45,6 +45,8 @@ from app.models.part import (
     PartRouteProfile,
     PartScanEvent,
 )
+from app.models.node import Node
+from app.models.voyager import Voyager
 
 __all__ = [
     "User",
@@ -94,4 +96,6 @@ __all__ = [
     "LoadIntent",
     "PlantPredictionRule",
     "PlantTimeSample",
+    "Node",
+    "Voyager",
 ]

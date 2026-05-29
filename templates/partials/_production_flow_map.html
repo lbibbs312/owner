@@ -45,14 +45,17 @@
       .ops-board-spatial .production-flow-canvas { background-color: #030712; border-bottom: 1px solid #1f2937; }
       @media (min-width: 992px) { .ops-board-spatial .production-flow-canvas { border-bottom: 0; border-right: 1px solid #1f2937; } }
       .ops-board-spatial .flow-live-board {
-        position: relative; min-height: 620px; padding: 18px; overflow: hidden;
+        position: relative; min-height: 620px; padding: 0; overflow: hidden;
         background:
           radial-gradient(circle at 54% 36%, rgba(59,130,246,0.12), transparent 34%),
           radial-gradient(circle at 30% 70%, rgba(239,68,68,0.10), transparent 28%),
           linear-gradient(180deg, #020617 0%, #030712 54%, #01040b 100%);
       }
+      .ops-board-spatial .flow-spatial-canvas { position: relative; width: 100%; aspect-ratio: 16 / 11; min-height: 620px; }
+      @media (max-width: 991.98px) { .ops-board-spatial .flow-spatial-canvas { aspect-ratio: 4 / 5; min-height: 640px; } }
       .ops-board-spatial .map-svg-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 18; overflow: visible; }
-      .ops-board-spatial .map-html-layer { position: relative; z-index: 10; display: flex; flex-direction: column; gap: 14px; pointer-events: none; }
+      .ops-board-spatial .map-html-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+      .ops-board-spatial .map-html-layer > .flow-object-layer { display: none; }
       .ops-board-spatial .flow-lane { stroke: #374151; stroke-width: 2.5; fill: none; transition: stroke 0.3s; vector-effect: non-scaling-stroke; pointer-events: stroke; }
       .ops-board-spatial .flow-lane.is-related-path { stroke: #f8fafc; stroke-width: 5; filter: drop-shadow(0 0 8px rgba(56,189,248,0.65)); opacity: 1; }
       .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open { stroke: #6366f1; stroke-width: 3.5; stroke-dasharray: 8 6; animation: ops-dash-flow 1.5s linear infinite; }
@@ -96,11 +99,10 @@
       .ops-board-spatial .flow-object-copy strong { display: block; color: #cbd5e1; font-weight: 700; margin-bottom: 2px; }
       .ops-board-spatial .flow-object-detail { color: #94a3b8; display: block; margin-top: 4px; }
       .ops-board-spatial .flow-node-row, .ops-board-spatial .route-chip-strip {
-        display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; pointer-events: none;
+        position: absolute; inset: 0; pointer-events: none;
       }
-      .ops-board-spatial .route-chip-strip { min-height: 98px; padding: 12px 0 10px; border-top: 1px solid rgba(51,65,85,0.45); justify-content: center; }
       .ops-board-spatial .flow-node {
-        position: relative; width: 198px; background-color: rgba(30, 41, 59, 0.88); border: 2px solid rgba(71,85,105,0.95);
+        position: absolute; width: 168px; transform: translate(-50%, -50%); background-color: rgba(30, 41, 59, 0.92); border: 2px solid rgba(71,85,105,0.95);
         border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); cursor: pointer;
         transition: border-color 0.2s, box-shadow 0.2s;
         color: #e5e7eb; text-align: left; padding: 0; font: inherit;
@@ -120,16 +122,19 @@
       .ops-board-spatial .facility-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background-color: #374151; font-size: 0.65rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
       .ops-board-spatial .facility-stat { background-color: #111827; padding: 4px 6px; display: flex; justify-content: space-between; color: #9ca3af; }
       .ops-board-spatial .facility-stat strong { color: #e5e7eb; font-weight: 700; }
+      .ops-board-spatial .flow-node:hover, .ops-board-spatial .flow-node.is-active, .ops-board-spatial .flow-node.is-related-object { transform: translate(-50%, -50%) scale(1.04); }
+      .ops-board-spatial .flow-node--hub { box-shadow: 0 0 0 3px rgba(99,102,241,0.18), 0 12px 28px rgba(0,0,0,0.55); }
       .ops-board-spatial .flow-chip {
-        position: relative; width: 150px; background-color: rgba(30,41,59,0.94); border: 1px solid #4b5563;
+        position: absolute; width: 138px; transform: translate(-50%, -50%); background-color: rgba(30,41,59,0.96); border: 1px solid #4b5563;
         border-radius: 0.4rem; cursor: pointer; z-index: 30; box-shadow: 0 4px 8px rgba(0,0,0,0.6);
         transition: border-color 0.15s, box-shadow 0.15s;
         color: #e5e7eb; padding: 0; text-align: left; font: inherit;
         pointer-events: auto;
       }
       @media (hover: hover) {
-        .ops-board-spatial .flow-chip:hover { border-color: #e5e7eb; box-shadow: 0 6px 14px rgba(0,0,0,0.7); z-index: 35; }
+        .ops-board-spatial .flow-chip:hover { border-color: #e5e7eb; box-shadow: 0 6px 14px rgba(0,0,0,0.7); z-index: 35; transform: translate(-50%, -50%) scale(1.08); }
       }
+      .ops-board-spatial .flow-chip.is-active { transform: translate(-50%, -50%) scale(1.08); }
       .ops-board-spatial .flow-chip.is-active { border-color: #e5e7eb; box-shadow: 0 0 20px rgba(255,255,255,0.18); z-index: 35; }
       .ops-board-spatial .flow-chip:focus-visible { outline: 2px solid #e5e7eb; outline-offset: 2px; }
       .ops-board-spatial .flow-chip--blocked, .ops-board-spatial .flow-chip--needs_review, .ops-board-spatial .flow-chip--critical, .ops-board-spatial .flow-chip--high { border-color: #ef4444; }
@@ -285,6 +290,15 @@
       .ops-board-spatial [data-flow-drawer-detail] dl { margin: 0; }
       .ops-board-spatial [data-flow-drawer-detail] h3 { color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; font-size: 0.9rem; margin: 0 0 8px; letter-spacing: 0.03em; }
       .ops-board-spatial [data-flow-drawer-detail] .drawer-kicker { color: #6b7280; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.65rem; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.05em; }
+      .ops-board-spatial .proof-trail-list { list-style: none; padding: 0; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .ops-board-spatial .proof-trail-row { display: block; padding: 8px 10px; margin-bottom: 6px; background-color: #030712; border: 1px solid #1f2937; border-left: 3px solid #475569; border-radius: 3px; font-size: 0.7rem; color: #9ca3af; }
+      .ops-board-spatial .proof-trail-row.blocked, .ops-board-spatial .proof-trail-row.issue, .ops-board-spatial .proof-trail-row.needs_review { border-left-color: #ef4444; }
+      .ops-board-spatial .proof-trail-row.waiting { border-left-color: #f59e0b; }
+      .ops-board-spatial .proof-trail-row.active, .ops-board-spatial .proof-trail-row.open { border-left-color: #6366f1; }
+      .ops-board-spatial .proof-trail-row.completed { border-left-color: #10b981; }
+      .ops-board-spatial .proof-trail-row strong { display: block; color: #fff; font-size: 0.74rem; font-weight: 700; margin-bottom: 2px; }
+      .ops-board-spatial .proof-trail-row .proof-trail-edge { display: block; color: #94a3b8; font-size: 0.65rem; }
+      .ops-board-spatial .proof-trail-row .proof-trail-proof { display: block; color: #38bdf8; font-size: 0.62rem; margin-top: 3px; }
     </style>
 
     {% set attention_ns = namespace(count=0) %}
@@ -325,7 +339,7 @@
         <div><span>Tenant / Company</span><strong>{{ current_user.company_name if current_user and current_user.company_name is defined and current_user.company_name else 'lacksdrivers' }}</strong></div>
         <div><span>User / Role</span><strong>{{ current_user.display_name if current_user and current_user.is_authenticated else 'Read only' }}{% if current_user and current_user.is_authenticated %} / {{ current_user.role }}{% endif %}</strong></div>
         <div><span>Shift Date</span><strong>{{ pf.date if pf else '' }}</strong></div>
-        <div><span>Proof Layer</span><strong>Shadow Ledger filters on click</strong></div>
+        <div><span>Proof Layer</span><strong>Proof Trail filters on click</strong></div>
       </div>
 
       <div class="flow-map-lanes" aria-label="Production to transport flow lanes">
@@ -339,20 +353,32 @@
       <div class="ops-spatial-body">
         <div>
           <div class="production-flow-canvas" aria-label="View Production Flow facility map">
-            <div class="flow-live-board" data-flow-live-board data-flow-animation-mode="live">
-              <svg class="map-svg-layer" data-flow-edge-layer aria-hidden="true">
+            <div class="flow-live-board flow-spatial-canvas" data-flow-live-board data-flow-animation-mode="live">
+              <svg class="map-svg-layer" data-flow-edge-layer aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
                 <defs>
-                  <marker id="ops-arrow-live-{{ flow_mode }}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0, 7 3.5, 0 7" fill="#38bdf8"/></marker>
-                  <marker id="ops-arrow-exception-{{ flow_mode }}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0, 7 3.5, 0 7" fill="#ef4444"/></marker>
+                  <marker id="ops-arrow-live-{{ flow_mode }}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 7 3.5, 0 7" fill="#38bdf8"/></marker>
+                  <marker id="ops-arrow-exception-{{ flow_mode }}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 7 3.5, 0 7" fill="#ef4444"/></marker>
                   <mask id="flow-card-cutouts-{{ flow_mode }}" data-flow-card-mask maskUnits="userSpaceOnUse">
-                    <rect x="0" y="0" width="100%" height="100%" fill="white"></rect>
+                    <rect x="0" y="0" width="100" height="100" fill="white"></rect>
                   </mask>
                 </defs>
+                <g data-flow-lane-group>
+                  {% for lane in pf.flow_lanes %}
+                    {% if lane.layout and lane.layout.path_d %}
+                      <path class="flow-lane flow-lane--{{ lane.worst_status or 'open' }}"
+                            d="{{ lane.layout.path_d }}"
+                            data-flow-path-key="{{ lane.origin_key }}--{{ lane.destination_key }}"
+                            data-source-key="node:{{ lane.origin_key }}"
+                            data-target-key="node:{{ lane.destination_key }}"
+                            marker-end="url(#ops-arrow-live-{{ flow_mode }})"/>
+                    {% endif %}
+                  {% endfor %}
+                </g>
                 <g data-flow-edge-group mask="url(#flow-card-cutouts-{{ flow_mode }})"></g>
               </svg>
 
               <div class="map-html-layer">
-                <div class="flow-object-layer" aria-label="Primary flow objects">
+                <div class="flow-object-layer" aria-label="Primary flow objects" hidden>
                   {% for object in pf.flow_objects %}
                     <button type="button"
                             class="flow-object-card flow-object-card--{{ object.status }}"
@@ -386,6 +412,7 @@
                     {% elif item.priority in ('hot','safety') %}{% set badge_text = 'HOT' %}{% set badge_class = 'chip-badge chip-badge--hot' %}{% endif %}
                     <button type="button"
                             class="flow-chip{% if item.item_type == 'route_stop' %} route-step-chip{% endif %} flow-chip--{{ item.status }}"
+                            style="{% if item.layout %}left: {{ item.layout.x }}%; top: {{ item.layout.y }}%;{% endif %}"
                             data-flow-open="item"
                             data-flow-id="{{ item.item_id }}"
                             data-flow-path-key="{{ item.related_path_key or '' }}"
@@ -417,6 +444,7 @@
                   {% for node in pf.flow_nodes %}
                     <button type="button"
                             class="flow-node flow-node--{{ node.worst_status }}{% if node.layout.is_hub %} flow-node--hub{% endif %}"
+                            style="{% if node.layout %}left: {{ node.layout.x }}%; top: {{ node.layout.y }}%;{% endif %}"
                             data-flow-open="node"
                             data-flow-id="{{ node.key }}"
                             data-flow-node-key="node:{{ node.key }}"
@@ -461,26 +489,42 @@
               {% endif %}
             </div>
             <div class="replay-row">
-              <span class="label">Shadow Ledger</span>
+              <span class="label">Proof Trail</span>
               <button class="btn-mini" type="button" data-flow-mode-button="live">Live</button>
               <button class="btn-mini" type="button" data-flow-mode-button="replay">Replay</button>
               <button class="btn-mini" type="button" data-flow-mode-button="static">Static</button>
               <input type="range" min="0" max="{{ pf.flow_edges|length if pf.flow_edges else 0 }}" value="{{ pf.flow_edges|length if pf.flow_edges else 0 }}" aria-label="Replay timeline" data-flow-replay-slider>
-              <span style="color:#6b7280; font-size:0.62rem;">Edges come from FlowEvent ledger rows only</span>
             </div>
           </div>
         </div>
 
         <aside class="flow-drawer-panel" data-flow-drawer aria-label="Production flow details">
           <div data-flow-drawer-global>
-            <h5 class="drawer-title">Shadow Ledger</h5>
-            <div class="drawer-kicker-line">Every visible edge, pulse, count, and alert is projected from append-only FlowEvents. Click a card or stop chip to filter the proof trail.</div>
-            <ul class="shadow-ledger-list" data-flow-event-timeline data-shadow-ledger-list>
+            <h5 class="drawer-title">Proof Trail</h5>
+            <div class="drawer-kicker-line">Stage transitions captured today. Click a node or chip to filter.</div>
+            {% set stage_label_map = {
+              'wip': 'WIP',
+              'staging': 'Staging',
+              'load_build': 'Load Build',
+              'manifested': 'Manifested',
+              'in_transit': 'In Transit',
+              'receiving': 'Receiving',
+              'exceptions': 'Exception',
+            } %}
+            {% macro stage_pretty(raw) -%}
+              {%- if raw and ':' in raw -%}
+                {%- set kind, body = raw.split(':', 1) -%}
+                {%- if kind == 'object' -%}{{ stage_label_map.get(body, body|title) }}
+                {%- else -%}{{ body|replace('_', ' ')|title }}
+                {%- endif -%}
+              {%- else -%}{{ raw or '\u2014' }}{%- endif -%}
+            {%- endmacro %}
+            <ul class="proof-trail-list" data-flow-event-timeline data-shadow-ledger-list>
               {% set edge_ns = namespace(count=0) %}
               {% for edge in pf.flow_edges|reverse %}
                 {% if edge_ns.count < 8 %}
                   {% set edge_ns.count = edge_ns.count + 1 %}
-                  <li class="shadow-ledger-row {{ edge.status }}"
+                  <li class="proof-trail-row {{ edge.status }}"
                       data-shadow-ledger-row
                       data-flow-event-id="{{ edge.event_id }}"
                       data-source-key="{{ edge.source_key }}"
@@ -488,17 +532,14 @@
                       data-entity-type="{{ edge.entity_type or '' }}"
                       data-entity-id="{{ edge.entity_id or '' }}"
                       data-stop-id="{{ edge.stop_id or '' }}">
-                    <strong>#{{ edge.event_id }} &nbsp;{{ edge.label }}</strong>
-                    <span class="ledger-edge">object: {{ edge.source_key }} &rarr; {{ edge.target_key }}{% if edge.previous_event_id %} &middot; after #{{ edge.previous_event_id }}{% endif %}</span>
-                    <span>entity: {{ edge.entity_type or 'flow' }}{% if edge.entity_id %} #{{ edge.entity_id }}{% endif %}{% if edge.stop_id %} &middot; stop {{ edge.stop_id }}{% endif %}</span>
-                    <span>source: {{ edge.source or 'ledger' }}{% if edge.actor_role %} / {{ edge.actor_role }}{% endif %}</span>
-                    <span class="ledger-proof">proof: {{ edge.proof_label or 'none' }}</span>
+                    <strong>{{ edge.label }}</strong>
+                    <span class="proof-trail-edge">{{ stage_pretty(edge.source_key) }} &rarr; {{ stage_pretty(edge.target_key) }}</span>
+                    {% if edge.proof_label %}<span class="proof-trail-proof">{{ edge.proof_label }}</span>{% endif %}
                   </li>
                 {% endif %}
               {% endfor %}
-              {% if edge_ns.count == 0 %}<li class="shadow-ledger-row">No FlowEvent edges for this date yet.</li>{% endif %}
+              {% if edge_ns.count == 0 %}<li class="proof-trail-row">No proof events for this date yet.</li>{% endif %}
             </ul>
-            <div class="shadow-ledger-note">{{ pf.ledger_summary.truth_statement if pf and pf.ledger_summary else 'The event ledger is the truth.' }}</div>
           </div>
           <div data-flow-drawer-detail hidden></div>
         </aside>
