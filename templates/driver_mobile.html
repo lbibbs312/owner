@@ -358,6 +358,10 @@
     }
     .route-panel { display: none; }
     @media (min-width: 1200px) { .route-panel { display: block; } }
+    @media (min-width: 1200px) {
+      .flow-first-shell .wide-body { grid-template-columns: minmax(0, 1fr); }
+      .flow-first-shell .route-panel { display: none; }
+    }
 
     .rp-head {
       padding: 14px 16px 10px;
@@ -1223,7 +1227,8 @@
   </style>
 </head>
 <body>
-  <div class="mobile-shell move-defense-mobile driver-ops-shell">
+  {% set flow_first_current = production_flow and route_map and route_map.map_mode == 'live_current_work' %}
+  <div class="mobile-shell move-defense-mobile driver-ops-shell{% if flow_first_current %} flow-first-shell{% endif %}">
     <header class="topbar">
       <div class="driver-row">
         <div class="cluster">
@@ -1268,6 +1273,7 @@
 	        {% endfor %}
 	      </nav>
 	      {% endif %}
+	      {% if active_task or not flow_first_current %}
 	      <section class="card hero">
         {% if active_task %}
           <div class="eyebrow"><span class="bolt"></span>{% if active_task.is_hot %}Active Hot Move{% else %}Active Task{% endif %}</div>
@@ -1328,15 +1334,21 @@
 	          </div>
 	        {% endif %}
       </section>
+      {% endif %}
 
       {# ---- Read-only operations console (capture actions below stay intact) ---- #}
       {% if floor %}
       {% from "partials/_next_action.html" import next_action_chip %}
       <section class="ops-console">
 
+        {% if production_flow %}
+          {% set production_flow_mode = "mobile" %}
+          {% include "partials/_production_flow_map.html" %}
+        {% endif %}
+
         {% include "partials/_next_action_card.html" %}
 
-        {% if route_context and route_context.current_stop %}
+        {% if route_context and route_context.current_stop and not flow_first_current %}
         {% set cs = route_context.current_stop %}
         <div class="ops-panel current-work-card">
           <div class="ops-head"><h3>Current Work</h3><span class="ops-sub">{{ route_panel_title }}</span></div>
@@ -1351,15 +1363,11 @@
         </div>
         {% endif %}
 
-        {% if route_map %}
+        {% if route_map and not flow_first_current %}
           {% include "partials/_compact_route_map.html" %}
         {% endif %}
 
-        {% if production_flow %}
-          {% set production_flow_mode = "mobile" %}
-          {% include "partials/_production_flow_map.html" %}
-        {% endif %}
-
+        {% if assigned_requests or not flow_first_current %}
         <div class="ops-panel">
           <div class="ops-head"><h3>Assigned Move Queue</h3><span class="ops-sub">{{ assigned_requests|length }}</span></div>
           <div class="ops-body">
@@ -1385,10 +1393,13 @@
             {% endif %}
           </div>
         </div>
+        {% endif %}
 
-        {% set card_keys = ['hot_or_urgent', 'blocked_or_no_parts', 'loading_now', 'unloading_now', 'waiting_over_limit', 'on_road'] %}
-        {% set heading = "Floor Operations Summary" %}
-        {% include "partials/_floor_operations_snapshot.html" %}
+        {% if not flow_first_current %}
+          {% set card_keys = ['hot_or_urgent', 'blocked_or_no_parts', 'loading_now', 'unloading_now', 'waiting_over_limit', 'on_road'] %}
+          {% set heading = "Floor Operations Summary" %}
+          {% include "partials/_floor_operations_snapshot.html" %}
+        {% endif %}
       </section>
       {% endif %}
 

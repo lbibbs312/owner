@@ -718,7 +718,7 @@ def _apply_map_layout(nodes, lanes, items, *, selected_node_key=None):
 
     lane_by_pair = {(lane["origin_label"], lane["destination_label"]): lane for lane in lanes}
     item_offsets = ((-9, -9), (10, 8), (-12, 9), (12, -8), (0, 14), (0, -14))
-    route_chip_offsets = ((0, 17), (12, 18), (-12, 18), (0, 24), (14, 24), (-14, 24))
+    route_chip_offsets = ((18, 16), (-18, 16), (18, 24), (-18, 24), (0, 27), (0, -24))
     node_item_counts = {}
     for index, item in enumerate(items):
         lane = lane_by_pair.get((item.get("origin_label"), item.get("destination_label")))

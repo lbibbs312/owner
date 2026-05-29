@@ -459,6 +459,8 @@ def test_mobile_dashboard_uses_compact_shared_production_flow(client, app):
     body = resp.get_data(as_text=True)
     assert 'data-production-flow-mode="mobile"' in body
     assert "Compact Production Flow" in body
+    assert "Active Route Map" not in body
+    assert body.index('data-component="FlowMapDashboard"') < body.index('class="driver-next-card"')
     assert "View Production Flow" in body
     assert "full 2D" not in body
 
