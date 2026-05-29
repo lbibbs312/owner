@@ -30,21 +30,33 @@
       .ops-board-spatial .production-flow-canvas { position: relative; background-color: #030712; overflow: hidden; min-height: 560px; border-bottom: 1px solid #1f2937; }
       @media (min-width: 992px) { .ops-board-spatial .production-flow-canvas { border-bottom: 0; border-right: 1px solid #1f2937; min-height: 640px; } }
       .ops-board-spatial .map-svg-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
-      .ops-board-spatial .map-html-layer { position: absolute; inset: 0; z-index: 10; }
-      .ops-board-spatial .flow-lane { stroke: #374151; stroke-width: 2.5; fill: none; transition: stroke 0.3s; vector-effect: non-scaling-stroke; }
+      .ops-board-spatial .map-html-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+      .ops-board-spatial .flow-lane { stroke: #374151; stroke-width: 2.5; fill: none; transition: stroke 0.3s; vector-effect: non-scaling-stroke; pointer-events: stroke; }
       .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open { stroke: #6366f1; stroke-width: 3.5; stroke-dasharray: 8 6; animation: ops-dash-flow 1.5s linear infinite; }
       .ops-board-spatial .flow-lane--waiting { stroke: #f59e0b; stroke-width: 3.5; stroke-dasharray: 8 6; animation: ops-dash-flow 1.5s linear infinite; }
       .ops-board-spatial .flow-lane--blocked, .ops-board-spatial .flow-lane--issue, .ops-board-spatial .flow-lane--needs_review { stroke: #ef4444; stroke-width: 4; stroke-dasharray: 8 6; animation: ops-dash-flow 1s linear infinite; }
       .ops-board-spatial .flow-lane--completed { stroke: #10b981; stroke-width: 3; }
       .ops-board-spatial .flow-lane--route-overlay { stroke: #38bdf8; stroke-width: 4.5; stroke-dasharray: 12 4; animation: ops-dash-flow 1.4s linear infinite; opacity: 0.95; }
       @keyframes ops-dash-flow { to { stroke-dashoffset: -14; } }
+      @media (prefers-reduced-motion: reduce) {
+        .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open,
+        .ops-board-spatial .flow-lane--waiting, .ops-board-spatial .flow-lane--blocked,
+        .ops-board-spatial .flow-lane--issue, .ops-board-spatial .flow-lane--needs_review,
+        .ops-board-spatial .flow-lane--route-overlay { animation: none; stroke-dasharray: none; }
+        .ops-board-spatial .flow-node, .ops-board-spatial .flow-chip { transition: none; }
+      }
       .ops-board-spatial .flow-node {
         position: absolute; width: 170px; background-color: #111827; border: 2px solid #374151;
         border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); cursor: pointer;
-        transform: translate(-50%, -50%); transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+        transform: translate(-50%, -50%); transition: border-color 0.2s, box-shadow 0.2s;
         color: #e5e7eb; text-align: left; padding: 0; font: inherit;
+        pointer-events: auto;
       }
-      .ops-board-spatial .flow-node:hover, .ops-board-spatial .flow-node.is-active { transform: translate(-50%, -50%) scale(1.05); border-color: #818cf8; box-shadow: 0 0 15px rgba(99,102,241,0.35); z-index: 20; }
+      @media (hover: hover) {
+        .ops-board-spatial .flow-node:hover { border-color: #818cf8; box-shadow: 0 0 18px rgba(99,102,241,0.4); z-index: 20; }
+      }
+      .ops-board-spatial .flow-node.is-active { border-color: #818cf8; box-shadow: 0 0 24px rgba(99,102,241,0.55); z-index: 25; }
+      .ops-board-spatial .flow-node:focus-visible { outline: 2px solid #818cf8; outline-offset: 2px; }
       .ops-board-spatial .flow-node--blocked, .ops-board-spatial .flow-node--issue { border-color: #ef4444; box-shadow: 0 0 15px rgba(239,68,68,0.2); }
       .ops-board-spatial .flow-node--waiting { border-color: #f59e0b; }
       .ops-board-spatial .flow-node--active, .ops-board-spatial .flow-node--open { border-color: #6366f1; }
@@ -56,10 +68,15 @@
       .ops-board-spatial .flow-chip {
         position: absolute; width: 142px; background-color: #1f2937; border: 1px solid #4b5563;
         border-radius: 0.4rem; cursor: pointer; z-index: 30; box-shadow: 0 4px 8px rgba(0,0,0,0.6);
-        transform: translate(-50%, -50%); transition: transform 0.15s, border-color 0.15s;
+        transform: translate(-50%, -50%); transition: border-color 0.15s, box-shadow 0.15s;
         color: #e5e7eb; padding: 0; text-align: left; font: inherit;
+        pointer-events: auto;
       }
-      .ops-board-spatial .flow-chip:hover, .ops-board-spatial .flow-chip.is-active { transform: translate(-50%, -50%) scale(1.1); border-color: #e5e7eb; z-index: 35; }
+      @media (hover: hover) {
+        .ops-board-spatial .flow-chip:hover { border-color: #e5e7eb; box-shadow: 0 6px 14px rgba(0,0,0,0.7); z-index: 35; }
+      }
+      .ops-board-spatial .flow-chip.is-active { border-color: #e5e7eb; box-shadow: 0 0 20px rgba(255,255,255,0.18); z-index: 35; }
+      .ops-board-spatial .flow-chip:focus-visible { outline: 2px solid #e5e7eb; outline-offset: 2px; }
       .ops-board-spatial .flow-chip--blocked, .ops-board-spatial .flow-chip--needs_review, .ops-board-spatial .flow-chip--critical, .ops-board-spatial .flow-chip--high { border-color: #ef4444; }
       .ops-board-spatial .flow-chip--waiting { border-color: #f59e0b; }
       .ops-board-spatial .flow-chip--active, .ops-board-spatial .flow-chip--open { border-color: #6366f1; }
@@ -127,7 +144,7 @@
         <div>
           <p class="ops-board-kicker" style="color:#6b7280; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; margin:0 0 4px;">{{ board_label }}</p>
           <h3>Production Flow Board</h3>
-          <div class="ops-sub">{{ pf.date if pf else '' }}{% if pf %} &middot; Plant moves, route proof, documents, and needs attention{% endif %}</div>
+          <div class="ops-sub">{{ pf.date if pf else '' }}{% if pf %} &middot; Plant moves, route proof, documents, and waiting work{% endif %}</div>
           {% if pf and pf.route_overlay and pf.route_overlay.path_node_keys %}
             <div class="route-overlay-caption" style="margin-top:6px; color:#38bdf8; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.7rem;">
               Showing today&rsquo;s route as proof trail{% if pf.route_overlay.driver_name %} &middot; {{ pf.route_overlay.driver_name }}{% endif %}
@@ -296,15 +313,16 @@
 
     <script>
     (function() {
-      var root = document.currentScript.previousElementSibling;
-      if (!root || !root.matches('[data-ops-spatial]')) {
-        root = document.querySelector('[data-ops-spatial]');
-      }
+      // Find the nearest ops-spatial root regardless of where this script sits in the DOM.
+      var script = document.currentScript;
+      var root = script ? script.closest('[data-ops-spatial]') : null;
+      if (!root) root = document.querySelector('[data-ops-spatial]:not([data-ops-spatial-bound])');
       if (!root || root.dataset.opsSpatialBound === '1') return;
       root.dataset.opsSpatialBound = '1';
 
       var globalView = root.querySelector('[data-flow-drawer-global]');
       var detailView = root.querySelector('[data-flow-drawer-detail]');
+      var selectedKey = null;
 
       function detailKey(kind, id) {
         if (kind === 'node') return 'flow-node-' + id;
@@ -312,33 +330,60 @@
         return 'flow-item-' + id;
       }
 
+      function clearActive() {
+        var actives = root.querySelectorAll('.is-active');
+        for (var i = 0; i < actives.length; i++) actives[i].classList.remove('is-active');
+      }
+
       function showGlobal() {
-        root.querySelectorAll('.is-active').forEach(function(el) { el.classList.remove('is-active'); });
+        clearActive();
+        selectedKey = null;
         if (detailView) { detailView.hidden = true; detailView.innerHTML = ''; }
         if (globalView) globalView.hidden = false;
       }
 
       function showDetail(kind, id, trigger) {
+        var key = kind + ':' + id;
+        // Idempotent: re-clicking the same item is a no-op — no DOM thrash.
+        if (key === selectedKey) return;
         var source = document.querySelector('[data-route-map-detail="' + detailKey(kind, id) + '"]');
         if (!source) { showGlobal(); return; }
-        root.querySelectorAll('.is-active').forEach(function(el) { el.classList.remove('is-active'); });
+        clearActive();
         if (trigger && (trigger.classList.contains('flow-node') || trigger.classList.contains('flow-chip'))) {
           trigger.classList.add('is-active');
+          trigger.setAttribute('aria-pressed', 'true');
         }
         if (globalView) globalView.hidden = true;
         if (detailView) {
           detailView.hidden = false;
-          detailView.innerHTML = '<button type="button" class="drawer-close" data-flow-close>Close \u2715</button>' + source.innerHTML;
+          detailView.innerHTML = '<button type="button" class="drawer-close" data-flow-close aria-label="Close details">Close \u2715</button>' + source.innerHTML;
         }
+        selectedKey = key;
       }
 
       root.addEventListener('click', function(e) {
-        if (e.target.closest('[data-flow-close]')) { e.preventDefault(); showGlobal(); return; }
+        var closeBtn = e.target.closest('[data-flow-close]');
+        if (closeBtn && root.contains(closeBtn)) {
+          e.preventDefault();
+          e.stopPropagation();
+          showGlobal();
+          return;
+        }
         var opener = e.target.closest('[data-flow-open]');
         if (!opener || !root.contains(opener)) return;
+        // Match scoped to this root: stop the click so live_route_map.js (also bound on the same
+        // [data-route-map-shell]) and any ancestor listeners don't run a second pass.
         e.preventDefault();
+        e.stopPropagation();
         showDetail(opener.getAttribute('data-flow-open'), opener.getAttribute('data-flow-id'), opener);
       });
+
+      // Buttons that follow the cursor through animated state on touch devices can stick in :hover
+      // and double-fire on the next tap. Blur them once the click is handled.
+      root.addEventListener('touchend', function(e) {
+        var opener = e.target.closest('[data-flow-open], [data-flow-close]');
+        if (opener && typeof opener.blur === 'function') opener.blur();
+      }, { passive: true });
     })();
     </script>
 	  {% else %}
