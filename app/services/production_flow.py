@@ -6,6 +6,7 @@ MoveRequest, DriverLog, PlantTransfer, issue, timing, and proof records.  It
 does not invent unavailable production asset snapshots.
 """
 from datetime import date as date_cls, datetime, timedelta
+import math
 import re
 
 from flask import has_request_context, url_for
@@ -174,69 +175,188 @@ def _lane_type(status):
     return "requested_move"
 
 
-LAYOUT_SLOTS = (
-    {"x": 7, "y": 8, "cx": 15, "cy": 20},
-    {"x": 42, "y": 8, "cx": 50, "cy": 20},
-    {"x": 77, "y": 8, "cx": 85, "cy": 20},
-    {"x": 77, "y": 62, "cx": 85, "cy": 74},
-    {"x": 42, "y": 62, "cx": 50, "cy": 74},
-    {"x": 7, "y": 62, "cx": 15, "cy": 74},
-    {"x": 24, "y": 35, "cx": 32, "cy": 47},
-    {"x": 59, "y": 35, "cx": 67, "cy": 47},
-)
+def _node_weight(node, degree_by_key):
+    pressure = (
+        node["blocked_count"] * 8
+        + node["waiting_count"] * 5
+        + node["active_count"] * 4
+        + node["open_count"] * 3
+        + node["issue_count"] * 6
+        + node["completed_count"]
+    )
+    return pressure + degree_by_key.get(node["key"], 0) * 3
 
 
-def _apply_map_layout(nodes, lanes, items):
-    """Attach deterministic display coordinates for the production-flow map."""
-    slot_by_key = {}
-    for index, node in enumerate(nodes):
-        slot = LAYOUT_SLOTS[index % len(LAYOUT_SLOTS)]
-        ring_offset = (index // len(LAYOUT_SLOTS)) * 4
-        node["layout"] = {
-            "x": min(slot["x"] + ring_offset, 82),
-            "y": min(slot["y"] + ring_offset, 72),
-            "cx": min(slot["cx"] + ring_offset, 90),
-            "cy": min(slot["cy"] + ring_offset, 84),
-            "slot": index,
+def _ring_point(center_x, center_y, radius_x, radius_y, angle_degrees):
+    radians = math.radians(angle_degrees)
+    return {
+        "x": round(center_x + math.cos(radians) * radius_x, 2),
+        "y": round(center_y + math.sin(radians) * radius_y, 2),
+    }
+
+
+def _clamp_layout(value, minimum=6, maximum=94):
+    return max(minimum, min(maximum, value))
+
+
+def _lane_pair_key(lane):
+    return tuple(sorted((lane["origin_key"], lane["destination_key"])))
+
+
+def _lane_curve(origin, destination, lane, lane_index_by_pair):
+    x1, y1 = origin["x"], origin["y"]
+    x2, y2 = destination["x"], destination["y"]
+    pair_key = _lane_pair_key(lane)
+    pair_index = lane_index_by_pair[pair_key]
+    lane_index_by_pair[pair_key] += 1
+
+    if lane["origin_key"] == lane["destination_key"]:
+        loop_x = _clamp_layout(x1 + 12)
+        loop_y = _clamp_layout(y1 - 18)
+        end_y = _clamp_layout(y1 + 9)
+        return {
+            "x1": x1,
+            "y1": y1,
+            "x2": x1,
+            "y2": end_y,
+            "cx": loop_x,
+            "cy": loop_y,
+            "label_x": _clamp_layout(loop_x + 2),
+            "label_y": _clamp_layout(loop_y + 5),
+            "path_d": f"M {x1:.2f} {y1:.2f} C {loop_x:.2f} {loop_y:.2f} {loop_x:.2f} {end_y:.2f} {x1:.2f} {end_y:.2f}",
+            "slot": pair_index,
         }
-        slot_by_key[node["key"]] = node["layout"]
 
-    for index, lane in enumerate(lanes):
+    dx = x2 - x1
+    dy = y2 - y1
+    length = math.hypot(dx, dy) or 1
+    nx = -dy / length
+    ny = dx / length
+    direction = 1 if lane["origin_key"] < lane["destination_key"] else -1
+    spread = 8 + (pair_index * 5)
+    offset = spread * direction
+    mid_x = (x1 + x2) / 2
+    mid_y = (y1 + y2) / 2
+    cx = _clamp_layout(mid_x + nx * offset)
+    cy = _clamp_layout(mid_y + ny * offset)
+    label_x = _clamp_layout(mid_x + nx * offset * 0.72)
+    label_y = _clamp_layout(mid_y + ny * offset * 0.72)
+    return {
+        "x1": x1,
+        "y1": y1,
+        "x2": x2,
+        "y2": y2,
+        "cx": round(cx, 2),
+        "cy": round(cy, 2),
+        "label_x": round(label_x, 2),
+        "label_y": round(label_y, 2),
+        "path_d": f"M {x1:.2f} {y1:.2f} Q {cx:.2f} {cy:.2f} {x2:.2f} {y2:.2f}",
+        "slot": pair_index,
+    }
+
+
+def _apply_map_layout(nodes, lanes, items, *, selected_node_key=None):
+    """Attach deterministic spatial graph coordinates for the production map."""
+    if not nodes:
+        return
+
+    degree_by_key = {node["key"]: 0 for node in nodes}
+    connected_to = {node["key"]: set() for node in nodes}
+    for lane in lanes:
+        origin_key = lane["origin_key"]
+        destination_key = lane["destination_key"]
+        lane_weight = max(1, lane["open_count"] + lane["active_count"] + lane["waiting_count"] + lane["blocked_count"] + lane["completed_count"])
+        if origin_key in degree_by_key:
+            degree_by_key[origin_key] += lane_weight
+            connected_to[origin_key].add(destination_key)
+        if destination_key in degree_by_key:
+            degree_by_key[destination_key] += lane_weight
+            connected_to[destination_key].add(origin_key)
+
+    node_by_key = {node["key"]: node for node in nodes}
+    selected_hub = node_by_key.get(selected_node_key)
+    hub = selected_hub or max(nodes, key=lambda node: (_node_weight(node, degree_by_key), node["label"]))
+    hub_key = hub["key"]
+    hub["layout"] = {"x": 50.0, "y": 50.0, "cx": 50.0, "cy": 50.0, "ring": "hub", "slot": 0, "is_hub": True}
+
+    remaining = [node for node in nodes if node["key"] != hub_key]
+    remaining.sort(
+        key=lambda node: (
+            node["key"] not in connected_to.get(hub_key, set()),
+            -degree_by_key.get(node["key"], 0),
+            -_node_weight(node, degree_by_key),
+            node["label"],
+        )
+    )
+
+    node_count = len(nodes)
+    if node_count == 2 and remaining:
+        remaining[0]["layout"] = {"x": 67.0, "y": 34.0, "cx": 67.0, "cy": 34.0, "ring": "inner", "slot": 1, "is_hub": False}
+    elif node_count == 3:
+        for index, node in enumerate(remaining):
+            point = _ring_point(50, 50, 30, 25, -35 + index * 140)
+            node["layout"] = {**point, "cx": point["x"], "cy": point["y"], "ring": "inner", "slot": index + 1, "is_hub": False}
+    else:
+        inner_count = min(len(remaining), 6)
+        outer_count = max(0, len(remaining) - inner_count)
+        for index, node in enumerate(remaining):
+            if index < inner_count:
+                angle_step = 360 / max(inner_count, 1)
+                angle = -90 + (index * angle_step)
+                point = _ring_point(50, 50, 31, 25, angle)
+                ring = "inner"
+            else:
+                outer_index = index - inner_count
+                angle_step = 360 / max(outer_count, 1)
+                angle = -72 + (outer_index * angle_step)
+                point = _ring_point(50, 50, 42, 35, angle)
+                ring = "outer"
+            point["x"] = _clamp_layout(point["x"], 8, 92)
+            point["y"] = _clamp_layout(point["y"], 10, 90)
+            node["layout"] = {**point, "cx": point["x"], "cy": point["y"], "ring": ring, "slot": index + 1, "is_hub": False}
+
+    slot_by_key = {node["key"]: node["layout"] for node in nodes}
+    lane_index_by_pair = {}
+    for lane in lanes:
+        lane_index_by_pair.setdefault(_lane_pair_key(lane), 0)
+    for lane in lanes:
         origin = slot_by_key.get(lane["origin_key"])
         destination = slot_by_key.get(lane["destination_key"])
-        lane["layout"] = {
-            "x1": origin["cx"] if origin else 12,
-            "y1": origin["cy"] if origin else 20,
-            "x2": destination["cx"] if destination else 88,
-            "y2": destination["cy"] if destination else 74,
-            "slot": index,
-        }
+        if not origin or not destination:
+            lane["layout"] = {
+                "x1": 14,
+                "y1": 18,
+                "x2": 86,
+                "y2": 82,
+                "cx": 50,
+                "cy": 50,
+                "label_x": 50,
+                "label_y": 50,
+                "path_d": "M 14 18 Q 50 50 86 82",
+                "slot": 0,
+            }
+            continue
+        lane["layout"] = _lane_curve(origin, destination, lane, lane_index_by_pair)
 
-    lane_by_pair = {
-        (lane["origin_label"], lane["destination_label"]): lane
-        for lane in lanes
-    }
-    fallback_slots = (
-        {"x": 25, "y": 13},
-        {"x": 61, "y": 13},
-        {"x": 77, "y": 44},
-        {"x": 57, "y": 67},
-        {"x": 25, "y": 67},
-        {"x": 9, "y": 44},
-    )
+    lane_by_pair = {(lane["origin_label"], lane["destination_label"]): lane for lane in lanes}
+    item_offsets = ((-9, -9), (10, 8), (-12, 9), (12, -8), (0, 14), (0, -14))
+    node_item_counts = {}
     for index, item in enumerate(items):
         lane = lane_by_pair.get((item.get("origin_label"), item.get("destination_label")))
+        offset = item_offsets[index % len(item_offsets)]
         if lane and lane.get("layout"):
-            layout = lane["layout"]
-            x = (layout["x1"] + layout["x2"]) / 2
-            y = (layout["y1"] + layout["y2"]) / 2
+            base_x = lane["layout"].get("label_x", 50)
+            base_y = lane["layout"].get("label_y", 50)
         else:
-            slot = fallback_slots[index % len(fallback_slots)]
-            x = slot["x"]
-            y = slot["y"]
+            node_key = _location_key(item.get("plant_location"))
+            node_layout = slot_by_key.get(node_key) or hub["layout"]
+            node_item_counts[node_key] = node_item_counts.get(node_key, 0) + 1
+            count = node_item_counts[node_key]
+            base_x = node_layout["x"] + (count % 3 - 1) * 7
+            base_y = node_layout["y"] + 13 + (count // 3) * 5
         item["layout"] = {
-            "x": max(2, min(x - 6, 86)),
-            "y": max(6, min(y - 4, 82)),
+            "x": round(_clamp_layout(base_x + offset[0], 7, 93), 2),
+            "y": round(_clamp_layout(base_y + offset[1], 8, 92), 2),
             "slot": index,
         }
 
@@ -680,6 +800,20 @@ def build_production_flow_context(
         _bump_status(node, "completed" if log.depart_time else "waiting", has_issue=log.id in issue_stop_ids or log.id in damaged_stop_ids)
         _add_source(node["meta"], "DriverLog")
 
+    logs_by_driver = {}
+    for log in logs:
+        logs_by_driver.setdefault(log.driver_id, []).append(log)
+    for driver_logs in logs_by_driver.values():
+        driver_logs.sort(key=lambda log: (log.created_at or datetime.min, log.id))
+        for prev_log, current_log in zip(driver_logs, driver_logs[1:]):
+            lane = _lane(lanes, prev_log.plant_name, current_log.plant_name)
+            if not lane:
+                continue
+            status = "completed" if current_log.depart_time else "waiting"
+            has_issue = current_log.id in issue_stop_ids or current_log.id in damaged_stop_ids
+            _bump_status(lane, "blocked" if has_issue else status)
+            lane["linked_driver_log_ids"].extend([prev_log.id, current_log.id])
+
     for transfer in transfers:
         item = _transfer_item(transfer)
         items.append(item)
@@ -709,7 +843,7 @@ def build_production_flow_context(
         if node:
             node["issue_count"] += 1
             node["blocked_count"] += 1
-            _add_source(node["meta"], "ExceptionEvent")
+            _add_source(node["meta"], "IssueEvent")
 
     for key, node in nodes.items():
         node["meta"]["timing"] = timing_by_node.get(key)
@@ -744,7 +878,8 @@ def build_production_flow_context(
         key=lambda l: (-(l["blocked_count"] + l["waiting_count"] + l["active_count"] + l["open_count"] + l["completed_count"]), l["origin_label"], l["destination_label"]),
     )
     items.sort(key=lambda item: (item["status"] not in {"blocked", "needs_review", "critical", "high"}, item["age_minutes"] is None, -(item["age_minutes"] or 0), item["label"]))
-    _apply_map_layout(flow_nodes, flow_lanes, items)
+    selected_node_key = _location_key(selected_plant) if selected_plant else None
+    _apply_map_layout(flow_nodes, flow_lanes, items, selected_node_key=selected_node_key)
 
     floor_summary = {
         "active_stop_count": len([log for log in logs if not log.depart_time]),
@@ -772,7 +907,7 @@ def build_production_flow_context(
             "selected_plant": selected_plant,
             "selected_move_request_id": selected_move_request_id,
             "selected_stop_id": selected_stop_id,
-            "selected_node_key": _location_key(selected_plant) if selected_plant else None,
+            "selected_node_key": selected_node_key,
         },
         "empty_states": {
             "no_flow_nodes": not bool(flow_nodes),

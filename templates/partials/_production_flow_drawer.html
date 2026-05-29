@@ -41,6 +41,7 @@
         <div><dt>Completed today</dt><dd>{{ lane.completed_count }}</dd></div>
         <div><dt>Oldest age</dt><dd>{% if lane.oldest_age_minutes is not none %}{{ lane.oldest_age_minutes }} min{% else %}Not tracked yet{% endif %}</dd></div>
         <div><dt>Linked requests</dt><dd>{% if lane.linked_request_ids %}{{ lane.linked_request_ids|join(', ') }}{% else %}No current data{% endif %}</dd></div>
+        <div><dt>Linked driver logs</dt><dd>{% if lane.linked_driver_log_ids %}{{ lane.linked_driver_log_ids|join(', ') }}{% else %}No current data{% endif %}</dd></div>
         <div><dt>Linked transfers</dt><dd>{% if lane.linked_transfer_ids %}{{ lane.linked_transfer_ids|join(', ') }}{% else %}No current data{% endif %}</dd></div>
       </dl>
       <div class="drawer-actions">
@@ -61,6 +62,8 @@
         <div><dt>Stage</dt><dd>{{ item.stage or 'No current data' }}</dd></div>
         <div><dt>Description</dt><dd>{{ item.description or 'No current data' }}</dd></div>
         <div><dt>Age</dt><dd>{% if item.age_minutes is not none %}{{ item.age_minutes }} min{% else %}Not tracked yet{% endif %}</dd></div>
+        {% if item.arrived_with is defined %}<div><dt>Arrived With</dt><dd>{{ item.arrived_with or 'Not tracked yet' }}</dd></div>{% endif %}
+        {% if item.departed_with is defined %}<div><dt>Departed With</dt><dd>{{ item.departed_with or 'Not tracked yet' }}</dd></div>{% endif %}
         <div><dt>Carrier Unit</dt><dd>{% if item.carrier_unit_count is not none %}{{ item.carrier_unit_count }}{% else %}Carrier unit snapshot not connected yet{% endif %}</dd></div>
         <div><dt>Rack / Capacity</dt><dd>{% if item.rack_count is not none %}{{ item.rack_count }}{% else %}Rack/capacity data not connected yet{% endif %}</dd></div>
         <div><dt>Trailer</dt><dd>{{ item.trailer or 'Not tracked yet' }}</dd></div>

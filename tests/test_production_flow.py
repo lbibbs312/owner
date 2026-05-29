@@ -127,6 +127,42 @@ def test_move_requests_create_location_nodes_and_lanes(app):
     assert ctx["flow_items"][0]["label"] == "MR-PF-1"
 
 
+def test_production_flow_map_uses_spatial_graph_layout(app):
+    from app.services.production_flow import build_production_flow_context
+
+    manager = _user()
+    _move_request(manager.id, request_number="MR-PF-1", origin_location_text="Raleigh East", destination_location_text="Plastic West")
+    _move_request(manager.id, request_number="MR-PF-2", origin_location_text="Raleigh East", destination_location_text="Paint Central")
+    _move_request(manager.id, request_number="MR-PF-3", origin_location_text="Kraft Plant", destination_location_text="Plastic West")
+    _move_request(manager.id, request_number="MR-PF-4", origin_location_text="PPL", destination_location_text="52nd Street")
+
+    ctx = build_production_flow_context(date=date.today())
+    node_points = [(node["layout"]["x"], node["layout"]["y"]) for node in ctx["flow_nodes"]]
+    y_positions = {round(y) for _, y in node_points}
+
+    assert len(ctx["flow_nodes"]) >= 5
+    assert len(y_positions) >= 3
+    assert all(6 <= x <= 94 and 6 <= y <= 94 for x, y in node_points)
+    assert all("path_d" in lane["layout"] for lane in ctx["flow_lanes"])
+    assert all((" Q " in lane["layout"]["path_d"] or " C " in lane["layout"]["path_d"]) for lane in ctx["flow_lanes"])
+
+
+def test_selected_plant_is_centered_as_graph_hub(app):
+    from app.services.production_flow import build_production_flow_context
+
+    manager = _user()
+    _move_request(manager.id, origin_location_text="Raleigh East", destination_location_text="Plastic West")
+    _move_request(manager.id, origin_location_text="Paint Central", destination_location_text="Plastic West")
+
+    ctx = build_production_flow_context(date=date.today(), selected_plant="Plastic West")
+    selected = next(node for node in ctx["flow_nodes"] if node["label"] == "Plastic West")
+
+    assert ctx["selected_context"]["selected_node_key"] == selected["key"]
+    assert selected["layout"]["is_hub"] is True
+    assert selected["layout"]["x"] == 50.0
+    assert selected["layout"]["y"] == 50.0
+
+
 def test_driver_logs_contribute_route_flow_items(app):
     from app.services.production_flow import build_production_flow_context
 
@@ -140,6 +176,30 @@ def test_driver_logs_contribute_route_flow_items(app):
     assert route_items[0]["linked_route_stop_id"] == log.id
     assert route_items[0]["plant_location"] == "Plastic West"
     assert ctx["floor_summary"]["active_stop_count"] == 1
+
+
+def test_driver_logs_create_real_lanes_between_stops(app):
+    from app.services.production_flow import build_production_flow_context
+
+    driver = _user("driver2", "driver")
+    first = _driver_log(
+        driver,
+        plant_name="RE",
+        depart_time="2026-05-28 12:20:00",
+        created_at=datetime.utcnow() - timedelta(minutes=40),
+    )
+    second = _driver_log(
+        driver,
+        plant_name="PW",
+        depart_time=None,
+        created_at=datetime.utcnow() - timedelta(minutes=10),
+    )
+
+    ctx = build_production_flow_context(date=date.today())
+    lane = next(lane for lane in ctx["flow_lanes"] if lane["origin_label"] == "Raleigh East" and lane["destination_label"] == "Plastic West")
+
+    assert lane["waiting_count"] == 1
+    assert lane["linked_driver_log_ids"] == [first.id, second.id]
 
 
 def test_production_flow_does_not_invent_carrier_or_rack_snapshot_data(app):
