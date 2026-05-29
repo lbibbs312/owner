@@ -51,7 +51,7 @@
           radial-gradient(circle at 30% 70%, rgba(239,68,68,0.10), transparent 28%),
           linear-gradient(180deg, #020617 0%, #030712 54%, #01040b 100%);
       }
-      .ops-board-spatial .map-svg-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; overflow: visible; }
+      .ops-board-spatial .map-svg-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 28; overflow: visible; }
       .ops-board-spatial .map-html-layer { position: relative; z-index: 10; display: flex; flex-direction: column; gap: 14px; pointer-events: none; }
       .ops-board-spatial .flow-lane { stroke: #374151; stroke-width: 2.5; fill: none; transition: stroke 0.3s; vector-effect: non-scaling-stroke; pointer-events: stroke; }
       .ops-board-spatial .flow-lane.is-related-path { stroke: #f8fafc; stroke-width: 5; filter: drop-shadow(0 0 8px rgba(56,189,248,0.65)); opacity: 1; }
@@ -149,22 +149,44 @@
       .ops-board-spatial .route-step-chip .chip-body strong { font-size: 0.62rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .route-step-chip .step-action { display: block; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .route-step-chip.is-active { border-color: #f8fafc; box-shadow: 0 0 18px rgba(56,189,248,0.35); }
-      .ops-board-spatial .flow-edge { fill: none; stroke: #60a5fa; stroke-width: 6.5; stroke-linecap: round; opacity: 0.9; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 8px rgba(96,165,250,0.6)); }
+      .ops-board-spatial .flow-edge { fill: none; stroke: #60a5fa; stroke-width: 7.5; stroke-linecap: round; opacity: 0.96; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 10px rgba(96,165,250,0.74)); }
       .ops-board-spatial .flow-edge--active { stroke: #38bdf8; opacity: 1; filter: drop-shadow(0 0 10px rgba(56,189,248,0.78)); }
       .ops-board-spatial .flow-edge--waiting { stroke: #f59e0b; opacity: 1; filter: drop-shadow(0 0 10px rgba(245,158,11,0.76)); }
       .ops-board-spatial .flow-edge--exception { stroke: #ef4444; opacity: 1; filter: drop-shadow(0 0 12px rgba(239,68,68,0.82)); }
       .ops-board-spatial .flow-edge--completed { stroke: #10b981; filter: drop-shadow(0 0 9px rgba(16,185,129,0.62)); }
+      .ops-board-spatial .flow-edge--live {
+        stroke-dasharray: 13 8;
+        animation: dash-flow 1s linear infinite;
+        filter: drop-shadow(0 0 14px rgba(56,189,248,0.9));
+      }
       .ops-board-spatial .flow-edge--new {
         stroke-dasharray: var(--path-length);
         stroke-dashoffset: var(--path-length);
         animation: drawFlowEdge 700ms ease-out forwards;
       }
-      .ops-board-spatial .flow-node--live { animation: livePulse 1.8s ease-in-out infinite; }
+      .ops-board-spatial .flow-node--live {
+        position: relative;
+        border-color: #e0f2fe !important;
+        animation: livePulse 1.35s ease-in-out infinite;
+      }
+      .ops-board-spatial .flow-node--live::after {
+        content: "";
+        position: absolute;
+        inset: -8px;
+        border: 2px solid rgba(56,189,248,0.74);
+        border-radius: inherit;
+        pointer-events: none;
+        animation: livePulseRing 1.35s ease-out infinite;
+      }
       .ops-board-spatial .flow-event--flash { animation: eventFlash 900ms ease-out; }
       @keyframes drawFlowEdge { to { stroke-dashoffset: 0; } }
       @keyframes livePulse {
         0%, 100% { box-shadow: 0 0 0 rgba(56,189,248,0.0), 0 6px 18px rgba(0,0,0,0.42); }
         50% { box-shadow: 0 0 0 2px rgba(56,189,248,0.34), 0 0 34px rgba(56,189,248,0.62), 0 12px 32px rgba(0,0,0,0.52); }
+      }
+      @keyframes livePulseRing {
+        0% { opacity: 0.75; transform: scale(0.98); }
+        100% { opacity: 0; transform: scale(1.12); }
       }
       @keyframes eventFlash {
         0% { background-color: rgba(56,189,248,0.28); }
@@ -580,7 +602,7 @@
         if (!d) return null;
         var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         var status = edge.is_exception ? 'exception' : (edge.status || 'active');
-        path.setAttribute('class', 'flow-edge flow-edge--' + status + (animate ? ' flow-edge--new' : ''));
+        path.setAttribute('class', 'flow-edge flow-edge--' + status + (edge.is_live ? ' flow-edge--live' : '') + (animate ? ' flow-edge--new' : ''));
         path.setAttribute('d', d);
         path.setAttribute('data-flow-edge-rendered', '1');
         path.setAttribute('data-flow-event-id', edge.event_id || '');
@@ -628,7 +650,7 @@
           clearRenderedEdges();
           clearLivePulse();
           var edges = typeof limit === 'number' ? this.edges.slice(0, limit) : this.edges;
-          for (var i = 0; i < edges.length; i++) drawEdge(edges[i], false);
+          for (var i = 0; i < edges.length; i++) drawEdge(edges[i], this.mode === 'live' && !!edges[i].is_live);
           if (edges.length) {
             for (var j = edges.length - 1; j >= 0; j--) {
               if (edges[j].is_live) { pulseTarget(edges[j]); break; }
