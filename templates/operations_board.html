@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% set board = operations_board %}
+
+{# ---- reusable bits -------------------------------------------------- #}
+{% macro stat_tile(label, value, tone='') %}
+  <span class="opsb-stat">
+    <span class="opsb-stat-key">{{ label }}</span>
+    <span class="opsb-stat-val {{ 'tone-' ~ tone if tone and value else '' }}">{{ value }}</span>
+  </span>
+{% endmacro %}
+
+{% macro proof_list(checklist) %}
+  <ul class="opsb-checklist">
+    {% for step in checklist %}
+      <li class="is-{{ step.state }}">
+        <span class="opsb-tick">{{ '✓' if step.state == 'complete' else '○' }}</span>{{ step.label }}
+      </li>
+    {% endfor %}
+  </ul>
+{% endmacro %}
+
+{% macro move_detail(move) %}
+  <div class="opsb-detail-head">
+    <div>
+      <div class="opsb-detail-kicker">Move · {{ move.origin_label }} → {{ move.destination_label }}</div>
+      <h5 class="opsb-detail-title">{{ move.label }}</h5>
+    </div>
+    <button type="button" class="opsb-detail-close" data-ops-home aria-label="Back to summary">×</button>
+  </div>
+  <div class="opsb-badge-row">
+    <span class="opsb-chip chip-{{ move.badge.tone }}">{{ move.badge.label }}</span>
+    {% if move.hot %}<span class="opsb-chip chip-danger">HOT</span>{% endif %}
+  </div>
+
+  <div class="opsb-section-title">Move details</div>
+  <dl class="opsb-facts">
+    <div><dt>Driver</dt><dd>{{ move.assigned_driver or 'Unassigned' }}</dd></div>
+    <div><dt>Equipment</dt><dd>{{ move.equipment or 'Not tracked yet' }}</dd></div>
+    <div><dt>Cargo / part</dt><dd>{{ move.cargo_text or 'No current data' }}{% if move.part_number %} · {{ move.part_number }}{% endif %}{% if move.quantity_text %} · {{ move.quantity_text }}{% endif %}</dd></div>
+    <div><dt>Due</dt><dd>{{ move.due_label or 'Not tracked yet' }}</dd></div>
+    <div><dt>Stage</dt><dd>{{ move.stage }}</dd></div>
+    <div><dt>Age</dt><dd>{% if move.age_minutes is not none %}{{ move.age_minutes }} min{% else %}Not tracked yet{% endif %}</dd></div>
+  </dl>
+
+  <div class="opsb-section-title">Proof &amp; audit checklist</div>
+  {{ proof_list(move.checklist) }}
+
+  <div class="opsb-section-title">Linked records</div>
+  <dl class="opsb-facts">
+    <div><dt>Move request</dt><dd>{% if move.linked_request_id %}#{{ move.linked_request_id }}{% else %}—{% endif %}</dd></div>
+    <div><dt>Route stop</dt><dd>{% if move.linked_route_stop_id %}Driver Log #{{ move.linked_route_stop_id }}{% else %}No linked stop{% endif %}</dd></div>
+    <div><dt>Proof / document</dt><dd>{% if move.linked_transfer_id %}Plant Transfer #{{ move.linked_transfer_id }}{% elif move.linked_document_id %}Document #{{ move.linked_document_id }}{% else %}Document not attached{% endif %}</dd></div>
+    <div><dt>Next action</dt><dd>{{ move.next_action or 'No action needed' }}</dd></div>
+  </dl>
+
+  <div class="opsb-detail-actions">
+    {% if move.view_url %}<a class="opsb-btn" href="{{ move.view_url }}">Open move record</a>{% endif %}
+  </div>
+{% endmacro %}
+
+{% macro node_detail(node) %}
+  {% set s = node.stats %}
+  <div class="opsb-detail-head">
+    <div>
+      <div class="opsb-detail-kicker">Facility · {{ node.short_code or '—' }}</div>
+      <h5 class="opsb-detail-title">{{ node.label }}</h5>
+    </div>
+    <button type="button" class="opsb-detail-close" data-ops-home aria-label="Back to summary">×</button>
+  </div>
+  <div class="opsb-badge-row">
+    <span class="opsb-chip chip-{{ node.state }}">{{ node.worst_status|replace('_', ' ')|title }}</span>
+  </div>
+
+  <div class="opsb-section-title">Flow at this facility</div>
+  <dl class="opsb-facts">
+    <div><dt>Inbound moves</dt><dd>{{ s.in }}</dd></div>
+    <div><dt>Outbound moves</dt><dd>{{ s.out }}</dd></div>
+    <div><dt>Waiting</dt><dd>{{ s.wait }}</dd></div>
+    <div><dt>Delayed (dock)</dt><dd>{{ s.dly }}</dd></div>
+    <div><dt>No pickup</dt><dd>{{ s.nop }}</dd></div>
+    <div><dt>Damage</dt><dd>{{ s.dmg }}</dd></div>
+    <div><dt>Missing proof</dt><dd>{{ s.gap }}</dd></div>
+    <div><dt>Open</dt><dd>{{ s.open }}</dd></div>
+    <div><dt>Active</dt><dd>{{ s.active }}</dd></div>
+    <div><dt>Blocked</dt><dd>{{ s.blocked }}</dd></div>
+    <div><dt>Completed today</dt><dd>{{ s.completed }}</dd></div>
+    <div><dt>Open issues</dt><dd>{{ s.issues }}</dd></div>
+  </dl>
+  <p class="opsb-note">Next action: {{ node.next_action or 'No action needed' }}</p>
+
+  <div class="opsb-detail-actions">
+    {% if node.view_url %}<a class="opsb-btn" href="{{ node.view_url }}">Move queue</a>{% endif %}
+    {% if node.active_moves_url %}<a class="opsb-btn" href="{{ node.active_moves_url }}">Active moves</a>{% endif %}
+  </div>
+{% endmacro %}
+
+{% macro exception_detail(item) %}
+  <div class="opsb-detail-head">
+    <div>
+      <div class="opsb-detail-kicker">{{ item.item_type|replace('_', ' ')|title }}</div>
+      <h5 class="opsb-detail-title">{{ item.label }}</h5>
+    </div>
+    <button type="button" class="opsb-detail-close" data-ops-home aria-label="Back to summary">×</button>
+  </div>
+  <div class="opsb-badge-row">
+    <span class="opsb-chip chip-danger">{{ item.reason }}</span>
+    {% if item.status_label %}<span class="opsb-chip chip-info">{{ item.status_label }}</span>{% endif %}
+  </div>
+  <div class="opsb-section-title">Detail</div>
+  <dl class="opsb-facts">
+    <div><dt>Location</dt><dd>{{ item.plant_location or 'No current data' }}</dd></div>
+    <div><dt>What happened</dt><dd>{{ item.description or 'No current data' }}</dd></div>
+    <div><dt>Age</dt><dd>{% if item.age_minutes is not none %}{{ item.age_minutes }} min{% else %}Not tracked yet{% endif %}</dd></div>
+    <div><dt>Next action</dt><dd>{{ item.next_action or 'Review issue' }}</dd></div>
+  </dl>
+  <div class="opsb-detail-actions">
+    {% if item.view_url %}<a class="opsb-btn" href="{{ item.view_url }}">Open record</a>{% endif %}
+  </div>
+{% endmacro %}
+
+{# ---- global / default summary --------------------------------------- #}
+{% macro global_summary(g, date, scope) %}
+  <div class="opsb-detail-head">
+    <h5 class="opsb-detail-title">System summary</h5>
+  </div>
+  <div class="opsb-summary-grid">
+    <div class="opsb-summary-cell"><span>Open requests</span><strong>{{ g.open }}</strong></div>
+    <div class="opsb-summary-cell"><span>Unassigned</span><strong class="tone-warning">{{ g.unassigned }}</strong></div>
+    <div class="opsb-summary-cell"><span>Exceptions</span><strong class="tone-danger">{{ g.exceptions }}</strong></div>
+    <div class="opsb-summary-cell"><span>Missing proof</span><strong class="tone-info">{{ g.audit_pending }}</strong></div>
+  </div>
+
+  <div class="opsb-section-title">Moves needing proof</div>
+  {% if g.moves_needing_proof %}
+    <ul class="opsb-list">
+      {% for move in g.moves_needing_proof %}
+        <li><button type="button" class="opsb-link" data-ops-open="flow-item" data-ops-id="{{ move.item_id }}">{{ move.label }}</button> — {{ move.origin_label }} → {{ move.destination_label }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="opsb-note">All current moves have proof attached.</p>
+  {% endif %}
+
+  <div class="opsb-section-title">Top active exceptions</div>
+  {% if g.top_exceptions %}
+    <ul class="opsb-list">
+      {% for item in g.top_exceptions %}
+        <li><button type="button" class="opsb-link" data-ops-open="flow-item" data-ops-id="{{ item.item_id }}">{{ item.label }}</button> — {{ item.reason }} at {{ item.plant_location }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="opsb-note">No active exceptions.</p>
+  {% endif %}
+
+  <p class="opsb-scope-note">Derived from move requests, route stops &amp; plant transfers · {{ date }}</p>
+{% endmacro %}
+
+{% block content %}
+{% set move_source_ids = board.moves | map(attribute='item_id') | list %}
+<div class="opsb-board" data-ops-board>
+
+  <header class="opsb-topbar">
+    <div>
+      <h2 class="opsb-board-title">Operations &amp; Audit Defense Board</h2>
+      <div class="opsb-board-sub">Network flow, case proofing &amp; exception management · {{ board.date }}</div>
+    </div>
+    <div class="opsb-counters">
+      <div class="opsb-counter"><span>Active moves</span><strong>{{ board.header.active }}</strong></div>
+      <div class="opsb-counter"><span>Delays</span><strong class="tone-warning">{{ board.header.delays }}</strong></div>
+      <div class="opsb-counter"><span>Missing proof</span><strong class="tone-info">{{ board.header.missing_proof }}</strong></div>
+      <div class="opsb-counter"><span>Exceptions</span><strong class="tone-danger">{{ board.header.exceptions }}</strong></div>
+      <div class="opsb-counter"><span>Completed</span><strong class="tone-success">{{ board.header.completed }}</strong></div>
+    </div>
+  </header>
+
+  <div class="opsb-layout">
+    <div class="opsb-left">
+      <div class="opsb-map-viewport">
+        <div class="opsb-map-canvas" style="width: {{ board.canvas.width }}px; height: {{ board.canvas.height }}px;">
+          <svg class="opsb-lanes" width="{{ board.canvas.width }}" height="{{ board.canvas.height }}" aria-hidden="true">
+            <defs>
+              <marker id="opsArrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+                <polygon points="0 0, 7 3, 0 6" fill="#475569"></polygon>
+              </marker>
+            </defs>
+            {% for lane in board.lanes %}
+              <line class="opsb-lane ops-lane-{{ lane.state }}"
+                    x1="{{ lane.x1 }}" y1="{{ lane.y1 }}" x2="{{ lane.x2 }}" y2="{{ lane.y2 }}"
+                    marker-end="url(#opsArrow)"></line>
+            {% endfor %}
+          </svg>
+
+          {% for node in board.nodes %}
+            <button type="button" class="opsb-facility ops-state-{{ node.state }}"
+                    style="left: {{ node.pos.left }}px; top: {{ node.pos.top }}px;"
+                    data-ops-open="flow-node" data-ops-id="{{ node.key }}">
+              <span class="opsb-facility-head">{{ node.label }}</span>
+              <span class="opsb-facility-grid">
+                {{ stat_tile('IN', node.stats.in) }}
+                {{ stat_tile('OUT', node.stats.out) }}
+                {{ stat_tile('WAIT', node.stats.wait) }}
+                {{ stat_tile('DLY', node.stats.dly, 'warning') }}
+                {{ stat_tile('DMG', node.stats.dmg, 'danger') }}
+                {{ stat_tile('GAP', node.stats.gap, 'info') }}
+              </span>
+            </button>
+          {% endfor %}
+
+          {% for token in board.tokens %}
+            <button type="button" class="opsb-token tone-{{ token.badge.tone }}"
+                    style="left: {{ token.left }}px; top: {{ token.top }}px;"
+                    data-ops-open="flow-item" data-ops-id="{{ token.item_id }}">
+              <span class="opsb-token-head">
+                <strong>{{ token.label }}</strong>
+                <span class="opsb-chip chip-{{ token.badge.tone }}">{{ token.badge.label }}</span>
+              </span>
+              <span class="opsb-token-body">{{ token.quantity_text or token.cargo_text or token.stage }} · {{ token.assigned_driver }}</span>
+            </button>
+          {% endfor %}
+
+          {% if board.empty %}
+            <div class="opsb-map-empty">No current data. Facilities, lanes &amp; moves appear here as move requests, route stops, and plant transfers are recorded.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="opsb-ticker">
+        <strong class="tone-danger">ACTION NEEDED</strong>
+        {% for item in board.ticker[:8] %}
+          <button type="button" class="opsb-ticker-item" data-ops-open="flow-item" data-ops-id="{{ item.item_id }}">
+            <span class="opsb-dot dot-{{ 'danger' if item.reason in ['Failed pickup'] or item.status in ['blocked','critical','needs_review'] else 'warning' }}"></span>
+            {{ item.label }} · {{ item.reason }}{% if item.plant_location %} ({{ item.plant_location }}){% endif %}
+          </button>
+        {% else %}
+          <span class="opsb-note">No active exceptions right now.</span>
+        {% endfor %}
+      </div>
+    </div>
+
+    <aside class="opsb-panel" data-ops-panel>
+      <div data-ops-panel-content></div>
+    </aside>
+  </div>
+
+  {# ---- hidden detail sources (copied into the panel by JS) ---------- #}
+  <div hidden data-ops-detail="global">{{ global_summary(board.global_summary, board.date, board.data_scope_note) }}</div>
+  {% for node in board.nodes %}
+    <div hidden data-ops-detail="flow-node-{{ node.key }}">{{ node_detail(node) }}</div>
+  {% endfor %}
+  {% for move in board.moves %}
+    <div hidden data-ops-detail="flow-item-{{ move.item_id }}">{{ move_detail(move) }}</div>
+  {% endfor %}
+  {% for item in board.ticker %}
+    {% if item.item_id not in move_source_ids %}
+      <div hidden data-ops-detail="flow-item-{{ item.item_id }}">{{ exception_detail(item) }}</div>
+    {% endif %}
+  {% endfor %}
+</div>
+
+<script src="{{ url_for('static', filename='js/operations_board.js') }}"></script>
+{% endblock %}

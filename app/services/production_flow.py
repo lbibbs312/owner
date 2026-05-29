@@ -17,7 +17,7 @@ from app.models import DamageReport, DriverLog, ExceptionEvent, MoveRequest, Pla
 from app.services.cargo_state import cargo_state_for_log, cargo_state_for_request
 from app.services.driver_wait import wait_minutes_for_log
 from app.services.floor_operations import ACTIVE_STATUSES, next_action_for_request
-from app.services.issue_severity import classify_issue
+from app.services.issue_severity import DEFAULT_WAIT_THRESHOLD, classify_issue
 from app.services.plant_addresses import PLANT_LABELS, plant_label
 from app.services.plant_time import plant_forecast_rows
 
@@ -29,6 +29,11 @@ CARRIER_SNAPSHOT_EMPTY = "Carrier unit snapshot not connected yet"
 RACK_SNAPSHOT_EMPTY = "Rack/capacity data not connected yet"
 DATA_SCOPE_EMPTY = "Using route and move request data only"
 DETROIT_TZ = pytz.timezone("America/Detroit")
+
+# A dock wait at or above this many minutes is surfaced as a delay on the
+# operations board. Mirrors issue_severity's wait threshold so the board and
+# the issue badges agree on what "delayed" means.
+DELAY_WAIT_THRESHOLD = DEFAULT_WAIT_THRESHOLD
 
 OPEN_STATUSES = {"open", "acknowledged"}
 ACTIVE_MOVE_STATUSES = {"assigned", "in_progress"}
@@ -191,6 +196,9 @@ def _node(nodes, label, *, node_type="plant"):
             "blocked_count": 0,
             "completed_count": 0,
             "issue_count": 0,
+            "delay_count": 0,
+            "no_pickup_count": 0,
+            "damage_count": 0,
             "worst_status": "none",
             "next_action": "No action needed",
             "meta": {
@@ -395,6 +403,13 @@ def _move_item(req, *, now, has_issue=False):
         "quantity_text": _quantity_text(req),
         "priority": (req.priority or "normal").lower(),
         "assigned_driver": _clean(req.assigned_display) or "Unassigned",
+        "assigned": bool(req.assigned_driver_id or _clean(req.assigned_driver_text)),
+        "hot": (req.priority or "").lower() in {"hot", "safety"},
+        "arrival_recorded": bool(getattr(log, "arrive_time", None)),
+        "departure_recorded": bool(getattr(log, "depart_time", None)),
+        "proof_recorded": bool(req.linked_plant_transfer_id or req.linked_document_id),
+        "due_label": _clean(req.due_time_text),
+        "equipment": _clean(req.equipment_display),
         "document_summary": f"Document #{req.linked_document_id}" if req.linked_document_id else DOCUMENT_MISSING,
         "view_url": _safe_url("manager.edit_move_request", request_id=req.id),
     }
@@ -434,6 +449,9 @@ def _route_item(log, *, now, issue_stop_ids=frozenset(), damaged_stop_ids=frozen
         "arrived_with": log.load_size or NOT_TRACKED,
         "departed_with": log.depart_load_size or NOT_TRACKED,
         "part_number": _clean(log.part_number),
+        "no_pickup": bool(getattr(log, "no_pickup", False)),
+        "delayed": bool((log.dock_wait_minutes or 0) >= DELAY_WAIT_THRESHOLD),
+        "hot": bool(getattr(log, "hot_parts", False)),
         "view_url": _safe_url("manager.view_driver_log", log_id=log.id),
     }
 
@@ -612,6 +630,10 @@ def build_production_flow_context(
             continue
         _bump_status(node, "completed" if log.depart_time else "waiting", has_issue=log.id in issue_stop_ids or log.id in damaged_stop_ids)
         _add_source(node["meta"], "DriverLog")
+        if getattr(log, "no_pickup", False):
+            node["no_pickup_count"] += 1
+        if (log.dock_wait_minutes or 0) >= DELAY_WAIT_THRESHOLD:
+            node["delay_count"] += 1
 
     for transfer in transfers:
         item = _transfer_item(transfer)
@@ -633,6 +655,7 @@ def build_production_flow_context(
         if node:
             node["issue_count"] += 1
             node["blocked_count"] += 1
+            node["damage_count"] += 1
             _add_source(node["meta"], "DamageReport")
 
     for event in issue_events:

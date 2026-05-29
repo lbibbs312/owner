@@ -201,6 +201,43 @@ def test_no_fake_telemetry_fields_appear(app):
         assert term not in rendered_contract
 
 
+def test_move_item_exposes_real_proof_signals(app):
+    from app.services.production_flow import build_production_flow_context
+
+    manager = _user()
+    _move_request(
+        manager.id,
+        request_number="MR-PF-PROOF",
+        status="assigned",
+        priority="hot",
+        assigned_driver_text="S. Jenkins",
+        linked_document_id=4321,
+    )
+
+    ctx = build_production_flow_context(date=date.today())
+    item = next(i for i in ctx["flow_items"] if i["label"] == "MR-PF-PROOF")
+
+    assert item["assigned"] is True
+    assert item["hot"] is True
+    assert item["proof_recorded"] is True
+    assert item["arrival_recorded"] is False
+    assert item["departure_recorded"] is False
+
+
+def test_nodes_track_no_pickup_delay_and_damage_counts(app):
+    from app.services.production_flow import build_production_flow_context
+
+    driver = _user("drv_pf", "driver")
+    _driver_log(driver, plant_name="PW", no_pickup=True, dock_wait_minutes=90)
+
+    ctx = build_production_flow_context(date=date.today())
+    node = next(n for n in ctx["flow_nodes"] if n["label"] == "Plastic West")
+
+    assert node["no_pickup_count"] == 1
+    assert node["delay_count"] == 1
+    assert node["damage_count"] == 0
+
+
 def test_manager_dashboard_uses_production_flow_mode(client, app):
     with app.app_context():
         manager = _user("boss", "management")

@@ -1,9 +1,10 @@
-from flask import abort, current_app, jsonify, render_template, send_from_directory
+from flask import abort, current_app, jsonify, render_template, request, send_from_directory
 from flask_login import current_user, login_required
 
 from app.blueprints.public import bp
 from app.models import Announcement
 from app.services.database_status import database_status
+from app.services.operations_board import build_operations_board_context
 from app.services.route_context import build_route_context
 
 
@@ -22,6 +23,19 @@ def onesignal_sw():
 @login_required
 def plant_directory():
     return render_template("plant_directory.html")
+
+
+@bp.route("/operations-board")
+@login_required
+def operations_board():
+    """Shared Operations & Audit Defense Board for any signed-in user.
+
+    Managers and drivers see the same live network view, built entirely from
+    real move/route/transfer/exception records via the production-flow service.
+    """
+    selected_plant = (request.args.get("plant") or "").strip() or None
+    board = build_operations_board_context(selected_plant=selected_plant)
+    return render_template("operations_board.html", operations_board=board)
 
 
 @bp.route("/healthz")
