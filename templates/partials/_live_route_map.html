@@ -1,142 +1,350 @@
-{# Live Route Map. Expects `route_map`; everything in the context is real app data. #}
+{# Live map shell. `mode="route"` is driver/mobile; `mode="production"` is manager/widescreen. #}
 {% set rm = route_map if route_map is defined else none %}
-{% set map_label = route_map_heading if route_map_heading is defined else 'Live Route Map' %}
-<section class="route-map-shell" data-route-map-shell>
-  <div class="route-map-top">
-    <div>
-      <p class="route-map-label">{{ map_label }}</p>
-      <h3>{{ (rm.route.current_location if rm and rm.route else none) or 'No current data' }}</h3>
-      <p class="route-map-sub">
-        {% if rm and rm.route %}
-          {{ rm.route.driver_name or 'Not tracked yet' }} · {{ rm.route.status|replace('_', ' ')|title }} · {{ rm.route.next_action or 'No action needed' }}
-        {% else %}
-          No current data
-        {% endif %}
-      </p>
-    </div>
-    {% if rm and rm.route %}
+{% set current_map_mode = map_mode if map_mode is defined else (rm.mode if rm and rm.mode is defined else 'route') %}
+{% set map_label = route_map_heading if route_map_heading is defined else ('Production Flow Map' if current_map_mode == 'production' else 'Live Route Map') %}
+
+{% if current_map_mode == 'production' %}
+  {% set pf = rm %}
+  {% set summary = pf.queue_summary if pf and pf.queue_summary else {} %}
+  {% set floor_summary = pf.floor_summary if pf and pf.floor_summary else {} %}
+  <section class="route-map-shell production-flow-shell" data-route-map-shell data-route-map-mode="production">
+    <div class="route-map-top">
+      <div>
+        <p class="route-map-label">{{ map_label }}</p>
+        <h3>Production Flow</h3>
+        <p class="route-map-sub">
+          {% if pf %}
+            {{ pf.date }} &middot; {{ floor_summary.data_scope_note or 'Using route and move request data only' }}
+          {% else %}
+            No current data
+          {% endif %}
+        </p>
+      </div>
       <div class="route-map-health">
-        <span>{{ rm.route.issue_summary or 'No open issues' }}</span>
-        <strong>{{ rm.route.document_summary or 'Document not attached' }}</strong>
+        <span>{{ summary.needs_attention_count|default(0) }} need attention</span>
+        <strong>{{ floor_summary.issue_count|default(0) }} open issue{{ 's' if floor_summary.issue_count|default(0) != 1 else '' }}</strong>
       </div>
+    </div>
+
+    {% if pf and (pf.flow_nodes or pf.flow_lanes or pf.flow_items) %}
+      <div class="production-flow-summary" aria-label="Production flow summary">
+        <span><strong>{{ summary.open_count|default(0) }}</strong> Open</span>
+        <span><strong>{{ summary.active_count|default(0) }}</strong> Active</span>
+        <span><strong>{{ summary.waiting_count|default(0) }}</strong> Waiting</span>
+        <span><strong>{{ summary.blocked_count|default(0) }}</strong> Blocked</span>
+        <span><strong>{{ summary.completed_count|default(0) }}</strong> Completed</span>
+        <span><strong>{{ summary.document_needed_count|default(0) }}</strong> Proof needed</span>
+      </div>
+
+      <div class="route-map-canvas production-flow-canvas" aria-label="Production flow nodes and lanes">
+        <div class="route-node-strip production-flow-nodes">
+          {% for node in pf.flow_nodes %}
+            {% set node_href = node.view_url or '#' %}
+            <a class="route-node production-node status-{{ node.worst_status }} {% if pf.selected_context.selected_node_key and pf.selected_context.selected_node_key == node.key %}selected{% endif %}"
+               href="{{ node_href }}"
+               data-route-map-open="flow-node"
+               data-route-map-id="{{ node.key }}">
+              <span class="route-node-code">{{ node.short_code or '--' }}</span>
+              <span class="route-node-name">{{ node.label }}</span>
+              <span class="route-node-meta">
+                {{ node.open_count }} open &middot; {{ node.active_count }} active{% if node.waiting_count %} &middot; {{ node.waiting_count }} waiting{% endif %}{% if node.blocked_count %} &middot; {{ node.blocked_count }} blocked{% endif %}
+              </span>
+            </a>
+          {% else %}
+            <div class="route-map-empty">No current data. Plant/location nodes appear after move requests, route stops, or plant transfers are recorded.</div>
+          {% endfor %}
+        </div>
+
+        {% if pf.flow_lanes %}
+          <div class="production-lane-board">
+            {% for lane in pf.flow_lanes %}
+              <a class="route-lane-row production-lane status-{{ lane.worst_status }}"
+                 href="{{ lane.view_url or '#' }}"
+                 data-route-map-open="flow-lane"
+                 data-route-map-id="{{ lane.origin_key }}--{{ lane.destination_key }}">
+                <span><strong>{{ lane.origin_label }}</strong> &rarr; <strong>{{ lane.destination_label }}</strong></span>
+                <small>{{ lane.open_count }} open &middot; {{ lane.active_count }} active &middot; {{ lane.waiting_count }} waiting &middot; {{ lane.completed_count }} completed{% if lane.blocked_count %} &middot; {{ lane.blocked_count }} blocked{% endif %}</small>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="route-map-empty">No lane data yet.</p>
+        {% endif %}
+      </div>
+
+      <div class="route-map-grid production-flow-grid">
+        <div class="route-map-section">
+          <div class="route-map-section-head">
+            <h4>Lane Pressure</h4>
+            <span>{{ pf.flow_lanes|length }}</span>
+          </div>
+          <div class="route-lane-list">
+            {% for lane in pf.flow_lanes %}
+              <a class="route-lane-row status-{{ lane.worst_status }}"
+                 href="{{ lane.view_url or '#' }}"
+                 data-route-map-open="flow-lane"
+                 data-route-map-id="{{ lane.origin_key }}--{{ lane.destination_key }}">
+                <span><strong>{{ lane.origin_label }}</strong> &rarr; <strong>{{ lane.destination_label }}</strong></span>
+                <small>{{ lane.open_count }} open &middot; {{ lane.active_count }} active &middot; {{ lane.waiting_count }} waiting &middot; {{ lane.completed_count }} completed{% if lane.blocked_count %} &middot; {{ lane.blocked_count }} blocked{% endif %}</small>
+              </a>
+            {% else %}
+              <p class="route-map-empty">No lane data yet.</p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="route-map-section">
+          <div class="route-map-section-head">
+            <h4>Flow Items</h4>
+            <span>{{ pf.flow_items|length }}</span>
+          </div>
+          <div class="route-move-list">
+            {% for item in pf.flow_items[:8] %}
+              <a class="route-move-card production-flow-item status-{{ item.status }}"
+                 href="{{ item.view_url or '#' }}"
+                 data-route-map-open="flow-item"
+                 data-route-map-id="{{ item.item_id }}">
+                <span class="route-move-title">{{ item.label }}</span>
+                <span class="route-move-path">{{ item.plant_location }}</span>
+                <span class="route-move-meta">{{ item.item_type|replace('_', ' ')|title }} &middot; {{ item.stage }} &middot; {{ item.next_action }}</span>
+                <span class="route-status-badge status-{{ item.status }}">{{ item.status_label }}</span>
+              </a>
+            {% else %}
+              <p class="route-map-empty">No current data.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <p class="route-map-empty">No current data. Move requests, route stops, and plant transfers will appear here after they are recorded.</p>
+      <p class="route-map-empty">{{ pf.empty_states.carrier_unit_snapshot if pf else 'Carrier unit snapshot not connected yet' }}</p>
     {% endif %}
-  </div>
 
-  {% if rm and (rm.plants or rm.stops or rm.moves or rm.lanes) %}
-    <div class="route-map-canvas" aria-label="Route map nodes and stop sequence">
-      <div class="route-node-strip">
-        {% for plant in rm.plants %}
-          {% set plant_href = plant.move_queue_url or '#' %}
-          <a class="route-node status-{{ plant.worst_status }} {% if rm.selected.selected_plant and rm.selected.selected_plant == plant.label %}selected{% endif %}"
-             href="{{ plant_href }}"
-             data-route-map-open="plant"
-             data-route-map-id="{{ plant.plant_key }}">
-            <span class="route-node-code">{{ plant.short_code or '--' }}</span>
-            <span class="route-node-name">{{ plant.label }}</span>
-            <span class="route-node-meta">
-              {{ plant.open_request_count }} open · {{ plant.active_stop_count }} active{% if plant.blocked_count %} · {{ plant.blocked_count }} blocked{% endif %}
-            </span>
-          </a>
-        {% else %}
-          <div class="route-map-empty">No current data. Plant nodes appear after stops, requests, or transfers are recorded.</div>
-        {% endfor %}
-      </div>
+    {% if pf %}
+      {% for node in pf.flow_nodes %}
+        <div class="route-map-detail-source" hidden data-route-map-detail="flow-node-{{ node.key }}">
+          <div class="drawer-kicker">Plant / Location &middot; {{ node.short_code or 'No current data' }}</div>
+          <h3>{{ node.label or 'No current data' }}</h3>
+          <div class="drawer-badges">
+            <span class="route-status-badge status-{{ node.worst_status }}">{{ node.worst_status|replace('_', ' ')|title }}</span>
+          </div>
+          <dl class="drawer-facts">
+            <div><dt>Open</dt><dd>{{ node.open_count }}</dd></div>
+            <div><dt>Active</dt><dd>{{ node.active_count }}</dd></div>
+            <div><dt>Waiting</dt><dd>{{ node.waiting_count }}</dd></div>
+            <div><dt>Blocked</dt><dd>{{ node.blocked_count }}</dd></div>
+            <div><dt>Completed</dt><dd>{{ node.completed_count }}</dd></div>
+            <div><dt>Issues</dt><dd>{{ node.issue_count }}</dd></div>
+            <div><dt>Carrier Unit</dt><dd>{{ node.meta.snapshot_empty_state or 'Carrier unit snapshot not connected yet' }}</dd></div>
+            <div><dt>Rack / Capacity</dt><dd>{{ node.meta.rack_empty_state or 'Rack/capacity data not connected yet' }}</dd></div>
+            <div><dt>Timing</dt><dd>{% if node.meta.timing and node.meta.timing.estimate_minutes is not none %}Expected Wait {{ node.meta.timing.estimate_label }}{% else %}Not tracked yet{% endif %}</dd></div>
+            <div><dt>Data Sources</dt><dd>{% if node.meta.data_sources %}{{ node.meta.data_sources|join(', ') }}{% else %}No current data{% endif %}</dd></div>
+            <div><dt>Next Action</dt><dd>{{ node.next_action or 'No action needed' }}</dd></div>
+          </dl>
+          <div class="drawer-actions">
+            {% if node.view_url %}<a href="{{ node.view_url }}">View related Move Queue</a>{% else %}<button type="button" disabled>View related Move Queue <span>Not wired yet.</span></button>{% endif %}
+            {% if node.active_moves_url %}<a href="{{ node.active_moves_url }}">View related Active Moves</a>{% else %}<button type="button" disabled>View related Active Moves <span>Not wired yet.</span></button>{% endif %}
+          </div>
+        </div>
+      {% endfor %}
 
-      <div class="route-stop-rail">
-        {% for stop in rm.stops %}
-          <a class="route-stop-card status-{{ stop.status }} {% if rm.route.current_stop_id == stop.stop_id %}active{% endif %}"
-             href="{{ stop.view_url or '#' }}"
-             data-route-map-open="stop"
-             data-route-map-id="{{ stop.stop_id }}">
-            <span class="route-stop-marker">{{ '✓' if stop.status == 'completed' else stop.sequence }}</span>
-            <span class="route-stop-main">
-              <strong>{{ stop.plant_name }}</strong>
-              <small>{{ stop.arrival_at|display_time if stop.arrival_at else 'No current data' }}{% if stop.departure_at %} &rarr; {{ stop.departure_at|to_12h_format }}{% else %} &rarr; open{% endif %}</small>
-              <small>{{ stop.cargo_status }} · {{ stop.next_action }}</small>
-            </span>
-            <span class="route-status-badge status-{{ stop.status }}">{{ stop.status_label }}</span>
-          </a>
-        {% else %}
-          <div class="route-map-empty">No stops logged yet.</div>
-        {% endfor %}
+      {% for lane in pf.flow_lanes %}
+        <div class="route-map-detail-source" hidden data-route-map-detail="flow-lane-{{ lane.origin_key }}--{{ lane.destination_key }}">
+          <div class="drawer-kicker">Production Lane</div>
+          <h3>{{ lane.origin_label }} &rarr; {{ lane.destination_label }}</h3>
+          <div class="drawer-badges">
+            <span class="route-status-badge status-{{ lane.worst_status }}">{{ lane.worst_status|replace('_', ' ')|title }}</span>
+          </div>
+          <dl class="drawer-facts">
+            <div><dt>Open moves</dt><dd>{{ lane.open_count }}</dd></div>
+            <div><dt>Active moves</dt><dd>{{ lane.active_count }}</dd></div>
+            <div><dt>Waiting</dt><dd>{{ lane.waiting_count }}</dd></div>
+            <div><dt>Blocked</dt><dd>{{ lane.blocked_count }}</dd></div>
+            <div><dt>Completed today</dt><dd>{{ lane.completed_count }}</dd></div>
+            <div><dt>Oldest age</dt><dd>{% if lane.oldest_age_minutes is not none %}{{ lane.oldest_age_minutes }} min{% else %}Not tracked yet{% endif %}</dd></div>
+            <div><dt>Linked requests</dt><dd>{% if lane.linked_request_ids %}{{ lane.linked_request_ids|join(', ') }}{% else %}No current data{% endif %}</dd></div>
+            <div><dt>Linked transfers</dt><dd>{% if lane.linked_transfer_ids %}{{ lane.linked_transfer_ids|join(', ') }}{% else %}No current data{% endif %}</dd></div>
+          </dl>
+          <div class="drawer-actions">
+            {% if lane.view_url %}<a href="{{ lane.view_url }}">Open related Move Queue</a>{% else %}<button type="button" disabled>Open related Move Queue <span>Not wired yet.</span></button>{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+
+      {% for item in pf.flow_items %}
+        <div class="route-map-detail-source" hidden data-route-map-detail="flow-item-{{ item.item_id }}">
+          <div class="drawer-kicker">{{ item.item_type|replace('_', ' ')|title }}</div>
+          <h3>{{ item.label or 'No current data' }}</h3>
+          <div class="drawer-badges">
+            <span class="route-status-badge status-{{ item.status }}">{{ item.status_label }}</span>
+          </div>
+          <dl class="drawer-facts">
+            <div><dt>Location / Lane</dt><dd>{{ item.plant_location or 'No current data' }}</dd></div>
+            <div><dt>Stage</dt><dd>{{ item.stage or 'No current data' }}</dd></div>
+            <div><dt>Description</dt><dd>{{ item.description or 'No current data' }}</dd></div>
+            <div><dt>Age</dt><dd>{% if item.age_minutes is not none %}{{ item.age_minutes }} min{% else %}Not tracked yet{% endif %}</dd></div>
+            <div><dt>Carrier Unit</dt><dd>{% if item.carrier_unit_count is not none %}{{ item.carrier_unit_count }}{% else %}Carrier unit snapshot not connected yet{% endif %}</dd></div>
+            <div><dt>Rack / Capacity</dt><dd>{% if item.rack_count is not none %}{{ item.rack_count }}{% else %}Rack/capacity data not connected yet{% endif %}</dd></div>
+            <div><dt>Trailer</dt><dd>{{ item.trailer or 'Not tracked yet' }}</dd></div>
+            <div><dt>Linked request</dt><dd>{% if item.linked_request_id %}Move Request #{{ item.linked_request_id }}{% else %}No linked move request{% endif %}</dd></div>
+            <div><dt>Linked stop</dt><dd>{% if item.linked_route_stop_id %}Driver Log #{{ item.linked_route_stop_id }}{% else %}No linked route stop{% endif %}</dd></div>
+            <div><dt>Proof / Document</dt><dd>{% if item.linked_transfer_id %}Plant Transfer #{{ item.linked_transfer_id }}{% elif item.linked_document_id %}Document #{{ item.linked_document_id }}{% else %}Document not attached{% endif %}</dd></div>
+            <div><dt>Next Action</dt><dd>{{ item.next_action or 'No action needed' }}</dd></div>
+          </dl>
+          <div class="drawer-actions">
+            {% if item.view_url %}<a href="{{ item.view_url }}">Open related record</a>{% else %}<button type="button" disabled>Open related record <span>Not wired yet.</span></button>{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="route-map-drawer" data-route-map-drawer hidden aria-hidden="true">
+      <button class="route-map-drawer-backdrop" type="button" data-route-map-close aria-label="Close details"></button>
+      <aside class="route-map-drawer-panel" role="dialog" aria-modal="true" aria-label="Production flow details">
+        <div class="drawer-grip"></div>
+        <button class="drawer-close" type="button" data-route-map-close>Close</button>
+        <div data-route-map-drawer-content></div>
+      </aside>
+    </div>
+  </section>
+{% else %}
+  <section class="route-map-shell" data-route-map-shell data-route-map-mode="route">
+    <div class="route-map-top">
+      <div>
+        <p class="route-map-label">{{ map_label }}</p>
+        <h3>{{ (rm.route.current_location if rm and rm.route else none) or 'No current data' }}</h3>
+        <p class="route-map-sub">
+          {% if rm and rm.route %}
+            {{ rm.route.driver_name or 'Not tracked yet' }} &middot; {{ rm.route.status|replace('_', ' ')|title }} &middot; {{ rm.route.next_action or 'No action needed' }}
+          {% else %}
+            No current data
+          {% endif %}
+        </p>
       </div>
+      {% if rm and rm.route %}
+        <div class="route-map-health">
+          <span>{{ rm.route.issue_summary or 'No open issues' }}</span>
+          <strong>{{ rm.route.document_summary or 'Document not attached' }}</strong>
+        </div>
+      {% endif %}
     </div>
 
-    <div class="route-map-grid">
-      <div class="route-map-section">
-        <div class="route-map-section-head">
-          <h4>Origin to Destination Lanes</h4>
-          <span>{{ rm.lanes|length }}</span>
-        </div>
-        <div class="route-lane-list">
-          {% for lane in rm.lanes %}
-            <a class="route-lane-row status-{{ lane.status }}"
-               href="{{ lane.view_url or '#' }}"
-               data-route-map-open="lane"
-               data-route-map-id="{{ lane.origin_key }}--{{ lane.destination_key }}">
-              <span><strong>{{ lane.origin_label }}</strong> &rarr; <strong>{{ lane.destination_label }}</strong></span>
-              <small>{{ lane.open_count }} open · {{ lane.active_count }} active · {{ lane.completed_count }} completed{% if lane.blocked_count %} · {{ lane.blocked_count }} blocked{% endif %}</small>
+    {% if rm and (rm.plants or rm.stops or rm.moves or rm.lanes) %}
+      <div class="route-map-canvas" aria-label="Driver route map nodes and stop sequence">
+        <div class="route-node-strip">
+          {% for plant in rm.plants %}
+            {% set plant_href = plant.move_queue_url or '#' %}
+            <a class="route-node status-{{ plant.worst_status }} {% if rm.selected.selected_plant and rm.selected.selected_plant == plant.label %}selected{% endif %}"
+               href="{{ plant_href }}"
+               data-route-map-open="plant"
+               data-route-map-id="{{ plant.plant_key }}">
+              <span class="route-node-code">{{ plant.short_code or '--' }}</span>
+              <span class="route-node-name">{{ plant.label }}</span>
+              <span class="route-node-meta">
+                {{ plant.open_request_count }} open &middot; {{ plant.active_stop_count }} active{% if plant.blocked_count %} &middot; {{ plant.blocked_count }} blocked{% endif %}
+              </span>
             </a>
-            <div class="route-map-detail-source" hidden data-route-map-detail="lane-{{ lane.origin_key }}--{{ lane.destination_key }}">
-              <div class="drawer-kicker">Lane / route leg</div>
-              <h3>{{ lane.origin_label }} &rarr; {{ lane.destination_label }}</h3>
-              <div class="drawer-badges">
-                <span class="route-status-badge status-{{ lane.status }}">{{ lane.status|replace('_', ' ')|title }}</span>
-              </div>
-              <dl class="drawer-facts">
-                <div><dt>Open requests</dt><dd>{{ lane.open_count }}</dd></div>
-                <div><dt>Active moves</dt><dd>{{ lane.active_count }}</dd></div>
-                <div><dt>Completed today</dt><dd>{{ lane.completed_count }}</dd></div>
-                <div><dt>Blocked / review</dt><dd>{{ lane.blocked_count }}</dd></div>
-                <div><dt>Linked requests</dt><dd>{% if lane.linked_move_request_ids %}{{ lane.linked_move_request_ids|join(', ') }}{% else %}No current data{% endif %}</dd></div>
-                <div><dt>Linked stops</dt><dd>{% if lane.linked_stop_ids %}{{ lane.linked_stop_ids|join(', ') }}{% else %}No current data{% endif %}</dd></div>
-              </dl>
-              <div class="drawer-actions">
-                {% if lane.view_url %}<a href="{{ lane.view_url }}">Open related Move Queue</a>{% else %}<button type="button" disabled>Open related Move Queue <span>Not wired yet.</span></button>{% endif %}
-              </div>
-            </div>
           {% else %}
-            <p class="route-map-empty">No lane data yet.</p>
+            <div class="route-map-empty">No current data. Plant nodes appear after stops, requests, or transfers are recorded.</div>
+          {% endfor %}
+        </div>
+
+        <div class="route-stop-rail">
+          {% for stop in rm.stops %}
+            <a class="route-stop-card status-{{ stop.status }} {% if rm.route.current_stop_id == stop.stop_id %}active{% endif %}"
+               href="{{ stop.view_url or '#' }}"
+               data-route-map-open="stop"
+               data-route-map-id="{{ stop.stop_id }}">
+              <span class="route-stop-marker">{{ '&#10003;'|safe if stop.status == 'completed' else stop.sequence }}</span>
+              <span class="route-stop-main">
+                <strong>{{ stop.plant_name }}</strong>
+                <small>{{ stop.arrival_at|display_time if stop.arrival_at else 'No current data' }}{% if stop.departure_at %} &rarr; {{ stop.departure_at|to_12h_format }}{% else %} &rarr; open{% endif %}</small>
+                <small>{{ stop.cargo_status }} &middot; {{ stop.next_action }}</small>
+              </span>
+              <span class="route-status-badge status-{{ stop.status }}">{{ stop.status_label }}</span>
+            </a>
+          {% else %}
+            <div class="route-map-empty">No stops logged yet.</div>
           {% endfor %}
         </div>
       </div>
 
-      <div class="route-map-section">
-        <div class="route-map-section-head">
-          <h4>Assigned Move Path</h4>
-          <span>{{ rm.moves|length }}</span>
+      <div class="route-map-grid">
+        <div class="route-map-section">
+          <div class="route-map-section-head">
+            <h4>Origin to Destination Lanes</h4>
+            <span>{{ rm.lanes|length }}</span>
+          </div>
+          <div class="route-lane-list">
+            {% for lane in rm.lanes %}
+              <a class="route-lane-row status-{{ lane.status }}"
+                 href="{{ lane.view_url or '#' }}"
+                 data-route-map-open="lane"
+                 data-route-map-id="{{ lane.origin_key }}--{{ lane.destination_key }}">
+                <span><strong>{{ lane.origin_label }}</strong> &rarr; <strong>{{ lane.destination_label }}</strong></span>
+                <small>{{ lane.open_count }} open &middot; {{ lane.active_count }} active &middot; {{ lane.completed_count }} completed{% if lane.blocked_count %} &middot; {{ lane.blocked_count }} blocked{% endif %}</small>
+              </a>
+              <div class="route-map-detail-source" hidden data-route-map-detail="lane-{{ lane.origin_key }}--{{ lane.destination_key }}">
+                <div class="drawer-kicker">Lane / route leg</div>
+                <h3>{{ lane.origin_label }} &rarr; {{ lane.destination_label }}</h3>
+                <div class="drawer-badges">
+                  <span class="route-status-badge status-{{ lane.status }}">{{ lane.status|replace('_', ' ')|title }}</span>
+                </div>
+                <dl class="drawer-facts">
+                  <div><dt>Open requests</dt><dd>{{ lane.open_count }}</dd></div>
+                  <div><dt>Active moves</dt><dd>{{ lane.active_count }}</dd></div>
+                  <div><dt>Completed today</dt><dd>{{ lane.completed_count }}</dd></div>
+                  <div><dt>Blocked / review</dt><dd>{{ lane.blocked_count }}</dd></div>
+                  <div><dt>Linked requests</dt><dd>{% if lane.linked_move_request_ids %}{{ lane.linked_move_request_ids|join(', ') }}{% else %}No current data{% endif %}</dd></div>
+                  <div><dt>Linked stops</dt><dd>{% if lane.linked_stop_ids %}{{ lane.linked_stop_ids|join(', ') }}{% else %}No current data{% endif %}</dd></div>
+                </dl>
+                <div class="drawer-actions">
+                  {% if lane.view_url %}<a href="{{ lane.view_url }}">Open related Move Queue</a>{% else %}<button type="button" disabled>Open related Move Queue <span>Not wired yet.</span></button>{% endif %}
+                </div>
+              </div>
+            {% else %}
+              <p class="route-map-empty">No lane data yet.</p>
+            {% endfor %}
+          </div>
         </div>
-        <div class="route-move-list">
-          {% for move in rm.moves %}
-            <a class="route-move-card status-{{ move.status }}"
-               href="{{ move.view_url or '#' }}"
-               data-route-map-open="move"
-               data-route-map-id="{{ move.move_request_id }}">
-              <span class="route-move-title">{{ move.request_number }}</span>
-              <span class="route-move-path">{{ move.origin_location_text }} &rarr; {{ move.destination_location_text }}</span>
-              <span class="route-move-meta">{{ move.cargo_text }}{% if move.part_number %} · {{ move.part_number }}{% endif %}{% if move.due_time_text %} · due {{ move.due_time_text }}{% endif %}</span>
-              <span class="route-status-badge status-{{ move.status }}">{{ move.status_label }}</span>
-            </a>
-          {% else %}
-            <p class="route-map-empty">No assigned move requests right now.</p>
-          {% endfor %}
+
+        <div class="route-map-section">
+          <div class="route-map-section-head">
+            <h4>Assigned Move Path</h4>
+            <span>{{ rm.moves|length }}</span>
+          </div>
+          <div class="route-move-list">
+            {% for move in rm.moves %}
+              <a class="route-move-card status-{{ move.status }}"
+                 href="{{ move.view_url or '#' }}"
+                 data-route-map-open="move"
+                 data-route-map-id="{{ move.move_request_id }}">
+                <span class="route-move-title">{{ move.request_number }}</span>
+                <span class="route-move-path">{{ move.origin_location_text }} &rarr; {{ move.destination_location_text }}</span>
+                <span class="route-move-meta">{{ move.cargo_text }}{% if move.part_number %} &middot; {{ move.part_number }}{% endif %}{% if move.due_time_text %} &middot; due {{ move.due_time_text }}{% endif %}</span>
+                <span class="route-status-badge status-{{ move.status }}">{{ move.status_label }}</span>
+              </a>
+            {% else %}
+              <p class="route-map-empty">No assigned move requests right now.</p>
+            {% endfor %}
+          </div>
         </div>
       </div>
+    {% else %}
+      <p class="route-map-empty">No current data. Stops, move requests, and plant transfers will appear here after they are recorded.</p>
+    {% endif %}
+
+    <div class="route-map-drawer" data-route-map-drawer hidden aria-hidden="true">
+      <button class="route-map-drawer-backdrop" type="button" data-route-map-close aria-label="Close details"></button>
+      <aside class="route-map-drawer-panel" role="dialog" aria-modal="true" aria-label="Route map details">
+        <div class="drawer-grip"></div>
+        <button class="drawer-close" type="button" data-route-map-close>Close</button>
+        <div data-route-map-drawer-content></div>
+      </aside>
     </div>
-  {% else %}
-    <p class="route-map-empty">No current data. Stops, move requests, and plant transfers will appear here after they are recorded.</p>
-  {% endif %}
 
-  <div class="route-map-drawer" data-route-map-drawer hidden aria-hidden="true">
-    <button class="route-map-drawer-backdrop" type="button" data-route-map-close aria-label="Close details"></button>
-    <aside class="route-map-drawer-panel" role="dialog" aria-modal="true" aria-label="Route map details">
-      <div class="drawer-grip"></div>
-      <button class="drawer-close" type="button" data-route-map-close>Close</button>
-      <div data-route-map-drawer-content></div>
-    </aside>
-  </div>
-
-  {% include "partials/_stop_detail_drawer.html" %}
-  {% include "partials/_plant_detail_drawer.html" %}
-  {% include "partials/_move_detail_drawer.html" %}
-</section>
+    {% include "partials/_stop_detail_drawer.html" %}
+    {% include "partials/_plant_detail_drawer.html" %}
+    {% include "partials/_move_detail_drawer.html" %}
+  </section>
+{% endif %}

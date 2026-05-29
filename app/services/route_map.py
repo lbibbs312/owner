@@ -9,6 +9,7 @@ from datetime import date as date_cls, datetime, timedelta
 import re
 
 from flask import has_request_context, url_for
+import pytz
 from werkzeug.routing import BuildError
 
 from app.models import DamageReport, DriverLog, MoveRequest, PlantTransfer, User
@@ -26,6 +27,7 @@ from app.services.route_context import build_route_context
 SAFE_EMPTY = "No current data"
 NOT_TRACKED = "Not tracked yet"
 DOCUMENT_MISSING = "Document not attached"
+DETROIT_TZ = pytz.timezone("America/Detroit")
 
 
 def _clean(value):
@@ -46,8 +48,9 @@ def _target_date(value):
 
 
 def _day_bounds(target):
-    start = datetime.combine(target, datetime.min.time())
-    return start, start + timedelta(days=1)
+    local_start = DETROIT_TZ.localize(datetime.combine(target, datetime.min.time()))
+    utc_start = local_start.astimezone(pytz.utc).replace(tzinfo=None)
+    return utc_start, utc_start + timedelta(days=1)
 
 
 def _safe_url(endpoint, **values):
