@@ -312,7 +312,10 @@ def _current_driver_load(driver_id, route_date=None):
         action="finalized",
         target_type="end_of_day",
     ).filter(ActivityEvent.details.contains(str(route_date))).first()
-    if route_finalized:
+    open_shift = _open_shift_for_driver(driver_id)
+    open_shift_route_date = _shift_route_date(open_shift)
+    route_still_active = bool(open_shift and (not open_shift_route_date or open_shift_route_date == route_date))
+    if route_finalized and not route_still_active:
         return current_load_after_logs([])
     logs = _active_driver_logs_query().filter_by(driver_id=driver_id, date=route_date).all()
     return current_load_after_logs(logs)
@@ -4068,14 +4071,16 @@ def mobile_dashboard():
         now=now_local,
     ).to_dict() if current_stop else None
     next_load_eta = next_load_prediction
-    if route_context.route_status == "completed" and route_date == today_local_date:
+    if route_is_active and route_date != today_local_date:
+        route_panel_title = "Active Route"
+    elif route_is_active:
+        route_panel_title = "Today's Route"
+    elif route_context.route_status == "completed" and route_date == today_local_date:
         route_panel_title = "Route Complete"
     elif route_context.route_status == "finalized" and route_date == today_local_date:
         route_panel_title = "Route Finalized"
     elif route_date == today_local_date:
         route_panel_title = "Today's Route"
-    elif route_is_active:
-        route_panel_title = "Active Route"
     else:
         route_panel_title = "Last Route"
     truck_source_pretrip = active_pretrip or route_pretrip or latest_pretrip

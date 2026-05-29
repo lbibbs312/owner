@@ -4089,6 +4089,56 @@ def test_new_log_load_state_ignores_previous_days_and_finalized_route(client, ap
     assert b"Raleigh East Load + PPL Hot Part" not in finalized_page.data
 
 
+def test_premature_finalized_event_does_not_lock_active_shift_new_logs(client, app):
+    from datetime import datetime
+
+    with app.app_context():
+        from app.blueprints.driver.routes import _today_local_date
+        from app.extensions import db
+        from app.models import ActivityEvent, DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("active_after_final", "active-after-final@example.com", "driver", first_name="Active")
+        today = _today_local_date()
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=1000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add(ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime.utcnow()))
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="RE",
+                load_size="Empty",
+                depart_load_size="Raleigh West Load",
+                arrive_time="08:00",
+                depart_time="08:15",
+                created_at=datetime.utcnow(),
+            )
+        )
+        db.session.add(
+            ActivityEvent(
+                user_id=driver.id,
+                category="eod",
+                action="finalized",
+                title="Route finalized",
+                details=f"Route finalized for {today}",
+                target_type="end_of_day",
+            )
+        )
+        db.session.commit()
+
+    login(client, "active_after_final")
+    mobile = client.get("/mobile")
+    assert mobile.status_code == 200
+    assert b"Continue route" in mobile.data
+    assert b"Add Stop" in mobile.data
+    assert b"Finalize Route" not in mobile.data
+
+    new_log = client.get("/new_driving_log")
+    assert new_log.status_code == 200
+    assert b"Raleigh West Load" in new_log.data
+
+
 def test_driver_logs_flags_impossible_plant_transfer_timing(client, app):
     from datetime import date
 
