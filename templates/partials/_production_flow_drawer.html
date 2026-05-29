@@ -20,13 +20,19 @@
   {% endfor %}
 
   {% for node in pf.flow_nodes %}
+    {% set profile = node.production_profile %}
     <div class="route-map-detail-source" hidden data-route-map-detail="flow-node-{{ node.key }}">
-      <div class="drawer-kicker">Plant / Location &middot; {{ node.short_code or 'No current data' }}</div>
-      <h3>{{ node.label or 'No current data' }}</h3>
+      <div class="drawer-kicker">Plant Position &middot; {{ profile.role_label if profile else (node.short_code or 'No current data') }}</div>
+      <h3>{% if profile and profile.sequence %}{{ profile.sequence }}. {% endif %}{{ node.label or 'No current data' }}</h3>
       <div class="drawer-badges">
         <span class="route-status-badge status-{{ node.worst_status }}">{{ node.worst_status|replace('_', ' ')|title }}</span>
       </div>
       <dl class="drawer-facts">
+        {% if profile %}
+          <div><dt>Production Role</dt><dd>{{ profile.role_label }}</dd></div>
+          <div><dt>Position Readout</dt><dd>{{ profile.primary_value }}</dd></div>
+          <div><dt>Line State</dt><dd>{{ profile.secondary_value }}</dd></div>
+        {% endif %}
         <div><dt>Open</dt><dd>{{ node.open_count }}</dd></div>
         <div><dt>Active</dt><dd>{{ node.active_count }}</dd></div>
         <div><dt>Waiting</dt><dd>{{ node.waiting_count }}</dd></div>

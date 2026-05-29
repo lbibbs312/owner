@@ -50,6 +50,165 @@ FRIENDLY_SOURCE = {
     "Document": "Document proof",
 }
 
+PRODUCTION_NODE_PROFILES = {
+    "ppl": {
+        "aliases": {"ppl", "plastic_logistics", "plastic_logistics_buffer", "molding"},
+        "sequence": "1",
+        "role_label": "MOLDING",
+        "console_title": "PLASTIC LOGISTICS BUFFER & MOLDING (PPL)",
+        "description": "Raw plastic substrates and outbound molding buffer.",
+        "primary_label": "Material queued",
+        "secondary_label": "Molding press",
+        "console_left_title": "RAW INJECTION MOLDING",
+        "console_right_title": "COMPONENT STAGING WMS",
+        "theme": "cyan",
+        "size": "primary",
+        "x": 19,
+        "y": 48,
+    },
+    "kraft_plant": {
+        "aliases": {"kp", "kraft_plant", "kraft_plater", "kraft", "plating"},
+        "sequence": "2",
+        "role_label": "PLATING",
+        "console_title": "KRAFT PLATER / PLATING (KP)",
+        "description": "Chrome plating, rack accumulation, and plater handoff.",
+        "primary_label": "Plated WIP",
+        "secondary_label": "Plating line",
+        "console_left_title": "CURRENT JOB LOADING",
+        "console_right_title": "ACTIVE PLATING ALERTS",
+        "theme": "red",
+        "size": "primary",
+        "x": 43,
+        "y": 27,
+    },
+    "plastic_west": {
+        "aliases": {"pw", "plastic_west", "paint_west", "paint", "coating", "raleigh_west"},
+        "sequence": "3",
+        "role_label": "COATING",
+        "console_title": "PAINT / COATING OPERATIONS (PW)",
+        "description": "Masking, color paint runs, and coated WIP release.",
+        "primary_label": "Painted WIP",
+        "secondary_label": "Coating line",
+        "console_left_title": "ROBOTIC COATING DEPT",
+        "console_right_title": "CONVEYOR / OVEN BUFFER",
+        "theme": "cyan",
+        "size": "primary",
+        "x": 66,
+        "y": 32,
+    },
+    "raleigh_west": {
+        "aliases": {"rw"},
+        "sequence": "3",
+        "role_label": "COATING",
+        "console_title": "RALEIGH WEST PRODUCTION BUFFER (RW)",
+        "description": "Paint/coating staging and outbound production handoff.",
+        "primary_label": "Painted WIP",
+        "secondary_label": "Outbound buffer",
+        "console_left_title": "COATING STAGING",
+        "console_right_title": "ROUTE HANDOFF",
+        "theme": "cyan",
+        "size": "primary",
+        "x": 66,
+        "y": 32,
+    },
+    "52nd_street_l": {
+        "aliases": {"52l", "52nd_street_l", "52nd_street", "52nd_street_logistics", "52nd_street_dc", "52dc"},
+        "sequence": "4",
+        "role_label": "ASSEMBLY",
+        "console_title": "52ND STREET ASSEMBLY / LOGISTICS (52L)",
+        "description": "Final assembly, inserts, pack, and ready-load build.",
+        "primary_label": "Ready loads",
+        "secondary_label": "Hot track",
+        "console_left_title": "ASSEMBLY CARRIER TABLE",
+        "console_right_title": "LOAD BUILD STATUS",
+        "theme": "cyan",
+        "size": "primary",
+        "x": 82,
+        "y": 55,
+    },
+    "52nd_street_dc": {
+        "aliases": {"52dc"},
+        "sequence": "4",
+        "role_label": "ASSEMBLY",
+        "console_title": "52ND STREET DC LOAD BUILD",
+        "description": "Assembly loads, trailer staging, and route-ready freight.",
+        "primary_label": "Ready loads",
+        "secondary_label": "Load build",
+        "console_left_title": "ASSEMBLY CARRIER TABLE",
+        "console_right_title": "LOAD BUILD STATUS",
+        "theme": "cyan",
+        "size": "primary",
+        "x": 82,
+        "y": 55,
+    },
+    "raleigh_east": {
+        "aliases": {"re", "raleigh_east", "oem_dock", "receiving"},
+        "sequence": "5",
+        "role_label": "OEM DOCK",
+        "console_title": "RALEIGH EAST OEM DOCK (RE)",
+        "description": "Receiving, reconcile, and direct OEM dock sequencing.",
+        "primary_label": "OEM delivered",
+        "secondary_label": "Dock state",
+        "console_left_title": "INTERSITE SHIPPER LOG",
+        "console_right_title": "SERIAL / LOT RECEIVING",
+        "theme": "cyan",
+        "size": "primary",
+        "x": 82,
+        "y": 80,
+    },
+    "helios": {
+        "aliases": {"helios", "helios_sub_plater", "sub_plater"},
+        "sequence": "",
+        "role_label": "HELIOS SUB-PLATER",
+        "console_title": "HELIOS SUPPORT CHAMBERS",
+        "description": "Auxiliary plating support and standby staging.",
+        "primary_label": "Staged",
+        "secondary_label": "Support line",
+        "console_left_title": "SUB-PRODUCTION STAGING",
+        "console_right_title": "AUXILIARY RELEASE",
+        "theme": "cyan",
+        "size": "secondary",
+        "x": 19,
+        "y": 80,
+    },
+    "trim_dc": {
+        "aliases": {"trim_dc", "trim", "distribution_center", "dc"},
+        "sequence": "",
+        "role_label": "TRIM DC",
+        "console_title": "TRIM PACKING DC",
+        "description": "Auxiliary packing, hold racks, and direct route staging.",
+        "primary_label": "Hold loads",
+        "secondary_label": "Packing status",
+        "console_left_title": "AUXILIARY PACKING",
+        "console_right_title": "ROUTE STAGING",
+        "theme": "cyan",
+        "size": "secondary",
+        "x": 55,
+        "y": 63,
+    },
+    "lab": {
+        "aliases": {"lab", "corporate_lab", "quality_hold_lab", "quality", "corp", "corporate"},
+        "sequence": "",
+        "role_label": "QUALITY HOLD LAB",
+        "console_title": "QUALITY HOLD LAB",
+        "description": "Scrap, QA holds, damage review, and containment proof.",
+        "primary_label": "Scrap / holds",
+        "secondary_label": "Containment",
+        "console_left_title": "SCRAP / QA HOLD LOG",
+        "console_right_title": "CONTAINMENT STATUS",
+        "theme": "red",
+        "size": "secondary",
+        "x": 55,
+        "y": 84,
+    },
+}
+
+PRODUCTION_NODE_ALIAS_INDEX = {}
+for _profile_key, _profile in PRODUCTION_NODE_PROFILES.items():
+    PRODUCTION_NODE_ALIAS_INDEX[_profile_key] = _profile_key
+    for _alias in _profile["aliases"]:
+        PRODUCTION_NODE_ALIAS_INDEX[_alias] = _profile_key
+
 
 def _clean(value):
     return str(value or "").strip()
@@ -110,6 +269,178 @@ def _short_code(value):
     if len(words) == 1:
         return words[0][:4].upper()
     return "".join(word[0] for word in words[:4]).upper()
+
+
+def _profile_key_for_node(node):
+    candidates = {
+        _location_key(node.get("label")),
+        _location_key(node.get("short_code")),
+        _clean(node.get("short_code")).lower(),
+    }
+    for code, label in PLANT_LABELS.items():
+        if label == node.get("label"):
+            candidates.add(_location_key(code))
+            candidates.add(code.lower())
+    for candidate in candidates:
+        if candidate in PRODUCTION_NODE_ALIAS_INDEX:
+            return PRODUCTION_NODE_ALIAS_INDEX[candidate]
+    return None
+
+
+def _production_profile_for_node(node):
+    profile_key = _profile_key_for_node(node)
+    if profile_key:
+        base = dict(PRODUCTION_NODE_PROFILES[profile_key])
+        base["profile_key"] = profile_key
+        return base
+    return {
+        "profile_key": "generic",
+        "sequence": "",
+        "role_label": node.get("short_code") or "PLANT NODE",
+        "console_title": f"{node.get('label') or SAFE_EMPTY} PRODUCTION POSITION",
+        "description": "Configurable production, staging, receiving, or transport location.",
+        "primary_label": "Material signals",
+        "secondary_label": "Position state",
+        "console_left_title": "CURRENT POSITION READOUT",
+        "console_right_title": "FLOW PROOF",
+        "theme": "cyan",
+        "size": "primary",
+        "x": None,
+        "y": None,
+    }
+
+
+def _status_state_label(node):
+    if node.get("blocked_count") or node.get("issue_count"):
+        return "Blocked"
+    if node.get("waiting_count"):
+        return "Waiting"
+    if node.get("active_count") or node.get("open_count"):
+        return "Active"
+    if node.get("completed_count"):
+        return "Complete"
+    return "Standby"
+
+
+def _work_signal_count(node):
+    return (
+        node.get("open_count", 0)
+        + node.get("active_count", 0)
+        + node.get("waiting_count", 0)
+        + node.get("completed_count", 0)
+    )
+
+
+def _singular_plural(count, singular, plural=None):
+    return f"{count} {singular if count == 1 else (plural or singular + 's')}"
+
+
+def _item_node_keys(item):
+    keys = set()
+    for field in ("related_node_key",):
+        value = _clean(item.get(field))
+        if value:
+            keys.add(value)
+    for field in ("origin_label", "destination_label", "plant_location"):
+        value = _clean(item.get(field))
+        if not value:
+            continue
+        for part in value.split("->"):
+            key = _location_key(part)
+            if key and key != "unspecified":
+                keys.add(key)
+    return keys
+
+
+def _material_line_for_item(item):
+    part = _clean(item.get("part_number"))
+    quantity = _clean(item.get("quantity_text"))
+    trailer = _clean(item.get("trailer"))
+    candidates = [
+        f"Part {part}" if part else "",
+        _clean(item.get("cargo_text")),
+        _clean(item.get("departed_with")),
+        _clean(item.get("arrived_with")),
+        _clean(item.get("description")),
+        _clean(item.get("stage")),
+    ]
+    ignored = {"empty", "none", "no current data", "not tracked yet", "document not attached"}
+    label = next((candidate for candidate in candidates if candidate and candidate.lower() not in ignored), "")
+    if not label:
+        return ""
+    suffixes = []
+    if quantity:
+        suffixes.append(quantity)
+    if trailer:
+        suffixes.append(f"Trailer {trailer}")
+    if suffixes:
+        return f"{label} ({', '.join(suffixes)})"
+    return label
+
+
+def _material_lines_for_node(node, items, limit=3):
+    node_key = node.get("key")
+    lines = []
+    seen = set()
+    for item in items:
+        if node_key not in _item_node_keys(item):
+            continue
+        line = _material_line_for_item(item)
+        if not line or line in seen:
+            continue
+        seen.add(line)
+        lines.append(line)
+        if len(lines) >= limit:
+            break
+    return lines
+
+
+def _primary_value_for_node(node, material_lines):
+    if material_lines:
+        return material_lines[0]
+    count = _work_signal_count(node)
+    if count:
+        return _singular_plural(count, "flow signal")
+    return "No material record"
+
+
+def _console_lines_for_node(node, material_lines):
+    source = ", ".join(node.get("source_labels") or node.get("meta", {}).get("source_labels") or []) or SAFE_EMPTY
+    work_count = _work_signal_count(node)
+    material = material_lines[0] if material_lines else "No material record on this date"
+    if len(material_lines) > 1:
+        material = f"{material} +{len(material_lines) - 1}"
+    return {
+        "left": [
+            {"label": "Material", "value": material},
+            {"label": "Flow signals", "value": str(work_count)},
+            {"label": "Source", "value": source},
+        ],
+        "right": [
+            {"label": "Status", "value": _status_state_label(node)},
+            {"label": "Proof needed", "value": str(node.get("proof_needed_count", 0))},
+            {"label": "Issues", "value": str(node.get("issue_count", 0))},
+        ],
+    }
+
+
+def _apply_production_profiles(nodes, items):
+    for node in nodes:
+        profile = _production_profile_for_node(node)
+        material_lines = _material_lines_for_node(node, items)
+        console_lines = _console_lines_for_node(node, material_lines)
+        state_label = _status_state_label(node)
+        profile.update({
+            "state_label": state_label,
+            "primary_value": _primary_value_for_node(node, material_lines),
+            "secondary_value": state_label,
+            "material_lines": material_lines,
+            "console_left": console_lines["left"],
+            "console_right": console_lines["right"],
+            "signal_count": _work_signal_count(node),
+            "attention_count": node.get("blocked_count", 0) + node.get("issue_count", 0),
+        })
+        node["production_profile"] = profile
 
 
 def _status_label(status):
@@ -328,6 +659,27 @@ def _apply_map_layout(nodes, lanes, items, *, selected_node_key=None):
             point["y"] = _clamp_layout(point["y"], 10, 90)
             node["layout"] = {**point, "cx": point["x"], "cy": point["y"], "ring": ring, "slot": index + 1, "is_hub": False}
 
+    production_slot_counts = {}
+    for node in nodes:
+        profile = _production_profile_for_node(node)
+        if profile.get("x") is None or profile.get("y") is None:
+            continue
+        count = production_slot_counts.get(profile["profile_key"], 0)
+        production_slot_counts[profile["profile_key"]] = count + 1
+        offset_x = (count % 2) * 5
+        offset_y = (count // 2) * 6
+        x = _clamp_layout(profile["x"] + offset_x, 8, 92)
+        y = _clamp_layout(profile["y"] + offset_y, 10, 90)
+        node["layout"] = {
+            "x": round(x, 2),
+            "y": round(y, 2),
+            "cx": round(x, 2),
+            "cy": round(y, 2),
+            "ring": "production",
+            "slot": count,
+            "is_hub": node["key"] == selected_node_key,
+        }
+
     slot_by_key = {node["key"]: node["layout"] for node in nodes}
     lane_index_by_pair = {}
     for lane in lanes:
@@ -353,14 +705,24 @@ def _apply_map_layout(nodes, lanes, items, *, selected_node_key=None):
 
     lane_by_pair = {(lane["origin_label"], lane["destination_label"]): lane for lane in lanes}
     item_offsets = ((-9, -9), (10, 8), (-12, 9), (12, -8), (0, 14), (0, -14))
+    route_chip_offsets = ((11, 9), (11, 15), (-11, 9), (-11, 15), (0, 19), (0, -16))
     node_item_counts = {}
     for index, item in enumerate(items):
         lane = lane_by_pair.get((item.get("origin_label"), item.get("destination_label")))
-        offset = item_offsets[index % len(item_offsets)]
-        if lane and lane.get("layout"):
+        if item.get("item_type") == "route_stop":
+            node_key = item.get("related_node_key") or _location_key(item.get("plant_location"))
+            node_layout = slot_by_key.get(node_key) or hub["layout"]
+            count = node_item_counts.get(f"route:{node_key}", 0)
+            node_item_counts[f"route:{node_key}"] = count + 1
+            offset = route_chip_offsets[count % len(route_chip_offsets)]
+            base_x = node_layout["x"]
+            base_y = node_layout["y"]
+        elif lane and lane.get("layout"):
+            offset = item_offsets[index % len(item_offsets)]
             base_x = lane["layout"].get("label_x", 50)
             base_y = lane["layout"].get("label_y", 50)
         else:
+            offset = item_offsets[index % len(item_offsets)]
             node_key = _location_key(item.get("plant_location"))
             node_layout = slot_by_key.get(node_key) or hub["layout"]
             node_item_counts[node_key] = node_item_counts.get(node_key, 0) + 1
@@ -1282,6 +1644,34 @@ def build_production_flow_context(
     items.sort(key=lambda item: (item["status"] not in {"blocked", "needs_review", "critical", "high"}, item["age_minutes"] is None, -(item["age_minutes"] or 0), item["label"]))
     selected_node_key = _location_key(selected_plant) if selected_plant else None
     _apply_map_layout(flow_nodes, flow_lanes, items, selected_node_key=selected_node_key)
+    _apply_production_profiles(flow_nodes, items)
+
+    node_by_key = {node["key"]: node for node in flow_nodes}
+    transport_token = None
+    if route_overlay and route_overlay.get("stop_markers"):
+        markers = route_overlay["stop_markers"]
+        active_marker = next((marker for marker in markers if not marker.get("departure_at")), markers[-1])
+        layout = node_by_key.get(active_marker.get("location_key"), {}).get("layout") or {}
+        cargo_text = active_marker.get("departed_with") or active_marker.get("arrived_with") or ""
+        loaded = bool(cargo_text and cargo_text.lower() not in {"empty", "none", "not tracked yet"})
+        transport_token = {
+            "label": route_overlay.get("driver_name") or "Route shuttle",
+            "badge": "FULL" if loaded else "MT",
+            "cargo": cargo_text or NOT_TRACKED,
+            "status": "Docked" if active_marker.get("location_key") else "En route",
+            "dock": active_marker.get("location_label") or NOT_TRACKED,
+            "x": round(_clamp_layout((layout.get("x") or 50) + 6, 7, 93), 2),
+            "y": round(_clamp_layout((layout.get("y") or 50) + 7, 9, 91), 2),
+        }
+        route_overlay["transport_token"] = transport_token
+
+    console_node = None
+    if flow_nodes:
+        console_node = next((node for node in flow_nodes if node.get("issue_count") or node.get("blocked_count")), None)
+        if not console_node:
+            console_node = next((node for node in flow_nodes if node.get("waiting_count") or node.get("active_count") or node.get("open_count")), None)
+        if not console_node:
+            console_node = flow_nodes[0]
 
     floor_summary = {
         "active_stop_count": len([log for log in logs if not log.depart_time]),
@@ -1307,6 +1697,8 @@ def build_production_flow_context(
         "flow_items": items,
         "flow_edges": flow_edges,
         "route_overlay": route_overlay,
+        "transport_token": transport_token,
+        "console_node": console_node,
         "proof_markers": proof_markers,
         "issue_markers": issue_markers,
         "queue_summary": queue_summary,

@@ -152,7 +152,7 @@ def test_production_flow_map_uses_spatial_graph_layout(app):
     assert all((" Q " in lane["layout"]["path_d"] or " C " in lane["layout"]["path_d"]) for lane in ctx["flow_lanes"])
 
 
-def test_selected_plant_is_centered_as_graph_hub(app):
+def test_selected_plant_uses_fixed_production_position_not_graph_recentering(app):
     from app.services.production_flow import build_production_flow_context
 
     manager = _user()
@@ -164,8 +164,10 @@ def test_selected_plant_is_centered_as_graph_hub(app):
 
     assert ctx["selected_context"]["selected_node_key"] == selected["key"]
     assert selected["layout"]["is_hub"] is True
-    assert selected["layout"]["x"] == 50.0
-    assert selected["layout"]["y"] == 50.0
+    assert selected["production_profile"]["role_label"] == "COATING"
+    assert selected["layout"]["ring"] == "production"
+    assert selected["layout"]["x"] == 66
+    assert selected["layout"]["y"] == 32
 
 
 def test_production_flow_context_supports_mode_and_action_permissions(app):
@@ -249,6 +251,37 @@ def test_production_flow_does_not_invent_carrier_or_rack_snapshot_data(app):
     assert all(node["meta"]["rack_capacity_snapshot"] is None for node in ctx["flow_nodes"])
 
 
+def test_known_plants_render_as_production_positions(app):
+    from app.services.production_flow import build_production_flow_context
+
+    manager = _user()
+    _move_request(
+        manager.id,
+        request_number="MR-PPL-KP",
+        origin_location_text="PPL",
+        destination_location_text="KP",
+        cargo_text="Raw grille substrates",
+        part_number="GRILLE-BASE-N1511",
+    )
+    _move_request(
+        manager.id,
+        request_number="MR-KP-52L",
+        origin_location_text="KP",
+        destination_location_text="52L",
+        cargo_text="Chrome grille assemblies",
+    )
+
+    ctx = build_production_flow_context(date=date.today())
+    by_label = {node["label"]: node for node in ctx["flow_nodes"]}
+
+    assert by_label["PPL"]["production_profile"]["role_label"] == "MOLDING"
+    assert by_label["Kraft Plant"]["production_profile"]["role_label"] == "PLATING"
+    assert by_label["52nd Street L"]["production_profile"]["role_label"] == "ASSEMBLY"
+    assert "GRILLE-BASE-N1511" in by_label["PPL"]["production_profile"]["primary_value"]
+    assert by_label["PPL"]["layout"]["ring"] == "production"
+    assert by_label["Kraft Plant"]["layout"]["ring"] == "production"
+
+
 def test_status_counts_are_correct(app):
     from app.services.production_flow import build_production_flow_context
 
@@ -325,6 +358,11 @@ def test_flow_map_uses_large_objects_and_compact_stop_chips(client, app):
     assert "Production Digital Twin" in body
     assert "Operational Alerts" in body
     assert "Plant Computer Console" in body
+    assert "production-node-card" in body
+    assert "COATING" in body
+    assert "TRIM DC" in body
+    assert "driver-shuttle-token" in body
+    assert "facility-grid" not in body
     assert "projected from events and current records" not in body
     assert "Receiving, unload, and reconcile events project here." not in body
     assert "route-step-chip" in body
@@ -392,7 +430,7 @@ def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
     assert "data-flow-edge-data" in body
     assert "flow-edge--new" in body
     assert "livePulse" in body
-    assert "stroke-width: 4.25" in body
+    assert "stroke-width: 2.6" in body
     assert "flow-edge--live" in body
     assert "flow-event-pulse" in body
     assert "data-flow-card-mask" in body

@@ -30,8 +30,7 @@
       .ops-board-spatial .flow-topbar > div { background-color: #030712; padding: 8px 10px; min-width: 0; }
       .ops-board-spatial .flow-topbar span { display: block; color: #6b7280; font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .flow-topbar strong { display: block; color: #e5e7eb; font-size: 0.76rem; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .ops-board-spatial .flow-map-lanes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background-color: #1f2937; border-bottom: 1px solid #1f2937; }
-      @media (min-width: 992px) { .ops-board-spatial .flow-map-lanes { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
+      .ops-board-spatial .flow-map-lanes { display: none; }
       .ops-board-spatial .flow-map-lane-card { background-color: #0b1220; min-height: 38px; padding: 9px 10px; border-top: 3px solid #374151; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
       .ops-board-spatial .flow-map-lane-card strong { color: #fff; display: block; font-size: 0.72rem; text-transform: uppercase; line-height: 1.25; }
       .ops-board-spatial .flow-map-lane-card span { color: #9ca3af; display: block; font-size: 0.65rem; margin-top: 6px; }
@@ -41,11 +40,11 @@
       .ops-board-spatial .flow-map-lane-card--in_transit { border-top-color: #38bdf8; }
       .ops-board-spatial .flow-map-lane-card--receiving { border-top-color: #10b981; }
       .ops-board-spatial .ops-spatial-body { display: grid; grid-template-columns: 1fr; background-color: #05080e; }
-      @media (min-width: 992px) { .ops-board-spatial .ops-spatial-body { grid-template-columns: minmax(0, 1fr) minmax(320px, 380px); align-items: stretch; } }
-      @media (min-width: 1180px) { .ops-board-spatial .ops-spatial-body { grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(320px, 370px); } }
+      @media (min-width: 992px) { .ops-board-spatial .ops-spatial-body { grid-template-columns: minmax(230px, 280px) minmax(0, 1fr); align-items: stretch; } }
+      @media (min-width: 1280px) { .ops-board-spatial .ops-spatial-body { grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(320px, 370px); } }
       .ops-board-spatial .flow-ops-stream { background-color: #0e1420; border-bottom: 1px solid #1e293b; padding: 12px; display: grid; gap: 12px; align-content: start; }
-      @media (min-width: 992px) and (max-width: 1179.98px) { .ops-board-spatial .flow-ops-stream { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-      @media (min-width: 1180px) { .ops-board-spatial .flow-ops-stream { border-right: 1px solid #1e293b; border-bottom: 0; min-height: 640px; } }
+      @media (min-width: 992px) { .ops-board-spatial .flow-ops-stream { border-right: 1px solid #1e293b; border-bottom: 0; min-height: 640px; } }
+      @media (min-width: 992px) and (max-width: 1279.98px) { .ops-board-spatial .flow-drawer-panel { grid-column: 1 / -1; } }
       .ops-board-spatial .flow-stream-section { background-color: rgba(3, 7, 18, 0.55); border: 1px solid #1e293b; border-radius: 8px; padding: 10px; }
       .ops-board-spatial .flow-stream-title { color: #94a3b8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 8px; }
       .ops-board-spatial .flow-alert-card { border: 1px solid rgba(245,158,11,0.35); background-color: rgba(245,158,11,0.08); border-radius: 8px; padding: 8px; color: #cbd5e1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.66rem; line-height: 1.35; }
@@ -61,6 +60,7 @@
       .ops-board-spatial .flow-live-board {
         position: relative; min-height: 620px; padding: 0; overflow: hidden;
         background:
+          radial-gradient(#1e293b 1px, transparent 1.5px) 0 0 / 24px 24px,
           radial-gradient(circle at 54% 36%, rgba(59,130,246,0.12), transparent 34%),
           radial-gradient(circle at 30% 70%, rgba(239,68,68,0.10), transparent 28%),
           linear-gradient(180deg, #020617 0%, #030712 54%, #01040b 100%);
@@ -70,13 +70,13 @@
       .ops-board-spatial .map-svg-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 18; overflow: visible; }
       .ops-board-spatial .map-html-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
       .ops-board-spatial .map-html-layer > .flow-object-layer { display: none; }
-      .ops-board-spatial .flow-lane { stroke: #374151; stroke-width: 2.5; fill: none; transition: stroke 0.3s; vector-effect: non-scaling-stroke; pointer-events: stroke; }
-      .ops-board-spatial .flow-lane.is-related-path { stroke: #f8fafc; stroke-width: 5; filter: drop-shadow(0 0 8px rgba(56,189,248,0.65)); opacity: 1; }
-      .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open { stroke: #6366f1; stroke-width: 3.5; stroke-dasharray: 8 6; animation: ops-dash-flow 1.5s linear infinite; }
-      .ops-board-spatial .flow-lane--waiting { stroke: #f59e0b; stroke-width: 3.5; stroke-dasharray: 8 6; animation: ops-dash-flow 1.5s linear infinite; }
-      .ops-board-spatial .flow-lane--blocked, .ops-board-spatial .flow-lane--issue, .ops-board-spatial .flow-lane--needs_review { stroke: #ef4444; stroke-width: 4; stroke-dasharray: 8 6; animation: ops-dash-flow 1s linear infinite; }
-      .ops-board-spatial .flow-lane--completed { stroke: #10b981; stroke-width: 3; }
-      .ops-board-spatial .flow-lane--route-overlay { stroke: #38bdf8; stroke-width: 4.5; stroke-dasharray: 12 4; animation: ops-dash-flow 1.4s linear infinite; opacity: 0.95; }
+      .ops-board-spatial .flow-lane { stroke: #64748b; stroke-width: 1.4; fill: none; opacity: 0.28; transition: stroke 0.3s; vector-effect: non-scaling-stroke; pointer-events: stroke; stroke-dasharray: 8 8; }
+      .ops-board-spatial .flow-lane.is-related-path { stroke: #e0f2fe; stroke-width: 2.8; filter: drop-shadow(0 0 8px rgba(56,189,248,0.65)); opacity: 0.9; }
+      .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open { stroke: #94a3b8; stroke-width: 1.6; stroke-dasharray: 8 8; animation: ops-dash-flow 1.8s linear infinite; }
+      .ops-board-spatial .flow-lane--waiting { stroke: #f59e0b; stroke-width: 1.8; stroke-dasharray: 8 7; animation: ops-dash-flow 1.5s linear infinite; opacity: 0.5; }
+      .ops-board-spatial .flow-lane--blocked, .ops-board-spatial .flow-lane--issue, .ops-board-spatial .flow-lane--needs_review { stroke: #ef4444; stroke-width: 2; stroke-dasharray: 6 6; animation: ops-dash-flow 1s linear infinite; opacity: 0.66; }
+      .ops-board-spatial .flow-lane--completed { stroke: #10b981; stroke-width: 1.6; opacity: 0.48; }
+      .ops-board-spatial .flow-lane--route-overlay { stroke: #38bdf8; stroke-width: 2.6; stroke-dasharray: 10 6; animation: ops-dash-flow 1.4s linear infinite; opacity: 0.85; }
       @keyframes ops-dash-flow { to { stroke-dashoffset: -14; } }
       @media (prefers-reduced-motion: reduce) {
         .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open,
@@ -116,10 +116,10 @@
         position: absolute; inset: 0; pointer-events: none;
       }
       .ops-board-spatial .flow-node {
-        position: absolute; width: 168px; transform: translate(-50%, -50%); background-color: rgba(30, 41, 59, 0.92); border: 2px solid rgba(71,85,105,0.95);
-        border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); cursor: pointer;
+        position: absolute; width: 236px; transform: translate(-50%, -50%); background-color: rgba(14, 20, 32, 0.95); border: 1px solid rgba(51,65,85,0.96);
+        border-radius: 0.7rem; box-shadow: 0 14px 34px rgba(0,0,0,0.42); cursor: pointer;
         transition: border-color 0.2s, box-shadow 0.2s;
-        color: #e5e7eb; text-align: left; padding: 0; font: inherit;
+        color: #e5e7eb; text-align: left; padding: 13px 14px; font: inherit;
         pointer-events: auto;
       }
       @media (hover: hover) {
@@ -132,10 +132,23 @@
       .ops-board-spatial .flow-node--waiting { border-color: #f59e0b; }
       .ops-board-spatial .flow-node--active, .ops-board-spatial .flow-node--open { border-color: #6366f1; }
       .ops-board-spatial .flow-node--completed { border-color: #10b981; }
-      .ops-board-spatial .facility-header { background-color: #1f2937; padding: 5px 8px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; border-bottom: 1px solid #374151; border-radius: 0.4rem 0.4rem 0 0; text-align: center; color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .ops-board-spatial .facility-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background-color: #374151; font-size: 0.65rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-      .ops-board-spatial .facility-stat { background-color: #111827; padding: 4px 6px; display: flex; justify-content: space-between; color: #9ca3af; }
-      .ops-board-spatial .facility-stat strong { color: #e5e7eb; font-weight: 700; }
+      .ops-board-spatial .production-node-card--secondary { width: 202px; padding: 11px 12px; }
+      .ops-board-spatial .production-node-card--red { border-color: rgba(244,63,94,0.44); box-shadow: 0 0 22px rgba(244,63,94,0.08), 0 14px 34px rgba(0,0,0,0.42); }
+      .ops-board-spatial .production-node-card--cyan { border-color: rgba(34,211,238,0.28); }
+      .ops-board-spatial .production-node-header { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 7px; }
+      .ops-board-spatial .production-node-role { color: #22d3ee; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.68rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; line-height: 1.25; }
+      .ops-board-spatial .production-node-card--red .production-node-role { color: #f43f5e; }
+      .ops-board-spatial .production-node-dot { width: 9px; height: 9px; border-radius: 999px; background-color: #10b981; box-shadow: 0 0 12px rgba(16,185,129,0.68); flex: 0 0 auto; }
+      .ops-board-spatial .production-node-card--red .production-node-dot, .ops-board-spatial .flow-node--blocked .production-node-dot, .ops-board-spatial .flow-node--issue .production-node-dot { background-color: #f43f5e; box-shadow: 0 0 14px rgba(244,63,94,0.78); }
+      .ops-board-spatial .flow-node--waiting .production-node-dot { background-color: #f59e0b; box-shadow: 0 0 14px rgba(245,158,11,0.7); }
+      .ops-board-spatial .production-node-copy { color: #94a3b8; font-size: 0.66rem; line-height: 1.35; margin: 0 0 10px; }
+      .ops-board-spatial .production-metric-row { display: flex; justify-content: space-between; gap: 10px; color: #64748b; font-size: 0.64rem; line-height: 1.35; }
+      .ops-board-spatial .production-metric-row + .production-metric-row { margin-top: 5px; }
+      .ops-board-spatial .production-metric-row span { flex: 0 0 auto; }
+      .ops-board-spatial .production-metric-row strong { color: #e5e7eb; font-size: 0.66rem; max-width: 58%; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .ops-board-spatial .production-node-card--red .production-metric-row strong { color: #fb7185; }
+      .ops-board-spatial .production-material-list { margin-top: 9px; display: grid; gap: 4px; }
+      .ops-board-spatial .production-material-list span { display: block; color: #cbd5e1; background-color: rgba(15,23,42,0.72); border: 1px solid rgba(51,65,85,0.72); border-radius: 5px; padding: 3px 5px; font-size: 0.58rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .flow-node:hover, .ops-board-spatial .flow-node.is-active, .ops-board-spatial .flow-node.is-related-object { transform: translate(-50%, -50%) scale(1.04); }
       .ops-board-spatial .flow-node--hub { box-shadow: 0 0 0 3px rgba(99,102,241,0.18), 0 12px 28px rgba(0,0,0,0.55); }
       .ops-board-spatial .flow-chip {
@@ -163,8 +176,8 @@
       .ops-board-spatial .chip-body { padding: 4px 6px; font-size: 0.65rem; line-height: 1.3; color: #9ca3af; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
       .ops-board-spatial .chip-body strong { color: #fff; font-weight: 600; display: block; }
       .ops-board-spatial .route-step-chip {
-        width: 132px; min-height: 62px; background-color: rgba(30, 41, 59, 0.97); border-style: solid;
-        z-index: 32;
+        width: 112px; min-height: 50px; background-color: rgba(15, 23, 42, 0.94); border-style: solid;
+        z-index: 22;
       }
       .ops-board-spatial .route-step-chip .chip-header { padding: 3px 5px; border-bottom: 0; }
       .ops-board-spatial .route-step-chip .chip-id { font-size: 0.62rem; }
@@ -173,7 +186,11 @@
       .ops-board-spatial .route-step-chip .chip-body strong { font-size: 0.62rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .route-step-chip .step-action { display: block; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .route-step-chip.is-active { border-color: #f8fafc; box-shadow: 0 0 18px rgba(56,189,248,0.35); }
-      .ops-board-spatial .flow-edge { fill: none; stroke: #60a5fa; stroke-width: 4.25; stroke-linecap: round; opacity: 0.98; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 9px rgba(96,165,250,0.72)); }
+      .ops-board-spatial .driver-shuttle-token { position: absolute; width: 44px; height: 44px; transform: translate(-50%, -50%); border-radius: 12px; border: 1px solid rgba(224,242,254,0.55); background-color: #22d3ee; color: #020617; display: grid; place-items: center; z-index: 34; box-shadow: 0 0 28px rgba(34,211,238,0.45); pointer-events: none; }
+      .ops-board-spatial .driver-shuttle-token svg { width: 25px; height: 25px; fill: currentColor; }
+      .ops-board-spatial .driver-shuttle-token span { position: absolute; top: -8px; right: -9px; min-width: 23px; text-align: center; padding: 1px 3px; border-radius: 999px; color: #020617; background-color: #10b981; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.54rem; font-weight: 900; }
+      .ops-board-spatial .driver-shuttle-token.is-loaded span { background-color: #f59e0b; }
+      .ops-board-spatial .flow-edge { fill: none; stroke: #60a5fa; stroke-width: 2.6; stroke-linecap: round; opacity: 0.9; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 8px rgba(96,165,250,0.65)); }
       .ops-board-spatial .flow-edge--active { stroke: #38bdf8; opacity: 1; filter: drop-shadow(0 0 10px rgba(56,189,248,0.78)); }
       .ops-board-spatial .flow-edge--waiting { stroke: #f59e0b; opacity: 1; filter: drop-shadow(0 0 10px rgba(245,158,11,0.76)); }
       .ops-board-spatial .flow-edge--exception { stroke: #ef4444; opacity: 1; filter: drop-shadow(0 0 12px rgba(239,68,68,0.82)); }
@@ -234,7 +251,10 @@
         }
       }
       .production-flow--mobile .ops-board-spatial .ops-spatial-body { grid-template-columns: 1fr; }
+      @media (min-width: 992px) { .production-flow--mobile .ops-board-spatial .ops-spatial-body { grid-template-columns: minmax(230px, 280px) minmax(0, 1fr); } }
+      @media (min-width: 1280px) { .production-flow--mobile .ops-board-spatial .ops-spatial-body { grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(320px, 370px); } }
       .production-flow--mobile .ops-board-spatial .production-flow-canvas { border-right: 0; border-bottom: 1px solid #1f2937; }
+      @media (min-width: 992px) { .production-flow--mobile .ops-board-spatial .production-flow-canvas { border-right: 1px solid #1f2937; border-bottom: 0; } }
       .production-flow--mobile .ops-board-spatial .flow-live-board { min-height: 760px; }
       .production-flow--mobile .ops-board-spatial .flow-object-layer { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .production-flow--mobile .ops-board-spatial .flow-drawer-panel { min-height: auto; max-height: none; border-top: 1px solid #1f2937; }
@@ -303,9 +323,12 @@
       .ops-board-spatial .flow-console-head span { color: #64748b; font-size: 0.6rem; text-transform: uppercase; }
       .ops-board-spatial .flow-console-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.66rem; color: #94a3b8; }
       @media (max-width: 640px) { .ops-board-spatial .flow-console-body { grid-template-columns: 1fr; } }
-      .ops-board-spatial .flow-console-cell { background-color: #05080e; border: 1px solid #1e293b; border-radius: 6px; padding: 8px; min-height: 52px; }
+      .ops-board-spatial .flow-console-cell { background-color: #05080e; border: 1px solid #1e293b; border-radius: 6px; padding: 10px; min-height: 104px; }
       .ops-board-spatial .flow-console-cell span { display: block; color: #64748b; text-transform: uppercase; font-size: 0.56rem; letter-spacing: 0.06em; margin-bottom: 3px; }
       .ops-board-spatial .flow-console-cell strong { color: #e5e7eb; font-size: 0.72rem; }
+      .ops-board-spatial .flow-console-lines { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 5px; }
+      .ops-board-spatial .flow-console-lines li { display: flex; justify-content: space-between; gap: 10px; color: #38bdf8; }
+      .ops-board-spatial .flow-console-lines b { color: #e5e7eb; font-weight: 700; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .ops-board-spatial .drawer-close { float: right; background: transparent; border: 1px solid #374151; color: #e5e7eb; padding: 2px 8px; border-radius: 3px; font-size: 0.65rem; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
       .ops-board-spatial .drawer-close:hover { border-color: #6366f1; }
       .ops-board-spatial [data-flow-drawer-detail]:not([hidden]) { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid #1f2937; }
@@ -429,7 +452,7 @@
                     <rect x="0" y="0" width="100" height="100" fill="white"></rect>
                   </mask>
                 </defs>
-                <g data-flow-lane-group>
+                <g data-flow-lane-group mask="url(#flow-card-cutouts-{{ flow_mode }})">
                   {% for lane in pf.flow_lanes %}
                     {% if lane.layout and lane.layout.path_d %}
                       <path class="flow-lane flow-lane--{{ lane.worst_status or 'open' }}"
@@ -506,29 +529,44 @@
                     </button>
                   {% endfor %}
                 </div>
+                {% if pf.transport_token %}
+                  <div class="driver-shuttle-token{% if pf.transport_token.badge == 'FULL' %} is-loaded{% endif %}"
+                       style="left: {{ pf.transport_token.x }}%; top: {{ pf.transport_token.y }}%;"
+                       aria-label="{{ pf.transport_token.label }} shuttle {{ pf.transport_token.status }}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2a3 3 0 0 0 6 0h6a3 3 0 0 0 6 0h2v-5l-3-4ZM6 18.5A1.5 1.5 0 1 1 6 15.5a1.5 1.5 0 0 1 0 3Zm12 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM17 12V9h2.5l1.96 2.5H17Z"/></svg>
+                    <span>{{ pf.transport_token.badge }}</span>
+                  </div>
+                {% endif %}
 
                 <div class="flow-node-row" aria-label="Physical flow nodes">
                   {% for node in pf.flow_nodes %}
+                    {% set profile = node.production_profile %}
                     <button type="button"
-                            class="flow-node flow-node--{{ node.worst_status }}{% if node.layout.is_hub %} flow-node--hub{% endif %}"
+                            class="flow-node production-node-card production-node-card--{{ profile.size }} production-node-card--{{ profile.theme }} flow-node--{{ node.worst_status }}{% if node.layout.is_hub %} flow-node--hub{% endif %}"
                             style="{% if node.layout %}left: {{ node.layout.x }}%; top: {{ node.layout.y }}%;{% endif %}"
                             data-flow-open="node"
                             data-flow-id="{{ node.key }}"
                             data-flow-node-key="node:{{ node.key }}"
+                            data-console-template-key="{{ node.key }}"
                             data-entity-type="flow_node"
                             data-entity-id="{{ node.key }}"
                             data-truth-level="projection"
                             data-status="{{ node.worst_status }}"
                             aria-label="{{ node.label }} facility">
-                      <div class="facility-header">{{ node.short_code or '--' }} &middot; {{ node.label|truncate(16,true,'') }}</div>
-                      <div class="facility-grid">
-                        <div class="facility-stat"><span>OPEN</span><strong>{{ node.open_count }}</strong></div>
-                        <div class="facility-stat"><span>ACT</span><strong>{{ node.active_count }}</strong></div>
-                        <div class="facility-stat"><span>WAIT</span><strong>{{ node.waiting_count }}</strong></div>
-                        <div class="facility-stat"><span>BLK</span><strong>{{ node.blocked_count }}</strong></div>
-                        <div class="facility-stat"><span>DONE</span><strong>{{ node.completed_count }}</strong></div>
-                        <div class="facility-stat"><span>ISS</span><strong>{{ node.issue_count }}</strong></div>
+                      <div class="production-node-header">
+                        <span class="production-node-role">{% if profile.sequence %}{{ profile.sequence }}. {% endif %}{{ profile.role_label }} &middot; {{ node.short_code or node.label|truncate(4,true,'') }}</span>
+                        <span class="production-node-dot" aria-hidden="true"></span>
                       </div>
+                      <p class="production-node-copy">{{ profile.description }}</p>
+                      <div class="production-metric-row"><span>{{ profile.primary_label }}:</span><strong>{{ profile.primary_value }}</strong></div>
+                      <div class="production-metric-row"><span>{{ profile.secondary_label }}:</span><strong>{{ profile.secondary_value }}</strong></div>
+                      {% if profile.material_lines and profile.material_lines|length > 1 %}
+                        <div class="production-material-list" aria-label="Material at {{ node.label }}">
+                          {% for line in profile.material_lines[1:3] %}
+                            <span>{{ line }}</span>
+                          {% endfor %}
+                        </div>
+                      {% endif %}
                     </button>
                   {% endfor %}
                 </div>
@@ -536,21 +574,63 @@
             </div>
           </div>
 
+          {% set console_node = pf.console_node if pf.console_node else none %}
+          {% set console_profile = console_node.production_profile if console_node else none %}
           <div class="flow-console-panel" aria-label="Plant computer console">
             <div class="flow-console-head">
-              <strong>Plant Computer Console: <span data-flow-console-title>{% if latest_edge %}{{ latest_edge.label }}{% elif current_attention %}{{ current_attention.display_label or current_attention.label }}{% else %}Live Flow Standby{% endif %}</span></strong>
-              <span>Selected object readout</span>
+              <strong>Plant Computer Console: <span data-flow-console-title>{% if console_profile %}{{ console_profile.console_title }}{% elif latest_edge %}{{ latest_edge.label }}{% else %}Live Flow Standby{% endif %}</span></strong>
+              <span>Internal plant system screen view</span>
             </div>
-            <div class="flow-console-body">
-              <div class="flow-console-cell">
-                <span>Current Signal</span>
-                <strong data-flow-console-status>{% if latest_edge %}{{ latest_edge.source_key }} &rarr; {{ latest_edge.target_key }}{% elif current_attention %}{{ current_attention.next_action or current_attention.status_label }}{% else %}No active exception{% endif %}</strong>
-              </div>
-              <div class="flow-console-cell">
-                <span>Ledger Proof</span>
-                <strong data-flow-console-proof>{% if latest_edge %}FlowEvent #{{ latest_edge.event_id }} &middot; {{ latest_edge.proof_label or 'none' }}{% else %}{{ pf.ledger_summary.event_count if pf and pf.ledger_summary else 0 }} events today{% endif %}</strong>
-              </div>
+            <div class="flow-console-body" data-flow-console-body>
+              {% if console_profile %}
+                <div class="flow-console-cell">
+                  <span>&gt; {{ console_profile.console_left_title }}</span>
+                  <ul class="flow-console-lines">
+                    {% for row in console_profile.console_left %}
+                      <li>{{ row.label }}:<b>{{ row.value }}</b></li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                <div class="flow-console-cell">
+                  <span>&gt; {{ console_profile.console_right_title }}</span>
+                  <ul class="flow-console-lines">
+                    {% for row in console_profile.console_right %}
+                      <li>{{ row.label }}:<b>{{ row.value }}</b></li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% else %}
+                <div class="flow-console-cell">
+                  <span>Current Signal</span>
+                  <strong data-flow-console-status>{% if latest_edge %}{{ latest_edge.source_key }} &rarr; {{ latest_edge.target_key }}{% elif current_attention %}{{ current_attention.next_action or current_attention.status_label }}{% else %}No active exception{% endif %}</strong>
+                </div>
+                <div class="flow-console-cell">
+                  <span>Ledger Proof</span>
+                  <strong data-flow-console-proof>{% if latest_edge %}FlowEvent #{{ latest_edge.event_id }} &middot; {{ latest_edge.proof_label or 'none' }}{% else %}{{ pf.ledger_summary.event_count if pf and pf.ledger_summary else 0 }} events today{% endif %}</strong>
+                </div>
+              {% endif %}
             </div>
+            {% for node in pf.flow_nodes %}
+              {% set profile = node.production_profile %}
+              <template data-flow-console-template="{{ node.key }}">
+                <div class="flow-console-cell">
+                  <span>&gt; {{ profile.console_left_title }}</span>
+                  <ul class="flow-console-lines">
+                    {% for row in profile.console_left %}
+                      <li>{{ row.label }}:<b>{{ row.value }}</b></li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                <div class="flow-console-cell">
+                  <span>&gt; {{ profile.console_right_title }}</span>
+                  <ul class="flow-console-lines">
+                    {% for row in profile.console_right %}
+                      <li>{{ row.label }}:<b>{{ row.value }}</b></li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              </template>
+            {% endfor %}
           </div>
 
           <div class="bottom-strip">
@@ -648,6 +728,7 @@
       var consoleTitle = root.querySelector('[data-flow-console-title]');
       var consoleStatus = root.querySelector('[data-flow-console-status]');
       var consoleProof = root.querySelector('[data-flow-console-proof]');
+      var consoleBody = root.querySelector('[data-flow-console-body]');
       var edgeDataNode = root.parentNode ? root.parentNode.querySelector('[data-flow-edge-data]') : null;
       var initialEdges = [];
       try {
@@ -773,7 +854,7 @@
         function xPct(px) { return (px / Math.max(boardBox.width, 1)) * 100; }
         function yPct(px) { return (px / Math.max(boardBox.height, 1)) * 100; }
         cardMask.innerHTML = '<rect x="0" y="0" width="100" height="100" fill="white"></rect>';
-        var blockers = root.querySelectorAll('.flow-object-card, .flow-chip, .flow-node');
+        var blockers = root.querySelectorAll('.flow-object-card, .flow-chip, .flow-node, .driver-shuttle-token');
         for (var i = 0; i < blockers.length; i++) {
           var box = blockers[i].getBoundingClientRect();
           var pad = 4;
@@ -853,22 +934,39 @@
         }
       }
 
+      function renderPlantConsole(key, title) {
+        if (!key || !consoleBody) return false;
+        var template = root.querySelector('[data-flow-console-template="' + key + '"]');
+        if (!template) return false;
+        consoleBody.innerHTML = template.innerHTML;
+        if (consoleTitle && title) consoleTitle.textContent = title;
+        return true;
+      }
+
       function updateConsole(trigger, edge) {
-        if (!consoleTitle || !consoleStatus || !consoleProof) return;
+        if (!consoleTitle) return;
         if (trigger) {
           var title = trigger.getAttribute('aria-label') || trigger.getAttribute('data-flow-id') || 'Selected object';
+          var consoleTemplateKey = trigger.getAttribute('data-console-template-key');
+          if (renderPlantConsole(consoleTemplateKey, title)) return;
           var status = trigger.getAttribute('data-status') || 'projection';
           var type = trigger.getAttribute('data-entity-type') || 'flow';
           var id = trigger.getAttribute('data-entity-id') || trigger.getAttribute('data-flow-id') || '';
           consoleTitle.textContent = title;
-          consoleStatus.textContent = status.replace(/_/g, ' ') + (id ? ' · ' + type.replace(/_/g, ' ') + ' #' + id : '');
-          consoleProof.textContent = 'Shadow Ledger filtered for selected object';
+          if (consoleStatus) consoleStatus.textContent = status.replace(/_/g, ' ') + (id ? ' · ' + type.replace(/_/g, ' ') + ' #' + id : '');
+          if (consoleProof) consoleProof.textContent = 'Shadow Ledger filtered for selected object';
+          if (consoleBody && !consoleStatus) {
+            consoleBody.innerHTML = '<div class="flow-console-cell"><span>Selected projection</span><strong>' + status.replace(/_/g, ' ') + '</strong></div><div class="flow-console-cell"><span>Shadow Ledger</span><strong>Filtered for selected object</strong></div>';
+          }
           return;
         }
         if (edge) {
           consoleTitle.textContent = edge.label || 'FlowEvent';
-          consoleStatus.textContent = (edge.source_key || 'source') + ' -> ' + (edge.target_key || 'target');
-          consoleProof.textContent = 'FlowEvent #' + (edge.event_id || '') + ' · ' + (edge.proof_label || 'none');
+          if (consoleStatus) consoleStatus.textContent = (edge.source_key || 'source') + ' -> ' + (edge.target_key || 'target');
+          if (consoleProof) consoleProof.textContent = 'FlowEvent #' + (edge.event_id || '') + ' · ' + (edge.proof_label || 'none');
+          if (consoleBody && !consoleStatus) {
+            consoleBody.innerHTML = '<div class="flow-console-cell"><span>Ledger transition</span><strong>' + (edge.source_key || 'source') + ' -> ' + (edge.target_key || 'target') + '</strong></div><div class="flow-console-cell"><span>Proof</span><strong>FlowEvent #' + (edge.event_id || '') + ' · ' + (edge.proof_label || 'none') + '</strong></div>';
+          }
         }
       }
 
