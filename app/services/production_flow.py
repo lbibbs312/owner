@@ -639,6 +639,158 @@ def _flow_object_cards(queue_summary, floor_summary, ledger_counts):
     ]
 
 
+def _flow_object_key_for_event(event_type):
+    event_type = (event_type or "").upper()
+    if event_type in {"WIP_STARTED"}:
+        return "object:wip"
+    if event_type in {"WIP_COMPLETED", "STAGED"}:
+        return "object:staging"
+    if event_type in {"ASSIGNED_TO_TRAILER", "LOADED_TO_CONTAINER", "REMOVED_FROM_CONTAINER"}:
+        return "object:load_build"
+    if event_type in {"DOCUMENT_UPLOADED", "PROOF_ATTACHED", "MANIFEST_CREATED", "MANIFEST_INITIALIZED", "MANIFEST_ATTACHED"}:
+        return "object:manifested"
+    if event_type in {"DEPARTED_ORIGIN", "IN_TRANSIT"}:
+        return "object:in_transit"
+    if event_type in {"ARRIVED_DESTINATION", "UNLOADED", "RECEIVED", "RECONCILED"}:
+        return "object:receiving"
+    if event_type in {
+        "QA_HOLD_PLACED",
+        "SCRAP_MARKED",
+        "DAMAGE_REPORTED",
+        "FORKLIFT_ISSUE_REPORTED",
+        "DELAY_REPORTED",
+        "MISMATCH_DETECTED",
+        "EXPECTED_BUT_NOT_SCANNED",
+        "SCANNED_BUT_NOT_EXPECTED",
+    }:
+        return "object:exceptions"
+    return None
+
+
+def _flow_source_for_event(event_type):
+    event_type = (event_type or "").upper()
+    if event_type in {"WIP_COMPLETED", "STAGED"}:
+        return "object:wip"
+    if event_type in {"ASSIGNED_TO_TRAILER", "LOADED_TO_CONTAINER", "REMOVED_FROM_CONTAINER"}:
+        return "object:staging"
+    if event_type in {"DOCUMENT_UPLOADED", "PROOF_ATTACHED", "MANIFEST_CREATED", "MANIFEST_INITIALIZED", "MANIFEST_ATTACHED"}:
+        return "object:load_build"
+    if event_type in {"DEPARTED_ORIGIN", "IN_TRANSIT"}:
+        return "object:manifested"
+    if event_type in {"ARRIVED_DESTINATION"}:
+        return "object:in_transit"
+    if event_type in {"UNLOADED", "RECEIVED", "RECONCILED"}:
+        return "object:receiving"
+    if event_type in {
+        "QA_HOLD_PLACED",
+        "SCRAP_MARKED",
+        "DAMAGE_REPORTED",
+        "FORKLIFT_ISSUE_REPORTED",
+        "DELAY_REPORTED",
+        "MISMATCH_DETECTED",
+        "EXPECTED_BUT_NOT_SCANNED",
+        "SCANNED_BUT_NOT_EXPECTED",
+    }:
+        return "object:receiving"
+    return None
+
+
+def _event_node_key(value):
+    key = _location_key(value or "")
+    return f"node:{key}" if key else None
+
+
+def _event_entity_key(event):
+    if event.entity_type and event.entity_id:
+        return f"{event.entity_type}:{event.entity_id}"
+    return None
+
+
+def _flow_map_edges(target):
+    """Return FlowMapEdge projection rows derived only from FlowEvent ledger rows."""
+    start, end = _day_bounds(target)
+    try:
+        events = (
+            FlowEvent.query.filter(FlowEvent.occurred_at >= start, FlowEvent.occurred_at < end)
+            .order_by(FlowEvent.occurred_at.asc(), FlowEvent.id.asc())
+            .all()
+        )
+    except SQLAlchemyError:
+        db.session.rollback()
+        return []
+
+    edges = []
+    last_by_scope = {}
+    latest_edge_id = None
+    for event in events:
+        payload = event.payload_json or {}
+        scope = event.correlation_id or event.route_id or f"{event.entity_type}:{event.entity_id}"
+        previous = last_by_scope.get(scope)
+        previous_target = previous["target_key"] if previous else None
+
+        source_key = payload.get("source_node_key") or payload.get("source_key") or _flow_source_for_event(event.event_type) or previous_target
+        target_key = payload.get("target_node_key") or payload.get("target_key") or _flow_object_key_for_event(event.event_type)
+        if not source_key and event.origin_node_id:
+            source_key = _event_node_key(event.origin_node_id)
+        if not target_key and event.destination_node_id:
+            target_key = _event_node_key(event.destination_node_id)
+        if source_key == target_key and previous_target:
+            source_key = previous_target
+        if not source_key or not target_key or source_key == target_key:
+            last_by_scope[scope] = {"event_id": event.id, "target_key": target_key or source_key}
+            continue
+
+        is_exception = event.event_type in {
+            "MISMATCH_DETECTED",
+            "QA_HOLD_PLACED",
+            "SCRAP_MARKED",
+            "DAMAGE_REPORTED",
+            "FORKLIFT_ISSUE_REPORTED",
+            "DELAY_REPORTED",
+            "EXPECTED_BUT_NOT_SCANNED",
+            "SCANNED_BUT_NOT_EXPECTED",
+        }
+        status = "exception" if is_exception else _flow_projection_status(event.event_type)
+        edge = {
+            "id": f"flow-edge-{event.id}",
+            "event_id": event.id,
+            "previous_event_id": payload.get("previous_event_id") or (previous["event_id"] if previous else None),
+            "source_key": source_key,
+            "target_key": target_key,
+            "entity_key": _event_entity_key(event),
+            "entity_type": event.entity_type,
+            "entity_id": event.entity_id,
+            "route_id": event.route_id,
+            "manifest_id": event.manifest_id,
+            "container_id": event.container_id,
+            "event_type": event.event_type,
+            "status": status,
+            "truth_level": "ledger",
+            "occurred_at": event.occurred_at.isoformat() if event.occurred_at else "",
+            "is_live": False,
+            "is_exception": is_exception,
+            "label": (event.event_type or "FLOW_EVENT").replace("_", " ").title(),
+        }
+        edges.append(edge)
+        latest_edge_id = edge["id"]
+        last_by_scope[scope] = {"event_id": event.id, "target_key": target_key}
+
+    for edge in edges:
+        edge["is_live"] = edge["id"] == latest_edge_id and edge["status"] not in {"completed", "reconciled", "closed"}
+    return edges
+
+
+def _flow_projection_status(event_type):
+    event_type = (event_type or "").upper()
+    if event_type in {"RECONCILED", "RECEIVED", "UNLOADED"}:
+        return "completed"
+    if event_type in {"ARRIVED_DESTINATION", "STAGED"}:
+        return "waiting"
+    if event_type in {"DEPARTED_ORIGIN", "IN_TRANSIT", "ASSIGNED_TO_TRAILER", "LOADED_TO_CONTAINER"}:
+        return "active"
+    return "open"
+
+
 def _timing_by_node(target):
     rows = plant_forecast_rows(target)
     timing = {}
@@ -1145,6 +1297,7 @@ def build_production_flow_context(
         "data_scope_note": DATA_SCOPE_EMPTY,
     }
     no_flow_signals = not bool(flow_nodes or flow_lanes or items)
+    flow_edges = _flow_map_edges(target)
 
     return {
         "mode": mode,
@@ -1152,6 +1305,7 @@ def build_production_flow_context(
         "flow_nodes": flow_nodes,
         "flow_lanes": flow_lanes,
         "flow_items": items,
+        "flow_edges": flow_edges,
         "route_overlay": route_overlay,
         "proof_markers": proof_markers,
         "issue_markers": issue_markers,

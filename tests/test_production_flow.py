@@ -328,6 +328,62 @@ def test_flow_map_uses_large_objects_and_compact_stop_chips(client, app):
     assert "Event Timeline" in body
 
 
+def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
+    with app.app_context():
+        driver = _user("flow-edge-driver", "driver")
+        _driver_log(driver, plant_name="RW", depart_time="08:30", load_size="Empty", depart_load_size="Trim DC Load")
+        _driver_log(driver, plant_name="Trim DC", depart_time=None, load_size="Trim DC Load")
+
+        from app.services.flow_events import FlowEventService
+        from app.services.production_flow import build_production_flow_context
+
+        first = FlowEventService.append_event(
+            event_type="DEPARTED_ORIGIN",
+            entity_type="route_stop",
+            entity_id=1,
+            route_id="driver-route-edge",
+            origin_node_id="RW",
+            destination_node_id="Trim DC",
+            occurred_at=datetime.utcnow() - timedelta(minutes=6),
+            source="mobile",
+            commit=True,
+        )
+        second = FlowEventService.append_event(
+            event_type="ARRIVED_DESTINATION",
+            entity_type="route_stop",
+            entity_id=2,
+            route_id="driver-route-edge",
+            origin_node_id="RW",
+            destination_node_id="Trim DC",
+            occurred_at=datetime.utcnow() - timedelta(minutes=1),
+            source="mobile",
+            commit=True,
+        )
+
+        ctx = build_production_flow_context(date=date.today(), driver_id=driver.id)
+        edges = ctx["flow_edges"]
+        assert edges[0]["event_id"] == first.id
+        assert edges[0]["source_key"] == "object:manifested"
+        assert edges[0]["target_key"] == "object:in_transit"
+        assert edges[1]["event_id"] == second.id
+        assert edges[1]["previous_event_id"] == first.id
+        assert edges[1]["source_key"] == "object:in_transit"
+        assert edges[1]["target_key"] == "object:receiving"
+        assert edges[1]["is_live"] is True
+
+    _login(client, "flow-edge-driver")
+    resp = client.get("/mobile")
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "FlowMapAnimator" in body
+    assert "data-flow-edge-data" in body
+    assert "flow-edge--new" in body
+    assert "livePulse" in body
+    assert 'data-flow-node-key="object:in_transit"' in body
+    assert 'data-flow-event-id="' in body
+
+
 def test_mobile_dashboard_uses_compact_shared_production_flow(client, app):
     with app.app_context():
         driver = _user("mobile-pf-driver", "driver")
