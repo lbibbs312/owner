@@ -62,10 +62,10 @@ from app.services.load_state import (
 )
 from app.services.parts import record_part_scan as save_part_scan, scan_event_payload
 from app.services.next_load_prediction import build_next_load_prediction
-from app.services.route_context import build_route_context
-from app.services.floor_operations import build_floor_operations_snapshot, assigned_move_queue, route_next_action
+from app.services.route_context import build_route_context, build_route_cta_context
+from app.services.floor_operations import build_floor_operations_snapshot, assigned_move_queue
 from app.services.production_flow import build_production_flow_context
-from app.services.route_map import build_driver_route_map_context
+from app.services.route_map import build_driver_route_map_context, build_driver_map_mode_context
 from app.services.plant_time import forecast_for_stop, plant_time_forecast, route_stop_forecasts
 from app.services.report_summary import damage_report_count_label, damage_report_detail_label
 from app.services.hot_parts import (
@@ -444,6 +444,66 @@ def _dashboard_route_date_for_driver(driver_id, today_local_date=None, open_shif
     if _route_date_has_driver_records(driver_id, today_local_date):
         return today_local_date
     return _latest_driver_route_date(driver_id) or today_local_date
+
+
+def _requested_mobile_route_date():
+    date_str = request.args.get("date")
+    if not date_str:
+        return None
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _mobile_route_date_options(driver_id, route_date, today_local_date):
+    options = [
+        {
+            "label": "Today",
+            "date": today_local_date,
+            "active": route_date == today_local_date,
+            "url": url_for("driver.mobile_dashboard", date=today_local_date.isoformat()),
+        }
+    ]
+    previous = _latest_driver_route_date(driver_id)
+    if previous and previous != today_local_date:
+        options.append(
+            {
+                "label": "Previous Route",
+                "date": previous,
+                "active": route_date == previous,
+                "url": url_for("driver.mobile_dashboard", date=previous.isoformat()),
+            }
+        )
+    if route_date and route_date not in {item["date"] for item in options}:
+        options.append(
+            {
+                "label": "Selected Date",
+                "date": route_date,
+                "active": True,
+                "url": url_for("driver.mobile_dashboard", date=route_date.isoformat()),
+            }
+        )
+    return options
+
+
+def _route_cta_urls(route_date, current_stop=None):
+    date_value = route_date.isoformat() if route_date else _today_local_date().isoformat()
+    urls = {
+        "add_damage": url_for("driver.new_damage_report"),
+        "add_note": url_for("driver.new_damage_report"),
+        "add_stop": url_for("driver.new_driving_log"),
+        "attach_document": url_for("driver.new_plant_transfer"),
+        "finalize_route": url_for("driver.end_of_day_summary"),
+        "print_route": url_for("driver.driver_logs_print", date=date_value),
+        "route_history": url_for("driver.mobile_history"),
+        "start_shift": url_for("driver.new_pretrip"),
+        "view_route": url_for("driver.driver_logs", date=date_value),
+    }
+    if current_stop:
+        urls["confirm_cargo"] = url_for("driver.pickup_driver_log", log_id=current_stop.id)
+        urls["record_departure"] = url_for("driver.depart_driver_log", log_id=current_stop.id)
+    return urls
 
 
 def _soft_delete_record(record):
@@ -3937,7 +3997,8 @@ def mobile_dashboard():
     now_local, _ = _now_local_and_utc()
     today_local_date = now_local.date()
     open_shift = _open_shift_for_driver(current_user.id)
-    route_date = _dashboard_route_date_for_driver(current_user.id, today_local_date, open_shift=open_shift)
+    requested_route_date = _requested_mobile_route_date()
+    route_date = requested_route_date or _dashboard_route_date_for_driver(current_user.id, today_local_date, open_shift=open_shift)
     shift_elapsed = None
     if open_shift:
         shift_elapsed = _format_duration((datetime.utcnow() - open_shift.start_time).total_seconds())
@@ -3963,7 +4024,8 @@ def mobile_dashboard():
         .order_by(PreTrip.created_at.desc())
         .first()
     )
-    route_is_active = bool(open_shift or (route_pretrip and not route_pretrip.posttrip))
+    open_shift_route_date = _shift_route_date(open_shift)
+    route_is_active = bool((open_shift and (not open_shift_route_date or open_shift_route_date == route_date)) or (route_pretrip and not route_pretrip.posttrip))
     active_pretrip = todays_pretrip or (route_pretrip if route_is_active else None)
     pending_posttrip = bool(active_pretrip and not active_pretrip.posttrip)
     latest_transfer = (
@@ -4041,11 +4103,6 @@ def mobile_dashboard():
         .filter_by(user_id=current_user.id, transfer_date=route_date)
         .first()
     )
-    driver_next_action = route_next_action(
-        route_context,
-        has_high_issue=open_damage_count > 0,
-        missing_document=departed_today and not has_transfer_today,
-    )
     route_map = build_driver_route_map_context(
         driver=current_user,
         date=route_date,
@@ -4053,16 +4110,44 @@ def mobile_dashboard():
     )
     production_flow = build_production_flow_context(
         date=route_date,
-        driver_id=current_user.id,
         selected_stop_id=current_stop.id if current_stop else None,
         mode="mobile",
     )
+    proof_missing = bool(departed_today and not has_transfer_today)
+    route_cta = build_route_cta_context(
+        route_context,
+        production_flow_context=production_flow,
+        proof_missing=proof_missing,
+        has_active_shift=bool(open_shift),
+        route_is_active=route_is_active,
+        route_date=route_date,
+        today_local_date=today_local_date,
+        has_last_route=bool(todays_logs),
+        selected_date_forced=bool(requested_route_date),
+        pending_posttrip=pending_posttrip,
+    )
+    driver_next_action = route_cta["next_action"]
+    route_map_mode = build_driver_map_mode_context(
+        route_context,
+        route_map,
+        production_flow,
+        route_date=route_date,
+        today_local_date=today_local_date,
+        route_is_active=route_is_active,
+    )
+    route_map.update(route_map_mode)
+    route_date_options = _mobile_route_date_options(current_user.id, route_date, today_local_date)
+    route_cta_urls = _route_cta_urls(route_date, current_stop=current_stop)
 
     return render_template(
         "driver_mobile.html",
         floor=floor,
         route_map=route_map,
         production_flow=production_flow,
+        route_map_mode=route_map_mode,
+        route_cta=route_cta,
+        route_cta_urls=route_cta_urls,
+        route_date_options=route_date_options,
         assigned_requests=assigned_requests,
         driver_next_action=driver_next_action,
         active_task=active_task,

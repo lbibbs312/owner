@@ -903,6 +903,7 @@ def build_production_flow_context(
         "rack_capacity_snapshot": None,
         "data_scope_note": DATA_SCOPE_EMPTY,
     }
+    no_flow_signals = not bool(flow_nodes or flow_lanes or items)
 
     return {
         "mode": mode,
@@ -926,6 +927,8 @@ def build_production_flow_context(
             "can_export": bool(can_export),
         },
         "empty_states": {
+            "no_flow_signals": no_flow_signals,
+            "flow_empty_message": "No production-flow signals for this date.",
             "no_flow_nodes": not bool(flow_nodes),
             "no_flow_lanes": not bool(flow_lanes),
             "no_flow_items": not bool(items),

@@ -1,4 +1,8 @@
 {% set rm = route_map if route_map is defined else none %}
+{% set map_mode = rm.map_mode if rm and rm.map_mode is defined else 'live_current_work' %}
+{% set map_label = rm.map_label if rm and rm.map_label is defined else 'Active Route Map' %}
+{% set cta = route_cta if route_cta is defined and route_cta else {} %}
+{% set urls = route_cta_urls if route_cta_urls is defined else {} %}
 {% set active_stops = [] %}
 {% set completed_stops = [] %}
 {% if rm and rm.stops %}
@@ -26,7 +30,7 @@
 <section class="compact-route-map" data-route-map-shell data-route-map-mode="route">
   <div class="compact-map-head">
     <div>
-      <span>Compact Live Route Map</span>
+      <span>{{ map_label }}</span>
       <h3>{{ route_panel_title or "Today's Route" }}</h3>
     </div>
     {% if rm and rm.route %}
@@ -50,11 +54,13 @@
             {% if not loop.last %}<span class="compact-route-lane status-{{ stop.status }}" aria-hidden="true"></span>{% endif %}
           {% endfor %}
         </div>
-        <p class="compact-map-note">
-          {% if active_stops %}
-            Current work first. Completed stops stay collapsed below.
-          {% else %}
-            Current work is closed. Completed stops are below.
+	        <p class="compact-map-note">
+	          {% if map_mode == 'route_replay' %}
+	            Last Route / Route Replay. Live route actions are hidden.
+	          {% elif active_stops %}
+	            Current work first. Completed stops stay collapsed below.
+	          {% else %}
+	            Current work is closed. Completed stops are below.
           {% endif %}
         </p>
       </div>
@@ -136,9 +142,23 @@
         {% endfor %}
       </div>
     {% endif %}
-  {% else %}
-    <p class="compact-empty">Stops, move requests, and plant transfers will appear here after they are recorded.</p>
-  {% endif %}
+	  {% else %}
+	    <p class="compact-empty">
+	      {% if map_mode == 'production_flow' %}
+	        No active route for this date. Production Flow is available below.
+	      {% else %}
+	        {{ rm.map_empty_message if rm and rm.map_empty_message else 'No active route or production-flow signals for this date.' }}
+	      {% endif %}
+	    </p>
+	    <div class="compact-map-actions {% if not cta.has_route_history %}single{% endif %}">
+	      {% if urls.get('start_shift') %}
+	        <a class="button primary" href="{{ urls.get('start_shift') }}">Start Shift / PreTrip</a>
+	      {% endif %}
+	      {% if urls.get('route_history') %}
+	        <a class="button ghost" href="{{ urls.get('route_history') }}">View Last Route</a>
+	      {% endif %}
+	    </div>
+	  {% endif %}
 
   <div class="route-map-drawer" data-route-map-drawer hidden aria-hidden="true">
     <button class="route-map-drawer-backdrop" type="button" data-route-map-close aria-label="Close details"></button>

@@ -1,32 +1,34 @@
 {% from "partials/_next_action.html" import next_action_chip %}
 {% set cs = route_context.current_stop if route_context and route_context.current_stop else none %}
+{% set cta = route_cta if route_cta is defined and route_cta else {} %}
+{% set primary = cta.primary_cta if cta.primary_cta is defined else none %}
+{% set secondary = cta.secondary_cta if cta.secondary_cta is defined else none %}
+{% set urls = route_cta_urls if route_cta_urls is defined else {} %}
 <section class="driver-next-card">
   <div class="driver-next-main">
     <span>Next Action</span>
-    <strong>{{ driver_next_action or 'No action needed' }}</strong>
+    <strong>{{ cta.next_action or driver_next_action or 'No action needed' }}</strong>
     <p>
       {% if cs %}
         {{ cs.plant_name }} &middot; {{ wait_label_for_log(cs) or 'Expected Wait pending' }}
-      {% elif route_context and route_context.route_status in ['completed', 'finalized'] %}
-        Route is {{ route_context.route_status|replace('_', ' ') }}.
+      {% elif cta.route_state_message %}
+        {{ cta.route_state_message }}
       {% else %}
         No current stop open.
       {% endif %}
     </p>
   </div>
   <div class="driver-next-side">
-    {{ next_action_chip(driver_next_action) }}
+    {{ next_action_chip(cta.next_action or driver_next_action) }}
   </div>
   <div class="driver-next-actions">
-    {% if cs %}
-      <a class="button primary" href="{{ url_for('driver.depart_driver_log', log_id=cs.id) }}">Record Departure</a>
-      <a class="button ghost" href="{{ url_for('driver.pickup_driver_log', log_id=cs.id) }}">Select Destination</a>
-    {% elif route_context and route_context.route_status in ['completed', 'finalized'] %}
-      <a class="button primary" href="{{ url_for('driver.end_of_day_summary') }}">Finalize Route</a>
-      <a class="button ghost" href="{{ url_for('driver.driver_logs_print') }}">Print Route</a>
-    {% else %}
-      <a class="button primary" href="{{ url_for('driver.new_driving_log') }}">Add Stop</a>
-      <a class="button ghost" href="{{ url_for('driver.list_tasks') }}">View Tasks</a>
+    {% if primary and urls.get(primary.action) %}
+      <a class="button primary" href="{{ urls.get(primary.action) }}">{{ primary.label }}</a>
+    {% endif %}
+    {% if secondary and urls.get(secondary.action) %}
+      <a class="button ghost" href="{{ urls.get(secondary.action) }}">{{ secondary.label }}</a>
+    {% elif cs and urls.get('confirm_cargo') and (not primary or primary.action != 'confirm_cargo') %}
+      <a class="button ghost" href="{{ urls.get('confirm_cargo') }}">Confirm Cargo</a>
     {% endif %}
   </div>
 </section>

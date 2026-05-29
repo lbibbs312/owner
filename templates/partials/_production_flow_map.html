@@ -6,6 +6,7 @@
 {% set can_open_records = permissions.can_edit or permissions.can_assign or permissions.can_review or permissions.can_export %}
 {% set is_mobile_flow = flow_mode == 'mobile' %}
 {% set is_plant_floor_flow = flow_mode == 'plant_floor' %}
+{% set has_flow_signals = pf and (pf.flow_nodes or pf.flow_lanes or pf.flow_items) %}
 {% set board_label = production_flow_label if production_flow_label is defined else ('Plant Floor Board' if is_plant_floor_flow else ('Compact Production Flow' if is_mobile_flow else 'Production Flow Map')) %}
 {% set board_title = production_flow_title if production_flow_title is defined else ('Plant Floor Board' if is_plant_floor_flow else 'Production Flow') %}
 
@@ -22,14 +23,16 @@
     </div>
   </div>
 
-  <div class="production-flow-summary" aria-label="Move Queue Summary">
-    <span><strong>{{ summary.open_count|default(0) }}</strong> Open</span>
-    <span><strong>{{ summary.active_count|default(0) }}</strong> Active</span>
-    <span><strong>{{ summary.waiting_count|default(0) }}</strong> Waiting</span>
-    <span><strong>{{ summary.blocked_count|default(0) }}</strong> Blocked</span>
-    <span><strong>{{ summary.completed_count|default(0) }}</strong> Completed</span>
-    <span><strong>{{ summary.hot_count|default(0) }}</strong> Hot</span>
-  </div>
+  {% if has_flow_signals %}
+    <div class="production-flow-summary" aria-label="Move Queue Summary">
+      <span><strong>{{ summary.open_count|default(0) }}</strong> Open</span>
+      <span><strong>{{ summary.active_count|default(0) }}</strong> Active</span>
+      <span><strong>{{ summary.waiting_count|default(0) }}</strong> Waiting</span>
+      <span><strong>{{ summary.blocked_count|default(0) }}</strong> Blocked</span>
+      <span><strong>{{ summary.completed_count|default(0) }}</strong> Completed</span>
+      <span><strong>{{ summary.hot_count|default(0) }}</strong> Hot</span>
+    </div>
+  {% endif %}
 
   {% if is_mobile_flow %}
     <details class="mobile-production-flow" {% if summary.needs_attention_count|default(0) or summary.blocked_count|default(0) %}open{% endif %}>
@@ -37,7 +40,7 @@
         <span>View Production Flow</span>
         <strong>{{ pf.flow_nodes|length if pf else 0 }} locations</strong>
       </summary>
-      {% if pf and (pf.flow_nodes or pf.flow_lanes or pf.flow_items) %}
+	      {% if has_flow_signals %}
         <div class="mobile-flow-grid">
           <div class="mobile-flow-section">
             <h4>Plant / Location Pressure</h4>
@@ -98,15 +101,15 @@
           {% endif %}
           <p class="mobile-flow-note">{{ pf.empty_states.data_scope }}</p>
         </div>
-      {% else %}
-        <div class="flow-empty-state">
-          <strong>No current production-flow data.</strong>
-          <span>Move requests, route stops, and plant transfers will appear here after they are recorded.</span>
-          <span>{{ pf.empty_states.carrier_unit_snapshot if pf else 'Carrier unit snapshot not connected yet' }}</span>
-        </div>
-      {% endif %}
-    </details>
-  {% elif pf and (pf.flow_nodes or pf.flow_lanes or pf.flow_items) %}
+	      {% else %}
+	        <div class="flow-empty-state">
+	          <strong>No production-flow signals for this date.</strong>
+	          <span>Move requests, route stops, and plant transfers will appear here after they are recorded.</span>
+	          <span>{{ pf.empty_states.carrier_unit_snapshot if pf else 'Carrier unit snapshot not connected yet' }}</span>
+	        </div>
+	      {% endif %}
+	    </details>
+	  {% elif has_flow_signals %}
     <div class="flow-map-layout">
       <div class="production-flow-canvas" aria-label="Production flow facility map">
         <svg class="flow-graph-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
@@ -214,12 +217,12 @@
         <span class="flow-bottom-empty">{{ pf.empty_states.data_scope }}</span>
       {% endif %}
     </div>
-  {% else %}
-    <div class="flow-empty-state">
-      <strong>No current production-flow data.</strong>
-      <span>Move requests, route stops, and plant transfers will appear here after they are recorded.</span>
-      <span>{{ pf.empty_states.carrier_unit_snapshot if pf else 'Carrier unit snapshot not connected yet' }}</span>
-    </div>
+	  {% else %}
+	    <div class="flow-empty-state">
+	      <strong>No production-flow signals for this date.</strong>
+	      <span>Move requests, route stops, and plant transfers will appear here after they are recorded.</span>
+	      <span>{{ pf.empty_states.carrier_unit_snapshot if pf else 'Carrier unit snapshot not connected yet' }}</span>
+	    </div>
   {% endif %}
 
   {% include "partials/_production_flow_drawer.html" %}

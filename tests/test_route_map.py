@@ -189,7 +189,7 @@ def test_driver_dashboard_renders_assigned_move_queue(client, app):
     body = resp.get_data(as_text=True)
     assert "Assigned Move Queue" in body
     assert "MR-REAL-1" in body
-    assert "Live Route Map" in body
+    assert "Production Flow" in body
 
 
 def test_driver_dashboard_renders_with_no_assigned_requests(client, app):
@@ -202,7 +202,23 @@ def test_driver_dashboard_renders_with_no_assigned_requests(client, app):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "No assigned moves right now" in body
-    assert "Stops, move requests, and plant transfers will appear here" in body
+    assert "No active route or production-flow signals for this date." in body
+
+
+def test_mobile_production_flow_view_is_not_driver_scoped(client, app):
+    with app.app_context():
+        manager = _user("flow_mgr", "management")
+        _user("flow_driver", "driver")
+        _move_request(manager.id, request_number="MR-BROAD-1")
+
+    _login(client, "flow_driver")
+    resp = client.get("/mobile")
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert 'data-production-flow-mode="mobile"' in body
+    assert "Production Flow" in body
+    assert "MR-BROAD-1" in body
 
 
 def test_manager_dashboard_uses_issue_terminology(client, app):

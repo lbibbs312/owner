@@ -595,6 +595,49 @@ def _empty_states(route, stops, moves, lanes):
     }
 
 
+def build_driver_map_mode_context(route_context, route_map=None, production_flow_context=None, *, route_date=None, today_local_date=None, route_is_active=False):
+    """Choose the driver map mode without requiring active driving."""
+    route_map = route_map or {}
+    production_flow_context = production_flow_context or {}
+    stops = route_map.get("stops") or []
+    moves = route_map.get("moves") or []
+    plants = route_map.get("plants") or []
+    has_route_history = bool(stops)
+    has_route_or_queue = bool(stops or moves or plants)
+    has_production = bool(
+        production_flow_context.get("flow_nodes")
+        or production_flow_context.get("flow_lanes")
+        or production_flow_context.get("flow_items")
+    )
+    current_stop = getattr(route_context, "current_stop", None)
+    is_today = bool(route_date and today_local_date and route_date == today_local_date)
+
+    if current_stop is not None or (route_is_active and has_route_or_queue):
+        mode = "live_current_work"
+        label = "Active Route Map"
+        empty = ""
+    elif has_route_history:
+        mode = "route_replay"
+        label = "Last Route Replay" if not is_today else "Route Replay"
+        empty = ""
+    elif has_production:
+        mode = "production_flow"
+        label = "Production Flow"
+        empty = ""
+    else:
+        mode = "no_current_activity"
+        label = "No Current Activity"
+        empty = "No active route or production-flow signals for this date."
+
+    return {
+        "map_mode": mode,
+        "map_label": label,
+        "map_empty_message": empty,
+        "has_route_history": has_route_history,
+        "has_production_flow": has_production,
+    }
+
+
 def build_driver_route_map_context(
     driver_log=None,
     driver=None,
@@ -629,6 +672,9 @@ def build_driver_route_map_context(
     plants, lanes = _build_plants_and_lanes(stops, moves, transfers, role="driver")
     route = _route_summary(route_context, moves=moves, stops=stops, driver=driver)
     return {
+        "map_mode": "live_current_work" if stops or moves or plants else "no_current_activity",
+        "map_label": "Active Route Map" if stops or moves or plants else "No Current Activity",
+        "map_empty_message": "No active route or production-flow signals for this date." if not (stops or moves or plants) else "",
         "route": route,
         "stops": stops,
         "moves": moves,

@@ -5047,6 +5047,143 @@ def test_mobile_dashboard_route_panel_falls_back_to_latest_route_when_today_is_e
     assert b"Start shift with PreTrip" in page.data
 
 
+def test_mobile_dashboard_selected_date_renders_route_replay(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("replay_driver", "replay@example.com", "driver", first_name="Replay", last_name="Driver")
+        route_date = date(2026, 5, 28)
+        db.session.add_all(
+            [
+                DriverLog(
+                    driver_id=driver.id,
+                    date=route_date,
+                    plant_name="RE",
+                    load_size="Empty",
+                    depart_load_size="Plastic West Load",
+                    arrive_time="08:00",
+                    depart_time="08:15",
+                    created_at=datetime(2026, 5, 28, 8, 0),
+                ),
+                DriverLog(
+                    driver_id=driver.id,
+                    date=route_date,
+                    plant_name="PW",
+                    load_size="Plastic West Load",
+                    depart_load_size="Empty",
+                    arrive_time="08:30",
+                    depart_time="08:45",
+                    created_at=datetime(2026, 5, 28, 8, 30),
+                ),
+            ]
+        )
+        db.session.commit()
+
+    login(client, "replay_driver")
+    page = client.get("/mobile?date=2026-05-28")
+
+    assert page.status_code == 200
+    assert b"Last Route Replay" in page.data
+    assert b"Last Route / Route Replay" in page.data
+    assert b"Raleigh East" in page.data
+    assert b"/driver_logs?date=2026-05-28" in page.data
+    assert b"Finalize Route" not in page.data
+
+
+def test_mobile_dashboard_finalized_route_with_missing_proof_uses_attach_document(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ActivityEvent, DriverLog
+
+        driver = create_user("proof_driver", "proof@example.com", "driver", first_name="Proof", last_name="Driver")
+        route_date = date.today()
+        db.session.add_all(
+            [
+                DriverLog(
+                    driver_id=driver.id,
+                    date=route_date,
+                    plant_name="RE",
+                    load_size="Empty",
+                    depart_load_size="Plastic West Load",
+                    arrive_time="08:00",
+                    depart_time="08:15",
+                    created_at=datetime(2026, 5, 28, 8, 0),
+                ),
+                ActivityEvent(
+                    user_id=driver.id,
+                    category="eod",
+                    action="finalized",
+                    title="Route finalized",
+                    details=f"Route finalized for {route_date}",
+                    target_type="end_of_day",
+                ),
+            ]
+        )
+        db.session.commit()
+
+    login(client, "proof_driver")
+    page = client.get("/mobile")
+
+    assert page.status_code == 200
+    assert b"Attach Document" in page.data
+    assert b"Finalize Route" not in page.data
+
+
+def test_mobile_dashboard_finalized_route_with_proof_hides_finalize(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ActivityEvent, DriverLog, PlantTransfer
+
+        driver = create_user("final_done_driver", "final-done@example.com", "driver", first_name="Final", last_name="Done")
+        route_date = date.today()
+        db.session.add_all(
+            [
+                DriverLog(
+                    driver_id=driver.id,
+                    date=route_date,
+                    plant_name="RE",
+                    load_size="Empty",
+                    depart_load_size="Plastic West Load",
+                    arrive_time="08:00",
+                    depart_time="08:15",
+                    created_at=datetime(2026, 5, 28, 8, 0),
+                ),
+                PlantTransfer(
+                    user_id=driver.id,
+                    transfer_date=route_date,
+                    ship_from="RE",
+                    ship_to="PW",
+                    driver_name="Final Done",
+                ),
+                ActivityEvent(
+                    user_id=driver.id,
+                    category="eod",
+                    action="finalized",
+                    title="Route finalized",
+                    details=f"Route finalized for {route_date}",
+                    target_type="end_of_day",
+                ),
+            ]
+        )
+        db.session.commit()
+
+    login(client, "final_done_driver")
+    page = client.get("/mobile")
+
+    assert page.status_code == 200
+    assert b"No action needed" in page.data
+    assert b"Print Route" in page.data
+    assert b"Finalize Route" not in page.data
+    assert b"Attach Document" not in page.data
+
+
 def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     from datetime import date, datetime, timedelta
 

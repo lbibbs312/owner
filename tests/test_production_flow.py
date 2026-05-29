@@ -106,6 +106,8 @@ def test_production_flow_no_data_returns_safe_empty_states(app):
     assert ctx["flow_nodes"] == []
     assert ctx["flow_lanes"] == []
     assert ctx["flow_items"] == []
+    assert ctx["empty_states"]["no_flow_signals"] is True
+    assert ctx["empty_states"]["flow_empty_message"] == "No production-flow signals for this date."
     assert ctx["empty_states"]["no_flow_nodes"] is True
     assert ctx["empty_states"]["carrier_unit_snapshot"] == "Carrier unit snapshot not connected yet"
     assert ctx["empty_states"]["rack_capacity"] == "Rack/capacity data not connected yet"

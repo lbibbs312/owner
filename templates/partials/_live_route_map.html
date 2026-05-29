@@ -1,7 +1,7 @@
 {# Live map shell. `mode="route"` is driver/mobile; `mode="production"` is manager/widescreen. #}
 {% set rm = route_map if route_map is defined else none %}
 {% set current_map_mode = map_mode if map_mode is defined else (rm.mode if rm and rm.mode is defined else 'route') %}
-{% set map_label = route_map_heading if route_map_heading is defined else ('Production Flow Map' if current_map_mode == 'production' else 'Live Route Map') %}
+{% set map_label = route_map_heading if route_map_heading is defined else (rm.map_label if rm and rm.map_label is defined else ('Production Flow Map' if current_map_mode == 'production' else 'Active Route Map')) %}
 
 {% if current_map_mode == 'production' %}
   {% set pf = rm %}
@@ -208,7 +208,7 @@
     </div>
   </section>
 {% else %}
-  <section class="route-map-shell" data-route-map-shell data-route-map-mode="route">
+  <section class="route-map-shell" data-route-map-shell data-route-map-mode="{{ rm.map_mode if rm and rm.map_mode is defined else 'route' }}">
     <div class="route-map-top">
       <div>
         <p class="route-map-label">{{ map_label }}</p>
@@ -216,8 +216,10 @@
         <p class="route-map-sub">
           {% if rm and rm.route %}
             {{ rm.route.driver_name or 'Not tracked yet' }} &middot; {{ rm.route.status|replace('_', ' ')|title }} &middot; {{ rm.route.next_action or 'No action needed' }}
-          {% else %}
-            No current data
+	          {% elif rm and rm.map_empty_message %}
+	            {{ rm.map_empty_message }}
+	          {% else %}
+	            No current data
           {% endif %}
         </p>
       </div>
@@ -330,9 +332,9 @@
           </div>
         </div>
       </div>
-    {% else %}
-      <p class="route-map-empty">No current data. Stops, move requests, and plant transfers will appear here after they are recorded.</p>
-    {% endif %}
+	    {% else %}
+	      <p class="route-map-empty">{{ rm.map_empty_message if rm and rm.map_empty_message else 'No active route or production-flow signals for this date.' }}</p>
+	    {% endif %}
 
     <div class="route-map-drawer" data-route-map-drawer hidden aria-hidden="true">
       <button class="route-map-drawer-backdrop" type="button" data-route-map-close aria-label="Close details"></button>

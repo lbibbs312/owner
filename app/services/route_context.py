@@ -9,6 +9,7 @@ from sqlalchemy import or_
 
 from app.extensions import db
 from app.models import ActivityEvent, DamageReport, DriverLog, DriverLogPhoto, LoadIntent, PartScanEvent, PlantTimeSample, PreTrip, ShiftRecord, User
+from app.services.cargo_state import cargo_state_for_log
 from app.services.cargo_reconciliation_service import reconcile_cargo
 from app.services.driver_wait import wait_label_for_log
 from app.services.load_state import build_driver_log_route_context, current_load_after_logs, route_problem_reason, stop_role_details, truck_issue_reason
@@ -162,6 +163,139 @@ def _delay_reason_required(log, timing):
     if delay >= 15:
         return True
     return bool(expected and delay >= 10 and delay >= expected * 0.5)
+
+
+def _route_cta(label, action, style="primary"):
+    return {"label": label, "action": action, "style": style}
+
+
+def build_route_cta_context(
+    route_context,
+    driver_log=None,
+    production_flow_context=None,
+    *,
+    proof_missing=False,
+    has_active_shift=False,
+    route_is_active=False,
+    route_date=None,
+    today_local_date=None,
+    has_last_route=False,
+    selected_date_forced=False,
+    pending_posttrip=False,
+):
+    """Return the single route CTA decision used by driver/mobile surfaces."""
+    rows = getattr(route_context, "rows", None) or []
+    current_stop = getattr(route_context, "current_stop", None) or driver_log
+    route_status = getattr(route_context, "route_status", None)
+    route_finalized = bool(getattr(route_context, "route_finalized", False) or route_status == "finalized")
+    all_departed = bool(getattr(route_context, "all_departed", False))
+    has_route_history = bool(rows)
+    is_today = bool(route_date and today_local_date and route_date == today_local_date)
+
+    allowed_actions = []
+    display_mode = "active_route"
+    next_action = "No action needed"
+    primary = None
+    secondary = None
+    route_message = ""
+    proof_message = "Documents current"
+
+    show_finalize = False
+    show_attach = False
+    show_print = has_route_history
+    show_start_shift = False
+    show_posttrip = bool(pending_posttrip)
+
+    if route_finalized and not proof_missing:
+        display_mode = "finalized_route"
+        next_action = "No action needed"
+        primary = _route_cta("Print Route", "print_route")
+        secondary = _route_cta("Route History", "route_history", "ghost")
+        route_message = "Route is finalized."
+        allowed_actions = ["print_route", "route_history", "view_route"]
+    elif route_finalized and proof_missing:
+        display_mode = "proof_needed"
+        next_action = "Attach document"
+        primary = _route_cta("Attach Document", "attach_document")
+        secondary = _route_cta("Print Route", "print_route", "ghost")
+        route_message = "Route is finalized."
+        proof_message = "Document proof is missing."
+        show_attach = True
+        allowed_actions = ["attach_document", "print_route", "view_route", "route_history"]
+    elif current_stop is not None and not getattr(current_stop, "depart_time", None):
+        display_mode = "active_stop"
+        if cargo_state_for_log(current_stop)["state"] == "unknown":
+            next_action = "Confirm cargo"
+            primary = _route_cta("Confirm Cargo", "confirm_cargo")
+            allowed_actions = ["confirm_cargo"]
+        else:
+            next_action = "Record departure"
+            primary = _route_cta("Record Departure", "record_departure")
+            allowed_actions = ["record_departure", "add_damage", "add_note"]
+        secondary = _route_cta("Add Damage", "add_damage", "ghost")
+        route_message = "Current stop is open."
+    elif all_departed and has_route_history and not route_finalized:
+        if is_today and not selected_date_forced:
+            display_mode = "completed_route"
+            next_action = "Finalize route"
+            primary = _route_cta("Finalize Route", "finalize_route")
+            secondary = _route_cta("Print Draft", "print_route", "ghost")
+            show_finalize = True
+            allowed_actions = ["finalize_route", "print_route", "view_route"]
+            route_message = "All recorded stops are closed."
+        else:
+            display_mode = "read_only_history" if selected_date_forced else "last_route"
+            next_action = "Start new shift or View last route"
+            primary = _route_cta("Start New Shift", "start_shift")
+            secondary = _route_cta("Print Last Route", "print_route", "ghost")
+            show_start_shift = True
+            allowed_actions = ["start_shift", "view_route", "print_route", "route_history"]
+            route_message = "Showing a completed route."
+    elif has_route_history or has_last_route:
+        display_mode = "active_route" if route_is_active else ("read_only_history" if selected_date_forced else "last_route")
+        next_action = "Start new shift or View last route" if not route_is_active else "Complete route"
+        primary = _route_cta("Start New Shift", "start_shift") if not route_is_active else _route_cta("Add Stop", "add_stop")
+        secondary = _route_cta("View Last Route", "view_route", "ghost")
+        show_start_shift = not route_is_active
+        allowed_actions = ["start_shift", "view_route", "print_route", "route_history"] if not route_is_active else ["add_stop", "view_route"]
+        route_message = "Showing route history." if not route_is_active else "Route is active."
+    else:
+        display_mode = "no_active_shift" if not has_active_shift else "active_route"
+        next_action = "Start shift"
+        primary = _route_cta("Start Shift", "start_shift")
+        secondary = _route_cta("View Last Route", "route_history", "ghost")
+        show_start_shift = True
+        show_print = False
+        allowed_actions = ["start_shift", "route_history"]
+        route_message = "No active route for this date."
+
+    if proof_missing and not route_finalized and next_action not in {"Confirm cargo", "Record departure", "Finalize route"}:
+        display_mode = "proof_needed"
+        next_action = "Attach document"
+        primary = _route_cta("Attach Document", "attach_document")
+        secondary = _route_cta("Print Route", "print_route", "ghost") if has_route_history else secondary
+        show_attach = True
+        proof_message = "Document proof is missing."
+        if "attach_document" not in allowed_actions:
+            allowed_actions.insert(0, "attach_document")
+
+    return {
+        "route_display_mode": display_mode,
+        "next_action": next_action,
+        "primary_cta": primary,
+        "secondary_cta": secondary,
+        "allowed_actions": allowed_actions,
+        "route_state_message": route_message,
+        "proof_state_message": proof_message,
+        "show_finalize_button": show_finalize,
+        "show_attach_document_button": show_attach,
+        "show_print_button": show_print,
+        "show_start_shift_button": show_start_shift,
+        "show_posttrip_button": show_posttrip,
+        "route_finalized": route_finalized,
+        "proof_missing": bool(proof_missing),
+        "has_route_history": has_route_history,
+    }
 
 
 def _photo_review_rows(logs):

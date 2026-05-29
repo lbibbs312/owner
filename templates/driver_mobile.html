@@ -208,9 +208,35 @@
     .maintenance-chip.warn { background: rgba(245,158,11,.16); color: #fde68a; border-color: rgba(245,158,11,.28); }
     .maintenance-empty { padding: 3px 0; color: var(--muted); font-size: .8rem; }
 
-    .section-head { display: flex; justify-content: space-between; align-items: end; padding: 0 4px; }
-    .section-head h2 { margin: 0; font-size: 1.02rem; }
-    .section-head span, .muted { color: var(--muted); font-size: 0.78rem; }
+	    .section-head { display: flex; justify-content: space-between; align-items: end; padding: 0 4px; }
+	    .section-head h2 { margin: 0; font-size: 1.02rem; }
+	    .section-head span, .muted { color: var(--muted); font-size: 0.78rem; }
+	    .date-context {
+	      display: flex;
+	      gap: 8px;
+	      overflow-x: auto;
+	      padding: 0 2px 2px;
+	    }
+	    .date-context a {
+	      flex: 0 0 auto;
+	      display: inline-flex;
+	      align-items: center;
+	      gap: 6px;
+	      min-height: 34px;
+	      padding: 0 10px;
+	      border-radius: 999px;
+	      border: 1px solid rgba(148,163,184,.2);
+	      background: rgba(15,23,42,.82);
+	      color: #cbd5e1;
+	      font-size: .68rem;
+	      font-weight: 900;
+	      white-space: nowrap;
+	    }
+	    .date-context a.active {
+	      border-color: rgba(243,199,207,.38);
+	      background: rgba(127,29,45,.26);
+	      color: #fff;
+	    }
 
     .list { display: grid; gap: 10px; }
     .list-item { padding: 14px; border-bottom: 1px solid rgba(148,163,184,0.13); }
@@ -727,13 +753,19 @@
     .compact-route-lane.status-needs_review {
       background: repeating-linear-gradient(90deg, #ef4444 0 8px, transparent 8px 14px);
     }
-    .compact-map-note {
-      margin: 0;
-      padding-top: 2px;
-      color: #cbd5e1;
-      font-size: .72rem;
-      font-weight: 800;
-    }
+	    .compact-map-note {
+	      margin: 0;
+	      padding-top: 2px;
+	      color: #cbd5e1;
+	      font-size: .72rem;
+	      font-weight: 800;
+	    }
+	    .compact-map-actions {
+	      display: grid;
+	      grid-template-columns: repeat(2, minmax(0, 1fr));
+	      gap: 8px;
+	    }
+	    .compact-map-actions.single { grid-template-columns: 1fr; }
     .compact-stop-list {
       display: grid;
       gap: 8px;
@@ -899,10 +931,23 @@
       border-color: rgba(148,163,184,.2);
       color: #cbd5e1;
     }
-    .move-defense-mobile .tone-danger { background: rgba(239,68,68,.16); border-color: rgba(248,113,113,.35); color:#fecaca; }
-    .move-defense-mobile .tone-warn { background: rgba(245,158,11,.16); border-color: rgba(245,158,11,.35); color:#fde68a; }
-    .move-defense-mobile .tone-info { background: rgba(59,130,246,.16); border-color: rgba(147,197,253,.3); color:#bfdbfe; }
-    .move-defense-mobile .tone-good { background: rgba(16,185,129,.16); border-color: rgba(16,185,129,.3); color:#bbf7d0; }
+	    .move-defense-mobile .ops-tag.tone-danger { background: rgba(239,68,68,.16); border-color: rgba(248,113,113,.35); color:#fecaca; }
+	    .move-defense-mobile .ops-tag.tone-warn { background: rgba(245,158,11,.16); border-color: rgba(245,158,11,.35); color:#fde68a; }
+	    .move-defense-mobile .ops-tag.tone-info { background: rgba(59,130,246,.16); border-color: rgba(147,197,253,.3); color:#bfdbfe; }
+	    .move-defense-mobile .ops-tag.tone-good { background: rgba(16,185,129,.16); border-color: rgba(16,185,129,.3); color:#bbf7d0; }
+	    .move-defense-mobile .fo-card {
+	      position: relative;
+	      border-left: 4px solid rgba(148,163,184,.55);
+	    }
+	    .move-defense-mobile .fo-card.tone-info { border-left-color:#60a5fa; }
+	    .move-defense-mobile .fo-card.tone-warn { border-left-color:#f59e0b; }
+	    .move-defense-mobile .fo-card.tone-danger { border-left-color:#ef4444; }
+	    .move-defense-mobile .fo-card.tone-good { border-left-color:#10b981; }
+	    .move-defense-mobile .fo-card.tone-muted { border-left-color:#64748b; }
+	    .move-defense-mobile .fo-card.tone-info .fo-num { color:#bfdbfe; }
+	    .move-defense-mobile .fo-card.tone-warn .fo-num { color:#fde68a; }
+	    .move-defense-mobile .fo-card.tone-danger .fo-num { color:#fecaca; }
+	    .move-defense-mobile .fo-card.tone-good .fo-num { color:#bbf7d0; }
 
     .move-defense-mobile .production-flow-board {
       background: linear-gradient(180deg, rgba(15,23,42,.98), rgba(17,24,39,.94));
@@ -1210,9 +1255,20 @@
       {% endif %}
     {% endwith %}
 
-    <div class="wide-body">
-    <main>
-      <section class="card hero">
+	    <div class="wide-body">
+	    <main>
+	      {% set cta = route_cta if route_cta is defined and route_cta else {} %}
+	      {% set primary = cta.primary_cta if cta.primary_cta is defined else none %}
+	      {% set secondary = cta.secondary_cta if cta.secondary_cta is defined else none %}
+	      {% set cta_urls = route_cta_urls if route_cta_urls is defined else {} %}
+	      {% if route_date_options %}
+	      <nav class="date-context" aria-label="Route date">
+	        {% for option in route_date_options %}
+	          <a class="{% if option.active %}active{% endif %}" href="{{ option.url }}">{{ option.label }} · {{ option.date.strftime('%b %d') if option.date else '' }}</a>
+	        {% endfor %}
+	      </nav>
+	      {% endif %}
+	      <section class="card hero">
         {% if active_task %}
           <div class="eyebrow"><span class="bolt"></span>{% if active_task.is_hot %}Active Hot Move{% else %}Active Task{% endif %}</div>
           <h1>{{ active_task.title }}</h1>
@@ -1241,13 +1297,12 @@
               </form>
             {% endif %}
           </div>
-        {% else %}
-          {% set route_done = route_context and route_context.route_status in ['completed', 'finalized'] and todays_logs %}
-          {% if route_done %}
-            <div class="eyebrow"><span class="bolt"></span>{{ 'Route Finalized' if route_context.route_status == 'finalized' else 'Route Complete' }}</div>
-            <h1>{{ 'Route Finalized' if route_context.route_status == 'finalized' else 'Ready To Finalize' }}</h1>
-            <p>All recorded stops are closed. Review the route, mileage, photos, and signatures before final approval.</p>
-          {% elif next_load_prediction %}
+	        {% else %}
+	          {% if cta.route_display_mode in ['completed_route', 'finalized_route', 'proof_needed', 'last_route', 'read_only_history'] and todays_logs %}
+	            <div class="eyebrow"><span class="bolt"></span>{% if cta.route_display_mode == 'finalized_route' %}Route Finalized{% elif cta.route_display_mode == 'completed_route' %}Route Complete{% elif cta.route_display_mode == 'proof_needed' %}Proof Needed{% elif cta.route_display_mode == 'read_only_history' %}Route History{% else %}Last Route{% endif %}</div>
+	            <h1>{% if cta.route_display_mode == 'completed_route' %}Ready To Finalize{% else %}{{ cta.next_action or 'No action needed' }}{% endif %}</h1>
+	            <p>{{ cta.proof_state_message if cta.route_display_mode == 'proof_needed' else cta.route_state_message }}</p>
+	          {% elif next_load_prediction %}
             <div class="eyebrow"><span class="bolt"></span>{{ next_load_prediction.title }}</div>
             <h1>{{ next_load_prediction.predicted_load_label if next_load_prediction.is_known else 'Awaiting load intent' }}</h1>
             <p>{% if next_load_prediction.is_known %}Likely destination: {{ next_load_prediction.display_destination }}. Basis: {{ next_load_prediction.reason_text }}{% else %}Next load is unknown. {{ next_load_prediction.required_driver_action }}{% endif %}</p>
@@ -1256,24 +1311,22 @@
               <span class="badge">Confidence: {{ next_load_prediction.confidence_label }}</span>
               <span class="badge">Source: {{ next_load_prediction.source_label }}</span>
             </div>
-          {% else %}
-            <div class="eyebrow"><span class="bolt"></span>Ready For Dispatch</div>
-            <h1>No active move</h1>
-            <p>You have no pending driver tasks right now. Create a driver log or open the task queue.</p>
-          {% endif %}
-          <div class="hero-actions">
-            {% if route_context and route_context.current_stop %}
-              <a class="button primary" href="{{ url_for('driver.depart_driver_log', log_id=route_context.current_stop.id) }}">Record Departure</a>
-              <a class="button ghost" href="{{ url_for('driver.pickup_driver_log', log_id=route_context.current_stop.id) }}">Select Destination</a>
-            {% elif route_done %}
-              <a class="button primary" href="{{ url_for('driver.end_of_day_summary') }}">Finalize Route</a>
-              <a class="button ghost" href="{{ url_for('driver.driver_logs_print') }}">Print Route</a>
-            {% else %}
-              <a class="button primary" href="{{ url_for('driver.new_driving_log') }}">Create Driver Log</a>
-              <a class="button ghost" href="{{ url_for('driver.list_tasks') }}">View Tasks</a>
-            {% endif %}
-          </div>
-        {% endif %}
+	          {% else %}
+	            <div class="eyebrow"><span class="bolt"></span>Ready For Dispatch</div>
+	            <h1>{{ cta.next_action or 'No active move' }}</h1>
+	            <p>{{ cta.route_state_message or 'You have no pending driver tasks right now. Create a driver log or open the task queue.' }}</p>
+	          {% endif %}
+	          <div class="hero-actions">
+	            {% if primary and cta_urls.get(primary.action) %}
+	              <a class="button primary" href="{{ cta_urls.get(primary.action) }}">{{ primary.label }}</a>
+	            {% endif %}
+	            {% if secondary and cta_urls.get(secondary.action) %}
+	              <a class="button ghost" href="{{ cta_urls.get(secondary.action) }}">{{ secondary.label }}</a>
+	            {% elif cta_urls.get('view_route') and cta.has_route_history %}
+	              <a class="button ghost" href="{{ cta_urls.get('view_route') }}">View Route</a>
+	            {% endif %}
+	          </div>
+	        {% endif %}
       </section>
 
       {# ---- Read-only operations console (capture actions below stay intact) ---- #}
@@ -1431,12 +1484,19 @@
       </section>
       {% endif %}
 
-      <section class="wide-actions" aria-label="Desktop driver actions">
-        <a class="button ghost" href="{{ url_for('driver.damage_reports') }}">Damage Reports</a>
-        <a class="button ghost" href="{{ url_for('driver.driver_logs_print') }}">Print Route</a>
-        <a class="button ghost" href="{{ url_for('driver.end_of_day_summary') }}">Finalize Route</a>
-        <a class="button ghost" href="{{ url_for('driver.mobile_history') }}">Route History</a>
-      </section>
+	      <section class="wide-actions" aria-label="Desktop driver actions">
+	        <a class="button ghost" href="{{ url_for('driver.damage_reports') }}">Damage Reports</a>
+	        {% if cta.show_attach_document_button and cta_urls.get('attach_document') %}
+	          <a class="button ghost" href="{{ cta_urls.get('attach_document') }}">Attach Document</a>
+	        {% endif %}
+	        {% if cta.show_print_button and cta_urls.get('print_route') %}
+	          <a class="button ghost" href="{{ cta_urls.get('print_route') }}">Print Route</a>
+	        {% endif %}
+	        {% if cta.show_finalize_button and cta_urls.get('finalize_route') %}
+	          <a class="button ghost" href="{{ cta_urls.get('finalize_route') }}">Finalize Route</a>
+	        {% endif %}
+	        <a class="button ghost" href="{{ url_for('driver.mobile_history') }}">Route History</a>
+	      </section>
 
       {% set fuel_logs = todays_logs | selectattr('fuel') | selectattr('fuel_mileage') | list %}
       {% set start_mi = route_pretrip.start_mileage if route_pretrip else none %}
