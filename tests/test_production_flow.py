@@ -308,6 +308,26 @@ def test_manager_dashboard_uses_production_flow_mode(client, app):
     assert 'class="route-stop-rail"' not in body
 
 
+def test_flow_map_uses_large_objects_and_compact_stop_chips(client, app):
+    with app.app_context():
+        driver = _user("flow-stop-driver", "driver")
+        _driver_log(driver, plant_name="RW", depart_time="08:30", load_size="Empty", depart_load_size="Trim DC Load")
+        _driver_log(driver, plant_name="Trim DC", depart_time=None, load_size="Trim DC Load")
+
+    _login(client, "flow-stop-driver")
+    resp = client.get("/mobile")
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "flow-object-card" in body
+    assert "Load Build / Trailer" in body
+    assert "Route-only data. Attach manifest or enter paper data to build expected flow." in body
+    assert "route-step-chip" in body
+    assert "Stop Details" in body
+    assert "Actual Scans" in body
+    assert "Event Timeline" in body
+
+
 def test_mobile_dashboard_uses_compact_shared_production_flow(client, app):
     with app.app_context():
         driver = _user("mobile-pf-driver", "driver")

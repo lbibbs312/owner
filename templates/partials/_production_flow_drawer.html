@@ -1,6 +1,24 @@
 {% if pf %}
   {% set permissions = pf.permissions if pf.permissions else {} %}
   {% set can_open_records = permissions.can_edit or permissions.can_assign or permissions.can_review or permissions.can_export %}
+  {% for object in pf.flow_objects %}
+    <div class="route-map-detail-source" hidden data-route-map-detail="flow-object-{{ object.key }}">
+      <div class="drawer-kicker">Flow Object</div>
+      <h3>{{ object.label }}</h3>
+      <div class="drawer-badges">
+        <span class="route-status-badge status-{{ object.status }}">{{ object.status|replace('_', ' ')|title }}</span>
+      </div>
+      <dl class="drawer-facts">
+        <div><dt>Projected Count</dt><dd>{{ object.count }}</dd></div>
+        <div><dt>Current Readout</dt><dd>{{ object.headline }}</dd></div>
+        <div><dt>Flow Basis</dt><dd>{{ object.detail }}</dd></div>
+        <div><dt>Ledger</dt><dd>{{ pf.ledger_summary.event_count if pf.ledger_summary else 0 }} event{{ '' if pf.ledger_summary and pf.ledger_summary.event_count == 1 else 's' }}</dd></div>
+        <div><dt>Open Manifests</dt><dd>{{ pf.ledger_summary.open_manifest_count if pf.ledger_summary else 0 }}</dd></div>
+        <div><dt>Active Exceptions</dt><dd>{{ pf.ledger_summary.active_exception_count if pf.ledger_summary else 0 }}</dd></div>
+      </dl>
+    </div>
+  {% endfor %}
+
   {% for node in pf.flow_nodes %}
     <div class="route-map-detail-source" hidden data-route-map-detail="flow-node-{{ node.key }}">
       <div class="drawer-kicker">Plant / Location &middot; {{ node.short_code or 'No current data' }}</div>
@@ -59,21 +77,55 @@
       <div class="drawer-badges">
         <span class="route-status-badge status-{{ item.status }}">{{ item.status_label }}</span>
       </div>
-      <dl class="drawer-facts">
-        <div><dt>Location / Lane</dt><dd>{{ item.plant_location or 'No current data' }}</dd></div>
-        <div><dt>Stage</dt><dd>{{ item.stage or 'No current data' }}</dd></div>
-        <div><dt>Description</dt><dd>{{ item.description or 'No current data' }}</dd></div>
-        <div><dt>Age</dt><dd>{% if item.age_minutes is not none %}{{ item.age_minutes }} min{% else %}Not tracked yet{% endif %}</dd></div>
-        {% if item.arrived_with is defined %}<div><dt>Arrived With</dt><dd>{{ item.arrived_with or 'Not tracked yet' }}</dd></div>{% endif %}
-        {% if item.departed_with is defined %}<div><dt>Departed With</dt><dd>{{ item.departed_with or 'Not tracked yet' }}</dd></div>{% endif %}
-        <div><dt>Carrier Unit</dt><dd>{% if item.carrier_unit_count is not none %}{{ item.carrier_unit_count }}{% else %}Carrier unit snapshot not connected yet{% endif %}</dd></div>
-        <div><dt>Rack / Capacity</dt><dd>{% if item.rack_count is not none %}{{ item.rack_count }}{% else %}Rack/capacity data not connected yet{% endif %}</dd></div>
-        <div><dt>Trailer</dt><dd>{{ item.trailer or 'Not tracked yet' }}</dd></div>
-        <div><dt>Linked request</dt><dd>{% if item.linked_request_id %}Move Request #{{ item.linked_request_id }}{% else %}No linked move request{% endif %}</dd></div>
-        <div><dt>Linked stop</dt><dd>{% if item.linked_route_stop_id %}Driver Log #{{ item.linked_route_stop_id }}{% else %}No linked route stop{% endif %}</dd></div>
-        <div><dt>Proof / Document</dt><dd>{% if item.linked_transfer_id %}Plant Transfer #{{ item.linked_transfer_id }}{% elif item.linked_document_id %}Document #{{ item.linked_document_id }}{% else %}Document not attached{% endif %}</dd></div>
-        <div><dt>Next Action</dt><dd>{{ item.next_action or 'No action needed' }}</dd></div>
-      </dl>
+      {% if item.item_type == 'route_stop' %}
+        <div class="drawer-section-title">Stop Details</div>
+        <dl class="drawer-facts">
+          <div><dt>Node</dt><dd>{{ item.plant_location or 'No current data' }}</dd></div>
+          <div><dt>Current State</dt><dd>{{ item.status_label or item.stage or 'No current data' }}</dd></div>
+          <div><dt>Arrived</dt><dd>{{ item.arrival_at or 'Not tracked yet' }}</dd></div>
+          <div><dt>Departed</dt><dd>{{ item.departure_at or 'Open' }}</dd></div>
+          <div><dt>Current Required Action</dt><dd>{{ item.next_action or 'No action needed' }}</dd></div>
+        </dl>
+
+        <div class="drawer-section-title">Related Route</div>
+        <dl class="drawer-facts">
+          <div><dt>Route Stop</dt><dd>{% if item.linked_route_stop_id %}Driver Log #{{ item.linked_route_stop_id }}{% else %}No linked route stop{% endif %}</dd></div>
+          <div><dt>Route Path</dt><dd>{{ item.plant_location or 'No current data' }}</dd></div>
+          <div><dt>Related Manifest</dt><dd>{% if item.linked_transfer_id %}Plant Transfer #{{ item.linked_transfer_id }}{% else %}Route-only data. Attach manifest or enter paper data to build expected flow.{% endif %}</dd></div>
+        </dl>
+
+        <div class="drawer-section-title">Cargo / Container</div>
+        <dl class="drawer-facts">
+          <div><dt>Related Trailer / Container</dt><dd>{{ item.trailer or 'Not tracked yet' }}</dd></div>
+          <div><dt>Expected Cargo</dt><dd>{{ item.arrived_with or 'Not tracked yet' }}</dd></div>
+          <div><dt>Actual Scans</dt><dd>Scan events open here after manifest/container matching is connected.</dd></div>
+          <div><dt>Carrier / Rack</dt><dd>{% if item.carrier_unit_count is not none or item.rack_count is not none %}{{ item.carrier_unit_count or 0 }} carrier, {{ item.rack_count or 0 }} rack{% else %}Nested inventory not connected yet{% endif %}</dd></div>
+        </dl>
+
+        <div class="drawer-section-title">Audit Trail</div>
+        <ul class="audit-list">
+          <li class="{{ item.status }}"><div><strong>Event Timeline</strong> &middot; Arrival{% if item.departure_at %}, departure{% endif %}, scans, and approvals are shown from the event ledger as they are appended.</div></li>
+          <li class="{{ item.status }}"><div><strong>Exceptions</strong> &middot; {{ item.status_label if item.status in ('blocked','needs_review','critical','high') else 'No active stop exception' }}</div></li>
+          <li><div><strong>Proof / Documents</strong> &middot; {% if item.linked_transfer_id %}Plant Transfer #{{ item.linked_transfer_id }}{% elif item.linked_document_id %}Document #{{ item.linked_document_id }}{% else %}Document not attached{% endif %}</div></li>
+        </ul>
+      {% else %}
+        <dl class="drawer-facts">
+          <div><dt>Location / Lane</dt><dd>{{ item.plant_location or 'No current data' }}</dd></div>
+          <div><dt>Stage</dt><dd>{{ item.stage or 'No current data' }}</dd></div>
+          <div><dt>Description</dt><dd>{{ item.description or 'No current data' }}</dd></div>
+          <div><dt>Age</dt><dd>{% if item.age_minutes is not none %}{{ item.age_minutes }} min{% else %}Not tracked yet{% endif %}</dd></div>
+          {% if item.arrived_with is defined %}<div><dt>Arrived With</dt><dd>{{ item.arrived_with or 'Not tracked yet' }}</dd></div>{% endif %}
+          {% if item.departed_with is defined %}<div><dt>Departed With</dt><dd>{{ item.departed_with or 'Not tracked yet' }}</dd></div>{% endif %}
+          <div><dt>Carrier Unit</dt><dd>{% if item.carrier_unit_count is not none %}{{ item.carrier_unit_count }}{% else %}Carrier unit snapshot not connected yet{% endif %}</dd></div>
+          <div><dt>Rack / Capacity</dt><dd>{% if item.rack_count is not none %}{{ item.rack_count }}{% else %}Rack/capacity data not connected yet{% endif %}</dd></div>
+          <div><dt>Trailer</dt><dd>{{ item.trailer or 'Not tracked yet' }}</dd></div>
+          <div><dt>Linked request</dt><dd>{% if item.linked_request_id %}Move Request #{{ item.linked_request_id }}{% else %}No linked move request{% endif %}</dd></div>
+          <div><dt>Linked stop</dt><dd>{% if item.linked_route_stop_id %}Driver Log #{{ item.linked_route_stop_id }}{% else %}No linked route stop{% endif %}</dd></div>
+          <div><dt>Proof / Document</dt><dd>{% if item.linked_transfer_id %}Plant Transfer #{{ item.linked_transfer_id }}{% elif item.linked_document_id %}Document #{{ item.linked_document_id }}{% else %}Document not attached{% endif %}</dd></div>
+          <div><dt>Next Action</dt><dd>{{ item.next_action or 'No action needed' }}</dd></div>
+        </dl>
+      {% endif %}
+      <div class="drawer-section-title">Available Actions</div>
       <div class="drawer-actions">
         {% if can_open_records and item.view_url %}<a href="{{ item.view_url }}">Open related record</a>{% else %}<button type="button" disabled>Open related record <span>{% if can_open_records %}Not wired yet.{% else %}Requires authorized identity.{% endif %}</span></button>{% endif %}
       </div>

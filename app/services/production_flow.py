@@ -16,7 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.routing import BuildError
 
 from app.extensions import db
-from app.models import DamageReport, DriverLog, ExceptionEvent, FlowEvent, FlowManifest, MoveRequest, PlantTransfer
+from app.models import DamageReport, DriverLog, ExceptionEvent, FlowEvent, FlowManifest, ManifestLine, MoveRequest, PlantTransfer
 from app.models.user import User
 from app.services.cargo_state import cargo_state_for_log, cargo_state_for_request
 from app.services.driver_wait import wait_minutes_for_log
@@ -559,15 +559,84 @@ def _flow_ledger_counts(target):
             FlowEvent.occurred_at < end,
         ).count()
         open_manifests = FlowManifest.query.filter(FlowManifest.current_status.notin_(["reconciled", "approved", "closed"])).count()
+        manifest_line_count = ManifestLine.query.count()
     except SQLAlchemyError:
         db.session.rollback()
-        return {"event_count": 0, "active_exceptions": 0, "open_manifests": 0, "ledger_ready": False}
+        return {"event_count": 0, "active_exceptions": 0, "open_manifests": 0, "manifest_line_count": 0, "ledger_ready": False}
     return {
         "event_count": event_count,
         "active_exceptions": active_exceptions,
         "open_manifests": open_manifests,
+        "manifest_line_count": manifest_line_count,
         "ledger_ready": True,
     }
+
+
+def _flow_object_cards(queue_summary, floor_summary, ledger_counts):
+    route_only_note = "Route-only data. Attach manifest or enter paper data to build expected flow."
+    manifest_note = (
+        f"{ledger_counts['open_manifests']} open manifest(s), {ledger_counts['manifest_line_count']} expected line(s)."
+        if ledger_counts["open_manifests"]
+        else route_only_note
+    )
+    return [
+        {
+            "key": "wip",
+            "label": "WIP Lot",
+            "status": "open" if queue_summary["open_count"] else "none",
+            "count": queue_summary["open_count"],
+            "headline": f"{queue_summary['open_count']} move request(s) waiting for production source.",
+            "detail": "Production WIP lots will anchor here as events arrive.",
+        },
+        {
+            "key": "staging",
+            "label": "Staging Node",
+            "status": "waiting" if queue_summary["waiting_count"] else "none",
+            "count": queue_summary["waiting_count"],
+            "headline": f"{queue_summary['waiting_count']} staged or waiting step(s).",
+            "detail": "Staged containers and proof-needed work roll up here.",
+        },
+        {
+            "key": "load_build",
+            "label": "Load Build / Trailer",
+            "status": "active" if queue_summary["active_count"] else "none",
+            "count": queue_summary["active_count"],
+            "headline": f"{queue_summary['active_count']} active load-build move(s).",
+            "detail": manifest_note,
+        },
+        {
+            "key": "manifested",
+            "label": "Manifest",
+            "status": "open" if ledger_counts["open_manifests"] else "needs_review",
+            "count": ledger_counts["open_manifests"],
+            "headline": "Manifest / Intersite Shipper",
+            "detail": manifest_note,
+        },
+        {
+            "key": "in_transit",
+            "label": "In Transit Load",
+            "status": "active" if floor_summary["active_stop_count"] else "none",
+            "count": floor_summary["active_stop_count"],
+            "headline": f"{floor_summary['active_stop_count']} active route stop(s).",
+            "detail": "Route chips below open the audit drawer; they do not expand on the map.",
+        },
+        {
+            "key": "receiving",
+            "label": "Receiving Node",
+            "status": "completed" if floor_summary["completed_stop_count"] else "none",
+            "count": floor_summary["completed_stop_count"],
+            "headline": f"{floor_summary['completed_stop_count']} completed receiving step(s).",
+            "detail": "Receiving, unload, and reconcile events project here.",
+        },
+        {
+            "key": "exceptions",
+            "label": "Exception / Hold / Scrap",
+            "status": "blocked" if queue_summary["blocked_count"] + ledger_counts["active_exceptions"] else "none",
+            "count": queue_summary["blocked_count"] + ledger_counts["active_exceptions"],
+            "headline": f"{queue_summary['blocked_count'] + ledger_counts['active_exceptions']} active exception signal(s).",
+            "detail": "Mismatch, QA hold, scrap, damage, delay, and forklift issues stay structured.",
+        },
+    ]
 
 
 def _timing_by_node(target):
@@ -616,6 +685,8 @@ def _move_item(req, *, now, has_issue=False):
         "linked_transfer_id": req.linked_plant_transfer_id,
         "origin_label": origin,
         "destination_label": destination,
+        "related_path_key": f"{_location_key(origin)}--{_location_key(destination)}",
+        "related_node_key": _location_key(destination),
         "cargo_text": _clean(req.cargo_text) or SAFE_EMPTY,
         "part_number": _clean(req.part_number),
         "quantity_text": _quantity_text(req),
@@ -643,6 +714,8 @@ def _route_item(log, *, now, issue_stop_ids=frozenset(), damaged_stop_ids=frozen
         "sequence_number": sequence_number,
         "source_label": FRIENDLY_SOURCE["DriverLog"],
         "plant_location": _location_label(log.plant_name) or SAFE_EMPTY,
+        "related_node_key": _location_key(_location_label(log.plant_name) or ""),
+        "related_path_key": None,
         "stage": "Completed" if log.depart_time else "Waiting",
         "trailer": None,
         "carrier_unit_count": None,
@@ -698,6 +771,8 @@ def _transfer_item(transfer):
         "linked_transfer_id": transfer.id,
         "origin_label": origin,
         "destination_label": destination,
+        "related_path_key": f"{_location_key(origin)}--{_location_key(destination)}",
+        "related_node_key": _location_key(destination),
         "source_label": FRIENDLY_SOURCE["PlantTransfer"],
         "view_url": None,
     }
@@ -710,6 +785,8 @@ def _damage_item(report, *, now):
         "item_type": "issue",
         "label": f"Damage Report #{report.id}",
         "plant_location": _location_label(report.plant_name) or SAFE_EMPTY,
+        "related_node_key": _location_key(_location_label(report.plant_name) or ""),
+        "related_path_key": None,
         "stage": issue["category_label"],
         "trailer": _clean(report.trailer_number) or None,
         "carrier_unit_count": None,
@@ -739,6 +816,8 @@ def _exception_item(event, *, now):
         "item_type": "issue",
         "label": event.summary,
         "plant_location": _location_label(event.plant_name) or SAFE_EMPTY,
+        "related_node_key": _location_key(_location_label(event.plant_name) or ""),
+        "related_path_key": None,
         "stage": issue["category_label"],
         "trailer": None,
         "carrier_unit_count": None,
@@ -1077,6 +1156,7 @@ def build_production_flow_context(
         "proof_markers": proof_markers,
         "issue_markers": issue_markers,
         "queue_summary": queue_summary,
+        "flow_objects": _flow_object_cards(queue_summary, floor_summary, ledger_counts),
         "flow_lanes_target": [
             {"key": "wip", "label": "WIP / Production", "count": queue_summary["open_count"]},
             {"key": "staging", "label": "Staging", "count": queue_summary["waiting_count"]},
@@ -1090,6 +1170,7 @@ def build_production_flow_context(
             "ready": ledger_counts["ledger_ready"],
             "event_count": queue_summary["flow_event_count"],
             "open_manifest_count": queue_summary["open_manifest_count"],
+            "manifest_line_count": ledger_counts["manifest_line_count"],
             "active_exception_count": queue_summary["blocked_count"] + queue_summary["ledger_exception_count"],
             "truth_statement": "The visual map is the product. The event ledger is the truth. Status is only a projection.",
         },

@@ -47,6 +47,7 @@
       .ops-board-spatial .map-svg-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
       .ops-board-spatial .map-html-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
       .ops-board-spatial .flow-lane { stroke: #374151; stroke-width: 2.5; fill: none; transition: stroke 0.3s; vector-effect: non-scaling-stroke; pointer-events: stroke; }
+      .ops-board-spatial .flow-lane.is-related-path { stroke: #f8fafc; stroke-width: 5; filter: drop-shadow(0 0 8px rgba(56,189,248,0.65)); opacity: 1; }
       .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open { stroke: #6366f1; stroke-width: 3.5; stroke-dasharray: 8 6; animation: ops-dash-flow 1.5s linear infinite; }
       .ops-board-spatial .flow-lane--waiting { stroke: #f59e0b; stroke-width: 3.5; stroke-dasharray: 8 6; animation: ops-dash-flow 1.5s linear infinite; }
       .ops-board-spatial .flow-lane--blocked, .ops-board-spatial .flow-lane--issue, .ops-board-spatial .flow-lane--needs_review { stroke: #ef4444; stroke-width: 4; stroke-dasharray: 8 6; animation: ops-dash-flow 1s linear infinite; }
@@ -60,6 +61,27 @@
         .ops-board-spatial .flow-lane--route-overlay { animation: none; stroke-dasharray: none; }
         .ops-board-spatial .flow-node, .ops-board-spatial .flow-chip { transition: none; }
       }
+      .ops-board-spatial .flow-object-layer {
+        position: absolute; inset: 18px 18px auto 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px; z-index: 18; pointer-events: none;
+      }
+      @media (min-width: 1180px) { .ops-board-spatial .flow-object-layer { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+      .ops-board-spatial .flow-object-card {
+        min-height: 92px; background-color: rgba(15, 23, 42, 0.94); border: 1px solid #334155;
+        border-top: 3px solid #64748b; border-radius: 6px; color: #e5e7eb; padding: 9px 10px;
+        text-align: left; font: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.42); cursor: pointer; pointer-events: auto;
+      }
+      .ops-board-spatial .flow-object-card:hover { border-color: #94a3b8; }
+      .ops-board-spatial .flow-object-card.is-active, .ops-board-spatial .flow-object-card.is-related-object { border-color: #f8fafc; box-shadow: 0 0 18px rgba(56,189,248,0.35); }
+      .ops-board-spatial .flow-object-card--blocked, .ops-board-spatial .flow-object-card--needs_review { border-top-color: #ef4444; }
+      .ops-board-spatial .flow-object-card--waiting { border-top-color: #f59e0b; }
+      .ops-board-spatial .flow-object-card--active, .ops-board-spatial .flow-object-card--open { border-top-color: #38bdf8; }
+      .ops-board-spatial .flow-object-card--completed { border-top-color: #10b981; }
+      .ops-board-spatial .flow-object-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; color: #fff; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; line-height: 1.25; }
+      .ops-board-spatial .flow-object-count { font-size: 1rem; color: #fff; flex-shrink: 0; }
+      .ops-board-spatial .flow-object-copy { color: #9ca3af; font-size: 0.63rem; line-height: 1.25; margin-top: 6px; }
+      .ops-board-spatial .flow-object-copy strong { display: block; color: #cbd5e1; font-weight: 700; margin-bottom: 2px; }
       .ops-board-spatial .flow-node {
         position: absolute; width: 170px; background-color: #111827; border: 2px solid #374151;
         border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); cursor: pointer;
@@ -71,6 +93,7 @@
         .ops-board-spatial .flow-node:hover { border-color: #818cf8; box-shadow: 0 0 18px rgba(99,102,241,0.4); z-index: 20; }
       }
       .ops-board-spatial .flow-node.is-active { border-color: #818cf8; box-shadow: 0 0 24px rgba(99,102,241,0.55); z-index: 25; }
+      .ops-board-spatial .flow-node.is-related-object { border-color: #f8fafc; box-shadow: 0 0 22px rgba(56,189,248,0.45); z-index: 24; }
       .ops-board-spatial .flow-node:focus-visible { outline: 2px solid #818cf8; outline-offset: 2px; }
       .ops-board-spatial .flow-node--blocked, .ops-board-spatial .flow-node--issue { border-color: #ef4444; box-shadow: 0 0 15px rgba(239,68,68,0.2); }
       .ops-board-spatial .flow-node--waiting { border-color: #f59e0b; }
@@ -81,7 +104,7 @@
       .ops-board-spatial .facility-stat { background-color: #111827; padding: 4px 6px; display: flex; justify-content: space-between; color: #9ca3af; }
       .ops-board-spatial .facility-stat strong { color: #e5e7eb; font-weight: 700; }
       .ops-board-spatial .flow-chip {
-        position: absolute; width: 142px; background-color: #1f2937; border: 1px solid #4b5563;
+        position: absolute; width: 138px; background-color: #1f2937; border: 1px solid #4b5563;
         border-radius: 0.4rem; cursor: pointer; z-index: 30; box-shadow: 0 4px 8px rgba(0,0,0,0.6);
         transform: translate(-50%, -50%); transition: border-color 0.15s, box-shadow 0.15s;
         color: #e5e7eb; padding: 0; text-align: left; font: inherit;
@@ -103,8 +126,27 @@
       .ops-board-spatial .chip-badge--waiting { background-color: #f59e0b; color: #000; }
       .ops-board-spatial .chip-body { padding: 4px 6px; font-size: 0.65rem; line-height: 1.3; color: #9ca3af; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
       .ops-board-spatial .chip-body strong { color: #fff; font-weight: 600; display: block; }
+      .ops-board-spatial .route-step-chip {
+        width: 112px; min-height: 58px; background-color: rgba(15, 23, 42, 0.96); border-style: solid;
+        z-index: 32;
+      }
+      .ops-board-spatial .route-step-chip .chip-header { padding: 3px 5px; border-bottom: 0; }
+      .ops-board-spatial .route-step-chip .chip-id { font-size: 0.62rem; }
+      .ops-board-spatial .route-step-chip .chip-badge { font-size: 0.48rem; padding: 1px 4px; max-width: 48px; overflow: hidden; text-overflow: ellipsis; }
+      .ops-board-spatial .route-step-chip .chip-body { padding: 0 5px 5px; font-size: 0.58rem; line-height: 1.2; }
+      .ops-board-spatial .route-step-chip .chip-body strong { font-size: 0.62rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .ops-board-spatial .route-step-chip .step-action { display: block; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .ops-board-spatial .route-step-chip.is-active { border-color: #f8fafc; box-shadow: 0 0 18px rgba(56,189,248,0.35); }
       .ops-board-spatial .flow-drawer-panel { background-color: #111827; padding: 16px; min-height: 560px; overflow-y: auto; }
       @media (min-width: 992px) { .ops-board-spatial .flow-drawer-panel { min-height: 640px; max-height: 720px; } }
+      @media (max-width: 991.98px) {
+        .ops-board-spatial .flow-object-layer { inset: 12px 12px auto 12px; grid-template-columns: 1fr; max-height: 310px; overflow-y: auto; }
+        .ops-board-spatial .production-flow-canvas { min-height: 720px; }
+        .ops-board-spatial .flow-drawer-panel.is-detail-open {
+          position: fixed; left: 0; right: 0; bottom: 0; z-index: 999; min-height: 0; max-height: 72vh;
+          border-radius: 12px 12px 0 0; border-top: 1px solid #334155; box-shadow: 0 -16px 36px rgba(0,0,0,0.55);
+        }
+      }
       .ops-board-spatial .drawer-section-title { font-size: 0.65rem; text-transform: uppercase; color: #6b7280; border-bottom: 1px solid #374151; padding-bottom: 4px; margin-bottom: 8px; margin-top: 16px; font-weight: 700; letter-spacing: 0.05em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
       .ops-board-spatial .drawer-title { color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; font-size: 0.9rem; margin: 0 0 4px; letter-spacing: 0.03em; }
       .ops-board-spatial .drawer-kicker-line { color: #6b7280; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.7rem; margin-bottom: 12px; }
@@ -212,17 +254,41 @@
                 {% elif lane.worst_status == 'waiting' %}{% set marker_id = 'ops-arrow-warning-' ~ flow_mode %}
                 {% elif lane.worst_status in ('active','open') %}{% set marker_id = 'ops-arrow-active-' ~ flow_mode %}
                 {% elif lane.worst_status == 'completed' %}{% set marker_id = 'ops-arrow-done-' ~ flow_mode %}{% endif %}
-                <path class="flow-lane flow-lane--{{ lane.worst_status }}{% if lane.route_overlay_active %} flow-lane--route-overlay{% endif %}" d="{{ lane.layout.path_d }}" marker-end="url(#{{ marker_id }})"></path>
+                <path class="flow-lane flow-lane--{{ lane.worst_status }}{% if lane.route_overlay_active %} flow-lane--route-overlay{% endif %}"
+                      d="{{ lane.layout.path_d }}"
+                      data-flow-path-key="{{ lane.origin_key }}--{{ lane.destination_key }}"
+                      marker-end="url(#{{ marker_id }})"></path>
               {% endfor %}
             </svg>
 
             <div class="map-html-layer">
+              <div class="flow-object-layer" aria-label="Primary flow objects">
+                {% for object in pf.flow_objects %}
+                  <button type="button"
+                          class="flow-object-card flow-object-card--{{ object.status }}"
+                          data-flow-open="object"
+                          data-flow-id="{{ object.key }}"
+                          data-flow-object-key="{{ object.key }}"
+                          aria-label="{{ object.label }} flow object">
+                    <span class="flow-object-head">
+                      <span>{{ object.label }}</span>
+                      <span class="flow-object-count">{{ object.count }}</span>
+                    </span>
+                    <span class="flow-object-copy">
+                      <strong>{{ object.headline }}</strong>
+                      {{ object.detail }}
+                    </span>
+                  </button>
+                {% endfor %}
+              </div>
+
               {% for node in pf.flow_nodes %}
                 <button type="button"
                         class="flow-node flow-node--{{ node.worst_status }}{% if node.layout.is_hub %} flow-node--hub{% endif %}"
                         style="left: {{ node.layout.x }}%; top: {{ node.layout.y }}%;"
                         data-flow-open="node"
                         data-flow-id="{{ node.key }}"
+                        data-flow-node-key="{{ node.key }}"
                         aria-label="{{ node.label }} facility">
                   <div class="facility-header">{{ node.short_code or '--' }} &middot; {{ node.label|truncate(16,true,'') }}</div>
                   <div class="facility-grid">
@@ -243,18 +309,25 @@
                 {% elif item.status == 'waiting' %}{% set badge_text = 'WAIT' %}{% set badge_class = 'chip-badge chip-badge--waiting' %}
                 {% elif item.priority in ('hot','safety') %}{% set badge_text = 'HOT' %}{% set badge_class = 'chip-badge chip-badge--hot' %}{% endif %}
                 <button type="button"
-                        class="flow-chip flow-chip--{{ item.status }}"
+                        class="flow-chip{% if item.item_type == 'route_stop' %} route-step-chip{% endif %} flow-chip--{{ item.status }}"
                         style="left: {{ item.layout.x }}%; top: {{ item.layout.y }}%;"
                         data-flow-open="item"
                         data-flow-id="{{ item.item_id }}"
+                        data-flow-path-key="{{ item.related_path_key or '' }}"
+                        data-flow-node-key="{{ item.related_node_key or '' }}"
                         aria-label="{{ item.display_label or item.label }} move">
                   <div class="chip-header">
-                    <span class="chip-id">{{ (item.display_label or item.label)|truncate(12,true,'') }}</span>
-                    {% if badge_text %}<span class="{{ badge_class }}">{{ badge_text }}</span>{% endif %}
+                    <span class="chip-id">{{ (item.display_label or item.label)|truncate(10,true,'') }}</span>
+                    <span class="{{ badge_class if badge_text else 'chip-badge' }}">{{ badge_text or item.status_label|truncate(7,true,'') }}</span>
                   </div>
                   <div class="chip-body">
-                    <strong>{{ (item.cargo_text or item.description or item.stage or '\u2014')|truncate(22,true,'') }}</strong>
-                    {{ (item.assigned_driver or item.next_action or '')|truncate(22,true,'') }}
+                    {% if item.item_type == 'route_stop' %}
+                      <strong>{{ (item.plant_location or item.stage or '\u2014')|truncate(15,true,'') }}</strong>
+                      <span class="step-action">{{ (item.next_action or item.status_label or '')|truncate(17,true,'') }}</span>
+                    {% else %}
+                      <strong>{{ (item.cargo_text or item.description or item.stage or '\u2014')|truncate(18,true,'') }}</strong>
+                      {{ (item.assigned_driver or item.next_action or '')|truncate(18,true,'') }}
+                    {% endif %}
                   </div>
                 </button>
               {% endfor %}
@@ -362,17 +435,41 @@
       function detailKey(kind, id) {
         if (kind === 'node') return 'flow-node-' + id;
         if (kind === 'lane') return 'flow-lane-' + id;
+        if (kind === 'object') return 'flow-object-' + id;
         return 'flow-item-' + id;
       }
 
       function clearActive() {
         var actives = root.querySelectorAll('.is-active');
         for (var i = 0; i < actives.length; i++) actives[i].classList.remove('is-active');
+        var related = root.querySelectorAll('.is-related-path, .is-related-object');
+        for (var j = 0; j < related.length; j++) related[j].classList.remove('is-related-path', 'is-related-object');
+      }
+
+      function highlightRelated(trigger) {
+        if (!trigger) return;
+        var pathKey = trigger.getAttribute('data-flow-path-key');
+        if (pathKey) {
+          var paths = root.querySelectorAll('[data-flow-path-key="' + pathKey + '"]');
+          for (var i = 0; i < paths.length; i++) paths[i].classList.add('is-related-path');
+        }
+        var nodeKey = trigger.getAttribute('data-flow-node-key');
+        if (nodeKey) {
+          var nodes = root.querySelectorAll('[data-flow-node-key="' + nodeKey + '"]');
+          for (var j = 0; j < nodes.length; j++) nodes[j].classList.add('is-related-object');
+        }
+        var objectKey = trigger.getAttribute('data-flow-object-key');
+        if (objectKey) {
+          var objects = root.querySelectorAll('[data-flow-object-key="' + objectKey + '"]');
+          for (var k = 0; k < objects.length; k++) objects[k].classList.add('is-related-object');
+        }
       }
 
       function showGlobal() {
         clearActive();
         selectedKey = null;
+        var drawer = root.querySelector('[data-flow-drawer]');
+        if (drawer) drawer.classList.remove('is-detail-open');
         if (detailView) { detailView.hidden = true; detailView.innerHTML = ''; }
         if (globalView) globalView.hidden = false;
       }
@@ -384,15 +481,18 @@
         var source = document.querySelector('[data-route-map-detail="' + detailKey(kind, id) + '"]');
         if (!source) { showGlobal(); return; }
         clearActive();
-        if (trigger && (trigger.classList.contains('flow-node') || trigger.classList.contains('flow-chip'))) {
+        if (trigger && (trigger.classList.contains('flow-node') || trigger.classList.contains('flow-chip') || trigger.classList.contains('flow-object-card'))) {
           trigger.classList.add('is-active');
           trigger.setAttribute('aria-pressed', 'true');
         }
+        highlightRelated(trigger);
         if (globalView) globalView.hidden = true;
         if (detailView) {
           detailView.hidden = false;
           detailView.innerHTML = '<button type="button" class="drawer-close" data-flow-close aria-label="Close details">Close \u2715</button>' + source.innerHTML;
         }
+        var drawer = root.querySelector('[data-flow-drawer]');
+        if (drawer) drawer.classList.add('is-detail-open');
         selectedKey = key;
       }
 
