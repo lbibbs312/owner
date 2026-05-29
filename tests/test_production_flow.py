@@ -380,8 +380,11 @@ def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
     assert "data-flow-edge-data" in body
     assert "flow-edge--new" in body
     assert "livePulse" in body
-    assert "stroke-width: 7.5" in body
+    assert "stroke-width: 4.25" in body
     assert "flow-edge--live" in body
+    assert "flow-event-pulse" in body
+    assert "data-flow-card-mask" in body
+    assert "data-flow-edge-group" in body
     assert "livePulseRing" in body
     assert "ops-arrow-live-" in body
     assert ".production-flow--mobile .ops-board-spatial .ops-spatial-body" in body

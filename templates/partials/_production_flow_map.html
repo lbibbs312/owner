@@ -51,7 +51,7 @@
           radial-gradient(circle at 30% 70%, rgba(239,68,68,0.10), transparent 28%),
           linear-gradient(180deg, #020617 0%, #030712 54%, #01040b 100%);
       }
-      .ops-board-spatial .map-svg-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 28; overflow: visible; }
+      .ops-board-spatial .map-svg-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 18; overflow: visible; }
       .ops-board-spatial .map-html-layer { position: relative; z-index: 10; display: flex; flex-direction: column; gap: 14px; pointer-events: none; }
       .ops-board-spatial .flow-lane { stroke: #374151; stroke-width: 2.5; fill: none; transition: stroke 0.3s; vector-effect: non-scaling-stroke; pointer-events: stroke; }
       .ops-board-spatial .flow-lane.is-related-path { stroke: #f8fafc; stroke-width: 5; filter: drop-shadow(0 0 8px rgba(56,189,248,0.65)); opacity: 1; }
@@ -68,7 +68,11 @@
         .ops-board-spatial .flow-lane--route-overlay { animation: none; stroke-dasharray: none; }
         .ops-board-spatial .flow-node, .ops-board-spatial .flow-chip,
         .ops-board-spatial .flow-edge--new, .ops-board-spatial .flow-node--live,
-        .ops-board-spatial .flow-event--flash { animation: none !important; transition: none; }
+        .ops-board-spatial .flow-edge--live, .ops-board-spatial .flow-event--flash { animation: none !important; transition: none; }
+        .ops-board-spatial .flow-event-pulse { display: none; }
+      }
+      .ops-board-spatial [data-flow-edge-group] {
+        mask: url(#flow-card-cutouts-{{ flow_mode }});
       }
       .ops-board-spatial .flow-object-layer {
         display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; pointer-events: none;
@@ -149,7 +153,7 @@
       .ops-board-spatial .route-step-chip .chip-body strong { font-size: 0.62rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .route-step-chip .step-action { display: block; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .route-step-chip.is-active { border-color: #f8fafc; box-shadow: 0 0 18px rgba(56,189,248,0.35); }
-      .ops-board-spatial .flow-edge { fill: none; stroke: #60a5fa; stroke-width: 7.5; stroke-linecap: round; opacity: 0.96; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 10px rgba(96,165,250,0.74)); }
+      .ops-board-spatial .flow-edge { fill: none; stroke: #60a5fa; stroke-width: 4.25; stroke-linecap: round; opacity: 0.98; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 9px rgba(96,165,250,0.72)); }
       .ops-board-spatial .flow-edge--active { stroke: #38bdf8; opacity: 1; filter: drop-shadow(0 0 10px rgba(56,189,248,0.78)); }
       .ops-board-spatial .flow-edge--waiting { stroke: #f59e0b; opacity: 1; filter: drop-shadow(0 0 10px rgba(245,158,11,0.76)); }
       .ops-board-spatial .flow-edge--exception { stroke: #ef4444; opacity: 1; filter: drop-shadow(0 0 12px rgba(239,68,68,0.82)); }
@@ -158,6 +162,13 @@
         stroke-dasharray: 13 8;
         animation: dash-flow 1s linear infinite;
         filter: drop-shadow(0 0 14px rgba(56,189,248,0.9));
+      }
+      .ops-board-spatial .flow-event-pulse {
+        fill: #e0f2fe;
+        stroke: #38bdf8;
+        stroke-width: 2;
+        filter: drop-shadow(0 0 10px rgba(56,189,248,0.9));
+        pointer-events: none;
       }
       .ops-board-spatial .flow-edge--new {
         stroke-dasharray: var(--path-length);
@@ -310,9 +321,13 @@
             <div class="flow-live-board" data-flow-live-board data-flow-animation-mode="live">
               <svg class="map-svg-layer" data-flow-edge-layer aria-hidden="true">
                 <defs>
-                  <marker id="ops-arrow-live-{{ flow_mode }}" markerWidth="13" markerHeight="13" refX="11" refY="6.5" orient="auto"><polygon points="0 0, 13 6.5, 0 13" fill="#38bdf8"/></marker>
-                  <marker id="ops-arrow-exception-{{ flow_mode }}" markerWidth="13" markerHeight="13" refX="11" refY="6.5" orient="auto"><polygon points="0 0, 13 6.5, 0 13" fill="#ef4444"/></marker>
+                  <marker id="ops-arrow-live-{{ flow_mode }}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0, 7 3.5, 0 7" fill="#38bdf8"/></marker>
+                  <marker id="ops-arrow-exception-{{ flow_mode }}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0, 7 3.5, 0 7" fill="#ef4444"/></marker>
+                  <mask id="flow-card-cutouts-{{ flow_mode }}" data-flow-card-mask maskUnits="userSpaceOnUse">
+                    <rect x="0" y="0" width="100%" height="100%" fill="white"></rect>
+                  </mask>
                 </defs>
+                <g data-flow-edge-group mask="url(#flow-card-cutouts-{{ flow_mode }})"></g>
               </svg>
 
               <div class="map-html-layer">
@@ -519,6 +534,8 @@
       var selectedKey = null;
       var liveBoard = root.querySelector('[data-flow-live-board]');
       var edgeLayer = root.querySelector('[data-flow-edge-layer]');
+      var edgeGroup = root.querySelector('[data-flow-edge-group]');
+      var cardMask = root.querySelector('[data-flow-card-mask]');
       var edgeDataNode = root.parentNode ? root.parentNode.querySelector('[data-flow-edge-data]') : null;
       var initialEdges = [];
       try {
@@ -586,16 +603,45 @@
         var boardBox = liveBoard.getBoundingClientRect();
         var a = source.getBoundingClientRect();
         var b = target.getBoundingClientRect();
-        var x1 = a.left + a.width / 2 - boardBox.left;
-        var y1 = a.top + a.height / 2 - boardBox.top;
-        var x2 = b.left + b.width / 2 - boardBox.left;
-        var y2 = b.top + b.height / 2 - boardBox.top;
-        var dx = Math.max(40, Math.abs(x2 - x1) * 0.45);
-        return 'M ' + x1.toFixed(1) + ' ' + y1.toFixed(1) + ' C ' + (x1 + dx).toFixed(1) + ' ' + y1.toFixed(1) + ', ' + (x2 - dx).toFixed(1) + ' ' + y2.toFixed(1) + ', ' + x2.toFixed(1) + ' ' + y2.toFixed(1);
+        var aCenterX = a.left + a.width / 2;
+        var aCenterY = a.top + a.height / 2;
+        var bCenterX = b.left + b.width / 2;
+        var bCenterY = b.top + b.height / 2;
+        var horizontal = Math.abs(bCenterX - aCenterX) >= Math.abs(bCenterY - aCenterY);
+        var gutter = 10;
+        var x1 = (horizontal ? (bCenterX >= aCenterX ? a.right + gutter : a.left - gutter) : aCenterX) - boardBox.left;
+        var y1 = (horizontal ? aCenterY : (bCenterY >= aCenterY ? a.bottom + gutter : a.top - gutter)) - boardBox.top;
+        var x2 = (horizontal ? (bCenterX >= aCenterX ? b.left - gutter : b.right + gutter) : bCenterX) - boardBox.left;
+        var y2 = (horizontal ? bCenterY : (bCenterY >= aCenterY ? b.top - gutter : b.bottom + gutter)) - boardBox.top;
+        var dx = horizontal ? Math.max(34, Math.abs(x2 - x1) * 0.38) : Math.max(26, Math.abs(x2 - x1) * 0.35);
+        var dy = horizontal ? Math.max(18, Math.abs(y2 - y1) * 0.35) : Math.max(34, Math.abs(y2 - y1) * 0.38);
+        if (horizontal) {
+          return 'M ' + x1.toFixed(1) + ' ' + y1.toFixed(1) + ' C ' + (x1 + (x2 >= x1 ? dx : -dx)).toFixed(1) + ' ' + y1.toFixed(1) + ', ' + (x2 - (x2 >= x1 ? dx : -dx)).toFixed(1) + ' ' + y2.toFixed(1) + ', ' + x2.toFixed(1) + ' ' + y2.toFixed(1);
+        }
+        return 'M ' + x1.toFixed(1) + ' ' + y1.toFixed(1) + ' C ' + x1.toFixed(1) + ' ' + (y1 + (y2 >= y1 ? dy : -dy)).toFixed(1) + ', ' + x2.toFixed(1) + ' ' + (y2 - (y2 >= y1 ? dy : -dy)).toFixed(1) + ', ' + x2.toFixed(1) + ' ' + y2.toFixed(1);
+      }
+
+      function updateCardMask() {
+        if (!liveBoard || !cardMask) return;
+        var boardBox = liveBoard.getBoundingClientRect();
+        cardMask.innerHTML = '<rect x="0" y="0" width="' + boardBox.width.toFixed(1) + '" height="' + boardBox.height.toFixed(1) + '" fill="white"></rect>';
+        var blockers = root.querySelectorAll('.flow-object-card, .flow-chip, .flow-node');
+        for (var i = 0; i < blockers.length; i++) {
+          var box = blockers[i].getBoundingClientRect();
+          var pad = 4;
+          var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('x', (box.left - boardBox.left - pad).toFixed(1));
+          rect.setAttribute('y', (box.top - boardBox.top - pad).toFixed(1));
+          rect.setAttribute('width', (box.width + pad * 2).toFixed(1));
+          rect.setAttribute('height', (box.height + pad * 2).toFixed(1));
+          rect.setAttribute('rx', '8');
+          rect.setAttribute('fill', 'black');
+          cardMask.appendChild(rect);
+        }
       }
 
       function drawEdge(edge, animate) {
-        if (!edgeLayer || !edge) return null;
+        if (!edgeGroup || !edge) return null;
         var source = findVisual(edge.source_key);
         var target = findVisual(edge.target_key);
         var d = edgePath(source, target);
@@ -609,17 +655,33 @@
         path.setAttribute('data-source-key', edge.source_key || '');
         path.setAttribute('data-target-key', edge.target_key || '');
         path.setAttribute('marker-end', edge.is_exception ? 'url(#ops-arrow-exception-{{ flow_mode }})' : 'url(#ops-arrow-live-{{ flow_mode }})');
-        edgeLayer.appendChild(path);
+        edgeGroup.appendChild(path);
         if (animate && typeof path.getTotalLength === 'function') {
           var length = Math.ceil(path.getTotalLength());
           path.style.setProperty('--path-length', length);
         }
+        if (edge.is_live) attachMovingPulse(path, edge);
         return path;
       }
 
+      function attachMovingPulse(path, edge) {
+        if (!edgeGroup || !path || !edge) return;
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        var pulse = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        var motion = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
+        pulse.setAttribute('class', 'flow-event-pulse');
+        pulse.setAttribute('r', '5');
+        pulse.setAttribute('data-flow-event-id', edge.event_id || '');
+        motion.setAttribute('dur', '1.8s');
+        motion.setAttribute('repeatCount', 'indefinite');
+        motion.setAttribute('path', path.getAttribute('d'));
+        pulse.appendChild(motion);
+        edgeGroup.appendChild(pulse);
+      }
+
       function clearRenderedEdges() {
-        if (!edgeLayer) return;
-        var rendered = edgeLayer.querySelectorAll('[data-flow-edge-rendered]');
+        if (!edgeGroup) return;
+        var rendered = edgeGroup.querySelectorAll('[data-flow-edge-rendered], .flow-event-pulse');
         for (var i = 0; i < rendered.length; i++) rendered[i].remove();
       }
 
@@ -649,8 +711,9 @@
         renderStatic: function(limit) {
           clearRenderedEdges();
           clearLivePulse();
+          updateCardMask();
           var edges = typeof limit === 'number' ? this.edges.slice(0, limit) : this.edges;
-          for (var i = 0; i < edges.length; i++) drawEdge(edges[i], this.mode === 'live' && !!edges[i].is_live);
+          for (var i = 0; i < edges.length; i++) drawEdge(edges[i], false);
           if (edges.length) {
             for (var j = edges.length - 1; j >= 0; j--) {
               if (edges[j].is_live) { pulseTarget(edges[j]); break; }
