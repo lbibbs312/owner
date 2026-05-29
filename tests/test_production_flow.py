@@ -166,7 +166,7 @@ def test_selected_plant_uses_fixed_production_position_not_graph_recentering(app
     assert selected["layout"]["is_hub"] is True
     assert selected["production_profile"]["role_label"] == "COATING"
     assert selected["layout"]["ring"] == "production"
-    assert selected["layout"]["x"] == 66
+    assert selected["layout"]["x"] == 61
     assert selected["layout"]["y"] == 32
 
 

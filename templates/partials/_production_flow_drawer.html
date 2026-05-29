@@ -27,28 +27,53 @@
       <div class="drawer-badges">
         <span class="route-status-badge status-{{ node.worst_status }}">{{ node.worst_status|replace('_', ' ')|title }}</span>
       </div>
-      <dl class="drawer-facts">
-        {% if profile %}
-          <div><dt>Production Role</dt><dd>{{ profile.role_label }}</dd></div>
-          <div><dt>Position Readout</dt><dd>{{ profile.primary_value }}</dd></div>
-          <div><dt>Line State</dt><dd>{{ profile.secondary_value }}</dd></div>
+      {% if profile %}
+        <div class="drawer-section-title">{{ profile.console_left_title }}</div>
+        <dl class="drawer-facts">
+          {% for row in profile.console_left %}
+            <div><dt>{{ row.label }}</dt><dd>{{ row.value }}</dd></div>
+          {% endfor %}
+        </dl>
+
+        <div class="drawer-section-title">{{ profile.console_right_title }}</div>
+        <dl class="drawer-facts">
+          {% for row in profile.console_right %}
+            <div><dt>{{ row.label }}</dt><dd>{{ row.value }}</dd></div>
+          {% endfor %}
+        </dl>
+
+        {% if profile.material_lines %}
+          <div class="drawer-section-title">Material At This Position</div>
+          <ul class="audit-list">
+            {% for line in profile.material_lines[:4] %}
+              <li><div><strong>{{ line }}</strong></div></li>
+            {% endfor %}
+          </ul>
         {% endif %}
-        <div><dt>Open</dt><dd>{{ node.open_count }}</dd></div>
-        <div><dt>Active</dt><dd>{{ node.active_count }}</dd></div>
-        <div><dt>Waiting</dt><dd>{{ node.waiting_count }}</dd></div>
-        <div><dt>Blocked</dt><dd>{{ node.blocked_count }}</dd></div>
-        <div><dt>Completed</dt><dd>{{ node.completed_count }}</dd></div>
-        <div><dt>Issues</dt><dd>{{ node.issue_count }}</dd></div>
-        <div><dt>Carrier Unit</dt><dd>{{ node.meta.snapshot_empty_state or 'Carrier unit snapshot not connected yet' }}</dd></div>
-        <div><dt>Rack / Capacity</dt><dd>{{ node.meta.rack_empty_state or 'Rack/capacity data not connected yet' }}</dd></div>
-        <div><dt>Timing</dt><dd>{% if node.meta.timing and node.meta.timing.estimate_minutes is not none %}Expected Wait {{ node.meta.timing.estimate_label }}{% else %}Not tracked yet{% endif %}</dd></div>
-        <div><dt>Source</dt><dd>{% if node.source_labels %}{{ node.source_labels|join(', ') }}{% elif node.meta.source_labels %}{{ node.meta.source_labels|join(', ') }}{% else %}No current data{% endif %}</dd></div>
-        <div><dt>Next Action</dt><dd>{{ node.next_action or 'No action needed' }}</dd></div>
-      </dl>
-      <div class="drawer-actions">
-        {% if can_open_records and node.view_url %}<a href="{{ node.view_url }}">View related Move Queue</a>{% else %}<button type="button" disabled>View related Move Queue <span>{% if can_open_records %}Not wired yet.{% else %}Requires authorized identity.{% endif %}</span></button>{% endif %}
-        {% if can_open_records and node.active_moves_url %}<a href="{{ node.active_moves_url }}">View related Active Moves</a>{% else %}<button type="button" disabled>View related Active Moves <span>{% if can_open_records %}Not wired yet.{% else %}Requires authorized identity.{% endif %}</span></button>{% endif %}
-      </div>
+
+        <div class="drawer-section-title">Projection Signals</div>
+        <dl class="drawer-facts">
+          <div><dt>Open / Active / Waiting</dt><dd>{{ node.open_count }} / {{ node.active_count }} / {{ node.waiting_count }}</dd></div>
+          {% if node.completed_count %}<div><dt>Closed Today</dt><dd>{{ node.completed_count }}</dd></div>{% endif %}
+          {% if node.blocked_count or node.issue_count %}<div><dt>Blocks / Issues</dt><dd>{{ node.blocked_count }} / {{ node.issue_count }}</dd></div>{% endif %}
+          {% if node.proof_needed_count %}<div><dt>Proof Needed</dt><dd>{{ node.proof_needed_count }}</dd></div>{% endif %}
+          <div><dt>Source</dt><dd>{% if node.source_labels %}{{ node.source_labels|join(', ') }}{% elif node.meta.source_labels %}{{ node.meta.source_labels|join(', ') }}{% else %}No current data{% endif %}</dd></div>
+          {% if node.next_action and node.next_action != 'No action needed' %}<div><dt>Next Action</dt><dd>{{ node.next_action }}</dd></div>{% endif %}
+        </dl>
+      {% else %}
+        <dl class="drawer-facts">
+          <div><dt>Open / Active / Waiting</dt><dd>{{ node.open_count }} / {{ node.active_count }} / {{ node.waiting_count }}</dd></div>
+          <div><dt>Blocked / Issues</dt><dd>{{ node.blocked_count }} / {{ node.issue_count }}</dd></div>
+          <div><dt>Source</dt><dd>{% if node.source_labels %}{{ node.source_labels|join(', ') }}{% elif node.meta.source_labels %}{{ node.meta.source_labels|join(', ') }}{% else %}No current data{% endif %}</dd></div>
+          {% if node.next_action and node.next_action != 'No action needed' %}<div><dt>Next Action</dt><dd>{{ node.next_action }}</dd></div>{% endif %}
+        </dl>
+      {% endif %}
+      {% if can_open_records and (node.view_url or node.active_moves_url) %}
+        <div class="drawer-actions">
+          {% if node.view_url %}<a href="{{ node.view_url }}">View related Move Queue</a>{% endif %}
+          {% if node.active_moves_url %}<a href="{{ node.active_moves_url }}">View related Active Moves</a>{% endif %}
+        </div>
+      {% endif %}
     </div>
   {% endfor %}
 

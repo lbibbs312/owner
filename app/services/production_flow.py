@@ -93,7 +93,7 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "CONVEYOR / OVEN BUFFER",
         "theme": "cyan",
         "size": "primary",
-        "x": 66,
+        "x": 61,
         "y": 32,
     },
     "raleigh_west": {
@@ -108,7 +108,7 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "ROUTE HANDOFF",
         "theme": "cyan",
         "size": "primary",
-        "x": 66,
+        "x": 61,
         "y": 32,
     },
     "52nd_street_l": {
@@ -123,7 +123,7 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "LOAD BUILD STATUS",
         "theme": "cyan",
         "size": "primary",
-        "x": 82,
+        "x": 74,
         "y": 55,
     },
     "52nd_street_dc": {
@@ -138,7 +138,7 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "LOAD BUILD STATUS",
         "theme": "cyan",
         "size": "primary",
-        "x": 82,
+        "x": 74,
         "y": 55,
     },
     "raleigh_east": {
@@ -153,7 +153,7 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "SERIAL / LOT RECEIVING",
         "theme": "cyan",
         "size": "primary",
-        "x": 82,
+        "x": 74,
         "y": 80,
     },
     "helios": {
@@ -183,7 +183,7 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "ROUTE STAGING",
         "theme": "cyan",
         "size": "secondary",
-        "x": 55,
+        "x": 50,
         "y": 63,
     },
     "lab": {
@@ -198,7 +198,7 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "CONTAINMENT STATUS",
         "theme": "red",
         "size": "secondary",
-        "x": 55,
+        "x": 50,
         "y": 84,
     },
 }
@@ -718,7 +718,7 @@ def _apply_map_layout(nodes, lanes, items, *, selected_node_key=None):
 
     lane_by_pair = {(lane["origin_label"], lane["destination_label"]): lane for lane in lanes}
     item_offsets = ((-9, -9), (10, 8), (-12, 9), (12, -8), (0, 14), (0, -14))
-    route_chip_offsets = ((11, 9), (11, 15), (-11, 9), (-11, 15), (0, 19), (0, -16))
+    route_chip_offsets = ((0, 17), (12, 18), (-12, 18), (0, 24), (14, 24), (-14, 24))
     node_item_counts = {}
     for index, item in enumerate(items):
         lane = lane_by_pair.get((item.get("origin_label"), item.get("destination_label")))

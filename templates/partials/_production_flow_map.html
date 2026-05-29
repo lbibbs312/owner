@@ -67,6 +67,8 @@
       }
       .ops-board-spatial .flow-spatial-canvas { position: relative; width: 100%; aspect-ratio: 16 / 11; min-height: 620px; }
       @media (max-width: 991.98px) { .ops-board-spatial .flow-spatial-canvas { aspect-ratio: 4 / 5; min-height: 640px; } }
+      .ops-board-spatial .production-flow-canvas::before,
+      .ops-board-spatial .production-flow-canvas::after { content: none !important; display: none !important; }
       .ops-board-spatial .map-svg-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 18; overflow: visible; }
       .ops-board-spatial .map-html-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
       .ops-board-spatial .map-html-layer > .flow-object-layer { display: none; }
@@ -120,7 +122,7 @@
         border-radius: 0.7rem; box-shadow: 0 14px 34px rgba(0,0,0,0.42); cursor: pointer;
         transition: border-color 0.2s, box-shadow 0.2s;
         color: #e5e7eb; text-align: left; padding: 13px 14px; font: inherit;
-        pointer-events: auto;
+        pointer-events: auto; z-index: 20;
       }
       @media (hover: hover) {
         .ops-board-spatial .flow-node:hover { border-color: #818cf8; box-shadow: 0 0 18px rgba(99,102,241,0.4); z-index: 20; }
@@ -177,7 +179,7 @@
       .ops-board-spatial .chip-body strong { color: #fff; font-weight: 600; display: block; }
       .ops-board-spatial .route-step-chip {
         width: 112px; min-height: 50px; background-color: rgba(15, 23, 42, 0.94); border-style: solid;
-        z-index: 22;
+        z-index: 12;
       }
       .ops-board-spatial .route-step-chip .chip-header { padding: 3px 5px; border-bottom: 0; }
       .ops-board-spatial .route-step-chip .chip-id { font-size: 0.62rem; }
@@ -257,8 +259,8 @@
       .production-flow--mobile .ops-board-spatial .ops-live-proof { display: none; }
       .production-flow--mobile .ops-board-spatial .production-flow-canvas { border-right: 0; border-bottom: 1px solid #1f2937; }
       .production-flow--mobile .ops-board-spatial .flow-live-board { min-height: 760px; }
-      .production-flow--mobile .ops-board-spatial .flow-node { width: 218px; }
-      .production-flow--mobile .ops-board-spatial .production-node-card--secondary { width: 190px; }
+      .production-flow--mobile .ops-board-spatial .flow-node { width: 200px; }
+      .production-flow--mobile .ops-board-spatial .production-node-card--secondary { width: 174px; }
       .production-flow--mobile .ops-board-spatial .route-step-chip[data-status="completed"] { display: none; }
       .production-flow--mobile .ops-board-spatial .exception-ticker { display: none; }
       .production-flow--mobile .ops-board-spatial .flow-object-layer { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -285,9 +287,9 @@
       .ops-board-spatial .audit-list li.completed::before { color: #10b981; }
       .ops-board-spatial .audit-list strong { color: #fff; font-weight: 700; }
       .ops-board-spatial .drawer-facts { display: grid; grid-template-columns: 1fr; gap: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.7rem; margin: 8px 0; }
-      .ops-board-spatial .drawer-facts > div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 6px; background-color: #030712; border: 1px solid #1f2937; border-radius: 3px; }
-      .ops-board-spatial .drawer-facts dt { color: #6b7280; margin: 0; }
-      .ops-board-spatial .drawer-facts dd { color: #e5e7eb; margin: 0; text-align: right; }
+      .ops-board-spatial .drawer-facts > div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 6px; background-color: #030712; border: 1px solid #1f2937; border-radius: 3px; min-width: 0; }
+      .ops-board-spatial .drawer-facts dt { color: #6b7280; margin: 0; flex: 0 0 42%; min-width: 0; }
+      .ops-board-spatial .drawer-facts dd { color: #e5e7eb; margin: 0; text-align: right; min-width: 0; overflow-wrap: anywhere; }
       .ops-board-spatial .shadow-ledger-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
       .ops-board-spatial .shadow-ledger-row { background-color: #030712; border: 1px solid #1f2937; border-radius: 6px; padding: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #9ca3af; font-size: 0.68rem; line-height: 1.35; }
       .ops-board-spatial .shadow-ledger-row strong { color: #fff; font-size: 0.76rem; }
@@ -902,18 +904,10 @@
       }
 
       function attachMovingPulse(path, edge) {
-        if (!edgeGroup || !path || !edge) return;
-        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-        var pulse = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        var motion = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
-        pulse.setAttribute('class', 'flow-event-pulse');
-        pulse.setAttribute('r', '5');
-        pulse.setAttribute('data-flow-event-id', edge.event_id || '');
-        motion.setAttribute('dur', '1.8s');
-        motion.setAttribute('repeatCount', 'indefinite');
-        motion.setAttribute('path', path.getAttribute('d'));
-        pulse.appendChild(motion);
-        edgeGroup.appendChild(pulse);
+        // Mobile Chromium can render SVG animateMotion circles at 0,0 before motion starts,
+        // which creates the large blue crescent seen in the live map. The event proof remains
+        // visible through the animated edge dash and the pulsing target node.
+        return;
       }
 
       function clearRenderedEdges() {
