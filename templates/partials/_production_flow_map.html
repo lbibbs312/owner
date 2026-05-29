@@ -17,8 +17,8 @@
     {# Real data wiring: pf.flow_nodes / pf.flow_lanes / pf.flow_items / pf.route_overlay / pf.queue_summary. #}
     {# Drawer detail bodies are reused from _production_flow_drawer.html (hidden source divs). #}
     <style>
-      .ops-board-spatial { background-color: #0b0f19; color: #e5e7eb; border-radius: 0.5rem; border: 1px solid #1f2937; }
-      .ops-board-spatial .ops-spatial-head { background-color: #111827; border-bottom: 1px solid #374151; padding: 12px 16px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; }
+      .ops-board-spatial { background-color: #05080e; color: #e5e7eb; border-radius: 0.5rem; border: 1px solid #1f2937; overflow: hidden; }
+      .ops-board-spatial .ops-spatial-head { background-color: #0e1420; border-bottom: 1px solid #1e293b; padding: 12px 16px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; }
       .ops-board-spatial .ops-spatial-head h3 { color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; font-size: 1rem; margin: 0; letter-spacing: 0.03em; }
       .ops-board-spatial .ops-spatial-head .ops-sub { color: #6b7280; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.7rem; }
       .ops-board-spatial .ops-live-proof { display: grid; grid-template-columns: 1fr; gap: 6px; min-width: min(100%, 300px); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -40,8 +40,22 @@
       .ops-board-spatial .flow-map-lane-card--manifested { border-top-color: #3b82f6; }
       .ops-board-spatial .flow-map-lane-card--in_transit { border-top-color: #38bdf8; }
       .ops-board-spatial .flow-map-lane-card--receiving { border-top-color: #10b981; }
-      .ops-board-spatial .ops-spatial-body { display: grid; grid-template-columns: 1fr; }
+      .ops-board-spatial .ops-spatial-body { display: grid; grid-template-columns: 1fr; background-color: #05080e; }
       @media (min-width: 992px) { .ops-board-spatial .ops-spatial-body { grid-template-columns: minmax(0, 1fr) minmax(320px, 380px); align-items: stretch; } }
+      @media (min-width: 1180px) { .ops-board-spatial .ops-spatial-body { grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(320px, 370px); } }
+      .ops-board-spatial .flow-ops-stream { background-color: #0e1420; border-bottom: 1px solid #1e293b; padding: 12px; display: grid; gap: 12px; align-content: start; }
+      @media (min-width: 992px) and (max-width: 1179.98px) { .ops-board-spatial .flow-ops-stream { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      @media (min-width: 1180px) { .ops-board-spatial .flow-ops-stream { border-right: 1px solid #1e293b; border-bottom: 0; min-height: 640px; } }
+      .ops-board-spatial .flow-stream-section { background-color: rgba(3, 7, 18, 0.55); border: 1px solid #1e293b; border-radius: 8px; padding: 10px; }
+      .ops-board-spatial .flow-stream-title { color: #94a3b8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 8px; }
+      .ops-board-spatial .flow-alert-card { border: 1px solid rgba(245,158,11,0.35); background-color: rgba(245,158,11,0.08); border-radius: 8px; padding: 8px; color: #cbd5e1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.66rem; line-height: 1.35; }
+      .ops-board-spatial .flow-alert-card + .flow-alert-card { margin-top: 8px; }
+      .ops-board-spatial .flow-alert-card strong { display: block; color: #fff; font-size: 0.72rem; margin-bottom: 2px; }
+      .ops-board-spatial .flow-alert-card--blocked { border-color: rgba(239,68,68,0.48); background-color: rgba(239,68,68,0.10); }
+      .ops-board-spatial .flow-alert-card--quiet { border-color: rgba(16,185,129,0.28); background-color: rgba(16,185,129,0.07); }
+      .ops-board-spatial .flow-event-stream { list-style: none; padding: 0; margin: 0; display: grid; gap: 7px; }
+      .ops-board-spatial .flow-event-stream li { border-left: 3px solid #38bdf8; background-color: #05080e; padding: 7px 8px; color: #9ca3af; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.64rem; line-height: 1.32; }
+      .ops-board-spatial .flow-event-stream strong { display: block; color: #e5e7eb; font-size: 0.7rem; }
       .ops-board-spatial .production-flow-canvas { background-color: #030712; border-bottom: 1px solid #1f2937; }
       @media (min-width: 992px) { .ops-board-spatial .production-flow-canvas { border-bottom: 0; border-right: 1px solid #1f2937; } }
       .ops-board-spatial .flow-live-board {
@@ -279,11 +293,19 @@
       .ops-board-spatial .exception-item--waiting { background-color: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); }
       .ops-board-spatial .exception-item--waiting:hover { background-color: rgba(245,158,11,0.22); }
       .ops-board-spatial .exception-empty { color: #6b7280; font-size: 0.7rem; }
-      .ops-board-spatial .replay-row { display: flex; align-items: center; gap: 10px; font-size: 0.7rem; margin-top: 8px; padding-top: 8px; border-top: 1px solid #1f2937; color: #9ca3af; flex-wrap: wrap; }
-      .ops-board-spatial .replay-row .label { text-transform: uppercase; font-weight: 700; color: #6b7280; }
-      .ops-board-spatial .replay-row .btn-mini { background-color: transparent; border: 1px solid #374151; color: #e5e7eb; padding: 2px 8px; border-radius: 3px; font-size: 0.65rem; cursor: pointer; font-family: inherit; }
-      .ops-board-spatial .replay-row .btn-mini:hover { border-color: #6366f1; }
-      .ops-board-spatial .replay-row input[type=range] { flex-grow: 1; min-width: 120px; }
+      .ops-board-spatial .flow-proof-status { display: flex; align-items: center; gap: 10px; font-size: 0.68rem; margin-top: 8px; padding-top: 8px; border-top: 1px solid #1f2937; color: #9ca3af; flex-wrap: wrap; }
+      .ops-board-spatial .flow-proof-status .label { text-transform: uppercase; font-weight: 800; color: #38bdf8; }
+      .ops-board-spatial .flow-proof-status .proof-dot { width: 7px; height: 7px; border-radius: 999px; background-color: #00e676; box-shadow: 0 0 10px rgba(0,230,118,0.6); animation: livePulseDot 1.5s ease-in-out infinite; }
+      @keyframes livePulseDot { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+      .ops-board-spatial .flow-console-panel { background-color: #0e1420; border-top: 1px solid #1e293b; }
+      .ops-board-spatial .flow-console-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 8px 12px; background-color: #090d16; border-bottom: 1px solid #1e293b; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .ops-board-spatial .flow-console-head strong { color: #fff; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; }
+      .ops-board-spatial .flow-console-head span { color: #64748b; font-size: 0.6rem; text-transform: uppercase; }
+      .ops-board-spatial .flow-console-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.66rem; color: #94a3b8; }
+      @media (max-width: 640px) { .ops-board-spatial .flow-console-body { grid-template-columns: 1fr; } }
+      .ops-board-spatial .flow-console-cell { background-color: #05080e; border: 1px solid #1e293b; border-radius: 6px; padding: 8px; min-height: 52px; }
+      .ops-board-spatial .flow-console-cell span { display: block; color: #64748b; text-transform: uppercase; font-size: 0.56rem; letter-spacing: 0.06em; margin-bottom: 3px; }
+      .ops-board-spatial .flow-console-cell strong { color: #e5e7eb; font-size: 0.72rem; }
       .ops-board-spatial .drawer-close { float: right; background: transparent; border: 1px solid #374151; color: #e5e7eb; padding: 2px 8px; border-radius: 3px; font-size: 0.65rem; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
       .ops-board-spatial .drawer-close:hover { border-color: #6366f1; }
       .ops-board-spatial [data-flow-drawer-detail]:not([hidden]) { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid #1f2937; }
@@ -310,13 +332,14 @@
       {% endif %}
     {% endfor %}
     {% set current_attention = attention_items[0] if attention_items else none %}
+    {% set latest_edge = (pf.flow_edges|last) if pf.flow_edges else none %}
 
     <div class="ops-board-spatial mb-3" data-ops-spatial>
       <header class="ops-spatial-head">
         <div>
           <p class="ops-board-kicker" style="color:#6b7280; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; margin:0 0 4px;">{{ board_label }}</p>
-          <h3>Production Flow Board</h3>
-          <div class="ops-sub">{{ pf.date if pf else '' }}{% if pf %} &middot; FlowMapDashboard &middot; live production map{% endif %}</div>
+          <h3>Production Digital Twin</h3>
+          <div class="ops-sub">{{ pf.date if pf else '' }}{% if pf %} &middot; Production Flow Board &middot; live event map{% endif %}</div>
           {% if pf and pf.route_overlay and pf.route_overlay.path_node_keys %}
             <div class="route-overlay-caption" style="margin-top:6px; color:#38bdf8; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.7rem;">
               Showing today&rsquo;s route as proof trail{% if pf.route_overlay.driver_name %} &middot; {{ pf.route_overlay.driver_name }}{% endif %}
@@ -339,7 +362,7 @@
         <div><span>Tenant / Company</span><strong>{{ current_user.company_name if current_user and current_user.company_name is defined and current_user.company_name else 'lacksdrivers' }}</strong></div>
         <div><span>User / Role</span><strong>{{ current_user.display_name if current_user and current_user.is_authenticated else 'Read only' }}{% if current_user and current_user.is_authenticated %} / {{ current_user.role }}{% endif %}</strong></div>
         <div><span>Shift Date</span><strong>{{ pf.date if pf else '' }}</strong></div>
-        <div><span>Proof Layer</span><strong>Proof Trail filters on click</strong></div>
+        <div><span>Proof Layer</span><strong>Shadow Ledger filters on click</strong></div>
       </div>
 
       <div class="flow-map-lanes" aria-label="Production to transport flow lanes">
@@ -351,7 +374,51 @@
       </div>
 
       <div class="ops-spatial-body">
-        <div>
+        <aside class="flow-ops-stream" aria-label="Operational alerts and live event stream">
+          <div class="flow-stream-section">
+            <p class="flow-stream-title">Operational Alerts</p>
+            {% if attention_items %}
+              {% for item in attention_items[:3] %}
+                <div class="flow-alert-card flow-alert-card--{{ 'blocked' if item.status in ('blocked','needs_review','critical','high') else 'waiting' }}"
+                     data-flow-open="item"
+                     data-flow-id="{{ item.item_id }}"
+                     data-flow-node-key="{{ item.item_type }}:{{ item.linked_route_stop_id if item.item_type == 'route_stop' else item.item_id }}"
+                     data-related-node-key="{{ item.related_node_key or '' }}"
+                     data-entity-type="{{ item.item_type }}"
+                     data-entity-id="{{ item.linked_route_stop_id if item.item_type == 'route_stop' else item.item_id }}">
+                  <strong>{{ item.display_label or item.label }}</strong>
+                  {{ (item.next_action or item.stage or item.status_label or '')|truncate(74,true,'') }}
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="flow-alert-card flow-alert-card--quiet">
+                <strong>No blocked flow</strong>
+                Current records do not show a structured production-flow exception.
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="flow-stream-section">
+            <p class="flow-stream-title">Live Event Stream</p>
+            <ul class="flow-event-stream">
+              {% set stream_ns = namespace(count=0) %}
+              {% for edge in pf.flow_edges|reverse %}
+                {% if stream_ns.count < 5 %}
+                  {% set stream_ns.count = stream_ns.count + 1 %}
+                  <li data-flow-event-id="{{ edge.event_id }}">
+                    <strong>#{{ edge.event_id }} {{ edge.label }}</strong>
+                    {{ edge.source_key }} &rarr; {{ edge.target_key }}
+                  </li>
+                {% endif %}
+              {% endfor %}
+              {% if stream_ns.count == 0 %}
+                <li><strong>Waiting for FlowEvent</strong> New movement events will appear here.</li>
+              {% endif %}
+            </ul>
+          </div>
+        </aside>
+
+        <div class="flow-main-stage">
           <div class="production-flow-canvas" aria-label="View Production Flow facility map">
             <div class="flow-live-board flow-spatial-canvas" data-flow-live-board data-flow-animation-mode="live">
               <svg class="map-svg-layer" data-flow-edge-layer aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -469,6 +536,23 @@
             </div>
           </div>
 
+          <div class="flow-console-panel" aria-label="Plant computer console">
+            <div class="flow-console-head">
+              <strong>Plant Computer Console: <span data-flow-console-title>{% if latest_edge %}{{ latest_edge.label }}{% elif current_attention %}{{ current_attention.display_label or current_attention.label }}{% else %}Live Flow Standby{% endif %}</span></strong>
+              <span>Selected object readout</span>
+            </div>
+            <div class="flow-console-body">
+              <div class="flow-console-cell">
+                <span>Current Signal</span>
+                <strong data-flow-console-status>{% if latest_edge %}{{ latest_edge.source_key }} &rarr; {{ latest_edge.target_key }}{% elif current_attention %}{{ current_attention.next_action or current_attention.status_label }}{% else %}No active exception{% endif %}</strong>
+              </div>
+              <div class="flow-console-cell">
+                <span>Ledger Proof</span>
+                <strong data-flow-console-proof>{% if latest_edge %}FlowEvent #{{ latest_edge.event_id }} &middot; {{ latest_edge.proof_label or 'none' }}{% else %}{{ pf.ledger_summary.event_count if pf and pf.ledger_summary else 0 }} events today{% endif %}</strong>
+              </div>
+            </div>
+          </div>
+
           <div class="bottom-strip">
             <div class="exception-ticker" aria-label="Needs attention">
               {% if attention_items %}
@@ -488,19 +572,17 @@
                 <span class="exception-empty">{{ pf.empty_states.needs_attention_empty if pf and pf.empty_states else 'No production-flow issues found for this date.' }}</span>
               {% endif %}
             </div>
-            <div class="replay-row">
-              <span class="label">Proof Trail</span>
-              <button class="btn-mini" type="button" data-flow-mode-button="live">Live</button>
-              <button class="btn-mini" type="button" data-flow-mode-button="replay">Replay</button>
-              <button class="btn-mini" type="button" data-flow-mode-button="static">Static</button>
-              <input type="range" min="0" max="{{ pf.flow_edges|length if pf.flow_edges else 0 }}" value="{{ pf.flow_edges|length if pf.flow_edges else 0 }}" aria-label="Replay timeline" data-flow-replay-slider>
+            <div class="flow-proof-status">
+              <span class="proof-dot" aria-hidden="true"></span>
+              <span class="label">Shadow Ledger</span>
+              <span>Animated paths are drawn only from FlowEvent ledger rows.</span>
             </div>
           </div>
         </div>
 
         <aside class="flow-drawer-panel" data-flow-drawer aria-label="Production flow details">
           <div data-flow-drawer-global>
-            <h5 class="drawer-title">Proof Trail</h5>
+            <h5 class="drawer-title">Shadow Ledger</h5>
             <div class="drawer-kicker-line">Stage transitions captured today. Click a node or chip to filter.</div>
             {% set stage_label_map = {
               'wip': 'WIP',
@@ -563,6 +645,9 @@
       var edgeLayer = root.querySelector('[data-flow-edge-layer]');
       var edgeGroup = root.querySelector('[data-flow-edge-group]');
       var cardMask = root.querySelector('[data-flow-card-mask]');
+      var consoleTitle = root.querySelector('[data-flow-console-title]');
+      var consoleStatus = root.querySelector('[data-flow-console-status]');
+      var consoleProof = root.querySelector('[data-flow-console-proof]');
       var edgeDataNode = root.parentNode ? root.parentNode.querySelector('[data-flow-edge-data]') : null;
       var initialEdges = [];
       try {
@@ -660,6 +745,8 @@
       function edgePath(source, target) {
         if (!liveBoard || !source || !target) return '';
         var boardBox = liveBoard.getBoundingClientRect();
+        function xPct(px) { return Math.max(0, Math.min(100, (px / Math.max(boardBox.width, 1)) * 100)); }
+        function yPct(px) { return Math.max(0, Math.min(100, (px / Math.max(boardBox.height, 1)) * 100)); }
         var a = source.getBoundingClientRect();
         var b = target.getBoundingClientRect();
         var aCenterX = a.left + a.width / 2;
@@ -675,24 +762,26 @@
         var dx = horizontal ? Math.max(34, Math.abs(x2 - x1) * 0.38) : Math.max(26, Math.abs(x2 - x1) * 0.35);
         var dy = horizontal ? Math.max(18, Math.abs(y2 - y1) * 0.35) : Math.max(34, Math.abs(y2 - y1) * 0.38);
         if (horizontal) {
-          return 'M ' + x1.toFixed(1) + ' ' + y1.toFixed(1) + ' C ' + (x1 + (x2 >= x1 ? dx : -dx)).toFixed(1) + ' ' + y1.toFixed(1) + ', ' + (x2 - (x2 >= x1 ? dx : -dx)).toFixed(1) + ' ' + y2.toFixed(1) + ', ' + x2.toFixed(1) + ' ' + y2.toFixed(1);
+          return 'M ' + xPct(x1).toFixed(2) + ' ' + yPct(y1).toFixed(2) + ' C ' + xPct(x1 + (x2 >= x1 ? dx : -dx)).toFixed(2) + ' ' + yPct(y1).toFixed(2) + ', ' + xPct(x2 - (x2 >= x1 ? dx : -dx)).toFixed(2) + ' ' + yPct(y2).toFixed(2) + ', ' + xPct(x2).toFixed(2) + ' ' + yPct(y2).toFixed(2);
         }
-        return 'M ' + x1.toFixed(1) + ' ' + y1.toFixed(1) + ' C ' + x1.toFixed(1) + ' ' + (y1 + (y2 >= y1 ? dy : -dy)).toFixed(1) + ', ' + x2.toFixed(1) + ' ' + (y2 - (y2 >= y1 ? dy : -dy)).toFixed(1) + ', ' + x2.toFixed(1) + ' ' + y2.toFixed(1);
+        return 'M ' + xPct(x1).toFixed(2) + ' ' + yPct(y1).toFixed(2) + ' C ' + xPct(x1).toFixed(2) + ' ' + yPct(y1 + (y2 >= y1 ? dy : -dy)).toFixed(2) + ', ' + xPct(x2).toFixed(2) + ' ' + yPct(y2 - (y2 >= y1 ? dy : -dy)).toFixed(2) + ', ' + xPct(x2).toFixed(2) + ' ' + yPct(y2).toFixed(2);
       }
 
       function updateCardMask() {
         if (!liveBoard || !cardMask) return;
         var boardBox = liveBoard.getBoundingClientRect();
-        cardMask.innerHTML = '<rect x="0" y="0" width="' + boardBox.width.toFixed(1) + '" height="' + boardBox.height.toFixed(1) + '" fill="white"></rect>';
+        function xPct(px) { return (px / Math.max(boardBox.width, 1)) * 100; }
+        function yPct(px) { return (px / Math.max(boardBox.height, 1)) * 100; }
+        cardMask.innerHTML = '<rect x="0" y="0" width="100" height="100" fill="white"></rect>';
         var blockers = root.querySelectorAll('.flow-object-card, .flow-chip, .flow-node');
         for (var i = 0; i < blockers.length; i++) {
           var box = blockers[i].getBoundingClientRect();
           var pad = 4;
           var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-          rect.setAttribute('x', (box.left - boardBox.left - pad).toFixed(1));
-          rect.setAttribute('y', (box.top - boardBox.top - pad).toFixed(1));
-          rect.setAttribute('width', (box.width + pad * 2).toFixed(1));
-          rect.setAttribute('height', (box.height + pad * 2).toFixed(1));
+          rect.setAttribute('x', xPct(box.left - boardBox.left - pad).toFixed(2));
+          rect.setAttribute('y', yPct(box.top - boardBox.top - pad).toFixed(2));
+          rect.setAttribute('width', xPct(box.width + pad * 2).toFixed(2));
+          rect.setAttribute('height', yPct(box.height + pad * 2).toFixed(2));
           rect.setAttribute('rx', '8');
           rect.setAttribute('fill', 'black');
           cardMask.appendChild(rect);
@@ -764,6 +853,25 @@
         }
       }
 
+      function updateConsole(trigger, edge) {
+        if (!consoleTitle || !consoleStatus || !consoleProof) return;
+        if (trigger) {
+          var title = trigger.getAttribute('aria-label') || trigger.getAttribute('data-flow-id') || 'Selected object';
+          var status = trigger.getAttribute('data-status') || 'projection';
+          var type = trigger.getAttribute('data-entity-type') || 'flow';
+          var id = trigger.getAttribute('data-entity-id') || trigger.getAttribute('data-flow-id') || '';
+          consoleTitle.textContent = title;
+          consoleStatus.textContent = status.replace(/_/g, ' ') + (id ? ' · ' + type.replace(/_/g, ' ') + ' #' + id : '');
+          consoleProof.textContent = 'Shadow Ledger filtered for selected object';
+          return;
+        }
+        if (edge) {
+          consoleTitle.textContent = edge.label || 'FlowEvent';
+          consoleStatus.textContent = (edge.source_key || 'source') + ' -> ' + (edge.target_key || 'target');
+          consoleProof.textContent = 'FlowEvent #' + (edge.event_id || '') + ' · ' + (edge.proof_label || 'none');
+        }
+      }
+
       var FlowMapAnimator = {
         edges: initialEdges,
         mode: 'live',
@@ -790,6 +898,7 @@
           clearLivePulse();
           pulseTarget(edge);
           flashTimeline(edge);
+          updateConsole(null, edge);
         },
         replay: function() {
           var self = this;
@@ -804,6 +913,7 @@
             clearLivePulse();
             pulseTarget(edge);
             flashTimeline(edge);
+            updateConsole(null, edge);
             window.setTimeout(step, 520);
           }
           step();
@@ -820,6 +930,7 @@
       function showGlobal() {
         clearActive();
         clearLedgerFilter();
+        if (FlowMapAnimator.edges.length) updateConsole(null, FlowMapAnimator.edges[FlowMapAnimator.edges.length - 1]);
         selectedKey = null;
         var drawer = root.querySelector('[data-flow-drawer]');
         if (drawer) drawer.classList.remove('is-detail-open');
@@ -840,6 +951,7 @@
         }
         highlightRelated(trigger);
         filterShadowLedger(trigger);
+        updateConsole(trigger, null);
         if (globalView) globalView.hidden = false;
         if (detailView) {
           detailView.hidden = false;
@@ -851,13 +963,6 @@
       }
 
       root.addEventListener('click', function(e) {
-        var modeBtn = e.target.closest('[data-flow-mode-button]');
-        if (modeBtn && root.contains(modeBtn)) {
-          e.preventDefault();
-          e.stopPropagation();
-          FlowMapAnimator.setMode(modeBtn.getAttribute('data-flow-mode-button'));
-          return;
-        }
         var closeBtn = e.target.closest('[data-flow-close]');
         if (closeBtn && root.contains(closeBtn)) {
           e.preventDefault();
@@ -881,13 +986,6 @@
         if (opener && typeof opener.blur === 'function') opener.blur();
       }, { passive: true });
 
-      var replaySlider = root.querySelector('[data-flow-replay-slider]');
-      if (replaySlider) {
-        replaySlider.addEventListener('input', function() {
-          FlowMapAnimator.mode = 'static';
-          FlowMapAnimator.renderStatic(parseInt(replaySlider.value || '0', 10));
-        });
-      }
       document.addEventListener('flow-map:event-appended', function(e) {
         var edge = e.detail && (e.detail.edge || e.detail);
         FlowMapAnimator.appendLive(edge);

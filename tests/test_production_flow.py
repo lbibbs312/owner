@@ -322,6 +322,9 @@ def test_flow_map_uses_large_objects_and_compact_stop_chips(client, app):
     assert "flow-object-card" in body
     assert "Load Build / Trailer" in body
     assert "Route-only data. Attach manifest or enter paper data to build expected flow." in body
+    assert "Production Digital Twin" in body
+    assert "Operational Alerts" in body
+    assert "Plant Computer Console" in body
     assert "projected from events and current records" not in body
     assert "Receiving, unload, and reconcile events project here." not in body
     assert "route-step-chip" in body
@@ -329,6 +332,10 @@ def test_flow_map_uses_large_objects_and_compact_stop_chips(client, app):
     assert "Actual Scans" in body
     assert "Event Timeline" in body
     assert "Shadow Ledger" in body
+    assert "Movie Speed" not in body
+    assert "Timeline Script" not in body
+    assert "data-flow-mode-button" not in body
+    assert "data-flow-replay-slider" not in body
 
 
 def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
@@ -395,6 +402,7 @@ def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
     assert "Shadow Ledger" in body
     assert "data-shadow-ledger-row" in body
     assert "filterShadowLedger" in body
+    assert "data-flow-console-title" in body
     assert ".production-flow--mobile .ops-board-spatial .ops-spatial-body" in body
     assert 'data-flow-node-key="object:in_transit"' in body
     assert 'data-flow-event-id="' in body
