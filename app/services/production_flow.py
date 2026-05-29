@@ -574,42 +574,38 @@ def _flow_ledger_counts(target):
 
 def _flow_object_cards(queue_summary, floor_summary, ledger_counts):
     route_only_note = "Route-only data. Attach manifest or enter paper data to build expected flow."
-    manifest_note = (
-        f"{ledger_counts['open_manifests']} open manifest(s), {ledger_counts['manifest_line_count']} expected line(s)."
-        if ledger_counts["open_manifests"]
-        else route_only_note
-    )
+    manifest_note = f"{ledger_counts['manifest_line_count']} expected line(s)." if ledger_counts["open_manifests"] else route_only_note
     return [
         {
             "key": "wip",
             "label": "WIP Lot",
             "status": "open" if queue_summary["open_count"] else "none",
             "count": queue_summary["open_count"],
-            "headline": f"{queue_summary['open_count']} move request(s) waiting for production source.",
-            "detail": "Production WIP lots will anchor here as events arrive.",
+            "headline": f"{queue_summary['open_count']} open",
+            "detail": "Production source queue.",
         },
         {
             "key": "staging",
             "label": "Staging Node",
             "status": "waiting" if queue_summary["waiting_count"] else "none",
             "count": queue_summary["waiting_count"],
-            "headline": f"{queue_summary['waiting_count']} staged or waiting step(s).",
-            "detail": "Staged containers and proof-needed work roll up here.",
+            "headline": f"{queue_summary['waiting_count']} waiting",
+            "detail": "Staged or waiting work.",
         },
         {
             "key": "load_build",
             "label": "Load Build / Trailer",
             "status": "active" if queue_summary["active_count"] else "none",
             "count": queue_summary["active_count"],
-            "headline": f"{queue_summary['active_count']} active load-build move(s).",
-            "detail": manifest_note,
+            "headline": f"{queue_summary['active_count']} active",
+            "detail": "Trailer/load-build moves.",
         },
         {
             "key": "manifested",
             "label": "Manifest",
             "status": "open" if ledger_counts["open_manifests"] else "needs_review",
             "count": ledger_counts["open_manifests"],
-            "headline": "Manifest / Intersite Shipper",
+            "headline": f"{ledger_counts['open_manifests']} open" if ledger_counts["open_manifests"] else "Route-only data",
             "detail": manifest_note,
         },
         {
@@ -617,24 +613,24 @@ def _flow_object_cards(queue_summary, floor_summary, ledger_counts):
             "label": "In Transit Load",
             "status": "active" if floor_summary["active_stop_count"] else "none",
             "count": floor_summary["active_stop_count"],
-            "headline": f"{floor_summary['active_stop_count']} active route stop(s).",
-            "detail": "Route chips below open the audit drawer; they do not expand on the map.",
+            "headline": f"{floor_summary['active_stop_count']} active",
+            "detail": "Current route movement.",
         },
         {
             "key": "receiving",
             "label": "Receiving Node",
             "status": "completed" if floor_summary["completed_stop_count"] else "none",
             "count": floor_summary["completed_stop_count"],
-            "headline": f"{floor_summary['completed_stop_count']} completed receiving step(s).",
-            "detail": "Receiving, unload, and reconcile events project here.",
+            "headline": f"{floor_summary['completed_stop_count']} done",
+            "detail": "Received or closed steps.",
         },
         {
             "key": "exceptions",
             "label": "Exception / Hold / Scrap",
             "status": "blocked" if queue_summary["blocked_count"] + ledger_counts["active_exceptions"] else "none",
             "count": queue_summary["blocked_count"] + ledger_counts["active_exceptions"],
-            "headline": f"{queue_summary['blocked_count'] + ledger_counts['active_exceptions']} active exception signal(s).",
-            "detail": "Mismatch, QA hold, scrap, damage, delay, and forklift issues stay structured.",
+            "headline": f"{queue_summary['blocked_count'] + ledger_counts['active_exceptions']} open issues",
+            "detail": "Structured exception signals.",
         },
     ]
 
@@ -763,10 +759,14 @@ def _flow_map_edges(target):
             "route_id": event.route_id,
             "manifest_id": event.manifest_id,
             "container_id": event.container_id,
+            "stop_id": event.stop_id,
             "event_type": event.event_type,
             "status": status,
             "truth_level": "ledger",
             "occurred_at": event.occurred_at.isoformat() if event.occurred_at else "",
+            "source": event.source,
+            "actor_role": event.actor_role,
+            "proof_label": "document" if event.document_id else ("photo" if event.photo_id else "none"),
             "is_live": False,
             "is_exception": is_exception,
             "label": (event.event_type or "FLOW_EVENT").replace("_", " ").title(),

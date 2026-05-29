@@ -322,10 +322,13 @@ def test_flow_map_uses_large_objects_and_compact_stop_chips(client, app):
     assert "flow-object-card" in body
     assert "Load Build / Trailer" in body
     assert "Route-only data. Attach manifest or enter paper data to build expected flow." in body
+    assert "projected from events and current records" not in body
+    assert "Receiving, unload, and reconcile events project here." not in body
     assert "route-step-chip" in body
     assert "Stop Details" in body
     assert "Actual Scans" in body
     assert "Event Timeline" in body
+    assert "Shadow Ledger" in body
 
 
 def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
@@ -365,6 +368,8 @@ def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
         assert edges[0]["event_id"] == first.id
         assert edges[0]["source_key"] == "object:manifested"
         assert edges[0]["target_key"] == "object:in_transit"
+        assert edges[0]["source"] == "mobile"
+        assert edges[0]["proof_label"] == "none"
         assert edges[1]["event_id"] == second.id
         assert edges[1]["previous_event_id"] == first.id
         assert edges[1]["source_key"] == "object:in_transit"
@@ -387,9 +392,13 @@ def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
     assert "data-flow-edge-group" in body
     assert "livePulseRing" in body
     assert "ops-arrow-live-" in body
+    assert "Shadow Ledger" in body
+    assert "data-shadow-ledger-row" in body
+    assert "filterShadowLedger" in body
     assert ".production-flow--mobile .ops-board-spatial .ops-spatial-body" in body
     assert 'data-flow-node-key="object:in_transit"' in body
     assert 'data-flow-event-id="' in body
+    assert "System Summary" not in body
 
 
 def test_mobile_dashboard_uses_compact_shared_production_flow(client, app):
@@ -451,7 +460,8 @@ def test_no_action_needed_no_exceptions_contradiction(client, app):
     assert "ACTION NEEDED: No active exceptions" not in body
     assert "No active exceptions" not in body
     assert "Top Active Exceptions" not in body
-    assert "Top Needs Attention" in body
+    assert "Top Needs Attention" not in body
+    assert "Shadow Ledger" in body
 
 
 def test_route_stops_display_as_sequence_not_database_id(app):

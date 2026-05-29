@@ -21,18 +21,18 @@
       .ops-board-spatial .ops-spatial-head { background-color: #111827; border-bottom: 1px solid #374151; padding: 12px 16px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; }
       .ops-board-spatial .ops-spatial-head h3 { color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; font-size: 1rem; margin: 0; letter-spacing: 0.03em; }
       .ops-board-spatial .ops-spatial-head .ops-sub { color: #6b7280; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.7rem; }
-      .ops-board-spatial .ops-spatial-counters { display: flex; gap: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; flex-wrap: wrap; }
-      .ops-board-spatial .ops-spatial-counters > div { text-align: center; padding: 0 8px; }
-      .ops-board-spatial .ops-spatial-counters .label { display: block; color: #6b7280; }
-      .ops-board-spatial .ops-spatial-counters .value { font-weight: 700; color: #fff; }
+      .ops-board-spatial .ops-live-proof { display: grid; grid-template-columns: 1fr; gap: 6px; min-width: min(100%, 300px); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .ops-board-spatial .ops-live-proof > div { background-color: #030712; border: 1px solid #334155; border-radius: 6px; padding: 6px 9px; }
+      .ops-board-spatial .ops-live-proof .label { display: block; color: #6b7280; font-size: 0.58rem; letter-spacing: 0.06em; text-transform: uppercase; }
+      .ops-board-spatial .ops-live-proof .value { display: block; color: #fff; font-size: 0.76rem; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .flow-topbar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background-color: #1f2937; border-bottom: 1px solid #1f2937; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-      @media (min-width: 992px) { .ops-board-spatial .flow-topbar { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+      @media (min-width: 992px) { .ops-board-spatial .flow-topbar { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
       .ops-board-spatial .flow-topbar > div { background-color: #030712; padding: 8px 10px; min-width: 0; }
       .ops-board-spatial .flow-topbar span { display: block; color: #6b7280; font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .flow-topbar strong { display: block; color: #e5e7eb; font-size: 0.76rem; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .flow-map-lanes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background-color: #1f2937; border-bottom: 1px solid #1f2937; }
       @media (min-width: 992px) { .ops-board-spatial .flow-map-lanes { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
-      .ops-board-spatial .flow-map-lane-card { background-color: #0b1220; min-height: 76px; padding: 10px; border-top: 3px solid #374151; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .ops-board-spatial .flow-map-lane-card { background-color: #0b1220; min-height: 38px; padding: 9px 10px; border-top: 3px solid #374151; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
       .ops-board-spatial .flow-map-lane-card strong { color: #fff; display: block; font-size: 0.72rem; text-transform: uppercase; line-height: 1.25; }
       .ops-board-spatial .flow-map-lane-card span { color: #9ca3af; display: block; font-size: 0.65rem; margin-top: 6px; }
       .ops-board-spatial .flow-map-lane-card b { color: #fff; font-size: 1.1rem; margin-right: 4px; }
@@ -79,7 +79,7 @@
       }
       @media (min-width: 1180px) { .ops-board-spatial .flow-object-layer { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
       .ops-board-spatial .flow-object-card {
-        min-height: 118px; background-color: rgba(30, 41, 59, 0.86); border: 1px solid rgba(100,116,139,0.7);
+        min-height: 92px; background-color: rgba(30, 41, 59, 0.86); border: 1px solid rgba(100,116,139,0.7);
         border-top: 3px solid #64748b; border-radius: 8px; color: #e5e7eb; padding: 11px 12px;
         text-align: left; font: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         box-shadow: 0 12px 32px rgba(0,0,0,0.5); cursor: pointer; pointer-events: auto;
@@ -92,8 +92,9 @@
       .ops-board-spatial .flow-object-card--completed { border-color: rgba(16,185,129,0.72); border-top-color: #10b981; box-shadow: 0 0 22px rgba(16,185,129,0.14), 0 12px 32px rgba(0,0,0,0.5); }
       .ops-board-spatial .flow-object-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; color: #fff; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; line-height: 1.25; }
       .ops-board-spatial .flow-object-count { font-size: 1rem; color: #fff; flex-shrink: 0; }
-      .ops-board-spatial .flow-object-copy { color: #9ca3af; font-size: 0.63rem; line-height: 1.25; margin-top: 6px; }
+      .ops-board-spatial .flow-object-copy { color: #9ca3af; font-size: 0.63rem; line-height: 1.25; margin-top: 8px; display: block; }
       .ops-board-spatial .flow-object-copy strong { display: block; color: #cbd5e1; font-weight: 700; margin-bottom: 2px; }
+      .ops-board-spatial .flow-object-detail { color: #94a3b8; display: block; margin-top: 4px; }
       .ops-board-spatial .flow-node-row, .ops-board-spatial .route-chip-strip {
         display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; pointer-events: none;
       }
@@ -243,6 +244,17 @@
       .ops-board-spatial .drawer-facts > div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 6px; background-color: #030712; border: 1px solid #1f2937; border-radius: 3px; }
       .ops-board-spatial .drawer-facts dt { color: #6b7280; margin: 0; }
       .ops-board-spatial .drawer-facts dd { color: #e5e7eb; margin: 0; text-align: right; }
+      .ops-board-spatial .shadow-ledger-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+      .ops-board-spatial .shadow-ledger-row { background-color: #030712; border: 1px solid #1f2937; border-radius: 6px; padding: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #9ca3af; font-size: 0.68rem; line-height: 1.35; }
+      .ops-board-spatial .shadow-ledger-row strong { color: #fff; font-size: 0.76rem; }
+      .ops-board-spatial .shadow-ledger-row span { display: block; }
+      .ops-board-spatial .shadow-ledger-row .ledger-edge { color: #cbd5e1; }
+      .ops-board-spatial .shadow-ledger-row .ledger-proof { color: #60a5fa; }
+      .ops-board-spatial .shadow-ledger-row.exception { border-color: rgba(239,68,68,0.66); box-shadow: 0 0 18px rgba(239,68,68,0.12); }
+      .ops-board-spatial .shadow-ledger-row.active { border-color: rgba(56,189,248,0.55); }
+      .ops-board-spatial .shadow-ledger-row.completed { border-color: rgba(16,185,129,0.45); }
+      .ops-board-spatial .shadow-ledger-row.is-filtered-out { display: none; }
+      .ops-board-spatial .shadow-ledger-note { color: #64748b; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.64rem; margin-top: 10px; }
       .ops-board-spatial .drawer-badges { margin-bottom: 8px; }
       .ops-board-spatial .route-status-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 0.65rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; font-weight: 700; background-color: #374151; color: #e5e7eb; }
       .ops-board-spatial .status-blocked, .ops-board-spatial .status-issue, .ops-board-spatial .status-needs_review { background-color: #ef4444; color: #fff; }
@@ -269,48 +281,57 @@
       .ops-board-spatial .replay-row input[type=range] { flex-grow: 1; min-width: 120px; }
       .ops-board-spatial .drawer-close { float: right; background: transparent; border: 1px solid #374151; color: #e5e7eb; padding: 2px 8px; border-radius: 3px; font-size: 0.65rem; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
       .ops-board-spatial .drawer-close:hover { border-color: #6366f1; }
+      .ops-board-spatial [data-flow-drawer-detail]:not([hidden]) { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid #1f2937; }
       .ops-board-spatial [data-flow-drawer-detail] dl { margin: 0; }
       .ops-board-spatial [data-flow-drawer-detail] h3 { color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; font-size: 0.9rem; margin: 0 0 8px; letter-spacing: 0.03em; }
       .ops-board-spatial [data-flow-drawer-detail] .drawer-kicker { color: #6b7280; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.65rem; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.05em; }
     </style>
+
+    {% set attention_ns = namespace(count=0) %}
+    {% set attention_items = [] %}
+    {% for item in pf.flow_items %}
+      {% if attention_ns.count < 8 and item.status in ('blocked','waiting','needs_review','critical','high') %}
+        {% set attention_ns.count = attention_ns.count + 1 %}
+        {% set _ = attention_items.append(item) %}
+      {% endif %}
+    {% endfor %}
+    {% set current_attention = attention_items[0] if attention_items else none %}
 
     <div class="ops-board-spatial mb-3" data-ops-spatial>
       <header class="ops-spatial-head">
         <div>
           <p class="ops-board-kicker" style="color:#6b7280; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; margin:0 0 4px;">{{ board_label }}</p>
           <h3>Production Flow Board</h3>
-          <div class="ops-sub">{{ pf.date if pf else '' }}{% if pf %} &middot; FlowMapDashboard &middot; map first, ledger backed, statuses projected{% endif %}</div>
+          <div class="ops-sub">{{ pf.date if pf else '' }}{% if pf %} &middot; FlowMapDashboard &middot; live production map{% endif %}</div>
           {% if pf and pf.route_overlay and pf.route_overlay.path_node_keys %}
             <div class="route-overlay-caption" style="margin-top:6px; color:#38bdf8; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.7rem;">
               Showing today&rsquo;s route as proof trail{% if pf.route_overlay.driver_name %} &middot; {{ pf.route_overlay.driver_name }}{% endif %}
             </div>
           {% endif %}
         </div>
-        <div class="ops-spatial-counters">
-          <div><span class="label">Active</span><span class="value">{{ summary.active_count|default(0) }}</span></div>
-          <div><span class="label">Waiting</span><span class="value" style="color:#f59e0b;">{{ summary.waiting_count|default(0) }}</span></div>
-          <div><span class="label">Blocked</span><span class="value" style="color:#ef4444;">{{ summary.blocked_count|default(0) }}</span></div>
-          <div><span class="label">Proof Needed</span><span class="value" style="color:#3b82f6;">{{ summary.document_needed_count|default(0) }}</span></div>
-          <div><span class="label">Manifests</span><span class="value" style="color:#38bdf8;">{{ summary.open_manifest_count|default(0) }}</span></div>
-          <div><span class="label">Ledger Events</span><span class="value">{{ summary.flow_event_count|default(0) }}</span></div>
-          <div><span class="label">Completed</span><span class="value" style="color:#10b981;">{{ summary.completed_count|default(0) }}</span></div>
+        <div class="ops-live-proof">
+          <div>
+            <span class="label">Needs Attention</span>
+            <span class="value">{% if current_attention %}{{ current_attention.display_label or current_attention.label }} &middot; {{ (current_attention.next_action or current_attention.stage or current_attention.status_label or '')|truncate(38,true,'') }}{% else %}No open action{% endif %}</span>
+          </div>
+          <div>
+            <span class="label">Ledger</span>
+            <span class="value">{{ 'Ledger online' if pf.ledger_summary.ready else 'Ledger migration needed' }} &middot; {{ pf.ledger_summary.event_count if pf and pf.ledger_summary else 0 }} events</span>
+          </div>
         </div>
       </header>
 
       <div class="flow-topbar" aria-label="Flow map operating context">
         <div><span>Tenant / Company</span><strong>{{ current_user.company_name if current_user and current_user.company_name is defined and current_user.company_name else 'lacksdrivers' }}</strong></div>
         <div><span>User / Role</span><strong>{{ current_user.display_name if current_user and current_user.is_authenticated else 'Read only' }}{% if current_user and current_user.is_authenticated %} / {{ current_user.role }}{% endif %}</strong></div>
-        <div><span>Shift Time</span><strong>{{ pf.date if pf else '' }}</strong></div>
-        <div><span>Offline / Sync</span><strong>{{ 'Ledger online' if pf.ledger_summary.ready else 'Ledger migration needed' }}</strong></div>
-        <div><span>Active Exceptions</span><strong>{{ pf.ledger_summary.active_exception_count if pf and pf.ledger_summary else summary.blocked_count|default(0) }}</strong></div>
-        <div><span>Open Manifests</span><strong>{{ pf.ledger_summary.open_manifest_count if pf and pf.ledger_summary else 0 }}</strong></div>
+        <div><span>Shift Date</span><strong>{{ pf.date if pf else '' }}</strong></div>
+        <div><span>Proof Layer</span><strong>Shadow Ledger filters on click</strong></div>
       </div>
 
       <div class="flow-map-lanes" aria-label="Production to transport flow lanes">
         {% for lane in pf.flow_lanes_target %}
           <div class="flow-map-lane-card flow-map-lane-card--{{ lane.key }}">
             <strong>{{ lane.label }}</strong>
-            <span><b>{{ lane.count }}</b> projected from events and current records</span>
           </div>
         {% endfor %}
       </div>
@@ -350,7 +371,7 @@
                       </span>
                       <span class="flow-object-copy">
                         <strong>{{ object.headline }}</strong>
-                        {{ object.detail }}
+                        {% if object.detail %}<span class="flow-object-detail">{{ object.detail }}</span>{% endif %}
                       </span>
                     </button>
                   {% endfor %}
@@ -421,21 +442,17 @@
           </div>
 
           <div class="bottom-strip">
-            {% set ns = namespace(count=0) %}
-            {% set attention_items = [] %}
-            {% for item in pf.flow_items %}
-              {% if ns.count < 8 and item.status in ('blocked','waiting','needs_review','critical','high') %}
-                {% set ns.count = ns.count + 1 %}
-                {% set _ = attention_items.append(item) %}
-              {% endif %}
-            {% endfor %}
             <div class="exception-ticker" aria-label="Needs attention">
               {% if attention_items %}
                 <strong>NEEDS ATTENTION:</strong>
                 {% for item in attention_items %}
                   <span class="exception-item exception-item--{{ 'waiting' if item.status == 'waiting' else 'blocked' }}"
                         data-flow-open="item"
-                        data-flow-id="{{ item.item_id }}">
+                        data-flow-id="{{ item.item_id }}"
+                        data-flow-node-key="{{ item.item_type }}:{{ item.linked_route_stop_id if item.item_type == 'route_stop' else item.item_id }}"
+                        data-related-node-key="{{ item.related_node_key or '' }}"
+                        data-entity-type="{{ item.item_type }}"
+                        data-entity-id="{{ item.linked_route_stop_id if item.item_type == 'route_stop' else item.item_id }}">
                     {{ item.display_label or item.label }} &middot; {{ (item.next_action or item.stage or item.status_label or '')|truncate(40,true,'') }}
                   </span>
                 {% endfor %}
@@ -444,7 +461,7 @@
               {% endif %}
             </div>
             <div class="replay-row">
-              <span class="label">Timeline</span>
+              <span class="label">Shadow Ledger</span>
               <button class="btn-mini" type="button" data-flow-mode-button="live">Live</button>
               <button class="btn-mini" type="button" data-flow-mode-button="replay">Replay</button>
               <button class="btn-mini" type="button" data-flow-mode-button="static">Static</button>
@@ -456,63 +473,32 @@
 
         <aside class="flow-drawer-panel" data-flow-drawer aria-label="Production flow details">
           <div data-flow-drawer-global>
-            <h5 class="drawer-title">System Summary</h5>
-            <div class="drawer-kicker-line">{{ pf.ledger_summary.truth_statement if pf and pf.ledger_summary else 'The event ledger is the truth.' }}</div>
-            <div class="drawer-stat-grid">
-              <div>Open<strong>{{ summary.open_count|default(0) }}</strong></div>
-              <div>Active<strong>{{ summary.active_count|default(0) }}</strong></div>
-              <div>Waiting<strong style="color:#f59e0b;">{{ summary.waiting_count|default(0) }}</strong></div>
-              <div>Blocked<strong style="color:#ef4444;">{{ summary.blocked_count|default(0) }}</strong></div>
-              <div>Proof<strong style="color:#3b82f6;">{{ summary.document_needed_count|default(0) }}</strong></div>
-              <div>Done<strong style="color:#10b981;">{{ summary.completed_count|default(0) }}</strong></div>
-            </div>
-
-            <div class="drawer-section-title">Floor Snapshot</div>
-            <div class="drawer-facts">
-              <div><dt>Active stops</dt><dd>{{ floor_summary.active_stop_count|default(0) }}</dd></div>
-              <div><dt>Completed stops</dt><dd>{{ floor_summary.completed_stop_count|default(0) }}</dd></div>
-              <div><dt>Plant transfers</dt><dd>{{ floor_summary.transfer_count|default(0) }}</dd></div>
-              <div><dt>Open issues</dt><dd>{{ floor_summary.issue_count|default(0) }}</dd></div>
-            </div>
-
-            <div class="drawer-section-title">Top Needs Attention</div>
-            <ul class="audit-list">
-              {% set ns2 = namespace(count=0) %}
-              {% for item in pf.flow_items %}
-                {% if ns2.count < 5 and item.status in ('blocked','waiting','needs_review','critical','high') %}
-                  {% set ns2.count = ns2.count + 1 %}
-                  <li class="{{ item.status }}">
-                    <div><strong>{{ item.display_label or item.label }}</strong> &middot; {{ (item.next_action or item.stage or item.status_label or '')|truncate(60,true,'') }}</div>
-                  </li>
-                {% endif %}
-              {% endfor %}
-              {% if ns2.count == 0 %}<li>No production-flow issues found.</li>{% endif %}
-            </ul>
-
-            <div class="drawer-section-title">Event Timeline</div>
-            <ul class="audit-list" data-flow-event-timeline>
+            <h5 class="drawer-title">Shadow Ledger</h5>
+            <div class="drawer-kicker-line">Every visible edge, pulse, count, and alert is projected from append-only FlowEvents. Click a card or stop chip to filter the proof trail.</div>
+            <ul class="shadow-ledger-list" data-flow-event-timeline data-shadow-ledger-list>
               {% set edge_ns = namespace(count=0) %}
               {% for edge in pf.flow_edges|reverse %}
-                {% if edge_ns.count < 6 %}
+                {% if edge_ns.count < 8 %}
                   {% set edge_ns.count = edge_ns.count + 1 %}
-                  <li class="{{ edge.status }}" data-flow-event-id="{{ edge.event_id }}">
-                    <div><strong>{{ edge.label }}</strong> &middot; {{ edge.source_key }} to {{ edge.target_key }}{% if edge.previous_event_id %} &middot; after #{{ edge.previous_event_id }}{% endif %}</div>
+                  <li class="shadow-ledger-row {{ edge.status }}"
+                      data-shadow-ledger-row
+                      data-flow-event-id="{{ edge.event_id }}"
+                      data-source-key="{{ edge.source_key }}"
+                      data-target-key="{{ edge.target_key }}"
+                      data-entity-type="{{ edge.entity_type or '' }}"
+                      data-entity-id="{{ edge.entity_id or '' }}"
+                      data-stop-id="{{ edge.stop_id or '' }}">
+                    <strong>#{{ edge.event_id }} &nbsp;{{ edge.label }}</strong>
+                    <span class="ledger-edge">object: {{ edge.source_key }} &rarr; {{ edge.target_key }}{% if edge.previous_event_id %} &middot; after #{{ edge.previous_event_id }}{% endif %}</span>
+                    <span>entity: {{ edge.entity_type or 'flow' }}{% if edge.entity_id %} #{{ edge.entity_id }}{% endif %}{% if edge.stop_id %} &middot; stop {{ edge.stop_id }}{% endif %}</span>
+                    <span>source: {{ edge.source or 'ledger' }}{% if edge.actor_role %} / {{ edge.actor_role }}{% endif %}</span>
+                    <span class="ledger-proof">proof: {{ edge.proof_label or 'none' }}</span>
                   </li>
                 {% endif %}
               {% endfor %}
-              {% if edge_ns.count == 0 %}<li>No FlowEvent edges for this date yet.</li>{% endif %}
+              {% if edge_ns.count == 0 %}<li class="shadow-ledger-row">No FlowEvent edges for this date yet.</li>{% endif %}
             </ul>
-
-            <div class="drawer-section-title">Lane Pressure</div>
-            <ul class="audit-list">
-              {% for lane in pf.flow_lanes[:5] %}
-                <li class="{{ lane.worst_status }}">
-                  <div><strong>{{ lane.origin_label }} &rarr; {{ lane.destination_label }}</strong> &middot; {{ lane.open_count }} open, {{ lane.active_count }} active{% if lane.blocked_count %}, {{ lane.blocked_count }} blocked{% endif %}</div>
-                </li>
-              {% else %}
-                <li>No lane data yet.</li>
-              {% endfor %}
-            </ul>
+            <div class="shadow-ledger-note">{{ pf.ledger_summary.truth_statement if pf and pf.ledger_summary else 'The event ledger is the truth.' }}</div>
           </div>
           <div data-flow-drawer-detail hidden></div>
         </aside>
@@ -579,6 +565,38 @@
         if (objectKey) {
           var objects = root.querySelectorAll('[data-flow-object-key="' + objectKey + '"]');
           for (var k = 0; k < objects.length; k++) objects[k].classList.add('is-related-object');
+        }
+      }
+
+      function clearLedgerFilter() {
+        var rows = root.querySelectorAll('[data-shadow-ledger-row]');
+        for (var i = 0; i < rows.length; i++) rows[i].classList.remove('is-filtered-out');
+      }
+
+      function filterShadowLedger(trigger) {
+        clearLedgerFilter();
+        if (!trigger) return;
+        var nodeKey = trigger.getAttribute('data-flow-node-key') || '';
+        var entityType = trigger.getAttribute('data-entity-type') || '';
+        var entityId = trigger.getAttribute('data-entity-id') || '';
+        var rows = root.querySelectorAll('[data-shadow-ledger-row]');
+        var matches = [];
+        for (var i = 0; i < rows.length; i++) {
+          var row = rows[i];
+          var rowSource = row.getAttribute('data-source-key') || '';
+          var rowTarget = row.getAttribute('data-target-key') || '';
+          var rowEntityType = row.getAttribute('data-entity-type') || '';
+          var rowEntityId = row.getAttribute('data-entity-id') || '';
+          var rowStopId = row.getAttribute('data-stop-id') || '';
+          var isMatch =
+            (nodeKey && (rowSource === nodeKey || rowTarget === nodeKey)) ||
+            (entityType && entityId && rowEntityType === entityType && rowEntityId === entityId) ||
+            (entityType === 'route_stop' && entityId && rowStopId === entityId);
+          if (isMatch) matches.push(row);
+        }
+        if (!matches.length) return;
+        for (var j = 0; j < rows.length; j++) {
+          if (matches.indexOf(rows[j]) === -1) rows[j].classList.add('is-filtered-out');
         }
       }
 
@@ -760,6 +778,7 @@
 
       function showGlobal() {
         clearActive();
+        clearLedgerFilter();
         selectedKey = null;
         var drawer = root.querySelector('[data-flow-drawer]');
         if (drawer) drawer.classList.remove('is-detail-open');
@@ -779,7 +798,8 @@
           trigger.setAttribute('aria-pressed', 'true');
         }
         highlightRelated(trigger);
-        if (globalView) globalView.hidden = true;
+        filterShadowLedger(trigger);
+        if (globalView) globalView.hidden = false;
         if (detailView) {
           detailView.hidden = false;
           detailView.innerHTML = '<button type="button" class="drawer-close" data-flow-close aria-label="Close details">Close \u2715</button>' + source.innerHTML;
