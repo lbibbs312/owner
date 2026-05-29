@@ -774,7 +774,7 @@
                 <th>Arrive</th>
                 <th>Depart</th>
                 {% if reported_delay_count %}<th>Delay</th>{% endif %}
-                <th>Pickup Estimate</th>
+                <th>Expected Wait</th>
                 <th>Issues</th>
                 <th>Stop Status</th>
                 <th style="text-align:right;">Action</th>
@@ -801,7 +801,7 @@
                     <div class="timing-cell">
                       {% if row.forecast %}
                         <span class="timing-main">{{ row.forecast.estimate_label }}</span>
-                        <span class="timing-sub">{% if row.forecast.ready_at_label %}Ready estimate {{ row.forecast.ready_at_label }}{% else %}{{ row.forecast.confidence }}{% endif %}</span>
+                        <span class="timing-sub">{% if row.forecast.ready_at_label %}Expected wait {{ row.forecast.ready_at_label }}{% else %}{{ row.forecast.confidence }}{% endif %}</span>
                         <span class="timing-state {{ row.forecast.severity }}">{{ row.forecast.status }}</span>
                       {% else %}
                         <span class="timing-main">Complete</span>

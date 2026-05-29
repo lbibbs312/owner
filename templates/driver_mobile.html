@@ -283,7 +283,21 @@
       .side-nav .nav-link.active { background:rgba(127,29,45,.24); }
       main { padding-left: 22px; padding-right: 22px; }
     }
-    @media (min-width: 960px) {
+    @media (max-width: 460px) {
+      .topbar { padding: 12px; }
+      .cluster { gap: 9px; }
+      .avatar { width: 40px; height: 40px; }
+      .driver-name { font-size: .92rem; }
+      .status-line { font-size: .7rem; }
+      .header-actions { gap: 6px; }
+      .logout-link { min-height: 32px; padding: 0 8px; font-size: .62rem; }
+      .shift-pill { padding: 7px 8px; border-radius: 10px; }
+      .shift-pill strong { font-size: .82rem; }
+    }
+    @media (max-width: 380px) {
+      .logout-link { display: none; }
+    }
+    @media (min-width: 1200px) {
       .side-nav { display: none; }
       .mobile-shell {
         width: min(1560px, calc(100vw - 48px));
@@ -317,7 +331,7 @@
       .route-panel::-webkit-scrollbar-thumb { background: #64748b; border-radius: 999px; }
     }
     .route-panel { display: none; }
-    @media (min-width: 960px) { .route-panel { display: block; } }
+    @media (min-width: 1200px) { .route-panel { display: block; } }
 
     .rp-head {
       padding: 14px 16px 10px;
@@ -492,7 +506,45 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
     }
-    .driver-next-actions .button { min-height: 42px; }
+    .driver-next-actions .button {
+      min-width: 0;
+      min-height: 42px;
+      line-height: 1.1;
+      text-align: center;
+      white-space: normal;
+    }
+    .driver-ops-shell main > .ops-console { order: -5; }
+    .driver-ops-shell main > .hero {
+      order: 4;
+      padding: 14px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(127,29,45,.72), rgba(15,23,42,.94));
+    }
+    .driver-ops-shell main > .hero::after {
+      right: 8px;
+      top: 8px;
+      font-size: 3.4rem;
+      opacity: .72;
+    }
+    .driver-ops-shell main > .hero .eyebrow {
+      font-size: .64rem;
+      letter-spacing: .07em;
+    }
+    .driver-ops-shell main > .hero h1 {
+      margin-top: 8px;
+      font-size: clamp(1.24rem, 5vw, 1.65rem);
+      line-height: 1.04;
+    }
+    .driver-ops-shell main > .hero p {
+      margin-bottom: 12px;
+      font-size: .8rem;
+    }
+    .driver-ops-shell main > .hero .button,
+    .driver-ops-shell main > .hero button.action {
+      min-height: 40px;
+      border-radius: 11px;
+      font-size: .76rem;
+    }
     .current-work-card {
       border-color: rgba(245,158,11,.28) !important;
     }
@@ -579,6 +631,108 @@
       font-size: .72rem;
       line-height: 1.15;
       overflow-wrap: anywhere;
+    }
+    .compact-flow-canvas {
+      position: relative;
+      padding: 12px 10px;
+      border: 1px solid rgba(148,163,184,.18);
+      border-radius: 15px;
+      background:
+        radial-gradient(circle at 12% 20%, rgba(127,29,45,.24), transparent 9rem),
+        rgba(2,6,23,.36);
+      overflow: hidden;
+    }
+    .compact-map-nodes {
+      display: flex;
+      align-items: stretch;
+      gap: 7px;
+      min-width: min-content;
+      overflow-x: auto;
+      padding: 2px 1px 8px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(148,163,184,.45) rgba(15,23,42,.45);
+    }
+    .compact-route-node {
+      position: relative;
+      flex: 0 0 112px;
+      min-height: 92px;
+      display: grid;
+      align-content: start;
+      gap: 6px;
+      border: 1px solid rgba(148,163,184,.22);
+      border-radius: 13px;
+      background: rgba(15,23,42,.9);
+      color: #f8fafc;
+      padding: 10px;
+      text-align: left;
+      cursor: pointer;
+      z-index: 2;
+    }
+    .compact-route-node.active {
+      border-color: rgba(245,158,11,.62);
+      box-shadow: 0 0 0 3px rgba(245,158,11,.12);
+    }
+    .compact-route-node.status-completed { border-color: rgba(16,185,129,.32); }
+    .compact-route-node.status-blocked,
+    .compact-route-node.status-needs_review { border-color: rgba(239,68,68,.5); }
+    .compact-route-code {
+      width: 38px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      background: rgba(127,29,45,.3);
+      border: 1px solid rgba(243,199,207,.24);
+      color: #f3c7cf;
+      font-size: .64rem;
+      font-weight: 950;
+    }
+    .compact-route-node.active .compact-route-code {
+      background: #f59e0b;
+      border-color: #fbbf24;
+      color: #111827;
+    }
+    .compact-route-label {
+      color: #fff;
+      font-size: .76rem;
+      line-height: 1.12;
+      font-weight: 950;
+      overflow-wrap: anywhere;
+    }
+    .compact-route-node small {
+      color: #94a3b8;
+      font-size: .58rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .compact-route-lane {
+      align-self: center;
+      flex: 0 0 34px;
+      height: 4px;
+      border-radius: 999px;
+      background: repeating-linear-gradient(90deg, #475569 0 8px, transparent 8px 14px);
+      opacity: .9;
+    }
+    .compact-route-lane.status-active,
+    .compact-route-lane.status-open,
+    .compact-route-lane.status-future {
+      background: repeating-linear-gradient(90deg, #6366f1 0 8px, transparent 8px 14px);
+    }
+    .compact-route-lane.status-completed {
+      background: #10b981;
+      opacity: .64;
+    }
+    .compact-route-lane.status-blocked,
+    .compact-route-lane.status-needs_review {
+      background: repeating-linear-gradient(90deg, #ef4444 0 8px, transparent 8px 14px);
+    }
+    .compact-map-note {
+      margin: 0;
+      padding-top: 2px;
+      color: #cbd5e1;
+      font-size: .72rem;
+      font-weight: 800;
     }
     .compact-stop-list {
       display: grid;
@@ -830,7 +984,7 @@
     .move-defense-mobile .drawer-actions button[disabled] { cursor:not-allowed; border-color:rgba(148,163,184,.16); background:rgba(148,163,184,.08); color:#94a3b8; }
     .move-defense-mobile .drawer-actions button span { color:#cbd5e1; font-size:.66rem; }
 
-    @media (min-width: 960px) {
+    @media (min-width: 1200px) {
       .move-defense-mobile .route-map-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
       .move-defense-mobile .route-map-drawer-panel { left:auto; top:0; bottom:0; right:0; width:min(430px,100vw); max-height:none; border-top:0; border-left:1px solid rgba(148,163,184,.24); border-radius:0; box-shadow:-18px 0 44px rgba(0,0,0,.32); }
       .move-defense-mobile .drawer-grip { display:none; }

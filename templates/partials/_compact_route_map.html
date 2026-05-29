@@ -1,4 +1,28 @@
 {% set rm = route_map if route_map is defined else none %}
+{% set active_stops = [] %}
+{% set completed_stops = [] %}
+{% if rm and rm.stops %}
+  {% for stop in rm.stops %}
+    {% if stop.status == 'completed' %}
+      {% set _ = completed_stops.append(stop) %}
+    {% else %}
+      {% set _ = active_stops.append(stop) %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+{% set map_stops = [] %}
+{% if active_stops %}
+  {% if completed_stops %}
+    {% set _ = map_stops.append(completed_stops|last) %}
+  {% endif %}
+  {% for stop in active_stops[:4] %}
+    {% set _ = map_stops.append(stop) %}
+  {% endfor %}
+{% elif rm and rm.stops %}
+  {% for stop in rm.stops[:5] %}
+    {% set _ = map_stops.append(stop) %}
+  {% endfor %}
+{% endif %}
 <section class="compact-route-map" data-route-map-shell data-route-map-mode="route">
   <div class="compact-map-head">
     <div>
@@ -11,27 +35,47 @@
   </div>
 
   {% if rm and (rm.stops or rm.moves or rm.plants) %}
-    <div class="compact-node-strip" aria-label="Route locations">
-      {% for plant in rm.plants[:5] %}
-        <button class="compact-node status-{{ plant.worst_status }}"
-                type="button"
-                data-route-map-open="plant"
-                data-route-map-id="{{ plant.plant_key }}">
-          <span>{{ plant.short_code or '--' }}</span>
-          <strong>{{ plant.label }}</strong>
-        </button>
-      {% endfor %}
-    </div>
-
-    {% set active_stops = [] %}
-    {% set completed_stops = [] %}
-    {% for stop in rm.stops %}
-      {% if stop.status == 'completed' %}
-        {% set _ = completed_stops.append(stop) %}
-      {% else %}
-        {% set _ = active_stops.append(stop) %}
-      {% endif %}
-    {% endfor %}
+    {% if map_stops %}
+      <div class="compact-flow-canvas" aria-label="Route locations">
+        <div class="compact-map-nodes" style="--node-count: {{ map_stops|length }};">
+          {% for stop in map_stops %}
+            <button class="compact-route-node status-{{ stop.status }} {% if rm.route.current_stop_id == stop.stop_id %}active{% endif %}"
+                    type="button"
+                    data-route-map-open="stop"
+                    data-route-map-id="{{ stop.stop_id }}">
+              <span class="compact-route-code">{{ stop.short_code or stop.sequence }}</span>
+              <span class="compact-route-label">{{ stop.plant_name }}</span>
+              <small>{{ stop.status_label }}</small>
+            </button>
+            {% if not loop.last %}<span class="compact-route-lane status-{{ stop.status }}" aria-hidden="true"></span>{% endif %}
+          {% endfor %}
+        </div>
+        <p class="compact-map-note">
+          {% if active_stops %}
+            Current work first. Completed stops stay collapsed below.
+          {% else %}
+            Current work is closed. Completed stops are below.
+          {% endif %}
+        </p>
+      </div>
+    {% elif rm.plants %}
+      <div class="compact-flow-canvas" aria-label="Route locations">
+        <div class="compact-map-nodes" style="--node-count: {{ (rm.plants[:5])|length }};">
+          {% for plant in rm.plants[:5] %}
+            <button class="compact-route-node status-{{ plant.worst_status }}"
+                    type="button"
+                    data-route-map-open="plant"
+                    data-route-map-id="{{ plant.plant_key }}">
+              <span class="compact-route-code">{{ plant.short_code or '--' }}</span>
+              <span class="compact-route-label">{{ plant.label }}</span>
+              <small>{{ plant.worst_status|replace('_', ' ')|title }}</small>
+            </button>
+            {% if not loop.last %}<span class="compact-route-lane status-{{ plant.worst_status }}" aria-hidden="true"></span>{% endif %}
+          {% endfor %}
+        </div>
+        <p class="compact-map-note">Using route and move request data only.</p>
+      </div>
+    {% endif %}
 
     <div class="compact-stop-list">
       {% for stop in active_stops %}
