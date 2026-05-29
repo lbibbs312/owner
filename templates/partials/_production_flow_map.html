@@ -1,0 +1,127 @@
+{% set pf = production_flow if production_flow is defined else route_map %}
+{% set summary = pf.queue_summary if pf and pf.queue_summary else {} %}
+{% set floor_summary = pf.floor_summary if pf and pf.floor_summary else {} %}
+
+<section class="ops-console production-flow-board" data-route-map-shell data-route-map-mode="production">
+  <div class="ops-board-head">
+    <div>
+      <p class="ops-board-kicker">Production Flow Map</p>
+      <h3>Production Flow</h3>
+      <p>{{ pf.date if pf else '' }}{% if pf %} &middot; {{ floor_summary.data_scope_note or 'Using route and move request data only' }}{% endif %}</p>
+    </div>
+    <div class="ops-board-status">
+      <span>{{ summary.needs_attention_count|default(0) }} needs attention</span>
+      <strong>{{ summary.document_needed_count|default(0) }} proof needed</strong>
+    </div>
+  </div>
+
+  <div class="production-flow-summary" aria-label="Move Queue Summary">
+    <span><strong>{{ summary.open_count|default(0) }}</strong> Open</span>
+    <span><strong>{{ summary.active_count|default(0) }}</strong> Active</span>
+    <span><strong>{{ summary.waiting_count|default(0) }}</strong> Waiting</span>
+    <span><strong>{{ summary.blocked_count|default(0) }}</strong> Blocked</span>
+    <span><strong>{{ summary.completed_count|default(0) }}</strong> Completed</span>
+    <span><strong>{{ summary.hot_count|default(0) }}</strong> Hot</span>
+  </div>
+
+  {% if pf and (pf.flow_nodes or pf.flow_lanes or pf.flow_items) %}
+    <div class="flow-map-layout">
+      <div class="map-viewport production-flow-map" aria-label="Production flow facility map">
+        <svg class="flow-lane-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <marker id="flowArrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <polygon points="0 0, 6 3, 0 6" fill="#4b5563"></polygon>
+            </marker>
+          </defs>
+          {% for lane in pf.flow_lanes %}
+            <line x1="{{ lane.layout.x1 }}" y1="{{ lane.layout.y1 }}"
+                  x2="{{ lane.layout.x2 }}" y2="{{ lane.layout.y2 }}"
+                  class="flow-lane-line lane-{{ lane.worst_status }}"
+                  marker-end="url(#flowArrow)"></line>
+          {% endfor %}
+        </svg>
+
+        {% for node in pf.flow_nodes %}
+          <a class="facility-card status-{{ node.worst_status }} {% if pf.selected_context.selected_node_key and pf.selected_context.selected_node_key == node.key %}active{% endif %}"
+             href="{{ node.view_url or '#' }}"
+             style="left: {{ node.layout.x }}%; top: {{ node.layout.y }}%;"
+             data-route-map-open="flow-node"
+             data-route-map-id="{{ node.key }}">
+            <div class="facility-header">
+              <span>{{ node.short_code or '--' }}</span>
+              <strong>{{ node.label }}</strong>
+            </div>
+            <div class="facility-grid">
+              <span>Open <strong>{{ node.open_count }}</strong></span>
+              <span>Active <strong>{{ node.active_count }}</strong></span>
+              <span>Wait <strong>{{ node.waiting_count }}</strong></span>
+              <span>Issue <strong>{{ node.issue_count }}</strong></span>
+              <span>Blocked <strong>{{ node.blocked_count }}</strong></span>
+              <span>Done <strong>{{ node.completed_count }}</strong></span>
+            </div>
+          </a>
+        {% endfor %}
+
+        {% for item in pf.flow_items[:10] %}
+          <a class="move-token status-{{ item.status }} priority-{{ item.priority or 'normal' }}"
+             href="{{ item.view_url or '#' }}"
+             style="left: {{ item.layout.x }}%; top: {{ item.layout.y }}%;"
+             data-route-map-open="flow-item"
+             data-route-map-id="{{ item.item_id }}">
+            <span class="move-token-header">
+              <strong>{{ item.label }}</strong>
+              <em>{{ item.status_label }}</em>
+            </span>
+            <span class="move-token-body">
+              <span>{{ item.cargo_text or item.description }}</span>
+              <small>{{ item.assigned_driver or item.next_action }}</small>
+            </span>
+          </a>
+        {% endfor %}
+      </div>
+
+      <aside class="flow-side-panel" aria-label="Production flow snapshot">
+        <div class="flow-side-block">
+          <h4>Floor Operations Snapshot</h4>
+          <dl>
+            <div><dt>Active stops</dt><dd>{{ floor_summary.active_stop_count|default(0) }}</dd></div>
+            <div><dt>Completed stops</dt><dd>{{ floor_summary.completed_stop_count|default(0) }}</dd></div>
+            <div><dt>Plant transfers</dt><dd>{{ floor_summary.transfer_count|default(0) }}</dd></div>
+            <div><dt>Open issues</dt><dd>{{ floor_summary.issue_count|default(0) }}</dd></div>
+          </dl>
+          <p>{{ floor_summary.data_scope_note or 'Using route and move request data only' }}</p>
+        </div>
+
+        <div class="flow-side-block">
+          <h4>Lane Pressure</h4>
+          <div class="lane-pressure-list">
+            {% for lane in pf.flow_lanes[:6] %}
+              <button class="lane-pressure status-{{ lane.worst_status }}"
+                      type="button"
+                      data-route-map-open="flow-lane"
+                      data-route-map-id="{{ lane.origin_key }}--{{ lane.destination_key }}">
+                <span>{{ lane.origin_label }} &rarr; {{ lane.destination_label }}</span>
+                <small>{{ lane.open_count }} open &middot; {{ lane.active_count }} active{% if lane.waiting_count %} &middot; {{ lane.waiting_count }} waiting{% endif %}{% if lane.blocked_count %} &middot; {{ lane.blocked_count }} blocked{% endif %}</small>
+              </button>
+            {% else %}
+              <p class="ops-empty">No lane data yet.</p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="flow-side-block">
+          <h4>Carrier Unit Snapshot</h4>
+          <p>{{ pf.empty_states.carrier_unit_snapshot or 'Carrier unit snapshot not connected yet' }}</p>
+        </div>
+      </aside>
+    </div>
+  {% else %}
+    <div class="flow-empty-state">
+      <strong>No current production-flow data.</strong>
+      <span>Move requests, route stops, and plant transfers will appear here after they are recorded.</span>
+      <span>{{ pf.empty_states.carrier_unit_snapshot if pf else 'Carrier unit snapshot not connected yet' }}</span>
+    </div>
+  {% endif %}
+
+  {% include "partials/_production_flow_drawer.html" %}
+</section>

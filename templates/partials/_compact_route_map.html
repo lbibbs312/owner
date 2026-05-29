@@ -1,0 +1,111 @@
+{% set rm = route_map if route_map is defined else none %}
+<section class="compact-route-map" data-route-map-shell data-route-map-mode="route">
+  <div class="compact-map-head">
+    <div>
+      <span>Compact Live Route Map</span>
+      <h3>{{ route_panel_title or "Today's Route" }}</h3>
+    </div>
+    {% if rm and rm.route %}
+      <strong>{{ rm.route.next_action or 'No action needed' }}</strong>
+    {% endif %}
+  </div>
+
+  {% if rm and (rm.stops or rm.moves or rm.plants) %}
+    <div class="compact-node-strip" aria-label="Route locations">
+      {% for plant in rm.plants[:5] %}
+        <button class="compact-node status-{{ plant.worst_status }}"
+                type="button"
+                data-route-map-open="plant"
+                data-route-map-id="{{ plant.plant_key }}">
+          <span>{{ plant.short_code or '--' }}</span>
+          <strong>{{ plant.label }}</strong>
+        </button>
+      {% endfor %}
+    </div>
+
+    {% set active_stops = [] %}
+    {% set completed_stops = [] %}
+    {% for stop in rm.stops %}
+      {% if stop.status == 'completed' %}
+        {% set _ = completed_stops.append(stop) %}
+      {% else %}
+        {% set _ = active_stops.append(stop) %}
+      {% endif %}
+    {% endfor %}
+
+    <div class="compact-stop-list">
+      {% for stop in active_stops %}
+        <button class="compact-stop status-{{ stop.status }} {% if rm.route.current_stop_id == stop.stop_id %}active{% endif %}"
+                type="button"
+                data-route-map-open="stop"
+                data-route-map-id="{{ stop.stop_id }}">
+          <span class="compact-stop-marker">{{ stop.sequence }}</span>
+          <span class="compact-stop-main">
+            <strong>{{ stop.plant_name }}</strong>
+            <small>{{ stop.arrival_at|display_time if stop.arrival_at else 'No current data' }}{% if stop.departure_at %} &rarr; {{ stop.departure_at|to_12h_format }}{% else %} &rarr; open{% endif %}</small>
+            <small>{{ stop.cargo_status }} &middot; {{ stop.next_action }}</small>
+          </span>
+          <em>{{ stop.status_label }}</em>
+        </button>
+      {% else %}
+        {% if completed_stops %}
+          <p class="compact-empty">Current work is closed. Completed stops are below.</p>
+        {% else %}
+          <p class="compact-empty">No stops logged yet.</p>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    {% if completed_stops %}
+      <details class="completed-stops">
+        <summary>Show completed stops ({{ completed_stops|length }})</summary>
+        <div class="compact-stop-list">
+          {% for stop in completed_stops %}
+            <button class="compact-stop status-completed"
+                    type="button"
+                    data-route-map-open="stop"
+                    data-route-map-id="{{ stop.stop_id }}">
+              <span class="compact-stop-marker">&#10003;</span>
+              <span class="compact-stop-main">
+                <strong>{{ stop.plant_name }}</strong>
+                <small>{{ stop.arrival_at|display_time if stop.arrival_at else 'No current data' }}{% if stop.departure_at %} &rarr; {{ stop.departure_at|to_12h_format }}{% endif %}</small>
+                <small>{{ stop.cargo_status }}</small>
+              </span>
+              <em>{{ stop.status_label }}</em>
+            </button>
+          {% endfor %}
+        </div>
+      </details>
+    {% endif %}
+
+    {% if rm.moves %}
+      <div class="compact-move-strip">
+        <span>Assigned Move Queue</span>
+        {% for move in rm.moves[:3] %}
+          <button type="button"
+                  class="compact-move status-{{ move.status }}"
+                  data-route-map-open="move"
+                  data-route-map-id="{{ move.move_request_id }}">
+            <strong>{{ move.request_number }}</strong>
+            <small>{{ move.origin_location_text }} &rarr; {{ move.destination_location_text }}</small>
+          </button>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% else %}
+    <p class="compact-empty">Stops, move requests, and plant transfers will appear here after they are recorded.</p>
+  {% endif %}
+
+  <div class="route-map-drawer" data-route-map-drawer hidden aria-hidden="true">
+    <button class="route-map-drawer-backdrop" type="button" data-route-map-close aria-label="Close details"></button>
+    <aside class="route-map-drawer-panel" role="dialog" aria-modal="true" aria-label="Route map details">
+      <div class="drawer-grip"></div>
+      <button class="drawer-close" type="button" data-route-map-close>Close</button>
+      <div data-route-map-drawer-content></div>
+    </aside>
+  </div>
+
+  {% include "partials/_stop_detail_drawer.html" %}
+  {% include "partials/_plant_detail_drawer.html" %}
+  {% include "partials/_move_detail_drawer.html" %}
+</section>

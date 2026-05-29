@@ -1,0 +1,18 @@
+{# Reusable, normalized issue-severity badge.
+
+   Import and call as a macro:
+     {% from "partials/_issue_badge.html" import issue_badge %}
+     {{ issue_badge(category=item.category, severity=item.severity) }}
+     {{ issue_badge(minutes=wait_minutes, wait_threshold=30) }}
+     {{ issue_badge(category="Damage flag", show_category=True) }}
+
+   Relies on the `classify_issue` template global (registered in
+   app/services/template_filters.py). Renders nothing when there is no
+   classifiable input (e.g. a wait with no elapsed minutes). #}
+{% macro issue_badge(category=None, severity=None, label=None, minutes=None, wait_threshold=None, show_category=False) -%}
+  {%- set _i = classify_issue(category=category, severity=severity, label=label, minutes=minutes, wait_threshold=wait_threshold) -%}
+  {%- if _i -%}
+    <span class="{{ _i.level_class }}" title="{{ _i.category_label }}">{{ _i.level_label }}</span>
+    {%- if show_category %} <span class="issue-cat">{{ _i.category_label }}</span>{% endif -%}
+  {%- endif -%}
+{%- endmacro %}

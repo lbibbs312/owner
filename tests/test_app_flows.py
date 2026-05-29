@@ -2751,11 +2751,12 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     assert b"Live Routes &amp; Stops" in dashboard.data
     assert b"Missing Departure" in dashboard.data
     assert b"Completed" in dashboard.data
-    assert b"Critical Exceptions" in dashboard.data
+    assert b"Needs Attention" in dashboard.data
+    assert b"Critical Exceptions" not in dashboard.data
     assert b"Truck Issue" in dashboard.data
     assert b"status-dot open" in dashboard.data
     assert b"status-dot complete" in dashboard.data
-    assert b"Live Problems" in dashboard.data
+    assert b"Needs Attention" in dashboard.data
     assert b'<span class="sbadge problem">Problem</span>' not in dashboard.data
     detail_page = client.get(f"/manager/driver-logs/{log_id}")
     assert detail_page.status_code == 200

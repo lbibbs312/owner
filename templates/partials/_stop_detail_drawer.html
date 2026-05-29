@@ -1,0 +1,39 @@
+{% if route_map %}
+  {% for stop in route_map.stops %}
+    <div class="route-map-detail-source" hidden data-route-map-detail="stop-{{ stop.stop_id }}">
+      <div class="drawer-kicker">Stop {{ stop.sequence }} · {{ stop.short_code or 'No current data' }}</div>
+      <h3>{{ stop.plant_name or 'No current data' }}</h3>
+      <div class="drawer-badges">
+        <span class="route-status-badge status-{{ stop.status }}">{{ stop.status_label }}</span>
+        {% if stop.has_damage %}<span class="route-status-badge status-blocked">Damage</span>{% endif %}
+        {% if stop.has_issue %}<span class="route-status-badge status-needs_review">Needs Review</span>{% endif %}
+      </div>
+      <dl class="drawer-facts">
+        <div><dt>Arrival</dt><dd>{{ stop.arrival_at|display_time if stop.arrival_at else 'No current data' }}</dd></div>
+        <div><dt>Departure</dt><dd>{{ stop.departure_at|to_12h_format if stop.departure_at else 'Not tracked yet' }}</dd></div>
+        <div><dt>Wait / dwell</dt><dd>{{ stop.wait_label or 'Not tracked yet' }}</dd></div>
+        <div><dt>Arrived with</dt><dd>{{ stop.arrived_with or 'Not tracked yet' }}</dd></div>
+        <div><dt>Departed with</dt><dd>{{ stop.departed_with or 'Not tracked yet' }}</dd></div>
+        <div><dt>Cargo / load</dt><dd>{{ stop.cargo_status or 'No current data' }}</dd></div>
+        <div><dt>Linked move</dt><dd>{% if stop.linked_move_request_id %}{{ stop.linked_move_request_number or ('Move #' ~ stop.linked_move_request_id) }}{% else %}No linked move request{% endif %}</dd></div>
+        <div><dt>Transfer / document</dt><dd>{% if stop.linked_plant_transfer_id %}Plant Transfer #{{ stop.linked_plant_transfer_id }}{% elif stop.linked_document_id %}Document #{{ stop.linked_document_id }}{% else %}Document not attached{% endif %}</dd></div>
+        <div><dt>Issue status</dt><dd>{% if stop.has_issue or stop.has_damage %}Needs review{% else %}No open issues{% endif %}</dd></div>
+        <div><dt>Next action</dt><dd>{{ stop.next_action or 'No action needed' }}</dd></div>
+      </dl>
+      {% if stop.notes %}
+        <p class="drawer-note">{{ stop.notes }}</p>
+      {% endif %}
+      <div class="drawer-actions">
+        {% for action in stop.actions %}
+          {% if action.method == 'post' and action.url %}
+            <form method="POST" action="{{ action.url }}"><button type="submit">{{ action.label }}</button></form>
+          {% elif action.url %}
+            <a href="{{ action.url }}">{{ action.label }}</a>
+          {% else %}
+            <button type="button" disabled>{{ action.label }} <span>Not wired yet.</span></button>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+{% endif %}

@@ -1,0 +1,13 @@
+{# Renders a single next-action chip. Import:
+   {% from "partials/_next_action.html" import next_action_chip %}
+   {{ next_action_chip(row.next_action) }} #}
+{% macro next_action_chip(action) -%}
+{%- set tones = {
+  "Assign driver": "info", "Acknowledge request": "info", "Start or link route": "info",
+  "Record departure": "action", "Confirm cargo": "action", "Attach document": "action",
+  "Verify time entry": "watch", "Review issue": "danger", "Review blocker": "danger",
+  "Reassign declined move": "danger", "Close request": "good", "Complete route": "good",
+  "No action needed": "muted"
+} -%}
+<span class="next-action na-{{ tones.get(action, 'info') }}">{{ action }}</span>
+{%- endmacro %}

@@ -1,0 +1,43 @@
+{# Manager Move Queue summary: 5 stat cards + latest request rows.
+   Expects `floor` (build_floor_operations_snapshot result). Manager-only
+   (uses manager.* endpoints). #}
+{% from "partials/_next_action.html" import next_action_chip %}
+{% set qs = floor.queue_summary %}
+<div class="ops-panel">
+  <div class="ops-head">
+    <h3>Move Queue</h3>
+    <a class="ops-link" href="{{ url_for('manager.move_requests') }}">Open Move Queue &rarr;</a>
+  </div>
+  <div class="ops-body">
+    <div class="mq-grid">
+      <div class="mq-stat"><span class="mq-num">{{ qs.open_requests }}</span><span class="mq-lbl">Open Requests</span></div>
+      <div class="mq-stat tone-danger"><span class="mq-num">{{ qs.hot_requests }}</span><span class="mq-lbl">Hot Requests</span></div>
+      <div class="mq-stat tone-warn"><span class="mq-num">{{ qs.unassigned_requests }}</span><span class="mq-lbl">Unassigned</span></div>
+      <div class="mq-stat tone-danger"><span class="mq-num">{{ qs.blocked_requests }}</span><span class="mq-lbl">Blocked</span></div>
+      <div class="mq-stat tone-warn"><span class="mq-num">{{ qs.due_soon_requests }}</span><span class="mq-lbl">Due Soon</span></div>
+    </div>
+    {% if floor.latest_requests %}
+    <div class="mq-list">
+      {% for r in floor.latest_requests %}
+      <div class="mq-row">
+        <div class="mq-row-main">
+          <div class="mq-row-top">
+            <span class="mq-id">{{ r.number }}</span>
+            <span class="ops-tag tone-{{ 'danger' if r.is_hot else ('warn' if r.priority == 'high' else 'muted') }}">{{ r.priority_label }}</span>
+            <span class="ops-tag">{{ r.status_label }}</span>
+          </div>
+          <div class="mq-route">{{ r.origin }} <span class="mq-arrow">&rarr;</span> {{ r.destination }}</div>
+          <div class="mq-meta">{{ r.cargo }}{% if r.due_label %} &middot; due {{ r.due_label }}{% endif %} &middot; {{ r.driver }}</div>
+        </div>
+        <div class="mq-side">
+          {{ next_action_chip(r.next_action) }}
+          <a class="ops-btn" href="{{ url_for('manager.edit_move_request', request_id=r.id) }}">{{ 'Assign' if r.driver == 'Unassigned' else 'View' }}</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="ops-empty">No current data. New move requests will appear here.</p>
+    {% endif %}
+  </div>
+</div>

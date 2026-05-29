@@ -1,0 +1,86 @@
+{% if pf %}
+  {% for node in pf.flow_nodes %}
+    <div class="route-map-detail-source" hidden data-route-map-detail="flow-node-{{ node.key }}">
+      <div class="drawer-kicker">Plant / Location &middot; {{ node.short_code or 'No current data' }}</div>
+      <h3>{{ node.label or 'No current data' }}</h3>
+      <div class="drawer-badges">
+        <span class="route-status-badge status-{{ node.worst_status }}">{{ node.worst_status|replace('_', ' ')|title }}</span>
+      </div>
+      <dl class="drawer-facts">
+        <div><dt>Open</dt><dd>{{ node.open_count }}</dd></div>
+        <div><dt>Active</dt><dd>{{ node.active_count }}</dd></div>
+        <div><dt>Waiting</dt><dd>{{ node.waiting_count }}</dd></div>
+        <div><dt>Blocked</dt><dd>{{ node.blocked_count }}</dd></div>
+        <div><dt>Completed</dt><dd>{{ node.completed_count }}</dd></div>
+        <div><dt>Issues</dt><dd>{{ node.issue_count }}</dd></div>
+        <div><dt>Carrier Unit</dt><dd>{{ node.meta.snapshot_empty_state or 'Carrier unit snapshot not connected yet' }}</dd></div>
+        <div><dt>Rack / Capacity</dt><dd>{{ node.meta.rack_empty_state or 'Rack/capacity data not connected yet' }}</dd></div>
+        <div><dt>Timing</dt><dd>{% if node.meta.timing and node.meta.timing.estimate_minutes is not none %}Expected Wait {{ node.meta.timing.estimate_label }}{% else %}Not tracked yet{% endif %}</dd></div>
+        <div><dt>Data Sources</dt><dd>{% if node.meta.data_sources %}{{ node.meta.data_sources|join(', ') }}{% else %}No current data{% endif %}</dd></div>
+        <div><dt>Next Action</dt><dd>{{ node.next_action or 'No action needed' }}</dd></div>
+      </dl>
+      <div class="drawer-actions">
+        {% if node.view_url %}<a href="{{ node.view_url }}">View related Move Queue</a>{% else %}<button type="button" disabled>View related Move Queue <span>Not wired yet.</span></button>{% endif %}
+        {% if node.active_moves_url %}<a href="{{ node.active_moves_url }}">View related Active Moves</a>{% else %}<button type="button" disabled>View related Active Moves <span>Not wired yet.</span></button>{% endif %}
+      </div>
+    </div>
+  {% endfor %}
+
+  {% for lane in pf.flow_lanes %}
+    <div class="route-map-detail-source" hidden data-route-map-detail="flow-lane-{{ lane.origin_key }}--{{ lane.destination_key }}">
+      <div class="drawer-kicker">Production Lane</div>
+      <h3>{{ lane.origin_label }} &rarr; {{ lane.destination_label }}</h3>
+      <div class="drawer-badges">
+        <span class="route-status-badge status-{{ lane.worst_status }}">{{ lane.worst_status|replace('_', ' ')|title }}</span>
+      </div>
+      <dl class="drawer-facts">
+        <div><dt>Open moves</dt><dd>{{ lane.open_count }}</dd></div>
+        <div><dt>Active moves</dt><dd>{{ lane.active_count }}</dd></div>
+        <div><dt>Waiting</dt><dd>{{ lane.waiting_count }}</dd></div>
+        <div><dt>Blocked</dt><dd>{{ lane.blocked_count }}</dd></div>
+        <div><dt>Completed today</dt><dd>{{ lane.completed_count }}</dd></div>
+        <div><dt>Oldest age</dt><dd>{% if lane.oldest_age_minutes is not none %}{{ lane.oldest_age_minutes }} min{% else %}Not tracked yet{% endif %}</dd></div>
+        <div><dt>Linked requests</dt><dd>{% if lane.linked_request_ids %}{{ lane.linked_request_ids|join(', ') }}{% else %}No current data{% endif %}</dd></div>
+        <div><dt>Linked transfers</dt><dd>{% if lane.linked_transfer_ids %}{{ lane.linked_transfer_ids|join(', ') }}{% else %}No current data{% endif %}</dd></div>
+      </dl>
+      <div class="drawer-actions">
+        {% if lane.view_url %}<a href="{{ lane.view_url }}">Open related Move Queue</a>{% else %}<button type="button" disabled>Open related Move Queue <span>Not wired yet.</span></button>{% endif %}
+      </div>
+    </div>
+  {% endfor %}
+
+  {% for item in pf.flow_items %}
+    <div class="route-map-detail-source" hidden data-route-map-detail="flow-item-{{ item.item_id }}">
+      <div class="drawer-kicker">{{ item.item_type|replace('_', ' ')|title }}</div>
+      <h3>{{ item.label or 'No current data' }}</h3>
+      <div class="drawer-badges">
+        <span class="route-status-badge status-{{ item.status }}">{{ item.status_label }}</span>
+      </div>
+      <dl class="drawer-facts">
+        <div><dt>Location / Lane</dt><dd>{{ item.plant_location or 'No current data' }}</dd></div>
+        <div><dt>Stage</dt><dd>{{ item.stage or 'No current data' }}</dd></div>
+        <div><dt>Description</dt><dd>{{ item.description or 'No current data' }}</dd></div>
+        <div><dt>Age</dt><dd>{% if item.age_minutes is not none %}{{ item.age_minutes }} min{% else %}Not tracked yet{% endif %}</dd></div>
+        <div><dt>Carrier Unit</dt><dd>{% if item.carrier_unit_count is not none %}{{ item.carrier_unit_count }}{% else %}Carrier unit snapshot not connected yet{% endif %}</dd></div>
+        <div><dt>Rack / Capacity</dt><dd>{% if item.rack_count is not none %}{{ item.rack_count }}{% else %}Rack/capacity data not connected yet{% endif %}</dd></div>
+        <div><dt>Trailer</dt><dd>{{ item.trailer or 'Not tracked yet' }}</dd></div>
+        <div><dt>Linked request</dt><dd>{% if item.linked_request_id %}Move Request #{{ item.linked_request_id }}{% else %}No linked move request{% endif %}</dd></div>
+        <div><dt>Linked stop</dt><dd>{% if item.linked_route_stop_id %}Driver Log #{{ item.linked_route_stop_id }}{% else %}No linked route stop{% endif %}</dd></div>
+        <div><dt>Proof / Document</dt><dd>{% if item.linked_transfer_id %}Plant Transfer #{{ item.linked_transfer_id }}{% elif item.linked_document_id %}Document #{{ item.linked_document_id }}{% else %}Document not attached{% endif %}</dd></div>
+        <div><dt>Next Action</dt><dd>{{ item.next_action or 'No action needed' }}</dd></div>
+      </dl>
+      <div class="drawer-actions">
+        {% if item.view_url %}<a href="{{ item.view_url }}">Open related record</a>{% else %}<button type="button" disabled>Open related record <span>Not wired yet.</span></button>{% endif %}
+      </div>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<div class="route-map-drawer" data-route-map-drawer hidden aria-hidden="true">
+  <button class="route-map-drawer-backdrop" type="button" data-route-map-close aria-label="Close details"></button>
+  <aside class="route-map-drawer-panel" role="dialog" aria-modal="true" aria-label="Production flow details">
+    <div class="drawer-grip"></div>
+    <button class="drawer-close" type="button" data-route-map-close>Close</button>
+    <div data-route-map-drawer-content></div>
+  </aside>
+</div>

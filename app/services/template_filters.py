@@ -8,6 +8,9 @@ from datetime import datetime, time
 
 import pytz
 
+from app.services.issue_severity import classify_issue, classify_wait, severity_level
+from app.services.cargo_state import cargo_state_for_log, cargo_state_for_request, cargo_state_label
+
 DETROIT_TZ = pytz.timezone("America/Detroit")
 UTC_DATETIME_FORMATS = ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M")
 
@@ -100,3 +103,10 @@ def register_template_filters(app):
     app.add_template_filter(_to_12h_format, name="to_12h_format")
     app.add_template_filter(_display_time, name="display_time")
     app.add_template_filter(_to_detroit_datetime, name="to_detroit_datetime")
+    # Normalized issue severity/category helpers for templates.
+    app.add_template_global(classify_issue, name="classify_issue")
+    app.add_template_global(classify_wait, name="classify_wait")
+    app.add_template_global(severity_level, name="severity_level")
+    app.add_template_global(cargo_state_for_log, name="cargo_state_for_log")
+    app.add_template_global(cargo_state_for_request, name="cargo_state_for_request")
+    app.add_template_global(cargo_state_label, name="cargo_state_label")

@@ -38,6 +38,8 @@ from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, Dri
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
 from app.services.operations import build_exception_items
+from app.services.floor_operations import build_floor_operations_snapshot
+from app.services.production_flow import build_production_flow_context
 from app.services.load_state import build_driver_log_route_context, route_problem_reason, secondary_not_dropped_reason, truck_issue_reason
 from app.services.cargo_reconciliation_service import reconcile_cargo
 from app.services.media_attachment_service import upload_file_path
@@ -2032,6 +2034,7 @@ def manager_dashboard():
     if division_filter not in {"All", "Plastics", "Trim"}:
         division_filter = "All"
     selected_driver_id = request.args.get("driver_id", type=int)
+    selected_plant = (request.args.get("plant") or "").strip() or None
     focus_panel = request.args.get("focus", "jobs")
     if focus_panel not in {"jobs", "routes"}:
         focus_panel = "jobs"
@@ -2062,9 +2065,19 @@ def manager_dashboard():
 
     active_driver_ids = {log.driver_id for log in todays_logs}
     active_drivers = [driver for driver in drivers if driver.id in active_driver_ids]
+    floor = build_floor_operations_snapshot(today)
+    production_flow = build_production_flow_context(
+        date=today,
+        mode="production",
+        selected_plant=selected_plant,
+        driver_id=selected_driver_id,
+    )
     return render_template(
         "manager_dashboard.html",
         create_task_form=create_task_form,
+        floor=floor,
+        production_flow=production_flow,
+        selected_plant=selected_plant,
         uncompleted_tasks=uncompleted_tasks,
         dispatch_rows=dispatch_rows,
         live_stop_rows=live_stop_rows,
