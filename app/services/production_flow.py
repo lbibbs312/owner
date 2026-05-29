@@ -5,11 +5,12 @@ This service is the widescreen / manager / plant-floor counterpart to
 MoveRequest, DriverLog, PlantTransfer, issue, timing, and proof records.  It
 does not invent unavailable production asset snapshots.
 """
-from datetime import date as date_cls, datetime, timedelta
 import re
+from datetime import date as date_cls
+from datetime import datetime, timedelta
 
-from flask import has_request_context, url_for
 import pytz
+from flask import has_request_context, url_for
 from sqlalchemy import or_
 from werkzeug.routing import BuildError
 
@@ -20,7 +21,6 @@ from app.services.floor_operations import ACTIVE_STATUSES, next_action_for_reque
 from app.services.issue_severity import DEFAULT_WAIT_THRESHOLD, classify_issue
 from app.services.plant_addresses import PLANT_LABELS, plant_label
 from app.services.plant_time import plant_forecast_rows
-
 
 SAFE_EMPTY = "No current data"
 NOT_TRACKED = "Not tracked yet"

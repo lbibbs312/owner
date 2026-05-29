@@ -184,14 +184,14 @@
               </marker>
             </defs>
             {% for lane in board.lanes %}
-              <line class="opsb-lane ops-lane-{{ lane.state }}"
+              <line class="opsb-lane opsb-lane-{{ lane.state }}"
                     x1="{{ lane.x1 }}" y1="{{ lane.y1 }}" x2="{{ lane.x2 }}" y2="{{ lane.y2 }}"
                     marker-end="url(#opsArrow)"></line>
             {% endfor %}
           </svg>
 
           {% for node in board.nodes %}
-            <button type="button" class="opsb-facility ops-state-{{ node.state }}"
+            <button type="button" class="opsb-facility opsb-state-{{ node.state }}"
                     style="left: {{ node.pos.left }}px; top: {{ node.pos.top }}px;"
                     data-ops-open="flow-node" data-ops-id="{{ node.key }}">
               <span class="opsb-facility-head">{{ node.label }}</span>
