@@ -10,106 +10,9 @@
 {% set board_label = production_flow_label if production_flow_label is defined else ('Plant Floor Board' if is_plant_floor_flow else ('Compact Production Flow' if is_mobile_flow else 'Production Flow Map')) %}
 {% set board_title = production_flow_title if production_flow_title is defined else ('Plant Floor Board' if is_plant_floor_flow else 'Production Flow') %}
 
-<section class="ops-console production-flow-board production-flow--{{ flow_mode|replace('_', '-') }}" data-route-map-shell data-route-map-mode="production" data-production-flow-mode="{{ flow_mode }}">
-  <div class="ops-board-head">
-    <div>
-      <p class="ops-board-kicker">{{ board_label }}</p>
-      <h3>{{ board_title }}</h3>
-      <p>{{ pf.date if pf else '' }}{% if pf %} &middot; {{ floor_summary.data_scope_note or 'Using route and move request data only' }}{% endif %}</p>
-    </div>
-    <div class="ops-board-status">
-      <span>{{ summary.needs_attention_count|default(0) }} needs attention</span>
-      <strong>{{ summary.document_needed_count|default(0) }} proof needed</strong>
-    </div>
-  </div>
+<section class="ops-console production-flow-board production-flow--{{ flow_mode|replace('_', '-') }}" data-route-map-shell data-route-map-mode="production" data-production-flow-mode="{{ flow_mode }}" aria-label="{{ board_label }}">
 
   {% if has_flow_signals %}
-    <div class="production-flow-summary" aria-label="Move Queue Summary">
-      <span><strong>{{ summary.open_count|default(0) }}</strong> Open</span>
-      <span><strong>{{ summary.active_count|default(0) }}</strong> Active</span>
-      <span><strong>{{ summary.waiting_count|default(0) }}</strong> Waiting</span>
-      <span><strong>{{ summary.blocked_count|default(0) }}</strong> Blocked</span>
-      <span><strong>{{ summary.completed_count|default(0) }}</strong> Completed</span>
-      <span><strong>{{ summary.hot_count|default(0) }}</strong> Hot</span>
-    </div>
-  {% endif %}
-
-  {% if is_mobile_flow %}
-    <details class="mobile-production-flow" {% if summary.needs_attention_count|default(0) or summary.blocked_count|default(0) %}open{% endif %}>
-      <summary>
-        <span>View Production Flow</span>
-        <strong>{{ pf.flow_nodes|length if pf else 0 }} locations</strong>
-      </summary>
-	      {% if has_flow_signals %}
-        <div class="mobile-flow-grid">
-          <div class="mobile-flow-section">
-            <h4>Plant / Location Pressure</h4>
-            <div class="mobile-flow-list">
-              {% for node in pf.flow_nodes[:4] %}
-                <button class="mobile-flow-row flow-node--{{ node.worst_status }}"
-                        type="button"
-                        data-route-map-open="flow-node"
-                        data-route-map-id="{{ node.key }}">
-                  <span class="mobile-flow-code">{{ node.short_code or '--' }}</span>
-                  <span class="mobile-flow-main">
-                    <strong>{{ node.label }}</strong>
-                    <small>{{ node.open_count }} open &middot; {{ node.active_count }} active{% if node.waiting_count %} &middot; {{ node.waiting_count }} waiting{% endif %}{% if node.blocked_count %} &middot; {{ node.blocked_count }} blocked{% endif %}</small>
-                  </span>
-                </button>
-              {% else %}
-                <p class="ops-empty">No location pressure yet.</p>
-              {% endfor %}
-            </div>
-          </div>
-          <div class="mobile-flow-section">
-            <h4>Lane Pressure</h4>
-            <div class="mobile-flow-list">
-              {% for lane in pf.flow_lanes[:4] %}
-                <button class="mobile-flow-row flow-lane-chip--{{ lane.worst_status }}"
-                        type="button"
-                        data-route-map-open="flow-lane"
-                        data-route-map-id="{{ lane.origin_key }}--{{ lane.destination_key }}">
-                  <span class="mobile-flow-code">&rarr;</span>
-                  <span class="mobile-flow-main">
-                    <strong>{{ lane.origin_label }} &rarr; {{ lane.destination_label }}</strong>
-                    <small>{{ lane.open_count }} open &middot; {{ lane.active_count }} active{% if lane.waiting_count %} &middot; {{ lane.waiting_count }} waiting{% endif %}{% if lane.blocked_count %} &middot; {{ lane.blocked_count }} blocked{% endif %}</small>
-                  </span>
-                </button>
-              {% else %}
-                <p class="ops-empty">No lane data yet.</p>
-              {% endfor %}
-            </div>
-          </div>
-          {% if pf.flow_items %}
-            <div class="mobile-flow-section">
-              <h4>Needs Action</h4>
-              <div class="mobile-flow-list">
-                {% for item in pf.flow_items[:4] %}
-                  <button class="mobile-flow-row flow-token--{{ item.status }}"
-                          type="button"
-                          data-route-map-open="flow-item"
-                          data-route-map-id="{{ item.item_id }}">
-                    <span class="mobile-flow-code">{{ item.item_type[:1]|upper }}</span>
-                    <span class="mobile-flow-main">
-                      <strong>{{ item.label }}</strong>
-                      <small>{{ item.stage }} &middot; {{ item.next_action }}</small>
-                    </span>
-                  </button>
-                {% endfor %}
-              </div>
-            </div>
-          {% endif %}
-          <p class="mobile-flow-note">{{ pf.empty_states.data_scope }}</p>
-        </div>
-	      {% else %}
-	        <div class="flow-empty-state">
-	          <strong>No production-flow signals for this date.</strong>
-	          <span>Move requests, route stops, and plant transfers will appear here after they are recorded.</span>
-	          <span>{{ pf.empty_states.carrier_unit_snapshot if pf else 'Carrier unit snapshot not connected yet' }}</span>
-	        </div>
-	      {% endif %}
-	    </details>
-	  {% elif has_flow_signals %}
     {# Operations & Audit Defense Board — spatial canvas, contextual drawer, exception ticker. #}
     {# Real data wiring: pf.flow_nodes / pf.flow_lanes / pf.flow_items / pf.queue_summary. #}
     {# Drawer detail bodies are reused from _production_flow_drawer.html (hidden source divs). #}
@@ -221,6 +124,7 @@
     <div class="ops-board-spatial mb-3" data-ops-spatial>
       <header class="ops-spatial-head">
         <div>
+          <p class="ops-board-kicker" style="color:#6b7280; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; margin:0 0 4px;">{{ board_label }}</p>
           <h3>Operations &amp; Audit Defense Board</h3>
           <div class="ops-sub">{{ pf.date if pf else '' }}{% if pf %} &middot; Spatial Network Flow &amp; Exception Management{% endif %}</div>
         </div>
@@ -235,7 +139,7 @@
 
       <div class="ops-spatial-body">
         <div>
-          <div class="production-flow-canvas" aria-label="Production flow facility map">
+          <div class="production-flow-canvas" aria-label="View Production Flow facility map">
             <svg class="map-svg-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               <defs>
                 <marker id="ops-arrow-default-{{ flow_mode }}" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><polygon points="0 0, 6 3, 0 6" fill="#4b5563"/></marker>
