@@ -675,12 +675,12 @@
         {% endif %}
       </div>
 
-      {# Operations console: Move Queue -> Production Flow Map -> Floor Operations (above live routes) #}
-      {% if floor %}
-        {% include "partials/_move_queue_summary.html" %}
-      {% endif %}
+      {# Operations console: Flow Map first; queue and route panels stay as operational side surfaces. #}
       {% if production_flow %}
         {% include "partials/_production_flow_map.html" %}
+      {% endif %}
+      {% if floor %}
+        {% include "partials/_move_queue_summary.html" %}
       {% endif %}
       {% if floor %}
         {% set heading = "Floor Operations Snapshot" %}

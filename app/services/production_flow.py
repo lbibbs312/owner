@@ -12,9 +12,11 @@ import re
 from flask import has_request_context, url_for
 import pytz
 from sqlalchemy import or_
+from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.routing import BuildError
 
-from app.models import DamageReport, DriverLog, ExceptionEvent, MoveRequest, PlantTransfer
+from app.extensions import db
+from app.models import DamageReport, DriverLog, ExceptionEvent, FlowEvent, FlowManifest, MoveRequest, PlantTransfer
 from app.models.user import User
 from app.services.cargo_state import cargo_state_for_log, cargo_state_for_request
 from app.services.driver_wait import wait_minutes_for_log
@@ -547,6 +549,27 @@ def _issue_events(target, *, driver_id=None):
     return query.order_by(ExceptionEvent.created_at.desc(), ExceptionEvent.id.desc()).all()
 
 
+def _flow_ledger_counts(target):
+    start, end = _day_bounds(target)
+    try:
+        event_count = FlowEvent.query.filter(FlowEvent.occurred_at >= start, FlowEvent.occurred_at < end).count()
+        active_exceptions = FlowEvent.query.filter(
+            FlowEvent.event_type == "MISMATCH_DETECTED",
+            FlowEvent.occurred_at >= start,
+            FlowEvent.occurred_at < end,
+        ).count()
+        open_manifests = FlowManifest.query.filter(FlowManifest.current_status.notin_(["reconciled", "approved", "closed"])).count()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return {"event_count": 0, "active_exceptions": 0, "open_manifests": 0, "ledger_ready": False}
+    return {
+        "event_count": event_count,
+        "active_exceptions": active_exceptions,
+        "open_manifests": open_manifests,
+        "ledger_ready": True,
+    }
+
+
 def _timing_by_node(target):
     rows = plant_forecast_rows(target)
     timing = {}
@@ -764,6 +787,7 @@ def build_production_flow_context(
     damage_reports = _damage_reports(target, driver_id=driver_id)
     issue_events = _issue_events(target, driver_id=driver_id)
     timing_by_node = _timing_by_node(target)
+    ledger_counts = _flow_ledger_counts(target)
 
     nodes = {}
     lanes = {}
@@ -781,6 +805,9 @@ def build_production_flow_context(
         "needs_attention_count": 0,
         "document_needed_count": 0,
         "hot_count": 0,
+        "flow_event_count": ledger_counts["event_count"],
+        "open_manifest_count": ledger_counts["open_manifests"],
+        "ledger_exception_count": ledger_counts["active_exceptions"],
     }
 
     for req in requests:
@@ -1050,6 +1077,22 @@ def build_production_flow_context(
         "proof_markers": proof_markers,
         "issue_markers": issue_markers,
         "queue_summary": queue_summary,
+        "flow_lanes_target": [
+            {"key": "wip", "label": "WIP / Production", "count": queue_summary["open_count"]},
+            {"key": "staging", "label": "Staging", "count": queue_summary["waiting_count"]},
+            {"key": "load_build", "label": "Load Build", "count": queue_summary["active_count"]},
+            {"key": "manifested", "label": "Manifested", "count": queue_summary["open_manifest_count"]},
+            {"key": "in_transit", "label": "In Transit", "count": floor_summary["active_stop_count"]},
+            {"key": "receiving", "label": "Receiving", "count": floor_summary["completed_stop_count"]},
+            {"key": "exceptions", "label": "Exceptions / Holds / Scrap", "count": queue_summary["blocked_count"] + queue_summary["ledger_exception_count"]},
+        ],
+        "ledger_summary": {
+            "ready": ledger_counts["ledger_ready"],
+            "event_count": queue_summary["flow_event_count"],
+            "open_manifest_count": queue_summary["open_manifest_count"],
+            "active_exception_count": queue_summary["blocked_count"] + queue_summary["ledger_exception_count"],
+            "truth_statement": "The visual map is the product. The event ledger is the truth. Status is only a projection.",
+        },
         "floor_summary": floor_summary,
         "selected_context": {
             "selected_plant": selected_plant,

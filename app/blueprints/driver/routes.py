@@ -64,6 +64,7 @@ from app.services.parts import record_part_scan as save_part_scan, scan_event_pa
 from app.services.next_load_prediction import build_next_load_prediction
 from app.services.route_context import build_route_context, build_route_cta_context
 from app.services.floor_operations import build_floor_operations_snapshot, assigned_move_queue
+from app.services.flow_events import FlowEventService
 from app.services.production_flow import build_production_flow_context
 from app.services.route_map import build_driver_route_map_context, build_driver_map_mode_context
 from app.services.plant_time import forecast_for_stop, plant_time_forecast, route_stop_forecasts
@@ -102,6 +103,33 @@ PLANT_TRANSFER_LINE_COUNT = 20
 DRIVER_LOG_AUDIT_FIELDS = ["plant_name", "load_size", "depart_load_size", "secondary_load", "downtime_reason", "part_number", "hot_parts", "arrive_time", "depart_time", "dock_wait_minutes", "maintenance", "fuel", "fuel_mileage", "meeting"]
 PLANT_TRANSFER_AUDIT_FIELDS = ["transfer_number", "transfer_date", "ship_to", "ship_from", "trailer_number", "driver_name", "driver_initials", "transfer_time", "loaded_by"]
 RYDER_CLOSING_ACTIONS = {"fixed", "left", "rental"}
+
+
+def _append_driver_log_flow_event(log, event_type, *, notes=None, payload=None, source="mobile"):
+    FlowEventService.append_event(
+        event_type=event_type,
+        entity_type="route_stop",
+        entity_id=log.id,
+        route_id=f"driver:{log.driver_id}:date:{log.date}" if log.driver_id and log.date else None,
+        stop_id=log.id,
+        actor_user_id=current_user.id,
+        actor_role=current_user.role,
+        origin_node_id=log.plant_name,
+        destination_node_id=destination_from_load(log.depart_load_size) or log.plant_name,
+        source=source,
+        payload_json={
+            "plant_name": log.plant_name,
+            "arrive_time": log.arrive_time,
+            "depart_time": log.depart_time,
+            "arrival_load": log.load_size,
+            "departure_load": log.depart_load_size,
+            "secondary_load": log.secondary_load,
+            "no_pickup": bool(log.no_pickup),
+            **(payload or {}),
+        },
+        notes=notes,
+        commit=False,
+    )
 
 
 def _first_record_id(records):
@@ -2710,6 +2738,13 @@ def new_driving_log():
             date=local_date,
         )
         db.session.add(newlog)
+        db.session.flush()
+        _append_driver_log_flow_event(
+            newlog,
+            "ARRIVED_DESTINATION",
+            notes=f"Arrived at {_plant_label(newlog.plant_name)}.",
+            payload={"driver_action": "arrive"},
+        )
         db.session.commit()
         record_activity(
             user_id=current_user.id,
@@ -2801,6 +2836,13 @@ def add_stop():
             date=log_date,
         )
         db.session.add(newlog)
+        db.session.flush()
+        _append_driver_log_flow_event(
+            newlog,
+            "ARRIVED_DESTINATION",
+            notes=f"Retroactive arrival at {_plant_label(newlog.plant_name)}.",
+            payload={"driver_action": "add_stop"},
+        )
 
         db.session.commit()
         record_activity(
@@ -3280,6 +3322,12 @@ def depart_driver_log(log_id):
         _set_departure_unload_reasons(log, primary_unload_reason, secondary_drop_reason)
         log.no_pickup = False if service_stop else departure_load == "Empty" and not log.secondary_load
         _sync_next_open_stop_arrival_cargo(log)
+        _append_driver_log_flow_event(
+            log,
+            "DEPARTED_ORIGIN",
+            notes=f"Departed {_plant_label(log.plant_name)} with {cargo_display(log.depart_load_size, log.secondary_load)}.",
+            payload={"driver_action": "depart", "service_stop": bool(service_stop)},
+        )
         db.session.commit()
         record_activity(
             user_id=current_user.id,
@@ -3323,6 +3371,12 @@ def no_pickup_driver_log(log_id):
     log.depart_time = depart_time
     log.dock_wait_minutes = _auto_wait_minutes_for_departure(log, now_local)
     _sync_next_open_stop_arrival_cargo(log)
+    _append_driver_log_flow_event(
+        log,
+        "DEPARTED_ORIGIN",
+        notes=f"No pickup at {_plant_label(log.plant_name)}.",
+        payload={"driver_action": "no_pickup"},
+    )
     db.session.commit()
     record_activity(
         user_id=current_user.id,
@@ -3374,6 +3428,12 @@ def pickup_driver_log(log_id):
         log.fuel_mileage = _form_mileage_value(form)
         log.meeting = form.meeting.data
         _sync_next_open_stop_arrival_cargo(log)
+        _append_driver_log_flow_event(
+            log,
+            "DEPARTED_ORIGIN",
+            notes=f"Pickup recorded at {_plant_label(log.plant_name)} with {load_display(log.depart_load_size)}.",
+            payload={"driver_action": "pickup"},
+        )
         db.session.commit()
         record_activity(
             user_id=current_user.id,

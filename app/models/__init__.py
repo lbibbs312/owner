@@ -17,6 +17,17 @@ from app.models.case import CaseEvent, ExceptionEvent, FollowupCase
 from app.models.damage import DamagePhoto, DamageReport
 from app.models.draft import DraftEntry
 from app.models.followup import OperationalFollowUp
+from app.models.flow import (
+    ContainerItem,
+    ContainerTreeSnapshot,
+    ContainerType,
+    EntityCurrentState,
+    FlowContainer,
+    FlowEvent,
+    FlowManifest,
+    FlowNodeSnapshot,
+    ManifestLine,
+)
 from app.models.plant_transfer import PlantTransfer, PlantTransferLine
 from app.models.move_request import MoveRequest
 from app.models.search import SearchCorpus
@@ -56,6 +67,15 @@ __all__ = [
     "DamageReport",
     "DraftEntry",
     "OperationalFollowUp",
+    "FlowEvent",
+    "EntityCurrentState",
+    "FlowNodeSnapshot",
+    "ContainerType",
+    "FlowContainer",
+    "ContainerItem",
+    "ContainerTreeSnapshot",
+    "FlowManifest",
+    "ManifestLine",
     "PlantTransfer",
     "PlantTransferLine",
     "MoveRequest",

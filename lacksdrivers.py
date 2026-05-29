@@ -14,6 +14,8 @@ forms, and SocketIO handlers live under ``app/``.
 import os
 import sys
 
+from app.config import is_render_runtime
+
 
 def _reexec_in_local_venv():
     if sys.prefix != sys.base_prefix:
@@ -21,11 +23,6 @@ def _reexec_in_local_venv():
     venv_python = os.path.join(os.path.dirname(__file__), ".venv", "bin", "python")
     if os.path.exists(venv_python):
         os.execv(venv_python, [venv_python, *sys.argv])
-
-
-_reexec_in_local_venv()
-
-from app.config import is_render_runtime
 
 
 def _abort_render_dev_entrypoint():
@@ -42,6 +39,7 @@ def _abort_render_dev_entrypoint():
 
 if __name__ == "__main__":
     _abort_render_dev_entrypoint()
+    _reexec_in_local_venv()
 
 from app import create_app
 from app.extensions import socketio

@@ -11,6 +11,7 @@ from app.models import ActivityEvent, DriverLog, ExternalDocument, MoveRequest, 
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
 from app.services.document_numbers import move_request_number
+from app.services.flow_events import FlowEventService
 from app.services.move_request_parser import parse_move_request_text
 from app.services.plant_addresses import plant_label as _plant_label
 
@@ -185,6 +186,48 @@ def _record_move_request_activity(move_request, *, action, title, details, befor
     )
 
 
+def _append_move_request_flow_event(move_request, event_type, *, notes=None, payload=None):
+    FlowEventService.append_event(
+        event_type=event_type,
+        entity_type="move_request",
+        entity_id=move_request.id,
+        route_id=move_request.linked_route_id,
+        stop_id=move_request.linked_driver_log_id,
+        actor_user_id=current_user.id,
+        actor_role=current_user.role,
+        origin_node_id=move_request.origin_location_text,
+        destination_node_id=move_request.destination_location_text,
+        source="admin",
+        payload_json={
+            "request_number": move_request.request_number,
+            "legacy_status_projection": move_request.status,
+            "priority": move_request.priority,
+            "cargo_text": move_request.cargo_text,
+            "quantity_value": move_request.quantity_value,
+            "quantity_unit": move_request.quantity_unit,
+            **(payload or {}),
+        },
+        notes=notes,
+        document_id=move_request.linked_document_id,
+        commit=False,
+    )
+
+
+def _move_status_event_type(status):
+    status = (status or "open").lower()
+    if status in {"assigned", "acknowledged", "waiting"}:
+        return "STAGED"
+    if status in {"in_progress", "active"}:
+        return "ASSIGNED_TO_TRAILER"
+    if status in {"completed"}:
+        return "RECONCILED"
+    if status in {"blocked", "needs_review"}:
+        return "DELAY_REPORTED"
+    if status in {"cancelled"}:
+        return "MANAGER_REJECTED"
+    return "WIP_STARTED"
+
+
 def _request_or_404(request_id):
     return MoveRequest.query.get_or_404(request_id)
 
@@ -257,6 +300,11 @@ def new_move_request():
             details=f"Created {move_request.display_number}.",
             before_values={},
         )
+        _append_move_request_flow_event(
+            move_request,
+            _move_status_event_type(move_request.status),
+            notes=f"Created {move_request.display_number}.",
+        )
         db.session.commit()
         flash("Move request created.", "success")
         return redirect(url_for("manager.move_requests"))
@@ -289,6 +337,14 @@ def edit_move_request(request_id):
             details=f"Updated {move_request.display_number}.",
             before_values=before_values,
         )
+        before_status = before_values.get("status")
+        if before_status != move_request.status:
+            _append_move_request_flow_event(
+                move_request,
+                _move_status_event_type(move_request.status),
+                notes=f"Updated {move_request.display_number} status from {before_status or 'unknown'} to {move_request.status}.",
+                payload={"previous_legacy_status_projection": before_status},
+            )
         db.session.commit()
         flash("Move request updated.", "success")
         return redirect(url_for("manager.move_requests"))
@@ -320,6 +376,12 @@ def assign_move_request(request_id):
         details=f"Assigned {move_request.display_number}.",
         before_values=before_values,
     )
+    _append_move_request_flow_event(
+        move_request,
+        "STAGED",
+        notes=f"Assigned {move_request.display_number}.",
+        payload={"assigned_driver_id": move_request.assigned_driver_id, "equipment_id": move_request.equipment_id},
+    )
     db.session.commit()
     flash("Move request assigned.", "success")
     return redirect(url_for("manager.move_requests"))
@@ -337,6 +399,12 @@ def acknowledge_move_request(request_id):
         title="Move request acknowledged",
         details=f"Acknowledged {move_request.display_number} by {acknowledged_by_text}.",
         before_values=before_values,
+    )
+    _append_move_request_flow_event(
+        move_request,
+        "MANAGER_APPROVED",
+        notes=f"Acknowledged {move_request.display_number} by {acknowledged_by_text}.",
+        payload={"acknowledged_by_text": acknowledged_by_text},
     )
     db.session.commit()
     flash("Move request acknowledged.", "success")
@@ -389,6 +457,12 @@ def link_move_request_evidence(request_id):
         details=f"Linked evidence for {move_request.display_number}: {', '.join(linked_labels)}.",
         before_values=before_values,
     )
+    _append_move_request_flow_event(
+        move_request,
+        "PROOF_ATTACHED" if (transfer or document) else "MANAGER_REJECTED",
+        notes=f"Linked evidence for {move_request.display_number}: {', '.join(linked_labels)}.",
+        payload={"linked_plant_transfer_id": plant_transfer_id, "linked_document_id": linked_document_id},
+    )
     db.session.commit()
     flash("Move request evidence link updated.", "success")
     return redirect(url_for("manager.move_requests"))
@@ -407,6 +481,12 @@ def mark_move_request_blocked(request_id):
         title="Move request blocked",
         details=f"Blocked {move_request.display_number}: {move_request.blocked_reason}",
         before_values=before_values,
+    )
+    _append_move_request_flow_event(
+        move_request,
+        "DELAY_REPORTED",
+        notes=move_request.blocked_reason,
+        payload={"blocked_reason": move_request.blocked_reason},
     )
     db.session.commit()
     flash("Move request marked blocked.", "warning")
@@ -427,6 +507,12 @@ def mark_move_request_completed(request_id):
         details=f"Completed {move_request.display_number}: {move_request.closed_reason}",
         before_values=before_values,
     )
+    _append_move_request_flow_event(
+        move_request,
+        "RECONCILED",
+        notes=move_request.closed_reason,
+        payload={"closed_reason": move_request.closed_reason},
+    )
     db.session.commit()
     flash("Move request marked completed.", "success")
     return redirect(url_for("manager.move_requests"))
@@ -445,6 +531,12 @@ def cancel_move_request(request_id):
         title="Move request cancelled",
         details=f"Cancelled {move_request.display_number}: {move_request.closed_reason}",
         before_values=before_values,
+    )
+    _append_move_request_flow_event(
+        move_request,
+        "MANAGER_REJECTED",
+        notes=move_request.closed_reason,
+        payload={"closed_reason": move_request.closed_reason},
     )
     db.session.commit()
     flash("Move request cancelled.", "warning")

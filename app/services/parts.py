@@ -3,6 +3,7 @@ import re
 
 from app.extensions import db
 from app.models import PartAlias, PartLocationHistory, PartMaster, PartScanEvent, PreTrip
+from app.services.flow_events import FlowEventService
 from app.services.load_state import destination_from_load
 from app.services.plant_addresses import plant_label
 
@@ -195,6 +196,32 @@ def record_part_scan(*, log, route=None, raw_value, scan_context, barcode_format
         source_scan_event_id=event.id,
     )
     db.session.add(location)
+    FlowEventService.append_event(
+        event_type="SCAN_RECORDED",
+        entity_type="part",
+        entity_id=part.id,
+        route_id=event.route_id,
+        stop_id=getattr(log, "id", None),
+        vehicle_id=getattr(pretrip, "truck_number", None),
+        trailer_id=getattr(pretrip, "trailer_number", None),
+        actor_user_id=getattr(log, "driver_id", None),
+        actor_role="driver",
+        origin_node_id=getattr(log, "plant_name", None),
+        destination_node_id=destination_from_load(getattr(log, "depart_load_size", None)) or getattr(log, "plant_name", None),
+        occurred_at=event.timestamp,
+        device_id=device_id,
+        source="scanner",
+        payload_json={
+            "part_scan_event_id": event.id,
+            "raw_value": raw,
+            "normalized_value": normalized,
+            "scan_context": context,
+            "validation_status": validation_status,
+            "validation_message": validation_message,
+            "created_offline": bool(created_offline),
+        },
+        commit=False,
+    )
     return event
 
 
