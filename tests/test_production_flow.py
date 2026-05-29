@@ -100,6 +100,9 @@ def test_production_flow_no_data_returns_safe_empty_states(app):
 
     ctx = build_production_flow_context(date=date.today())
 
+    assert ctx["mode"] == "widescreen"
+    assert ctx["permissions"]["can_view"] is True
+    assert ctx["permissions"]["can_edit"] is False
     assert ctx["flow_nodes"] == []
     assert ctx["flow_lanes"] == []
     assert ctx["flow_items"] == []
@@ -161,6 +164,31 @@ def test_selected_plant_is_centered_as_graph_hub(app):
     assert selected["layout"]["is_hub"] is True
     assert selected["layout"]["x"] == 50.0
     assert selected["layout"]["y"] == 50.0
+
+
+def test_production_flow_context_supports_mode_and_action_permissions(app):
+    from app.services.production_flow import build_production_flow_context
+
+    manager = _user()
+    _move_request(manager.id)
+
+    ctx = build_production_flow_context(
+        date=date.today(),
+        mode="admin",
+        can_edit=True,
+        can_assign=True,
+        can_review=True,
+        can_export=True,
+    )
+
+    assert ctx["mode"] == "admin"
+    assert ctx["permissions"] == {
+        "can_view": True,
+        "can_edit": True,
+        "can_assign": True,
+        "can_review": True,
+        "can_export": True,
+    }
 
 
 def test_driver_logs_contribute_route_flow_items(app):
@@ -272,6 +300,38 @@ def test_manager_dashboard_uses_production_flow_mode(client, app):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert 'data-route-map-mode="production"' in body
+    assert 'data-production-flow-mode="admin"' in body
     assert "Production Flow Map" in body
     assert "MR-PROD-1" in body
     assert 'class="route-stop-rail"' not in body
+
+
+def test_mobile_dashboard_uses_compact_shared_production_flow(client, app):
+    with app.app_context():
+        driver = _user("mobile-pf-driver", "driver")
+        _driver_log(driver, plant_name="RE")
+
+    _login(client, "mobile-pf-driver")
+    resp = client.get("/mobile")
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert 'data-production-flow-mode="mobile"' in body
+    assert "Compact Production Flow" in body
+    assert "View Production Flow" in body
+    assert "full 2D" not in body
+
+
+def test_operations_board_is_shared_read_only_plant_floor_board(client, app):
+    with app.app_context():
+        manager = _user()
+        _move_request(manager.id, request_number="MR-FLOOR-1")
+
+    resp = client.get("/operations-board")
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Plant Floor Board" in body
+    assert 'data-production-flow-mode="plant_floor"' in body
+    assert "MR-FLOOR-1" in body
+    assert "Requires authorized identity." in body

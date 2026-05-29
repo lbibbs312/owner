@@ -1,4 +1,6 @@
 {% if pf %}
+  {% set permissions = pf.permissions if pf.permissions else {} %}
+  {% set can_open_records = permissions.can_edit or permissions.can_assign or permissions.can_review or permissions.can_export %}
   {% for node in pf.flow_nodes %}
     <div class="route-map-detail-source" hidden data-route-map-detail="flow-node-{{ node.key }}">
       <div class="drawer-kicker">Plant / Location &middot; {{ node.short_code or 'No current data' }}</div>
@@ -20,8 +22,8 @@
         <div><dt>Next Action</dt><dd>{{ node.next_action or 'No action needed' }}</dd></div>
       </dl>
       <div class="drawer-actions">
-        {% if node.view_url %}<a href="{{ node.view_url }}">View related Move Queue</a>{% else %}<button type="button" disabled>View related Move Queue <span>Not wired yet.</span></button>{% endif %}
-        {% if node.active_moves_url %}<a href="{{ node.active_moves_url }}">View related Active Moves</a>{% else %}<button type="button" disabled>View related Active Moves <span>Not wired yet.</span></button>{% endif %}
+        {% if can_open_records and node.view_url %}<a href="{{ node.view_url }}">View related Move Queue</a>{% else %}<button type="button" disabled>View related Move Queue <span>{% if can_open_records %}Not wired yet.{% else %}Requires authorized identity.{% endif %}</span></button>{% endif %}
+        {% if can_open_records and node.active_moves_url %}<a href="{{ node.active_moves_url }}">View related Active Moves</a>{% else %}<button type="button" disabled>View related Active Moves <span>{% if can_open_records %}Not wired yet.{% else %}Requires authorized identity.{% endif %}</span></button>{% endif %}
       </div>
     </div>
   {% endfor %}
@@ -45,7 +47,7 @@
         <div><dt>Linked transfers</dt><dd>{% if lane.linked_transfer_ids %}{{ lane.linked_transfer_ids|join(', ') }}{% else %}No current data{% endif %}</dd></div>
       </dl>
       <div class="drawer-actions">
-        {% if lane.view_url %}<a href="{{ lane.view_url }}">Open related Move Queue</a>{% else %}<button type="button" disabled>Open related Move Queue <span>Not wired yet.</span></button>{% endif %}
+        {% if can_open_records and lane.view_url %}<a href="{{ lane.view_url }}">Open related Move Queue</a>{% else %}<button type="button" disabled>Open related Move Queue <span>{% if can_open_records %}Not wired yet.{% else %}Requires authorized identity.{% endif %}</span></button>{% endif %}
       </div>
     </div>
   {% endfor %}
@@ -73,7 +75,7 @@
         <div><dt>Next Action</dt><dd>{{ item.next_action or 'No action needed' }}</dd></div>
       </dl>
       <div class="drawer-actions">
-        {% if item.view_url %}<a href="{{ item.view_url }}">Open related record</a>{% else %}<button type="button" disabled>Open related record <span>Not wired yet.</span></button>{% endif %}
+        {% if can_open_records and item.view_url %}<a href="{{ item.view_url }}">Open related record</a>{% else %}<button type="button" disabled>Open related record <span>{% if can_open_records %}Not wired yet.{% else %}Requires authorized identity.{% endif %}</span></button>{% endif %}
       </div>
     </div>
   {% endfor %}

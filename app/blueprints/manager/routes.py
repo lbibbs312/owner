@@ -2068,9 +2068,13 @@ def manager_dashboard():
     floor = build_floor_operations_snapshot(today)
     production_flow = build_production_flow_context(
         date=today,
-        mode="production",
+        mode="admin",
         selected_plant=selected_plant,
         driver_id=selected_driver_id,
+        can_edit=True,
+        can_assign=True,
+        can_review=True,
+        can_export=True,
     )
     return render_template(
         "manager_dashboard.html",

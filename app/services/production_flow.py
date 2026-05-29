@@ -720,10 +720,19 @@ def build_production_flow_context(
     selected_plant=None,
     selected_move_request_id=None,
     selected_stop_id=None,
-    mode="production",
+    mode="widescreen",
+    can_edit=False,
+    can_assign=False,
+    can_review=False,
+    can_export=False,
 ):
     """Build a production-flow context from real MoveDefense records only."""
     target = _target_date(date)
+    mode = (mode or "widescreen").strip().lower()
+    if mode == "production":
+        mode = "widescreen"
+    if mode not in {"mobile", "widescreen", "plant_floor", "admin"}:
+        mode = "widescreen"
     now = datetime.utcnow()
     requests = _move_requests(target, driver_id=driver_id, selected_move_request_id=selected_move_request_id)
     logs = _driver_logs(target, driver_id=driver_id, selected_stop_id=selected_stop_id)
@@ -908,6 +917,13 @@ def build_production_flow_context(
             "selected_move_request_id": selected_move_request_id,
             "selected_stop_id": selected_stop_id,
             "selected_node_key": selected_node_key,
+        },
+        "permissions": {
+            "can_view": True,
+            "can_edit": bool(can_edit),
+            "can_assign": bool(can_assign),
+            "can_review": bool(can_review),
+            "can_export": bool(can_export),
         },
         "empty_states": {
             "no_flow_nodes": not bool(flow_nodes),

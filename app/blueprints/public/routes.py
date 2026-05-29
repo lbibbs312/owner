@@ -1,9 +1,13 @@
-from flask import abort, current_app, jsonify, render_template, send_from_directory
+from datetime import date as date_cls, datetime
+
+from flask import abort, current_app, jsonify, render_template, request, send_from_directory
 from flask_login import current_user, login_required
 
 from app.blueprints.public import bp
 from app.models import Announcement
 from app.services.database_status import database_status
+from app.services.floor_operations import build_floor_operations_snapshot
+from app.services.production_flow import build_production_flow_context
 from app.services.route_context import build_route_context
 
 
@@ -22,6 +26,32 @@ def onesignal_sw():
 @login_required
 def plant_directory():
     return render_template("plant_directory.html")
+
+
+@bp.route("/operations-board")
+@bp.route("/production-flow-board")
+def production_flow_board():
+    selected_plant = (request.args.get("plant") or "").strip() or None
+    target_date = date_cls.today()
+    raw_date = (request.args.get("date") or "").strip()
+    if raw_date:
+        try:
+            target_date = datetime.strptime(raw_date, "%Y-%m-%d").date()
+        except ValueError:
+            target_date = date_cls.today()
+    floor = build_floor_operations_snapshot(target_date)
+    production_flow = build_production_flow_context(
+        date=target_date,
+        selected_plant=selected_plant,
+        mode="plant_floor",
+    )
+    return render_template(
+        "plant_floor_board.html",
+        floor=floor,
+        production_flow=production_flow,
+        selected_plant=selected_plant,
+        today=target_date,
+    )
 
 
 @bp.route("/healthz")
