@@ -251,15 +251,20 @@
         }
       }
       .production-flow--mobile .ops-board-spatial .ops-spatial-body { grid-template-columns: 1fr; }
-      @media (min-width: 992px) { .production-flow--mobile .ops-board-spatial .ops-spatial-body { grid-template-columns: minmax(230px, 280px) minmax(0, 1fr); } }
-      @media (min-width: 1280px) { .production-flow--mobile .ops-board-spatial .ops-spatial-body { grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(320px, 370px); } }
+      .production-flow--mobile .ops-board-spatial .flow-main-stage { order: 1; }
+      .production-flow--mobile .ops-board-spatial .flow-ops-stream { display: none; order: 2; border-right: 0; border-bottom: 1px solid #1f2937; min-height: 0; }
+      .production-flow--mobile .ops-board-spatial .flow-drawer-panel { order: 3; }
+      .production-flow--mobile .ops-board-spatial .ops-live-proof { display: none; }
       .production-flow--mobile .ops-board-spatial .production-flow-canvas { border-right: 0; border-bottom: 1px solid #1f2937; }
-      @media (min-width: 992px) { .production-flow--mobile .ops-board-spatial .production-flow-canvas { border-right: 1px solid #1f2937; border-bottom: 0; } }
       .production-flow--mobile .ops-board-spatial .flow-live-board { min-height: 760px; }
+      .production-flow--mobile .ops-board-spatial .flow-node { width: 218px; }
+      .production-flow--mobile .ops-board-spatial .production-node-card--secondary { width: 190px; }
+      .production-flow--mobile .ops-board-spatial .route-step-chip[data-status="completed"] { display: none; }
+      .production-flow--mobile .ops-board-spatial .exception-ticker { display: none; }
       .production-flow--mobile .ops-board-spatial .flow-object-layer { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .production-flow--mobile .ops-board-spatial .flow-drawer-panel { min-height: auto; max-height: none; border-top: 1px solid #1f2937; }
+      .production-flow--mobile .ops-board-spatial .flow-drawer-panel { display: none; min-height: auto; max-height: none; border-top: 1px solid #1f2937; }
       .production-flow--mobile .ops-board-spatial .flow-drawer-panel.is-detail-open {
-        position: fixed; left: 0; right: 0; bottom: 0; z-index: 999; min-height: 0; max-height: 72vh;
+        display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 999; min-height: 0; max-height: 68vh;
         border-radius: 12px 12px 0 0; border-top: 1px solid #334155; box-shadow: 0 -16px 36px rgba(0,0,0,0.55);
       }
       @media (max-width: 760px) {
@@ -548,6 +553,7 @@
                             data-flow-id="{{ node.key }}"
                             data-flow-node-key="node:{{ node.key }}"
                             data-console-template-key="{{ node.key }}"
+                            data-console-title="{{ profile.console_title }}"
                             data-entity-type="flow_node"
                             data-entity-id="{{ node.key }}"
                             data-truth-level="projection"
@@ -720,6 +726,8 @@
 
       var globalView = root.querySelector('[data-flow-drawer-global]');
       var detailView = root.querySelector('[data-flow-drawer-detail]');
+      var flowShell = root.closest('[data-production-flow-mode]');
+      var isMobileFlow = flowShell && flowShell.getAttribute('data-production-flow-mode') === 'mobile';
       var selectedKey = null;
       var liveBoard = root.querySelector('[data-flow-live-board]');
       var edgeLayer = root.querySelector('[data-flow-edge-layer]');
@@ -946,7 +954,7 @@
       function updateConsole(trigger, edge) {
         if (!consoleTitle) return;
         if (trigger) {
-          var title = trigger.getAttribute('aria-label') || trigger.getAttribute('data-flow-id') || 'Selected object';
+          var title = trigger.getAttribute('data-console-title') || trigger.getAttribute('aria-label') || trigger.getAttribute('data-flow-id') || 'Selected object';
           var consoleTemplateKey = trigger.getAttribute('data-console-template-key');
           if (renderPlantConsole(consoleTemplateKey, title)) return;
           var status = trigger.getAttribute('data-status') || 'projection';
@@ -1033,7 +1041,7 @@
         var drawer = root.querySelector('[data-flow-drawer]');
         if (drawer) drawer.classList.remove('is-detail-open');
         if (detailView) { detailView.hidden = true; detailView.innerHTML = ''; }
-        if (globalView) globalView.hidden = false;
+        if (globalView) globalView.hidden = isMobileFlow;
       }
 
       function showDetail(kind, id, trigger) {
@@ -1050,7 +1058,7 @@
         highlightRelated(trigger);
         filterShadowLedger(trigger);
         updateConsole(trigger, null);
-        if (globalView) globalView.hidden = false;
+        if (globalView) globalView.hidden = isMobileFlow;
         if (detailView) {
           detailView.hidden = false;
           detailView.innerHTML = '<button type="button" class="drawer-close" data-flow-close aria-label="Close details">Close \u2715</button>' + source.innerHTML;

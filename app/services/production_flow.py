@@ -362,9 +362,20 @@ def _material_line_for_item(item):
         _clean(item.get("departed_with")),
         _clean(item.get("arrived_with")),
         _clean(item.get("description")),
-        _clean(item.get("stage")),
     ]
-    ignored = {"empty", "none", "no current data", "not tracked yet", "document not attached"}
+    ignored = {
+        "empty",
+        "none",
+        "no current data",
+        "not tracked yet",
+        "document not attached",
+        "waiting",
+        "completed",
+        "proof",
+        "no action needed",
+        "record departure",
+        "review issue",
+    }
     label = next((candidate for candidate in candidates if candidate and candidate.lower() not in ignored), "")
     if not label:
         return ""
@@ -404,20 +415,22 @@ def _primary_value_for_node(node, material_lines):
     return "No material record"
 
 
-def _console_lines_for_node(node, material_lines):
+def _console_lines_for_node(node, material_lines, profile):
     source = ", ".join(node.get("source_labels") or node.get("meta", {}).get("source_labels") or []) or SAFE_EMPTY
     work_count = _work_signal_count(node)
     material = material_lines[0] if material_lines else "No material record on this date"
     if len(material_lines) > 1:
         material = f"{material} +{len(material_lines) - 1}"
+    primary_label = profile.get("primary_label") or "Material"
+    secondary_label = profile.get("secondary_label") or "State"
     return {
         "left": [
-            {"label": "Material", "value": material},
-            {"label": "Flow signals", "value": str(work_count)},
-            {"label": "Source", "value": source},
+            {"label": primary_label, "value": material},
+            {"label": "Station records", "value": str(work_count)},
+            {"label": secondary_label, "value": _status_state_label(node)},
         ],
         "right": [
-            {"label": "Status", "value": _status_state_label(node)},
+            {"label": "Evidence source", "value": source},
             {"label": "Proof needed", "value": str(node.get("proof_needed_count", 0))},
             {"label": "Issues", "value": str(node.get("issue_count", 0))},
         ],
@@ -428,7 +441,7 @@ def _apply_production_profiles(nodes, items):
     for node in nodes:
         profile = _production_profile_for_node(node)
         material_lines = _material_lines_for_node(node, items)
-        console_lines = _console_lines_for_node(node, material_lines)
+        console_lines = _console_lines_for_node(node, material_lines, profile)
         state_label = _status_state_label(node)
         profile.update({
             "state_label": state_label,
