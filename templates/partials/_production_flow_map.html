@@ -13,8 +13,8 @@
 <section class="ops-console production-flow-board production-flow--{{ flow_mode|replace('_', '-') }}" data-route-map-shell data-route-map-mode="production" data-production-flow-mode="{{ flow_mode }}" aria-label="{{ board_label }}">
 
   {% if has_flow_signals %}
-    {# Operations & Audit Defense Board — spatial canvas, contextual drawer, exception ticker. #}
-    {# Real data wiring: pf.flow_nodes / pf.flow_lanes / pf.flow_items / pf.queue_summary. #}
+    {# Production Flow Board — plant nodes, lanes, today's route overlay, proof and issue markers. #}
+    {# Real data wiring: pf.flow_nodes / pf.flow_lanes / pf.flow_items / pf.route_overlay / pf.queue_summary. #}
     {# Drawer detail bodies are reused from _production_flow_drawer.html (hidden source divs). #}
     <style>
       .ops-board-spatial { background-color: #0b0f19; color: #e5e7eb; border-radius: 0.5rem; border: 1px solid #1f2937; }
@@ -36,6 +36,7 @@
       .ops-board-spatial .flow-lane--waiting { stroke: #f59e0b; stroke-width: 3.5; stroke-dasharray: 8 6; animation: ops-dash-flow 1.5s linear infinite; }
       .ops-board-spatial .flow-lane--blocked, .ops-board-spatial .flow-lane--issue, .ops-board-spatial .flow-lane--needs_review { stroke: #ef4444; stroke-width: 4; stroke-dasharray: 8 6; animation: ops-dash-flow 1s linear infinite; }
       .ops-board-spatial .flow-lane--completed { stroke: #10b981; stroke-width: 3; }
+      .ops-board-spatial .flow-lane--route-overlay { stroke: #38bdf8; stroke-width: 4.5; stroke-dasharray: 12 4; animation: ops-dash-flow 1.4s linear infinite; opacity: 0.95; }
       @keyframes ops-dash-flow { to { stroke-dashoffset: -14; } }
       .ops-board-spatial .flow-node {
         position: absolute; width: 170px; background-color: #111827; border: 2px solid #374151;
@@ -125,8 +126,13 @@
       <header class="ops-spatial-head">
         <div>
           <p class="ops-board-kicker" style="color:#6b7280; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; margin:0 0 4px;">{{ board_label }}</p>
-          <h3>Operations &amp; Audit Defense Board</h3>
-          <div class="ops-sub">{{ pf.date if pf else '' }}{% if pf %} &middot; Spatial Network Flow &amp; Exception Management{% endif %}</div>
+          <h3>Production Flow Board</h3>
+          <div class="ops-sub">{{ pf.date if pf else '' }}{% if pf %} &middot; Plant moves, route proof, documents, and needs attention{% endif %}</div>
+          {% if pf and pf.route_overlay and pf.route_overlay.path_node_keys %}
+            <div class="route-overlay-caption" style="margin-top:6px; color:#38bdf8; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.7rem;">
+              Showing today&rsquo;s route as proof trail{% if pf.route_overlay.driver_name %} &middot; {{ pf.route_overlay.driver_name }}{% endif %}
+            </div>
+          {% endif %}
         </div>
         <div class="ops-spatial-counters">
           <div><span class="label">Active</span><span class="value">{{ summary.active_count|default(0) }}</span></div>
@@ -154,7 +160,7 @@
                 {% elif lane.worst_status == 'waiting' %}{% set marker_id = 'ops-arrow-warning-' ~ flow_mode %}
                 {% elif lane.worst_status in ('active','open') %}{% set marker_id = 'ops-arrow-active-' ~ flow_mode %}
                 {% elif lane.worst_status == 'completed' %}{% set marker_id = 'ops-arrow-done-' ~ flow_mode %}{% endif %}
-                <path class="flow-lane flow-lane--{{ lane.worst_status }}" d="{{ lane.layout.path_d }}" marker-end="url(#{{ marker_id }})"></path>
+                <path class="flow-lane flow-lane--{{ lane.worst_status }}{% if lane.route_overlay_active %} flow-lane--route-overlay{% endif %}" d="{{ lane.layout.path_d }}" marker-end="url(#{{ marker_id }})"></path>
               {% endfor %}
             </svg>
 
@@ -189,9 +195,9 @@
                         style="left: {{ item.layout.x }}%; top: {{ item.layout.y }}%;"
                         data-flow-open="item"
                         data-flow-id="{{ item.item_id }}"
-                        aria-label="{{ item.label }} move">
+                        aria-label="{{ item.display_label or item.label }} move">
                   <div class="chip-header">
-                    <span class="chip-id">{{ item.label|truncate(12,true,'') }}</span>
+                    <span class="chip-id">{{ (item.display_label or item.label)|truncate(12,true,'') }}</span>
                     {% if badge_text %}<span class="{{ badge_class }}">{{ badge_text }}</span>{% endif %}
                   </div>
                   <div class="chip-body">
@@ -204,20 +210,27 @@
           </div>
 
           <div class="bottom-strip">
-            <div class="exception-ticker" aria-label="Active exceptions">
-              <strong>ACTION NEEDED:</strong>
-              {% set ns = namespace(count=0) %}
-              {% for item in pf.flow_items %}
-                {% if ns.count < 8 and item.status in ('blocked','waiting','needs_review','critical','high') %}
-                  {% set ns.count = ns.count + 1 %}
+            {% set ns = namespace(count=0) %}
+            {% set attention_items = [] %}
+            {% for item in pf.flow_items %}
+              {% if ns.count < 8 and item.status in ('blocked','waiting','needs_review','critical','high') %}
+                {% set ns.count = ns.count + 1 %}
+                {% set _ = attention_items.append(item) %}
+              {% endif %}
+            {% endfor %}
+            <div class="exception-ticker" aria-label="Needs attention">
+              {% if attention_items %}
+                <strong>NEEDS ATTENTION:</strong>
+                {% for item in attention_items %}
                   <span class="exception-item exception-item--{{ 'waiting' if item.status == 'waiting' else 'blocked' }}"
                         data-flow-open="item"
                         data-flow-id="{{ item.item_id }}">
-                    {{ item.label }} &middot; {{ (item.next_action or item.stage or item.status_label or '')|truncate(40,true,'') }}
+                    {{ item.display_label or item.label }} &middot; {{ (item.next_action or item.stage or item.status_label or '')|truncate(40,true,'') }}
                   </span>
-                {% endif %}
-              {% endfor %}
-              {% if ns.count == 0 %}<span class="exception-empty">No active exceptions for this date.</span>{% endif %}
+                {% endfor %}
+              {% else %}
+                <span class="exception-empty">{{ pf.empty_states.needs_attention_empty if pf and pf.empty_states else 'No production-flow issues found for this date.' }}</span>
+              {% endif %}
             </div>
             <div class="replay-row">
               <span class="label">Timeline</span>
@@ -251,18 +264,18 @@
               <div><dt>Open issues</dt><dd>{{ floor_summary.issue_count|default(0) }}</dd></div>
             </div>
 
-            <div class="drawer-section-title">Top Active Exceptions</div>
+            <div class="drawer-section-title">Top Needs Attention</div>
             <ul class="audit-list">
               {% set ns2 = namespace(count=0) %}
               {% for item in pf.flow_items %}
                 {% if ns2.count < 5 and item.status in ('blocked','waiting','needs_review','critical','high') %}
                   {% set ns2.count = ns2.count + 1 %}
                   <li class="{{ item.status }}">
-                    <div><strong>{{ item.label }}</strong> &middot; {{ (item.next_action or item.stage or item.status_label or '')|truncate(60,true,'') }}</div>
+                    <div><strong>{{ item.display_label or item.label }}</strong> &middot; {{ (item.next_action or item.stage or item.status_label or '')|truncate(60,true,'') }}</div>
                   </li>
                 {% endif %}
               {% endfor %}
-              {% if ns2.count == 0 %}<li>No active exceptions.</li>{% endif %}
+              {% if ns2.count == 0 %}<li>No production-flow issues found.</li>{% endif %}
             </ul>
 
             <div class="drawer-section-title">Lane Pressure</div>

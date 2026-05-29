@@ -337,3 +337,84 @@ def test_operations_board_is_shared_read_only_plant_floor_board(client, app):
     assert 'data-production-flow-mode="plant_floor"' in body
     assert "MR-FLOOR-1" in body
     assert "Requires authorized identity." in body
+
+
+def test_board_uses_production_flow_wording_not_audit_defense(client, app):
+    with app.app_context():
+        manager = _user("boss-wording", "management")
+        _move_request(manager.id, request_number="MR-WORD-1")
+
+    _login(client, "boss-wording")
+    resp = client.get("/manager/dashboard")
+
+    body = resp.get_data(as_text=True)
+    assert "Production Flow Board" in body
+    assert "Operations &amp; Audit Defense Board" not in body
+    assert "Operations & Audit Defense Board" not in body
+    assert "Spatial Network Flow" not in body
+    assert "Exception Management" not in body
+
+
+def test_no_action_needed_no_exceptions_contradiction(client, app):
+    # No move requests, no logs -> needs_attention section must not say "ACTION NEEDED: No active exceptions"
+    with app.app_context():
+        manager = _user("empty-mgr", "management")
+        _move_request(manager.id, request_number="MR-EMPTY-1", status="completed")
+
+    _login(client, "empty-mgr")
+    resp = client.get("/manager/dashboard")
+    body = resp.get_data(as_text=True)
+    assert "ACTION NEEDED: No active exceptions" not in body
+    assert "No active exceptions" not in body
+    assert "Top Active Exceptions" not in body
+    assert "Top Needs Attention" in body
+
+
+def test_route_stops_display_as_sequence_not_database_id(app):
+    from app.services.production_flow import build_production_flow_context
+
+    with app.app_context():
+        driver = _user("seq-driver", "driver")
+        today = date.today()
+        _driver_log(driver, plant_name="RE", arrive_time="08:00", depart_time=None, load_size="Empty")
+        _driver_log(driver, plant_name="DC", arrive_time="09:00", depart_time=None, load_size="Empty")
+        _driver_log(driver, plant_name="AWE", arrive_time="10:00", depart_time=None, load_size="Empty")
+
+        ctx = build_production_flow_context(date=today, driver_id=driver.id)
+        stop_labels = [item["display_label"] for item in ctx["flow_items"] if item["item_type"] == "route_stop"]
+        assert sorted(stop_labels) == ["Stop 1", "Stop 2", "Stop 3"]
+        for item in ctx["flow_items"]:
+            if item["item_type"] == "route_stop":
+                assert item["source_label"] == "Driver route log"
+
+
+def test_route_overlay_is_present_when_single_driver(app):
+    from app.services.production_flow import build_production_flow_context
+
+    with app.app_context():
+        driver = _user("overlay-driver", "driver")
+        today = date.today()
+        _driver_log(driver, plant_name="RE", arrive_time="08:00", depart_time="08:30", load_size="Empty")
+        _driver_log(driver, plant_name="DC", arrive_time="09:00", depart_time=None, load_size="Empty")
+
+        ctx = build_production_flow_context(date=today, driver_id=driver.id)
+        overlay = ctx["route_overlay"]
+        assert overlay is not None
+        assert overlay["path_node_keys"]
+        assert len(overlay["stop_markers"]) == 2
+        assert overlay["stop_markers"][0]["display_label"] == "Stop 1"
+        assert overlay["stop_markers"][1]["display_label"] == "Stop 2"
+        assert overlay["status"] == "in_progress"
+
+
+def test_drawer_uses_friendly_source_label_not_raw_class_name(app):
+    from app.services.production_flow import build_production_flow_context
+
+    with app.app_context():
+        mgr = _user("src-mgr", "management")
+        _move_request(mgr.id, request_number="MR-SRC-1")
+        ctx = build_production_flow_context(date=date.today())
+        node_sources = []
+        for node in ctx["flow_nodes"]:
+            node_sources.extend(node.get("source_labels") or [])
+        assert "Move request" in node_sources

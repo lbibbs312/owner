@@ -15,6 +15,7 @@ from sqlalchemy import or_
 from werkzeug.routing import BuildError
 
 from app.models import DamageReport, DriverLog, ExceptionEvent, MoveRequest, PlantTransfer
+from app.models.user import User
 from app.services.cargo_state import cargo_state_for_log, cargo_state_for_request
 from app.services.driver_wait import wait_minutes_for_log
 from app.services.floor_operations import ACTIVE_STATUSES, next_action_for_request
@@ -29,6 +30,7 @@ DOCUMENT_MISSING = "Document not attached"
 CARRIER_SNAPSHOT_EMPTY = "Carrier unit snapshot not connected yet"
 RACK_SNAPSHOT_EMPTY = "Rack/capacity data not connected yet"
 DATA_SCOPE_EMPTY = "Using route and move request data only"
+DATA_SCOPE_ROUTE_ONLY = "Using route proof data only"
 DETROIT_TZ = pytz.timezone("America/Detroit")
 
 OPEN_STATUSES = {"open", "acknowledged"}
@@ -36,6 +38,15 @@ ACTIVE_MOVE_STATUSES = {"assigned", "in_progress"}
 WAITING_STATUSES = {"waiting"}
 BLOCKED_STATUSES = {"blocked", "needs_review"}
 COMPLETED_STATUSES = {"completed"}
+
+FRIENDLY_SOURCE = {
+    "MoveRequest": "Move request",
+    "DriverLog": "Driver route log",
+    "PlantTransfer": "Plant transfer",
+    "DamageReport": "Damage report",
+    "IssueEvent": "Issue event",
+    "Document": "Document proof",
+}
 
 
 def _clean(value):
@@ -383,6 +394,7 @@ def _node(nodes, label, *, node_type="plant"):
             "meta": {
                 "timing": None,
                 "data_sources": [],
+                "source_labels": [],
                 "carrier_unit_snapshot": None,
                 "rack_capacity_snapshot": None,
                 "production_snapshot_available": False,
@@ -446,6 +458,10 @@ def _add_source(meta, source):
     sources = meta.setdefault("data_sources", [])
     if source not in sources:
         sources.append(source)
+    friendly = meta.setdefault("source_labels", [])
+    nice = FRIENDLY_SOURCE.get(source, source)
+    if nice not in friendly:
+        friendly.append(nice)
 
 
 def _move_requests(target, *, driver_id=None, selected_move_request_id=None):
@@ -583,21 +599,26 @@ def _move_item(req, *, now, has_issue=False):
         "priority": (req.priority or "normal").lower(),
         "assigned_driver": _clean(req.assigned_display) or "Unassigned",
         "document_summary": f"Document #{req.linked_document_id}" if req.linked_document_id else DOCUMENT_MISSING,
+        "source_label": FRIENDLY_SOURCE["MoveRequest"],
         "view_url": _safe_url("manager.edit_move_request", request_id=req.id),
     }
 
 
-def _route_item(log, *, now, issue_stop_ids=frozenset(), damaged_stop_ids=frozenset()):
+def _route_item(log, *, now, issue_stop_ids=frozenset(), damaged_stop_ids=frozenset(), sequence_number=None):
     status = "completed" if log.depart_time else "waiting"
     has_issue = log.id in issue_stop_ids or log.id in damaged_stop_ids
     if has_issue and not log.depart_time:
         status = "needs_review"
     cargo = cargo_state_for_log(log, has_open_damage=log.id in damaged_stop_ids)
     wait_minutes = wait_minutes_for_log(log, now=None) if not log.depart_time else (log.dock_wait_minutes or 0)
+    display_label = f"Stop {sequence_number}" if sequence_number else f"Stop {log.id}"
     return {
         "item_id": f"route_stop-{log.id}",
         "item_type": "route_stop",
-        "label": f"Stop {log.id}",
+        "label": display_label,
+        "display_label": display_label,
+        "sequence_number": sequence_number,
+        "source_label": FRIENDLY_SOURCE["DriverLog"],
         "plant_location": _location_label(log.plant_name) or SAFE_EMPTY,
         "stage": "Completed" if log.depart_time else "Waiting",
         "trailer": None,
@@ -654,6 +675,7 @@ def _transfer_item(transfer):
         "linked_transfer_id": transfer.id,
         "origin_label": origin,
         "destination_label": destination,
+        "source_label": FRIENDLY_SOURCE["PlantTransfer"],
         "view_url": None,
     }
 
@@ -682,6 +704,7 @@ def _damage_item(report, *, now):
         "linked_route_stop_id": report.driver_log_id,
         "linked_document_id": None,
         "linked_transfer_id": report.plant_transfer_id,
+        "source_label": FRIENDLY_SOURCE["DamageReport"],
         "view_url": _safe_url("driver.view_damage_report", report_id=report.id),
     }
 
@@ -710,6 +733,7 @@ def _exception_item(event, *, now):
         "linked_route_stop_id": event.stop_id or event.driver_log_id,
         "linked_document_id": None,
         "linked_transfer_id": event.target_id if event.target_type == "plant_transfer" else None,
+        "source_label": FRIENDLY_SOURCE["IssueEvent"],
         "view_url": None,
     }
 
@@ -800,8 +824,23 @@ def build_production_flow_context(
             if age is not None:
                 lane["oldest_age_minutes"] = age if lane["oldest_age_minutes"] is None else max(lane["oldest_age_minutes"], age)
 
+    sequence_by_log_id = {}
+    sorted_logs_by_driver = {}
     for log in logs:
-        item = _route_item(log, now=now, issue_stop_ids=issue_stop_ids, damaged_stop_ids=damaged_stop_ids)
+        sorted_logs_by_driver.setdefault(log.driver_id, []).append(log)
+    for driver_logs in sorted_logs_by_driver.values():
+        driver_logs.sort(key=lambda log: (log.created_at or datetime.min, log.id))
+        for idx, log in enumerate(driver_logs, start=1):
+            sequence_by_log_id[log.id] = idx
+
+    for log in logs:
+        item = _route_item(
+            log,
+            now=now,
+            issue_stop_ids=issue_stop_ids,
+            damaged_stop_ids=damaged_stop_ids,
+            sequence_number=sequence_by_log_id.get(log.id),
+        )
         items.append(item)
         node = _node(nodes, log.plant_name)
         if not node:
@@ -809,11 +848,7 @@ def build_production_flow_context(
         _bump_status(node, "completed" if log.depart_time else "waiting", has_issue=log.id in issue_stop_ids or log.id in damaged_stop_ids)
         _add_source(node["meta"], "DriverLog")
 
-    logs_by_driver = {}
-    for log in logs:
-        logs_by_driver.setdefault(log.driver_id, []).append(log)
-    for driver_logs in logs_by_driver.values():
-        driver_logs.sort(key=lambda log: (log.created_at or datetime.min, log.id))
+    for driver_logs in sorted_logs_by_driver.values():
         for prev_log, current_log in zip(driver_logs, driver_logs[1:]):
             lane = _lane(lanes, prev_log.plant_name, current_log.plant_name)
             if not lane:
@@ -865,6 +900,61 @@ def build_production_flow_context(
         )
         node["next_action"] = _node_next_action(node)
 
+    overlay_driver_id = driver_id
+    if not overlay_driver_id and sorted_logs_by_driver and len(sorted_logs_by_driver) == 1:
+        overlay_driver_id = next(iter(sorted_logs_by_driver))
+
+    route_overlay = None
+    overlay_pair_keys = set()
+    if overlay_driver_id and sorted_logs_by_driver.get(overlay_driver_id):
+        overlay_logs = sorted_logs_by_driver[overlay_driver_id]
+        path_node_keys = []
+        stop_markers = []
+        for log in overlay_logs:
+            location_label = _location_label(log.plant_name) or SAFE_EMPTY
+            node_key = _location_key(location_label) if location_label != SAFE_EMPTY else None
+            if node_key and (not path_node_keys or path_node_keys[-1] != node_key):
+                path_node_keys.append(node_key)
+            has_issue = log.id in issue_stop_ids or log.id in damaged_stop_ids
+            wait_minutes = wait_minutes_for_log(log, now=None) if not log.depart_time else (log.dock_wait_minutes or 0)
+            stop_markers.append({
+                "display_label": f"Stop {sequence_by_log_id.get(log.id)}",
+                "sequence_number": sequence_by_log_id.get(log.id),
+                "location_key": node_key,
+                "location_label": location_label,
+                "arrival_at": log.arrive_time or "",
+                "departure_at": log.depart_time or "",
+                "wait_minutes": wait_minutes,
+                "arrived_with": log.load_size or NOT_TRACKED,
+                "departed_with": log.depart_load_size or NOT_TRACKED,
+                "proof_status": "attached" if log.depart_time else "pending",
+                "issue_status": "needs_review" if has_issue else "ok",
+                "next_action": "Review issue" if has_issue else ("No action needed" if log.depart_time else "Record departure"),
+                "internal_stop_id": log.id,
+            })
+        for a, b in zip(path_node_keys, path_node_keys[1:]):
+            overlay_pair_keys.add((a, b))
+        driver_name = None
+        if overlay_driver_id:
+            user = User.query.get(overlay_driver_id)
+            if user:
+                driver_name = user.display_name
+        if all(log.depart_time for log in overlay_logs):
+            overlay_status = "completed"
+        elif any(log.depart_time for log in overlay_logs):
+            overlay_status = "in_progress"
+        else:
+            overlay_status = "in_progress"
+        route_overlay = {
+            "driver_name": driver_name,
+            "driver_id": overlay_driver_id,
+            "route_label": f"Route proof overlay: {driver_name}" if driver_name else "Route proof overlay",
+            "date": target,
+            "status": overlay_status,
+            "path_node_keys": path_node_keys,
+            "stop_markers": stop_markers,
+        }
+
     for lane in lanes.values():
         lane["linked_request_ids"] = sorted(set(lane["linked_request_ids"]))
         lane["linked_driver_log_ids"] = sorted(set(lane["linked_driver_log_ids"]))
@@ -877,6 +967,51 @@ def build_production_flow_context(
             completed_count=lane["completed_count"],
         )
         lane["lane_type"] = _lane_type(lane["worst_status"])
+        lane["proof_needed_count"] = sum(
+            1 for item in items
+            if item.get("item_type") == "move_request"
+            and item.get("origin_label") == lane["origin_label"]
+            and item.get("destination_label") == lane["destination_label"]
+            and not item.get("linked_document_id") and not item.get("linked_transfer_id")
+            and item.get("status") not in {"completed", "cancelled"}
+        )
+        lane["route_overlay_active"] = (lane["origin_key"], lane["destination_key"]) in overlay_pair_keys
+
+    for node in nodes.values():
+        node["proof_needed_count"] = sum(
+            1 for item in items
+            if item.get("item_type") == "move_request"
+            and (item.get("origin_label") == node["label"] or item.get("destination_label") == node["label"])
+            and not item.get("linked_document_id") and not item.get("linked_transfer_id")
+            and item.get("status") not in {"completed", "cancelled"}
+        )
+        node["source_labels"] = list(node["meta"].get("source_labels", []))
+
+    proof_markers = []
+    for item in items:
+        if item.get("linked_document_id") or item.get("linked_transfer_id"):
+            kind = "transfer" if item.get("linked_transfer_id") else "document"
+            proof_markers.append({
+                "marker_id": f"proof-{item['item_id']}",
+                "kind": kind,
+                "label": item.get("display_label") or item.get("label"),
+                "location_key": _location_key(item.get("plant_location") or "") or None,
+                "linked_item_id": item["item_id"],
+                "attached": True,
+                "next_action": item.get("next_action") or "No action needed",
+            })
+
+    issue_markers = []
+    for item in items:
+        if item.get("status") in {"blocked", "needs_review", "critical", "high"}:
+            issue_markers.append({
+                "marker_id": f"issue-{item['item_id']}",
+                "label": item.get("display_label") or item.get("label"),
+                "status": item["status"],
+                "location_key": _location_key(item.get("plant_location") or "") or None,
+                "linked_item_id": item["item_id"],
+                "next_action": item.get("next_action") or "Review issue",
+            })
 
     flow_nodes = sorted(
         nodes.values(),
@@ -911,6 +1046,9 @@ def build_production_flow_context(
         "flow_nodes": flow_nodes,
         "flow_lanes": flow_lanes,
         "flow_items": items,
+        "route_overlay": route_overlay,
+        "proof_markers": proof_markers,
+        "issue_markers": issue_markers,
         "queue_summary": queue_summary,
         "floor_summary": floor_summary,
         "selected_context": {
@@ -939,5 +1077,7 @@ def build_production_flow_context(
             "carrier_unit_snapshot": CARRIER_SNAPSHOT_EMPTY,
             "rack_capacity": RACK_SNAPSHOT_EMPTY,
             "data_scope": DATA_SCOPE_EMPTY,
+            "needs_attention_empty": "No production-flow issues found for this date.",
+            "route_proof_only": DATA_SCOPE_ROUTE_ONLY,
         },
     }

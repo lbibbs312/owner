@@ -18,7 +18,7 @@
         <div><dt>Carrier Unit</dt><dd>{{ node.meta.snapshot_empty_state or 'Carrier unit snapshot not connected yet' }}</dd></div>
         <div><dt>Rack / Capacity</dt><dd>{{ node.meta.rack_empty_state or 'Rack/capacity data not connected yet' }}</dd></div>
         <div><dt>Timing</dt><dd>{% if node.meta.timing and node.meta.timing.estimate_minutes is not none %}Expected Wait {{ node.meta.timing.estimate_label }}{% else %}Not tracked yet{% endif %}</dd></div>
-        <div><dt>Data Sources</dt><dd>{% if node.meta.data_sources %}{{ node.meta.data_sources|join(', ') }}{% else %}No current data{% endif %}</dd></div>
+        <div><dt>Source</dt><dd>{% if node.source_labels %}{{ node.source_labels|join(', ') }}{% elif node.meta.source_labels %}{{ node.meta.source_labels|join(', ') }}{% else %}No current data{% endif %}</dd></div>
         <div><dt>Next Action</dt><dd>{{ node.next_action or 'No action needed' }}</dd></div>
       </dl>
       <div class="drawer-actions">
