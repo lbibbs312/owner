@@ -430,8 +430,9 @@ def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
     assert "data-flow-edge-data" in body
     assert "flow-edge--new" in body
     assert "livePulse" in body
-    assert "stroke-width: 2.6" in body
+    assert "stroke-width: 3.7" in body
     assert "flow-edge--live" in body
+    assert "flow-event-dash" in body
     assert "flow-event-pulse" in body
     assert "data-flow-card-mask" in body
     assert "data-flow-edge-group" in body
@@ -458,10 +459,12 @@ def test_mobile_dashboard_uses_compact_shared_production_flow(client, app):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert 'data-production-flow-mode="mobile"' in body
+    assert 'class="flow-first-body"' in body
     assert "Compact Production Flow" in body
     assert "Active Route Map" not in body
     assert body.index('data-component="FlowMapDashboard"') < body.index('class="driver-next-card"')
     assert "View Production Flow" in body
+    assert "min-height: 960px" in body
     assert "full 2D" not in body
 
 

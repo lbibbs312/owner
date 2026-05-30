@@ -72,13 +72,13 @@
       .ops-board-spatial .map-svg-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 18; overflow: visible; }
       .ops-board-spatial .map-html-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
       .ops-board-spatial .map-html-layer > .flow-object-layer { display: none; }
-      .ops-board-spatial .flow-lane { stroke: #64748b; stroke-width: 1.4; fill: none; opacity: 0.28; transition: stroke 0.3s; vector-effect: non-scaling-stroke; pointer-events: stroke; stroke-dasharray: 8 8; }
+      .ops-board-spatial .flow-lane { stroke: #64748b; stroke-width: 1.8; fill: none; opacity: 0.38; transition: stroke 0.3s; vector-effect: non-scaling-stroke; pointer-events: stroke; stroke-dasharray: 8 8; }
       .ops-board-spatial .flow-lane.is-related-path { stroke: #e0f2fe; stroke-width: 2.8; filter: drop-shadow(0 0 8px rgba(56,189,248,0.65)); opacity: 0.9; }
-      .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open { stroke: #94a3b8; stroke-width: 1.6; stroke-dasharray: 8 8; animation: ops-dash-flow 1.8s linear infinite; }
-      .ops-board-spatial .flow-lane--waiting { stroke: #f59e0b; stroke-width: 1.8; stroke-dasharray: 8 7; animation: ops-dash-flow 1.5s linear infinite; opacity: 0.5; }
-      .ops-board-spatial .flow-lane--blocked, .ops-board-spatial .flow-lane--issue, .ops-board-spatial .flow-lane--needs_review { stroke: #ef4444; stroke-width: 2; stroke-dasharray: 6 6; animation: ops-dash-flow 1s linear infinite; opacity: 0.66; }
-      .ops-board-spatial .flow-lane--completed { stroke: #10b981; stroke-width: 1.6; opacity: 0.48; }
-      .ops-board-spatial .flow-lane--route-overlay { stroke: #38bdf8; stroke-width: 2.6; stroke-dasharray: 10 6; animation: ops-dash-flow 1.4s linear infinite; opacity: 0.85; }
+      .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open { stroke: #94a3b8; stroke-width: 2.15; stroke-dasharray: 9 7; animation: ops-dash-flow 1.35s linear infinite; opacity: 0.72; }
+      .ops-board-spatial .flow-lane--waiting { stroke: #f59e0b; stroke-width: 2.35; stroke-dasharray: 9 7; animation: ops-dash-flow 1.15s linear infinite; opacity: 0.76; }
+      .ops-board-spatial .flow-lane--blocked, .ops-board-spatial .flow-lane--issue, .ops-board-spatial .flow-lane--needs_review { stroke: #ef4444; stroke-width: 2.7; stroke-dasharray: 7 6; animation: ops-dash-flow 0.9s linear infinite; opacity: 0.82; }
+      .ops-board-spatial .flow-lane--completed { stroke: #10b981; stroke-width: 1.9; opacity: 0.58; }
+      .ops-board-spatial .flow-lane--route-overlay { stroke: #38bdf8; stroke-width: 3.15; stroke-dasharray: 10 6; animation: ops-dash-flow 1s linear infinite; opacity: 0.95; filter: drop-shadow(0 0 10px rgba(56,189,248,0.62)); }
       @keyframes ops-dash-flow { to { stroke-dashoffset: -14; } }
       @media (prefers-reduced-motion: reduce) {
         .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open,
@@ -192,15 +192,15 @@
       .ops-board-spatial .driver-shuttle-token svg { width: 25px; height: 25px; fill: currentColor; }
       .ops-board-spatial .driver-shuttle-token span { position: absolute; top: -8px; right: -9px; min-width: 23px; text-align: center; padding: 1px 3px; border-radius: 999px; color: #020617; background-color: #10b981; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.54rem; font-weight: 900; }
       .ops-board-spatial .driver-shuttle-token.is-loaded span { background-color: #f59e0b; }
-      .ops-board-spatial .flow-edge { fill: none; stroke: #60a5fa; stroke-width: 2.6; stroke-linecap: round; opacity: 0.9; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 8px rgba(96,165,250,0.65)); }
-      .ops-board-spatial .flow-edge--active { stroke: #38bdf8; opacity: 1; filter: drop-shadow(0 0 10px rgba(56,189,248,0.78)); }
-      .ops-board-spatial .flow-edge--waiting { stroke: #f59e0b; opacity: 1; filter: drop-shadow(0 0 10px rgba(245,158,11,0.76)); }
-      .ops-board-spatial .flow-edge--exception { stroke: #ef4444; opacity: 1; filter: drop-shadow(0 0 12px rgba(239,68,68,0.82)); }
-      .ops-board-spatial .flow-edge--completed { stroke: #10b981; filter: drop-shadow(0 0 9px rgba(16,185,129,0.62)); }
+      .ops-board-spatial .flow-edge { fill: none; stroke: #93c5fd; stroke-width: 3.7; stroke-linecap: round; opacity: 1; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 11px rgba(96,165,250,0.78)); }
+      .ops-board-spatial .flow-edge--active { stroke: #38bdf8; opacity: 1; filter: drop-shadow(0 0 14px rgba(56,189,248,0.92)); }
+      .ops-board-spatial .flow-edge--waiting { stroke: #f59e0b; opacity: 1; filter: drop-shadow(0 0 13px rgba(245,158,11,0.86)); }
+      .ops-board-spatial .flow-edge--exception { stroke: #ef4444; opacity: 1; filter: drop-shadow(0 0 15px rgba(239,68,68,0.9)); }
+      .ops-board-spatial .flow-edge--completed { stroke: #10b981; filter: drop-shadow(0 0 11px rgba(16,185,129,0.72)); }
       .ops-board-spatial .flow-edge--live {
-        stroke-dasharray: 13 8;
-        animation: dash-flow 1s linear infinite;
-        filter: drop-shadow(0 0 14px rgba(56,189,248,0.9));
+        stroke-dasharray: 14 8;
+        animation: flow-event-dash 0.9s linear infinite;
+        filter: drop-shadow(0 0 17px rgba(56,189,248,1));
       }
       .ops-board-spatial .flow-event-pulse {
         fill: #e0f2fe;
@@ -230,6 +230,7 @@
       }
       .ops-board-spatial .flow-event--flash { animation: eventFlash 900ms ease-out; }
       @keyframes drawFlowEdge { to { stroke-dashoffset: 0; } }
+      @keyframes flow-event-dash { to { stroke-dashoffset: -44; } }
       @keyframes livePulse {
         0%, 100% { box-shadow: 0 0 0 rgba(56,189,248,0.0), 0 6px 18px rgba(0,0,0,0.42); }
         50% { box-shadow: 0 0 0 2px rgba(56,189,248,0.34), 0 0 34px rgba(56,189,248,0.62), 0 12px 32px rgba(0,0,0,0.52); }
@@ -270,7 +271,88 @@
         border-radius: 12px 12px 0 0; border-top: 1px solid #334155; box-shadow: 0 -16px 36px rgba(0,0,0,0.55);
       }
       @media (max-width: 760px) {
+        .production-flow--mobile,
+        .production-flow--mobile .ops-board-spatial,
+        .production-flow--mobile .ops-board-spatial .flow-main-stage,
+        .production-flow--mobile .ops-board-spatial .production-flow-canvas,
+        .production-flow--mobile .ops-board-spatial .flow-live-board,
+        .production-flow--mobile .ops-board-spatial .flow-console-panel {
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+        }
+        .production-flow--mobile .ops-board-spatial .ops-spatial-head {
+          display: grid;
+          grid-template-columns: 1fr;
+          padding: 10px;
+          gap: 7px;
+        }
+        .production-flow--mobile .ops-board-spatial .ops-spatial-head h3 {
+          font-size: 0.86rem;
+          line-height: 1.1;
+        }
+        .production-flow--mobile .ops-board-spatial .ops-spatial-head .ops-sub,
+        .production-flow--mobile .ops-board-spatial .route-overlay-caption {
+          font-size: 0.6rem !important;
+          overflow-wrap: anywhere;
+        }
+        .production-flow--mobile .ops-board-spatial .flow-topbar { grid-template-columns: 1fr 1fr; }
+        .production-flow--mobile .ops-board-spatial .flow-topbar > div { padding: 7px 8px; }
+        .production-flow--mobile .ops-board-spatial .flow-topbar span { font-size: 0.5rem; }
+        .production-flow--mobile .ops-board-spatial .flow-topbar strong { font-size: 0.62rem; }
+        .production-flow--mobile .ops-board-spatial .flow-live-board,
+        .production-flow--mobile .ops-board-spatial .flow-spatial-canvas {
+          aspect-ratio: auto;
+          min-height: 960px;
+        }
+        .production-flow--mobile .ops-board-spatial .flow-node {
+          width: 160px;
+          padding: 9px 10px;
+          border-radius: 0.55rem;
+        }
+        .production-flow--mobile .ops-board-spatial .production-node-card--secondary { width: 144px; }
+        .production-flow--mobile .ops-board-spatial .production-node-role { font-size: 0.54rem; line-height: 1.22; }
+        .production-flow--mobile .ops-board-spatial .production-node-copy { font-size: 0.56rem; line-height: 1.28; margin-bottom: 7px; }
+        .production-flow--mobile .ops-board-spatial .production-metric-row { font-size: 0.54rem; gap: 6px; }
+        .production-flow--mobile .ops-board-spatial .production-metric-row strong { font-size: 0.56rem; max-width: 55%; }
+        .production-flow--mobile .ops-board-spatial .production-material-list span { font-size: 0.5rem; }
+        .production-flow--mobile .ops-board-spatial .route-step-chip {
+          width: 92px;
+          min-height: 42px;
+        }
+        .production-flow--mobile .ops-board-spatial .route-step-chip .chip-id { font-size: 0.54rem; }
+        .production-flow--mobile .ops-board-spatial .route-step-chip .chip-badge { font-size: 0.42rem; max-width: 40px; }
+        .production-flow--mobile .ops-board-spatial .route-step-chip .chip-body { font-size: 0.52rem; }
+        .production-flow--mobile .ops-board-spatial .route-step-chip .chip-body strong { font-size: 0.55rem; }
+        .production-flow--mobile .ops-board-spatial .driver-shuttle-token {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+        }
+        .production-flow--mobile .ops-board-spatial .driver-shuttle-token svg {
+          width: 20px;
+          height: 20px;
+        }
+        .production-flow--mobile .ops-board-spatial .flow-edge { stroke-width: 3.2; }
         .production-flow--mobile .ops-board-spatial .flow-object-layer { grid-template-columns: 1fr; }
+        .production-flow--mobile .ops-board-spatial .flow-console-head {
+          padding: 8px;
+          align-items: flex-start;
+        }
+        .production-flow--mobile .ops-board-spatial .flow-console-head span { display: none; }
+        .production-flow--mobile .ops-board-spatial .flow-console-body {
+          grid-template-columns: 1fr;
+          padding: 8px;
+        }
+        .production-flow--mobile .ops-board-spatial .flow-console-lines li {
+          display: grid;
+          grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+          gap: 8px;
+        }
+        .production-flow--mobile .ops-board-spatial .flow-console-lines b {
+          white-space: normal;
+          overflow-wrap: anywhere;
+        }
       }
       .ops-board-spatial .drawer-section-title { font-size: 0.65rem; text-transform: uppercase; color: #6b7280; border-bottom: 1px solid #374151; padding-bottom: 4px; margin-bottom: 8px; margin-top: 16px; font-weight: 700; letter-spacing: 0.05em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
       .ops-board-spatial .drawer-title { color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; font-size: 0.9rem; margin: 0 0 4px; letter-spacing: 0.03em; }
@@ -898,6 +980,10 @@
         if (animate && typeof path.getTotalLength === 'function') {
           var length = Math.ceil(path.getTotalLength());
           path.style.setProperty('--path-length', length);
+          window.setTimeout(function() {
+            path.classList.remove('flow-edge--new');
+            path.style.removeProperty('--path-length');
+          }, 760);
         }
         if (edge.is_live) attachMovingPulse(path, edge);
         return path;
@@ -994,6 +1080,7 @@
             this.renderStatic();
             return;
           }
+          updateCardMask();
           drawEdge(edge, this.mode === 'live');
           clearLivePulse();
           pulseTarget(edge);

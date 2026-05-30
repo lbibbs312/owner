@@ -96,6 +96,21 @@ PRODUCTION_NODE_PROFILES = {
         "x": 61,
         "y": 32,
     },
+    "paint_central": {
+        "aliases": {"pc", "paint_central", "paint_center", "central_paint"},
+        "sequence": "3B",
+        "role_label": "PAINT CENTRAL",
+        "console_title": "PAINT CENTRAL FINISH BUFFER (PC)",
+        "description": "Central paint staging, finish checks, and release buffer.",
+        "primary_label": "Finish WIP",
+        "secondary_label": "Release buffer",
+        "console_left_title": "FINISH LINE READOUT",
+        "console_right_title": "STAGING RELEASE",
+        "theme": "cyan",
+        "size": "secondary",
+        "x": 56,
+        "y": 47,
+    },
     "raleigh_west": {
         "aliases": {"rw"},
         "sequence": "3",
@@ -668,7 +683,7 @@ def _apply_map_layout(nodes, lanes, items, *, selected_node_key=None):
                 angle = -72 + (outer_index * angle_step)
                 point = _ring_point(50, 50, 42, 35, angle)
                 ring = "outer"
-            point["x"] = _clamp_layout(point["x"], 8, 92)
+            point["x"] = _clamp_layout(point["x"], 12, 88)
             point["y"] = _clamp_layout(point["y"], 10, 90)
             node["layout"] = {**point, "cx": point["x"], "cy": point["y"], "ring": ring, "slot": index + 1, "is_hub": False}
 
@@ -681,7 +696,7 @@ def _apply_map_layout(nodes, lanes, items, *, selected_node_key=None):
         production_slot_counts[profile["profile_key"]] = count + 1
         offset_x = (count % 2) * 5
         offset_y = (count // 2) * 6
-        x = _clamp_layout(profile["x"] + offset_x, 8, 92)
+        x = _clamp_layout(profile["x"] + offset_x, 12, 88)
         y = _clamp_layout(profile["y"] + offset_y, 10, 90)
         node["layout"] = {
             "x": round(x, 2),
@@ -743,8 +758,8 @@ def _apply_map_layout(nodes, lanes, items, *, selected_node_key=None):
             base_x = node_layout["x"] + (count % 3 - 1) * 7
             base_y = node_layout["y"] + 13 + (count // 3) * 5
         item["layout"] = {
-            "x": round(_clamp_layout(base_x + offset[0], 7, 93), 2),
-            "y": round(_clamp_layout(base_y + offset[1], 8, 92), 2),
+            "x": round(_clamp_layout(base_x + offset[0], 12, 86), 2),
+            "y": round(_clamp_layout(base_y + offset[1], 8, 88), 2),
             "slot": index,
         }
 
@@ -1673,8 +1688,8 @@ def build_production_flow_context(
             "cargo": cargo_text or NOT_TRACKED,
             "status": "Docked" if active_marker.get("location_key") else "En route",
             "dock": active_marker.get("location_label") or NOT_TRACKED,
-            "x": round(_clamp_layout((layout.get("x") or 50) + 6, 7, 93), 2),
-            "y": round(_clamp_layout((layout.get("y") or 50) + 7, 9, 91), 2),
+            "x": round(_clamp_layout((layout.get("x") or 50) + 5, 10, 88), 2),
+            "y": round(_clamp_layout((layout.get("y") or 50) + 6, 9, 88), 2),
         }
         route_overlay["transport_token"] = transport_token
 

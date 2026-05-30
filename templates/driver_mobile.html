@@ -362,6 +362,25 @@
       .flow-first-shell .wide-body { grid-template-columns: minmax(0, 1fr); }
       .flow-first-shell .route-panel { display: none; }
     }
+    @media (max-width: 760px) {
+      body.flow-first-body { background: var(--bg); }
+      body.flow-first-body .mobile-shell {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        min-height: 100vh;
+        border: 0;
+        border-radius: 0;
+        overflow: hidden;
+      }
+      body.flow-first-body main {
+        padding: 12px 8px 0;
+        gap: 12px;
+      }
+      body.flow-first-body .wide-body { display: block; }
+      body.flow-first-body .side-nav { display: none; }
+      body.flow-first-body .bottom-nav { display: grid; }
+    }
 
     .rp-head {
       padding: 14px 16px 10px;
@@ -1226,8 +1245,8 @@
     }
   </style>
 </head>
-<body>
   {% set flow_first_current = production_flow and route_map and route_map.map_mode == 'live_current_work' %}
+<body class="{% if flow_first_current %}flow-first-body{% endif %}">
   <div class="mobile-shell move-defense-mobile driver-ops-shell{% if flow_first_current %} flow-first-shell{% endif %}">
     <header class="topbar">
       <div class="driver-row">
