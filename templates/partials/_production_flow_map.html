@@ -7,8 +7,8 @@
 {% set is_mobile_flow = flow_mode == 'mobile' %}
 {% set is_plant_floor_flow = flow_mode == 'plant_floor' %}
 {% set has_flow_signals = pf and (pf.flow_nodes or pf.flow_lanes or pf.flow_items) %}
-{% set board_label = production_flow_label if production_flow_label is defined else ('Plant Floor Board' if is_plant_floor_flow else ('Compact Production Flow' if is_mobile_flow else 'Production Flow Map')) %}
-{% set board_title = production_flow_title if production_flow_title is defined else ('Plant Floor Board' if is_plant_floor_flow else 'Production Flow') %}
+{% set board_label = production_flow_label if production_flow_label is defined else ('Plant Floor Board' if is_plant_floor_flow else ('Compact Production Flow' if is_mobile_flow else 'Live Flow Map')) %}
+{% set board_title = production_flow_title if production_flow_title is defined else ('Plant Floor Board' if is_plant_floor_flow else 'Live Flow Map') %}
 
 <section class="ops-console production-flow-board production-flow--{{ flow_mode|replace('_', '-') }}" data-route-map-shell data-route-map-mode="production" data-production-flow-mode="{{ flow_mode }}" data-component="FlowMapDashboard" aria-label="{{ board_label }}">
 
@@ -72,19 +72,20 @@
       .ops-board-spatial .map-svg-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 18; overflow: visible; }
       .ops-board-spatial .map-html-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
       .ops-board-spatial .map-html-layer > .flow-object-layer { display: none; }
-      .ops-board-spatial .flow-lane { stroke: #64748b; stroke-width: 1.8; fill: none; opacity: 0.38; transition: stroke 0.3s; vector-effect: non-scaling-stroke; pointer-events: stroke; stroke-dasharray: 8 8; }
+      .ops-board-spatial .flow-lane { stroke: #64748b; stroke-width: 1.8; fill: none; opacity: 0.42; transition: stroke 0.3s; vector-effect: non-scaling-stroke; pointer-events: stroke; }
+      .ops-board-spatial .flow-lane--plant-flow { stroke: #94a3b8; stroke-width: 2.05; opacity: 0.68; }
       .ops-board-spatial .flow-lane.is-related-path { stroke: #e0f2fe; stroke-width: 2.8; filter: drop-shadow(0 0 8px rgba(56,189,248,0.65)); opacity: 0.9; }
-      .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open { stroke: #94a3b8; stroke-width: 2.15; stroke-dasharray: 9 7; animation: ops-dash-flow 1.35s linear infinite; opacity: 0.72; }
-      .ops-board-spatial .flow-lane--waiting { stroke: #f59e0b; stroke-width: 2.35; stroke-dasharray: 9 7; animation: ops-dash-flow 1.15s linear infinite; opacity: 0.76; }
-      .ops-board-spatial .flow-lane--blocked, .ops-board-spatial .flow-lane--issue, .ops-board-spatial .flow-lane--needs_review { stroke: #ef4444; stroke-width: 2.7; stroke-dasharray: 7 6; animation: ops-dash-flow 0.9s linear infinite; opacity: 0.82; }
-      .ops-board-spatial .flow-lane--completed { stroke: #10b981; stroke-width: 1.9; opacity: 0.58; }
-      .ops-board-spatial .flow-lane--route-overlay { stroke: #38bdf8; stroke-width: 3.15; stroke-dasharray: 10 6; animation: ops-dash-flow 1s linear infinite; opacity: 0.95; filter: drop-shadow(0 0 10px rgba(56,189,248,0.62)); }
+      .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open,
+      .ops-board-spatial .flow-lane--waiting,
+      .ops-board-spatial .flow-lane--blocked, .ops-board-spatial .flow-lane--issue, .ops-board-spatial .flow-lane--needs_review,
+      .ops-board-spatial .flow-lane--completed { stroke: #94a3b8; stroke-width: 2.05; opacity: 0.68; }
+      .ops-board-spatial .flow-lane--route-proof { stroke: #38bdf8; stroke-width: 3.15; stroke-dasharray: 10 6; animation: ops-dash-flow 1s linear infinite; opacity: 0.95; filter: drop-shadow(0 0 10px rgba(56,189,248,0.62)); }
       @keyframes ops-dash-flow { to { stroke-dashoffset: -14; } }
       @media (prefers-reduced-motion: reduce) {
         .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open,
         .ops-board-spatial .flow-lane--waiting, .ops-board-spatial .flow-lane--blocked,
         .ops-board-spatial .flow-lane--issue, .ops-board-spatial .flow-lane--needs_review,
-        .ops-board-spatial .flow-lane--route-overlay { animation: none; stroke-dasharray: none; }
+        .ops-board-spatial .flow-lane--route-proof { animation: none; stroke-dasharray: 10 6; }
         .ops-board-spatial .flow-node, .ops-board-spatial .flow-chip,
         .ops-board-spatial .flow-edge--new, .ops-board-spatial .flow-node--live,
         .ops-board-spatial .flow-edge--live, .ops-board-spatial .flow-event--flash { animation: none !important; transition: none; }
@@ -117,6 +118,7 @@
       .ops-board-spatial .flow-node-row, .ops-board-spatial .route-chip-strip {
         position: absolute; inset: 0; pointer-events: none;
       }
+      .ops-board-spatial .route-chip-strip { display: none; }
       .ops-board-spatial .flow-node {
         position: absolute; width: 236px; transform: translate(-50%, -50%); background-color: rgba(14, 20, 32, 0.95); border: 1px solid rgba(51,65,85,0.96);
         border-radius: 0.7rem; box-shadow: 0 14px 34px rgba(0,0,0,0.42); cursor: pointer;
@@ -194,8 +196,8 @@
       .ops-board-spatial .flow-edge--exception { stroke: #ef4444; opacity: 1; filter: drop-shadow(0 0 15px rgba(239,68,68,0.9)); }
       .ops-board-spatial .flow-edge--completed { stroke: #10b981; filter: drop-shadow(0 0 11px rgba(16,185,129,0.72)); }
       .ops-board-spatial .flow-edge--live {
-        stroke-dasharray: 14 8;
-        animation: flow-event-dash 0.9s linear infinite;
+        stroke-dasharray: none;
+        animation: none;
         filter: drop-shadow(0 0 17px rgba(56,189,248,1));
       }
       .ops-board-spatial .flow-event-pulse {
@@ -205,6 +207,11 @@
         filter: drop-shadow(0 0 10px rgba(56,189,248,0.9));
         pointer-events: none;
       }
+      .ops-board-spatial .route-proof-drawer { display: grid; gap: 6px; }
+      .ops-board-spatial .route-proof-stop { width: 100%; border: 1px solid #1e293b; background: #05080e; color: #cbd5e1; border-radius: 7px; padding: 7px 8px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: center; text-align: left; font: inherit; cursor: pointer; }
+      .ops-board-spatial .route-proof-stop:hover { border-color: #38bdf8; color: #fff; }
+      .ops-board-spatial .route-proof-stop strong { color: #fff; font-size: 0.7rem; }
+      .ops-board-spatial .route-proof-stop span { color: #94a3b8; font-size: 0.62rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .ops-board-spatial .flow-edge--new {
         stroke-dasharray: var(--path-length);
         stroke-dashoffset: var(--path-length);
@@ -283,7 +290,7 @@
       .production-flow--mobile .ops-board-spatial .flow-lane--issue,
       .production-flow--mobile .ops-board-spatial .flow-lane--needs_review,
       .production-flow--mobile .ops-board-spatial .flow-lane--completed,
-      .production-flow--mobile .ops-board-spatial .flow-lane--route-overlay {
+      .production-flow--mobile .ops-board-spatial .flow-lane--route-proof {
         stroke: #c9cfd8;
         filter: drop-shadow(0 0 9px rgba(215, 221, 230, 0.42));
       }
@@ -524,8 +531,8 @@
       <header class="ops-spatial-head">
         <div>
           <p class="ops-board-kicker" style="color:#6b7280; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; margin:0 0 4px;">{{ board_label }}</p>
-          <h3>Live Event Map</h3>
-          <div class="ops-sub">{{ pf.date if pf else '' }}{% if pf %} &middot; Production Flow Board &middot; event-backed map{% endif %}</div>
+          <h3>{{ board_title }}</h3>
+          <div class="ops-sub">{{ pf.date if pf else '' }}{% if pf %} &middot; normal plant flow plus driver proof trail{% endif %}</div>
           {% if pf and pf.route_overlay and pf.route_overlay.path_node_keys %}
             <div class="route-overlay-caption" style="margin-top:6px; color:#38bdf8; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.7rem;">
               Showing today&rsquo;s route as proof trail{% if pf.route_overlay.driver_name %} &middot; {{ pf.route_overlay.driver_name }}{% endif %}
@@ -548,7 +555,7 @@
         <div><span>Tenant / Company</span><strong>{{ current_user.company_name if current_user and current_user.company_name is defined and current_user.company_name else 'lacksdrivers' }}</strong></div>
         <div><span>User / Role</span><strong>{{ current_user.display_name if current_user and current_user.is_authenticated else 'Read only' }}{% if current_user and current_user.is_authenticated %} / {{ current_user.role }}{% endif %}</strong></div>
         <div><span>Shift Date</span><strong>{{ pf.date if pf else '' }}</strong></div>
-        <div><span>Event Proof</span><strong>Proof trail filters on click</strong></div>
+        <div><span>Proof Lines</span><strong>Extra proof appears on click</strong></div>
       </div>
 
       <div class="flow-map-lanes" aria-label="Production to transport flow lanes">
@@ -561,6 +568,29 @@
 
       <div class="ops-spatial-body">
         <aside class="flow-ops-stream" aria-label="Operational alerts and live event stream">
+          {% if pf.route_overlay and pf.route_overlay.stop_markers %}
+          <div class="flow-stream-section">
+            <p class="flow-stream-title">Today&rsquo;s Route</p>
+            <div class="route-proof-drawer">
+              {% for marker in pf.route_overlay.stop_markers %}
+                <button type="button"
+                        class="route-proof-stop"
+                        data-flow-open="item"
+                        data-flow-id="route_stop-{{ marker.internal_stop_id }}"
+                        data-flow-node-key="route_stop:{{ marker.internal_stop_id }}"
+                        data-related-node-key="{{ marker.location_key or '' }}"
+                        data-entity-type="route_stop"
+                        data-entity-id="{{ marker.internal_stop_id }}"
+                        data-status="{{ 'completed' if marker.departure_at else 'waiting' }}"
+                        aria-label="{{ marker.display_label }} {{ marker.location_label }}">
+                  <strong>{{ marker.display_label }}</strong>
+                  <span>{{ marker.location_label }}{% if marker.departure_at %} · departed{% else %} · open{% endif %}</span>
+                </button>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
           <div class="flow-stream-section">
             <p class="flow-stream-title">Operational Alerts</p>
             {% if attention_items %}
@@ -617,8 +647,8 @@
                 </defs>
                 <g data-flow-lane-group mask="url(#flow-card-cutouts-{{ flow_mode }})">
                   {% for lane in pf.flow_lanes %}
-                    {% if lane.layout and lane.layout.path_d %}
-                      <path class="flow-lane flow-lane--{{ lane.worst_status or 'open' }}"
+                    {% if lane.default_visible and lane.layout and lane.layout.path_d %}
+                      <path class="flow-lane flow-lane--plant-flow"
                             d="{{ lane.layout.path_d }}"
                             data-flow-path-key="{{ lane.origin_key }}--{{ lane.destination_key }}"
                             data-source-key="node:{{ lane.origin_key }}"
@@ -626,6 +656,17 @@
                             marker-end="url(#ops-arrow-live-{{ flow_mode }})"/>
                     {% endif %}
                   {% endfor %}
+                  {% if pf.route_overlay and pf.route_overlay.path_segments %}
+                    {% for segment in pf.route_overlay.path_segments %}
+                      <path class="flow-lane flow-lane--route-proof"
+                            d="{{ segment.path_d }}"
+                            data-route-proof-path="1"
+                            data-flow-path-key="{{ segment.origin_key }}--{{ segment.destination_key }}"
+                            data-source-key="node:{{ segment.origin_key }}"
+                            data-target-key="node:{{ segment.destination_key }}"
+                            marker-end="url(#ops-arrow-live-{{ flow_mode }})"/>
+                    {% endfor %}
+                  {% endif %}
                 </g>
                 <g data-flow-edge-group mask="url(#flow-card-cutouts-{{ flow_mode }})"></g>
               </svg>
@@ -809,8 +850,8 @@
             </div>
             <div class="flow-proof-status">
               <span class="proof-dot" aria-hidden="true"></span>
-              <span class="label">Event Proof</span>
-              <span>Animated paths are drawn only from FlowEvent ledger rows.</span>
+              <span class="label">Driver Proof Trail</span>
+              <span>Animated dashed paths come only from today&rsquo;s driver logs.</span>
             </div>
           </div>
         </div>
@@ -843,6 +884,7 @@
                   {% set edge_ns.count = edge_ns.count + 1 %}
                   <li class="proof-trail-row {{ edge.status }}"
                       data-shadow-ledger-row
+                      tabindex="0"
                       data-flow-event-id="{{ edge.event_id }}"
                       data-source-key="{{ edge.source_key }}"
                       data-target-key="{{ edge.target_key }}"
@@ -888,6 +930,7 @@
       var consoleBody = root.querySelector('[data-flow-console-body]');
       var edgeDataNode = root.parentNode ? root.parentNode.querySelector('[data-flow-edge-data]') : null;
       var initialEdges = [];
+      var selectedTrigger = null;
       try {
         initialEdges = edgeDataNode ? JSON.parse(edgeDataNode.textContent || '[]') : [];
       } catch (err) {
@@ -961,6 +1004,32 @@
         if (!matches.length) return;
         for (var j = 0; j < rows.length; j++) {
           if (matches.indexOf(rows[j]) === -1) rows[j].classList.add('is-filtered-out');
+        }
+      }
+
+      function edgeMatchesTrigger(trigger, edge) {
+        if (!trigger || !edge) return false;
+        var nodeKey = trigger.getAttribute('data-flow-node-key') || '';
+        var relatedNodeKey = trigger.getAttribute('data-related-node-key') || '';
+        var entityType = trigger.getAttribute('data-entity-type') || '';
+        var entityId = trigger.getAttribute('data-entity-id') || '';
+        var eventId = trigger.getAttribute('data-flow-event-id') || '';
+        return Boolean(
+          (eventId && String(edge.event_id || '') === String(eventId)) ||
+          (nodeKey && (edge.source_key === nodeKey || edge.target_key === nodeKey || edge.origin_node_key === nodeKey || edge.destination_node_key === nodeKey)) ||
+          (relatedNodeKey && (edge.source_key === 'node:' + relatedNodeKey || edge.target_key === 'node:' + relatedNodeKey || edge.origin_node_key === 'node:' + relatedNodeKey || edge.destination_node_key === 'node:' + relatedNodeKey)) ||
+          (entityType && entityId && edge.entity_type === entityType && String(edge.entity_id || '') === String(entityId)) ||
+          (entityType === 'route_stop' && entityId && String(edge.stop_id || '') === String(entityId))
+        );
+      }
+
+      function renderFilteredEdges(trigger) {
+        selectedTrigger = trigger || null;
+        clearRenderedEdges();
+        if (!selectedTrigger) return;
+        updateCardMask();
+        for (var i = 0; i < FlowMapAnimator.edges.length; i++) {
+          if (edgeMatchesTrigger(selectedTrigger, FlowMapAnimator.edges[i])) drawEdge(FlowMapAnimator.edges[i], false);
         }
       }
 
@@ -1084,8 +1153,8 @@
 
       function attachMovingPulse(path, edge) {
         // Mobile Chromium can render SVG animateMotion circles at 0,0 before motion starts,
-        // which creates the large blue crescent seen in the live map. The event proof remains
-        // visible through the animated edge dash and the pulsing target node.
+        // which creates a false proof line before motion starts. Click-filtered proof lines
+        // stay static so only the driver route trail uses animated dashes.
         return;
       }
 
@@ -1186,9 +1255,12 @@
         renderStatic: function(limit) {
           clearRenderedEdges();
           clearLivePulse();
+          if (!selectedTrigger) return;
           updateCardMask();
           var edges = typeof limit === 'number' ? this.edges.slice(0, limit) : this.edges;
-          for (var i = 0; i < edges.length; i++) drawEdge(edges[i], false);
+          for (var i = 0; i < edges.length; i++) {
+            if (edgeMatchesTrigger(selectedTrigger, edges[i])) drawEdge(edges[i], false);
+          }
           if (edges.length) {
             for (var j = edges.length - 1; j >= 0; j--) {
               if (edges[j].is_live) { pulseTarget(edges[j]); break; }
@@ -1202,8 +1274,9 @@
             this.renderStatic();
             return;
           }
+          if (!selectedTrigger || !edgeMatchesTrigger(selectedTrigger, edge)) return;
           updateCardMask();
-          drawEdge(edge, this.mode === 'live');
+          drawEdge(edge, false);
           clearLivePulse();
           pulseTarget(edge);
           flashTimeline(edge);
@@ -1239,6 +1312,9 @@
       function showGlobal() {
         clearActive();
         clearLedgerFilter();
+        selectedTrigger = null;
+        clearRenderedEdges();
+        clearLivePulse();
         if (FlowMapAnimator.edges.length) updateConsole(null, FlowMapAnimator.edges[FlowMapAnimator.edges.length - 1]);
         selectedKey = null;
         var drawer = root.querySelector('[data-flow-drawer]');
@@ -1261,6 +1337,7 @@
         highlightRelated(trigger);
         filterShadowLedger(trigger);
         updateConsole(trigger, null);
+        renderFilteredEdges(trigger);
         if (globalView) globalView.hidden = isMobileFlow;
         if (detailView) {
           detailView.hidden = false;
@@ -1280,7 +1357,15 @@
           return;
         }
         var opener = e.target.closest('[data-flow-open]');
-        if (!opener || !root.contains(opener)) return;
+        if (!opener || !root.contains(opener)) {
+          var proofRow = e.target.closest('[data-shadow-ledger-row]');
+          if (proofRow && root.contains(proofRow)) {
+            e.preventDefault();
+            e.stopPropagation();
+            renderFilteredEdges(proofRow);
+          }
+          return;
+        }
         // Match scoped to this root: stop the click so live_route_map.js (also bound on the same
         // [data-route-map-shell]) and any ancestor listeners don't run a second pass.
         e.preventDefault();
@@ -1305,8 +1390,8 @@
     </script>
 	  {% else %}
 	    <div class="flow-empty-state">
-	      <strong>No production-flow signals for this date.</strong>
-	      <span>Move requests, route stops, and plant transfers will appear here after they are recorded.</span>
+	      <strong>{% if pf and pf.dispatch_capture_count %}Dispatch captures need triage.{% else %}Configured plant flow only for this date.{% endif %}</strong>
+	      <span>{% if pf and pf.dispatch_capture_count %}Raw dispatch captures are visible in the Dispatch Capture Inbox even before a full move exists.{% else %}Route stops, move requests, and plant transfers will appear here after they are recorded.{% endif %}</span>
 	      <span>{{ pf.empty_states.carrier_unit_snapshot if pf else 'Carrier unit snapshot not connected yet' }}</span>
 	    </div>
   {% endif %}

@@ -16,6 +16,7 @@ from app.models.audit import AuditEvent
 from app.models.case import CaseEvent, ExceptionEvent, FollowupCase
 from app.models.damage import DamagePhoto, DamageReport
 from app.models.draft import DraftEntry
+from app.models.dispatch_capture import DispatchCapture
 from app.models.followup import OperationalFollowUp
 from app.models.flow import (
     ContainerItem,
@@ -68,6 +69,7 @@ __all__ = [
     "DamagePhoto",
     "DamageReport",
     "DraftEntry",
+    "DispatchCapture",
     "OperationalFollowUp",
     "FlowEvent",
     "EntityCurrentState",

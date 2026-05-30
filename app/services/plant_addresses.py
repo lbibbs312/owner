@@ -12,13 +12,13 @@ PLANT_LABELS = {
     "RW": "Raleigh West",
     "PC": "Paint Central",
     "PE": "Paint East",
-    "PW": "Plastic West",
-    "KP": "Kraft Plant",
+    "PW": "Paint West",
+    "KP": "Kraft Plater",
     "PPL": "PPL",
-    "DC": "Distribution Center",
+    "DC": "52nd Street DC",
     "Helios": "Helios",
     "BP": "Barden Plant",
-    "52L": "52nd Street L",
+    "52L": "52nd Street DC",
     "Trim DC": "Trim DC",
     "52DC": "52nd Street DC",
     "ALN": "Airlane North",
@@ -31,7 +31,8 @@ PLANT_LABELS = {
     "MONROE": "Monroe",
     "Ryder Rentals": "Ryder Rentals",
     "Other": "Other",
-    "Lab": "Lab",
+    "Lab": "Quality Hold",
+    "Quality Hold": "Quality Hold",
     "PPM": "PPM Monroe",
 }
 
@@ -67,6 +68,7 @@ PLANT_ADDRESSES = {
     "Ryder Rentals": "Ryder Rentals",
     "Other": "Unspecified location",
     "Lab": "Corporate Lab (placeholder)",
+    "Quality Hold": "Quality hold area",
     "PPM": "PPM MONROE(1648 monroe ave)",
 }
 

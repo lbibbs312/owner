@@ -67,12 +67,12 @@ def _move_request(creator_id, **kw):
     from app.models import MoveRequest
 
     base = dict(
-        raw_text="Move HDPE from Raleigh East to Plastic West",
+        raw_text="Move HDPE from Raleigh East to Paint West",
         created_by_id=creator_id,
         status="open",
         priority="normal",
         origin_location_text="Raleigh East",
-        destination_location_text="Plastic West",
+        destination_location_text="Paint West",
         cargo_text="HDPE",
     )
     base.update(kw)
@@ -109,7 +109,7 @@ def test_driver_route_map_with_driver_log_returns_stop_nodes(app):
     assert ctx["stops"][0]["status"] == "completed"
     assert ctx["stops"][1]["status"] == "active"
     assert ctx["route"]["current_stop_id"] == active.id
-    assert ctx["route"]["current_location"] == "Plastic West"
+    assert ctx["route"]["current_location"] == "Paint West"
 
 
 def test_route_map_with_move_requests_returns_plants_and_lanes(app):
@@ -122,10 +122,10 @@ def test_route_map_with_move_requests_returns_plants_and_lanes(app):
     labels = {plant["label"] for plant in ctx["plants"]}
 
     assert "Raleigh East" in labels
-    assert "Plastic West" in labels
+    assert "Paint West" in labels
     assert ctx["moves"][0]["move_request_id"] == req.id
     assert ctx["lanes"][0]["origin_label"] == "Raleigh East"
-    assert ctx["lanes"][0]["destination_label"] == "Plastic West"
+    assert ctx["lanes"][0]["destination_label"] == "Paint West"
     assert ctx["empty_states"]["no_lane_data"] is False
 
 
@@ -202,7 +202,8 @@ def test_driver_dashboard_renders_with_no_assigned_requests(client, app):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "No assigned moves right now" in body
-    assert "No active route or production-flow signals for this date." in body
+    assert "Live Flow Map" in body
+    assert "No active route or production-flow signals for this date." not in body
 
 
 def test_mobile_production_flow_view_is_not_driver_scoped(client, app):
@@ -231,5 +232,5 @@ def test_manager_dashboard_uses_issue_terminology(client, app):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "Needs Attention" in body
-    assert "Production Flow Map" in body
+    assert "Live Flow Map" in body
     assert "Critical Exceptions" not in body

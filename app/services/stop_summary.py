@@ -4,8 +4,8 @@ The audit sheet's Stop Details column previously rendered freeform prose
 generated inline in the print template:
 
     "Raleigh East: No pickup recorded; departed empty."
-    "Kraft Plant: Loaded two stops. Departed with Raleigh East Load +
-     52nd Street L Load. First stop after departure: 52nd Street L."
+    "Kraft Plater: Loaded two stops. Departed with Raleigh East Load +
+     52nd Street DC Load. First stop after departure: 52nd Street DC."
 
 That output mixed first-class events (loads, drops, waits) with state echoes
 of adjacent table columns (Transit Cargo, next-row Route), and it framed

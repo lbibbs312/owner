@@ -48,7 +48,77 @@ FRIENDLY_SOURCE = {
     "DamageReport": "Damage report",
     "IssueEvent": "Issue event",
     "Document": "Document proof",
+    "PlantFlowConfig": "Configured plant flow",
 }
+
+PRODUCTION_DISPLAY_LABELS = {
+    "rw": "Raleigh West",
+    "raleigh_west": "Raleigh West",
+    "raleigh west": "Raleigh West",
+    "kp": "Kraft Plater",
+    "kraft_plant": "Kraft Plater",
+    "kraft plant": "Kraft Plater",
+    "kraft_plater": "Kraft Plater",
+    "kraft plater": "Kraft Plater",
+    "pw": "Paint West",
+    "plastic_west": "Paint West",
+    "plastic west": "Paint West",
+    "paint_west": "Paint West",
+    "paint west": "Paint West",
+    "pc": "Paint Central",
+    "paint_central": "Paint Central",
+    "paint central": "Paint Central",
+    "52l": "52nd Street DC",
+    "52dc": "52nd Street DC",
+    "52nd_street_l": "52nd Street DC",
+    "52nd street l": "52nd Street DC",
+    "52nd_street_dc": "52nd Street DC",
+    "52nd street dc": "52nd Street DC",
+    "trim_dc": "Trim DC",
+    "trim dc": "Trim DC",
+    "re": "Raleigh East",
+    "raleigh_east": "Raleigh East",
+    "raleigh east": "Raleigh East",
+    "helios": "Helios",
+    "lab": "Quality Hold",
+    "quality": "Quality Hold",
+    "quality_hold": "Quality Hold",
+    "quality hold": "Quality Hold",
+}
+
+PRODUCTION_SHORT_CODES = {
+    "Raleigh West": "RW",
+    "Kraft Plater": "KP",
+    "Paint West": "PW",
+    "Paint Central": "PC",
+    "52nd Street DC": "52L",
+    "Trim DC": "Trim DC",
+    "Raleigh East": "RE",
+    "Helios": "Helios",
+    "Quality Hold": "QA",
+}
+
+CONFIGURED_PLANT_NODES = (
+    "Raleigh West",
+    "Kraft Plater",
+    "Paint West",
+    "Paint Central",
+    "52nd Street DC",
+    "Trim DC",
+    "Raleigh East",
+    "Helios",
+    "Quality Hold",
+)
+
+CONFIGURED_PLANT_FLOW = (
+    ("Raleigh West", "Kraft Plater"),
+    ("Kraft Plater", "Paint West"),
+    ("Paint West", "52nd Street DC"),
+    ("Paint Central", "52nd Street DC"),
+    ("52nd Street DC", "Raleigh East"),
+    ("Trim DC", "Raleigh West"),
+    ("Helios", "Kraft Plater"),
+)
 
 PRODUCTION_NODE_PROFILES = {
     "ppl": {
@@ -71,26 +141,26 @@ PRODUCTION_NODE_PROFILES = {
         "sequence": "2",
         "role_label": "PLATING",
         "console_title": "KRAFT PLATER / PLATING (KP)",
-        "description": "Chrome plating, rack accumulation, and plater handoff.",
-        "primary_label": "Plated WIP",
-        "secondary_label": "Plating line",
-        "console_left_title": "CURRENT JOB LOADING",
-        "console_right_title": "ACTIVE PLATING ALERTS",
+        "description": "Plating, racking, loading/unloading, staged skids, and overflow risk.",
+        "primary_label": "Staged skids",
+        "secondary_label": "Overflow risk",
+        "console_left_title": "PLATING / RACKING",
+        "console_right_title": "LOAD / OVERFLOW STATUS",
         "theme": "cyan",
         "size": "primary",
         "x": 43,
         "y": 27,
     },
     "plastic_west": {
-        "aliases": {"pw", "plastic_west", "paint_west", "paint", "coating", "raleigh_west"},
+        "aliases": {"pw", "plastic_west", "paint_west", "paint", "coating"},
         "sequence": "3",
-        "role_label": "COATING",
+        "role_label": "COATING / PAINT",
         "console_title": "PAINT / COATING OPERATIONS (PW)",
-        "description": "Masking, color paint runs, and coated WIP release.",
+        "description": "Coating, masking, paint line, and painted WIP release.",
         "primary_label": "Painted WIP",
-        "secondary_label": "Coating line",
-        "console_left_title": "ROBOTIC COATING DEPT",
-        "console_right_title": "CONVEYOR / OVEN BUFFER",
+        "secondary_label": "Paint line",
+        "console_left_title": "MASKING / COATING LINE",
+        "console_right_title": "PAINTED WIP",
         "theme": "cyan",
         "size": "primary",
         "x": 61,
@@ -99,7 +169,7 @@ PRODUCTION_NODE_PROFILES = {
     "paint_central": {
         "aliases": {"pc", "paint_central", "paint_center", "central_paint"},
         "sequence": "3B",
-        "role_label": "PAINT CENTRAL",
+        "role_label": "PAINT / FINISH SUPPORT",
         "console_title": "PAINT CENTRAL FINISH BUFFER (PC)",
         "description": "Central paint staging, finish checks, and release buffer.",
         "primary_label": "Finish WIP",
@@ -112,30 +182,30 @@ PRODUCTION_NODE_PROFILES = {
         "y": 47,
     },
     "raleigh_west": {
-        "aliases": {"rw"},
-        "sequence": "3",
-        "role_label": "COATING",
-        "console_title": "RALEIGH WEST PRODUCTION BUFFER (RW)",
-        "description": "Paint/coating staging and outbound production handoff.",
-        "primary_label": "Painted WIP",
-        "secondary_label": "Outbound buffer",
-        "console_left_title": "COATING STAGING",
-        "console_right_title": "ROUTE HANDOFF",
+        "aliases": {"rw", "raleigh_west", "front_end", "intake", "empty_pack_return"},
+        "sequence": "1",
+        "role_label": "FRONT END / INTAKE",
+        "console_title": "RALEIGH WEST INTAKE / EMPTY PACK RETURN (RW)",
+        "description": "Intake, empty packs, raw substrates, and staging capacity.",
+        "primary_label": "Intake / empty packs",
+        "secondary_label": "Staging capacity",
+        "console_left_title": "INTAKE / RAW SUBSTRATES",
+        "console_right_title": "EMPTY PACK RETURN",
         "theme": "cyan",
         "size": "primary",
-        "x": 61,
-        "y": 32,
+        "x": 20,
+        "y": 36,
     },
     "52nd_street_l": {
         "aliases": {"52l", "52nd_street_l", "52nd_street", "52nd_street_logistics", "52nd_street_dc", "52dc"},
         "sequence": "4",
         "role_label": "ASSEMBLY",
         "console_title": "52ND STREET ASSEMBLY / LOGISTICS (52L)",
-        "description": "Final assembly, inserts, pack, and ready-load build.",
-        "primary_label": "Ready loads",
-        "secondary_label": "Hot track",
-        "console_left_title": "ASSEMBLY CARRIER TABLE",
-        "console_right_title": "LOAD BUILD STATUS",
+        "description": "Assembly, carrier allocation, and trailer assignment.",
+        "primary_label": "Carrier allocation",
+        "secondary_label": "Trailer assignment",
+        "console_left_title": "ASSEMBLY / CARRIER TABLE",
+        "console_right_title": "TRAILER ASSIGNMENT",
         "theme": "cyan",
         "size": "primary",
         "x": 74,
@@ -146,11 +216,11 @@ PRODUCTION_NODE_PROFILES = {
         "sequence": "4",
         "role_label": "ASSEMBLY",
         "console_title": "52ND STREET DC LOAD BUILD",
-        "description": "Assembly loads, trailer staging, and route-ready freight.",
-        "primary_label": "Ready loads",
-        "secondary_label": "Load build",
-        "console_left_title": "ASSEMBLY CARRIER TABLE",
-        "console_right_title": "LOAD BUILD STATUS",
+        "description": "Assembly, carrier allocation, and trailer assignment.",
+        "primary_label": "Carrier allocation",
+        "secondary_label": "Trailer assignment",
+        "console_left_title": "ASSEMBLY / CARRIER TABLE",
+        "console_right_title": "TRAILER ASSIGNMENT",
         "theme": "cyan",
         "size": "primary",
         "x": 74,
@@ -161,11 +231,11 @@ PRODUCTION_NODE_PROFILES = {
         "sequence": "5",
         "role_label": "OEM DOCK",
         "console_title": "RALEIGH EAST OEM DOCK (RE)",
-        "description": "Receiving, reconcile, and direct OEM dock sequencing.",
-        "primary_label": "OEM delivered",
-        "secondary_label": "Dock state",
-        "console_left_title": "INTERSITE SHIPPER LOG",
-        "console_right_title": "SERIAL / LOT RECEIVING",
+        "description": "OEM dock delivery, JIT status, and unload state.",
+        "primary_label": "JIT status",
+        "secondary_label": "Unload state",
+        "console_left_title": "OEM DOCK DELIVERY",
+        "console_right_title": "JIT / UNLOAD STATE",
         "theme": "cyan",
         "size": "primary",
         "x": 74,
@@ -189,23 +259,23 @@ PRODUCTION_NODE_PROFILES = {
     "trim_dc": {
         "aliases": {"trim_dc", "trim", "distribution_center", "dc"},
         "sequence": "",
-        "role_label": "TRIM DC",
+        "role_label": "EXTRACTION / EMPTY PACK RETURN",
         "console_title": "TRIM PACKING DC",
-        "description": "Auxiliary packing, hold racks, and direct route staging.",
-        "primary_label": "Hold loads",
-        "secondary_label": "Packing status",
-        "console_left_title": "AUXILIARY PACKING",
-        "console_right_title": "ROUTE STAGING",
+        "description": "Empty packs created, staged, and returned to Raleigh West.",
+        "primary_label": "Empty packs created",
+        "secondary_label": "Return staging",
+        "console_left_title": "EXTRACTION / PACK CREATION",
+        "console_right_title": "RW RETURN STAGING",
         "theme": "cyan",
         "size": "secondary",
         "x": 50,
         "y": 63,
     },
     "lab": {
-        "aliases": {"lab", "corporate_lab", "quality_hold_lab", "quality", "corp", "corporate"},
+        "aliases": {"lab", "corporate_lab", "quality_hold_lab", "quality", "quality_hold", "qa_hold", "corp", "corporate"},
         "sequence": "",
-        "role_label": "QUALITY HOLD LAB",
-        "console_title": "QUALITY HOLD LAB",
+        "role_label": "QA / CONTAINMENT",
+        "console_title": "QUALITY HOLD / QA CONTAINMENT",
         "description": "Scrap, QA holds, damage review, and containment proof.",
         "primary_label": "Scrap / holds",
         "secondary_label": "Containment",
@@ -261,7 +331,13 @@ def _location_label(value):
     text = _clean(value)
     if not text:
         return None
-    return plant_label(text) or text
+    text_key = re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
+    configured = PRODUCTION_DISPLAY_LABELS.get(text.lower()) or PRODUCTION_DISPLAY_LABELS.get(text_key)
+    if configured:
+        return configured
+    label = plant_label(text) or text
+    label_key = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
+    return PRODUCTION_DISPLAY_LABELS.get(label.lower()) or PRODUCTION_DISPLAY_LABELS.get(label_key) or label
 
 
 def _location_key(value):
@@ -273,6 +349,9 @@ def _short_code(value):
     text = _clean(value)
     if not text:
         return ""
+    configured_label = _location_label(text)
+    if configured_label in PRODUCTION_SHORT_CODES:
+        return PRODUCTION_SHORT_CODES[configured_label]
     if text in PLANT_LABELS:
         return text
     for code, label in PLANT_LABELS.items():
@@ -421,12 +500,13 @@ def _material_lines_for_node(node, items, limit=3):
     return lines
 
 
-def _primary_value_for_node(node, material_lines):
-    if material_lines:
-        return material_lines[0]
+def _primary_value_for_node(node, material_lines, profile):
     count = _work_signal_count(node)
     if count:
         return _singular_plural(count, "flow signal")
+    primary_label = (profile.get("primary_label") if profile else "material").lower()
+    if primary_label:
+        return f"No {primary_label} record"
     return "No material record"
 
 
@@ -460,7 +540,7 @@ def _apply_production_profiles(nodes, items):
         state_label = _status_state_label(node)
         profile.update({
             "state_label": state_label,
-            "primary_value": _primary_value_for_node(node, material_lines),
+            "primary_value": _primary_value_for_node(node, material_lines, profile),
             "secondary_value": state_label,
             "material_lines": material_lines,
             "console_left": console_lines["left"],
@@ -625,6 +705,20 @@ def _lane_curve(origin, destination, lane, lane_index_by_pair):
         "path_d": f"M {x1:.2f} {y1:.2f} Q {cx:.2f} {cy:.2f} {x2:.2f} {y2:.2f}",
         "slot": pair_index,
     }
+
+
+def _route_proof_curve(origin, destination, index):
+    x1, y1 = origin["x"], origin["y"]
+    x2, y2 = destination["x"], destination["y"]
+    dx = x2 - x1
+    dy = y2 - y1
+    length = math.hypot(dx, dy) or 1
+    nx = -dy / length
+    ny = dx / length
+    offset = 4 + (index % 2) * 3
+    cx = _clamp_layout((x1 + x2) / 2 + nx * offset, 8, 92)
+    cy = _clamp_layout((y1 + y2) / 2 + ny * offset, 8, 92)
+    return f"M {x1:.2f} {y1:.2f} Q {cx:.2f} {cy:.2f} {x2:.2f} {y2:.2f}"
 
 
 def _apply_map_layout(nodes, lanes, items, *, selected_node_key=None):
@@ -800,7 +894,7 @@ def _node(nodes, label, *, node_type="plant"):
     return nodes[key]
 
 
-def _lane(lanes, origin, destination):
+def _lane(lanes, origin, destination, *, configured=False):
     origin = _location_label(origin)
     destination = _location_label(destination)
     if not origin or not destination:
@@ -815,6 +909,8 @@ def _lane(lanes, origin, destination):
             "origin_label": origin,
             "destination_label": destination,
             "lane_type": "requested_move",
+            "is_configured_flow": bool(configured),
+            "default_visible": bool(configured),
             "open_count": 0,
             "active_count": 0,
             "completed_count": 0,
@@ -827,7 +923,21 @@ def _lane(lanes, origin, destination):
             "linked_transfer_ids": [],
             "view_url": _safe_url("manager.move_requests", origin=origin, destination=destination),
         }
+    elif configured:
+        lanes[key]["is_configured_flow"] = True
+        lanes[key]["default_visible"] = True
     return lanes[key]
+
+
+def _seed_configured_plant_flow(nodes, lanes):
+    for label in CONFIGURED_PLANT_NODES:
+        node = _node(nodes, label)
+        if node:
+            _add_source(node["meta"], "PlantFlowConfig")
+    for origin, destination in CONFIGURED_PLANT_FLOW:
+        lane = _lane(lanes, origin, destination, configured=True)
+        if lane:
+            lane["lane_type"] = "plant_flow"
 
 
 def _bump_status(target, status, *, has_issue=False):
@@ -1415,6 +1525,7 @@ def build_production_flow_context(
     nodes = {}
     lanes = {}
     items = []
+    _seed_configured_plant_flow(nodes, lanes)
     issue_stop_ids = {event.stop_id or event.driver_log_id for event in issue_events if event.stop_id or event.driver_log_id}
     damaged_stop_ids = {report.driver_log_id for report in damage_reports if report.driver_log_id}
 
@@ -1616,7 +1727,12 @@ def build_production_flow_context(
             open_count=lane["open_count"],
             completed_count=lane["completed_count"],
         )
-        lane["lane_type"] = _lane_type(lane["worst_status"])
+        if lane.get("is_configured_flow"):
+            lane["lane_type"] = "plant_flow"
+            lane["default_visible"] = True
+        else:
+            lane["lane_type"] = _lane_type(lane["worst_status"])
+            lane["default_visible"] = False
         lane["proof_needed_count"] = sum(
             1 for item in items
             if item.get("item_type") == "move_request"
@@ -1677,6 +1793,19 @@ def build_production_flow_context(
     _apply_production_profiles(flow_nodes, items)
 
     node_by_key = {node["key"]: node for node in flow_nodes}
+    if route_overlay and route_overlay.get("path_node_keys"):
+        segments = []
+        for index, (origin_key, destination_key) in enumerate(zip(route_overlay["path_node_keys"], route_overlay["path_node_keys"][1:])):
+            origin_layout = node_by_key.get(origin_key, {}).get("layout")
+            destination_layout = node_by_key.get(destination_key, {}).get("layout")
+            if not origin_layout or not destination_layout:
+                continue
+            segments.append({
+                "origin_key": origin_key,
+                "destination_key": destination_key,
+                "path_d": _route_proof_curve(origin_layout, destination_layout, index),
+            })
+        route_overlay["path_segments"] = segments
     transport_token = None
     if route_overlay and route_overlay.get("stop_markers"):
         markers = route_overlay["stop_markers"]
@@ -1766,7 +1895,7 @@ def build_production_flow_context(
         },
         "empty_states": {
             "no_flow_signals": no_flow_signals,
-            "flow_empty_message": "No production-flow signals for this date.",
+            "flow_empty_message": "Configured plant flow only for this date.",
             "no_flow_nodes": not bool(flow_nodes),
             "no_flow_lanes": not bool(flow_lanes),
             "no_flow_items": not bool(items),

@@ -11,6 +11,7 @@
   <div class="ops-body">
     <div class="mq-grid">
       <div class="mq-stat"><span class="mq-num">{{ qs.open_requests }}</span><span class="mq-lbl">Open Requests</span></div>
+      <div class="mq-stat tone-info"><span class="mq-num">{{ qs.captured_requests|default(0) }}</span><span class="mq-lbl">Captured Intake</span></div>
       <div class="mq-stat tone-danger"><span class="mq-num">{{ qs.hot_requests }}</span><span class="mq-lbl">Hot Requests</span></div>
       <div class="mq-stat tone-warn"><span class="mq-num">{{ qs.unassigned_requests }}</span><span class="mq-lbl">Unassigned</span></div>
       <div class="mq-stat tone-danger"><span class="mq-num">{{ qs.blocked_requests }}</span><span class="mq-lbl">Blocked</span></div>

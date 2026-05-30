@@ -34,9 +34,10 @@ from app.services.document_numbers import (
 from app.extensions import db, socketio
 from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
-from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DriverLog, DriverLogPhoto, HotPartPhoto, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, ShiftRecord, Task, User
+from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DispatchCapture, DriverLog, DriverLogPhoto, HotPartPhoto, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, ShiftRecord, Task, User
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
+from app.services.dispatch_capture import create_dispatch_capture, convert_dispatch_capture, dismiss_dispatch_capture, open_dispatch_captures
 from app.services.operations import build_exception_items
 from app.services.floor_operations import build_floor_operations_snapshot
 from app.services.production_flow import build_production_flow_context
@@ -2025,6 +2026,51 @@ def search_suggest():
     return jsonify({"results": suggest_terms(query, context_key=context_key, limit=10)})
 
 
+@bp.route("/dispatch-captures", methods=["POST"])
+def create_dispatch_capture_route():
+    data = request.get_json(silent=True) if request.is_json else request.form
+    raw_text = (data.get("raw_text") if data else "") or ""
+    capture_type = (data.get("capture_type") if data else "") or ""
+    source = (data.get("source") if data else "") or "manager_dashboard"
+    if not raw_text.strip():
+        if request.is_json:
+            return jsonify({"ok": False, "error": "raw_text is required"}), 400
+        flash("Paste or type the dispatch message first.", "warning")
+        return redirect(url_for("manager.manager_dashboard"))
+
+    capture = create_dispatch_capture(
+        raw_text=raw_text,
+        capture_type=capture_type,
+        source=source,
+        user=current_user,
+    )
+    if request.is_json:
+        return jsonify({"ok": True, "capture_id": capture.id, "status": capture.status})
+    flash("Dispatch capture saved.", "success")
+    return redirect(url_for("manager.manager_dashboard", focus="jobs"))
+
+
+@bp.route("/dispatch-captures/<int:capture_id>/convert", methods=["POST"])
+def convert_dispatch_capture_route(capture_id):
+    capture = DispatchCapture.query.get_or_404(capture_id)
+    if capture.status not in {"captured", "needs_triage"}:
+        flash("That dispatch capture is already closed.", "info")
+        return redirect(url_for("manager.manager_dashboard", focus="jobs"))
+    entity_type = request.form.get("entity_type") or "move_request"
+    converted = convert_dispatch_capture(capture, entity_type=entity_type, user=current_user)
+    flash(f"{capture.display_number} converted to {capture.converted_entity_type} #{converted.id}.", "success")
+    return redirect(url_for("manager.manager_dashboard", focus="jobs"))
+
+
+@bp.route("/dispatch-captures/<int:capture_id>/dismiss", methods=["POST"])
+def dismiss_dispatch_capture_route(capture_id):
+    capture = DispatchCapture.query.get_or_404(capture_id)
+    if capture.status in {"captured", "needs_triage"}:
+        dismiss_dispatch_capture(capture, user=current_user)
+        flash(f"{capture.display_number} dismissed.", "info")
+    return redirect(url_for("manager.manager_dashboard", focus="jobs"))
+
+
 @bp.route("/dashboard", methods=["GET", "POST"])
 def manager_dashboard():
     create_task_form = TaskForm()
@@ -2057,6 +2103,8 @@ def manager_dashboard():
     dispatch_rows = _build_dispatch_rows(uncompleted_tasks, todays_transfers)
     if division_filter != "All":
         dispatch_rows = [row for row in dispatch_rows if row["division"] == division_filter]
+    dispatch_capture_rows = open_dispatch_captures()
+    dispatch_capture_count = len(dispatch_capture_rows)
 
     reported_delay_count = len([log for log in todays_logs if (log.dock_wait_minutes or 0) > 0])
     critical_exceptions = _critical_exception_rows(live_stop_rows, live_logs)
@@ -2076,11 +2124,17 @@ def manager_dashboard():
         can_review=True,
         can_export=True,
     )
+    if floor and floor.get("queue_summary") is not None:
+        floor["queue_summary"]["captured_requests"] = dispatch_capture_count
+    if production_flow is not None:
+        production_flow["dispatch_capture_count"] = dispatch_capture_count
     return render_template(
         "manager_dashboard.html",
         create_task_form=create_task_form,
         floor=floor,
         production_flow=production_flow,
+        dispatch_capture_rows=dispatch_capture_rows,
+        dispatch_capture_count=dispatch_capture_count,
         selected_plant=selected_plant,
         uncompleted_tasks=uncompleted_tasks,
         dispatch_rows=dispatch_rows,

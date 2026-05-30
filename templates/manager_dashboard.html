@@ -215,6 +215,36 @@
   .plant-timing-card strong { display:block; font-size:.86rem; }
   .plant-timing-card span { display:block; color:#64748b; font-size:.72rem; margin-top:2px; }
 
+  .capture-panel { background:#0f172a; color:#e2e8f0; border:1px solid #1e293b; border-radius:16px; overflow:hidden; box-shadow:0 18px 42px rgba(15,23,42,.16); }
+  .capture-head { padding:14px 16px; display:flex; justify-content:space-between; gap:12px; align-items:center; border-bottom:1px solid rgba(148,163,184,.16); }
+  .capture-head h3 { margin:0; font-size:1rem; font-weight:900; color:#fff; }
+  .capture-head span { font-size:.72rem; font-weight:800; color:#93c5fd; }
+  .capture-form { padding:14px 16px; display:grid; gap:10px; border-bottom:1px solid rgba(148,163,184,.16); }
+  .capture-text { width:100%; min-height:92px; resize:vertical; border:1px solid #334155; background:#020617; color:#f8fafc; border-radius:12px; padding:12px 13px; font:inherit; font-size:.9rem; outline:none; }
+  .capture-text:focus { border-color:#60a5fa; box-shadow:0 0 0 3px rgba(96,165,250,.16); }
+  .capture-actions { display:flex; flex-wrap:wrap; gap:8px; }
+  .capture-actions button { border:1px solid #334155; background:#1e293b; color:#e2e8f0; border-radius:999px; padding:7px 11px; font-size:.74rem; font-weight:900; cursor:pointer; }
+  .capture-actions button:hover { border-color:#93c5fd; color:#fff; }
+  .capture-actions .hot { background:#7f1d1d; border-color:#b91c1c; }
+  .capture-inbox { display:grid; gap:8px; padding:12px 16px 16px; }
+  .capture-card { background:#020617; border:1px solid #1e293b; border-radius:12px; padding:11px 12px; display:grid; gap:8px; }
+  .capture-card-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+  .capture-id { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-weight:900; color:#fff; font-size:.8rem; }
+  .capture-meta { color:#94a3b8; font-size:.68rem; font-weight:800; margin-top:2px; }
+  .capture-status { display:flex; flex-wrap:wrap; gap:5px; justify-content:flex-end; }
+  .capture-pill { display:inline-flex; align-items:center; border:1px solid #334155; border-radius:999px; padding:3px 8px; font-size:.62rem; font-weight:900; text-transform:uppercase; color:#cbd5e1; }
+  .capture-pill.warn { border-color:#f59e0b; color:#fbbf24; background:rgba(245,158,11,.08); }
+  .capture-pill.hot { border-color:#ef4444; color:#fca5a5; background:rgba(239,68,68,.1); }
+  .capture-raw { margin:0; color:#f8fafc; font-size:.88rem; line-height:1.35; }
+  .missing-chip-row { display:flex; flex-wrap:wrap; gap:5px; }
+  .missing-chip { border:1px solid #475569; background:#111827; color:#cbd5e1; border-radius:999px; padding:3px 8px; font-size:.65rem; font-weight:800; }
+  .missing-chip.warn { border-color:#f59e0b; color:#fbbf24; }
+  .capture-card-actions { display:flex; flex-wrap:wrap; gap:6px; }
+  .capture-card-actions form { margin:0; }
+  .capture-card-actions button { border:1px solid #334155; background:#0f172a; color:#e2e8f0; border-radius:8px; padding:6px 9px; font-size:.68rem; font-weight:900; cursor:pointer; }
+  .capture-card-actions button:hover { border-color:#60a5fa; }
+  .capture-empty { color:#94a3b8; margin:0; font-size:.84rem; font-weight:700; }
+
   /* Manage button */
   .btn-manage { background:#fff; border:1px solid #cbd5e1; color:#334155;
                 border-radius:10px; padding:6px 13px; font-size:.8rem; font-weight:800;
@@ -648,13 +678,86 @@
 
     <div class="mc-body">
 
+      <section class="capture-panel" id="dispatchCaptureInbox">
+        <div class="capture-head">
+          <div>
+            <h3>Universal Dispatch Capture Inbox</h3>
+            <span>{{ dispatch_capture_count or 0 }} captured request{{ '' if (dispatch_capture_count or 0) == 1 else 's' }} separate from converted moves</span>
+          </div>
+        </div>
+        <form class="capture-form" method="POST" action="{{ url_for('manager.create_dispatch_capture_route') }}">
+          <input type="hidden" name="source" value="manager_dashboard">
+          <textarea class="capture-text" name="raw_text" placeholder="Paste or type dispatch text exactly as received. Example: KP is really full so both of you work on it before shutdown." required></textarea>
+          <div class="capture-actions" aria-label="Quick capture type">
+            <button class="hot" type="submit" name="capture_type" value="hot_move">Hot Move</button>
+            <button type="submit" name="capture_type" value="empty_pack">Empty Pack</button>
+            <button type="submit" name="capture_type" value="quality_hold">Quality Hold</button>
+            <button type="submit" name="capture_type" value="delay_no_parts">Delay / No Parts</button>
+            <button type="submit" name="capture_type" value="damage">Damage</button>
+            <button type="submit" name="capture_type" value="trailer_request">Trailer Request</button>
+            <button type="submit" name="capture_type" value="maintenance">Maintenance</button>
+            <button type="submit" name="capture_type" value="general_note">General Note</button>
+          </div>
+        </form>
+        <div class="capture-inbox" aria-label="Dispatch captures needing triage">
+          {% for capture in dispatch_capture_rows %}
+            <article class="capture-card">
+              <div class="capture-card-top">
+                <div>
+                  <div class="capture-id">{{ capture.display_number }} · {{ capture.type_label }}</div>
+                  <div class="capture-meta">{{ capture.captured_at|to_detroit_datetime if capture.captured_at else '' }} · {{ capture.captured_by_label }}{% if capture.extracted_from_node or capture.extracted_to_node %} · {{ capture.extracted_from_node or 'Unknown' }}{% if capture.extracted_to_node %} → {{ capture.extracted_to_node }}{% endif %}{% endif %}</div>
+                </div>
+                <div class="capture-status">
+                  <span class="capture-pill {% if capture.status == 'needs_triage' %}warn{% endif %}">{{ capture.status_label }}</span>
+                  <span class="capture-pill {% if capture.priority in ['hot','high','safety'] %}hot{% endif %}">{{ capture.priority_label }}</span>
+                  <span class="capture-pill">{{ capture.confidence or 'low' }}</span>
+                </div>
+              </div>
+              <p class="capture-raw">{{ capture.raw_text }}</p>
+              <div class="missing-chip-row">
+                {% for field in capture.missing_fields %}
+                  <span class="missing-chip warn">Needs {{ field }}</span>
+                {% else %}
+                  <span class="missing-chip">Ready to convert</span>
+                {% endfor %}
+                {% for part in capture.extracted_part_numbers[:3] %}
+                  <span class="missing-chip">Part {{ part }}</span>
+                {% endfor %}
+                {% for qty in capture.extracted_quantities[:2] %}
+                  <span class="missing-chip">{{ qty }}</span>
+                {% endfor %}
+              </div>
+              <div class="capture-card-actions" aria-label="Convert or dismiss capture {{ capture.display_number }}">
+                <form method="POST" action="{{ url_for('manager.convert_dispatch_capture_route', capture_id=capture.id) }}"><button type="submit" name="entity_type" value="move_request">MoveRequest</button></form>
+                <form method="POST" action="{{ url_for('manager.convert_dispatch_capture_route', capture_id=capture.id) }}"><button type="submit" name="entity_type" value="empty_pack_return">EmptyPackReturn</button></form>
+                <form method="POST" action="{{ url_for('manager.convert_dispatch_capture_route', capture_id=capture.id) }}"><button type="submit" name="entity_type" value="quality_hold">QualityHold</button></form>
+                <form method="POST" action="{{ url_for('manager.convert_dispatch_capture_route', capture_id=capture.id) }}"><button type="submit" name="entity_type" value="damage_issue">DamageIssue</button></form>
+                <form method="POST" action="{{ url_for('manager.convert_dispatch_capture_route', capture_id=capture.id) }}"><button type="submit" name="entity_type" value="delay_report">DelayReport</button></form>
+                <form method="POST" action="{{ url_for('manager.convert_dispatch_capture_route', capture_id=capture.id) }}"><button type="submit" name="entity_type" value="maintenance_issue">MaintenanceIssue</button></form>
+                <form method="POST" action="{{ url_for('manager.dismiss_dispatch_capture_route', capture_id=capture.id) }}"><button type="submit">Dismiss</button></form>
+              </div>
+            </article>
+          {% else %}
+            <p class="capture-empty">No raw dispatch captures waiting. Pasted texts will appear here immediately, even when fields are missing.</p>
+          {% endfor %}
+        </div>
+      </section>
+
       {# Compact live summary - division counts stay in the detailed table filters below #}
-      <div class="kpi-row" style="grid-template-columns:repeat({{ 3 if live_problem_count else 2 }},minmax(0,1fr));">
+      {% set kpi_count = 3 + (1 if live_problem_count else 0) %}
+      <div class="kpi-row" style="grid-template-columns:repeat({{ kpi_count }},minmax(0,1fr));">
         <a class="kpi {% if division_filter == 'All' and focus_panel == 'jobs' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='All', focus='jobs') }}" aria-label="Show all active moves">
           <p class="kpi-lbl">Active Moves</p>
           <div class="kpi-val">
             <span class="kpi-num">{{ total_active_moves }}</span>
             <span class="kpi-tag">Open jobs</span>
+          </div>
+        </a>
+        <a class="kpi green {% if focus_panel == 'jobs' %}active{% endif %}" href="#dispatchCaptureInbox" aria-label="Show captured dispatch requests">
+          <p class="kpi-lbl">Captured Requests</p>
+          <div class="kpi-val">
+            <span class="kpi-num">{{ dispatch_capture_count or 0 }}</span>
+            <span class="kpi-tag">Needs triage</span>
           </div>
         </a>
         <a class="kpi blue {% if focus_panel == 'routes' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division=division_filter, focus='routes') }}" aria-label="Show live driver routes">

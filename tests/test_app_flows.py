@@ -813,6 +813,59 @@ def test_phase1a_group_chat_request_acknowledgement_and_transfer_link(client, ap
     assert b"Ack " in queue_page.data
 
 
+def test_dispatch_capture_inbox_saves_raw_text_and_converts_with_audit(client, app):
+    with app.app_context():
+        from app.models import AuditEvent, DispatchCapture, MoveRequest
+
+        manager = create_user("capture_mgr", "capture_mgr@example.com", "management")
+        manager_id = manager.id
+
+    login(client, "capture_mgr")
+    raw_text = "KP is really full so both of you work on it before shutdown."
+    created = client.post(
+        "/manager/dispatch-captures",
+        data={"raw_text": raw_text, "capture_type": "delay_no_parts"},
+        follow_redirects=False,
+    )
+    assert created.status_code == 302
+
+    with app.app_context():
+        capture = DispatchCapture.query.one()
+        capture_id = capture.id
+        assert capture.raw_text == raw_text
+        assert capture.captured_by == manager_id
+        assert capture.status == "needs_triage"
+        assert capture.guessed_type == "delay_no_parts"
+        assert capture.extracted_from_node == "Kraft Plater"
+
+    dashboard = client.get("/manager/dashboard")
+    assert dashboard.status_code == 200
+    assert raw_text.encode() in dashboard.data
+    assert b"Universal Dispatch Capture Inbox" in dashboard.data
+    assert b"Captured Requests" in dashboard.data
+    assert b"Needs owner/action" in dashboard.data
+
+    converted = client.post(
+        f"/manager/dispatch-captures/{capture_id}/convert",
+        data={"entity_type": "move_request"},
+        follow_redirects=False,
+    )
+    assert converted.status_code == 302
+
+    with app.app_context():
+        capture = DispatchCapture.query.get(capture_id)
+        req = MoveRequest.query.one()
+        assert capture.status == "converted"
+        assert capture.converted_entity_type == "MoveRequest"
+        assert capture.converted_entity_id == req.id
+        assert req.raw_text == raw_text
+        assert req.source == "dispatch_capture"
+        conversion_audit = AuditEvent.query.filter_by(
+            target_type="dispatch_capture", target_id=capture_id, action="converted"
+        ).one()
+        assert raw_text in conversion_audit.reason
+
+
 def test_driver_mobile_shows_full_parts_queue_and_route_task_events(client, app):
     from datetime import date, datetime
 
@@ -1065,13 +1118,13 @@ def test_plant_load_timing_uses_today_average_on_driver_and_manager_dashboards(c
     login(client, "timing_driver")
     mobile = client.get("/mobile")
     assert mobile.status_code == 200
-    assert b"Kraft Plant Load Timing" in mobile.data
+    assert b"Kraft Plater Load Timing" in mobile.data
     assert b"Today Average" in mobile.data
     assert b"1h 30m" in mobile.data
     assert b"Medium" in mobile.data
-    assert b"Next Load Estimate" in mobile.data
+    assert b"Ready Estimate" in mobile.data
     assert b"Raleigh East Load" in mobile.data
-    assert b"historical pattern" in mobile.data
+    assert b"Basis:" in mobile.data
     assert b"Timing status" in mobile.data
     assert b"forecast" not in mobile.data.lower()
 
@@ -1080,7 +1133,7 @@ def test_plant_load_timing_uses_today_average_on_driver_and_manager_dashboards(c
     manager = client.get(f"/manager/dashboard?driver_id={driver_id}&focus=routes")
     assert manager.status_code == 200
     assert b"Plant load timing" in manager.data
-    assert b"Kraft Plant" in manager.data
+    assert b"Kraft Plater" in manager.data
     assert b"1h 30m" in manager.data
     assert b"forecast" not in manager.data.lower()
 
@@ -1140,7 +1193,7 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
     assert b"Wait Time" in page.data
     assert b"Raleigh East: Wait 15 min" in page.data
     assert b"<strong>Raleigh East:</strong> Pickup." in page.data
-    assert b"Loaded Kraft Plant Load." in page.data
+    assert b"Loaded Kraft Plater Load." in page.data
     assert b"Wait 15 min." in page.data
     assert b"Wait time:</strong> Wait 15 min" not in page.data
     assert b"Movement segment" not in page.data
@@ -1148,8 +1201,8 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
     assert b"Plant Legend" in page.data
     assert b"PPL = PPL" in page.data
     assert b"RE = Raleigh East" in page.data
-    assert b"DC = Distribution Center" in page.data
-    assert b"KP = Kraft Plant" in page.data
+    assert b"DC = 52nd Street DC" in page.data
+    assert b"KP = Kraft Plater" in page.data
     assert b"PC = Paint Central" in page.data
 
     attachment = client.get("/driver_logs_print/attachment")
@@ -2373,7 +2426,7 @@ def test_first_driver_log_is_start_location_not_pickup(client, app):
     assert b"data-active-wait-minutes" in next_page.data
     assert b"data-active-wait-seconds" in next_page.data
     assert b"driver-active-wait.js?v=2" in next_page.data
-    assert b"Kraft Plant" in next_page.data
+    assert b"Kraft Plater" in next_page.data
 
 
 def test_stale_open_stop_does_not_show_as_active_wait_clock(client, app):
@@ -5273,10 +5326,12 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     page = client.get("/mobile")
 
     assert page.status_code == 200
-    assert b"Active Route" in page.data
+    body = page.get_data(as_text=True)
+    assert "Active Route" in body
     assert b"1 stop" in page.data
     assert b"Kraft" in page.data
     assert b"PostTrip Due" in page.data
+    assert body.index("PostTrip Due") < body.index("Live Flow Map")
 
 
 def test_mobile_dashboard_shows_truck_maintenance_history_from_previous_posttrips(client, app):

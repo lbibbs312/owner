@@ -103,12 +103,16 @@ def test_production_flow_no_data_returns_safe_empty_states(app):
     assert ctx["mode"] == "widescreen"
     assert ctx["permissions"]["can_view"] is True
     assert ctx["permissions"]["can_edit"] is False
-    assert ctx["flow_nodes"] == []
-    assert ctx["flow_lanes"] == []
+    labels = {node["label"] for node in ctx["flow_nodes"]}
+    assert {"Raleigh West", "Kraft Plater", "Paint West", "52nd Street DC", "Raleigh East", "Trim DC"} <= labels
+    plant_flow_lanes = [lane for lane in ctx["flow_lanes"] if lane["lane_type"] == "plant_flow"]
+    assert plant_flow_lanes
+    assert all(lane["default_visible"] is True for lane in plant_flow_lanes)
     assert ctx["flow_items"] == []
-    assert ctx["empty_states"]["no_flow_signals"] is True
-    assert ctx["empty_states"]["flow_empty_message"] == "No production-flow signals for this date."
-    assert ctx["empty_states"]["no_flow_nodes"] is True
+    assert ctx["empty_states"]["no_flow_signals"] is False
+    assert ctx["empty_states"]["no_flow_nodes"] is False
+    assert ctx["empty_states"]["no_flow_lanes"] is False
+    assert ctx["empty_states"]["no_flow_items"] is True
     assert ctx["empty_states"]["carrier_unit_snapshot"] == "Carrier unit snapshot not connected yet"
     assert ctx["empty_states"]["rack_capacity"] == "Rack/capacity data not connected yet"
     assert ctx["empty_states"]["data_scope"] == "Using route and move request data only"
@@ -122,12 +126,13 @@ def test_move_requests_create_location_nodes_and_lanes(app):
 
     ctx = build_production_flow_context(date=date.today())
     labels = {node["label"] for node in ctx["flow_nodes"]}
-    lane = ctx["flow_lanes"][0]
+    lane = next(lane for lane in ctx["flow_lanes"] if lane["linked_request_ids"] == [req.id])
 
-    assert {"Raleigh East", "Plastic West"} <= labels
+    assert {"Raleigh East", "Paint West"} <= labels
     assert lane["origin_label"] == "Raleigh East"
-    assert lane["destination_label"] == "Plastic West"
+    assert lane["destination_label"] == "Paint West"
     assert lane["linked_request_ids"] == [req.id]
+    assert lane["default_visible"] is False
     assert ctx["flow_items"][0]["item_type"] == "move_request"
     assert ctx["flow_items"][0]["label"] == "MR-PF-1"
 
@@ -160,11 +165,11 @@ def test_selected_plant_uses_fixed_production_position_not_graph_recentering(app
     _move_request(manager.id, origin_location_text="Paint Central", destination_location_text="Plastic West")
 
     ctx = build_production_flow_context(date=date.today(), selected_plant="Plastic West")
-    selected = next(node for node in ctx["flow_nodes"] if node["label"] == "Plastic West")
+    selected = next(node for node in ctx["flow_nodes"] if node["label"] == "Paint West")
 
     assert ctx["selected_context"]["selected_node_key"] == selected["key"]
     assert selected["layout"]["is_hub"] is True
-    assert selected["production_profile"]["role_label"] == "COATING"
+    assert selected["production_profile"]["role_label"] == "COATING / PAINT"
     assert selected["layout"]["ring"] == "production"
     assert selected["layout"]["x"] == 61
     assert selected["layout"]["y"] == 32
@@ -206,7 +211,7 @@ def test_driver_logs_contribute_route_flow_items(app):
     route_items = [item for item in ctx["flow_items"] if item["item_type"] == "route_stop"]
     assert len(route_items) == 1
     assert route_items[0]["linked_route_stop_id"] == log.id
-    assert route_items[0]["plant_location"] == "Plastic West"
+    assert route_items[0]["plant_location"] == "Paint West"
     assert ctx["floor_summary"]["active_stop_count"] == 1
 
 
@@ -228,10 +233,12 @@ def test_driver_logs_create_real_lanes_between_stops(app):
     )
 
     ctx = build_production_flow_context(date=date.today())
-    lane = next(lane for lane in ctx["flow_lanes"] if lane["origin_label"] == "Raleigh East" and lane["destination_label"] == "Plastic West")
+    lane = next(lane for lane in ctx["flow_lanes"] if lane["origin_label"] == "Raleigh East" and lane["destination_label"] == "Paint West")
 
     assert lane["waiting_count"] == 1
     assert lane["linked_driver_log_ids"] == [first.id, second.id]
+    assert lane["default_visible"] is False
+    assert ctx["route_overlay"]["path_segments"]
 
 
 def test_production_flow_does_not_invent_carrier_or_rack_snapshot_data(app):
@@ -275,11 +282,12 @@ def test_known_plants_render_as_production_positions(app):
     by_label = {node["label"]: node for node in ctx["flow_nodes"]}
 
     assert by_label["PPL"]["production_profile"]["role_label"] == "MOLDING"
-    assert by_label["Kraft Plant"]["production_profile"]["role_label"] == "PLATING"
-    assert by_label["52nd Street L"]["production_profile"]["role_label"] == "ASSEMBLY"
-    assert "GRILLE-BASE-N1511" in by_label["PPL"]["production_profile"]["primary_value"]
+    assert by_label["Kraft Plater"]["production_profile"]["role_label"] == "PLATING"
+    assert by_label["52nd Street DC"]["production_profile"]["role_label"] == "ASSEMBLY"
+    assert by_label["PPL"]["production_profile"]["primary_value"] == "1 flow signal"
+    assert "GRILLE-BASE-N1511" in by_label["PPL"]["production_profile"]["material_lines"][0]
     assert by_label["PPL"]["layout"]["ring"] == "production"
-    assert by_label["Kraft Plant"]["layout"]["ring"] == "production"
+    assert by_label["Kraft Plater"]["layout"]["ring"] == "production"
 
 
 def test_status_counts_are_correct(app):
@@ -336,7 +344,7 @@ def test_manager_dashboard_uses_production_flow_mode(client, app):
     body = resp.get_data(as_text=True)
     assert 'data-route-map-mode="production"' in body
     assert 'data-production-flow-mode="admin"' in body
-    assert "Production Flow Map" in body
+    assert "Live Flow Map" in body
     assert "MR-PROD-1" in body
     assert 'class="route-stop-rail"' not in body
 
@@ -355,21 +363,22 @@ def test_flow_map_uses_large_objects_and_compact_stop_chips(client, app):
     assert "flow-object-card" in body
     assert "Load Build / Trailer" in body
     assert "Route-only data. Attach manifest or enter paper data to build expected flow." in body
-    assert "Live Event Map" in body
+    assert "Live Flow Map" in body
     assert "Operational Alerts" in body
     assert "Plant Computer Console" in body
     assert "production-node-card" in body
-    assert "COATING" in body
-    assert "TRIM DC" in body
+    assert "FRONT END / INTAKE" in body
+    assert "Trim DC" in body
     assert "driver-shuttle-token" not in body
     assert "facility-grid" not in body
     assert "projected from events and current records" not in body
     assert "Receiving, unload, and reconcile events project here." not in body
-    assert "route-step-chip" in body
+    assert "Today&#39;s Route" in body or "Today&rsquo;s Route" in body
+    assert "flow-lane--route-proof" in body
     assert "Stop Details" in body
     assert "Actual Scans" in body
     assert "Event Timeline" in body
-    assert "Event Proof" in body
+    assert "Proof Lines" in body
     assert "Shadow Ledger" not in body
     assert "Production Digital Twin" not in body
     assert "Movie Speed" not in body
@@ -434,14 +443,17 @@ def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
     assert "livePulse" in body
     assert "stroke-width: 3.7" in body
     assert "flow-edge--live" in body
-    assert "flow-event-dash" in body
+    assert "renderFilteredEdges" in body
+    assert "edgeMatchesTrigger" in body
+    assert "flow-lane--route-proof" in body
     assert "flow-live-pulse" in body
     assert "flow-event-pulse" in body
     assert "data-flow-card-mask" in body
     assert "data-flow-edge-group" in body
     assert "livePulseRing" in body
     assert "ops-arrow-live-" in body
-    assert "Event Proof" in body
+    assert "Proof Lines" in body
+    assert "Animated dashed paths come only from today" in body
     assert "data-shadow-ledger-row" in body
     assert "filterShadowLedger" in body
     assert "data-flow-console-title" in body
@@ -497,7 +509,7 @@ def test_board_uses_production_flow_wording_not_audit_defense(client, app):
     resp = client.get("/manager/dashboard")
 
     body = resp.get_data(as_text=True)
-    assert "Production Flow Board" in body
+    assert "Live Flow Map" in body
     assert "Operations &amp; Audit Defense Board" not in body
     assert "Operations & Audit Defense Board" not in body
     assert "Spatial Network Flow" not in body
@@ -517,7 +529,7 @@ def test_no_action_needed_no_exceptions_contradiction(client, app):
     assert "No active exceptions" not in body
     assert "Top Active Exceptions" not in body
     assert "Top Needs Attention" not in body
-    assert "Event Proof" in body
+    assert "Proof Lines" in body
 
 
 def test_route_stops_display_as_sequence_not_database_id(app):

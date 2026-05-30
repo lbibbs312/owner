@@ -70,7 +70,7 @@ def test_queue_summary_counts(app):
 
     user = _user()
     _move_request(user.id, priority="hot", origin_location_text="Raleigh East",
-                  destination_location_text="Plastic West", cargo_text="HDPE")
+                  destination_location_text="Paint West", cargo_text="HDPE")
     _move_request(user.id, status="blocked", blocked_reason="no parts",
                   origin_location_text="A", destination_location_text="B")
     _move_request(user.id, status="assigned", assigned_driver_id=user.id,
@@ -90,12 +90,12 @@ def test_map_nodes_and_edges_derived_from_locations(app):
 
     user = _user()
     _move_request(user.id, status="assigned", assigned_driver_id=user.id,
-                  origin_location_text="Raleigh East", destination_location_text="Plastic West")
+                  origin_location_text="Raleigh East", destination_location_text="Paint West")
 
     snap = build_floor_operations_snapshot()
     labels = {node["label"] for node in snap["map_nodes"]}
     assert "Raleigh East" in labels
-    assert "Plastic West" in labels
+    assert "Paint West" in labels
 
     node = snap["map_nodes"][0]
     assert set(node) >= {
@@ -214,7 +214,7 @@ def test_manager_dashboard_renders_move_queue_and_request(client, app):
     with app.app_context():
         manager = _user("boss", "management")
         _move_request(manager.id, priority="hot", origin_location_text="Raleigh East",
-                      destination_location_text="Plastic West", cargo_text="HDPE")
+                      destination_location_text="Paint West", cargo_text="HDPE")
 
     _login(client, "boss")
     resp = client.get("/manager/dashboard")
@@ -222,10 +222,10 @@ def test_manager_dashboard_renders_move_queue_and_request(client, app):
     body = resp.get_data(as_text=True)
     assert "Move Queue" in body
     assert "Floor Operations" in body
-    assert "Production Flow Map" in body
+    assert "Live Flow Map" in body
     # The seeded request and its derived data surface on the dashboard.
     assert "Raleigh East" in body
-    assert "Plastic West" in body
+    assert "Paint West" in body
 
 
 def test_driver_dashboard_survives_no_assigned_requests(client, app):

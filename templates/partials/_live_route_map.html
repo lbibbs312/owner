@@ -1,7 +1,7 @@
 {# Live map shell. `mode="route"` is driver/mobile; `mode="production"` is manager/widescreen. #}
 {% set rm = route_map if route_map is defined else none %}
 {% set current_map_mode = map_mode if map_mode is defined else (rm.mode if rm and rm.mode is defined else 'route') %}
-{% set map_label = route_map_heading if route_map_heading is defined else (rm.map_label if rm and rm.map_label is defined else ('Production Flow Map' if current_map_mode == 'production' else 'Active Route Map')) %}
+{% set map_label = route_map_heading if route_map_heading is defined else (rm.map_label if rm and rm.map_label is defined else ('Live Flow Map' if current_map_mode == 'production' else 'Active Route Map')) %}
 
 {% if current_map_mode == 'production' %}
   {% set pf = rm %}
@@ -11,7 +11,7 @@
     <div class="route-map-top">
       <div>
         <p class="route-map-label">{{ map_label }}</p>
-        <h3>Production Flow</h3>
+        <h3>Live Flow Map</h3>
         <p class="route-map-sub">
           {% if pf %}
             {{ pf.date }} &middot; {{ floor_summary.data_scope_note or 'Using route and move request data only' }}

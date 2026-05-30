@@ -1292,6 +1292,14 @@
 	        {% endfor %}
 	      </nav>
 	      {% endif %}
+	      {% if pending_posttrip and active_pretrip %}
+	      <section class="quick-grid" aria-label="Required shift action">
+	        <a class="quick-card" href="{{ url_for('driver.do_posttrip', pretrip_id=active_pretrip.id) }}">
+	          <div class="quick-icon green">IN</div>
+	          <div><strong>PostTrip Due</strong><span>Finish inspection and end shift</span></div>
+	        </a>
+	      </section>
+	      {% endif %}
 	      {% if active_task or not flow_first_current %}
 	      <section class="card hero">
         {% if active_task %}
