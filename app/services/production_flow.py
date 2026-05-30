@@ -542,6 +542,7 @@ def _console_lines_for_node(node, material_lines, profile):
         ],
         "right": [
             {"label": "Evidence source", "value": source},
+            {"label": "Hot parts", "value": str(node.get("hot_count", 0))},
             {"label": "Proof needed", "value": str(node.get("proof_needed_count", 0))},
             {"label": "Issues", "value": str(node.get("issue_count", 0))},
         ],
@@ -562,7 +563,7 @@ def _apply_production_profiles(nodes, items):
             "console_left": console_lines["left"],
             "console_right": console_lines["right"],
             "signal_count": _work_signal_count(node),
-            "attention_count": node.get("blocked_count", 0) + node.get("issue_count", 0),
+            "attention_count": node.get("blocked_count", 0) + node.get("issue_count", 0) + node.get("hot_count", 0),
         })
         node["production_profile"] = profile
 
@@ -908,6 +909,8 @@ def _node(nodes, label, *, node_type="plant"):
             "blocked_count": 0,
             "completed_count": 0,
             "issue_count": 0,
+            "hot_count": 0,
+            "hold_count": 0,
             "worst_status": "none",
             "next_action": "No action needed",
             "meta": {
@@ -1587,6 +1590,8 @@ def build_production_flow_context(
     for req in requests:
         status = (req.status or "open").lower()
         has_issue = status in BLOCKED_STATUSES or bool(_clean(req.blocked_reason))
+        is_hot_request = (req.priority or "").lower() in {"hot", "safety"}
+        is_hold_request = _is_hold_signal(req.request_type, req.raw_text, req.cargo_text, req.notes, req.blocked_reason)
         item = _move_item(req, now=now, has_issue=has_issue)
         items.append(item)
 
@@ -1607,22 +1612,27 @@ def build_production_flow_context(
             queue_summary["needs_attention_count"] += 1
         if status not in {"completed", "cancelled"} and not (req.linked_document_id or req.linked_plant_transfer_id):
             queue_summary["document_needed_count"] += 1
-        if (req.priority or "").lower() in {"hot", "safety"}:
+        if is_hot_request:
             queue_summary["hot_count"] += 1
 
+        hot_focus_label = req.destination_location_text or req.origin_location_text
         for label in (req.origin_location_text, req.destination_location_text):
             node = _node(nodes, label)
             if not node:
                 continue
             _bump_status(node, status, has_issue=has_issue)
+            if is_hot_request and _location_key(label) == _location_key(hot_focus_label):
+                node["hot_count"] = node.get("hot_count", 0) + 1
+            if is_hold_request:
+                node["hold_count"] = node.get("hold_count", 0) + 1
             _add_source(node["meta"], "MoveRequest")
 
         lane = _lane(lanes, req.origin_location_text, req.destination_location_text)
         if lane:
             _bump_status(lane, status)
-            if (req.priority or "").lower() in {"hot", "safety"}:
+            if is_hot_request:
                 lane["hot_count"] += 1
-            if _is_hold_signal(req.request_type, req.raw_text, req.cargo_text, req.notes, req.blocked_reason):
+            if is_hold_request:
                 lane["hold_count"] += 1
             lane["linked_request_ids"].append(req.id)
             age = _age_minutes(req.requested_at, now=now)
@@ -1651,6 +1661,10 @@ def build_production_flow_context(
         if not node:
             continue
         _bump_status(node, "completed" if log.depart_time else "waiting", has_issue=log.id in issue_stop_ids or log.id in damaged_stop_ids)
+        if getattr(log, "hot_parts", False):
+            node["hot_count"] = node.get("hot_count", 0) + 1
+        if _is_hold_signal(log.load_size, log.depart_load_size, log.secondary_load, log.downtime_reason, log.plant_name):
+            node["hold_count"] = node.get("hold_count", 0) + 1
         _add_source(node["meta"], "DriverLog")
 
     for driver_logs in sorted_logs_by_driver.values():

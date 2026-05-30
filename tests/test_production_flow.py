@@ -320,6 +320,35 @@ def test_status_counts_are_correct(app):
     assert lane["replay_status"] == "held-up"
 
 
+def test_hot_part_focuses_destination_plant_card(client, app):
+    from app.services.production_flow import build_production_flow_context
+
+    with app.app_context():
+        manager = _user("hot-map-manager", "management")
+        _move_request(
+            manager.id,
+            priority="hot",
+            origin_location_text="Kraft Plater",
+            destination_location_text="Raleigh East",
+            cargo_text="Hot grille part",
+        )
+
+        ctx = build_production_flow_context(date=date.today())
+        by_label = {node["label"]: node for node in ctx["flow_nodes"]}
+        assert by_label["Raleigh East"]["hot_count"] == 1
+        assert by_label["Kraft Plater"]["hot_count"] == 0
+
+    _login(client, "hot-map-manager")
+    resp = client.get("/manager/dashboard")
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "flow-node--hot-focus" in body
+    assert 'data-hot-count="1"' in body
+    assert "Hot part" in body
+    assert "centerHotNode" in body
+
+
 def test_no_fake_telemetry_fields_appear(app):
     from app.services.production_flow import build_production_flow_context
 
@@ -387,6 +416,10 @@ def test_flow_map_uses_large_objects_and_compact_stop_chips(client, app):
     assert "flow-lane--plant-flow" not in body
     assert "flow-lane--flow-replay" in body
     assert "data-flow-sequence-token" in body
+    assert 'dur="16s"' in body
+    assert "production-flow-node-positions" in body
+    assert "bindNodeDragging" in body
+    assert 'data-flow-draggable="node"' in body
     assert "flow-replay--held-up" in body
     assert "Shadow Ledger" not in body
     assert "Production Digital Twin" not in body

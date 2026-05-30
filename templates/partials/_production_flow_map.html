@@ -79,7 +79,7 @@
         stroke-dasharray: 10 7;
         stroke-linecap: round;
         opacity: 0;
-        animation: ops-dash-flow 1.05s linear infinite, ops-sequence-replay 8.8s ease-in-out infinite;
+        animation: ops-dash-flow 1.75s linear infinite, ops-sequence-replay 16s ease-in-out infinite;
         animation-delay: 0s, var(--flow-sequence-delay, 0s);
         filter: drop-shadow(0 0 8px rgba(148,163,184,0.32));
       }
@@ -94,7 +94,7 @@
         stroke-width: 0.4;
         opacity: 0;
         filter: drop-shadow(0 0 8px rgba(56,189,248,0.9));
-        animation: ops-token-fade 8.8s ease-in-out infinite;
+        animation: ops-token-fade 16s ease-in-out infinite;
         animation-delay: var(--flow-sequence-delay, 0s);
         pointer-events: none;
       }
@@ -160,12 +160,28 @@
       .ops-board-spatial .flow-node {
         position: absolute; width: 236px; height: 138px; overflow: hidden; transform: translate(-50%, -50%); background-color: #0e1420; border: 1px solid rgba(51,65,85,0.96);
         border-radius: 0.7rem; box-shadow: 0 14px 34px rgba(0,0,0,0.42); cursor: pointer;
-        transition: border-color 0.2s, box-shadow 0.2s;
+        transition: left 0.35s ease, top 0.35s ease, width 0.25s ease, height 0.25s ease, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
         color: #e5e7eb; text-align: left; padding: 13px 14px; font: inherit;
-        pointer-events: auto; z-index: 20;
+        pointer-events: auto; z-index: 20; touch-action: none; user-select: none;
       }
+      .ops-board-spatial .flow-node.is-dragging { cursor: grabbing; z-index: 60; transition: border-color 0.2s, box-shadow 0.2s; }
       @media (hover: hover) {
         .ops-board-spatial .flow-node:hover { border-color: #818cf8; box-shadow: 0 0 18px rgba(99,102,241,0.4); z-index: 20; }
+      }
+      .ops-board-spatial .flow-node--hot-focus {
+        width: 286px; height: 162px; border-color: #ef4444 !important;
+        box-shadow: 0 0 0 2px rgba(239,68,68,0.28), 0 0 34px rgba(239,68,68,0.55), 0 18px 42px rgba(0,0,0,0.62) !important;
+        z-index: 45;
+      }
+      .ops-board-spatial .flow-node--hot-focus .production-node-role,
+      .ops-board-spatial .flow-node--hot-focus .production-metric-row strong { color: #fecdd3; }
+      .ops-board-spatial .flow-node--hot-focus .production-node-dot { background-color: #ef4444; box-shadow: 0 0 18px rgba(239,68,68,0.95); }
+      .ops-board-spatial .flow-node--hot-centered { z-index: 50; }
+      .ops-board-spatial .production-node-hot-badge {
+        display: inline-flex; align-items: center; justify-content: center; margin-top: 6px; padding: 3px 7px;
+        border-radius: 999px; border: 1px solid rgba(248,113,113,0.58); background-color: rgba(127,29,29,0.58);
+        color: #fee2e2; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.56rem; font-weight: 900;
+        text-transform: uppercase; letter-spacing: 0.06em;
       }
       .ops-board-spatial .flow-node.is-active { border-color: #818cf8; box-shadow: 0 0 24px rgba(99,102,241,0.55); z-index: 25; }
       .ops-board-spatial .flow-node.is-related-object { border-color: #f8fafc; box-shadow: 0 0 22px rgba(56,189,248,0.45); z-index: 24; }
@@ -303,6 +319,7 @@
       .production-flow--mobile .ops-board-spatial .production-flow-canvas { border-right: 0; border-bottom: 1px solid #1f2937; }
       .production-flow--mobile .ops-board-spatial .flow-live-board { min-height: 760px; }
       .production-flow--mobile .ops-board-spatial .flow-node { width: 200px; height: 132px; }
+      .production-flow--mobile .ops-board-spatial .flow-node--hot-focus { width: 240px; height: 154px; }
       .production-flow--mobile .ops-board-spatial .production-node-card--secondary { width: 174px; height: 118px; }
       .production-flow--mobile .ops-board-spatial .route-step-chip[data-status="completed"] { display: none; }
       .production-flow--mobile .ops-board-spatial .exception-ticker { display: none; }
@@ -443,6 +460,7 @@
           padding: 9px 10px;
           border-radius: 0.55rem;
         }
+        .production-flow--mobile .ops-board-spatial .flow-node--hot-focus { width: 210px; height: 150px; }
         .production-flow--mobile .ops-board-spatial .production-node-card--secondary { width: 144px; height: 112px; }
         .production-flow--mobile .ops-board-spatial .production-node-role { font-size: 0.54rem; line-height: 1.22; }
         .production-flow--mobile .ops-board-spatial .production-node-copy { font-size: 0.56rem; line-height: 1.28; margin-bottom: 7px; }
@@ -569,7 +587,7 @@
     {% set current_attention = attention_items[0] if attention_items else none %}
     {% set latest_edge = (pf.flow_edges|last) if pf.flow_edges else none %}
 
-    <div class="ops-board-spatial mb-3" data-ops-spatial>
+    <div class="ops-board-spatial mb-3" data-ops-spatial data-flow-position-scope="{{ flow_mode }}:{{ pf.date if pf else 'no-date' }}">
       <header class="ops-spatial-head">
         <div>
           <p class="ops-board-kicker" style="color:#6b7280; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; margin:0 0 4px;">{{ board_label }}</p>
@@ -691,7 +709,7 @@
                   {% set replay_ns = namespace(index=0) %}
                   {% for lane in pf.flow_lanes %}
                     {% if lane.default_visible and lane.layout and lane.layout.path_d %}
-                      {% set replay_delay = replay_ns.index * 0.82 %}
+                      {% set replay_delay = replay_ns.index * 1.45 %}
                       {% set replay_status = lane.replay_status or 'normal' %}
                       <path class="flow-lane flow-lane--flow-replay flow-replay--{{ replay_status }}"
                             d="{{ lane.layout.path_d }}"
@@ -708,14 +726,14 @@
                               style="--flow-sequence-delay: {{ '%.2f'|format(replay_delay) }}s;"
                               data-flow-sequence-token="{{ replay_ns.index }}"
                               aria-hidden="true">
-                        <animateMotion dur="8.8s" begin="{{ '%.2f'|format(replay_delay) }}s" repeatCount="indefinite" path="{{ lane.layout.path_d }}"/>
+                        <animateMotion dur="16s" begin="{{ '%.2f'|format(replay_delay) }}s" repeatCount="indefinite" path="{{ lane.layout.path_d }}"/>
                       </circle>
                       {% set replay_ns.index = replay_ns.index + 1 %}
                     {% endif %}
                   {% endfor %}
                   {% if pf.route_overlay and pf.route_overlay.path_segments %}
                     {% for segment in pf.route_overlay.path_segments %}
-                      {% set replay_delay = replay_ns.index * 0.82 %}
+                      {% set replay_delay = replay_ns.index * 1.45 %}
                       {% set replay_status = segment.replay_status or 'normal' %}
                       <path class="flow-lane flow-lane--flow-replay flow-lane--route-proof flow-replay--{{ replay_status }}"
                             d="{{ segment.path_d }}"
@@ -733,7 +751,7 @@
                               style="--flow-sequence-delay: {{ '%.2f'|format(replay_delay) }}s;"
                               data-flow-sequence-token="{{ replay_ns.index }}"
                               aria-hidden="true">
-                        <animateMotion dur="8.8s" begin="{{ '%.2f'|format(replay_delay) }}s" repeatCount="indefinite" path="{{ segment.path_d }}"/>
+                        <animateMotion dur="16s" begin="{{ '%.2f'|format(replay_delay) }}s" repeatCount="indefinite" path="{{ segment.path_d }}"/>
                       </circle>
                       {% set replay_ns.index = replay_ns.index + 1 %}
                     {% endfor %}
@@ -809,11 +827,13 @@
                     {% set profile = node.production_profile %}
                     {% set display_name = node.label ~ (' (' ~ node.short_code ~ ')' if node.short_code and node.short_code != node.label else '') %}
                     <button type="button"
-                            class="flow-node production-node-card production-node-card--{{ profile.size }} production-node-card--{{ profile.theme }} flow-node--{{ node.worst_status }}{% if node.layout.is_hub %} flow-node--hub{% endif %}{% if pf.transport_token and pf.transport_token.dock and (node.label == pf.transport_token.dock or node.short_code == pf.transport_token.dock) %} flow-node--live flow-live-pulse{% endif %}"
+                            class="flow-node production-node-card production-node-card--{{ profile.size }} production-node-card--{{ profile.theme }} flow-node--{{ node.worst_status }}{% if node.hot_count %} flow-node--hot-focus{% endif %}{% if node.layout.is_hub %} flow-node--hub{% endif %}{% if pf.transport_token and pf.transport_token.dock and (node.label == pf.transport_token.dock or node.short_code == pf.transport_token.dock) %} flow-node--live flow-live-pulse{% endif %}"
                             style="{% if node.layout %}left: {{ node.layout.x }}%; top: {{ node.layout.y }}%;{% endif %}"
                             data-flow-open="node"
                             data-flow-id="{{ node.key }}"
                             data-flow-node-key="node:{{ node.key }}"
+                            data-flow-draggable="node"
+                            data-hot-count="{{ node.hot_count or 0 }}"
                             data-console-template-key="{{ node.key }}"
                             data-console-title="{{ profile.console_title }}"
                             data-entity-type="flow_node"
@@ -829,6 +849,9 @@
                         <span class="production-node-dot" aria-hidden="true"></span>
                       </div>
                       <p class="production-node-copy">{{ profile.description }}</p>
+                      {% if node.hot_count %}
+                        <span class="production-node-hot-badge">Hot part{% if node.hot_count > 1 %} x{{ node.hot_count }}{% endif %}</span>
+                      {% endif %}
                       <div class="production-metric-row"><span>{{ profile.primary_label }}:</span><strong>{{ profile.primary_value }}</strong></div>
                       <div class="production-metric-row"><span>{{ profile.secondary_label }}:</span><strong>{{ profile.secondary_value }}</strong></div>
                     </button>
@@ -1170,6 +1193,173 @@
         return 'M ' + xPct(x1).toFixed(2) + ' ' + yPct(y1).toFixed(2) + ' C ' + xPct(x1).toFixed(2) + ' ' + yPct(y1 + (y2 >= y1 ? dy : -dy)).toFixed(2) + ', ' + xPct(x2).toFixed(2) + ' ' + yPct(y2 - (y2 >= y1 ? dy : -dy)).toFixed(2) + ', ' + xPct(x2).toFixed(2) + ' ' + yPct(y2).toFixed(2);
       }
 
+      var positionStoreKey = 'production-flow-node-positions:' + (root.getAttribute('data-flow-position-scope') || 'default');
+      var suppressNextClick = false;
+
+      function positionStore() {
+        try {
+          return JSON.parse(window.localStorage.getItem(positionStoreKey) || '{}') || {};
+        } catch (err) {
+          return {};
+        }
+      }
+
+      function writePositionStore(value) {
+        try {
+          window.localStorage.setItem(positionStoreKey, JSON.stringify(value || {}));
+        } catch (err) {}
+      }
+
+      function nodePositionKey(node) {
+        return node ? (node.getAttribute('data-flow-id') || node.getAttribute('data-flow-node-key') || '') : '';
+      }
+
+      function clampNodePosition(node, x, y) {
+        if (!liveBoard || !node) return { x: x, y: y };
+        var boardBox = liveBoard.getBoundingClientRect();
+        var nodeBox = node.getBoundingClientRect();
+        var minX = ((nodeBox.width / 2 + 8) / Math.max(boardBox.width, 1)) * 100;
+        var minY = ((nodeBox.height / 2 + 8) / Math.max(boardBox.height, 1)) * 100;
+        return {
+          x: Math.max(minX, Math.min(100 - minX, x)),
+          y: Math.max(minY, Math.min(100 - minY, y))
+        };
+      }
+
+      function applyNodePosition(node, x, y, options) {
+        if (!node) return;
+        options = options || {};
+        var point = options.skipClamp ? { x: x, y: y } : clampNodePosition(node, x, y);
+        node.style.left = point.x.toFixed(2) + '%';
+        node.style.top = point.y.toFixed(2) + '%';
+        node.dataset.userX = point.x.toFixed(2);
+        node.dataset.userY = point.y.toFixed(2);
+        if (!options.centerHot) node.classList.remove('flow-node--hot-centered');
+        if (options.save) {
+          var key = nodePositionKey(node);
+          if (key) {
+            var stored = positionStore();
+            stored[key] = { x: Number(point.x.toFixed(2)), y: Number(point.y.toFixed(2)) };
+            writePositionStore(stored);
+          }
+        }
+        updateFlowGeometry();
+      }
+
+      function applyStoredNodePositions() {
+        var stored = positionStore();
+        var nodes = root.querySelectorAll('.flow-node[data-flow-draggable="node"]');
+        for (var i = 0; i < nodes.length; i++) {
+          var key = nodePositionKey(nodes[i]);
+          if (!key || !stored[key]) continue;
+          applyNodePosition(nodes[i], Number(stored[key].x), Number(stored[key].y), { save: false });
+        }
+      }
+
+      function updateReplayPaths() {
+        var replayPaths = root.querySelectorAll('[data-flow-replay-kind]');
+        for (var i = 0; i < replayPaths.length; i++) {
+          var path = replayPaths[i];
+          var source = visibleVisual(path.getAttribute('data-source-key'));
+          var target = visibleVisual(path.getAttribute('data-target-key'));
+          var d = edgePath(source, target);
+          if (!d) continue;
+          path.setAttribute('d', d);
+          var index = path.getAttribute('data-flow-sequence-index');
+          var token = index !== null ? root.querySelector('[data-flow-sequence-token="' + index + '"]') : null;
+          var motion = token ? token.querySelector('animateMotion') : null;
+          if (motion) {
+            motion.setAttribute('path', d);
+            motion.setAttribute('dur', '16s');
+          }
+        }
+      }
+
+      function updateFlowGeometry() {
+        updateCardMask();
+        updateReplayPaths();
+        if (selectedTrigger && window.FlowMapAnimator) window.FlowMapAnimator.renderStatic();
+      }
+
+      function centerHotNode() {
+        var hotNode = root.querySelector('.flow-node[data-hot-count]:not([data-hot-count="0"])');
+        if (!hotNode) return;
+        hotNode.classList.add('flow-node--hot-centered');
+        applyNodePosition(hotNode, 50, 50, { save: false, centerHot: true, skipClamp: true });
+      }
+
+      function bindNodeDragging() {
+        var drag = null;
+        function currentPosition(node) {
+          return {
+            x: parseFloat(node.dataset.userX || node.style.left || '50') || 50,
+            y: parseFloat(node.dataset.userY || node.style.top || '50') || 50
+          };
+        }
+        function beginDrag(e) {
+          if (!drag || drag.dragging) return;
+          drag.dragging = true;
+          drag.node.classList.add('is-dragging');
+          drag.node.classList.remove('flow-node--hot-centered');
+          if (drag.node.setPointerCapture) {
+            try { drag.node.setPointerCapture(drag.pointerId); } catch (err) {}
+          }
+        }
+        root.addEventListener('pointerdown', function(e) {
+          var node = e.target.closest('.flow-node[data-flow-draggable="node"]');
+          if (!node || !root.contains(node)) return;
+          if (e.pointerType === 'mouse' && e.button !== 0) return;
+          var boardBox = liveBoard ? liveBoard.getBoundingClientRect() : null;
+          if (!boardBox) return;
+          var pos = currentPosition(node);
+          var centerX = boardBox.left + boardBox.width * pos.x / 100;
+          var centerY = boardBox.top + boardBox.height * pos.y / 100;
+          drag = {
+            node: node,
+            pointerId: e.pointerId,
+            startX: e.clientX,
+            startY: e.clientY,
+            offsetX: e.clientX - centerX,
+            offsetY: e.clientY - centerY,
+            dragging: false,
+            holdTimer: null
+          };
+          if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+            drag.holdTimer = window.setTimeout(function() { beginDrag(e); }, 420);
+          }
+        });
+        root.addEventListener('pointermove', function(e) {
+          if (!drag || e.pointerId !== drag.pointerId) return;
+          var moved = Math.abs(e.clientX - drag.startX) + Math.abs(e.clientY - drag.startY);
+          if (!drag.dragging) {
+            if (e.pointerType === 'mouse' && moved > 4) beginDrag(e);
+            else if (moved > 18 && drag.holdTimer) {
+              window.clearTimeout(drag.holdTimer);
+              drag.holdTimer = null;
+            }
+          }
+          if (!drag.dragging || !liveBoard) return;
+          e.preventDefault();
+          var boardBox = liveBoard.getBoundingClientRect();
+          var x = ((e.clientX - boardBox.left - drag.offsetX) / Math.max(boardBox.width, 1)) * 100;
+          var y = ((e.clientY - boardBox.top - drag.offsetY) / Math.max(boardBox.height, 1)) * 100;
+          applyNodePosition(drag.node, x, y, { save: false });
+        }, { passive: false });
+        function endDrag(e) {
+          if (!drag || e.pointerId !== drag.pointerId) return;
+          if (drag.holdTimer) window.clearTimeout(drag.holdTimer);
+          if (drag.dragging) {
+            applyNodePosition(drag.node, parseFloat(drag.node.dataset.userX || '50'), parseFloat(drag.node.dataset.userY || '50'), { save: true });
+            drag.node.classList.remove('is-dragging');
+            suppressNextClick = true;
+            window.setTimeout(function() { suppressNextClick = false; }, 80);
+          }
+          drag = null;
+        }
+        root.addEventListener('pointerup', endDrag);
+        root.addEventListener('pointercancel', endDrag);
+      }
+
       function updateCardMask() {
         if (!liveBoard || !cardMask) return;
         var boardBox = liveBoard.getBoundingClientRect();
@@ -1324,6 +1514,7 @@
           clearRenderedEdges();
           clearLivePulse();
           updateCardMask();
+          updateReplayPaths();
           if (!selectedTrigger) return;
           var edges = typeof limit === 'number' ? this.edges.slice(0, limit) : this.edges;
           for (var i = 0; i < edges.length; i++) {
@@ -1418,6 +1609,12 @@
       }
 
       root.addEventListener('click', function(e) {
+        if (suppressNextClick) {
+          e.preventDefault();
+          e.stopPropagation();
+          suppressNextClick = false;
+          return;
+        }
         var closeBtn = e.target.closest('[data-flow-close]');
         if (closeBtn && root.contains(closeBtn)) {
           e.preventDefault();
@@ -1454,8 +1651,11 @@
         FlowMapAnimator.appendLive(edge);
       });
       window.addEventListener('resize', function() { FlowMapAnimator.renderStatic(); });
+      bindNodeDragging();
+      applyStoredNodePositions();
+      centerHotNode();
       FlowMapAnimator.renderStatic();
-      window.setTimeout(updateCardMask, 60);
+      window.setTimeout(updateFlowGeometry, 60);
     })();
     </script>
 	  {% else %}
