@@ -78,8 +78,8 @@
         stroke-width: 2.35;
         stroke-dasharray: 10 7;
         stroke-linecap: round;
-        opacity: 0.22;
-        animation: ops-dash-flow 1.05s linear infinite, ops-sequence-replay 6.4s ease-in-out infinite;
+        opacity: 0;
+        animation: ops-dash-flow 1.05s linear infinite, ops-sequence-replay 8.8s ease-in-out infinite;
         animation-delay: 0s, var(--flow-sequence-delay, 0s);
         filter: drop-shadow(0 0 8px rgba(148,163,184,0.32));
       }
@@ -94,7 +94,7 @@
         stroke-width: 0.4;
         opacity: 0;
         filter: drop-shadow(0 0 8px rgba(56,189,248,0.9));
-        animation: ops-token-fade 6.4s ease-in-out infinite;
+        animation: ops-token-fade 8.8s ease-in-out infinite;
         animation-delay: var(--flow-sequence-delay, 0s);
         pointer-events: none;
       }
@@ -106,23 +106,23 @@
       .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open,
       .ops-board-spatial .flow-lane--waiting,
       .ops-board-spatial .flow-lane--blocked, .ops-board-spatial .flow-lane--issue, .ops-board-spatial .flow-lane--needs_review,
-      .ops-board-spatial .flow-lane--completed { stroke: #38bdf8; stroke-width: 2.35; opacity: 0.22; }
+      .ops-board-spatial .flow-lane--completed { stroke-width: 2.35; }
       @keyframes ops-dash-flow { to { stroke-dashoffset: -14; } }
       @keyframes ops-sequence-replay {
-        0%, 100% { opacity: 0.18; }
-        8%, 24% { opacity: 0.96; }
-        42% { opacity: 0.34; }
+        0%, 6%, 19%, 100% { opacity: 0; }
+        8%, 15% { opacity: 0.96; }
+        17% { opacity: 0.18; }
       }
       @keyframes ops-token-fade {
-        0%, 100% { opacity: 0; }
-        9%, 26% { opacity: 1; }
-        42% { opacity: 0.2; }
+        0%, 6%, 19%, 100% { opacity: 0; }
+        8%, 15% { opacity: 1; }
+        17% { opacity: 0.22; }
       }
       @media (prefers-reduced-motion: reduce) {
         .ops-board-spatial .flow-lane--active, .ops-board-spatial .flow-lane--open,
         .ops-board-spatial .flow-lane--waiting, .ops-board-spatial .flow-lane--blocked,
         .ops-board-spatial .flow-lane--issue, .ops-board-spatial .flow-lane--needs_review,
-        .ops-board-spatial .flow-lane--flow-replay, .ops-board-spatial .flow-lane--route-proof { animation: none; stroke-dasharray: 10 7; opacity: 0.72; }
+        .ops-board-spatial .flow-lane--flow-replay, .ops-board-spatial .flow-lane--route-proof { animation: none; stroke-dasharray: 10 7; opacity: 0.48; }
         .ops-board-spatial .flow-sequence-token { display: none; }
         .ops-board-spatial .flow-node, .ops-board-spatial .flow-chip,
         .ops-board-spatial .flow-edge--new, .ops-board-spatial .flow-node--live,
@@ -228,7 +228,7 @@
       .ops-board-spatial .route-step-chip .chip-body strong { font-size: 0.62rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .route-step-chip .step-action { display: block; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .route-step-chip.is-active { border-color: #f8fafc; box-shadow: 0 0 18px rgba(56,189,248,0.35); }
-      .ops-board-spatial .flow-edge { fill: none; stroke: #93c5fd; stroke-width: 3.7; stroke-dasharray: 9 6; stroke-linecap: round; opacity: 1; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 11px rgba(96,165,250,0.78)); }
+      .ops-board-spatial .flow-edge { fill: none; stroke: #93c5fd; stroke-width: 3.7; stroke-dasharray: 9 6; stroke-linecap: round; opacity: 0.95; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 11px rgba(96,165,250,0.78)); }
       .ops-board-spatial .flow-edge--active { stroke: #38bdf8; opacity: 1; filter: drop-shadow(0 0 14px rgba(56,189,248,0.92)); }
       .ops-board-spatial .flow-edge--waiting { stroke: #f59e0b; opacity: 1; filter: drop-shadow(0 0 13px rgba(245,158,11,0.86)); }
       .ops-board-spatial .flow-edge--exception { stroke: #ef4444; opacity: 1; filter: drop-shadow(0 0 15px rgba(239,68,68,0.9)); }
@@ -691,7 +691,7 @@
                   {% set replay_ns = namespace(index=0) %}
                   {% for lane in pf.flow_lanes %}
                     {% if lane.default_visible and lane.layout and lane.layout.path_d %}
-                      {% set replay_delay = replay_ns.index * 0.46 %}
+                      {% set replay_delay = replay_ns.index * 0.82 %}
                       {% set replay_status = lane.replay_status or 'normal' %}
                       <path class="flow-lane flow-lane--flow-replay flow-replay--{{ replay_status }}"
                             d="{{ lane.layout.path_d }}"
@@ -708,14 +708,14 @@
                               style="--flow-sequence-delay: {{ '%.2f'|format(replay_delay) }}s;"
                               data-flow-sequence-token="{{ replay_ns.index }}"
                               aria-hidden="true">
-                        <animateMotion dur="6.4s" begin="{{ '%.2f'|format(replay_delay) }}s" repeatCount="indefinite" path="{{ lane.layout.path_d }}"/>
+                        <animateMotion dur="8.8s" begin="{{ '%.2f'|format(replay_delay) }}s" repeatCount="indefinite" path="{{ lane.layout.path_d }}"/>
                       </circle>
                       {% set replay_ns.index = replay_ns.index + 1 %}
                     {% endif %}
                   {% endfor %}
                   {% if pf.route_overlay and pf.route_overlay.path_segments %}
                     {% for segment in pf.route_overlay.path_segments %}
-                      {% set replay_delay = replay_ns.index * 0.46 %}
+                      {% set replay_delay = replay_ns.index * 0.82 %}
                       {% set replay_status = segment.replay_status or 'normal' %}
                       <path class="flow-lane flow-lane--flow-replay flow-lane--route-proof flow-replay--{{ replay_status }}"
                             d="{{ segment.path_d }}"
@@ -733,7 +733,7 @@
                               style="--flow-sequence-delay: {{ '%.2f'|format(replay_delay) }}s;"
                               data-flow-sequence-token="{{ replay_ns.index }}"
                               aria-hidden="true">
-                        <animateMotion dur="6.4s" begin="{{ '%.2f'|format(replay_delay) }}s" repeatCount="indefinite" path="{{ segment.path_d }}"/>
+                        <animateMotion dur="8.8s" begin="{{ '%.2f'|format(replay_delay) }}s" repeatCount="indefinite" path="{{ segment.path_d }}"/>
                       </circle>
                       {% set replay_ns.index = replay_ns.index + 1 %}
                     {% endfor %}
