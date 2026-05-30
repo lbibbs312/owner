@@ -40,7 +40,6 @@ ACTIVE_MOVE_STATUSES = {"assigned", "in_progress"}
 WAITING_STATUSES = {"waiting"}
 BLOCKED_STATUSES = {"blocked", "needs_review"}
 COMPLETED_STATUSES = {"completed"}
-
 FRIENDLY_SOURCE = {
     "MoveRequest": "Move request",
     "DriverLog": "Driver route log",
@@ -627,6 +626,23 @@ def _lane_type(status):
     return "requested_move"
 
 
+def _is_hold_signal(*values):
+    text = " ".join(_clean(value) or "" for value in values).lower()
+    return any(token in text for token in ("quality hold", "qa hold", "containment", "on hold", "held", "hold area"))
+
+
+def _replay_status(*, hot_count=0, hold_count=0, blocked_count=0, waiting_count=0, active_count=0, open_count=0, completed_count=0):
+    if hot_count:
+        return "hot"
+    if hold_count:
+        return "held"
+    if blocked_count or waiting_count:
+        return "held-up"
+    if completed_count and not (active_count or open_count):
+        return "completed"
+    return "normal"
+
+
 def _node_weight(node, degree_by_key):
     pressure = (
         node["blocked_count"] * 8
@@ -916,6 +932,8 @@ def _lane(lanes, origin, destination, *, configured=False):
             "completed_count": 0,
             "blocked_count": 0,
             "waiting_count": 0,
+            "hot_count": 0,
+            "hold_count": 0,
             "worst_status": "none",
             "oldest_age_minutes": None,
             "linked_request_ids": [],
@@ -934,10 +952,11 @@ def _seed_configured_plant_flow(nodes, lanes):
         node = _node(nodes, label)
         if node:
             _add_source(node["meta"], "PlantFlowConfig")
-    for origin, destination in CONFIGURED_PLANT_FLOW:
+    for index, (origin, destination) in enumerate(CONFIGURED_PLANT_FLOW):
         lane = _lane(lanes, origin, destination, configured=True)
         if lane:
             lane["lane_type"] = "plant_flow"
+            lane["flow_sequence"] = index
 
 
 def _bump_status(target, status, *, has_issue=False):
@@ -1345,6 +1364,8 @@ def _move_item(req, *, now, has_issue=False):
         "part_number": _clean(req.part_number),
         "quantity_text": _quantity_text(req),
         "priority": (req.priority or "normal").lower(),
+        "is_hot_part": (req.priority or "").lower() in {"hot", "safety"},
+        "is_hold_signal": _is_hold_signal(req.request_type, req.raw_text, req.cargo_text, req.notes, req.blocked_reason),
         "assigned_driver": _clean(req.assigned_display) or "Unassigned",
         "document_summary": f"Document #{req.linked_document_id}" if req.linked_document_id else DOCUMENT_MISSING,
         "source_label": FRIENDLY_SOURCE["MoveRequest"],
@@ -1392,6 +1413,8 @@ def _route_item(log, *, now, issue_stop_ids=frozenset(), damaged_stop_ids=frozen
         "arrived_with": log.load_size or NOT_TRACKED,
         "departed_with": log.depart_load_size or NOT_TRACKED,
         "part_number": _clean(log.part_number),
+        "is_hot_part": bool(log.hot_parts),
+        "is_hold_signal": _is_hold_signal(log.load_size, log.depart_load_size, log.secondary_load, log.downtime_reason, log.plant_name),
         "view_url": _safe_url("manager.view_driver_log", log_id=log.id),
     }
 
@@ -1580,6 +1603,10 @@ def build_production_flow_context(
         lane = _lane(lanes, req.origin_location_text, req.destination_location_text)
         if lane:
             _bump_status(lane, status)
+            if (req.priority or "").lower() in {"hot", "safety"}:
+                lane["hot_count"] += 1
+            if _is_hold_signal(req.request_type, req.raw_text, req.cargo_text, req.notes, req.blocked_reason):
+                lane["hold_count"] += 1
             lane["linked_request_ids"].append(req.id)
             age = _age_minutes(req.requested_at, now=now)
             if age is not None:
@@ -1617,6 +1644,10 @@ def build_production_flow_context(
             status = "completed" if current_log.depart_time else "waiting"
             has_issue = current_log.id in issue_stop_ids or current_log.id in damaged_stop_ids
             _bump_status(lane, "blocked" if has_issue else status)
+            if getattr(prev_log, "hot_parts", False) or getattr(current_log, "hot_parts", False):
+                lane["hot_count"] += 1
+            if _is_hold_signal(prev_log.load_size, prev_log.depart_load_size, current_log.load_size, current_log.depart_load_size, current_log.downtime_reason, current_log.plant_name):
+                lane["hold_count"] += 1
             lane["linked_driver_log_ids"].extend([prev_log.id, current_log.id])
 
     for transfer in transfers:
@@ -1630,6 +1661,8 @@ def build_production_flow_context(
         lane = _lane(lanes, transfer.ship_from, transfer.ship_to)
         if lane:
             _bump_status(lane, "completed")
+            if _is_hold_signal(transfer.ship_from, transfer.ship_to):
+                lane["hold_count"] += 1
             lane["linked_transfer_ids"].append(transfer.id)
 
     for report in damage_reports:
@@ -1688,6 +1721,8 @@ def build_production_flow_context(
                 "wait_minutes": wait_minutes,
                 "arrived_with": log.load_size or NOT_TRACKED,
                 "departed_with": log.depart_load_size or NOT_TRACKED,
+                "is_hot_part": bool(log.hot_parts),
+                "is_hold_signal": _is_hold_signal(log.load_size, log.depart_load_size, log.secondary_load, log.downtime_reason, log.plant_name),
                 "proof_status": "attached" if log.depart_time else "pending",
                 "issue_status": "needs_review" if has_issue else "ok",
                 "next_action": "Review issue" if has_issue else ("No action needed" if log.depart_time else "Record departure"),
@@ -1721,6 +1756,15 @@ def build_production_flow_context(
         lane["linked_driver_log_ids"] = sorted(set(lane["linked_driver_log_ids"]))
         lane["linked_transfer_ids"] = sorted(set(lane["linked_transfer_ids"]))
         lane["worst_status"] = _worst_status(
+            blocked_count=lane["blocked_count"],
+            waiting_count=lane["waiting_count"],
+            active_count=lane["active_count"],
+            open_count=lane["open_count"],
+            completed_count=lane["completed_count"],
+        )
+        lane["replay_status"] = _replay_status(
+            hot_count=lane.get("hot_count", 0),
+            hold_count=lane.get("hold_count", 0),
             blocked_count=lane["blocked_count"],
             waiting_count=lane["waiting_count"],
             active_count=lane["active_count"],
@@ -1785,7 +1829,13 @@ def build_production_flow_context(
     )
     flow_lanes = sorted(
         lanes.values(),
-        key=lambda l: (-(l["blocked_count"] + l["waiting_count"] + l["active_count"] + l["open_count"] + l["completed_count"]), l["origin_label"], l["destination_label"]),
+        key=lambda l: (
+            0 if l.get("default_visible") else 1,
+            l.get("flow_sequence", 999),
+            -(l["blocked_count"] + l["waiting_count"] + l["active_count"] + l["open_count"] + l["completed_count"]),
+            l["origin_label"],
+            l["destination_label"],
+        ),
     )
     items.sort(key=lambda item: (item["status"] not in {"blocked", "needs_review", "critical", "high"}, item["age_minutes"] is None, -(item["age_minutes"] or 0), item["label"]))
     selected_node_key = _location_key(selected_plant) if selected_plant else None
@@ -1795,15 +1845,26 @@ def build_production_flow_context(
     node_by_key = {node["key"]: node for node in flow_nodes}
     if route_overlay and route_overlay.get("path_node_keys"):
         segments = []
+        marker_by_node_key = {marker.get("location_key"): marker for marker in route_overlay.get("stop_markers", []) if marker.get("location_key")}
         for index, (origin_key, destination_key) in enumerate(zip(route_overlay["path_node_keys"], route_overlay["path_node_keys"][1:])):
             origin_layout = node_by_key.get(origin_key, {}).get("layout")
             destination_layout = node_by_key.get(destination_key, {}).get("layout")
             if not origin_layout or not destination_layout:
                 continue
+            destination_marker = marker_by_node_key.get(destination_key, {})
+            segment_status = _replay_status(
+                hot_count=1 if destination_marker.get("is_hot_part") else 0,
+                hold_count=1 if destination_marker.get("is_hold_signal") else 0,
+                blocked_count=1 if destination_marker.get("issue_status") != "ok" else 0,
+                waiting_count=1 if not destination_marker.get("departure_at") else 0,
+                completed_count=1 if destination_marker.get("departure_at") else 0,
+            )
             segments.append({
                 "origin_key": origin_key,
                 "destination_key": destination_key,
                 "path_d": _route_proof_curve(origin_layout, destination_layout, index),
+                "flow_sequence": index,
+                "replay_status": segment_status,
             })
         route_overlay["path_segments"] = segments
     transport_token = None

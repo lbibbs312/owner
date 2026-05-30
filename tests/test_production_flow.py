@@ -302,7 +302,7 @@ def test_status_counts_are_correct(app):
 
     ctx = build_production_flow_context(date=date.today())
     summary = ctx["queue_summary"]
-    lane = ctx["flow_lanes"][0]
+    lane = next(lane for lane in ctx["flow_lanes"] if len(lane["linked_request_ids"]) == 5)
 
     assert summary["open_count"] == 1
     assert summary["active_count"] == 1
@@ -316,6 +316,7 @@ def test_status_counts_are_correct(app):
     assert lane["blocked_count"] == 1
     assert lane["completed_count"] == 1
     assert lane["worst_status"] == "blocked"
+    assert lane["replay_status"] == "held-up"
 
 
 def test_no_fake_telemetry_fields_appear(app):
@@ -378,7 +379,11 @@ def test_flow_map_uses_large_objects_and_compact_stop_chips(client, app):
     assert "Stop Details" in body
     assert "Actual Scans" in body
     assert "Event Timeline" in body
-    assert "Proof Lines" in body
+    assert "Replay Lines" in body
+    assert "flow-lane--plant-flow" not in body
+    assert "flow-lane--flow-replay" in body
+    assert "data-flow-sequence-token" in body
+    assert "flow-replay--held-up" in body
     assert "Shadow Ledger" not in body
     assert "Production Digital Twin" not in body
     assert "Movie Speed" not in body
@@ -452,8 +457,10 @@ def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
     assert "data-flow-edge-group" in body
     assert "livePulseRing" in body
     assert "ops-arrow-live-" in body
-    assert "Proof Lines" in body
-    assert "Animated dashed paths come only from today" in body
+    assert "Replay Lines" in body
+    assert "Dashed replay uses green completed, yellow held up, red hot part, and blue held flow." in body
+    assert "flow-lane--flow-replay" in body
+    assert "data-flow-sequence-token" in body
     assert "data-shadow-ledger-row" in body
     assert "filterShadowLedger" in body
     assert "data-flow-console-title" in body
@@ -529,7 +536,7 @@ def test_no_action_needed_no_exceptions_contradiction(client, app):
     assert "No active exceptions" not in body
     assert "Top Active Exceptions" not in body
     assert "Top Needs Attention" not in body
-    assert "Proof Lines" in body
+    assert "Replay Lines" in body
 
 
 def test_route_stops_display_as_sequence_not_database_id(app):
