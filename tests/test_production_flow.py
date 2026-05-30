@@ -171,8 +171,8 @@ def test_selected_plant_uses_fixed_production_position_not_graph_recentering(app
     assert selected["layout"]["is_hub"] is True
     assert selected["production_profile"]["role_label"] == "COATING / PAINT"
     assert selected["layout"]["ring"] == "production"
-    assert selected["layout"]["x"] == 61
-    assert selected["layout"]["y"] == 32
+    assert selected["layout"]["x"] == 64
+    assert selected["layout"]["y"] == 24
 
 
 def test_production_flow_context_supports_mode_and_action_permissions(app):
@@ -281,12 +281,13 @@ def test_known_plants_render_as_production_positions(app):
     ctx = build_production_flow_context(date=date.today())
     by_label = {node["label"]: node for node in ctx["flow_nodes"]}
 
-    assert by_label["PPL"]["production_profile"]["role_label"] == "MOLDING"
+    assert "PPL" not in by_label
+    assert by_label["Raleigh West"]["production_profile"]["role_label"] == "FRONT END / INTAKE / EMPTY PACK RETURN"
     assert by_label["Kraft Plater"]["production_profile"]["role_label"] == "PLATING"
-    assert by_label["52nd Street DC"]["production_profile"]["role_label"] == "ASSEMBLY"
-    assert by_label["PPL"]["production_profile"]["primary_value"] == "1 flow signal"
-    assert "GRILLE-BASE-N1511" in by_label["PPL"]["production_profile"]["material_lines"][0]
-    assert by_label["PPL"]["layout"]["ring"] == "production"
+    assert by_label["52nd Street DC"]["production_profile"]["role_label"] == "ASSEMBLY / CARRIER ALLOCATION"
+    assert by_label["Raleigh West"]["production_profile"]["primary_value"] == "1 flow signal"
+    assert "GRILLE-BASE-N1511" in by_label["Raleigh West"]["production_profile"]["material_lines"][0]
+    assert by_label["Raleigh West"]["layout"]["ring"] == "production"
     assert by_label["Kraft Plater"]["layout"]["ring"] == "production"
 
 
@@ -368,8 +369,11 @@ def test_flow_map_uses_large_objects_and_compact_stop_chips(client, app):
     assert "Operational Alerts" in body
     assert "Plant Computer Console" in body
     assert "production-node-card" in body
+    assert "Raleigh West (RW)" in body
+    assert "52nd Street DC (52L)" in body
     assert "FRONT END / INTAKE" in body
     assert "Trim DC" in body
+    assert "production-material-list" not in body
     assert "driver-shuttle-token" not in body
     assert "facility-grid" not in body
     assert "projected from events and current records" not in body

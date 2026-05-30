@@ -51,6 +51,12 @@ FRIENDLY_SOURCE = {
 }
 
 PRODUCTION_DISPLAY_LABELS = {
+    "ppl": "Raleigh West",
+    "plastic_logistics": "Raleigh West",
+    "plastic logistics": "Raleigh West",
+    "plastic_logistics_buffer": "Raleigh West",
+    "plastic logistics buffer": "Raleigh West",
+    "molding": "Raleigh West",
     "rw": "Raleigh West",
     "raleigh_west": "Raleigh West",
     "raleigh west": "Raleigh West",
@@ -147,8 +153,8 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "LOAD / OVERFLOW STATUS",
         "theme": "cyan",
         "size": "primary",
-        "x": 43,
-        "y": 27,
+        "x": 38,
+        "y": 23,
     },
     "plastic_west": {
         "aliases": {"pw", "plastic_west", "paint_west", "paint", "coating"},
@@ -162,8 +168,8 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "PAINTED WIP",
         "theme": "cyan",
         "size": "primary",
-        "x": 61,
-        "y": 32,
+        "x": 64,
+        "y": 24,
     },
     "paint_central": {
         "aliases": {"pc", "paint_central", "paint_center", "central_paint"},
@@ -177,13 +183,13 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "STAGING RELEASE",
         "theme": "cyan",
         "size": "secondary",
-        "x": 56,
+        "x": 58,
         "y": 47,
     },
     "raleigh_west": {
-        "aliases": {"rw", "raleigh_west", "front_end", "intake", "empty_pack_return"},
+        "aliases": {"rw", "raleigh_west", "ppl", "plastic_logistics", "plastic_logistics_buffer", "molding", "front_end", "intake", "empty_pack_return"},
         "sequence": "1",
-        "role_label": "FRONT END / INTAKE",
+        "role_label": "FRONT END / INTAKE / EMPTY PACK RETURN",
         "console_title": "RALEIGH WEST INTAKE / EMPTY PACK RETURN (RW)",
         "description": "Intake, empty packs, raw substrates, and staging capacity.",
         "primary_label": "Intake / empty packs",
@@ -192,13 +198,13 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "EMPTY PACK RETURN",
         "theme": "cyan",
         "size": "primary",
-        "x": 20,
-        "y": 36,
+        "x": 16,
+        "y": 40,
     },
     "52nd_street_l": {
         "aliases": {"52l", "52nd_street_l", "52nd_street", "52nd_street_logistics", "52nd_street_dc", "52dc"},
         "sequence": "4",
-        "role_label": "ASSEMBLY",
+        "role_label": "ASSEMBLY / CARRIER ALLOCATION",
         "console_title": "52ND STREET ASSEMBLY / LOGISTICS (52L)",
         "description": "Assembly, carrier allocation, and trailer assignment.",
         "primary_label": "Carrier allocation",
@@ -207,13 +213,13 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "TRAILER ASSIGNMENT",
         "theme": "cyan",
         "size": "primary",
-        "x": 74,
-        "y": 55,
+        "x": 82,
+        "y": 56,
     },
     "52nd_street_dc": {
         "aliases": {"52dc"},
         "sequence": "4",
-        "role_label": "ASSEMBLY",
+        "role_label": "ASSEMBLY / CARRIER ALLOCATION",
         "console_title": "52ND STREET DC LOAD BUILD",
         "description": "Assembly, carrier allocation, and trailer assignment.",
         "primary_label": "Carrier allocation",
@@ -222,13 +228,13 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "TRAILER ASSIGNMENT",
         "theme": "cyan",
         "size": "primary",
-        "x": 74,
-        "y": 55,
+        "x": 82,
+        "y": 56,
     },
     "raleigh_east": {
         "aliases": {"re", "raleigh_east", "oem_dock", "receiving"},
         "sequence": "5",
-        "role_label": "OEM DOCK",
+        "role_label": "OEM DOCK / JIT DELIVERY",
         "console_title": "RALEIGH EAST OEM DOCK (RE)",
         "description": "OEM dock delivery, JIT status, and unload state.",
         "primary_label": "JIT status",
@@ -237,13 +243,13 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "JIT / UNLOAD STATE",
         "theme": "cyan",
         "size": "primary",
-        "x": 74,
-        "y": 80,
+        "x": 82,
+        "y": 82,
     },
     "helios": {
         "aliases": {"helios", "helios_sub_plater", "sub_plater"},
         "sequence": "",
-        "role_label": "HELIOS SUB-PLATER",
+        "role_label": "SUB-PLATER / SUPPORT",
         "console_title": "HELIOS SUPPORT CHAMBERS",
         "description": "Auxiliary plating support and standby staging.",
         "primary_label": "Staged",
@@ -252,11 +258,11 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "AUXILIARY RELEASE",
         "theme": "cyan",
         "size": "secondary",
-        "x": 19,
-        "y": 80,
+        "x": 18,
+        "y": 78,
     },
     "trim_dc": {
-        "aliases": {"trim_dc", "trim", "distribution_center", "dc"},
+        "aliases": {"trim_dc", "trim"},
         "sequence": "",
         "role_label": "EXTRACTION / EMPTY PACK RETURN",
         "console_title": "TRIM PACKING DC",
@@ -267,8 +273,8 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "RW RETURN STAGING",
         "theme": "cyan",
         "size": "secondary",
-        "x": 50,
-        "y": 63,
+        "x": 44,
+        "y": 64,
     },
     "lab": {
         "aliases": {"lab", "corporate_lab", "quality_hold_lab", "quality", "quality_hold", "qa_hold", "corp", "corporate"},
@@ -282,7 +288,7 @@ PRODUCTION_NODE_PROFILES = {
         "console_right_title": "CONTAINMENT STATUS",
         "theme": "red",
         "size": "secondary",
-        "x": 50,
+        "x": 56,
         "y": 84,
     },
 }
@@ -365,15 +371,26 @@ def _short_code(value):
 
 
 def _profile_key_for_node(node):
-    candidates = {
-        _location_key(node.get("label")),
-        _location_key(node.get("short_code")),
-        _clean(node.get("short_code")).lower(),
-    }
+    candidates = []
+
+    def add_candidates(value):
+        raw = _clean(value)
+        if not raw:
+            return
+        for candidate in (_location_label(raw), raw):
+            if not candidate:
+                continue
+            normalized = re.sub(r"[^a-z0-9]+", "_", candidate.lower()).strip("_")
+            lowered = candidate.lower()
+            for key in (normalized, lowered):
+                if key and key not in candidates:
+                    candidates.append(key)
+
+    add_candidates(node.get("label"))
+    add_candidates(node.get("short_code"))
     for code, label in PLANT_LABELS.items():
         if label == node.get("label"):
-            candidates.add(_location_key(code))
-            candidates.add(code.lower())
+            add_candidates(code)
     for candidate in candidates:
         if candidate in PRODUCTION_NODE_ALIAS_INDEX:
             return PRODUCTION_NODE_ALIAS_INDEX[candidate]
