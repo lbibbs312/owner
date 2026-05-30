@@ -188,10 +188,6 @@
       .ops-board-spatial .route-step-chip .chip-body strong { font-size: 0.62rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .route-step-chip .step-action { display: block; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ops-board-spatial .route-step-chip.is-active { border-color: #f8fafc; box-shadow: 0 0 18px rgba(56,189,248,0.35); }
-      .ops-board-spatial .driver-shuttle-token { position: absolute; width: 44px; height: 44px; transform: translate(-50%, -50%); border-radius: 12px; border: 1px solid rgba(224,242,254,0.55); background-color: #22d3ee; color: #020617; display: grid; place-items: center; z-index: 34; box-shadow: 0 0 28px rgba(34,211,238,0.45); pointer-events: none; }
-      .ops-board-spatial .driver-shuttle-token svg { width: 25px; height: 25px; fill: currentColor; }
-      .ops-board-spatial .driver-shuttle-token span { position: absolute; top: -8px; right: -9px; min-width: 23px; text-align: center; padding: 1px 3px; border-radius: 999px; color: #020617; background-color: #10b981; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.54rem; font-weight: 900; }
-      .ops-board-spatial .driver-shuttle-token.is-loaded span { background-color: #f59e0b; }
       .ops-board-spatial .flow-edge { fill: none; stroke: #93c5fd; stroke-width: 3.7; stroke-linecap: round; opacity: 1; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 11px rgba(96,165,250,0.78)); }
       .ops-board-spatial .flow-edge--active { stroke: #38bdf8; opacity: 1; filter: drop-shadow(0 0 14px rgba(56,189,248,0.92)); }
       .ops-board-spatial .flow-edge--waiting { stroke: #f59e0b; opacity: 1; filter: drop-shadow(0 0 13px rgba(245,158,11,0.86)); }
@@ -214,12 +210,13 @@
         stroke-dashoffset: var(--path-length);
         animation: drawFlowEdge 700ms ease-out forwards;
       }
-      .ops-board-spatial .flow-node--live {
-        position: relative;
+      .ops-board-spatial .flow-node--live,
+      .ops-board-spatial .flow-live-pulse {
         border-color: #e0f2fe !important;
         animation: livePulse 1.35s ease-in-out infinite;
       }
-      .ops-board-spatial .flow-node--live::after {
+      .ops-board-spatial .flow-node--live::after,
+      .ops-board-spatial .flow-live-pulse::after {
         content: "";
         position: absolute;
         inset: -8px;
@@ -232,15 +229,15 @@
       @keyframes drawFlowEdge { to { stroke-dashoffset: 0; } }
       @keyframes flow-event-dash { to { stroke-dashoffset: -44; } }
       @keyframes livePulse {
-        0%, 100% { box-shadow: 0 0 0 rgba(56,189,248,0.0), 0 6px 18px rgba(0,0,0,0.42); }
-        50% { box-shadow: 0 0 0 2px rgba(56,189,248,0.34), 0 0 34px rgba(56,189,248,0.62), 0 12px 32px rgba(0,0,0,0.52); }
+        0%, 100% { box-shadow: 0 0 0 rgba(226,232,240,0), 0 6px 18px rgba(0,0,0,0.42); }
+        50% { box-shadow: 0 0 0 2px rgba(226,232,240,0.34), 0 0 34px rgba(226,232,240,0.62), 0 12px 32px rgba(0,0,0,0.52); }
       }
       @keyframes livePulseRing {
         0% { opacity: 0.75; transform: scale(0.98); }
         100% { opacity: 0; transform: scale(1.12); }
       }
       @keyframes eventFlash {
-        0% { background-color: rgba(56,189,248,0.28); }
+        0% { background-color: rgba(226,232,240,0.28); }
         100% { background-color: transparent; }
       }
       .ops-board-spatial .flow-drawer-panel { background-color: #111827; padding: 16px; min-height: 560px; overflow-y: auto; }
@@ -269,6 +266,92 @@
       .production-flow--mobile .ops-board-spatial .flow-drawer-panel.is-detail-open {
         display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 999; min-height: 0; max-height: 68vh;
         border-radius: 12px 12px 0 0; border-top: 1px solid #334155; box-shadow: 0 -16px 36px rgba(0,0,0,0.55);
+      }
+      .production-flow--mobile .ops-board-spatial .flow-live-board {
+        background:
+          radial-gradient(rgba(210, 215, 222, 0.20) 1px, transparent 1.5px) 0 0 / 24px 24px,
+          radial-gradient(circle at 50% 50%, rgba(214, 219, 226, 0.08), transparent 34%),
+          linear-gradient(180deg, #020617 0%, #030712 54%, #01040b 100%);
+      }
+      .production-flow--mobile .ops-board-spatial .route-overlay-caption { color: #b9c0ca !important; }
+      .production-flow--mobile .ops-board-spatial .flow-lane,
+      .production-flow--mobile .ops-board-spatial .flow-lane.is-related-path,
+      .production-flow--mobile .ops-board-spatial .flow-lane--active,
+      .production-flow--mobile .ops-board-spatial .flow-lane--open,
+      .production-flow--mobile .ops-board-spatial .flow-lane--waiting,
+      .production-flow--mobile .ops-board-spatial .flow-lane--blocked,
+      .production-flow--mobile .ops-board-spatial .flow-lane--issue,
+      .production-flow--mobile .ops-board-spatial .flow-lane--needs_review,
+      .production-flow--mobile .ops-board-spatial .flow-lane--completed,
+      .production-flow--mobile .ops-board-spatial .flow-lane--route-overlay {
+        stroke: #c9cfd8;
+        filter: drop-shadow(0 0 9px rgba(215, 221, 230, 0.42));
+      }
+      .production-flow--mobile .ops-board-spatial .flow-edge,
+      .production-flow--mobile .ops-board-spatial .flow-edge--active,
+      .production-flow--mobile .ops-board-spatial .flow-edge--waiting,
+      .production-flow--mobile .ops-board-spatial .flow-edge--exception,
+      .production-flow--mobile .ops-board-spatial .flow-edge--completed,
+      .production-flow--mobile .ops-board-spatial .flow-edge--live {
+        stroke: #d7dce4;
+        filter: drop-shadow(0 0 13px rgba(225, 229, 235, 0.62));
+      }
+      .production-flow--mobile .ops-board-spatial .flow-node,
+      .production-flow--mobile .ops-board-spatial .flow-node.is-active,
+      .production-flow--mobile .ops-board-spatial .flow-node.is-related-object,
+      .production-flow--mobile .ops-board-spatial .flow-node--blocked,
+      .production-flow--mobile .ops-board-spatial .flow-node--issue,
+      .production-flow--mobile .ops-board-spatial .flow-node--waiting,
+      .production-flow--mobile .ops-board-spatial .flow-node--active,
+      .production-flow--mobile .ops-board-spatial .flow-node--open,
+      .production-flow--mobile .ops-board-spatial .flow-node--completed,
+      .production-flow--mobile .ops-board-spatial .production-node-card--red,
+      .production-flow--mobile .ops-board-spatial .production-node-card--cyan {
+        border-color: rgba(202, 208, 217, 0.34);
+        box-shadow: 0 14px 34px rgba(0,0,0,0.42);
+      }
+      .production-flow--mobile .ops-board-spatial .production-node-role,
+      .production-flow--mobile .ops-board-spatial .production-node-card--red .production-node-role {
+        color: #d4dae3;
+      }
+      .production-flow--mobile .ops-board-spatial .production-node-dot,
+      .production-flow--mobile .ops-board-spatial .production-node-card--red .production-node-dot,
+      .production-flow--mobile .ops-board-spatial .flow-node--blocked .production-node-dot,
+      .production-flow--mobile .ops-board-spatial .flow-node--issue .production-node-dot,
+      .production-flow--mobile .ops-board-spatial .flow-node--waiting .production-node-dot {
+        background-color: #d7dce4;
+        box-shadow: 0 0 13px rgba(215, 220, 228, 0.64);
+      }
+      .production-flow--mobile .ops-board-spatial .production-node-card--red .production-metric-row strong,
+      .production-flow--mobile .ops-board-spatial .production-metric-row strong {
+        color: #eef2f7;
+      }
+      .production-flow--mobile .ops-board-spatial .flow-chip,
+      .production-flow--mobile .ops-board-spatial .flow-chip.is-active,
+      .production-flow--mobile .ops-board-spatial .flow-chip--blocked,
+      .production-flow--mobile .ops-board-spatial .flow-chip--needs_review,
+      .production-flow--mobile .ops-board-spatial .flow-chip--critical,
+      .production-flow--mobile .ops-board-spatial .flow-chip--high,
+      .production-flow--mobile .ops-board-spatial .flow-chip--waiting,
+      .production-flow--mobile .ops-board-spatial .flow-chip--active,
+      .production-flow--mobile .ops-board-spatial .flow-chip--open,
+      .production-flow--mobile .ops-board-spatial .flow-chip--completed {
+        border-color: rgba(215, 220, 228, 0.54);
+      }
+      .production-flow--mobile .ops-board-spatial .chip-badge,
+      .production-flow--mobile .ops-board-spatial .chip-badge--blocked,
+      .production-flow--mobile .ops-board-spatial .chip-badge--hot,
+      .production-flow--mobile .ops-board-spatial .chip-badge--waiting {
+        background-color: #d7dce4;
+        color: #030712;
+      }
+      .production-flow--mobile .ops-board-spatial .flow-node--live,
+      .production-flow--mobile .ops-board-spatial .flow-live-pulse {
+        border-color: #f4f7fb !important;
+      }
+      .production-flow--mobile .ops-board-spatial .flow-node--live::after,
+      .production-flow--mobile .ops-board-spatial .flow-live-pulse::after {
+        border-color: rgba(244, 247, 251, 0.72);
       }
       @media (max-width: 760px) {
         .production-flow--mobile,
@@ -324,15 +407,6 @@
         .production-flow--mobile .ops-board-spatial .route-step-chip .chip-badge { font-size: 0.42rem; max-width: 40px; }
         .production-flow--mobile .ops-board-spatial .route-step-chip .chip-body { font-size: 0.52rem; }
         .production-flow--mobile .ops-board-spatial .route-step-chip .chip-body strong { font-size: 0.55rem; }
-        .production-flow--mobile .ops-board-spatial .driver-shuttle-token {
-          width: 36px;
-          height: 36px;
-          border-radius: 10px;
-        }
-        .production-flow--mobile .ops-board-spatial .driver-shuttle-token svg {
-          width: 20px;
-          height: 20px;
-        }
         .production-flow--mobile .ops-board-spatial .flow-edge { stroke-width: 3.2; }
         .production-flow--mobile .ops-board-spatial .flow-object-layer { grid-template-columns: 1fr; }
         .production-flow--mobile .ops-board-spatial .flow-console-head {
@@ -450,8 +524,8 @@
       <header class="ops-spatial-head">
         <div>
           <p class="ops-board-kicker" style="color:#6b7280; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; margin:0 0 4px;">{{ board_label }}</p>
-          <h3>Production Digital Twin</h3>
-          <div class="ops-sub">{{ pf.date if pf else '' }}{% if pf %} &middot; Production Flow Board &middot; live event map{% endif %}</div>
+          <h3>Live Event Map</h3>
+          <div class="ops-sub">{{ pf.date if pf else '' }}{% if pf %} &middot; Production Flow Board &middot; event-backed map{% endif %}</div>
           {% if pf and pf.route_overlay and pf.route_overlay.path_node_keys %}
             <div class="route-overlay-caption" style="margin-top:6px; color:#38bdf8; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.7rem;">
               Showing today&rsquo;s route as proof trail{% if pf.route_overlay.driver_name %} &middot; {{ pf.route_overlay.driver_name }}{% endif %}
@@ -474,7 +548,7 @@
         <div><span>Tenant / Company</span><strong>{{ current_user.company_name if current_user and current_user.company_name is defined and current_user.company_name else 'lacksdrivers' }}</strong></div>
         <div><span>User / Role</span><strong>{{ current_user.display_name if current_user and current_user.is_authenticated else 'Read only' }}{% if current_user and current_user.is_authenticated %} / {{ current_user.role }}{% endif %}</strong></div>
         <div><span>Shift Date</span><strong>{{ pf.date if pf else '' }}</strong></div>
-        <div><span>Proof Layer</span><strong>Shadow Ledger filters on click</strong></div>
+        <div><span>Event Proof</span><strong>Proof trail filters on click</strong></div>
       </div>
 
       <div class="flow-map-lanes" aria-label="Production to transport flow lanes">
@@ -535,8 +609,8 @@
             <div class="flow-live-board flow-spatial-canvas" data-flow-live-board data-flow-animation-mode="live">
               <svg class="map-svg-layer" data-flow-edge-layer aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
                 <defs>
-                  <marker id="ops-arrow-live-{{ flow_mode }}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 7 3.5, 0 7" fill="#38bdf8"/></marker>
-                  <marker id="ops-arrow-exception-{{ flow_mode }}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 7 3.5, 0 7" fill="#ef4444"/></marker>
+                  <marker id="ops-arrow-live-{{ flow_mode }}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 7 3.5, 0 7" fill="#d7dce4"/></marker>
+                  <marker id="ops-arrow-exception-{{ flow_mode }}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 7 3.5, 0 7" fill="#d7dce4"/></marker>
                   <mask id="flow-card-cutouts-{{ flow_mode }}" data-flow-card-mask maskUnits="userSpaceOnUse">
                     <rect x="0" y="0" width="100" height="100" fill="white"></rect>
                   </mask>
@@ -618,20 +692,11 @@
                     </button>
                   {% endfor %}
                 </div>
-                {% if pf.transport_token %}
-                  <div class="driver-shuttle-token{% if pf.transport_token.badge == 'FULL' %} is-loaded{% endif %}"
-                       style="left: {{ pf.transport_token.x }}%; top: {{ pf.transport_token.y }}%;"
-                       aria-label="{{ pf.transport_token.label }} shuttle {{ pf.transport_token.status }}">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2a3 3 0 0 0 6 0h6a3 3 0 0 0 6 0h2v-5l-3-4ZM6 18.5A1.5 1.5 0 1 1 6 15.5a1.5 1.5 0 0 1 0 3Zm12 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM17 12V9h2.5l1.96 2.5H17Z"/></svg>
-                    <span>{{ pf.transport_token.badge }}</span>
-                  </div>
-                {% endif %}
-
                 <div class="flow-node-row" aria-label="Physical flow nodes">
                   {% for node in pf.flow_nodes %}
                     {% set profile = node.production_profile %}
                     <button type="button"
-                            class="flow-node production-node-card production-node-card--{{ profile.size }} production-node-card--{{ profile.theme }} flow-node--{{ node.worst_status }}{% if node.layout.is_hub %} flow-node--hub{% endif %}"
+                            class="flow-node production-node-card production-node-card--{{ profile.size }} production-node-card--{{ profile.theme }} flow-node--{{ node.worst_status }}{% if node.layout.is_hub %} flow-node--hub{% endif %}{% if pf.transport_token and pf.transport_token.dock and (node.label == pf.transport_token.dock or node.short_code == pf.transport_token.dock) %} flow-node--live flow-live-pulse{% endif %}"
                             style="{% if node.layout %}left: {{ node.layout.x }}%; top: {{ node.layout.y }}%;{% endif %}"
                             data-flow-open="node"
                             data-flow-id="{{ node.key }}"
@@ -744,7 +809,7 @@
             </div>
             <div class="flow-proof-status">
               <span class="proof-dot" aria-hidden="true"></span>
-              <span class="label">Shadow Ledger</span>
+              <span class="label">Event Proof</span>
               <span>Animated paths are drawn only from FlowEvent ledger rows.</span>
             </div>
           </div>
@@ -752,7 +817,7 @@
 
         <aside class="flow-drawer-panel" data-flow-drawer aria-label="Production flow details">
           <div data-flow-drawer-global>
-            <h5 class="drawer-title">Shadow Ledger</h5>
+            <h5 class="drawer-title">Event Proof</h5>
             <div class="drawer-kicker-line">Stage transitions captured today. Click a node or chip to filter.</div>
             {% set stage_label_map = {
               'wip': 'WIP',
@@ -915,6 +980,34 @@
         return null;
       }
 
+      function visibleVisual(flowKey) {
+        var visual = findVisual(flowKey);
+        return isVisibleVisual(visual) ? visual : null;
+      }
+
+      function visualForEdge(edge, side) {
+        if (!edge) return null;
+        var key = side === 'source' ? edge.source_key : edge.target_key;
+        var visual = visibleVisual(key);
+        if (visual) return visual;
+        var nodeKey = side === 'source' ? edge.origin_node_key : edge.destination_node_key;
+        visual = visibleVisual(nodeKey);
+        if (visual) return visual;
+        if (edge.stop_id) {
+          visual = root.querySelector('[data-entity-type="route_stop"][data-entity-id="' + edge.stop_id + '"]');
+          if (isVisibleVisual(visual)) return visual;
+        }
+        if (edge.entity_type && edge.entity_id) {
+          visual = root.querySelector('[data-entity-type="' + edge.entity_type + '"][data-entity-id="' + edge.entity_id + '"]');
+          if (isVisibleVisual(visual)) return visual;
+        }
+        if (side === 'target' && edge.target_key === 'object:receiving') {
+          visual = root.querySelector('.flow-node[data-status="waiting"], .route-step-chip[data-status="waiting"], .flow-node[data-status="active"], .route-step-chip[data-status="active"]');
+          if (isVisibleVisual(visual)) return visual;
+        }
+        return null;
+      }
+
       function edgePath(source, target) {
         if (!liveBoard || !source || !target) return '';
         var boardBox = liveBoard.getBoundingClientRect();
@@ -946,7 +1039,7 @@
         function xPct(px) { return (px / Math.max(boardBox.width, 1)) * 100; }
         function yPct(px) { return (px / Math.max(boardBox.height, 1)) * 100; }
         cardMask.innerHTML = '<rect x="0" y="0" width="100" height="100" fill="white"></rect>';
-        var blockers = root.querySelectorAll('.flow-object-card, .flow-chip, .flow-node, .driver-shuttle-token');
+        var blockers = root.querySelectorAll('.flow-object-card, .flow-chip, .flow-node');
         for (var i = 0; i < blockers.length; i++) {
           var box = blockers[i].getBoundingClientRect();
           var pad = 4;
@@ -963,8 +1056,8 @@
 
       function drawEdge(edge, animate) {
         if (!edgeGroup || !edge) return null;
-        var source = findVisual(edge.source_key);
-        var target = findVisual(edge.target_key);
+        var source = visualForEdge(edge, 'source');
+        var target = visualForEdge(edge, 'target');
         var d = edgePath(source, target);
         if (!d) return null;
         var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -1003,13 +1096,42 @@
       }
 
       function clearLivePulse() {
-        var live = root.querySelectorAll('.flow-node--live');
-        for (var i = 0; i < live.length; i++) live[i].classList.remove('flow-node--live');
+        var live = root.querySelectorAll('.flow-node--live, .flow-live-pulse');
+        for (var i = 0; i < live.length; i++) live[i].classList.remove('flow-node--live', 'flow-live-pulse');
+      }
+
+      function isVisibleVisual(el) {
+        if (!el || el.hidden) return false;
+        if (!el.getClientRects || !el.getClientRects().length) return false;
+        return window.getComputedStyle(el).display !== 'none';
+      }
+
+      function pulseVisual(el) {
+        if (!isVisibleVisual(el)) return false;
+        el.classList.add('flow-node--live', 'flow-live-pulse');
+        return true;
       }
 
       function pulseTarget(edge) {
-        var target = findVisual(edge && edge.target_key);
-        if (target) target.classList.add('flow-node--live');
+        if (!edge) return;
+        var pulsed = false;
+        if (edge.stop_id) {
+          var stopTarget = root.querySelector('[data-entity-type="route_stop"][data-entity-id="' + edge.stop_id + '"]');
+          pulsed = pulseVisual(stopTarget) || pulsed;
+        }
+        if (edge.entity_type && edge.entity_id) {
+          var entityTarget = root.querySelector('[data-entity-type="' + edge.entity_type + '"][data-entity-id="' + edge.entity_id + '"]');
+          pulsed = pulseVisual(entityTarget) || pulsed;
+        }
+        pulsed = pulseVisual(visualForEdge(edge, 'target')) || pulsed;
+        if (!pulsed && edge.target_key === 'object:receiving') {
+          var receiving = root.querySelector('.flow-node[data-status="waiting"], .route-step-chip[data-status="waiting"], .flow-node[data-status="active"], .route-step-chip[data-status="active"]');
+          pulsed = pulseVisual(receiving) || pulsed;
+        }
+        if (!pulsed) {
+          var current = root.querySelector('.route-step-chip[data-status="waiting"], .flow-node[data-status="waiting"], .route-step-chip[data-status="active"], .flow-node[data-status="active"]');
+          pulseVisual(current);
+        }
       }
 
       function flashTimeline(edge) {
@@ -1042,9 +1164,9 @@
           var id = trigger.getAttribute('data-entity-id') || trigger.getAttribute('data-flow-id') || '';
           consoleTitle.textContent = title;
           if (consoleStatus) consoleStatus.textContent = status.replace(/_/g, ' ') + (id ? ' · ' + type.replace(/_/g, ' ') + ' #' + id : '');
-          if (consoleProof) consoleProof.textContent = 'Shadow Ledger filtered for selected object';
+          if (consoleProof) consoleProof.textContent = 'Proof trail filtered for selected object';
           if (consoleBody && !consoleStatus) {
-            consoleBody.innerHTML = '<div class="flow-console-cell"><span>Selected projection</span><strong>' + status.replace(/_/g, ' ') + '</strong></div><div class="flow-console-cell"><span>Shadow Ledger</span><strong>Filtered for selected object</strong></div>';
+            consoleBody.innerHTML = '<div class="flow-console-cell"><span>Selected projection</span><strong>' + status.replace(/_/g, ' ') + '</strong></div><div class="flow-console-cell"><span>Event Proof</span><strong>Filtered for selected object</strong></div>';
           }
           return;
         }

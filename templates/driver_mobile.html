@@ -1365,7 +1365,9 @@
           {% include "partials/_production_flow_map.html" %}
         {% endif %}
 
-        {% include "partials/_next_action_card.html" %}
+        {% if not flow_first_current %}
+          {% include "partials/_next_action_card.html" %}
+        {% endif %}
 
         {% if route_context and route_context.current_stop and not flow_first_current %}
         {% set cs = route_context.current_stop %}
