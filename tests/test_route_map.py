@@ -292,7 +292,11 @@ def test_driver_dashboard_renders_route_narrative_cards(client, app):
     assert "HOT P-RE-10" in body
     assert "Paint Central empty load" in body
     assert "Arrived empty and departed empty at Paint Central" in body
-    assert body.count('class="route-focus-card') == 1
+    assert "LIVE FLOW BOARD" in body
+    assert 'data-flow-row' in body
+    assert 'data-flow-open-url' in body
+    assert 'data-live-flow-work-panel' in body
+    assert body.count('class="route-focus-card') == 0
     assert '<div class="compact-flow-canvas"' not in body
     assert 'class="route-narrative-count"' not in body
 

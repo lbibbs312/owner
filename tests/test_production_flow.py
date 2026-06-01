@@ -391,7 +391,7 @@ def test_flow_map_uses_large_objects_and_compact_stop_chips(client, app):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "Active Route Map" in body
+    assert "LIVE FLOW BOARD" in body
     assert "Today&#39;s Route" in body or "Today's Route" in body
     assert "Raleigh West" in body
     assert "Trim DC" in body
@@ -475,13 +475,13 @@ def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "Active Route Map" in body
+    assert "LIVE FLOW BOARD" in body
     assert "Today&#39;s Route" in body or "Today's Route" in body
     assert "Trim DC" in body
     assert "FlowMapAnimator" not in body
     assert "data-flow-edge-data" not in body
     assert "flow-edge--new" not in body
-    assert "livePulse" not in body
+    assert "data-flow-live-board" not in body
     assert "flow-edge--live" not in body
     assert "renderFilteredEdges" not in body
     assert "flow-lane--route-proof" not in body
@@ -532,7 +532,7 @@ def test_mobile_dashboard_uses_compact_shared_production_flow(client, app):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "Active Route Map" in body
+    assert "LIVE FLOW BOARD" in body
     assert "Production Flow" not in body
     assert 'data-production-flow-lazy' not in body
     assert "/mobile/production-flow-fragment" not in body

@@ -6,18 +6,18 @@
   <title>MoveDefense Mobile</title>
   <style>
     :root {
-      --bg: #090d12;
-      --panel: #151a20;
-      --panel-2: #202833;
-      --line: #303a47;
+      --bg: #050912;
+      --panel: #0d1524;
+      --panel-2: #121c2e;
+      --line: #223044;
       --text: #f8fafc;
-      --muted: #94a3b8;
-      --blue: #7f1d2d;
-      --blue-dark: #5c1320;
-      --maroon: #8b1538;
-      --maroon-dark: #2b1118;
-      --green: #10b981;
-      --amber: #f59e0b;
+      --muted: #8d98aa;
+      --blue: #3478f6;
+      --blue-dark: #174ea6;
+      --maroon: #2563eb;
+      --maroon-dark: #081426;
+      --green: #22e17f;
+      --amber: #f5b84b;
       --red: #ef4444;
       --nav-height: 88px;
     }
@@ -1564,6 +1564,489 @@
     .move-defense-mobile .drawer-actions button[disabled] { cursor:not-allowed; border-color:rgba(148,163,184,.16); background:rgba(148,163,184,.08); color:#94a3b8; }
     .move-defense-mobile .drawer-actions button span { color:#cbd5e1; font-size:.66rem; }
 
+    .move-defense-mobile {
+      background:
+        linear-gradient(rgba(37,99,235,.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(37,99,235,.045) 1px, transparent 1px),
+        radial-gradient(circle at 88% 8%, rgba(52,120,246,.26), transparent 22rem),
+        linear-gradient(180deg, #060a12, #08111f 58%, #050912);
+      background-size: 42px 42px, 42px 42px, auto, auto;
+    }
+    .move-defense-mobile .topbar {
+      background: rgba(5,9,18,.96);
+      border-color: rgba(52,120,246,.16);
+    }
+    .move-defense-mobile .avatar {
+      background: linear-gradient(135deg, #22e17f, #3478f6);
+      color: #04111f;
+      border-color: rgba(255,255,255,.16);
+      box-shadow: 0 0 0 3px rgba(52,120,246,.1);
+    }
+    .move-defense-mobile .logout-link {
+      color: #e8eefc;
+      border-color: rgba(52,120,246,.28);
+      background: rgba(8,19,34,.72);
+    }
+    .move-defense-mobile .shift-pill {
+      background: rgba(13,21,36,.92);
+      border-color: rgba(52,120,246,.22);
+    }
+    .move-defense-mobile button.shift-pill:hover {
+      border-color: rgba(52,120,246,.5);
+      background: rgba(52,120,246,.16);
+    }
+    .move-defense-mobile .button.primary,
+    .move-defense-mobile button.primary,
+    .move-defense-mobile .button.blue,
+    .move-defense-mobile button.blue,
+    .move-defense-mobile .ryder-submit {
+      background: #3478f6;
+      color: #fff;
+      border-color: rgba(125,168,255,.45);
+      box-shadow: 0 14px 30px rgba(52,120,246,.2);
+    }
+    .move-defense-mobile .button.ghost,
+    .move-defense-mobile button.ghost,
+    .move-defense-mobile .route-detail-link,
+    .move-defense-mobile .drawer-actions a,
+    .move-defense-mobile .drawer-actions button {
+      background: rgba(10,20,36,.78);
+      border-color: rgba(52,120,246,.22);
+      color: #e8eefc;
+    }
+    .move-defense-mobile .hero {
+      background: linear-gradient(135deg, rgba(7,17,31,.98), rgba(12,26,47,.94) 58%, rgba(8,13,22,.96));
+      border-color: rgba(52,120,246,.22);
+    }
+    .move-defense-mobile .hero::after {
+      content: "MD";
+      color: rgba(52,120,246,.1);
+      letter-spacing: 0;
+    }
+    .move-defense-mobile .eyebrow,
+    .move-defense-mobile .compact-map-head span,
+    .move-defense-mobile .drawer-kicker,
+    .move-defense-mobile .route-map-label {
+      color: #f5b84b;
+    }
+    .move-defense-mobile .hero p,
+    .move-defense-mobile .flash {
+      color: #b8c2d4;
+    }
+    .move-defense-mobile .date-context a.active {
+      border-color: rgba(52,120,246,.45);
+      background: rgba(52,120,246,.18);
+      color: #e8eefc;
+    }
+    .move-defense-mobile .quick-card {
+      background: linear-gradient(180deg, rgba(8,19,34,.96), rgba(5,9,18,.92));
+      border-color: rgba(52,120,246,.22);
+      box-shadow: inset 0 0 28px rgba(52,120,246,.05), 0 14px 30px rgba(0,0,0,.18);
+    }
+    .move-defense-mobile .driver-active-wait {
+      background: rgba(245,184,75,.1);
+      border-color: rgba(245,184,75,.42);
+    }
+    .move-defense-mobile .driver-active-wait-action {
+      background: #f5b84b;
+      color: #07111f;
+    }
+    .move-defense-mobile .nav-link.active {
+      color: #e8eefc;
+    }
+    .move-defense-mobile .nav-link.active strong,
+    .move-defense-mobile .side-nav .nav-link.active {
+      background: rgba(52,120,246,.22);
+      color: #8db7ff;
+    }
+
+    .move-defense-mobile .compact-route-map.live-flow-board {
+      gap: 0;
+      padding: 0;
+      border: 1px solid rgba(52,120,246,.24);
+      border-radius: 16px;
+      background:
+        linear-gradient(rgba(52,120,246,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(52,120,246,.04) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(10,24,42,.98), rgba(6,13,24,.96));
+      background-size: 38px 38px, 38px 38px, auto;
+      box-shadow: 0 18px 42px rgba(0,0,0,.28), inset 0 1px rgba(255,255,255,.03);
+    }
+    .live-flow-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 13px 14px;
+      border-bottom: 1px solid rgba(52,120,246,.16);
+    }
+    .live-flow-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #e8eefc;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .72rem;
+      letter-spacing: .18em;
+      font-weight: 900;
+    }
+    .live-flow-kicker i {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #22e17f;
+      box-shadow: 0 0 18px rgba(34,225,127,.75);
+      animation: livePulse 1.8s ease-in-out infinite;
+    }
+    .live-flow-head h3 {
+      margin: 6px 0 0;
+      color: #f8fafc;
+      font-size: 1.02rem;
+      line-height: 1.05;
+      font-weight: 950;
+    }
+    .live-flow-head strong {
+      color: #f5b84b;
+      font-size: .72rem;
+      font-weight: 950;
+      text-align: right;
+      max-width: 132px;
+    }
+    .live-flow-top-actions {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 10px 12px;
+      border-top: 1px solid rgba(255,255,255,.03);
+      border-bottom: 1px solid rgba(52,120,246,.14);
+      background:
+        linear-gradient(90deg, rgba(245,184,75,.08), transparent 18%),
+        rgba(3,7,14,.5);
+      scrollbar-width: none;
+    }
+    .live-flow-top-actions::-webkit-scrollbar { display: none; }
+    .live-flow-action-tab {
+      appearance: none;
+      flex: 0 0 118px;
+      min-height: 58px;
+      display: grid;
+      align-content: center;
+      gap: 3px;
+      padding: 9px 10px;
+      border: 1px solid rgba(52,120,246,.22);
+      border-radius: 9px;
+      background: rgba(8,19,34,.84);
+      color: #e8eefc;
+      text-align: left;
+      box-shadow: inset 0 0 20px rgba(52,120,246,.04);
+      cursor: pointer;
+    }
+    .live-flow-action-tab.primary {
+      border-color: rgba(52,120,246,.48);
+      background: linear-gradient(180deg, rgba(52,120,246,.32), rgba(8,19,34,.9));
+    }
+    .live-flow-action-tab strong {
+      color: #f8fafc;
+      font-size: .76rem;
+      font-weight: 950;
+      line-height: 1;
+    }
+    .live-flow-action-tab span {
+      color: #8d98aa;
+      font-size: .62rem;
+      font-weight: 800;
+      line-height: 1.15;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .live-flow-action-tab:focus-visible,
+    .live-flow-action-tab.is-active {
+      outline: 2px solid rgba(245,184,75,.72);
+      outline-offset: 2px;
+      border-color: rgba(245,184,75,.72);
+    }
+    .live-flow-alert {
+      display: grid;
+      gap: 2px;
+      padding: 9px 14px;
+      border-bottom: 1px solid rgba(239,68,68,.22);
+      background: rgba(239,68,68,.12);
+      color: #fecaca;
+      font-size: .72rem;
+      font-weight: 850;
+    }
+    .live-flow-alert span { color: #fca5a5; }
+    .live-flow-work-panel[hidden],
+    .live-flow-inline-panel[hidden],
+    .live-flow-embed-wrap[hidden] { display: none!important; }
+    .live-flow-work-panel {
+      border-bottom: 1px solid rgba(52,120,246,.16);
+      background: rgba(3,7,14,.72);
+    }
+    .live-flow-work-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(52,120,246,.14);
+    }
+    .live-flow-work-head div {
+      min-width: 0;
+      display: grid;
+      gap: 3px;
+    }
+    .live-flow-work-head span {
+      color: #f5b84b;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .6rem;
+      font-weight: 950;
+      letter-spacing: .14em;
+    }
+    .live-flow-work-head strong {
+      color: #f8fafc;
+      font-size: .86rem;
+      font-weight: 950;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .live-flow-work-head button {
+      min-height: 32px;
+      border-radius: 8px;
+      border: 1px solid rgba(52,120,246,.26);
+      background: rgba(8,19,34,.86);
+      color: #e8eefc;
+      font-size: .68rem;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .live-flow-context:empty { display: none; }
+    .live-flow-context {
+      max-height: 28vh;
+      overflow-y: auto;
+      padding: 11px 12px;
+      border-bottom: 1px solid rgba(52,120,246,.12);
+    }
+    .flow-selected-detail {
+      display: grid;
+      gap: 9px;
+    }
+    .flow-selected-detail h4 {
+      margin: 0;
+      color: #dbeafe;
+      font-size: .82rem;
+      font-weight: 950;
+    }
+    .flow-selected-detail p {
+      margin: 0;
+      color: #8d98aa;
+      font-size: .72rem;
+      font-weight: 800;
+    }
+    .live-flow-inline-panel {
+      max-height: 58vh;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .inline-maintenance-grid {
+      display: grid;
+      gap: 12px;
+    }
+    .inline-maintenance-grid section {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+      padding: 11px;
+      border: 1px solid rgba(52,120,246,.18);
+      border-radius: 10px;
+      background: rgba(8,19,34,.62);
+    }
+    .inline-maintenance-grid h4 {
+      margin: 0;
+      color: #f8fafc;
+      font-size: .82rem;
+      font-weight: 950;
+    }
+    .maintenance-table-wrap {
+      overflow-x: auto;
+      border: 1px solid rgba(52,120,246,.14);
+      border-radius: 9px;
+    }
+    .live-flow-panel-link {
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      border: 1px solid rgba(52,120,246,.28);
+      background: rgba(52,120,246,.14);
+      color: #dbeafe;
+      font-size: .72rem;
+      font-weight: 900;
+    }
+    .live-flow-embed-wrap {
+      height: min(62vh, 620px);
+      background: #050912;
+    }
+    .live-flow-embed-wrap iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #050912;
+    }
+    .live-flow-window {
+      position: relative;
+      overflow: hidden;
+      max-height: 272px;
+    }
+    .live-flow-track {
+      display: grid;
+    }
+    .live-flow-window.is-scrolling .live-flow-track {
+      animation: liveFlowScroll 22s linear infinite;
+    }
+    .live-flow-window.is-scrolling:hover .live-flow-track,
+    .live-flow-window.is-scrolling:focus-within .live-flow-track,
+    .live-flow-board.is-interacting .live-flow-track {
+      animation-play-state: paused;
+    }
+    .live-flow-row {
+      appearance: none;
+      width: 100%;
+      min-height: 68px;
+      display: grid;
+      grid-template-columns: minmax(70px,.58fr) minmax(0,1fr) auto;
+      grid-template-areas:
+        "code main status"
+        "code meta status";
+      align-items: center;
+      gap: 2px 10px;
+      padding: 13px 14px;
+      border: 0;
+      border-bottom: 1px solid rgba(52,120,246,.12);
+      color: #f8fafc;
+      text-align: left;
+      cursor: pointer;
+    }
+    .live-flow-row.is-selected {
+      background: linear-gradient(90deg, rgba(245,184,75,.18), rgba(52,120,246,.12) 50%, transparent);
+      box-shadow: inset 3px 0 #f5b84b;
+    }
+    .live-flow-row.tone-active {
+      background: linear-gradient(90deg, rgba(52,120,246,.12), transparent 62%);
+    }
+    .live-flow-row.tone-empty {
+      background: rgba(141,152,170,.025);
+    }
+    .live-flow-row.tone-blocked,
+    .live-flow-row.tone-needs_review {
+      background: rgba(239,68,68,.1);
+      box-shadow: inset 0 0 0 1px rgba(239,68,68,.18);
+    }
+    .flow-code {
+      grid-area: code;
+      color: #f8fafc;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .78rem;
+      font-weight: 950;
+      letter-spacing: .06em;
+      white-space: nowrap;
+    }
+    .flow-main {
+      grid-area: main;
+      min-width: 0;
+      color: #dbeafe;
+      font-size: .78rem;
+      font-weight: 850;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .flow-meta {
+      grid-area: meta;
+      min-width: 0;
+      color: #8d98aa;
+      font-size: .72rem;
+      font-weight: 750;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .flow-status {
+      grid-area: status;
+      justify-self: end;
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .66rem;
+      font-weight: 950;
+      letter-spacing: .08em;
+      white-space: nowrap;
+    }
+    .flow-status.status-active,
+    .flow-status.status-pickup {
+      color: #8db7ff;
+      background: rgba(52,120,246,.18);
+      border: 1px solid rgba(52,120,246,.35);
+    }
+    .flow-status.status-delivery,
+    .flow-status.status-completed {
+      color: #86f7b7;
+      background: rgba(34,225,127,.14);
+      border: 1px solid rgba(34,225,127,.28);
+    }
+    .flow-status.status-empty {
+      color: #cbd5e1;
+      background: rgba(141,152,170,.12);
+      border: 1px solid rgba(141,152,170,.22);
+    }
+    .live-flow-ticker {
+      display: flex;
+      overflow: hidden;
+      border-top: 1px solid rgba(52,120,246,.12);
+      border-bottom: 1px solid rgba(52,120,246,.12);
+      background: rgba(3,7,14,.58);
+      color: #f5b84b;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .66rem;
+      letter-spacing: .14em;
+      white-space: nowrap;
+    }
+    .live-flow-ticker span {
+      display: inline-block;
+      min-width: max-content;
+      padding: 9px 0;
+      animation: liveTicker 24s linear infinite;
+    }
+    .move-defense-mobile .route-detail-grid,
+    .move-defense-mobile .route-focus-details {
+      padding: 0;
+    }
+    .move-defense-mobile .route-detail-grid div,
+    .move-defense-mobile .route-detail-row {
+      background: rgba(8,19,34,.72);
+      border-color: rgba(52,120,246,.16);
+    }
+
+    @keyframes livePulse {
+      0%, 100% { transform: scale(1); opacity: .82; }
+      50% { transform: scale(1.26); opacity: 1; }
+    }
+    @keyframes liveFlowScroll {
+      0%, 16% { transform: translateY(0); }
+      100% { transform: translateY(calc(var(--flow-rows) * -68px)); }
+    }
+    @keyframes liveTicker {
+      from { transform: translateX(0); }
+      to { transform: translateX(-100%); }
+    }
+
     @media (min-width: 1200px) {
       .move-defense-mobile .route-map-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
       .move-defense-mobile .route-map-drawer-panel { left:auto; top:0; bottom:0; right:0; width:min(430px,100vw); max-height:none; border-top:0; border-left:1px solid rgba(148,163,184,.24); border-radius:0; box-shadow:-18px 0 44px rgba(0,0,0,.32); }
@@ -1621,6 +2104,7 @@
       {% set primary = cta.primary_cta if cta.primary_cta is defined else none %}
       {% set secondary = cta.secondary_cta if cta.secondary_cta is defined else none %}
       {% set cta_urls = route_cta_urls if route_cta_urls is defined else {} %}
+      {% set truck_history_url = url_for('driver.truck_maintenance_history', truck_number=current_truck_number) if current_truck_number else url_for('driver.truck_maintenance_history') %}
       {% if route_date_options %}
 	      <nav class="date-context" aria-label="Route date">
 	        {% for option in route_date_options %}
@@ -1736,24 +2220,6 @@
       </section>
       {% endif %}
 
-      <section class="quick-grid" aria-label="Shift actions">
-        <a class="quick-card" href="{{ url_for('driver.new_plant_transfer') }}">
-          <div class="quick-icon">PT</div>
-          <div><strong>Plant Transfer</strong><span>{{ latest_transfer.ship_from ~ ' to ' ~ latest_transfer.ship_to if latest_transfer else 'Create a transfer sheet' }}</span></div>
-        </a>
-        {% if pending_posttrip and active_pretrip %}
-          <a class="quick-card" href="{{ url_for('driver.do_posttrip', pretrip_id=active_pretrip.id) }}">
-            <div class="quick-icon green">IN</div>
-            <div><strong>PostTrip Due</strong><span>Finish inspection and end shift</span></div>
-          </a>
-        {% else %}
-          <a class="quick-card" href="{{ url_for('driver.new_pretrip') }}">
-            <div class="quick-icon green">IN</div>
-            <div><strong>PreTrip / Shift</strong><span>{{ 'Shift started from PreTrip' if active_pretrip else 'Start shift with PreTrip' }}</span></div>
-          </a>
-        {% endif %}
-      </section>
-
       {% if current_stop and current_stop_forecast %}
       {% set fs = current_stop_forecast %}
       {% set current_route = (todays_log_routes or {}).get(current_stop.id) %}
@@ -1847,153 +2313,6 @@
       </section>
       {% endif %}
 
-      {% set truck_history_url = url_for('driver.truck_maintenance_history', truck_number=current_truck_number) if current_truck_number else url_for('driver.truck_maintenance_history') %}
-      <section class="list">
-        <div class="section-head">
-          <h2>Truck Maintenance History</h2>
-          <span>{{ current_truck_number or 'No truck set' }}</span>
-        </div>
-        <div class="card maintenance-card">
-          {% if current_truck_number %}
-            <div class="maintenance-compact">
-              {% if truck_maintenance_history %}
-                {% set latest = truck_maintenance_history[0] %}
-                <div>
-                  <p class="maintenance-title">Truck {{ current_truck_number }}</p>
-                  <p class="maintenance-meta">Last PostTrip {{ latest.closed_at|to_detroit_datetime if latest.closed_at else latest.date }}{% if latest.end_mileage is not none %} - {{ "{:,}".format(latest.end_mileage) }} mi{% endif %}</p>
-                  {% if latest.regen_events %}
-                    <p class="maintenance-alert">Regen {{ latest.regen_events[0].opened_label }}: {{ latest.regen_events[0].label }}{% if latest.regen_events[0].mileage is not none %} at {{ "{:,}".format(latest.regen_events[0].mileage) }} mi{% endif %}</p>
-                  {% elif latest.issues %}
-                    <p class="maintenance-alert">Issue {{ latest.issues[0].opened_label }}: {{ latest.issues[0].label }}{% if latest.issues[0].mileage is not none %} at {{ "{:,}".format(latest.issues[0].mileage) }} mi{% endif %}</p>
-                  {% else %}
-                    <p class="maintenance-note">No truck issues marked on the last completed PostTrip.</p>
-                  {% endif %}
-                </div>
-              {% else %}
-                <div>
-                  <p class="maintenance-title">Truck {{ current_truck_number }}</p>
-                  <p class="maintenance-note">No previous completed PostTrips found for this truck.</p>
-                </div>
-              {% endif %}
-              <div class="maintenance-actions">
-                <a class="button ghost" href="{{ truck_history_url }}" target="_blank" rel="noopener">Open History</a>
-              </div>
-            </div>
-
-            <div class="maintenance-wide">
-              {% if truck_maintenance_history %}
-                <table class="maintenance-table" aria-label="Truck maintenance history for {{ current_truck_number }}">
-                  <thead>
-                    <tr>
-                      <th>PostTrip</th>
-                      <th>Driver</th>
-                      <th>Mileage</th>
-                      <th>Fuel</th>
-                      <th>Issues</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for item in truck_maintenance_history %}
-                      {% if loop.index <= 5 %}
-                        <tr>
-                          <td><strong>{{ item.closed_at|to_detroit_datetime if item.closed_at else item.date }}</strong><span>{{ item.date.strftime('%b %d, %Y') if item.date else 'Date not set' }}</span></td>
-                          <td><strong>{{ item.driver_name }}</strong><span>Truck {{ item.pretrip.truck_number or current_truck_number }}</span></td>
-                          <td><strong>{% if item.end_mileage is not none %}{{ "{:,}".format(item.end_mileage) }} mi{% else %}--{% endif %}</strong><span>{% if item.miles_driven is not none %}{{ "{:,}".format(item.miles_driven) }} driven{% elif item.start_mileage is not none %}Start {{ "{:,}".format(item.start_mileage) }}{% else %}Miles not calculated{% endif %}</span></td>
-                          <td>
-                            <div class="maintenance-list">
-                              {% for fuel in item.fuel_logs[:2] %}
-                                <span><strong>{{ "{:,}".format(fuel.mileage) }} mi</strong>{{ fuel.time_label }} at {{ fuel.plant }}</span>
-                              {% else %}
-                                <span>No fuel logged</span>
-                              {% endfor %}
-                            </div>
-                          </td>
-                          <td>
-                            <div class="maintenance-list">
-                              {% if item.regen_events %}<span class="maintenance-chip warn">Regen</span>{% endif %}
-                              {% for issue in item.issues[:2] %}
-                                <span><strong>{{ issue.opened_label }} at {{ issue.plant }}</strong>{{ issue.label }}{% if issue.mileage is not none %} - {{ "{:,}".format(issue.mileage) }} mi{% endif %}</span>
-                              {% else %}
-                                <span>No issues logged</span>
-                              {% endfor %}
-                            </div>
-                          </td>
-                          <td><span class="maintenance-chip">{{ item.status_label }}</span>{% if item.remarks %}<span>{{ item.remarks }}</span>{% endif %}</td>
-                        </tr>
-                      {% endif %}
-                    {% endfor %}
-                  </tbody>
-                </table>
-                <a class="button ghost" href="{{ truck_history_url }}">Full History</a>
-              {% else %}
-                <p class="maintenance-empty">No previous completed PostTrips found for truck {{ current_truck_number }}.</p>
-              {% endif %}
-            </div>
-          {% else %}
-            <p class="maintenance-empty">Start a PreTrip with a truck number to load maintenance history.</p>
-          {% endif %}
-        </div>
-      </section>
-
-      <section class="list">
-        <div class="section-head">
-          <h2>Ryder Service</h2>
-          <span>Truck issue follow-up</span>
-        </div>
-        <div class="card ryder-panel">
-          {% if pending_ryder_event %}
-            <div class="ryder-entry active">
-              <strong>Ryder timer running: {{ pending_ryder_elapsed }}</strong>
-              <span>{{ pending_ryder_truck or 'Truck' }} headed to Ryder for {{ pending_ryder_issue or 'a truck issue' }}. Close this before the next stop.</span>
-            </div>
-          {% endif %}
-          <form class="ryder-form" method="POST" action="{{ url_for('driver.mobile_ryder_service') }}" data-autosave="true" data-autosave-key="mobile-ryder-service">
-            <div class="ryder-grid">
-              <div class="ryder-field">
-                <label for="ryderTruck">Truck</label>
-                <input id="ryderTruck" class="ryder-input" name="truck_number" value="{{ active_pretrip.truck_number if active_pretrip else '' }}" placeholder="Truck number">
-              </div>
-              <div class="ryder-field">
-                <label for="ryderIssue">Problem</label>
-                <select id="ryderIssue" class="ryder-select" name="issue" required>
-                  {% for value, label in truck_issue_choices %}
-                    <option value="{{ value }}" {% if pending_ryder_issue == label %}selected{% endif %}>{{ 'Choose problem' if not value else label }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="ryder-field">
-                <label for="ryderOutcome">Status</label>
-                <select id="ryderOutcome" class="ryder-select" name="outcome" required>
-                  <option value="">Choose status</option>
-                  <option value="headed">Headed to Ryder</option>
-                  <option value="fixed">Fixed at Ryder</option>
-                  <option value="left">Ryder kept it</option>
-                  <option value="rental">Got rental truck</option>
-                </select>
-              </div>
-            </div>
-            <div class="ryder-field">
-              <label for="ryderNotes">Notes</label>
-              <textarea id="ryderNotes" class="ryder-textarea" name="notes" placeholder="CEL code, leak location, rental number, tow info, or what Ryder said"></textarea>
-            </div>
-            <button class="ryder-submit" type="submit">Save Ryder Status</button>
-          </form>
-          <div class="ryder-history">
-            {% for event in recent_ryder_events %}
-              <div class="ryder-entry">
-                <strong>{{ event.title }}</strong>
-                <span>{{ event.details }}</span>
-              </div>
-            {% else %}
-              <div class="ryder-entry">
-                <strong>No Ryder notes today</strong>
-                <span>Use Headed to Ryder to start the timer, then close it as fixed, kept by Ryder, or rental.</span>
-              </div>
-            {% endfor %}
-          </div>
-        </div>
-      </section>
     </main>
 
     <aside class="route-panel">
@@ -2110,6 +2429,157 @@
 <script src="{{ url_for('static', filename='js/autosave-drafts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/driver-active-wait.js', v='2') }}"></script>
 <script src="{{ url_for('static', filename='js/live_route_map.js') }}"></script>
+<script>
+  (function () {
+    function usableUrl(url) {
+      return url && url !== '#';
+    }
+
+    function embedUrl(url) {
+      if (!usableUrl(url)) return '';
+      try {
+        var parsed = new URL(url, window.location.origin);
+        parsed.searchParams.set('embed', '1');
+        return parsed.pathname + parsed.search + parsed.hash;
+      } catch (error) {
+        return url;
+      }
+    }
+
+    document.querySelectorAll('[data-route-map-shell].live-flow-board').forEach(function (board) {
+      var panel = board.querySelector('[data-live-flow-work-panel]');
+      var panelTitle = board.querySelector('[data-live-flow-work-title]');
+      var context = board.querySelector('[data-live-flow-context]');
+      var embedWrap = board.querySelector('[data-live-flow-embed-wrap]');
+      var frame = board.querySelector('[data-live-flow-frame]');
+      var selectedRow = null;
+      var activeTrigger = null;
+
+      function setActiveTrigger(trigger) {
+        if (activeTrigger) activeTrigger.classList.remove('is-active');
+        activeTrigger = trigger || null;
+        if (activeTrigger) activeTrigger.classList.add('is-active');
+      }
+
+      function hideInlinePanels() {
+        board.querySelectorAll('[data-flow-inline-panel]').forEach(function (node) {
+          node.hidden = true;
+        });
+      }
+
+      function showPanel(title) {
+        if (!panel) return;
+        panel.hidden = false;
+        board.classList.add('is-interacting');
+        if (panelTitle) panelTitle.textContent = title || 'Route detail';
+      }
+
+      function showContextFor(row) {
+        if (!context) return;
+        var key = row.getAttribute('data-detail-template');
+        var template = key ? board.querySelector('template[data-flow-detail-template="' + key + '"]') : null;
+        context.innerHTML = template ? template.innerHTML : '';
+      }
+
+      function showEmbed(url, title, trigger) {
+        if (!usableUrl(url) || !frame || !embedWrap) return;
+        showPanel(title || 'Route work');
+        hideInlinePanels();
+        if (context) context.innerHTML = '';
+        embedWrap.hidden = false;
+        frame.src = embedUrl(url);
+        setActiveTrigger(trigger);
+      }
+
+      function showInline(name, title, trigger) {
+        var inlinePanel = board.querySelector('[data-flow-inline-panel="' + name + '"]');
+        if (!inlinePanel) return;
+        showPanel(title || 'Route work');
+        hideInlinePanels();
+        if (context) context.innerHTML = '';
+        if (embedWrap) embedWrap.hidden = true;
+        inlinePanel.hidden = false;
+        setActiveTrigger(trigger);
+      }
+
+      board.addEventListener('click', function (event) {
+        var close = event.target.closest('[data-live-flow-close]');
+        if (close) {
+          event.preventDefault();
+          if (panel) panel.hidden = true;
+          if (frame) frame.removeAttribute('src');
+          if (context) context.innerHTML = '';
+          hideInlinePanels();
+          if (embedWrap) embedWrap.hidden = true;
+          if (selectedRow) selectedRow.classList.remove('is-selected');
+          selectedRow = null;
+          setActiveTrigger(null);
+          board.classList.remove('is-interacting');
+          return;
+        }
+
+        var inlineTrigger = event.target.closest('[data-flow-open-panel]');
+        if (inlineTrigger && board.contains(inlineTrigger)) {
+          event.preventDefault();
+          showInline(
+            inlineTrigger.getAttribute('data-flow-open-panel'),
+            inlineTrigger.getAttribute('data-flow-panel-title'),
+            inlineTrigger
+          );
+          return;
+        }
+
+        var urlTrigger = event.target.closest('[data-flow-open-url]');
+        if (urlTrigger && board.contains(urlTrigger)) {
+          var url = urlTrigger.getAttribute('data-flow-open-url');
+          if (usableUrl(url)) {
+            event.preventDefault();
+            showEmbed(url, urlTrigger.getAttribute('data-flow-panel-title'), urlTrigger);
+          }
+          return;
+        }
+
+        var row = event.target.closest('[data-flow-row]');
+        if (!row || !board.contains(row)) return;
+        event.preventDefault();
+
+        if (selectedRow === row) {
+          showEmbed(row.getAttribute('data-sheet-url'), 'Full Route Sheet', null);
+          return;
+        }
+
+        if (selectedRow) selectedRow.classList.remove('is-selected');
+        selectedRow = row;
+        row.classList.add('is-selected');
+        showPanel(row.getAttribute('data-title') || 'Route detail');
+        hideInlinePanels();
+        if (embedWrap) embedWrap.hidden = true;
+        showContextFor(row);
+        setActiveTrigger(null);
+      });
+
+      if (frame) {
+        frame.addEventListener('load', function () {
+          try {
+            var doc = frame.contentDocument;
+            if (!doc || doc.getElementById('liveFlowEmbedStyle')) return;
+            var style = doc.createElement('style');
+            style.id = 'liveFlowEmbedStyle';
+            style.textContent = [
+              'html,body{background:#050912!important;color:#f8fafc!important;}',
+              'body{margin:0!important;}',
+              '.navbar,.bottom-nav,.side-nav,.topbar,.manager-flash-stack{display:none!important;}',
+              '#pageContent>.container.mt-4.fade-in,.container{max-width:none!important;width:100%!important;margin:0!important;padding:14px!important;}',
+              '.card,.alert,.table,.form-control,.form-select,textarea,input,select{border-radius:10px!important;}',
+              '.btn{border-radius:9px!important;font-weight:800!important;}'
+            ].join('');
+            doc.head.appendChild(style);
+          } catch (error) {}
+        });
+      }
+    });
+  })();
+</script>
 
 {% if config.ENABLE_SOCKETIO %}
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
