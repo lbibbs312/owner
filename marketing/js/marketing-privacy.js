@@ -431,6 +431,34 @@
       "&body=" + encodeURIComponent(body);
   }
 
+  function submitForm(form, eventName) {
+    var endpoint = config.formEndpoint || "";
+    if (!endpoint) {
+      submitMailtoForm(form, eventName);
+      return;
+    }
+    var status = form.querySelector("[data-form-status]");
+    var btn = form.querySelector('button[type="submit"]');
+    populateAttributionFields(form);
+    if (status) status.textContent = "Sending…";
+    if (btn) btn.disabled = true;
+    trackEvent(eventName, pageProps());
+    fetch(endpoint, {
+      method: "POST",
+      body: new FormData(form),
+      headers: { "Accept": "application/json" }
+    }).then(function (res) {
+      if (!res.ok) throw new Error("bad status");
+      if (status) status.textContent = "Thanks — we got it. We'll be in touch shortly.";
+      form.reset();
+    }).catch(function () {
+      if (status) status.textContent = "Couldn't reach the server — opening your email app instead.";
+      submitMailtoForm(form, eventName);
+    }).finally(function () {
+      if (btn) btn.disabled = false;
+    });
+  }
+
   function wireForms() {
     document.querySelectorAll("form[data-md-form]").forEach(function (form) {
       populateAttributionFields(form);
@@ -446,7 +474,7 @@
       form.addEventListener("submit", function (event) {
         event.preventDefault();
         var formType = form.getAttribute("data-md-form");
-        submitMailtoForm(form, formType === "contact" ? "contact_form_submit" : "pilot_form_submit");
+        submitForm(form, formType === "contact" ? "contact_form_submit" : "pilot_form_submit");
       });
     });
   }

@@ -7,11 +7,11 @@
 <!-- ====== SEO: target the uncontested long-tail, not "DVIR app" ====== -->
 <title>MoveDefense — Plant-to-Plant Fleet Dispatch &amp; Production-Flow Software</title>
 <meta name="description" content="MoveDefense is the dispatch, inspection, and production-flow system for manufacturers that run their own shuttle drivers between plants. Catch rack and part mismatches before they ship, win damage disputes, and keep an audit-ready DVIR history." />
-<meta name="keywords" content="plant to plant transfer software, intersite logistics software, returnable rack tracking, manufacturing shuttle dispatch, DVIR app for manufacturers, in-house fleet management" />
+<meta name="keywords" content="plant to plant transfer software, intersite logistics software, returnable rack tracking, intersite shuttle dispatch, manufacturing shuttle dispatch, in-house fleet management" />
 <meta name="robots" content="index, follow" />
 <link rel="canonical" href="https://movedefense.com/" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-<meta name="google-site-verification" content="TODO_GOOGLE_SEARCH_CONSOLE_TOKEN" />
+<link rel="alternate icon" href="/favicon.ico" sizes="32x32" />
 
 <!-- Public marketing analytics only. Private app/dashboard routes do not load this file. -->
 <script>
@@ -23,7 +23,10 @@
     umamiWebsiteId: "",
     umamiSrc: "https://cloud.umami.is/script.js",
     analyticsDefault: true,
-    attributionTtlDays: 90
+    attributionTtlDays: 90,
+    // Paste a form endpoint to make pilot/contact forms submit without a mail client.
+    // e.g. Formspree: "https://formspree.io/f/xxxxxxx". Empty = fall back to the email app.
+    formEndpoint: ""
   };
 </script>
 <script>
@@ -69,17 +72,44 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "MoveDefense",
+  "url": "https://movedefense.com/",
   "applicationCategory": "BusinessApplication",
+  "applicationSubCategory": "Logistics & Fleet Management Software",
   "operatingSystem": "Web, iOS, Android",
-  "description": "Dispatch, inspection, and production-flow software for manufacturers that run their own shuttle drivers between plants. Tracks plant transfers, returnable racks and lots, flags scan-count mismatches, generates damage evidence packets, and keeps an audit-ready DVIR history.",
-  "offers": { "@type": "Offer", "priceCurrency": "USD", "price": "0", "description": "Request a demo for pricing" },
-  "publisher": { "@type": "Organization", "name": "MoveDefense", "url": "https://movedefense.com/" }
+  "description": "Plant-to-plant transfer software for manufacturers that run their own shuttle drivers. Dispatch, inspection, and production-flow on one live board — with returnable rack tracking, scan-count mismatch alerts, damage evidence packets, and audit-ready DVIRs.",
+  "featureList": [
+    "Plant-to-plant transfer tracking",
+    "Returnable rack and lot tracking",
+    "Intersite shuttle dispatch board",
+    "Scan-count mismatch alerts",
+    "Damage evidence packets with photo timestamps",
+    "Audit-ready DVIR history",
+    "Capture-first dispatch intake"
+  ],
+  "offers": { "@type": "Offer", "priceCurrency": "USD", "price": "0", "description": "Request a demo for pricing — pilot available" },
+  "creator": { "@type": "Organization", "name": "MoveDefense", "url": "https://movedefense.com/" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "MoveDefense",
+  "url": "https://movedefense.com/",
+  "description": "Developer of plant-to-plant fleet dispatch and driver-compliance software for mid-market manufacturers that run their own shuttle fleets.",
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "contactType": "sales",
+    "email": "bibbstechnology@gmail.com",
+    "availableLanguage": "English"
+  }
 }
 </script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" /></noscript>
 
 <style>
   :root{
@@ -478,9 +508,10 @@
   .seq-watch.ok{color:var(--green);border-color:rgba(43,213,118,.3);background:rgba(43,213,118,.08)}
   .seq-watch.bad{color:var(--red);border-color:rgba(255,82,71,.45);background:rgba(255,82,71,.1)}
   .seq-photo{position:relative;width:100%;max-width:440px;aspect-ratio:4/3;border-radius:14px;overflow:hidden;border:1px solid var(--line);
-    background-image:var(--img,none),radial-gradient(120% 90% at 72% 8%,#16324f,transparent 55%),linear-gradient(160deg,#0e1a2b,#070b12);
+    background-image:radial-gradient(120% 90% at 72% 8%,#16324f,transparent 55%),linear-gradient(160deg,#0e1a2b,#070b12);
     background-size:cover;background-position:center;box-shadow:0 30px 70px -30px rgba(0,0,0,.85)}
-  .seq-photo::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,11,18,.1) 30%,rgba(7,11,18,.82) 100%)}
+  .seq-photo .ph-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+  .seq-photo::after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(7,11,18,.1) 30%,rgba(7,11,18,.82) 100%)}
   .ph-tag{position:absolute;top:12px;left:12px;z-index:2;font-family:var(--mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text);background:rgba(7,11,18,.55);border:1px solid var(--line);padding:5px 10px;border-radius:6px;backdrop-filter:blur(4px)}
   .ph-hud{position:absolute;left:12px;right:12px;bottom:12px;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:10px;
     background:rgba(8,13,20,.62);border:1px solid var(--line);border-radius:9px;padding:11px 13px;backdrop-filter:blur(6px);
@@ -506,6 +537,7 @@
   /* scroll reveal */
   .obs{opacity:0;transform:translateY(28px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
   .obs.in{opacity:1;transform:none}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
   /* responsive */
   @media(max-width:920px){
@@ -580,7 +612,7 @@
 <div class="wrap">
   <section class="hero" style="padding-top:84px">
     <div>
-      <div class="eyebrow reveal-up">In-house fleet ops · Intersite logistics</div>
+      <div class="eyebrow reveal-up">In-house fleet ops · Intersite shuttle dispatch</div>
       <h1 class="reveal-up" style="animation-delay:.05s">One board for every<br><span class="accent">plant-to-plant</span> move.</h1>
       <p class="lede reveal-up" style="animation-delay:.12s;margin-bottom:14px">MoveDefense helps in-house manufacturing fleets <strong>capture</strong> shuttles, racks, lots, inspections, damage, and exceptions <strong>before they disappear</strong> into texts and clipboards.</p>
       <p class="reveal-up" style="animation-delay:.16s;margin-bottom:34px;font-family:var(--mono);font-size:.82rem;letter-spacing:.04em;color:var(--muted-2)">Built for the dock, the yard, the driver, and the line.</p>
@@ -642,6 +674,7 @@
 
 <!-- ================= SEQUENCE (scroll-driven) ================= -->
 <div class="wrap">
+  <h2 class="sr-only">The life of a plant-to-plant move</h2>
   <div class="seq-wrap" id="seqWrap">
     <div class="seq-sticky">
       <div class="seq-card">
@@ -655,7 +688,8 @@
           <div class="seq-frame active" data-i="0">
             <div class="seq-text"><div class="seq-num">01</div><h3>It starts as a text, or email.</h3><p>A supervisor pastes the request. MoveDefense captures the move instantly — holds and all. No form to fill in.</p></div>
             <div class="seq-visual">
-              <figure class="seq-photo" style="--img:url('img/seq-capture.jpg')">
+              <figure class="seq-photo">
+                <img class="ph-img" src="img/seq-capture.jpg" alt="MoveDefense dispatch capture screen — a plant-to-plant move flagged for review at staging" loading="lazy" decoding="async">
                 <span class="ph-tag">01 · Capture</span>
                 <div class="ph-hud"><span class="lab">Dispatch capture</span><span class="v" style="color:var(--amber)">#1042 · NEEDS REVIEW</span></div>
               </figure>
@@ -665,7 +699,8 @@
           <div class="seq-frame" data-i="1">
             <div class="seq-text"><div class="seq-num">02</div><h3>Racks load onto the trailer.</h3><p>Every carrier, rack, and lot is nested under the trailer, so you always know what's actually on board.</p></div>
             <div class="seq-visual">
-              <figure class="seq-photo" style="--img:url('img/seq-staging.jpg')">
+              <figure class="seq-photo">
+                <img class="ph-img" src="img/seq-staging.jpg" alt="Returnable racks staged and nested under trailer TR-225 before an intersite shuttle transfer" loading="lazy" decoding="async">
                 <span class="ph-tag">02 · Staging</span>
                 <div class="ph-hud"><span class="lab">Staging · TR-225</span><span class="v" style="color:var(--blue-bright)">10 carriers · 70 racks</span></div>
               </figure>
@@ -675,7 +710,8 @@
           <div class="seq-frame" data-i="2">
             <div class="seq-text"><div class="seq-num">03</div><h3>Plant to plant.</h3><p>The shuttle's status is live on the board, so there are no more "where's 225?" calls across the yard.</p></div>
             <div class="seq-visual">
-              <figure class="seq-photo" style="--img:url('img/seq-transit.jpg')">
+              <figure class="seq-photo">
+                <img class="ph-img" src="img/seq-transit.jpg" alt="In-house shuttle running a plant-to-plant transfer from plating to paint west" loading="lazy" decoding="async">
                 <span class="ph-tag">03 · Transit</span>
                 <div class="ph-hud"><span class="lab">Plating &rarr; Paint West</span><span class="v" style="color:var(--blue-bright)">ETA 14 min</span></div>
               </figure>
@@ -685,7 +721,8 @@
           <div class="seq-frame" data-i="3">
             <div class="seq-text"><div class="seq-num">04</div><h3>And something doesn't add up.</h3><p>A short rack, a missed scan, a damaged load — an exception can fire at capture, staging, or transit. MoveDefense watches every handoff and holds the move the moment the counts diverge.</p></div>
             <div class="seq-visual">
-              <figure class="seq-photo" style="--img:url('img/seq-exception.jpg')">
+              <figure class="seq-photo">
+                <img class="ph-img" src="img/seq-exception.jpg" alt="Scan-count mismatch exception alert holding a move at unrack — rack R-2207 short 20 pieces" loading="lazy" decoding="async">
                 <span class="ph-tag">04 · Exception</span>
                 <div class="ph-hud alert"><span class="lab" style="color:var(--red)">Unrack · R-2207</span><span class="v">MISMATCH &minus;20 · HOLD</span></div>
               </figure>
@@ -793,7 +830,7 @@
   <section id="compare">
     <div class="sec-label obs">Why MoveDefense</div>
     <h2 class="sec-h obs">Fleet apps stop at the truck. We don't.</h2>
-    <p class="sec-sub obs">Most fleet and ELD apps are built around the vehicle — inspection, GPS, and compliance. They usually don't know what's on the trailer, which rack it's in, or where that load sits in your production flow. That's the whole point of MoveDefense.</p>
+    <p class="sec-sub obs">Most fleet and ELD apps are built around the vehicle — inspection, GPS, and compliance. They usually don't know what's on the trailer, which rack it's in, or where that load sits in your production flow. MoveDefense is plant-to-plant transfer software with returnable rack tracking and a live production-flow board — built for the move, not just the vehicle.</p>
     <div class="compare obs">
       <div class="crow head">
         <div>Capability</div>
@@ -955,9 +992,9 @@
         </div>
         <div class="foot-col">
           <h5>For</h5>
-          <a href="#">Automotive suppliers</a>
-          <a href="#">Multi-plant manufacturers</a>
-          <a href="#">Distribution &amp; 3PL fleets</a>
+          <a href="#problem">Automotive suppliers</a>
+          <a href="#features">Multi-plant manufacturers</a>
+          <a href="#compare">Distribution &amp; 3PL fleets</a>
         </div>
         <div class="foot-col">
           <h5>Access</h5>
