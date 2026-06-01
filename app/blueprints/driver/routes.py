@@ -4254,6 +4254,7 @@ def mobile_dashboard():
         driver=current_user,
         date=route_date,
         selected_stop_id=current_stop.id if current_stop else None,
+        route_pretrip=route_pretrip,
     )
     production_flow = None
     proof_missing = bool(departed_today and not has_transfer_today)

@@ -2,6 +2,14 @@
 {% set map_mode = rm.map_mode if rm and rm.map_mode is defined else 'live_current_work' %}
 {% set cta = route_cta if route_cta is defined and route_cta else {} %}
 {% set urls = route_cta_urls if route_cta_urls is defined else {} %}
+{% set primary_cta = cta.primary_cta if cta.primary_cta is defined else none %}
+{% set secondary_cta = cta.secondary_cta if cta.secondary_cta is defined else none %}
+{% set board_ctas = [] %}
+{% for route_action in [primary_cta, secondary_cta] %}
+  {% if route_action and route_action.action not in ['record_departure', 'add_damage', 'view_route', 'route_history'] and urls.get(route_action.action) %}
+    {% set _ = board_ctas.append(route_action) %}
+  {% endif %}
+{% endfor %}
 {% set active_pt = active_pretrip if active_pretrip is defined else none %}
 {% set pending_pt = pending_posttrip if pending_posttrip is defined else false %}
 {% set active_stops = [] %}
@@ -25,7 +33,16 @@
     {% endif %}
   {% endfor %}
 {% endif %}
-{% set board_count = (1 if primary_stop or primary_event or completed_stops else 0) + (recurring_events|length) %}
+{% set board_tasks = [] %}
+{% if active_task is defined and active_task %}
+  {% set _ = board_tasks.append(active_task) %}
+{% endif %}
+{% if task_queue is defined and task_queue %}
+  {% for task in task_queue[:4] %}
+    {% set _ = board_tasks.append(task) %}
+  {% endfor %}
+{% endif %}
+{% set board_count = (board_tasks|length) + (1 if primary_stop or primary_event or completed_stops else 0) + (recurring_events|length) %}
 {% set route_sheet_url = urls.get('view_route') or urls.get('route_history') %}
 {% set depart_url = urls.get('record_departure') %}
 {% set damage_url = urls.get('add_damage') %}
@@ -68,10 +85,13 @@
 
 <section class="compact-route-map live-flow-board" data-route-map-shell data-route-map-mode="route" data-route-sheet-url="{{ route_sheet_url or '#' }}">
   <div class="live-flow-head">
-    <div>
-      <span class="live-flow-kicker"><i></i> LIVE FLOW BOARD</span>
-      <h3>{{ route_panel_title or "Today's Route" }}</h3>
-    </div>
+	    <div>
+	      <span class="live-flow-kicker"><i></i> LIVE FLOW BOARD</span>
+	      <h3>{{ route_panel_title or "Today's Route" }}</h3>
+	      {% if rm and rm.stops %}
+	        <p class="live-flow-subline">{{ rm.stops|length }} stop{{ 's' if rm.stops|length != 1 else '' }}</p>
+	      {% endif %}
+	    </div>
     <div class="live-flow-head-status">
       <span class="flow-status status-{{ route_status_tone }}">{{ route_status_label }}</span>
       <time data-live-flow-clock>--:--:--</time>
@@ -83,6 +103,12 @@
       <strong>Depart</strong>
       <span>Departure / proof</span>
     </a>
+    {% for route_action in board_ctas %}
+      <a class="live-flow-action-tab primary" href="{{ urls.get(route_action.action) }}" data-flow-open-url="{{ urls.get(route_action.action) }}" data-flow-panel-title="{{ route_action.label }}">
+        <strong>{{ route_action.label.replace(' Route', '').replace(' Document', '') }}</strong>
+        <span>{% if route_action.action == 'finalize_route' %}Ready To Finalize{% elif route_action.action == 'print_route' %}Route packet{% elif route_action.action == 'attach_document' %}Proof document{% elif route_action.action == 'confirm_cargo' %}Cargo check{% else %}{{ cta.next_action or route_action.label }}{% endif %}</span>
+      </a>
+    {% endfor %}
     <a class="live-flow-action-tab" href="{{ depart_url or route_sheet_url or '#' }}" data-flow-open-url="{{ depart_url or route_sheet_url or '#' }}" data-flow-panel-title="Camera / Proof">
       <strong>Camera</strong>
       <span>Photo proof</span>
@@ -245,10 +271,27 @@
     </div>
   </div>
 
-  {% if rm and rm.stops %}
+  {% if (rm and rm.stops) or board_tasks %}
     <div class="live-flow-window {% if board_count > 3 %}is-scrolling{% endif %}" aria-label="Live route flow">
       <div class="live-flow-track" style="--flow-rows: {{ board_count if board_count > 0 else 1 }};">
         {% for _pass in range(2 if board_count > 3 else 1) %}
+          {% for task in board_tasks %}
+            {% set task_status_text = 'HOT' if task.is_hot else task.status.replace('-', ' ')|upper %}
+            {% set task_status_tone = 'hot' if task.is_hot else ('open' if task.status == 'in-progress' else ('empty' if task.status == 'pending' else 'ready')) %}
+            <button class="live-flow-row tone-{{ 'hot' if task.is_hot else 'active' }}" type="button"
+                    data-flow-row
+                    data-detail-template="task-{{ loop.index0 }}"
+                    data-title="Dispatch task"
+                    data-sheet-url="{{ url_for('driver.view_task', task_id=task.id) }}"
+                    data-depart-url="#"
+                    data-proof-url="{{ url_for('driver.view_task', task_id=task.id) }}"
+                    data-damage-url="{{ damage_url or '#' }}"
+                    data-document-url="{{ document_url or '#' }}">
+              <span class="flow-code">{{ 'HOT' if task.is_hot else 'TASK' }}</span>
+              <span class="flow-detail"><strong>{{ task.title }}</strong>{% if task.part_number %} &middot; Part {{ task.part_number }}{% elif task.details %} &middot; {{ task.details|truncate(38, true) }}{% endif %}</span>
+              <span class="flow-status status-{{ task_status_tone }}">{{ task_status_text }}</span>
+            </button>
+          {% endfor %}
           {% if primary_stop %}
             <button class="live-flow-row tone-active" type="button"
                     data-flow-row
@@ -259,7 +302,8 @@
                     data-proof-url="{{ depart_url or primary_stop.view_url or route_sheet_url or '#' }}"
                     data-damage-url="{{ damage_url or '#' }}"
                     data-document-url="{{ document_url or '#' }}">
-              <span class="flow-line"><strong>STP-{{ primary_stop.sequence }}</strong> {{ primary_stop.plant_name }} &middot; {{ primary_stop.arrived_with }} &rarr; {{ primary_stop.departed_with }}{% if primary_stop.wait_label %} &middot; {{ primary_stop.wait_label }}{% endif %}</span>
+              <span class="flow-code">{{ primary_stop.board_code or 'STP-' ~ primary_stop.sequence }}</span>
+              <span class="flow-detail">{{ primary_stop.board_detail or (primary_stop.plant_name ~ ' - ' ~ primary_stop.arrived_with ~ ' -> ' ~ primary_stop.departed_with) }}</span>
               <span class="flow-status status-open">OPEN</span>
             </button>
           {% elif primary_event %}
@@ -268,6 +312,8 @@
             {% set event_proof_url = (event_detail.view_url if event_detail else '') or route_sheet_url %}
             {% set event_status_label = 'EMPTY' if primary_event.kind == 'empty' else 'RECORDED' %}
             {% set event_status_tone = 'empty' if primary_event.kind == 'empty' else 'recorded' %}
+            {% set event_code = event_detail.board_code if event_detail and event_detail.board_code else 'STP-' ~ (event_detail.sequence if event_detail else primary_event.count) %}
+            {% set event_row_detail = event_detail.board_detail if event_detail and event_detail.board_detail else primary_event.board_detail or primary_event.route_line %}
             <button class="live-flow-row tone-{{ primary_event.tone }}" type="button"
                     data-flow-row
                     data-detail-template="primary-event"
@@ -277,7 +323,8 @@
                     data-proof-url="{{ event_proof_url or '#' }}"
                     data-damage-url="{{ damage_url or '#' }}"
                     data-document-url="{{ document_url or '#' }}">
-              <span class="flow-line"><strong>STP-{{ event_detail.sequence if event_detail else primary_event.count }}</strong> {{ primary_event.route_line }} &middot; {{ primary_event.load_count_label }}</span>
+              <span class="flow-code">{{ event_code }}</span>
+              <span class="flow-detail">{{ event_row_detail }}{% if primary_event.kind != 'empty' and primary_event.load_count_label %} &middot; {{ primary_event.load_count_label }}{% endif %}</span>
               <span class="flow-status status-{{ event_status_tone }}">{{ event_status_label }}</span>
             </button>
           {% elif completed_stops %}
@@ -291,7 +338,8 @@
                     data-proof-url="{{ last_stop.view_url or route_sheet_url or '#' }}"
                     data-damage-url="{{ damage_url or '#' }}"
                     data-document-url="{{ document_url or '#' }}">
-              <span class="flow-line"><strong>STP-{{ last_stop.sequence }}</strong> {{ last_stop.plant_name }} &middot; {{ last_stop.arrived_with }} &rarr; {{ last_stop.departed_with }}</span>
+              <span class="flow-code">{{ last_stop.board_code or 'STP-' ~ last_stop.sequence }}</span>
+              <span class="flow-detail">{{ last_stop.board_detail or (last_stop.plant_name ~ ' - ' ~ last_stop.arrived_with ~ ' -> ' ~ last_stop.departed_with) }}</span>
               <span class="flow-status status-completed">CLOSED</span>
             </button>
           {% endif %}
@@ -301,6 +349,8 @@
             {% set item_proof_url = (detail.view_url if detail else '') or route_sheet_url %}
             {% set item_status_label = 'EMPTY' if item.kind == 'empty' else 'RECORDED' %}
             {% set item_status_tone = 'empty' if item.kind == 'empty' else 'recorded' %}
+            {% set item_code = detail.board_code if detail and detail.board_code else 'STP-' ~ (detail.sequence if detail else item.count) %}
+            {% set item_row_detail = detail.board_detail if detail and detail.board_detail else item.board_detail or item.route_line %}
             <button class="live-flow-row tone-{{ item.tone }}" type="button"
                     data-flow-row
                     data-detail-template="event-{{ loop.index0 }}"
@@ -310,7 +360,8 @@
                     data-proof-url="{{ item_proof_url or '#' }}"
                     data-damage-url="{{ damage_url or '#' }}"
                     data-document-url="{{ document_url or '#' }}">
-              <span class="flow-line"><strong>STP-{{ detail.sequence if detail else item.count }}</strong> {{ item.route_line }} &middot; {{ item.load_count_label }}</span>
+              <span class="flow-code">{{ item_code }}</span>
+              <span class="flow-detail">{{ item_row_detail }}{% if item.kind != 'empty' and item.load_count_label %} &middot; {{ item.load_count_label }}{% endif %}</span>
               <span class="flow-status status-{{ item_status_tone }}">{{ item_status_label }}</span>
             </button>
           {% endfor %}
@@ -324,13 +375,42 @@
     </div>
 
     <div class="live-flow-templates" hidden>
+      {% for task in board_tasks %}
+        <template data-flow-detail-template="task-{{ loop.index0 }}">
+          <div class="flow-selected-detail">
+            <h4>Dispatch task</h4>
+            <p>{{ task.details or 'No extra dispatch notes.' }}</p>
+            <div class="route-detail-grid">
+              {% if task.part_number %}<div><span>Part</span><strong>{{ task.part_number }}</strong></div>{% endif %}
+              <div><span>Status</span><strong>{{ 'HOT' if task.is_hot else task.status.replace('-', ' ')|title }}</strong></div>
+              <div><span>Assignment</span><strong>{{ 'Open for any driver' if not task.assigned_to else 'Assigned to you' }}</strong></div>
+              {% if task.accepted_at %}<div><span>Accepted</span><strong>{{ task.accepted_at|to_detroit_datetime }}</strong></div>{% endif %}
+            </div>
+            <div class="route-detail-actions">
+              <a class="route-detail-link" href="{{ url_for('driver.view_task', task_id=task.id) }}">Open Task</a>
+              {% if task.status == 'pending' %}
+                <form action="{{ url_for('driver.accept_task', task_id=task.id, next='mobile') }}" method="POST">
+                  <button class="route-detail-link" type="submit">Accept</button>
+                </form>
+                <form action="{{ url_for('driver.decline_task', task_id=task.id, next='mobile') }}" method="POST">
+                  <button class="route-detail-link danger" type="submit">Decline</button>
+                </form>
+              {% else %}
+                <form action="{{ url_for('driver.complete_task', task_id=task.id, next='mobile') }}" method="POST">
+                  <button class="route-detail-link" type="submit">Complete</button>
+                </form>
+              {% endif %}
+            </div>
+          </div>
+        </template>
+      {% endfor %}
       {% if primary_stop %}
         <template data-flow-detail-template="primary-stop">
           <div class="flow-selected-detail">
             <h4>Stop {{ primary_stop.sequence }} route details</h4>
             <div class="route-detail-grid">
               <div><span>Arrived with</span><strong>{{ primary_stop.arrived_with }}</strong></div>
-              <div><span>Departed with</span><strong>{{ primary_stop.departed_with }}</strong></div>
+	              <div><span>Departed with</span><strong>{{ 'No Pickup' if primary_stop.no_pickup else primary_stop.departed_with }}</strong></div>
               <div><span>Wait</span><strong>{{ primary_stop.wait_label }}</strong></div>
               <div><span>Next</span><strong>{{ primary_stop.next_action }}</strong></div>
             </div>
@@ -349,7 +429,7 @@
                     <strong>{{ detail.plant }}</strong>
                     <small>{{ detail.arrival_at|display_time if detail.arrival_at else 'No arrival time' }}{% if detail.departure_at %} to {{ detail.departure_at|to_12h_format }}{% endif %}</small>
                     {% if detail.pickup_label %}<small>{{ detail.pickup_label }}</small>{% endif %}
-                    <small>In: {{ detail.arrived_with }} / Out: {{ detail.departed_with }}</small>
+	                    <small>In: {{ detail.arrived_with }} / Out: {{ 'No Pickup' if detail.no_pickup else detail.departed_with }}</small>
                     {% if detail.parts or detail.flags or detail.wait_label %}
                       <span class="route-focus-chips">
                         {% for part in detail.parts %}<em>{{ part }}</em>{% endfor %}
@@ -370,7 +450,7 @@
             <h4>Stop {{ last_stop.sequence }} route details</h4>
             <div class="route-detail-grid">
               <div><span>Arrived with</span><strong>{{ last_stop.arrived_with }}</strong></div>
-              <div><span>Departed with</span><strong>{{ last_stop.departed_with }}</strong></div>
+	              <div><span>Departed with</span><strong>{{ 'No Pickup' if last_stop.no_pickup else last_stop.departed_with }}</strong></div>
               <div><span>Status</span><strong>{{ last_stop.status_label }}</strong></div>
               <div><span>Next</span><strong>{{ last_stop.next_action }}</strong></div>
             </div>
@@ -390,7 +470,7 @@
                     <strong>{{ detail.plant }}</strong>
                     <small>{{ detail.arrival_at|display_time if detail.arrival_at else 'No arrival time' }}{% if detail.departure_at %} to {{ detail.departure_at|to_12h_format }}{% endif %}</small>
                     {% if detail.pickup_label %}<small>{{ detail.pickup_label }}</small>{% endif %}
-                    <small>In: {{ detail.arrived_with }} / Out: {{ detail.departed_with }}</small>
+	                    <small>In: {{ detail.arrived_with }} / Out: {{ 'No Pickup' if detail.no_pickup else detail.departed_with }}</small>
                     {% if detail.parts or detail.flags or detail.wait_label %}
                       <span class="route-focus-chips">
                         {% for part in detail.parts %}<em>{{ part }}</em>{% endfor %}

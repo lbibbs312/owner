@@ -20,7 +20,13 @@ from app.services.floor_operations import (
     next_action_for_request,
     route_next_action,
 )
-from app.services.load_state import destination_from_load, is_empty_load, load_display
+from app.services.load_state import (
+    destination_from_load,
+    is_empty_load,
+    is_service_stop,
+    load_display,
+    service_stop_label,
+)
 from app.services.plant_addresses import PLANT_LABELS, plant_label
 from app.services.route_context import build_route_context
 
@@ -99,6 +105,59 @@ def _status_label(status):
 
 def _norm_key(value):
     return re.sub(r"[^a-z0-9]+", "_", _clean(value).lower()).strip("_") or "unspecified"
+
+
+def _board_cargo_label(value):
+    text = _clean(value)
+    if not text or text == NOT_TRACKED:
+        return "--"
+    return load_display(text)
+
+
+def _service_board_code(log):
+    if getattr(log, "fuel", False):
+        return "FUEL"
+    plant_text = f"{getattr(log, 'plant_name', '')} {plant_label(getattr(log, 'plant_name', ''))}".lower()
+    if "ryder" in plant_text:
+        return "RYDR"
+    if getattr(log, "maintenance", False):
+        return "MTN"
+    if getattr(log, "meeting", False):
+        return "MTG"
+    return "SRVC"
+
+
+def _board_stop_code(log, sequence):
+    if is_service_stop(log):
+        return _service_board_code(log)
+    return f"STP-{sequence or '?'}"
+
+
+def _service_board_detail(log, label, route_pretrip=None):
+    if getattr(log, "fuel", False) and getattr(log, "fuel_mileage", None) is not None:
+        start_mileage = getattr(route_pretrip, "start_mileage", None)
+        if start_mileage is not None:
+            delta = log.fuel_mileage - start_mileage
+            return f"+{delta:,} mi from pre-trip"
+        return f"{log.fuel_mileage:,} mi recorded"
+    return f"{label} - {service_stop_label(log).lower()}"
+
+
+def _board_stop_detail(log, label, arrived_with, departed_with, wait_label="", route_pretrip=None):
+    if is_service_stop(log):
+        return _service_board_detail(log, label, route_pretrip=route_pretrip)
+
+    arrived = _board_cargo_label(arrived_with)
+    closed = bool(getattr(log, "depart_time", None))
+    departed = _board_cargo_label(departed_with) if closed else "--"
+    no_pickup = bool(getattr(log, "no_pickup", False))
+    if closed and no_pickup and arrived == "Empty" and departed == "Empty":
+        return f"{label} - empty return"
+
+    detail = f"{label} - {arrived} -> {departed}"
+    if wait_label and wait_label != NOT_TRACKED:
+        detail = f"{detail} - {wait_label}"
+    return detail
 
 
 def _date_label(value):
@@ -326,7 +385,7 @@ def _stop_next_action(log, *, status, cargo, linked_move=None):
     return "No action needed"
 
 
-def _build_stops(route_context, *, role="driver", move_requests=None):
+def _build_stops(route_context, *, role="driver", move_requests=None, route_pretrip=None):
     move_requests = move_requests or []
     linked_by_log = {req.linked_driver_log_id: req for req in move_requests if req.linked_driver_log_id}
     log_ids = [row["log"].id for row in getattr(route_context, "rows", []) if row.get("log")]
@@ -356,19 +415,33 @@ def _build_stops(route_context, *, role="driver", move_requests=None):
             linked_move=linked_move,
         )
         wait_minutes = wait_minutes_for_log(log, now=None) if not log.depart_time else (log.dock_wait_minutes or 0)
+        sequence = row.get("index") or len(stops) + 1
+        arrived_with = row.get("cargo_in") or log.load_size or NOT_TRACKED
+        departed_with = row.get("cargo_out") or log.depart_load_size or NOT_TRACKED
+        wait_label = f"{wait_minutes} min" if wait_minutes is not None else NOT_TRACKED
         stops.append({
             "stop_id": log.id,
-            "sequence": row.get("index") or len(stops) + 1,
+            "sequence": sequence,
             "plant_name": label,
             "short_code": _short_code(log.plant_name or label),
+            "board_code": _board_stop_code(log, sequence),
+            "board_detail": _board_stop_detail(
+                log,
+                label,
+                arrived_with,
+                departed_with,
+                wait_label=wait_label,
+                route_pretrip=route_pretrip,
+            ),
             "status": status,
             "status_label": _status_label(status),
             "arrival_at": log.arrive_time or "",
             "departure_at": log.depart_time or "",
             "wait_minutes": wait_minutes,
-            "wait_label": f"{wait_minutes} min" if wait_minutes is not None else NOT_TRACKED,
-            "arrived_with": row.get("cargo_in") or log.load_size or NOT_TRACKED,
-            "departed_with": row.get("cargo_out") or log.depart_load_size or NOT_TRACKED,
+            "wait_label": wait_label,
+            "arrived_with": arrived_with,
+            "departed_with": departed_with,
+            "no_pickup": bool(getattr(log, "no_pickup", False)),
             "cargo_status": cargo["label"],
             "linked_move_request_id": getattr(linked_move, "id", None),
             "linked_move_request_number": getattr(linked_move, "display_number", None),
@@ -449,13 +522,14 @@ def _stop_count_label(count):
     return f"{count} stop{'s' if count != 1 else ''}"
 
 
-def _new_narrative_group(kind, *, title, route_line, origin_label=None, destination_label=None):
+def _new_narrative_group(kind, *, title, route_line, board_detail=None, origin_label=None, destination_label=None):
     return {
         "key": _norm_key(f"{kind}:{title}:{origin_label}:{destination_label}"),
         "kind": kind,
         "tone": "empty" if kind == "empty" else ("delivery" if kind == "delivery" else "pickup"),
         "title": title,
         "route_line": route_line,
+        "board_detail": board_detail or route_line,
         "origin_label": origin_label,
         "destination_label": destination_label,
         "count": 0,
@@ -501,12 +575,21 @@ def _base_stop_detail(log, row, route, *, cargo_label, pickup=None):
     return {
         "stop_id": getattr(log, "id", None),
         "sequence": row.get("index"),
+        "board_code": _board_stop_code(log, row.get("index")),
+        "board_detail": _board_stop_detail(
+            log,
+            row.get("plant") or plant_label(getattr(log, "plant_name", None)) or SAFE_EMPTY,
+            row.get("cargo_in") or route.get("arrive_cargo_desc") or load_display(getattr(log, "load_size", "")),
+            row.get("cargo_out") or route.get("depart_cargo_desc") or load_display(getattr(log, "depart_load_size", "")),
+            wait_label=wait_label.replace("Wait ", "", 1) if wait_label else "",
+        ),
         "plant": row.get("plant") or plant_label(getattr(log, "plant_name", None)) or SAFE_EMPTY,
         "arrival_at": getattr(log, "arrive_time", ""),
         "departure_at": getattr(log, "depart_time", ""),
         "cargo_label": cargo_label,
         "arrived_with": row.get("cargo_in") or route.get("arrive_cargo_desc") or load_display(getattr(log, "load_size", "")),
         "departed_with": row.get("cargo_out") or route.get("depart_cargo_desc") or load_display(getattr(log, "depart_load_size", "")),
+        "no_pickup": bool(getattr(log, "no_pickup", False)),
         "parts": parts,
         "flags": tuple(dict.fromkeys(flags)),
         "wait_label": wait_label,
@@ -558,6 +641,7 @@ def _build_delivery_narratives(route_context):
                 "delivery",
                 title=f"{destination_label} delivery from {origin_label}",
                 route_line=f"{cargo_label} delivered from {origin_label} to {destination_label}",
+                board_detail=f"{origin_label} -> {destination_label} - {cargo_label}",
                 origin_label=origin_label,
                 destination_label=destination_label,
             )
@@ -572,6 +656,7 @@ def _build_delivery_narratives(route_context):
                 "empty",
                 title=f"{plant_label_text} empty load",
                 route_line=f"Arrived empty and departed empty at {plant_label_text}",
+                board_detail=f"{plant_label_text} - empty return",
                 destination_label=plant_label_text,
             )
             detail = _base_stop_detail(log, row, route, cargo_label="Empty load")
@@ -852,6 +937,7 @@ def build_driver_route_map_context(
     selected_stop_id=None,
     selected_plant=None,
     selected_move_request_id=None,
+    route_pretrip=None,
 ):
     """Build the driver route-map context from the driver's real work."""
     driver_id = getattr(driver, "id", None) or getattr(driver_log, "driver_id", None)
@@ -874,7 +960,7 @@ def build_driver_route_map_context(
         _move_view_model(req, damaged_log_ids=damaged_log_ids, issue_request_ids=issue_request_ids, role="driver")
         for req in requests
     ]
-    stops = _build_stops(route_context, role="driver", move_requests=requests)
+    stops = _build_stops(route_context, role="driver", move_requests=requests, route_pretrip=route_pretrip)
     delivery_narratives = _build_delivery_narratives(route_context)
     transfers = _transfers_for_view(driver_id=driver_id, target=target)
     plants, lanes = _build_plants_and_lanes(stops, moves, transfers, role="driver")

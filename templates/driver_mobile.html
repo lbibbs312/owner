@@ -386,10 +386,13 @@
     }
     .route-panel { display: none; }
     @media (min-width: 1200px) { .route-panel { display: block; } }
-    @media (min-width: 1200px) {
-      .flow-first-shell .wide-body { grid-template-columns: minmax(0, 1fr); }
-      .flow-first-shell .route-panel { display: none; }
-    }
+	    @media (min-width: 1200px) {
+	      .flow-first-shell .wide-body { grid-template-columns: minmax(0, 1fr); }
+	      .flow-first-shell .route-panel { display: none; }
+	      .board-only-shell .wide-body { grid-template-columns: minmax(0, 1fr); }
+	      .board-only-shell .route-panel { display: none; }
+	      .board-only-shell main { padding-right: 22px; }
+	    }
     @media (max-width: 760px) {
       body.flow-first-body { background: var(--bg); }
       body.flow-first-body .mobile-shell {
@@ -1729,33 +1732,51 @@
       border-bottom: 1px solid var(--md-line);
       background: rgba(255,255,255,.016);
     }
-    .live-flow-kicker {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
+	    .live-flow-kicker {
+	      display: inline-flex;
+	      align-items: center;
+	      gap: 10px;
       color: var(--md-text);
       font-family: var(--md-mono);
       font-size: .78rem;
       letter-spacing: .14em;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-    .live-flow-kicker i {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--md-green);
-      box-shadow: 0 0 18px rgba(43,213,118,.6);
-      animation: livePulse 1.8s ease-in-out infinite;
-    }
-    .live-flow-head h3 {
-      margin: 6px 0 0;
-      color: var(--md-text);
-      font-family: var(--md-display);
-      font-size: 1.02rem;
-      line-height: 1.05;
-      font-weight: 800;
-    }
+	      font-weight: 700;
+	      text-transform: uppercase;
+	    }
+	    .live-flow-kicker i {
+	      position: relative;
+	      width: 8px;
+	      height: 8px;
+	      border-radius: 50%;
+	      background: var(--md-green);
+	      box-shadow: 0 0 12px rgba(43,213,118,.82), 0 0 28px rgba(43,213,118,.32);
+	      animation: livePulse 1.8s ease-in-out infinite;
+	    }
+	    .live-flow-kicker i::after {
+	      content: "";
+	      position: absolute;
+	      inset: -7px;
+	      border: 1px solid rgba(43,213,118,.48);
+	      border-radius: 50%;
+	      animation: livePulseRing 1.8s ease-out infinite;
+	    }
+	    .live-flow-head h3 {
+	      margin: 6px 0 0;
+	      color: var(--md-text);
+	      font-family: var(--md-display);
+	      font-size: 1.02rem;
+	      line-height: 1.05;
+	      font-weight: 800;
+	    }
+	    .live-flow-subline {
+	      margin: 5px 0 0;
+	      color: var(--md-muted);
+	      font-family: var(--md-mono);
+	      font-size: .66rem;
+	      font-weight: 700;
+	      letter-spacing: .06em;
+	      text-transform: uppercase;
+	    }
     .live-flow-head-status {
       display: grid;
       justify-items: end;
@@ -1823,13 +1844,17 @@
       white-space: nowrap;
       max-width: 92px;
     }
-    .live-flow-action-tab:focus-visible,
-    .live-flow-action-tab.is-active {
-      outline: 2px solid rgba(255,178,36,.72);
-      outline-offset: 2px;
-      border-color: rgba(255,178,36,.72);
-      box-shadow: inset 0 0 24px rgba(91,157,255,.1), 0 0 0 1px rgba(255,178,36,.16);
-    }
+	    .live-flow-action-tab:focus-visible,
+	    .live-flow-action-tab.is-active {
+	      outline: 2px solid rgba(255,178,36,.72);
+	      outline-offset: 2px;
+	      border-color: rgba(255,178,36,.72);
+	      box-shadow:
+	        inset 0 0 24px rgba(91,157,255,.2),
+	        0 0 0 1px rgba(255,178,36,.2),
+	        0 0 22px rgba(255,178,36,.18),
+	        0 0 34px rgba(91,157,255,.12);
+	    }
     .live-flow-alert {
       display: grid;
       gap: 2px;
@@ -2025,74 +2050,99 @@
     .live-flow-board.is-interacting .live-flow-track {
       animation-play-state: paused;
     }
-    .live-flow-row {
-      appearance: none;
-      width: 100%;
-      min-height: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      padding: 13px 14px;
-      border: 1px solid transparent;
-      border-radius: 9px;
-      color: var(--md-text);
-      text-align: left;
+	    .live-flow-row {
+	      appearance: none;
+	      width: 100%;
+	      min-height: 0;
+	      display: grid;
+	      grid-template-columns: 72px minmax(0, 1fr) max-content;
+	      align-items: center;
+	      gap: 10px;
+	      padding: 12px 12px;
+	      border: 1px solid transparent;
+	      border-radius: 9px;
+	      color: var(--md-text);
+	      text-align: left;
       cursor: pointer;
       background: transparent;
       font-family: var(--md-mono);
-      font-size: .82rem;
-    }
-    .live-flow-row + .live-flow-row { margin-top: 6px; }
-    .live-flow-row.is-selected {
-      border-color: rgba(255,178,36,.38);
-      background: linear-gradient(90deg, rgba(255,178,36,.12), rgba(91,157,255,.08) 52%, transparent);
-      box-shadow: inset 3px 0 var(--md-amber);
-    }
-    .live-flow-row.tone-active {
-      background: rgba(91,157,255,.045);
-    }
-    .live-flow-row.tone-empty {
-      background: rgba(138,153,179,.025);
-    }
-    .live-flow-row.tone-blocked,
-    .live-flow-row.tone-needs_review {
-      background: rgba(239,68,68,.1);
-      box-shadow: inset 0 0 0 1px rgba(239,68,68,.18);
-    }
-    .flow-line {
-      flex: 1 1 auto;
-      min-width: 0;
-      color: var(--md-muted);
-      font-family: var(--md-mono);
-      font-size: .78rem;
-      font-weight: 400;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .flow-line strong {
-      color: var(--md-text);
-      display: inline;
-      font-weight: 600;
-      letter-spacing: .04em;
-      margin-right: 12px;
-      white-space: nowrap;
-    }
-    .flow-status {
-      flex: 0 0 auto;
-      display: inline-flex;
-      align-items: center;
-      min-height: 0;
-      padding: 4px 10px;
+	      font-size: .82rem;
+	      overflow: hidden;
+	    }
+	    .live-flow-row + .live-flow-row { margin-top: 6px; }
+	    .live-flow-row.is-selected {
+	      border-color: rgba(255,178,36,.52);
+	      background: linear-gradient(90deg, rgba(255,178,36,.12), rgba(91,157,255,.08) 52%, transparent);
+	      box-shadow: inset 3px 0 var(--md-amber), 0 0 22px rgba(91,157,255,.12);
+	    }
+	    .live-flow-row.tone-active {
+	      border-color: rgba(91,157,255,.34);
+	      background: linear-gradient(90deg, rgba(91,157,255,.12), rgba(255,178,36,.045) 62%, rgba(12,21,33,.18));
+	      box-shadow: inset 3px 0 rgba(91,157,255,.88), 0 0 22px rgba(91,157,255,.12);
+	      animation: activeRowPulse 2.8s ease-in-out infinite;
+	    }
+	    .live-flow-row.tone-empty {
+	      background: rgba(138,153,179,.025);
+	    }
+	    .live-flow-row.tone-completed {
+	      background: rgba(8,19,34,.42);
+	    }
+	    .live-flow-row.tone-delivery {
+	      background: rgba(43,213,118,.035);
+	    }
+	    .live-flow-row.tone-hot,
+	    .live-flow-row.tone-blocked,
+	    .live-flow-row.tone-needs_review {
+	      background: rgba(239,68,68,.1);
+	      border-color: rgba(255,82,71,.36);
+	      box-shadow: inset 3px 0 var(--md-red), 0 0 22px rgba(255,82,71,.12);
+	    }
+	    .flow-code {
+	      min-width: 0;
+	      color: var(--md-text);
+	      font-family: var(--md-mono);
+	      font-size: .78rem;
+	      font-weight: 800;
+	      letter-spacing: .06em;
+	      text-transform: uppercase;
+	      white-space: nowrap;
+	      overflow: hidden;
+	      text-overflow: ellipsis;
+	    }
+	    .flow-detail,
+	    .flow-line {
+	      min-width: 0;
+	      color: var(--md-muted);
+	      font-family: var(--md-mono);
+	      font-size: .78rem;
+	      font-weight: 500;
+	      line-height: 1.28;
+	      display: -webkit-box;
+	      -webkit-line-clamp: 2;
+	      -webkit-box-orient: vertical;
+	      overflow: hidden;
+	    }
+	    .flow-detail strong,
+	    .flow-line strong {
+	      color: var(--md-text);
+	      display: inline;
+	      font-weight: 800;
+	      letter-spacing: .04em;
+	    }
+	    .flow-status {
+	      justify-self: end;
+	      display: inline-flex;
+	      align-items: center;
+	      min-height: 0;
+	      padding: 4px 10px;
       border-radius: 999px;
       font-family: var(--md-mono);
       font-size: .68rem;
-      font-weight: 600;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
+	      font-weight: 700;
+	      letter-spacing: .08em;
+	      text-transform: uppercase;
+	      white-space: nowrap;
+	    }
     .flow-status.status-active,
     .flow-status.status-pickup,
     .flow-status.status-open {
@@ -2100,14 +2150,15 @@
       background: rgba(91,157,255,.12);
       border: 1px solid rgba(91,157,255,.3);
     }
-    .flow-status.status-delivery,
-    .flow-status.status-completed,
-    .flow-status.status-ready,
-    .flow-status.status-recorded,
-    .flow-status.status-no_action {
-      color: var(--md-green);
-      background: rgba(43,213,118,.12);
-      border: 1px solid rgba(43,213,118,.3);
+	    .flow-status.status-delivery,
+	    .flow-status.status-completed,
+	    .flow-status.status-ready,
+	    .flow-status.status-recorded,
+	    .flow-status.status-progress,
+	    .flow-status.status-no_action {
+	      color: var(--md-green);
+	      background: rgba(43,213,118,.12);
+	      border: 1px solid rgba(43,213,118,.3);
     }
     .flow-status.status-empty,
     .flow-status.status-hold {
@@ -2122,9 +2173,9 @@
       background: rgba(255,82,71,.12);
       border: 1px solid rgba(255,82,71,.32);
     }
-    .live-flow-ticker {
-      display: flex;
-      overflow: hidden;
+	    .live-flow-ticker {
+	      display: flex;
+	      overflow: hidden;
       border-top: 1px solid var(--md-line-soft);
       border-bottom: 1px solid var(--md-line-soft);
       background: var(--md-ink);
@@ -2133,16 +2184,34 @@
       font-size: .7rem;
       letter-spacing: .08em;
       text-transform: uppercase;
-      white-space: nowrap;
-      padding: 8px 0;
-    }
-    .live-flow-ticker span {
-      display: inline-block;
-      min-width: max-content;
-      padding: 0;
-      animation: liveTicker 24s linear infinite;
-    }
-    .live-flow-ticker span + span { padding-left: 46px; }
+	      white-space: nowrap;
+	      padding: 8px 12px;
+	    }
+	    .live-flow-ticker span {
+	      display: inline-block;
+	      min-width: max-content;
+	      padding: 0;
+	      animation: none;
+	    }
+	    .live-flow-ticker span + span { display: none; }
+	    .route-detail-actions form {
+	      min-width: 0;
+	      margin: 0;
+	    }
+	    .route-detail-actions .route-detail-link {
+	      width: 100%;
+	      border-color: rgba(91,157,255,.32);
+	      background: rgba(47,109,240,.16);
+	      font-family: var(--md-mono);
+	      letter-spacing: .08em;
+	      text-transform: uppercase;
+	      cursor: pointer;
+	    }
+	    .route-detail-actions .route-detail-link.danger {
+	      border-color: rgba(255,82,71,.34);
+	      background: rgba(255,82,71,.12);
+	      color: #ffc9c5;
+	    }
     .move-defense-mobile .route-detail-grid,
     .move-defense-mobile .route-focus-details {
       padding: 0;
@@ -2153,10 +2222,18 @@
       border-color: rgba(52,120,246,.16);
     }
 
-    @keyframes livePulse {
-      0%, 100% { transform: scale(1); opacity: .82; }
-      50% { transform: scale(1.26); opacity: 1; }
-    }
+	    @keyframes livePulse {
+	      0%, 100% { transform: scale(1); opacity: .82; }
+	      50% { transform: scale(1.26); opacity: 1; }
+	    }
+	    @keyframes livePulseRing {
+	      0% { transform: scale(.72); opacity: .62; }
+	      80%, 100% { transform: scale(1.7); opacity: 0; }
+	    }
+	    @keyframes activeRowPulse {
+	      0%, 100% { box-shadow: inset 3px 0 rgba(91,157,255,.88), 0 0 18px rgba(91,157,255,.1); }
+	      50% { box-shadow: inset 3px 0 var(--md-amber), 0 0 24px rgba(255,178,36,.13), 0 0 32px rgba(91,157,255,.12); }
+	    }
     @keyframes liveFlowScroll {
       0%, 16% { transform: translateY(0); }
       100% { transform: translateY(calc(var(--flow-rows) * -58px)); }
@@ -2175,8 +2252,9 @@
   </style>
 </head>
   {% set flow_first_current = production_flow and route_map and route_map.map_mode == 'live_current_work' %}
+  {% set board_only_home = true %}
 <body class="{% if flow_first_current %}flow-first-body{% endif %}">
-  <div class="mobile-shell move-defense-mobile driver-ops-shell{% if flow_first_current %} flow-first-shell{% endif %}">
+  <div class="mobile-shell move-defense-mobile driver-ops-shell{% if flow_first_current %} flow-first-shell{% endif %}{% if board_only_home %} board-only-shell{% endif %}">
     <header class="topbar">
       <div class="driver-row">
         <div class="cluster">
@@ -2224,14 +2302,14 @@
       {% set secondary = cta.secondary_cta if cta.secondary_cta is defined else none %}
       {% set cta_urls = route_cta_urls if route_cta_urls is defined else {} %}
       {% set truck_history_url = url_for('driver.truck_maintenance_history', truck_number=current_truck_number) if current_truck_number else url_for('driver.truck_maintenance_history') %}
-      {% if route_date_options %}
+	      {% if not board_only_home and route_date_options %}
 	      <nav class="date-context" aria-label="Route date">
 	        {% for option in route_date_options %}
 	          <a class="{% if option.active %}active{% endif %}" href="{{ option.url }}">{{ option.label }} · {{ option.date.strftime('%b %d') if option.date else '' }}</a>
 	        {% endfor %}
 	      </nav>
       {% endif %}
-      {% if active_task or not flow_first_current %}
+	      {% if not board_only_home and (active_task or not flow_first_current) %}
 		      <section class="card hero {% if not active_task and cta.route_display_mode in ['completed_route', 'finalized_route', 'proof_needed'] %}route-complete-panel {% if cta.route_display_mode == 'proof_needed' %}proof-needed{% endif %}{% endif %}">
         {% if active_task %}
           <div class="eyebrow"><span class="bolt"></span>{% if active_task.is_hot %}Active Hot Move{% else %}Active Task{% endif %}</div>
@@ -2303,7 +2381,7 @@
 
       </section>
 
-      {% if task_queue %}
+	      {% if not board_only_home and task_queue %}
       <section class="list">
         <div class="section-head">
           <h2>Parts Queue</h2>
@@ -2339,7 +2417,7 @@
       </section>
       {% endif %}
 
-      {% if current_stop and current_stop_forecast %}
+	      {% if not board_only_home and current_stop and current_stop_forecast %}
       {% set fs = current_stop_forecast %}
       {% set current_route = (todays_log_routes or {}).get(current_stop.id) %}
       <section class="card timing-card">
@@ -2363,7 +2441,8 @@
       </section>
       {% endif %}
 
-	      <section class="wide-actions" aria-label="Desktop driver actions">
+		      {% if not board_only_home %}
+		      <section class="wide-actions" aria-label="Desktop driver actions">
 	        <a class="button ghost" href="{{ url_for('driver.damage_reports') }}">Damage Reports</a>
 	        {% if cta.show_attach_document_button and cta_urls.get('attach_document') %}
 	          <a class="button ghost" href="{{ cta_urls.get('attach_document') }}">Attach Document</a>
@@ -2375,12 +2454,13 @@
 	          <a class="button ghost" href="{{ cta_urls.get('finalize_route') }}">Finalize Route</a>
 	        {% endif %}
 	        <a class="button ghost" href="{{ url_for('driver.mobile_history') }}">Route History</a>
-	      </section>
+		      </section>
+		      {% endif %}
 
       {% set fuel_logs = todays_logs | selectattr('fuel') | selectattr('fuel_mileage') | list %}
       {% set start_mi = route_pretrip.start_mileage if route_pretrip else none %}
       {% set end_mi = route_pretrip.posttrip.end_mileage if (route_pretrip and route_pretrip.posttrip) else none %}
-      {% if start_mi or fuel_logs %}
+	      {% if not board_only_home and (start_mi or fuel_logs) %}
       <section class="list">
         <div class="section-head">
           <h2>Mileage Snapshot</h2>
@@ -2434,7 +2514,8 @@
 
     </main>
 
-    <aside class="route-panel">
+	    {% if not board_only_home %}
+	    <aside class="route-panel">
       <div class="rp-head">
         <h3>{{ route_panel_title or "Today's Route" }}</h3>
         <span>{% if route_date and route_date != today_local_date %}{{ route_date.strftime('%b %d') }} - {% endif %}{{ todays_logs|length }} stop{{ 's' if todays_logs|length != 1 else '' }}</span>
@@ -2518,7 +2599,8 @@
           <a href="{{ url_for('driver.new_damage_report') }}">Damage</a>
         </div>
       </div>
-    </aside>
+	    </aside>
+	    {% endif %}
 
     </div>{# end wide-body #}
   </div>
