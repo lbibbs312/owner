@@ -259,6 +259,28 @@ def _open_shift_for_driver(driver_id):
     )
 
 
+def _open_shifts_for_driver(driver_id):
+    return (
+        ShiftRecord.query.filter_by(user_id=driver_id, end_time=None)
+        .order_by(ShiftRecord.start_time.asc(), ShiftRecord.id.asc())
+        .all()
+    )
+
+
+def _close_shift_record(shift, ended_at):
+    shift.end_time = ended_at
+    elapsed_hours = (shift.end_time - shift.start_time).total_seconds() / 3600.0
+    shift.total_hours = max(0, elapsed_hours)
+
+
+def _end_open_shifts_for_driver(driver_id, ended_at=None):
+    ended_at = ended_at or datetime.utcnow()
+    open_shifts = _open_shifts_for_driver(driver_id)
+    for shift in open_shifts:
+        _close_shift_record(shift, ended_at)
+    return open_shifts
+
+
 def _shift_route_date(shift):
     if not shift:
         return None
@@ -1823,6 +1845,8 @@ def new_pretrip():
                     week_ending=None,
                 )
             )
+        elif existing_open_shift.pretrip_id is None:
+            existing_open_shift.pretrip_id = new_pt.id
         db.session.commit()
         record_activity(
             user_id=current_user.id,
@@ -1879,22 +1903,20 @@ def do_posttrip(pretrip_id):
         else:
             miles_val = None
 
-        new_posttrip = PostTrip(
-            pretrip_id=pretrip_id,
-            end_mileage=end_mileage_val,
-            remarks=form.remarks.data,
-            miles_driven=miles_val,
+        posttrip = (
+            PostTrip.query.filter_by(pretrip_id=pretrip_id)
+            .order_by(PostTrip.created_at.asc(), PostTrip.id.asc())
+            .first()
         )
-        db.session.add(new_posttrip)
-        db.session.commit()
+        if posttrip is None:
+            posttrip = PostTrip(pretrip_id=pretrip_id)
+            db.session.add(posttrip)
+        posttrip.end_mileage = end_mileage_val
+        posttrip.remarks = form.remarks.data
+        posttrip.miles_driven = miles_val
 
-        shift = ShiftRecord.query.filter_by(pretrip_id=pretrip_id).first()
-        if shift and shift.end_time is None:
-            shift.end_time = datetime.utcnow()
-            shift.total_hours = (
-                shift.end_time - shift.start_time
-            ).total_seconds() / 3600.0
-            db.session.commit()
+        _end_open_shifts_for_driver(pt.user_id)
+        db.session.commit()
 
         record_activity(
             user_id=current_user.id,
@@ -1903,7 +1925,7 @@ def do_posttrip(pretrip_id):
             title="PostTrip completed",
             details=f"PreTrip #{pt.id}; miles driven: {miles_val if miles_val is not None else 'not calculated'}.",
             target_type="posttrip",
-            target_id=new_posttrip.id,
+            target_id=posttrip.id,
         )
 
         flash("PostTrip completed successfully and shift clock ended!", "success")
@@ -3242,27 +3264,25 @@ def start_shift():
 @bp.route("/end_shift", methods=["GET", "POST"])
 @login_required
 def end_shift():
-    open_shift = ShiftRecord.query.filter_by(
-        user_id=current_user.id, end_time=None
-    ).first()
-    if not open_shift:
+    ended_at = datetime.utcnow()
+    closed_shifts = _end_open_shifts_for_driver(current_user.id, ended_at)
+    if not closed_shifts:
         flash("No open shift found!", "warning")
         return _shift_redirect()
 
-    open_shift.end_time = datetime.utcnow()
-    open_shift.total_hours = (
-        open_shift.end_time - open_shift.start_time
-    ).total_seconds() / 3600
     db.session.commit()
-    record_activity(
-        user_id=current_user.id,
-        category="shift",
-        action="ended",
-        title="Shift ended",
-        details=f"Total hours: {open_shift.total_hours:.2f}.",
-        target_type="shift",
-        target_id=open_shift.id,
-    )
+    for shift in closed_shifts:
+        record_activity(
+            user_id=current_user.id,
+            category="shift",
+            action="ended",
+            title="Shift ended",
+            details=f"Total hours: {shift.total_hours:.2f}.",
+            target_type="shift",
+            target_id=shift.id,
+            commit=False,
+        )
+    db.session.commit()
 
     flash("Shift ended!", "success")
     return _shift_redirect()
@@ -3293,6 +3313,7 @@ def end_of_day_summary():
             db.session.add(signature_shift)
         signature_shift.driver_signature = sig_data
         signature_shift.signature_timestamp = datetime.utcnow()
+        _end_open_shifts_for_driver(current_user.id)
         db.session.commit()
         _record_eod_finalized(today_local_date, logs, pretrips_today, plant_transfers_today)
         flash("Route signed and finalized. Review the signed printout before saving or printing.", "success")
@@ -3382,6 +3403,8 @@ def end_of_day_attachment():
 @login_required
 def submit_end_of_day():
     today_local_date, logs, pretrips_today, plant_transfers_today = _get_today_eod_records()
+    _end_open_shifts_for_driver(current_user.id)
+    db.session.commit()
     _record_eod_finalized(today_local_date, logs, pretrips_today, plant_transfers_today)
     flash("End of Day finalized and added to activity history.", "success")
     return redirect(url_for("driver.dashboard"))
