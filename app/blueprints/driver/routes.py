@@ -3267,12 +3267,21 @@ def record_part_scan(log_id):
 @_driver_route_guard("driver.driver_logs", "that departure page", "Driver Logs")
 def depart_driver_log(log_id):
     log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
+    quick_depart = (
+        request.form.get("next") == "mobile"
+        or request.args.get("next") == "mobile"
+        or request.form.get("source") == "live_flow"
+    )
+
+    def depart_redirect():
+        return redirect(url_for("driver.mobile_dashboard" if quick_depart else "driver.driver_logs"))
+
     if current_user.role == "driver" and log.driver_id != current_user.id:
         flash("Not authorized to depart someone else's log!", "danger")
-        return redirect(url_for("driver.driver_logs"))
+        return depart_redirect()
     if log.depart_time:
         flash("That log already has a departure time.", "warning")
-        return redirect(url_for("driver.driver_logs"))
+        return depart_redirect()
 
     form = DepartForm()
     route = _driver_log_context_for(log)
@@ -3280,6 +3289,8 @@ def depart_driver_log(log_id):
     service_label = service_stop_label(log) if service_stop else ""
 
     def render_depart_page():
+        if quick_depart:
+            return redirect(url_for("driver.mobile_dashboard"))
         now_local = datetime.now(pytz.timezone("America/Detroit"))
         auto_wait_seconds = elapsed_wait_seconds(log, now=now_local)
         auto_wait_minutes = None if auto_wait_seconds is None else auto_wait_seconds // 60
@@ -3417,7 +3428,7 @@ def depart_driver_log(log_id):
         ingest_driver_log(log, commit=True)
         _emit_driver_log_updated(log, "departed")
         flash(f"Departed {log.plant_name} with {cargo_display(log.depart_load_size, log.secondary_load)}.", "success")
-        return redirect(url_for("driver.driver_logs"))
+        return depart_redirect()
 
     return render_depart_page()
 

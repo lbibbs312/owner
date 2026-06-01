@@ -1900,7 +1900,7 @@
       width: min(440px, calc(100vw - 24px));
       max-height: min(76vh, 700px);
       overflow: hidden;
-      border: 1px solid rgba(91,157,255,.34);
+      border: 1px solid rgba(111,174,255,.68);
       border-radius: 14px;
       background:
         linear-gradient(rgba(91,157,255,.04) 1px, transparent 1px),
@@ -1908,10 +1908,29 @@
         linear-gradient(180deg, rgba(15,26,41,.98), rgba(6,10,18,.98));
       background-size: 18px 18px, 18px 18px, auto;
       box-shadow:
-        inset 0 0 0 1px rgba(255,255,255,.035),
-        0 0 0 1px rgba(255,178,36,.1),
+        inset 0 0 0 1px rgba(255,255,255,.06),
+        inset 0 0 28px rgba(91,157,255,.1),
+        0 0 0 1px rgba(255,178,36,.16),
+        0 0 18px rgba(91,157,255,.34),
+        0 0 44px rgba(91,157,255,.22),
+        0 0 76px rgba(47,109,240,.16),
         0 26px 70px rgba(0,0,0,.58),
-        0 0 38px rgba(91,157,255,.14);
+        0 0 38px rgba(91,157,255,.18);
+    }
+    .live-flow-work-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      border-radius: inherit;
+      box-shadow:
+        inset 0 0 0 1px rgba(255,178,36,.08),
+        inset 0 0 22px rgba(91,157,255,.08);
+    }
+    .live-flow-work-card > * {
+      position: relative;
+      z-index: 1;
     }
     .live-flow-work-head {
       display: flex;
@@ -2279,6 +2298,13 @@
 	      font-size: .82rem;
 	      overflow: hidden;
 	    }
+	    .live-flow-row::before,
+	    .live-flow-row::after,
+	    .flow-status::before,
+	    .flow-status::after {
+	      content: none!important;
+	      display: none!important;
+	    }
 	    .live-flow-row + .live-flow-row { margin-top: 6px; }
 	    .live-flow-row.is-selected {
 	      border-color: rgba(255,178,36,.52);
@@ -2338,7 +2364,7 @@
 	    .live-flow-row.tone-active .flow-code::before { content: '→'; color: var(--md-blue-bright); }
 	    .live-flow-row.tone-delivery .flow-code::before,
 	    .live-flow-row.tone-completed .flow-code::before { content: '◆'; color: var(--md-green); }
-	    .live-flow-row.tone-empty .flow-code::before { content: '·'; color: var(--md-muted); }
+	    .live-flow-row.tone-empty .flow-code::before { content: '•'; color: var(--md-muted); }
 	    .live-flow-row.tone-hot .flow-code::before { content: '◆'; color: var(--md-amber); }
 	    .live-flow-row.tone-blocked .flow-code::before,
 	    .live-flow-row.tone-needs_review .flow-code::before { content: '▲'; color: var(--md-red); }

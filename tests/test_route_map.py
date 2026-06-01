@@ -115,6 +115,37 @@ def test_driver_route_map_with_driver_log_returns_stop_nodes(app):
     assert ctx["route"]["current_location"] == "Paint West"
 
 
+def test_driver_route_map_flags_real_exception_states_for_warning_rows(app):
+    from app.extensions import db
+    from app.models import DamageReport
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user()
+    risky = _driver_log(
+        driver,
+        plant_name="RE",
+        downtime_reason="Missing proof, transfer mismatch, rack shortage, delayed audit risk hold",
+    )
+    db.session.add(
+        DamageReport(
+            reported_by_id=driver.id,
+            driver_log_id=risky.id,
+            plant_name="RE",
+            description="Damage found on rack",
+            status="open",
+        )
+    )
+    db.session.commit()
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    assert stop["status"] == "needs_review"
+    assert stop["has_damage"] is True
+    assert stop["has_issue"] is True
+    assert {"Missing proof", "Mismatch", "Shortage", "Delay", "Audit risk", "Hold"}.issubset(set(stop["flags"]))
+
+
 def test_driver_route_map_aggregates_delivery_and_empty_load_narratives(app):
     from app.services.route_map import build_driver_route_map_context
 

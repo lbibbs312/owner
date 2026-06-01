@@ -35,6 +35,17 @@ SAFE_EMPTY = "No current data"
 NOT_TRACKED = "Not tracked yet"
 DOCUMENT_MISSING = "Document not attached"
 DETROIT_TZ = pytz.timezone("America/Detroit")
+RISK_FLAGS = {
+    "Audit risk",
+    "Damage",
+    "Delay",
+    "Hold",
+    "Mismatch",
+    "Missing proof",
+    "Needs review",
+    "Shortage",
+    "Verify route",
+}
 
 
 def _clean(value):
@@ -404,7 +415,9 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
         label = row.get("plant") or _location_label(log.plant_name) or SAFE_EMPTY
         linked_move = linked_by_log.get(log.id)
         cargo = cargo_state_for_log(log, has_open_damage=log.id in damaged_log_ids)
-        has_issue = log.id in issue_stop_ids
+        route = row.get("route") or {}
+        flags = _detail_flags(log, row, route)
+        has_issue = log.id in issue_stop_ids or any(flag in RISK_FLAGS for flag in flags)
         has_damage = log.id in damaged_log_ids
         status = _stop_status(
             row,
@@ -454,6 +467,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             ),
             "has_damage": has_damage,
             "has_issue": has_issue,
+            "flags": flags,
             "notes": row.get("note") or "",
             "next_action": _stop_next_action(log, status=status, cargo=cargo, linked_move=linked_move),
             "view_url": _safe_url("manager.view_driver_log" if role == "manager" else "driver.view_driver_log", log_id=log.id),
@@ -478,6 +492,18 @@ def _detail_flags(log, row, route):
         flags.append("No pickup")
     if "hold" in text or "held" in text or "blocked" in text:
         flags.append("Hold")
+    if "damage" in text or "damaged" in text:
+        flags.append("Damage")
+    if "missing proof" in text or "missing document" in text or "proof missing" in text:
+        flags.append("Missing proof")
+    if "mismatch" in text or "wrong plant" in text or "wrong trailer" in text or "wrong load" in text:
+        flags.append("Mismatch")
+    if "shortage" in text or "short " in f"{text} " or "shorted" in text:
+        flags.append("Shortage")
+    if "delay" in text or "delayed" in text or "late" in text:
+        flags.append("Delay")
+    if "audit risk" in text or "audit-risk" in text or "audit hold" in text:
+        flags.append("Audit risk")
     if "scrap" in text:
         flags.append("Scrap")
     if route.get("unload_blocked") or route.get("secondary_drop_blocked"):
@@ -546,7 +572,6 @@ def _add_narrative_detail(groups, key, group, detail):
     if key not in groups:
         groups[key] = group
     target = groups[key]
-    risk_flags = {"Hold", "Needs review", "Verify route"}
     target["count"] += 1
     target["load_count_label"] = _load_count_label(target["count"])
     target["stop_count_label"] = _stop_count_label(len(target["details"]) + 1)
@@ -557,7 +582,7 @@ def _add_narrative_detail(groups, key, group, detail):
     for flag in detail.get("flags") or []:
         if flag not in target["flags"]:
             target["flags"].append(flag)
-        if flag in risk_flags:
+        if flag in RISK_FLAGS:
             target["tone"] = "blocked"
         elif flag == "Hot" and target.get("tone") != "blocked":
             target["tone"] = "hot"

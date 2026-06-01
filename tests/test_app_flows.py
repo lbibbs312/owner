@@ -5474,10 +5474,86 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "LIVE FLOW BOARD" in body
     assert 'data-flow-open-panel="depart"' in body
     assert "data-depart-wizard" in body
+    assert 'name="next" value="mobile"' in body
     assert "live-flow-work-scrim" in body
     assert "Did you get unloaded?" in body
     assert "Depart / Load" not in body
+    assert "content: '→'" in body
+    assert "content: '•'" in body
+    assert "content: '▲'" in body
+    assert "&diams; ROUTE LOGS" in body
+    assert ".live-flow-work-card::before" in body
+    assert ".flow-status::after" in body
     assert page.data.count(b"PostTrip Due") == 1
+
+
+def test_mobile_quick_depart_returns_to_live_board_without_full_depart_form(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("quick_depart_driver", "quick-depart@example.com", "driver", first_name="Quick", last_name="Depart")
+        quick_log = DriverLog(
+            driver_id=driver.id,
+            date=date.today(),
+            plant_name="RE",
+            load_size="Empty",
+            arrive_time="00:01",
+        )
+        invalid_log = DriverLog(
+            driver_id=driver.id,
+            date=date.today(),
+            plant_name="PW",
+            load_size="Empty",
+            arrive_time="00:02",
+        )
+        db.session.add_all([quick_log, invalid_log])
+        db.session.commit()
+        quick_id = quick_log.id
+        invalid_id = invalid_log.id
+
+    login(client, "quick_depart_driver")
+    response = client.post(
+        f"/driver_logs/{quick_id}/depart",
+        data={
+            "next": "mobile",
+            "source": "live_flow",
+            "unloaded_on_departure": "yes",
+            "secondary_dropped_on_departure": "yes",
+            "got_loaded": "no",
+            "destination": "",
+            "secondary_destination": "",
+            "secondary_load_type": "load",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/mobile")
+    with app.app_context():
+        from app.models import DriverLog
+
+        assert DriverLog.query.get(quick_id).depart_time
+
+    invalid_response = client.post(
+        f"/driver_logs/{invalid_id}/depart",
+        data={
+            "next": "mobile",
+            "source": "live_flow",
+            "unloaded_on_departure": "yes",
+            "destination": "",
+        },
+        follow_redirects=False,
+    )
+
+    assert invalid_response.status_code == 302
+    assert invalid_response.headers["Location"].endswith("/mobile")
+    with app.app_context():
+        from app.models import DriverLog
+
+        assert DriverLog.query.get(invalid_id).depart_time is None
 
 
 def test_new_driver_log_uses_today_when_open_shift_route_date_is_stale(client, app):

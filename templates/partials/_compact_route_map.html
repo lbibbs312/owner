@@ -159,6 +159,8 @@
           {% set depart_code = primary_stop.board_code or 'STP-' ~ primary_stop.sequence %}
           {% set is_service_depart = depart_code in ['FUEL', 'RYDR', 'MTN', 'MTG', 'SRVC'] %}
           <form class="depart-wizard" method="POST" action="{{ depart_url }}" data-depart-wizard>
+            <input type="hidden" name="next" value="mobile">
+            <input type="hidden" name="source" value="live_flow">
             <input type="hidden" name="unloaded_on_departure" data-depart-field="unloaded_on_departure" value="{{ 'yes' if is_service_depart else '' }}">
             <input type="hidden" name="unload_reason" data-depart-field="unload_reason" value="">
             <input type="hidden" name="secondary_dropped_on_departure" data-depart-field="secondary_dropped_on_departure" value="{{ 'yes' if is_service_depart else '' }}">
