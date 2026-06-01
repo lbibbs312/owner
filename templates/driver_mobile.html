@@ -89,7 +89,11 @@
       padding: 8px 10px;
       text-align: right;
       flex: 0 0 auto;
+      color: var(--text);
     }
+    .shift-pill-form { margin: 0; flex: 0 0 auto; }
+    button.shift-pill { cursor: pointer; min-height: 48px; }
+    button.shift-pill:hover { border-color: rgba(243,199,207,.38); background: rgba(127, 29, 45, 0.28); }
     .shift-pill span { display: block; color: var(--muted); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 800; }
     .shift-pill strong { display: block; margin-top: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.95rem; }
 
@@ -1262,10 +1266,19 @@
         </div>
         <div class="header-actions">
           <a class="logout-link" href="{{ url_for('auth.logout') }}">Logout</a>
-          <div class="shift-pill">
-            <span>{% if open_shift %}Shift Time{% else %}Shift{% endif %}</span>
-            <strong>{{ shift_elapsed if shift_elapsed else '--:--' }}</strong>
-          </div>
+          {% if open_shift %}
+            <form class="shift-pill-form" action="{{ url_for('driver.end_shift', next='mobile') }}" method="POST">
+              <button class="shift-pill" type="submit" aria-label="End shift">
+                <span>End Shift</span>
+                <strong>{{ shift_elapsed if shift_elapsed else '--:--' }}</strong>
+              </button>
+            </form>
+          {% else %}
+            <div class="shift-pill">
+              <span>Shift</span>
+              <strong>--:--</strong>
+            </div>
+          {% endif %}
         </div>
       </div>
       {% include "_driver_active_wait_banner.html" %}
@@ -1487,12 +1500,7 @@
             <div><strong>Plant Transfer</strong><span>{{ latest_transfer.ship_from ~ ' to ' ~ latest_transfer.ship_to if latest_transfer else 'Create a transfer sheet' }}</span></div>
           </a>
         {% endif %}
-        {% if pending_posttrip and active_pretrip %}
-          <a class="quick-card" href="{{ url_for('driver.do_posttrip', pretrip_id=active_pretrip.id) }}">
-            <div class="quick-icon green">IN</div>
-            <div><strong>PostTrip Due</strong><span>Finish inspection and end shift</span></div>
-          </a>
-        {% else %}
+        {% if not pending_posttrip %}
           <a class="quick-card" href="{{ url_for('driver.new_pretrip') }}">
             <div class="quick-icon green">IN</div>
             <div><strong>PreTrip / Shift</strong><span>{{ 'Shift started from PreTrip' if active_pretrip else 'Start shift with PreTrip' }}</span></div>

@@ -2372,6 +2372,92 @@ def test_pretrip_create_and_print_route(client, app):
     assert b"PreTrip printed" in activity.data
 
 
+def test_posttrip_ends_unlinked_manual_shift_timer(client, app):
+    from datetime import date, datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import PreTrip, ShiftRecord
+
+        driver = create_user("driver1", "driver1@example.com", "driver", first_name="Driver", last_name="One")
+        pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="BT-1",
+            pretrip_date=date.today(),
+            start_mileage=1000,
+        )
+        db.session.add(pretrip)
+        db.session.flush()
+        shift = ShiftRecord(
+            user_id=driver.id,
+            pretrip_id=None,
+            start_time=datetime.utcnow() - timedelta(hours=81),
+        )
+        db.session.add(shift)
+        db.session.commit()
+        pretrip_id = pretrip.id
+        shift_id = shift.id
+        driver_id = driver.id
+
+    login(client, "driver1")
+    response = client.post(
+        f"/do_posttrip/{pretrip_id}",
+        data={"end_mileage": "1042", "remarks": "done"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        from app.models import ShiftRecord
+
+        saved_shift = ShiftRecord.query.get(shift_id)
+        assert saved_shift.end_time is not None
+        assert saved_shift.total_hours >= 80
+        assert ShiftRecord.query.filter_by(user_id=driver_id, end_time=None).count() == 0
+
+
+def test_posttrip_submit_reuses_existing_posttrip(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import PreTrip
+
+        driver = create_user("driver1", "driver1@example.com", "driver", first_name="Driver", last_name="One")
+        pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="BT-1",
+            pretrip_date=date.today(),
+            start_mileage=1000,
+        )
+        db.session.add(pretrip)
+        db.session.commit()
+        pretrip_id = pretrip.id
+
+    login(client, "driver1")
+    first = client.post(
+        f"/do_posttrip/{pretrip_id}",
+        data={"end_mileage": "1042", "remarks": "first submit"},
+        follow_redirects=False,
+    )
+    second = client.post(
+        f"/do_posttrip/{pretrip_id}",
+        data={"end_mileage": "1060", "remarks": "second submit"},
+        follow_redirects=False,
+    )
+
+    assert first.status_code == 302
+    assert second.status_code == 302
+    with app.app_context():
+        from app.models import PostTrip
+
+        saved = PostTrip.query.filter_by(pretrip_id=pretrip_id).all()
+        assert len(saved) == 1
+        assert saved[0].end_mileage == 1060
+        assert saved[0].miles_driven == 60
+        assert saved[0].remarks == "second submit"
+
+
 def test_driver_log_form_ignores_unchecked_hot_part_and_truck_issue_fields(client, app):
     with app.app_context():
         create_user("driver1", "driver1@example.com", "driver")
@@ -4550,6 +4636,58 @@ def test_end_of_day_recovers_signature_from_autosave_draft(client, app):
         assert saved_shift.signature_timestamp is not None
 
 
+def test_end_of_day_signature_submit_ends_open_shift_timer(client, app):
+    from datetime import date, datetime, timedelta
+
+    signature = "data:image/png;base64,endshift"
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("shift_sign_driver", "shift-sign@example.com", "driver")
+        route_date = date.today()
+        pretrip = PreTrip(user_id=driver.id, truck_number="BT-1", pretrip_date=route_date, start_mileage=1000)
+        db.session.add(pretrip)
+        db.session.flush()
+        shift = ShiftRecord(
+            user_id=driver.id,
+            pretrip_id=pretrip.id,
+            start_time=datetime.utcnow() - timedelta(hours=9),
+        )
+        db.session.add_all([
+            shift,
+            DriverLog(
+                driver_id=driver.id,
+                date=route_date,
+                plant_name="RE",
+                load_size="Empty",
+                depart_load_size="Empty",
+                depart_time="17:15",
+                arrive_time=f"{route_date.isoformat()} 17:00:00",
+            ),
+        ])
+        db.session.commit()
+        driver_id = driver.id
+        shift_id = shift.id
+
+    login(client, "shift_sign_driver")
+    response = client.post(
+        "/end_of_day_summary",
+        data={"driver_signature": signature},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        from app.models import ShiftRecord
+
+        saved_shift = ShiftRecord.query.get(shift_id)
+        assert saved_shift.driver_signature == signature
+        assert saved_shift.end_time is not None
+        assert saved_shift.total_hours >= 8
+        assert ShiftRecord.query.filter_by(user_id=driver_id, end_time=None).count() == 0
+
+
 def test_pretrip_printout_highlights_defects_and_written_remarks(client, app):
     from datetime import date
 
@@ -4926,6 +5064,7 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert page.data.count(b"RW to KP hot move") == 1
     assert b"Part P0903110 needs trailer assignment." in page.data
     assert b"PostTrip Due" in page.data
+    assert page.data.count(b"PostTrip Due") == 1
     assert b"Logout" in page.data
     assert b"Parts Queue" not in page.data
     assert b"RW to KP" in page.data
@@ -5332,6 +5471,91 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert b"Kraft" in page.data
     assert b"PostTrip Due" in page.data
     assert body.index("PostTrip Due") < body.index("Live Flow Map")
+    assert page.data.count(b"PostTrip Due") == 1
+
+
+def test_new_driver_log_redirect_preserves_open_shift_route_date(client, app):
+    from datetime import date, datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("route_date_log_driver", "route-date-log@example.com", "driver", first_name="Route", last_name="Date")
+        route_date = date.today() - timedelta(days=1)
+        pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="ST2",
+            pretrip_date=route_date,
+            start_mileage=379164,
+        )
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add(
+            ShiftRecord(
+                user_id=driver.id,
+                pretrip_id=pretrip.id,
+                start_time=datetime.utcnow() - timedelta(hours=20),
+            )
+        )
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "route_date_log_driver")
+    response = client.post(
+        "/new_driving_log",
+        data={"plant_name": "KP", "load_size": "Empty"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"/driver_logs?date={route_date.isoformat()}")
+    with app.app_context():
+        saved = DriverLog.query.filter_by(driver_id=driver_id, date=route_date, plant_name="KP").one()
+        assert saved.load_size == "Empty"
+
+    route_page = client.get(f"/driver_logs?date={route_date.isoformat()}")
+    assert route_page.status_code == 200
+    assert b"Kraft" in route_page.data
+
+
+def test_mobile_shift_time_button_ends_shift_and_returns_mobile(client, app):
+    from datetime import datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ShiftRecord
+
+        driver = create_user("driver1", "driver1@example.com", "driver", first_name="Driver", last_name="One")
+        shift = ShiftRecord(
+            user_id=driver.id,
+            pretrip_id=None,
+            start_time=datetime.utcnow() - timedelta(hours=2, minutes=15),
+        )
+        db.session.add(shift)
+        db.session.commit()
+        driver_id = driver.id
+        shift_id = shift.id
+
+    login(client, "driver1")
+    page = client.get("/mobile")
+
+    assert page.status_code == 200
+    assert b"End Shift" in page.data
+    assert b"/end_shift?next=mobile" in page.data
+
+    response = client.post("/end_shift?next=mobile", follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/mobile")
+    with app.app_context():
+        from app.models import ActivityEvent, ShiftRecord
+
+        saved_shift = ShiftRecord.query.get(shift_id)
+        assert saved_shift.end_time is not None
+        assert saved_shift.total_hours >= 2
+        assert ShiftRecord.query.filter_by(user_id=driver_id, end_time=None).count() == 0
+        assert ActivityEvent.query.filter_by(user_id=driver_id, category="shift", action="ended").count() == 1
 
 
 def test_mobile_dashboard_shows_truck_maintenance_history_from_previous_posttrips(client, app):
