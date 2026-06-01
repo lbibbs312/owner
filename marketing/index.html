@@ -11,6 +11,20 @@
 <meta name="robots" content="index, follow" />
 <link rel="canonical" href="https://movedefense.com/" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<meta name="google-site-verification" content="TODO_GOOGLE_SEARCH_CONSOLE_TOKEN" />
+
+<!-- Public marketing analytics only. Private app/dashboard routes do not load this file. -->
+<script>
+  window.MoveDefenseMarketingConfig = {
+    analyticsProvider: "none", // "ga4", "plausible", "umami", or "none"
+    ga4MeasurementId: "",
+    plausibleDomain: "movedefense.com",
+    plausibleSrc: "https://plausible.io/js/script.js",
+    umamiWebsiteId: "",
+    umamiSrc: "https://cloud.umami.is/script.js",
+    attributionTtlDays: 90
+  };
+</script>
 
 <!-- Open Graph / social preview -->
 <meta property="og:type" content="website" />
@@ -283,6 +297,50 @@
   .cta-inner p{color:var(--muted);font-size:1.08rem;margin-bottom:30px}
   .cta-inner .hero-cta{justify-content:center}
 
+  /* lead forms + consent */
+  .lead-form,.contact-form{max-width:860px;margin:34px auto 0;text-align:left;position:relative;z-index:1}
+  .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  .form-field{display:block}
+  .form-field.wide{grid-column:1/-1}
+  .form-field span{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+  .form-field input,.form-field textarea,.form-field select{
+    width:100%;min-height:46px;border:1px solid var(--line);border-radius:8px;
+    background:#07101c;color:var(--text);font:500 .95rem/1.4 var(--body);
+    padding:12px 13px;outline:none;transition:border-color .18s,box-shadow .18s;
+  }
+  .form-field textarea{min-height:104px;resize:vertical}
+  .form-field input:focus,.form-field textarea:focus,.form-field select:focus{
+    border-color:var(--blue-bright);box-shadow:0 0 0 3px rgba(91,157,255,.14)}
+  .form-actions{display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:18px}
+  .form-note{max-width:760px;margin:16px auto 0!important;color:var(--muted-2)!important;
+    font-family:var(--mono);font-size:.76rem!important;text-align:center}
+  .form-status{min-height:22px;margin-top:14px!important;text-align:center!important;
+    color:var(--green)!important;font-family:var(--mono);font-size:.78rem!important}
+  .contact-block{margin:46px auto 0;max-width:860px;border-top:1px solid var(--line-soft);padding-top:34px}
+  .contact-block h3{font-family:var(--display);font-weight:800;text-transform:uppercase;
+    letter-spacing:-.01em;font-size:1.35rem;text-align:center;margin-bottom:8px}
+  .contact-block > p{text-align:center!important;margin-bottom:18px!important}
+  .attr-hidden{display:none!important}
+
+  .consent-banner{position:fixed;left:18px;right:18px;bottom:18px;z-index:100;
+    display:none;justify-content:center;pointer-events:none}
+  .consent-banner.show{display:flex}
+  .consent-panel{width:min(920px,100%);border:1px solid var(--line);border-radius:12px;
+    background:rgba(7,11,18,.96);box-shadow:0 28px 80px rgba(0,0,0,.55);
+    padding:18px;pointer-events:auto}
+  .consent-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+  .consent-top h2{font-family:var(--display);font-size:1.1rem;text-transform:uppercase;letter-spacing:0;margin-bottom:6px}
+  .consent-top p{color:var(--muted);font-size:.9rem;max-width:66ch}
+  .consent-options{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}
+  .consent-option{border:1px solid var(--line-soft);border-radius:8px;padding:10px 12px;
+    display:flex;align-items:center;gap:9px;color:var(--muted);font-size:.88rem}
+  .consent-option input{accent-color:var(--blue)}
+  .consent-option input:disabled{accent-color:var(--muted-2)}
+  .consent-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px}
+  .consent-link{color:var(--blue-bright);text-decoration:none}
+  .consent-link:hover{text-decoration:underline}
+
   /* footer */
   footer{border-top:1px solid var(--line-soft);padding:48px 0 56px;margin-top:90px;position:relative;z-index:1}
   .foot{display:flex;justify-content:space-between;align-items:flex-start;gap:30px;flex-wrap:wrap}
@@ -420,6 +478,11 @@
     .feat{font-size:.86rem}
     .login-link{display:none}
     .wrap{padding:0 18px}
+    .form-grid{grid-template-columns:1fr}
+    .cta-inner{padding:44px 18px}
+    .consent-banner{left:10px;right:10px;bottom:10px}
+    .consent-top{display:block}
+    .consent-actions{justify-content:flex-start}
   }
   @media(prefers-reduced-motion:reduce){
     *{animation:none!important;transition:none!important}
@@ -459,7 +522,7 @@
     </nav>
     <div class="nav-cta">
       <span class="login-link disabled" aria-disabled="true">Operator login · pilot only</span>
-      <a href="#demo" class="btn btn-primary">Request a demo</a>
+      <a href="#demo" class="btn btn-primary" data-track-cta="header_request_demo">Request a demo</a>
     </div>
   </div>
 </header>
@@ -474,8 +537,8 @@
       <p class="lede reveal-up" style="animation-delay:.12s;margin-bottom:14px">MoveDefense helps in-house manufacturing fleets <strong>capture</strong> shuttles, racks, lots, inspections, damage, and exceptions <strong>before they disappear</strong> into texts and clipboards.</p>
       <p class="reveal-up" style="animation-delay:.16s;margin-bottom:34px;font-family:var(--mono);font-size:.82rem;letter-spacing:.04em;color:var(--muted-2)">Built for the dock, the yard, the driver, and the line.</p>
       <div class="hero-cta reveal-up" style="animation-delay:.2s">
-        <a href="#demo" class="btn btn-primary btn-lg">Request a 15-min demo</a>
-        <a href="#how" class="btn btn-ghost btn-lg">See how it works</a>
+        <a href="#demo" class="btn btn-primary btn-lg" data-track-cta="hero_request_demo">Request a 15-min demo</a>
+        <a href="#how" class="btn btn-ghost btn-lg" data-track-cta="hero_see_how">See how it works</a>
       </div>
       <div class="hero-meta reveal-up" style="animation-delay:.28s">
         <span><i class="dot"></i> Audit-ready DVIRs</span>
@@ -733,9 +796,92 @@
     <div class="cta-inner obs">
       <h2>See your plant floor<br>as one live board.</h2>
       <p>15-minute demo. We'll show how a mismatch alert fires from a real plant-floor scenario.</p>
-      <div class="hero-cta">
-        <a href="mailto:bibbstechnology@gmail.com?subject=MoveDefense%20pilot%20request" class="btn btn-primary btn-lg">Start a pilot</a>
-        <span class="btn btn-disabled btn-lg" aria-disabled="true">Operator login coming soon</span>
+      <form id="pilot-form" class="lead-form" action="mailto:bibbstechnology@gmail.com" method="post" enctype="text/plain" data-md-form="pilot" data-md-mailto="bibbstechnology@gmail.com" data-md-subject="MoveDefense pilot request">
+        <div class="form-grid">
+          <label class="form-field">
+            <span>Name</span>
+            <input type="text" name="name" autocomplete="name" required>
+          </label>
+          <label class="form-field">
+            <span>Work email</span>
+            <input type="email" name="email" autocomplete="email" required>
+          </label>
+          <label class="form-field">
+            <span>Company</span>
+            <input type="text" name="company" autocomplete="organization">
+          </label>
+          <label class="form-field">
+            <span>Role</span>
+            <input type="text" name="role" autocomplete="organization-title">
+          </label>
+          <label class="form-field wide">
+            <span>What should the pilot prove?</span>
+            <textarea name="pilot_goal" rows="3" placeholder="Hot moves, route sheets, damage follow-up, audit proof, missed scans..."></textarea>
+          </label>
+        </div>
+        <div class="attr-hidden" data-attribution-fields>
+          <input type="hidden" name="first_source">
+          <input type="hidden" name="first_medium">
+          <input type="hidden" name="first_referrer">
+          <input type="hidden" name="first_landing_page">
+          <input type="hidden" name="first_utm_source">
+          <input type="hidden" name="first_utm_medium">
+          <input type="hidden" name="first_utm_campaign">
+          <input type="hidden" name="last_source">
+          <input type="hidden" name="last_medium">
+          <input type="hidden" name="last_referrer">
+          <input type="hidden" name="last_landing_page">
+          <input type="hidden" name="last_utm_source">
+          <input type="hidden" name="last_utm_medium">
+          <input type="hidden" name="last_utm_campaign">
+        </div>
+        <p class="form-note">Use this for pilot/contact details only. Customer fleet data, driver logs, routes, uploads, and internal records stay inside the private MoveDefense app.</p>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary btn-lg" data-track-cta="pilot_form_submit_button">Request pilot</button>
+          <span class="btn btn-disabled btn-lg" aria-disabled="true">Operator login coming soon</span>
+        </div>
+        <p class="form-status" data-form-status aria-live="polite"></p>
+      </form>
+
+      <div class="contact-block" id="contact">
+        <h3>Have a question first?</h3>
+        <p>Send a short note. Attribution fields are attached only to this public marketing message.</p>
+        <form id="contact-form" class="contact-form" action="mailto:bibbstechnology@gmail.com" method="post" enctype="text/plain" data-md-form="contact" data-md-mailto="bibbstechnology@gmail.com" data-md-subject="MoveDefense contact request">
+          <div class="form-grid">
+            <label class="form-field">
+              <span>Name</span>
+              <input type="text" name="name" autocomplete="name" required>
+            </label>
+            <label class="form-field">
+              <span>Email</span>
+              <input type="email" name="email" autocomplete="email" required>
+            </label>
+            <label class="form-field wide">
+              <span>Message</span>
+              <textarea name="message" rows="3" placeholder="What do you want to know?"></textarea>
+            </label>
+          </div>
+          <div class="attr-hidden" data-attribution-fields>
+            <input type="hidden" name="first_source">
+            <input type="hidden" name="first_medium">
+            <input type="hidden" name="first_referrer">
+            <input type="hidden" name="first_landing_page">
+            <input type="hidden" name="first_utm_source">
+            <input type="hidden" name="first_utm_medium">
+            <input type="hidden" name="first_utm_campaign">
+            <input type="hidden" name="last_source">
+            <input type="hidden" name="last_medium">
+            <input type="hidden" name="last_referrer">
+            <input type="hidden" name="last_landing_page">
+            <input type="hidden" name="last_utm_source">
+            <input type="hidden" name="last_utm_medium">
+            <input type="hidden" name="last_utm_campaign">
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-ghost btn-lg" data-track-cta="contact_form_submit_button">Contact MoveDefense</button>
+          </div>
+          <p class="form-status" data-form-status aria-live="polite"></p>
+        </form>
       </div>
     </div>
   </section>
@@ -756,7 +902,8 @@
           <a href="#features">Features</a>
           <a href="#compare">Why MoveDefense</a>
           <a href="#how">How it works</a>
-          <a href="#demo">Request a demo</a>
+          <a href="#demo" data-track-cta="footer_request_demo">Request a demo</a>
+          <a href="privacy.html">Privacy</a>
         </div>
         <div class="foot-col">
           <h5>For</h5>
@@ -767,16 +914,39 @@
         <div class="foot-col">
           <h5>Access</h5>
           <span>Operator access after onboarding</span>
-          <a href="mailto:bibbstechnology@gmail.com">Contact</a>
+          <a href="#contact" data-track-cta="footer_contact">Contact</a>
         </div>
       </div>
     </div>
     <div class="copyright">
       <span>&copy; 2026 MoveDefense. Built for the plant floor.</span>
-      <span>INTERSITE LOGISTICS · DISPATCH · COMPLIANCE</span>
+      <span><a class="consent-link" href="privacy.html">Privacy policy</a> · INTERSITE LOGISTICS · DISPATCH · COMPLIANCE</span>
     </div>
   </div>
 </footer>
+
+<!-- ================= PRIVACY CONSENT ================= -->
+<div class="consent-banner" id="cookie-consent" role="dialog" aria-live="polite" aria-label="Cookie and analytics choices">
+  <div class="consent-panel">
+    <div class="consent-top">
+      <div>
+        <h2>Privacy choices</h2>
+        <p>MoveDefense uses necessary first-party storage for consent and form attribution. Analytics tools load only if you allow analytics. Marketing cookies and ad pixels stay off unless you grant marketing consent.</p>
+      </div>
+      <a class="consent-link" href="privacy.html">Privacy policy</a>
+    </div>
+    <div class="consent-options">
+      <label class="consent-option"><input type="checkbox" checked disabled> Necessary</label>
+      <label class="consent-option"><input type="checkbox" id="consent-analytics"> Analytics</label>
+      <label class="consent-option"><input type="checkbox" id="consent-marketing"> Marketing</label>
+    </div>
+    <div class="consent-actions">
+      <button type="button" class="btn btn-ghost" data-consent-decline>Decline optional</button>
+      <button type="button" class="btn btn-ghost" data-consent-save>Save choices</button>
+      <button type="button" class="btn btn-primary" data-consent-analytics>Accept analytics</button>
+    </div>
+  </div>
+</div>
 
 <script>
   // live clock on the dispatch board
@@ -861,5 +1031,6 @@
     document.querySelectorAll('.roi .num[data-count]').forEach(function(n){io.observe(n);});
   })();
 </script>
+<script src="js/marketing-privacy.js" defer></script>
 </body>
 </html>

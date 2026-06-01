@@ -4,12 +4,15 @@ The page is a single static file: `marketing/index.html`. No build step. Pick on
 
 ---
 
-## ⚠️ Swap these placeholders FIRST (in `index.html`)
-- `bibbstechnology@gmail.com` → your real demo/contact email (appears in the demo CTA + footer)
-- `/login` → the real URL of the Flask app login (e.g. `https://app.movedefense.com/login`)
-- `https://movedefense.com/` → your real domain (in `<link rel="canonical">`, OG tags)
-- `https://movedefense.com/og-image.png` → add a real 1200×630 social preview image
+## Swap these placeholders first
+- `TODO_GOOGLE_SEARCH_CONSOLE_TOKEN` -> your Google Search Console verification token in `index.html` and `privacy.html`.
+- `window.MoveDefenseMarketingConfig.analyticsProvider` -> set to `ga4`, `plausible`, `umami`, or keep `none`.
+- `ga4MeasurementId`, `plausibleDomain`, or `umamiWebsiteId` -> fill only for the provider you use.
+- `https://movedefense.com/` -> your real domain in canonical, OG, `robots.txt`, and `sitemap.xml`.
+- `https://movedefense.com/og-image.png` -> add a real 1200x630 social preview image
   named `og-image.png` in the `marketing/` folder (or update the path)
+
+The public marketing site now has first-party attribution, consent categories, and pilot/contact forms. Do not copy `marketing/js/marketing-privacy.js` into the authenticated app templates.
 
 ---
 
@@ -45,10 +48,11 @@ Keeps marketing + app under one Render account.
 ## Domain split (SEO-correct)
 - **Root domain** `movedefense.com` → the **marketing page** (this file).
 - **Subdomain** `app.movedefense.com` → the **Flask app** (login/operator portal).
-- Point the "Operator login" link + the app's external links accordingly.
+- Keep app dashboards, driver logs, demo data, API routes, internal logs, and customer data out of the marketing analytics scope.
 
 ## Right after it's live
-1. Add `og-image.png` (1200×630) so social shares render.
-2. Verify the domain in **Google Search Console**, submit the URL.
-3. Tell me the live URL → I run `/seo page <url>` + `/seo schema <url>` to score it.
-4. Add a `sitemap.xml` + `robots.txt` (I can generate via `/seo sitemap`).
+1. Add `og-image.png` (1200x630) so social shares render.
+2. Verify the domain in **Google Search Console**, then submit `https://movedefense.com/sitemap.xml`.
+3. Choose one analytics provider. Analytics scripts load only after analytics consent.
+4. Leave marketing consent off by default. Do not add ad pixels or remarketing tags unless the consent gate is updated intentionally.
+5. Tell me the live URL -> I run `/seo page <url>` + `/seo schema <url>` to score it.
