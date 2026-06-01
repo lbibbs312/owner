@@ -17,6 +17,7 @@
     plausibleSrc: "https://plausible.io/js/script.js",
     umamiWebsiteId: "",
     umamiSrc: "https://cloud.umami.is/script.js",
+    analyticsDefault: true,
     attributionTtlDays: 90
   };
 </script>
@@ -90,15 +91,15 @@
     <p>On public marketing and help pages, MoveDefense may record basic attribution so we can understand which pages and campaigns lead to demo, pilot, or contact requests.</p>
     <ul>
       <li>First-touch and last-touch source, medium, referrer, landing page, and UTM campaign fields.</li>
-      <li>Public page views and button clicks, if analytics consent is granted.</li>
-      <li>Pilot and contact form events, if analytics consent is granted.</li>
+      <li>Public page views and button clicks, unless analytics is turned off in Cookie preferences.</li>
+      <li>Pilot and contact form events, unless analytics is turned off in Cookie preferences.</li>
     </ul>
   </section>
 
   <section>
     <h2>Consent Categories</h2>
     <p><strong>Necessary:</strong> keeps your consent choice and public form attribution working. This category is always on.</p>
-    <p><strong>Analytics:</strong> allows GA4, Plausible, or Umami analytics to load on public marketing pages only. Analytics is optional.</p>
+    <p><strong>Analytics:</strong> allows GA4, Plausible, or Umami analytics to load on public marketing pages only. Analytics is on by default and can be turned off in Cookie preferences.</p>
     <p><strong>Marketing:</strong> would allow advertising or remarketing tags. Marketing is off by default, and no ad pixels are currently configured on this site.</p>
   </section>
 
@@ -132,16 +133,16 @@
     <div class="consent-top">
       <div>
         <h2>Privacy choices</h2>
-        <p>Necessary storage keeps consent and public form attribution working. Analytics and marketing are optional. <a class="consent-link" href="privacy.html">Privacy policy</a></p>
+        <p>Necessary storage keeps consent and public form attribution working. Analytics is on by default and can be turned off here. Marketing stays off unless you enable it. <a class="consent-link" href="privacy.html">Privacy policy</a></p>
       </div>
     </div>
     <div class="consent-options">
       <label class="consent-option"><input type="checkbox" checked disabled> Necessary</label>
-      <label class="consent-option"><input type="checkbox" id="consent-analytics"> Analytics</label>
+      <label class="consent-option"><input type="checkbox" id="consent-analytics" checked> Analytics</label>
       <label class="consent-option"><input type="checkbox" id="consent-marketing"> Marketing</label>
     </div>
     <div class="consent-actions">
-      <button type="button" class="btn" data-consent-decline>Decline optional</button>
+      <button type="button" class="btn" data-consent-decline>Opt out of analytics</button>
       <button type="button" class="btn" data-consent-save>Save &amp; close</button>
     </div>
   </div>

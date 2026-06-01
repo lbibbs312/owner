@@ -53,6 +53,6 @@ Keeps marketing + app under one Render account.
 ## Right after it's live
 1. Add `og-image.png` (1200x630) so social shares render.
 2. Verify the domain in **Google Search Console**, then submit `https://movedefense.com/sitemap.xml`.
-3. Choose one analytics provider. Analytics scripts load only after analytics consent.
+3. Choose one analytics provider. Analytics runs by default unless a visitor turns it off in Cookie preferences.
 4. Leave marketing consent off by default. Do not add ad pixels or remarketing tags unless the consent gate is updated intentionally.
 5. Tell me the live URL -> I run `/seo page <url>` + `/seo schema <url>` to score it.

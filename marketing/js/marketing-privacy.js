@@ -303,11 +303,21 @@
 
   function analyticsAllowed() {
     var consent = readConsent();
-    return !consent || consent.analytics === true;
+    return consent ? consent.analytics === true : config.analyticsDefault !== false;
   }
 
   function provider() {
     return String(config.analyticsProvider || "none").toLowerCase();
+  }
+
+  function updateGoogleConsent(analyticsGranted) {
+    if (provider() !== "ga4" || typeof window.gtag !== "function") return;
+    window.gtag("consent", "update", {
+      ad_storage: "denied",
+      ad_user_data: "denied",
+      ad_personalization: "denied",
+      analytics_storage: analyticsGranted ? "granted" : "denied"
+    });
   }
 
   function injectScript(src, attrs) {
@@ -461,11 +471,12 @@
     var consent = readConsent();
     var analytics = document.getElementById("consent-analytics");
     var marketing = document.getElementById("consent-marketing");
-    if (analytics && consent) analytics.checked = consent.analytics;
-    if (marketing && consent) marketing.checked = consent.marketing;
+    if (analytics) analytics.checked = consent ? consent.analytics : config.analyticsDefault !== false;
+    if (marketing) marketing.checked = consent ? consent.marketing : false;
 
     function persist(values) {
       saveConsent(values);
+      updateGoogleConsent(values.analytics === true);
       banner.classList.remove("show");
       loadAnalytics();
       trackEvent("page_view", pageProps());

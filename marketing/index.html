@@ -22,6 +22,7 @@
     plausibleSrc: "https://plausible.io/js/script.js",
     umamiWebsiteId: "",
     umamiSrc: "https://cloud.umami.is/script.js",
+    analyticsDefault: true,
     attributionTtlDays: 90
   };
 </script>
@@ -952,16 +953,16 @@
     <div class="consent-top">
       <div>
         <h2>Privacy choices</h2>
-        <p>MoveDefense uses necessary first-party storage for consent and public form attribution. Analytics and marketing are optional. <a class="consent-link" href="privacy.html">Privacy policy</a></p>
+        <p>MoveDefense uses first-party storage for consent and public form attribution. Analytics is on by default and can be turned off here. Marketing stays off unless you enable it. <a class="consent-link" href="privacy.html">Privacy policy</a></p>
       </div>
     </div>
     <div class="consent-options">
       <label class="consent-option"><input type="checkbox" checked disabled> Necessary</label>
-      <label class="consent-option"><input type="checkbox" id="consent-analytics"> Analytics</label>
+      <label class="consent-option"><input type="checkbox" id="consent-analytics" checked> Analytics</label>
       <label class="consent-option"><input type="checkbox" id="consent-marketing"> Marketing</label>
     </div>
     <div class="consent-actions">
-      <button type="button" class="btn btn-ghost" data-consent-decline>Decline optional</button>
+      <button type="button" class="btn btn-ghost" data-consent-decline>Opt out of analytics</button>
       <button type="button" class="btn btn-ghost" data-consent-save>Save &amp; close</button>
     </div>
   </div>
