@@ -303,7 +303,7 @@
 
   function analyticsAllowed() {
     var consent = readConsent();
-    return consent && consent.analytics === true;
+    return !consent || consent.analytics === true;
   }
 
   function provider() {
