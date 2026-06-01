@@ -433,6 +433,26 @@ def _shift_route_date(shift):
     return start_time.astimezone(pytz.timezone("America/Detroit")).date()
 
 
+def _shift_elapsed_hours(shift, now_utc=None):
+    if not shift or not shift.start_time:
+        return 0
+    now_utc = now_utc or datetime.utcnow()
+    start_time = shift.start_time
+    if start_time.tzinfo is not None:
+        start_time = start_time.astimezone(pytz.utc).replace(tzinfo=None)
+    return max(0, (now_utc - start_time).total_seconds() / 3600.0)
+
+
+def _is_stale_open_shift(shift, today_local_date=None, *, stale_after_hours=18):
+    if not shift:
+        return False
+    today_local_date = today_local_date or _today_local_date()
+    shift_date = _shift_route_date(shift)
+    if not shift_date or shift_date >= today_local_date:
+        return False
+    return _shift_elapsed_hours(shift) >= stale_after_hours
+
+
 def _driver_logs_url_for_date(route_date):
     if route_date:
         return url_for("driver.driver_logs", date=route_date.isoformat())
@@ -454,7 +474,7 @@ def _active_route_date_for_driver(driver_id, today_local_date=None, open_shift=N
     today_local_date = today_local_date or _today_local_date()
     open_shift = open_shift if open_shift is not None else _open_shift_for_driver(driver_id)
     shift_date = _shift_route_date(open_shift)
-    if shift_date:
+    if shift_date and not _is_stale_open_shift(open_shift, today_local_date):
         return shift_date
     open_pretrip = _latest_open_pretrip(driver_id)
     if open_pretrip and open_pretrip.pretrip_date:
@@ -814,6 +834,33 @@ def _arrival_local_dt_for_log(log):
         if normalized is None:
             return None
         return _local_dt_for_hhmm(log.date, normalized)
+
+
+def _repair_today_driver_log_dates(driver_id, today_local_date):
+    """Recover live stop entries saved under a stale route date.
+
+    This only moves rows whose stored UTC arrival timestamp resolves to today's
+    Detroit date, so retroactive add-stop entries with old arrival dates stay put.
+    """
+    if not driver_id or not today_local_date:
+        return 0
+    candidates = (
+        _active_driver_logs_query()
+        .filter(DriverLog.driver_id == driver_id, DriverLog.date != today_local_date)
+        .order_by(DriverLog.created_at.desc(), DriverLog.id.desc())
+        .limit(50)
+        .all()
+    )
+    changed = 0
+    for log in candidates:
+        arrival_dt = _arrival_local_dt_for_log(log)
+        if not arrival_dt or arrival_dt.date() != today_local_date:
+            continue
+        log.date = today_local_date
+        changed += 1
+    if changed:
+        db.session.commit()
+    return changed
 
 
 def _depart_local_dt_for_log(log):
@@ -2682,6 +2729,8 @@ def mark_plant_transfer_printed(transfer_id):
 @login_required
 def driver_logs():
     search_date = _selected_log_date_from_request()
+    if current_user.role == "driver" and search_date == _today_local_date():
+        _repair_today_driver_log_dates(current_user.id, search_date)
 
     if current_user.role == "management":
         all_drivers = User.query.filter_by(role="driver").all()
@@ -4091,6 +4140,8 @@ def mobile_dashboard():
     open_shift = _open_shift_for_driver(current_user.id)
     requested_route_date = _requested_mobile_route_date()
     route_date = requested_route_date or _dashboard_route_date_for_driver(current_user.id, today_local_date, open_shift=open_shift)
+    if route_date == today_local_date:
+        _repair_today_driver_log_dates(current_user.id, today_local_date)
     shift_elapsed = None
     if open_shift:
         shift_elapsed = _format_duration((datetime.utcnow() - open_shift.start_time).total_seconds())
@@ -4176,6 +4227,12 @@ def mobile_dashboard():
     current_truck_number = _normalize_truck_number(
         truck_source_pretrip.truck_number if truck_source_pretrip else ""
     )
+    if current_truck_number:
+        recent_ryder_events = [
+            event
+            for event in recent_ryder_events
+            if _same_truck_number(_detail_value(event.details, "Truck"), current_truck_number)
+        ][:3]
     truck_maintenance_history = _truck_maintenance_history(
         current_truck_number,
         current_pretrip_id=active_pretrip.id if active_pretrip else None,
@@ -4202,11 +4259,7 @@ def mobile_dashboard():
         date=route_date,
         selected_stop_id=current_stop.id if current_stop else None,
     )
-    production_flow = build_production_flow_context(
-        date=route_date,
-        selected_stop_id=current_stop.id if current_stop else None,
-        mode="mobile",
-    )
+    production_flow = None
     proof_missing = bool(departed_today and not has_transfer_today)
     route_cta = build_route_cta_context(
         route_context,
@@ -4232,6 +4285,11 @@ def mobile_dashboard():
     route_map.update(route_map_mode)
     route_date_options = _mobile_route_date_options(current_user.id, route_date, today_local_date)
     route_cta_urls = _route_cta_urls(route_date, current_stop=current_stop)
+    production_flow_url_args = {
+        "date": route_date.isoformat() if route_date else today_local_date.isoformat()
+    }
+    if current_stop:
+        production_flow_url_args["selected_stop_id"] = current_stop.id
 
     return render_template(
         "driver_mobile.html",
@@ -4241,6 +4299,7 @@ def mobile_dashboard():
         route_map_mode=route_map_mode,
         route_cta=route_cta,
         route_cta_urls=route_cta_urls,
+        production_flow_url=url_for("driver.mobile_production_flow_fragment", **production_flow_url_args),
         route_date_options=route_date_options,
         assigned_requests=assigned_requests,
         driver_next_action=driver_next_action,
@@ -4275,6 +4334,35 @@ def mobile_dashboard():
         truck_maintenance_history=truck_maintenance_history,
         truck_issue_choices=TRUCK_ISSUE_CHOICES,
         **ryder_context,
+    )
+
+
+@bp.route("/mobile/production-flow-fragment")
+@login_required
+def mobile_production_flow_fragment():
+    if current_user.role == "management":
+        return redirect(url_for("manager.manager_dashboard"))
+
+    now_local, _ = _now_local_and_utc()
+    today_local_date = now_local.date()
+    route_date = _requested_mobile_route_date() or _dashboard_route_date_for_driver(
+        current_user.id,
+        today_local_date,
+        open_shift=_open_shift_for_driver(current_user.id),
+    )
+    if route_date == today_local_date:
+        _repair_today_driver_log_dates(current_user.id, today_local_date)
+    selected_stop_id = request.args.get("selected_stop_id", type=int)
+    production_flow = build_production_flow_context(
+        date=route_date,
+        driver_id=current_user.id,
+        selected_stop_id=selected_stop_id,
+        mode="mobile",
+    )
+    return render_template(
+        "partials/_production_flow_map.html",
+        production_flow=production_flow,
+        production_flow_mode="mobile",
     )
 
 

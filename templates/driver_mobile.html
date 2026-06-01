@@ -1384,6 +1384,11 @@
         {% if production_flow %}
           {% set production_flow_mode = "mobile" %}
           {% include "partials/_production_flow_map.html" %}
+        {% elif production_flow_url is defined and production_flow_url %}
+          <div class="ops-panel" data-production-flow-lazy data-url="{{ production_flow_url }}">
+            <div class="ops-head"><h3>Production Flow</h3><span class="ops-sub">Loading after dashboard</span></div>
+            <div class="ops-body"><p class="ops-empty">Production Flow loads after the route actions so the dashboard opens faster.</p></div>
+          </div>
         {% endif %}
 
         {% if not flow_first_current %}
@@ -1405,7 +1410,7 @@
         </div>
         {% endif %}
 
-        {% if route_map and not flow_first_current %}
+        {% if route_map and not flow_first_current and (route_map.map_mode not in ['production_flow', 'no_current_activity'] or cta.has_route_history) %}
           {% include "partials/_compact_route_map.html" %}
         {% endif %}
 
@@ -1864,6 +1869,50 @@
 <script src="{{ url_for('static', filename='js/autosave-drafts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/driver-active-wait.js', v='2') }}"></script>
 <script src="{{ url_for('static', filename='js/live_route_map.js') }}"></script>
+<script>
+  (function () {
+    const slot = document.querySelector('[data-production-flow-lazy]');
+    if (!slot) return;
+    let loaded = false;
+    function runScripts(root) {
+      root.querySelectorAll('script').forEach((oldScript) => {
+        const script = document.createElement('script');
+        for (const attr of oldScript.attributes) script.setAttribute(attr.name, attr.value);
+        script.text = oldScript.textContent;
+        oldScript.replaceWith(script);
+      });
+    }
+    function loadProductionFlow() {
+      if (loaded) return;
+      loaded = true;
+      fetch(slot.dataset.url, { headers: { 'X-Requested-With': 'fetch' } })
+        .then((response) => {
+          if (!response.ok) throw new Error('Production Flow failed to load');
+          return response.text();
+        })
+        .then((html) => {
+          slot.innerHTML = html;
+          runScripts(slot);
+        })
+        .catch(() => {
+          slot.querySelector('.ops-body').innerHTML = '<p class="ops-empty">Production Flow could not load. Refresh to try again.</p>';
+        });
+    }
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect();
+          loadProductionFlow();
+        }
+      }, { rootMargin: '220px' });
+      observer.observe(slot);
+    } else if ('requestIdleCallback' in window) {
+      requestIdleCallback(loadProductionFlow, { timeout: 1500 });
+    } else {
+      setTimeout(loadProductionFlow, 600);
+    }
+  })();
+</script>
 
 {% if config.ENABLE_SOCKETIO %}
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>

@@ -5448,7 +5448,7 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
                 ShiftRecord(
                     user_id=driver.id,
                     pretrip_id=pretrip.id,
-                    start_time=datetime(2026, 5, 17, 23, 30, 0),
+                    start_time=datetime.utcnow() - timedelta(hours=4),
                 ),
                 DriverLog(
                     driver_id=driver.id,
@@ -5470,11 +5470,11 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert b"1 stop" in page.data
     assert b"Kraft" in page.data
     assert b"PostTrip Due" in page.data
-    assert body.index("PostTrip Due") < body.index("Live Flow Map")
+    assert body.index("PostTrip Due") < body.index("Production Flow")
     assert page.data.count(b"PostTrip Due") == 1
 
 
-def test_new_driver_log_redirect_preserves_open_shift_route_date(client, app):
+def test_new_driver_log_uses_today_when_open_shift_route_date_is_stale(client, app):
     from datetime import date, datetime, timedelta
 
     with app.app_context():
@@ -5482,19 +5482,26 @@ def test_new_driver_log_redirect_preserves_open_shift_route_date(client, app):
         from app.models import DriverLog, PreTrip, ShiftRecord
 
         driver = create_user("route_date_log_driver", "route-date-log@example.com", "driver", first_name="Route", last_name="Date")
-        route_date = date.today() - timedelta(days=1)
-        pretrip = PreTrip(
+        today = date.today()
+        stale_route_date = today - timedelta(days=1)
+        stale_pretrip = PreTrip(
             user_id=driver.id,
             truck_number="ST2",
-            pretrip_date=route_date,
+            pretrip_date=stale_route_date,
             start_mileage=379164,
         )
-        db.session.add(pretrip)
+        today_pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="ST4",
+            pretrip_date=today,
+            start_mileage=380000,
+        )
+        db.session.add_all([stale_pretrip, today_pretrip])
         db.session.flush()
         db.session.add(
             ShiftRecord(
                 user_id=driver.id,
-                pretrip_id=pretrip.id,
+                pretrip_id=stale_pretrip.id,
                 start_time=datetime.utcnow() - timedelta(hours=20),
             )
         )
@@ -5509,14 +5516,55 @@ def test_new_driver_log_redirect_preserves_open_shift_route_date(client, app):
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith(f"/driver_logs?date={route_date.isoformat()}")
+    assert response.headers["Location"].endswith(f"/driver_logs?date={today.isoformat()}")
     with app.app_context():
-        saved = DriverLog.query.filter_by(driver_id=driver_id, date=route_date, plant_name="KP").one()
+        saved = DriverLog.query.filter_by(driver_id=driver_id, date=today, plant_name="KP").one()
         assert saved.load_size == "Empty"
 
-    route_page = client.get(f"/driver_logs?date={route_date.isoformat()}")
+    route_page = client.get(f"/driver_logs?date={today.isoformat()}")
     assert route_page.status_code == 200
     assert b"Kraft" in route_page.data
+
+
+def test_mobile_dashboard_repairs_today_logs_saved_under_old_route_date(client, app):
+    from datetime import date, datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip
+
+        driver = create_user("repair_route_driver", "repair-route@example.com", "driver", first_name="Repair", last_name="Route")
+        today = date.today()
+        stale_route_date = today - timedelta(days=1)
+        db.session.add(
+            PreTrip(
+                user_id=driver.id,
+                truck_number="ST4",
+                pretrip_date=today,
+                start_mileage=380000,
+            )
+        )
+        drifted_log = DriverLog(
+            driver_id=driver.id,
+            date=stale_route_date,
+            plant_name="KP",
+            load_size="Empty",
+            arrive_time=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        db.session.add(drifted_log)
+        db.session.commit()
+        driver_id = driver.id
+        log_id = drifted_log.id
+
+    login(client, "repair_route_driver")
+    page = client.get("/mobile")
+
+    assert page.status_code == 200
+    assert b"Kraft" in page.data
+    with app.app_context():
+        saved = DriverLog.query.get(log_id)
+        assert saved.driver_id == driver_id
+        assert saved.date == today
 
 
 def test_mobile_shift_time_button_ends_shift_and_returns_mobile(client, app):

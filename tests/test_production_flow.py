@@ -519,14 +519,18 @@ def test_mobile_dashboard_uses_compact_shared_production_flow(client, app):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert 'data-production-flow-mode="mobile"' in body
-    assert 'class="flow-first-body"' in body
-    assert "Compact Production Flow" in body
-    assert "Active Route Map" not in body
-    assert '<section class="driver-next-card">' not in body
-    assert "View Production Flow" in body
-    assert "min-height: 960px" in body
+    assert 'data-production-flow-lazy' in body
+    assert "/mobile/production-flow-fragment" in body
+    assert '<section class="driver-next-card">' in body
+    assert "Production Flow loads after the route actions" in body
     assert "full 2D" not in body
+
+    fragment = client.get("/mobile/production-flow-fragment")
+    assert fragment.status_code == 200
+    fragment_body = fragment.get_data(as_text=True)
+    assert 'data-production-flow-mode="mobile"' in fragment_body
+    assert "Compact Production Flow" in fragment_body
+    assert "min-height: 960px" in fragment_body
 
 
 def test_operations_board_is_shared_read_only_plant_floor_board(client, app):

@@ -1007,27 +1007,29 @@ def _add_source(meta, source):
 
 def _move_requests(target, *, driver_id=None, selected_move_request_id=None):
     start, end = _day_bounds(target)
-    active = MoveRequest.query.filter(MoveRequest.status.in_(ACTIVE_STATUSES)).all()
-    completed = MoveRequest.query.filter(
+    active_query = MoveRequest.query.filter(MoveRequest.status.in_(ACTIVE_STATUSES))
+    completed_query = MoveRequest.query.filter(
         MoveRequest.status == "completed",
         or_(
             MoveRequest.updated_at.between(start, end),
             MoveRequest.created_at.between(start, end),
         ),
-    ).all()
+    )
+    if driver_id:
+        driver_scope = or_(
+            MoveRequest.assigned_driver_id == driver_id,
+            MoveRequest.linked_driver_log.has(DriverLog.driver_id == driver_id),
+        )
+        active_query = active_query.filter(driver_scope)
+        completed_query = completed_query.filter(driver_scope)
+    active = active_query.all()
+    completed = completed_query.all()
     by_id = {req.id: req for req in active + completed}
     if selected_move_request_id and selected_move_request_id not in by_id:
         selected = MoveRequest.query.get(selected_move_request_id)
         if selected:
             by_id[selected.id] = selected
     rows = list(by_id.values())
-    if driver_id:
-        filtered = []
-        for req in rows:
-            linked_log = getattr(req, "linked_driver_log", None)
-            if req.assigned_driver_id == driver_id or (linked_log is not None and linked_log.driver_id == driver_id):
-                filtered.append(req)
-        rows = filtered
     rows.sort(
         key=lambda req: (
             getattr(req, "due_at", None) is None,

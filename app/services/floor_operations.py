@@ -12,6 +12,8 @@ Public entry point: :func:`build_floor_operations_snapshot`.
 import re
 from datetime import date as date_cls, datetime, timedelta
 
+from sqlalchemy import or_
+
 from app.models import ActivityEvent, DamageReport, DriverLog, MoveRequest, ShiftRecord
 from app.services.cargo_state import cargo_state_for_log, cargo_state_for_request
 from app.services.driver_wait import wait_minutes_for_log
@@ -304,18 +306,21 @@ def build_floor_operations_snapshot(date=None, driver_id=None, wait_threshold=No
     now = datetime.utcnow()
     due_soon_cutoff = now + timedelta(hours=DUE_SOON_HOURS)
 
-    active_requests = (
-        MoveRequest.query.filter(MoveRequest.status.in_(ACTIVE_STATUSES))
-        .order_by(MoveRequest.requested_at.desc())
-        .all()
+    active_query = MoveRequest.query.filter(MoveRequest.status.in_(ACTIVE_STATUSES))
+    completed_query = MoveRequest.query.filter(
+        MoveRequest.status == "completed",
+        MoveRequest.updated_at >= day_start,
+        MoveRequest.updated_at < day_end,
     )
-    completed_today = (
-        MoveRequest.query.filter(
-            MoveRequest.status == "completed",
-            MoveRequest.updated_at >= day_start,
-            MoveRequest.updated_at < day_end,
-        ).all()
-    )
+    if driver_id:
+        driver_scope = or_(
+            MoveRequest.assigned_driver_id == driver_id,
+            MoveRequest.linked_driver_log.has(DriverLog.driver_id == driver_id),
+        )
+        active_query = active_query.filter(driver_scope)
+        completed_query = completed_query.filter(driver_scope)
+    active_requests = active_query.order_by(MoveRequest.requested_at.desc()).all()
+    completed_today = completed_query.all()
 
     queue_summary = {
         "open_requests": len(active_requests),
@@ -327,9 +332,12 @@ def build_floor_operations_snapshot(date=None, driver_id=None, wait_threshold=No
     completed_today_count = len(completed_today)
 
     # --- Driver logs for the day -------------------------------------------
-    todays_logs = DriverLog.query.filter(
+    log_query = DriverLog.query.filter(
         DriverLog.deleted_at.is_(None), DriverLog.date == target
-    ).all()
+    )
+    if driver_id:
+        log_query = log_query.filter_by(driver_id=driver_id)
+    todays_logs = log_query.all()
     open_logs = [log for log in todays_logs if not _departed(log)]
     departed_logs = [log for log in todays_logs if _departed(log)]
 
@@ -343,9 +351,10 @@ def build_floor_operations_snapshot(date=None, driver_id=None, wait_threshold=No
         if minutes is not None and minutes >= threshold:
             waiting_over.append((log, minutes))
 
-    open_shift_driver_ids = {
-        shift.user_id for shift in ShiftRecord.query.filter(ShiftRecord.end_time.is_(None)).all()
-    }
+    shift_query = ShiftRecord.query.filter(ShiftRecord.end_time.is_(None))
+    if driver_id:
+        shift_query = shift_query.filter_by(user_id=driver_id)
+    open_shift_driver_ids = {shift.user_id for shift in shift_query.all()}
     on_road_driver_ids = open_shift_driver_ids - {log.driver_id for log in open_logs}
 
     floor_cards = [
