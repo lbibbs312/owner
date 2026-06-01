@@ -118,6 +118,8 @@
   .login-link{font-family:var(--mono);font-size:.8rem;color:var(--muted);text-decoration:none;
     letter-spacing:.05em;transition:color .2s}
   .login-link:hover{color:var(--blue-bright)}
+  .login-link.disabled{color:var(--muted-2);opacity:.58;cursor:not-allowed}
+  .login-link.disabled:hover{color:var(--muted-2)}
   .btn{font-family:var(--body);font-weight:600;font-size:.9rem;text-decoration:none;
     border-radius:7px;padding:11px 20px;display:inline-flex;align-items:center;gap:9px;
     cursor:pointer;border:1px solid transparent;transition:transform .15s,box-shadow .2s,background .2s;white-space:nowrap}
@@ -125,6 +127,8 @@
   .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(47,109,240,.5);background:var(--blue-bright)}
   .btn-ghost{background:transparent;color:var(--text);border-color:var(--line)}
   .btn-ghost:hover{border-color:var(--blue-bright);color:var(--blue-bright)}
+  .btn-disabled,.btn-disabled:hover{background:transparent;color:var(--muted-2);border-color:var(--line-soft);
+    cursor:not-allowed;box-shadow:none;transform:none;opacity:.66}
   .btn-lg{padding:15px 28px;font-size:1rem}
 
   /* ---------- hero ---------- */
@@ -288,6 +292,7 @@
   .foot-col h5{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
   .foot-col a{display:block;color:var(--muted-2);text-decoration:none;font-size:.88rem;margin-bottom:9px;transition:color .2s}
   .foot-col a:hover{color:var(--blue-bright)}
+  .foot-col span{display:block;color:var(--muted-2);font-size:.88rem;margin-bottom:9px;opacity:.66}
   .copyright{margin-top:40px;padding-top:24px;border-top:1px solid var(--line-soft);
     font-family:var(--mono);font-size:.74rem;color:var(--muted-2);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 
@@ -453,7 +458,7 @@
       <a href="#how">How it works</a>
     </nav>
     <div class="nav-cta">
-      <a href="https://app.movedefense.com/login" class="login-link">OPERATOR LOGIN &rarr;</a>
+      <span class="login-link disabled" aria-disabled="true">Operator login · pilot only</span>
       <a href="#demo" class="btn btn-primary">Request a demo</a>
     </div>
   </div>
@@ -729,8 +734,8 @@
       <h2>See your plant floor<br>as one live board.</h2>
       <p>15-minute demo. We'll show how a mismatch alert fires from a real plant-floor scenario.</p>
       <div class="hero-cta">
-        <a href="mailto:bibbstechnology@gmail.com?subject=MoveDefense%20demo%20request" class="btn btn-primary btn-lg">Request a 15-min demo</a>
-        <a href="https://app.movedefense.com/login" class="btn btn-ghost btn-lg">Operator login</a>
+        <a href="mailto:bibbstechnology@gmail.com?subject=MoveDefense%20pilot%20request" class="btn btn-primary btn-lg">Start a pilot</a>
+        <span class="btn btn-disabled btn-lg" aria-disabled="true">Operator login coming soon</span>
       </div>
     </div>
   </section>
@@ -761,7 +766,7 @@
         </div>
         <div class="foot-col">
           <h5>Access</h5>
-          <a href="https://app.movedefense.com/login">Operator login</a>
+          <span>Operator access after onboarding</span>
           <a href="mailto:bibbstechnology@gmail.com">Contact</a>
         </div>
       </div>
