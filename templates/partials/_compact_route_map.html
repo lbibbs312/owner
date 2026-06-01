@@ -22,7 +22,7 @@
   {% for stop in active_stops[:4] %}
     {% set _ = map_stops.append(stop) %}
   {% endfor %}
-{% elif rm and rm.stops %}
+  {% elif rm and rm.stops %}
   {% for stop in rm.stops[:5] %}
     {% set _ = map_stops.append(stop) %}
   {% endfor %}
@@ -38,7 +38,7 @@
     {% endif %}
   </div>
 
-  {% if rm and (rm.stops or rm.moves or rm.plants) %}
+  {% if rm and rm.stops %}
     {% if map_stops %}
       <div class="compact-flow-canvas" aria-label="Route locations">
         <div class="compact-map-nodes" style="--node-count: {{ map_stops|length }};">
@@ -63,23 +63,6 @@
 	            Current work is closed. Completed stops are below.
           {% endif %}
         </p>
-      </div>
-    {% elif rm.plants %}
-      <div class="compact-flow-canvas" aria-label="Route locations">
-        <div class="compact-map-nodes" style="--node-count: {{ (rm.plants[:5])|length }};">
-          {% for plant in rm.plants[:5] %}
-            <button class="compact-route-node status-{{ plant.worst_status }}"
-                    type="button"
-                    data-route-map-open="plant"
-                    data-route-map-id="{{ plant.plant_key }}">
-              <span class="compact-route-code">{{ plant.short_code or '--' }}</span>
-              <span class="compact-route-label">{{ plant.label }}</span>
-              <small>{{ plant.worst_status|replace('_', ' ')|title }}</small>
-            </button>
-            {% if not loop.last %}<span class="compact-route-lane status-{{ plant.worst_status }}" aria-hidden="true"></span>{% endif %}
-          {% endfor %}
-        </div>
-        <p class="compact-map-note">Using route and move request data only.</p>
       </div>
     {% endif %}
 
@@ -106,7 +89,48 @@
       {% endfor %}
     </div>
 
-    {% if completed_stops %}
+    {% if rm.delivery_narratives %}
+      <div class="route-narrative-list" aria-label="Completed route narrative">
+        {% for item in rm.delivery_narratives %}
+          <details class="route-narrative-card tone-{{ item.tone }}">
+            <summary>
+              <span class="route-narrative-count">x{{ item.count }}</span>
+              <span class="route-narrative-main">
+                <strong>{{ item.title }}</strong>
+                <small>{{ item.route_line }} · {{ item.load_count_label }} / {{ item.stop_count_label }}</small>
+                {% if item.parts or item.flags %}
+                  <span class="route-narrative-chips">
+                    {% for part in item.parts[:5] %}<em>{{ part }}</em>{% endfor %}
+                    {% for flag in item.flags[:5] %}<em class="flag">{{ flag }}</em>{% endfor %}
+                  </span>
+                {% endif %}
+              </span>
+            </summary>
+            <div class="route-narrative-details">
+              {% for detail in item.details %}
+                <a class="route-narrative-detail" href="{{ detail.view_url or '#' }}">
+                  <span class="detail-stop">Stop {{ detail.sequence }}</span>
+                  <span class="detail-main">
+                    <strong>{{ detail.plant }}</strong>
+                    <small>{{ detail.arrival_at|display_time if detail.arrival_at else 'No current data' }}{% if detail.departure_at %} &rarr; {{ detail.departure_at|to_12h_format }}{% endif %}</small>
+                    {% if detail.pickup_label %}<small>{{ detail.pickup_label }}</small>{% endif %}
+                    <small>In: {{ detail.arrived_with }} / Out: {{ detail.departed_with }}</small>
+                    {% if detail.parts or detail.flags or detail.wait_label %}
+                      <span class="route-narrative-chips">
+                        {% for part in detail.parts %}<em>{{ part }}</em>{% endfor %}
+                        {% if detail.wait_label %}<em>{{ detail.wait_label }}</em>{% endif %}
+                        {% for flag in detail.flags %}<em class="flag">{{ flag }}</em>{% endfor %}
+                      </span>
+                    {% endif %}
+                    {% if detail.note %}<small>{{ detail.note }}</small>{% endif %}
+                  </span>
+                </a>
+              {% endfor %}
+            </div>
+          </details>
+        {% endfor %}
+      </div>
+    {% elif completed_stops %}
       <details class="completed-stops">
         <summary>Show completed stops ({{ completed_stops|length }})</summary>
         <div class="compact-stop-list">
@@ -127,28 +151,9 @@
         </div>
       </details>
     {% endif %}
-
-    {% if rm.moves %}
-      <div class="compact-move-strip">
-        <span>Assigned Move Queue</span>
-        {% for move in rm.moves[:3] %}
-          <button type="button"
-                  class="compact-move status-{{ move.status }}"
-                  data-route-map-open="move"
-                  data-route-map-id="{{ move.move_request_id }}">
-            <strong>{{ move.request_number }}</strong>
-            <small>{{ move.origin_location_text }} &rarr; {{ move.destination_location_text }}</small>
-          </button>
-        {% endfor %}
-      </div>
-    {% endif %}
 	  {% else %}
 	    <p class="compact-empty">
-	      {% if map_mode == 'production_flow' %}
-	        No active route for this date. Production Flow is available below.
-	      {% else %}
-	        {{ rm.map_empty_message if rm and rm.map_empty_message else 'No active route or production-flow signals for this date.' }}
-	      {% endif %}
+	      {{ rm.map_empty_message if rm and rm.map_empty_message else 'No stops logged yet for this route date.' }}
 	    </p>
 	    <div class="compact-map-actions {% if not cta.has_route_history %}single{% endif %}">
 	      {% if urls.get('start_shift') %}
@@ -170,6 +175,4 @@
   </div>
 
   {% include "partials/_stop_detail_drawer.html" %}
-  {% include "partials/_plant_detail_drawer.html" %}
-  {% include "partials/_move_detail_drawer.html" %}
 </section>

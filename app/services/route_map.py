@@ -20,6 +20,7 @@ from app.services.floor_operations import (
     next_action_for_request,
     route_next_action,
 )
+from app.services.load_state import destination_from_load, is_empty_load, load_display
 from app.services.plant_addresses import PLANT_LABELS, plant_label
 from app.services.route_context import build_route_context
 
@@ -94,6 +95,10 @@ def _short_code(value):
 def _status_label(status):
     status = _clean(status).replace("_", " ").strip()
     return status.title() if status else SAFE_EMPTY
+
+
+def _norm_key(value):
+    return re.sub(r"[^a-z0-9]+", "_", _clean(value).lower()).strip("_") or "unspecified"
 
 
 def _date_label(value):
@@ -384,6 +389,203 @@ def _build_stops(route_context, *, role="driver", move_requests=None):
     return stops
 
 
+def _detail_flags(log, row, route):
+    text = " ".join(
+        _clean(value)
+        for value in (
+            getattr(log, "downtime_reason", ""),
+            row.get("note"),
+            " ".join(route.get("warnings") or []),
+        )
+    ).lower()
+    flags = []
+    if getattr(log, "hot_parts", False):
+        flags.append("Hot")
+    if getattr(log, "no_pickup", False):
+        flags.append("No pickup")
+    if "hold" in text or "held" in text or "blocked" in text:
+        flags.append("Hold")
+    if "scrap" in text:
+        flags.append("Scrap")
+    if route.get("unload_blocked") or route.get("secondary_drop_blocked"):
+        flags.append("Needs review")
+    if route.get("deviation"):
+        flags.append("Verify route")
+    if getattr(log, "maintenance", False):
+        flags.append("Maintenance")
+    if getattr(log, "fuel", False):
+        flags.append("Fuel")
+    if getattr(log, "meeting", False):
+        flags.append("Meeting")
+    return tuple(dict.fromkeys(flags))
+
+
+def _part_labels(log, *extra_parts):
+    labels = []
+    part = _clean(getattr(log, "part_number", ""))
+    if part:
+        labels.append(f"HOT {part}" if getattr(log, "hot_parts", False) else part)
+    elif getattr(log, "hot_parts", False):
+        labels.append("Hot part")
+    for item in extra_parts:
+        text = _clean(item)
+        if text and text not in labels:
+            labels.append(text)
+    return labels
+
+
+def _delivery_destination(load_label, fallback_plant):
+    destination = destination_from_load(load_label)
+    if destination:
+        return plant_label(destination), destination
+    return _location_label(fallback_plant) or SAFE_EMPTY, _location_key(fallback_plant)
+
+
+def _load_count_label(count):
+    return f"{count} load{'s' if count != 1 else ''}"
+
+
+def _stop_count_label(count):
+    return f"{count} stop{'s' if count != 1 else ''}"
+
+
+def _new_narrative_group(kind, *, title, route_line, origin_label=None, destination_label=None):
+    return {
+        "key": _norm_key(f"{kind}:{title}:{origin_label}:{destination_label}"),
+        "kind": kind,
+        "tone": "empty" if kind == "empty" else ("delivery" if kind == "delivery" else "pickup"),
+        "title": title,
+        "route_line": route_line,
+        "origin_label": origin_label,
+        "destination_label": destination_label,
+        "count": 0,
+        "load_count_label": "",
+        "stop_count_label": "",
+        "parts": [],
+        "flags": [],
+        "details": [],
+        "latest_departure_at": "",
+    }
+
+
+def _add_narrative_detail(groups, key, group, detail):
+    if key not in groups:
+        groups[key] = group
+    target = groups[key]
+    target["count"] += 1
+    target["load_count_label"] = _load_count_label(target["count"])
+    target["stop_count_label"] = _stop_count_label(len(target["details"]) + 1)
+    target["latest_departure_at"] = detail.get("departure_at") or target["latest_departure_at"]
+    for part in detail.get("parts") or []:
+        if part not in target["parts"]:
+            target["parts"].append(part)
+    for flag in detail.get("flags") or []:
+        if flag not in target["flags"]:
+            target["flags"].append(flag)
+    target["details"].append(detail)
+
+
+def _base_stop_detail(log, row, route, *, cargo_label, pickup=None):
+    flags = list(_detail_flags(log, row, route))
+    parts = _part_labels(log, *((pickup or {}).get("parts") or ()))
+    wait_minutes = wait_minutes_for_log(log, now=None) if not getattr(log, "depart_time", None) else (getattr(log, "dock_wait_minutes", None) or 0)
+    wait_label = f"Wait {wait_minutes} min" if wait_minutes else ""
+    pickup_label = ""
+    if pickup:
+        pickup_label = f"Picked up at {pickup['plant_label']}"
+        if pickup.get("departure_at"):
+            pickup_label = f"{pickup_label} before stop {row.get('index')}"
+        for flag in pickup.get("flags") or []:
+            if flag not in flags:
+                flags.append(flag)
+    return {
+        "stop_id": getattr(log, "id", None),
+        "sequence": row.get("index"),
+        "plant": row.get("plant") or plant_label(getattr(log, "plant_name", None)) or SAFE_EMPTY,
+        "arrival_at": getattr(log, "arrive_time", ""),
+        "departure_at": getattr(log, "depart_time", ""),
+        "cargo_label": cargo_label,
+        "arrived_with": row.get("cargo_in") or route.get("arrive_cargo_desc") or load_display(getattr(log, "load_size", "")),
+        "departed_with": row.get("cargo_out") or route.get("depart_cargo_desc") or load_display(getattr(log, "depart_load_size", "")),
+        "parts": parts,
+        "flags": tuple(dict.fromkeys(flags)),
+        "wait_label": wait_label,
+        "note": row.get("note") or "",
+        "pickup_label": pickup_label,
+        "view_url": _safe_url("driver.view_driver_log", log_id=getattr(log, "id", None)),
+    }
+
+
+def _pickup_info(log, row, route, cargo_label):
+    return {
+        "plant_label": row.get("plant") or plant_label(getattr(log, "plant_name", None)) or SAFE_EMPTY,
+        "stop_id": getattr(log, "id", None),
+        "sequence": row.get("index"),
+        "departure_at": getattr(log, "depart_time", ""),
+        "parts": _part_labels(log),
+        "flags": _detail_flags(log, row, route),
+        "cargo_label": cargo_label,
+    }
+
+
+def _build_delivery_narratives(route_context):
+    """Aggregate completed route work into readable delivery and empty-load cards."""
+    groups = {}
+    pending_by_cargo = {}
+    pending_by_destination = {}
+
+    for row in getattr(route_context, "rows", []) or []:
+        log = row.get("log")
+        route = row.get("route") or {}
+        if not log or not getattr(log, "depart_time", None):
+            continue
+
+        plant_label_text = row.get("plant") or plant_label(getattr(log, "plant_name", None)) or SAFE_EMPTY
+        removed = [load_display(item) for item in row.get("cargo_removed") or () if not is_empty_load(item)]
+        added = [load_display(item) for item in row.get("cargo_added") or () if not is_empty_load(item)]
+
+        for cargo_label in removed:
+            cargo_key = _norm_key(cargo_label)
+            destination_label, destination_key = _delivery_destination(cargo_label, plant_label_text)
+            pickup = pending_by_cargo.pop(cargo_key, None)
+            if pickup and pending_by_destination.get(destination_key) is pickup:
+                pending_by_destination.pop(destination_key, None)
+            if pickup is None:
+                pickup = pending_by_destination.pop(destination_key, None)
+            origin_label = (pickup or {}).get("plant_label") or "Earlier stop"
+            key = _norm_key(f"delivery:{origin_label}:{destination_label}")
+            group = _new_narrative_group(
+                "delivery",
+                title=f"{destination_label} delivery from {origin_label}",
+                route_line=f"{cargo_label} delivered from {origin_label} to {destination_label}",
+                origin_label=origin_label,
+                destination_label=destination_label,
+            )
+            detail = _base_stop_detail(log, row, route, cargo_label=cargo_label, pickup=pickup)
+            _add_narrative_detail(groups, key, group, detail)
+
+        arrived_empty = is_empty_load(row.get("cargo_in")) or is_empty_load(route.get("arrive_cargo_desc")) or is_empty_load(getattr(log, "load_size", None))
+        departed_empty = is_empty_load(row.get("cargo_out")) or is_empty_load(route.get("depart_cargo_desc")) or is_empty_load(getattr(log, "depart_load_size", None))
+        if not removed and not added and arrived_empty and departed_empty:
+            key = _norm_key(f"empty:{plant_label_text}")
+            group = _new_narrative_group(
+                "empty",
+                title=f"{plant_label_text} empty load",
+                route_line=f"Arrived empty and departed empty at {plant_label_text}",
+                destination_label=plant_label_text,
+            )
+            detail = _base_stop_detail(log, row, route, cargo_label="Empty load")
+            _add_narrative_detail(groups, key, group, detail)
+
+        for cargo_label in added:
+            destination_label, destination_key = _delivery_destination(cargo_label, plant_label_text)
+            info = _pickup_info(log, row, route, cargo_label)
+            pending_by_cargo[_norm_key(cargo_label)] = info
+            pending_by_destination[destination_key] = info
+
+    return list(groups.values())
+
+
 def _plant_seed(plants, label, *, role="driver"):
     label = _location_label(label)
     if not label:
@@ -600,10 +802,7 @@ def build_driver_map_mode_context(route_context, route_map=None, production_flow
     route_map = route_map or {}
     production_flow_context = production_flow_context or {}
     stops = route_map.get("stops") or []
-    moves = route_map.get("moves") or []
-    plants = route_map.get("plants") or []
     has_route_history = bool(stops)
-    has_route_or_queue = bool(stops or moves or plants)
     has_production = bool(
         production_flow_context.get("flow_nodes")
         or production_flow_context.get("flow_lanes")
@@ -612,7 +811,7 @@ def build_driver_map_mode_context(route_context, route_map=None, production_flow
     current_stop = getattr(route_context, "current_stop", None)
     is_today = bool(route_date and today_local_date and route_date == today_local_date)
 
-    if current_stop is not None or (route_is_active and has_route_or_queue):
+    if current_stop is not None or (route_is_active and has_route_history):
         mode = "live_current_work"
         label = "Active Route Map"
         empty = ""
@@ -627,7 +826,7 @@ def build_driver_map_mode_context(route_context, route_map=None, production_flow
     else:
         mode = "no_current_activity"
         label = "No Current Activity"
-        empty = "No active route or production-flow signals for this date."
+        empty = "No route stops logged for this date."
 
     return {
         "map_mode": mode,
@@ -668,15 +867,17 @@ def build_driver_route_map_context(
         for req in requests
     ]
     stops = _build_stops(route_context, role="driver", move_requests=requests)
+    delivery_narratives = _build_delivery_narratives(route_context)
     transfers = _transfers_for_view(driver_id=driver_id, target=target)
     plants, lanes = _build_plants_and_lanes(stops, moves, transfers, role="driver")
     route = _route_summary(route_context, moves=moves, stops=stops, driver=driver)
     return {
         "map_mode": "live_current_work" if stops or moves or plants else "no_current_activity",
         "map_label": "Active Route Map" if stops or moves or plants else "No Current Activity",
-        "map_empty_message": "No active route or production-flow signals for this date." if not (stops or moves or plants) else "",
+        "map_empty_message": "No route stops logged for this date." if not stops else "",
         "route": route,
         "stops": stops,
+        "delivery_narratives": delivery_narratives,
         "moves": moves,
         "plants": plants,
         "lanes": lanes,

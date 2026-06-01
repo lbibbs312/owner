@@ -5470,7 +5470,8 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert b"1 stop" in page.data
     assert b"Kraft" in page.data
     assert b"PostTrip Due" in page.data
-    assert body.index("PostTrip Due") < body.index("Production Flow")
+    assert "Production Flow" not in body
+    assert "Active Route Map" in body
     assert page.data.count(b"PostTrip Due") == 1
 
 

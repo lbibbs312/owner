@@ -93,6 +93,7 @@ def test_driver_route_map_no_data_returns_safe_empty_state(app):
     assert ctx["empty_states"]["no_move_requests"] is True
     assert ctx["route"]["current_location"] == "No current data"
     assert ctx["stops"] == []
+    assert ctx["delivery_narratives"] == []
     assert ctx["moves"] == []
 
 
@@ -110,6 +111,57 @@ def test_driver_route_map_with_driver_log_returns_stop_nodes(app):
     assert ctx["stops"][1]["status"] == "active"
     assert ctx["route"]["current_stop_id"] == active.id
     assert ctx["route"]["current_location"] == "Paint West"
+
+
+def test_driver_route_map_aggregates_delivery_and_empty_load_narratives(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user()
+    for hour in (8, 10):
+        _driver_log(
+            driver,
+            plant_name="PC",
+            arrive_time=f"2026-05-28 {hour:02d}:00:00",
+            depart_time=f"{hour:02d}:15",
+            load_size="Empty",
+            depart_load_size="Raleigh East Load",
+            part_number=f"P-RE-{hour}",
+            hot_parts=(hour == 10),
+        )
+        _driver_log(
+            driver,
+            plant_name="RE",
+            arrive_time=f"2026-05-28 {hour + 1:02d}:00:00",
+            depart_time=f"{hour + 1:02d}:20",
+            load_size="Raleigh East Load",
+            depart_load_size="Empty",
+            no_pickup=True,
+        )
+    _driver_log(
+        driver,
+        plant_name="PC",
+        arrive_time="2026-05-28 12:00:00",
+        depart_time="12:10",
+        load_size="Empty",
+        depart_load_size="Empty",
+        no_pickup=True,
+    )
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    narratives = ctx["delivery_narratives"]
+
+    delivery = next(item for item in narratives if item["kind"] == "delivery")
+    empty = next(item for item in narratives if item["kind"] == "empty")
+    assert delivery["title"] == "Raleigh East delivery from Paint Central"
+    assert delivery["count"] == 2
+    assert delivery["load_count_label"] == "2 loads"
+    assert "P-RE-8" in delivery["parts"]
+    assert "HOT P-RE-10" in delivery["parts"]
+    assert "Hot" in delivery["flags"]
+    assert delivery["details"][0]["pickup_label"].startswith("Picked up at Paint Central")
+    assert empty["title"] == "Paint Central empty load"
+    assert empty["count"] == 1
+    assert "No pickup" in empty["flags"]
 
 
 def test_route_map_with_move_requests_returns_plants_and_lanes(app):
@@ -170,7 +222,7 @@ def test_route_map_drawer_partials_render(app):
     assert "Original request" in move_html
 
 
-def test_driver_dashboard_renders_assigned_move_queue(client, app):
+def test_driver_dashboard_keeps_assigned_queue_off_main_route_display(client, app):
     driver = None
     with app.app_context():
         manager = _user("mgr", "management")
@@ -187,9 +239,58 @@ def test_driver_dashboard_renders_assigned_move_queue(client, app):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "Assigned Move Queue" in body
-    assert "MR-REAL-1" in body
-    assert "Production Flow" in body
+    assert "Today&#39;s Route" in body or "Today's Route" in body
+    assert "No route stops logged for this date." in body
+    assert "Assigned Move Queue" not in body
+    assert "MR-REAL-1" not in body
+    assert "Production Flow" not in body
+
+
+def test_driver_dashboard_renders_route_narrative_cards(client, app):
+    with app.app_context():
+        driver = _user("driver_route_narrative", "driver")
+        for hour in (8, 10):
+            _driver_log(
+                driver,
+                plant_name="PC",
+                arrive_time=f"2026-05-28 {hour:02d}:00:00",
+                depart_time=f"{hour:02d}:15",
+                load_size="Empty",
+                depart_load_size="Raleigh East Load",
+                part_number=f"P-RE-{hour}",
+                hot_parts=(hour == 10),
+            )
+            _driver_log(
+                driver,
+                plant_name="RE",
+                arrive_time=f"2026-05-28 {hour + 1:02d}:00:00",
+                depart_time=f"{hour + 1:02d}:20",
+                load_size="Raleigh East Load",
+                depart_load_size="Empty",
+                no_pickup=True,
+            )
+        _driver_log(
+            driver,
+            plant_name="PC",
+            arrive_time="2026-05-28 12:00:00",
+            depart_time="12:10",
+            load_size="Empty",
+            depart_load_size="Empty",
+            no_pickup=True,
+        )
+
+    _login(client, "driver_route_narrative")
+    resp = client.get("/mobile")
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Raleigh East delivery from Paint Central" in body
+    assert "Raleigh East Load delivered from Paint Central to Raleigh East" in body
+    assert "x2" in body
+    assert "P-RE-8" in body
+    assert "HOT P-RE-10" in body
+    assert "Paint Central empty load" in body
+    assert "Arrived empty and departed empty at Paint Central" in body
 
 
 def test_driver_dashboard_renders_with_no_assigned_requests(client, app):
@@ -201,9 +302,11 @@ def test_driver_dashboard_renders_with_no_assigned_requests(client, app):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "No assigned moves right now" in body
-    assert "Live Flow Map" in body
-    assert "No active route or production-flow signals for this date." not in body
+    assert "Today&#39;s Route" in body or "Today's Route" in body
+    assert "No route stops logged for this date." in body
+    assert "Assigned Move Queue" not in body
+    assert "Live Flow Map" not in body
+    assert "Production Flow" not in body
 
 
 def test_mobile_production_flow_view_is_not_driver_scoped(client, app):
@@ -217,9 +320,10 @@ def test_mobile_production_flow_view_is_not_driver_scoped(client, app):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert 'data-production-flow-mode="mobile"' in body
-    assert "Production Flow" in body
-    assert "MR-BROAD-1" in body
+    assert 'data-production-flow-mode="mobile"' not in body
+    assert "Production Flow" not in body
+    assert "MR-BROAD-1" not in body
+    assert "Today&#39;s Route" in body or "Today's Route" in body
 
 
 def test_manager_dashboard_uses_issue_terminology(client, app):

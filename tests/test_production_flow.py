@@ -391,36 +391,32 @@ def test_flow_map_uses_large_objects_and_compact_stop_chips(client, app):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "flow-object-card" in body
-    assert "Load Build / Trailer" in body
-    assert "Route-only data. Attach manifest or enter paper data to build expected flow." in body
-    assert "Live Flow Map" in body
-    assert "Operational Alerts" in body
-    assert "Plant Computer Console" in body
-    assert "production-node-card" in body
-    assert "Raleigh West (RW)" in body
-    assert "52nd Street DC (52L)" in body
-    assert "FRONT END / INTAKE" in body
+    assert "Active Route Map" in body
+    assert "Today&#39;s Route" in body or "Today's Route" in body
+    assert "Raleigh West" in body
     assert "Trim DC" in body
+    assert "flow-object-card" not in body
+    assert "Load Build / Trailer" not in body
+    assert "Live Flow Map" not in body
+    assert "Operational Alerts" not in body
+    assert "Plant Computer Console" not in body
+    assert "production-node-card" not in body
     assert "production-material-list" not in body
     assert "driver-shuttle-token" not in body
     assert "facility-grid" not in body
     assert "projected from events and current records" not in body
     assert "Receiving, unload, and reconcile events project here." not in body
-    assert "Today&#39;s Route" in body or "Today&rsquo;s Route" in body
-    assert "flow-lane--route-proof" in body
-    assert "Stop Details" in body
-    assert "Actual Scans" in body
-    assert "Event Timeline" in body
-    assert "Replay Lines" in body
+    assert "flow-lane--route-proof" not in body
+    assert "Actual Scans" not in body
+    assert "Event Timeline" not in body
+    assert "Replay Lines" not in body
     assert "flow-lane--plant-flow" not in body
-    assert "flow-lane--flow-replay" in body
-    assert "data-flow-sequence-token" in body
-    assert 'dur="16s"' in body
-    assert "production-flow-node-positions" in body
-    assert "bindNodeDragging" in body
-    assert 'data-flow-draggable="node"' in body
-    assert "flow-replay--held-up" in body
+    assert "flow-lane--flow-replay" not in body
+    assert "data-flow-sequence-token" not in body
+    assert "production-flow-node-positions" not in body
+    assert "bindNodeDragging" not in body
+    assert 'data-flow-draggable="node"' not in body
+    assert "flow-replay--held-up" not in body
     assert "Shadow Ledger" not in body
     assert "Production Digital Twin" not in body
     assert "Movie Speed" not in body
@@ -479,6 +475,23 @@ def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
+    assert "Active Route Map" in body
+    assert "Today&#39;s Route" in body or "Today's Route" in body
+    assert "Trim DC" in body
+    assert "FlowMapAnimator" not in body
+    assert "data-flow-edge-data" not in body
+    assert "flow-edge--new" not in body
+    assert "livePulse" not in body
+    assert "flow-edge--live" not in body
+    assert "renderFilteredEdges" not in body
+    assert "flow-lane--route-proof" not in body
+    assert "Replay Lines" not in body
+    assert "data-shadow-ledger-row" not in body
+    assert "System Summary" not in body
+
+    fragment = client.get("/mobile/production-flow-fragment")
+    assert fragment.status_code == 200
+    body = fragment.get_data(as_text=True)
     assert "FlowMapAnimator" in body
     assert "data-flow-edge-data" in body
     assert "flow-edge--new" in body
@@ -519,10 +532,11 @@ def test_mobile_dashboard_uses_compact_shared_production_flow(client, app):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert 'data-production-flow-lazy' in body
-    assert "/mobile/production-flow-fragment" in body
+    assert "Active Route Map" in body
+    assert "Production Flow" not in body
+    assert 'data-production-flow-lazy' not in body
+    assert "/mobile/production-flow-fragment" not in body
     assert '<section class="driver-next-card">' in body
-    assert "Production Flow loads after the route actions" in body
     assert "full 2D" not in body
 
     fragment = client.get("/mobile/production-flow-fragment")

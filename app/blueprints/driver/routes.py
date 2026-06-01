@@ -63,7 +63,6 @@ from app.services.load_state import (
 from app.services.parts import record_part_scan as save_part_scan, scan_event_payload
 from app.services.next_load_prediction import build_next_load_prediction
 from app.services.route_context import build_route_context, build_route_cta_context
-from app.services.floor_operations import build_floor_operations_snapshot, assigned_move_queue
 from app.services.flow_events import FlowEventService
 from app.services.production_flow import build_production_flow_context
 from app.services.route_map import build_driver_route_map_context, build_driver_map_mode_context
@@ -4240,9 +4239,6 @@ def mobile_dashboard():
     )
     ryder_context = _ryder_followup_context(current_user.id)
 
-    # Read-only operations console (Move Queue / Floor Ops / Flow Map).
-    floor = build_floor_operations_snapshot(route_date, driver_id=current_user.id)
-    assigned_requests = assigned_move_queue(current_user.id)
     open_damage_count = DamageReport.query.filter(
         DamageReport.status != "closed",
         DamageReport.reported_by_id == current_user.id,
@@ -4285,23 +4281,15 @@ def mobile_dashboard():
     route_map.update(route_map_mode)
     route_date_options = _mobile_route_date_options(current_user.id, route_date, today_local_date)
     route_cta_urls = _route_cta_urls(route_date, current_stop=current_stop)
-    production_flow_url_args = {
-        "date": route_date.isoformat() if route_date else today_local_date.isoformat()
-    }
-    if current_stop:
-        production_flow_url_args["selected_stop_id"] = current_stop.id
 
     return render_template(
         "driver_mobile.html",
-        floor=floor,
         route_map=route_map,
         production_flow=production_flow,
         route_map_mode=route_map_mode,
         route_cta=route_cta,
         route_cta_urls=route_cta_urls,
-        production_flow_url=url_for("driver.mobile_production_flow_fragment", **production_flow_url_args),
         route_date_options=route_date_options,
-        assigned_requests=assigned_requests,
         driver_next_action=driver_next_action,
         active_task=active_task,
         queued_tasks=queued_tasks,
