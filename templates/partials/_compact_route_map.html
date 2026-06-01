@@ -83,57 +83,57 @@
   {% set route_status_tone = 'ready' %}
 {% endif %}
 
-<section class="compact-route-map live-flow-board" data-route-map-shell data-route-map-mode="route" data-route-sheet-url="{{ route_sheet_url or '#' }}">
-  <div class="live-flow-head">
+<section class="compact-route-map md-flow-board" data-route-map-shell data-route-map-mode="route" data-route-sheet-url="{{ route_sheet_url or '#' }}">
+  <div class="md-flow-head">
 	    <div>
-	      <span class="live-flow-kicker"><i></i> LIVE FLOW BOARD</span>
+	      <span class="md-flow-kicker"><i></i> LIVE FLOW BOARD</span>
 	      <h3>{{ route_panel_title or "Today's Route" }}</h3>
 	      {% if rm and rm.stops %}
-	        <p class="live-flow-subline">{{ rm.stops|length }} stop{{ 's' if rm.stops|length != 1 else '' }}</p>
+	        <p class="md-flow-subline">{{ rm.stops|length }} stop{{ 's' if rm.stops|length != 1 else '' }}</p>
 	      {% endif %}
 	    </div>
-    <div class="live-flow-head-status">
+    <div class="md-flow-head-status">
       <span class="flow-status status-{{ route_status_tone }}">{{ route_status_label }}</span>
-      <time data-live-flow-clock>--:--:--</time>
+      <time data-md-flow-clock>--:--:--</time>
     </div>
   </div>
 
-  <div class="live-flow-top-actions" aria-label="Live flow workflow actions">
-    <a class="live-flow-action-tab primary" href="{{ depart_url or add_stop_url or '#' }}"
+  <div class="md-flow-top-actions" aria-label="Live flow workflow actions">
+    <a class="md-flow-action-tab primary" href="{{ depart_url or add_stop_url or '#' }}"
        {% if depart_url %}data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow"{% else %}data-flow-open-url="{{ add_stop_url or '#' }}" data-flow-panel-title="Add Stop"{% endif %}>
       <strong>Depart</strong>
       <span>Departure / proof</span>
     </a>
     {% for route_action in board_ctas %}
-      <a class="live-flow-action-tab primary" href="{{ urls.get(route_action.action) }}" data-flow-open-url="{{ urls.get(route_action.action) }}" data-flow-panel-title="{{ route_action.label }}">
+      <a class="md-flow-action-tab primary" href="{{ urls.get(route_action.action) }}" data-flow-open-url="{{ urls.get(route_action.action) }}" data-flow-panel-title="{{ route_action.label }}">
         <strong>{{ route_action.label.replace(' Route', '').replace(' Document', '') }}</strong>
         <span>{% if route_action.action == 'finalize_route' %}Ready To Finalize{% elif route_action.action == 'print_route' %}Route packet{% elif route_action.action == 'attach_document' %}Proof document{% elif route_action.action == 'confirm_cargo' %}Cargo check{% else %}{{ cta.next_action or route_action.label }}{% endif %}</span>
       </a>
     {% endfor %}
-    <a class="live-flow-action-tab" href="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-open-url="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-panel-title="Camera / Proof">
+    <a class="md-flow-action-tab" href="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-open-url="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-panel-title="Camera / Proof">
       <strong>Camera</strong>
       <span>Photo proof</span>
     </a>
-    <a class="live-flow-action-tab" href="{{ transfer_url }}" data-flow-open-url="{{ transfer_url }}" data-flow-panel-title="Plant Transfer">
+    <a class="md-flow-action-tab" href="{{ transfer_url }}" data-flow-open-url="{{ transfer_url }}" data-flow-panel-title="Plant Transfer">
       <strong>Transfer</strong>
       <span>{{ transfer_note }}</span>
     </a>
-    <a class="live-flow-action-tab" href="{{ shift_url }}" data-flow-open-url="{{ shift_url }}" data-flow-panel-title="{{ 'PostTrip Work' if posttrip_url else 'PreTrip / Shift' }}">
+    <a class="md-flow-action-tab" href="{{ shift_url }}" data-flow-open-url="{{ shift_url }}" data-flow-panel-title="{{ 'PostTrip Work' if posttrip_url else 'PreTrip / Shift' }}">
       <strong>{{ shift_label }}</strong>
       <span>{{ shift_note }}</span>
     </a>
-    <button class="live-flow-action-tab" type="button" data-flow-open-panel="maintenance" data-flow-panel-title="Maintenance / Ryder">
+    <button class="md-flow-action-tab" type="button" data-flow-open-panel="maintenance" data-flow-panel-title="Maintenance / Ryder">
       <strong>Maintenance</strong>
       <span>Ryder / truck</span>
     </button>
-    <a class="live-flow-action-tab" href="{{ route_sheet_url or '#' }}" data-flow-open-url="{{ route_sheet_url or '#' }}" data-flow-panel-title="Full Route Sheet">
+    <a class="md-flow-action-tab" href="{{ route_sheet_url or '#' }}" data-flow-open-url="{{ route_sheet_url or '#' }}" data-flow-panel-title="Full Route Sheet">
       <strong>Sheet</strong>
       <span>Full details</span>
     </a>
   </div>
 
   {% if pending_ryder %}
-    <div class="live-flow-alert">
+    <div class="md-flow-alert">
       <strong>Ryder timer running: {{ pending_ryder_elapsed if pending_ryder_elapsed is defined else '' }}</strong>
       <span>{{ pending_ryder_truck if pending_ryder_truck is defined and pending_ryder_truck else 'Truck' }} headed to Ryder for {{ pending_ryder_issue if pending_ryder_issue is defined and pending_ryder_issue else 'a truck issue' }}.</span>
     </div>
@@ -143,18 +143,18 @@
     <p class="compact-map-note">Last Route Replay. Last Route / Route Replay. Live route actions are hidden.</p>
   {% endif %}
 
-  <div class="live-flow-work-panel" data-live-flow-work-panel hidden>
-    <button class="live-flow-work-scrim" type="button" data-live-flow-close aria-label="Close work window"></button>
-    <div class="live-flow-work-card" role="dialog" aria-modal="true" aria-labelledby="liveFlowWorkTitle">
-      <div class="live-flow-work-head">
+  <div class="md-flow-work-panel" data-md-flow-work-panel hidden>
+    <button class="md-flow-work-scrim" type="button" data-md-flow-close aria-label="Close work window"></button>
+    <div class="md-flow-work-card" role="dialog" aria-modal="true" aria-labelledby="liveFlowWorkTitle">
+      <div class="md-flow-work-head">
         <div>
           <span>WORK WINDOW</span>
-          <strong id="liveFlowWorkTitle" data-live-flow-work-title>Route detail</strong>
+          <strong id="liveFlowWorkTitle" data-md-flow-work-title>Route detail</strong>
         </div>
-        <button type="button" data-live-flow-close>Close</button>
+        <button type="button" data-md-flow-close>Close</button>
       </div>
-      <div class="live-flow-context" data-live-flow-context></div>
-      <div class="live-flow-inline-panel depart-quick-flow" data-flow-inline-panel="depart" hidden>
+      <div class="md-flow-context" data-md-flow-context></div>
+      <div class="md-flow-inline-panel depart-quick-flow" data-flow-inline-panel="depart" hidden>
         {% if depart_url and primary_stop %}
           {% set depart_code = primary_stop.board_code or 'STP-' ~ primary_stop.sequence %}
           {% set is_service_depart = depart_code in ['FUEL', 'RYDR', 'MTN', 'MTG', 'SRVC'] %}
@@ -245,18 +245,18 @@
                 <button type="button" data-depart-prev="3">Back</button>
                 <button class="depart-submit" type="submit">Record Departure</button>
               </div>
-              <a class="live-flow-panel-link ghost" href="{{ url_for('driver.driver_logs') }}">Open DL</a>
+              <a class="md-flow-panel-link ghost" href="{{ url_for('driver.driver_logs') }}">Open DL</a>
             </section>
           </form>
         {% else %}
           <div class="depart-empty">
             <h4>No open stop</h4>
             <p>Start or open a stop before recording departure.</p>
-            <a class="live-flow-panel-link" href="{{ add_stop_url or url_for('driver.new_driving_log') }}">Add Stop</a>
+            <a class="md-flow-panel-link" href="{{ add_stop_url or url_for('driver.new_driving_log') }}">Add Stop</a>
           </div>
         {% endif %}
       </div>
-    <div class="live-flow-inline-panel" data-flow-inline-panel="maintenance" hidden>
+    <div class="md-flow-inline-panel" data-flow-inline-panel="maintenance" hidden>
       <div class="inline-maintenance-grid">
         <section>
           <h4>Ryder Service</h4>
@@ -360,10 +360,10 @@
                   </tbody>
                 </table>
               </div>
-              <a class="live-flow-panel-link" href="{{ history_url }}" target="_blank" rel="noopener">Open History</a>
+              <a class="md-flow-panel-link" href="{{ history_url }}" target="_blank" rel="noopener">Open History</a>
             {% else %}
               <p class="maintenance-empty">No previous completed PostTrips found for truck {{ current_truck }}.</p>
-              <a class="live-flow-panel-link" href="{{ history_url }}" target="_blank" rel="noopener">Open History</a>
+              <a class="md-flow-panel-link" href="{{ history_url }}" target="_blank" rel="noopener">Open History</a>
             {% endif %}
           {% else %}
             <p class="maintenance-empty">Start a PreTrip with a truck number to load maintenance history.</p>
@@ -371,20 +371,20 @@
         </section>
       </div>
     </div>
-    <div class="live-flow-embed-wrap" data-live-flow-embed-wrap hidden>
-      <iframe title="Live flow work window" name="live-flow-work-frame" data-live-flow-frame loading="lazy"></iframe>
+    <div class="md-flow-embed-wrap" data-md-flow-embed-wrap hidden>
+      <iframe title="Live flow work window" name="md-flow-work-frame" data-md-flow-frame loading="lazy"></iframe>
     </div>
     </div>
   </div>
 
   {% if (rm and rm.stops) or board_tasks %}
-    <div class="live-flow-window {% if board_count > 3 %}is-scrolling{% endif %}" aria-label="Live route flow">
-      <div class="live-flow-track" style="--flow-rows: {{ board_count if board_count > 0 else 1 }};">
-        {% for _pass in range(2 if board_count > 3 else 1) %}
+    <div class="md-flow-window" aria-label="Live route flow">
+      <div class="md-flow-track" style="--flow-rows: {{ board_count if board_count > 0 else 1 }};">
+        {% for _pass in range(1) %}
           {% for task in board_tasks %}
             {% set task_status_text = 'HOT' if task.is_hot else task.status.replace('-', ' ')|upper %}
             {% set task_status_tone = 'hot' if task.is_hot else ('open' if task.status == 'in-progress' else ('empty' if task.status == 'pending' else 'ready')) %}
-            <button class="live-flow-row tone-{{ 'hot' if task.is_hot else 'active' }}" type="button"
+            <button class="md-flow-row tone-{{ 'hot' if task.is_hot else 'active' }}" type="button"
                     data-flow-row
                     data-detail-template="task-{{ loop.index0 }}"
                     data-title="Dispatch task"
@@ -400,7 +400,7 @@
           {% endfor %}
           {% if primary_stop %}
             {% set primary_risk = primary_stop.has_damage or primary_stop.has_issue %}
-            <button class="live-flow-row tone-{{ 'blocked' if primary_risk else 'active' }}" type="button"
+            <button class="md-flow-row tone-{{ 'blocked' if primary_risk else 'active' }}" type="button"
                     data-flow-row
                     data-detail-template="primary-stop"
                     data-title="Stop {{ primary_stop.sequence }} - {{ primary_stop.plant_name }}"
@@ -421,7 +421,7 @@
             {% set event_status_tone = 'blocked' if primary_event.tone in ['blocked', 'needs_review'] else ('hot' if primary_event.tone == 'hot' else ('empty' if primary_event.kind == 'empty' else 'recorded')) %}
             {% set event_code = event_detail.board_code if event_detail and event_detail.board_code else 'STP-' ~ (event_detail.sequence if event_detail else primary_event.count) %}
             {% set event_row_detail = event_detail.board_detail if event_detail and event_detail.board_detail else primary_event.board_detail or primary_event.route_line %}
-            <button class="live-flow-row tone-{{ primary_event.tone }}" type="button"
+            <button class="md-flow-row tone-{{ primary_event.tone }}" type="button"
                     data-flow-row
                     data-detail-template="primary-event"
                     data-title="{{ primary_event.title }}"
@@ -437,7 +437,7 @@
           {% elif completed_stops %}
             {% set last_stop = completed_stops|last %}
             {% set last_stop_risk = last_stop.has_damage or last_stop.has_issue %}
-            <button class="live-flow-row tone-{{ 'blocked' if last_stop_risk else 'completed' }}" type="button"
+            <button class="md-flow-row tone-{{ 'blocked' if last_stop_risk else 'completed' }}" type="button"
                     data-flow-row
                     data-detail-template="last-stop"
                     data-title="Stop {{ last_stop.sequence }} - {{ last_stop.plant_name }}"
@@ -459,7 +459,7 @@
             {% set item_status_tone = 'blocked' if item.tone in ['blocked', 'needs_review'] else ('hot' if item.tone == 'hot' else ('empty' if item.kind == 'empty' else 'recorded')) %}
             {% set item_code = detail.board_code if detail and detail.board_code else 'STP-' ~ (detail.sequence if detail else item.count) %}
             {% set item_row_detail = detail.board_detail if detail and detail.board_detail else item.board_detail or item.route_line %}
-            <button class="live-flow-row tone-{{ item.tone }}" type="button"
+            <button class="md-flow-row tone-{{ item.tone }}" type="button"
                     data-flow-row
                     data-detail-template="event-{{ loop.index0 }}"
                     data-title="{{ item.title }}"
@@ -477,12 +477,12 @@
       </div>
     </div>
 
-    <div class="live-flow-ticker" aria-hidden="true">
+    <div class="md-flow-ticker" aria-hidden="true">
       <span>ROUTE LOGS &nbsp; PLANT TRANSFERS &nbsp; PARTS &nbsp; DAMAGE &nbsp; HOLDS &nbsp; SCRAP &nbsp; HOT MOVES &nbsp; POSTTRIP</span>
       <span>ROUTE LOGS &nbsp; PLANT TRANSFERS &nbsp; PARTS &nbsp; DAMAGE &nbsp; HOLDS &nbsp; SCRAP &nbsp; HOT MOVES &nbsp; POSTTRIP</span>
     </div>
 
-    <div class="live-flow-templates" hidden>
+    <div class="md-flow-templates" hidden>
       {% for task in board_tasks %}
         <template data-flow-detail-template="task-{{ loop.index0 }}">
           <div class="flow-selected-detail">
@@ -598,7 +598,7 @@
     <p class="compact-empty">
       {{ rm.map_empty_message if rm and rm.map_empty_message else 'No route stops logged for this date.' }}
     </p>
-    <div class="live-flow-ticker" aria-hidden="true">
+    <div class="md-flow-ticker" aria-hidden="true">
       <span>ROUTE LOGS &nbsp; PLANT TRANSFERS &nbsp; PARTS &nbsp; DAMAGE &nbsp; HOLDS &nbsp; SCRAP &nbsp; HOT MOVES &nbsp; POSTTRIP</span>
       <span>ROUTE LOGS &nbsp; PLANT TRANSFERS &nbsp; PARTS &nbsp; DAMAGE &nbsp; HOLDS &nbsp; SCRAP &nbsp; HOT MOVES &nbsp; POSTTRIP</span>
     </div>
