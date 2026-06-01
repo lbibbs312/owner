@@ -455,7 +455,7 @@
     });
   }
 
-  function showConsentBanner() {
+  function wireConsentBanner() {
     var banner = document.getElementById("cookie-consent");
     if (!banner) return;
     var consent = readConsent();
@@ -463,7 +463,6 @@
     var marketing = document.getElementById("consent-marketing");
     if (analytics && consent) analytics.checked = consent.analytics;
     if (marketing && consent) marketing.checked = consent.marketing;
-    if (!consent) banner.classList.add("show");
 
     function persist(values) {
       saveConsent(values);
@@ -475,6 +474,14 @@
 
     var decline = banner.querySelector("[data-consent-decline]");
     var save = banner.querySelector("[data-consent-save]");
+    var prefLink = document.getElementById("open-preferences");
+
+    if (prefLink) {
+      prefLink.addEventListener("click", function (e) {
+        e.preventDefault();
+        banner.classList.add("show");
+      });
+    }
 
     if (decline) decline.addEventListener("click", function () {
       persist({ analytics: false, marketing: false });
@@ -491,7 +498,7 @@
     updateAttribution();
     wireForms();
     wireCtas();
-    showConsentBanner();
+    wireConsentBanner();
     loadAnalytics();
     trackEvent("page_view", pageProps());
     maybeTrackPricingView();

@@ -323,11 +323,30 @@
   .contact-block > p{text-align:center!important;margin-bottom:18px!important}
   .attr-hidden{display:none!important}
 
-  .consent-banner{position:relative;z-index:1;display:none;border-top:1px solid rgba(255,255,255,.05)}
-  .consent-banner.show{display:block}
-  .consent-panel{width:100%;max-width:var(--maxw);margin:0 auto;padding:18px 28px 22px;
-    display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:18px;
-    background:transparent;border:0;border-radius:0;box-shadow:none}
+  .consent-banner{
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:9999;
+    background:rgba(5,8,15,.85);
+    backdrop-filter:blur(5px);
+    align-items:center;
+    justify-content:center;
+  }
+  .consent-banner.show{
+    display:flex;
+  }
+  .consent-panel{
+    width:90%;
+    max-width:420px;
+    background:#0b1120;
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:12px;
+    padding:24px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
   .consent-top{display:block;min-width:0}
   .consent-top h2{display:inline;font-family:var(--mono);font-size:.74rem;text-transform:uppercase;
     letter-spacing:.12em;color:var(--muted);margin:0}
@@ -483,7 +502,7 @@
     .wrap{padding:0 18px}
     .form-grid{grid-template-columns:1fr}
     .cta-inner{padding:44px 18px}
-    .consent-panel{grid-template-columns:1fr;padding:18px;gap:12px}
+    .consent-panel{padding:20px;gap:12px}
     .consent-actions{justify-content:flex-start}
   }
   @media(prefers-reduced-motion:reduce){
@@ -922,7 +941,7 @@
     </div>
     <div class="copyright">
       <span>&copy; 2026 MoveDefense. Built for the plant floor.</span>
-      <span><a class="consent-link" href="privacy.html">Privacy policy</a> · INTERSITE LOGISTICS · DISPATCH · COMPLIANCE</span>
+      <span><a class="consent-link" href="privacy.html">Privacy policy</a> &middot; <a href="#" id="open-preferences" class="consent-link">Cookie preferences</a> &middot; INTERSITE LOGISTICS &middot; DISPATCH &middot; COMPLIANCE</span>
     </div>
   </div>
 </footer>
