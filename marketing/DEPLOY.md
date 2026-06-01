@@ -5,7 +5,7 @@ The page is a single static file: `marketing/index.html`. No build step. Pick on
 ---
 
 ## ⚠️ Swap these placeholders FIRST (in `index.html`)
-- `hello@movedefense.com` → your real demo/contact email (appears in the demo CTA + footer)
+- `bibbstechnology@gmail.com` → your real demo/contact email (appears in the demo CTA + footer)
 - `/login` → the real URL of the Flask app login (e.g. `https://app.movedefense.com/login`)
 - `https://movedefense.com/` → your real domain (in `<link rel="canonical">`, OG tags)
 - `https://movedefense.com/og-image.png` → add a real 1200×630 social preview image
