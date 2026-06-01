@@ -29,6 +29,7 @@ from app.services.load_state import (
 )
 from app.services.plant_addresses import PLANT_LABELS, plant_label
 from app.services.route_context import build_route_context
+from app.services.route_issues import board_badge, derive_issues
 
 
 SAFE_EMPTY = "No current data"
@@ -432,6 +433,19 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
         arrived_with = row.get("cargo_in") or log.load_size or NOT_TRACKED
         departed_with = row.get("cargo_out") or log.depart_load_size or NOT_TRACKED
         wait_label = f"{wait_minutes} min" if wait_minutes is not None else NOT_TRACKED
+        departed = bool(log.depart_time)
+        stop_issues = derive_issues(
+            flags,
+            has_damage=has_damage,
+            departed=departed,
+            wait_minutes=wait_minutes,
+        )
+        stop_badge = board_badge(
+            stop_issues,
+            ok_label="CLOSED" if departed else "OPEN",
+            ok_pill_tone="completed" if departed else "open",
+            ok_row_tone="completed" if departed else "active",
+        )
         stops.append({
             "stop_id": log.id,
             "sequence": sequence,
@@ -468,6 +482,8 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             "has_damage": has_damage,
             "has_issue": has_issue,
             "flags": flags,
+            "issues": stop_issues,
+            "badge": stop_badge,
             "notes": row.get("note") or "",
             "next_action": _stop_next_action(log, status=status, cargo=cargo, linked_move=linked_move),
             "view_url": _safe_url("manager.view_driver_log" if role == "manager" else "driver.view_driver_log", log_id=log.id),
@@ -697,6 +713,16 @@ def _build_delivery_narratives(route_context):
             info = _pickup_info(log, row, route, cargo_label)
             pending_by_cargo[_norm_key(cargo_label)] = info
             pending_by_destination[destination_key] = info
+
+    for group in groups.values():
+        narrative_issues = derive_issues(group.get("flags") or ())
+        group["issues"] = narrative_issues
+        group["badge"] = board_badge(
+            narrative_issues,
+            ok_label="EMPTY" if group.get("kind") == "empty" else "RECORDED",
+            ok_pill_tone="empty" if group.get("kind") == "empty" else "recorded",
+            ok_row_tone="empty" if group.get("kind") == "empty" else ("delivery" if group.get("kind") == "delivery" else "completed"),
+        )
 
     return sorted(
         groups.values(),

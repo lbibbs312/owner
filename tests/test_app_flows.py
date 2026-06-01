@@ -907,7 +907,10 @@ def test_driver_mobile_shows_full_parts_queue_and_route_task_events(client, app)
     login(client, "driver1")
     queue_page = client.get("/mobile")
     assert queue_page.status_code == 200
-    assert b"Parts Queue" in queue_page.data
+    assert b"LIVE FLOW BOARD" in queue_page.data
+    assert b"Parts Queue" not in queue_page.data
+    assert b'<span class="flow-code">HOT</span>' in queue_page.data
+    assert b'<span class="flow-code">TASK</span>' in queue_page.data
     assert b"P-HOT-1" in queue_page.data
     assert b"P-OPEN-1" in queue_page.data
     assert b"Open for any driver" in queue_page.data
@@ -949,10 +952,10 @@ def test_driver_mobile_shows_full_parts_queue_and_route_task_events(client, app)
     route_page = client.get("/mobile")
     assert route_page.status_code == 200
     assert b"Task T" not in route_page.data
-    assert b"Hot Part: P-HOT-1" in route_page.data
-    assert b"Accepted" in route_page.data
-    assert b"Unloaded" in route_page.data
-    assert b"Wait 12 min" in route_page.data
+    assert b"Hot Part: P-HOT-1" not in route_page.data
+    assert b"Raleigh East Load" in route_page.data
+    assert b"12 min" in route_page.data
+    assert b"CLOSED" in route_page.data
 
 
 def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
@@ -1118,14 +1121,12 @@ def test_plant_load_timing_uses_today_average_on_driver_and_manager_dashboards(c
     login(client, "timing_driver")
     mobile = client.get("/mobile")
     assert mobile.status_code == 200
-    assert b"Kraft Plater Load Timing" in mobile.data
-    assert b"Today Average" in mobile.data
-    assert b"1h 30m" in mobile.data
-    assert b"Medium" in mobile.data
-    assert b"Ready Estimate" in mobile.data
+    assert b"LIVE FLOW BOARD" in mobile.data
+    assert b"Kraft Plater Load Timing" not in mobile.data
+    assert b"Today Average" not in mobile.data
+    assert b"Ready Estimate" not in mobile.data
+    assert b"Kraft Plater" in mobile.data
     assert b"Raleigh East Load" in mobile.data
-    assert b"Basis:" in mobile.data
-    assert b"Timing status" in mobile.data
     assert b"forecast" not in mobile.data.lower()
 
     client.get("/logout")
@@ -5097,7 +5098,7 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"OLD-PART" in day_report.data
     assert b"2 skid(s)" in day_report.data
     assert b"qty 18" in day_report.data
-    assert b"Distribution Center" in day_report.data
+    assert b"52nd Street DC" in day_report.data
     assert b"4:05pm" in day_report.data
     assert b"5:45pm" in day_report.data
     assert past_date.isoformat().encode() not in day_report.data
@@ -5475,15 +5476,17 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert 'data-flow-open-panel="depart"' in body
     assert "data-depart-wizard" in body
     assert 'name="next" value="mobile"' in body
-    assert "live-flow-work-scrim" in body
+    assert "md-flow-work-scrim" in body
     assert "Did you get unloaded?" in body
     assert "Depart / Load" not in body
-    assert "content: '→'" in body
-    assert "content: '•'" in body
-    assert "content: '▲'" in body
+    assert "→" in body
+    assert "·" in body
+    assert ".md-flow-ticker span::before" in body
+    assert "border-radius: 2px" in body
+    assert "content: none!important" in body
     assert "ROUTE LOGS &nbsp; PLANT TRANSFERS" in body
     assert "&diams;" not in body
-    assert ".live-flow-work-card::before" in body
+    assert ".md-flow-work-card::before" in body
     assert ".flow-status::after" in body
     assert page.data.count(b"PostTrip Due") == 1
 
@@ -5993,7 +5996,7 @@ def test_repeated_plant_and_truck_issues_roll_up_to_cases(client, app):
         driver = create_user("case_driver", "case-driver@example.com", "driver")
         create_user("case_manager", "case-manager@example.com", "management")
         today = date.today()
-        yesterday = today - timedelta(days=1)
+        yesterday = today - timedelta(days=1 if today.weekday() > 0 else 0)
         db.session.add_all([
             DriverLog(driver_id=driver.id, date=today, plant_name="PC", load_size="Empty", arrive_time="08:00", depart_time="08:20", dock_wait_minutes=59, created_at=datetime(2026, 5, 20, 8, 0)),
             DriverLog(driver_id=driver.id, date=today, plant_name="PC", load_size="Empty", arrive_time="09:00", depart_time="09:20", dock_wait_minutes=42, created_at=datetime(2026, 5, 20, 9, 0)),

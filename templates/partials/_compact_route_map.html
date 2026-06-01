@@ -42,7 +42,7 @@
     {% set _ = board_tasks.append(task) %}
   {% endfor %}
 {% endif %}
-{% set board_count = (board_tasks|length) + (1 if primary_stop or primary_event or completed_stops else 0) + (recurring_events|length) %}
+{% set board_count = (board_tasks|length) + (1 if primary_stop else 0) + (completed_stops|length) + (1 if primary_event and not primary_stop else 0) + (recurring_events|length) %}
 {% set route_sheet_url = urls.get('view_route') or urls.get('route_history') %}
 {% set depart_url = urls.get('record_departure') %}
 {% set damage_url = urls.get('add_damage') %}
@@ -78,6 +78,9 @@
 {% elif 'open' in route_status_lower or 'depart' in route_status_lower or 'pickup' in route_status_lower %}
   {% set route_status_label = 'OPEN' %}
   {% set route_status_tone = 'open' %}
+{% elif 'review' in route_status_lower or 'issue' in route_status_lower or 'blocked' in route_status_lower or 'blocker' in route_status_lower %}
+  {% set route_status_label = 'REVIEW ISSUE' %}
+  {% set route_status_tone = 'risk' %}
 {% else %}
   {% set route_status_label = route_status_raw|upper %}
   {% set route_status_tone = 'ready' %}
@@ -99,11 +102,17 @@
   </div>
 
   <div class="md-flow-top-actions" aria-label="Live flow workflow actions">
-    <a class="md-flow-action-tab primary" href="{{ depart_url or add_stop_url or '#' }}"
-       {% if depart_url %}data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow"{% else %}data-flow-open-url="{{ add_stop_url or '#' }}" data-flow-panel-title="Add Stop"{% endif %}>
+    {% if depart_url and primary_stop %}
+    <a class="md-flow-action-tab primary" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow">
       <strong>Depart</strong>
       <span>Departure / proof</span>
     </a>
+    {% elif add_stop_url %}
+    <a class="md-flow-action-tab primary" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}" data-flow-panel-title="Add Stop">
+      <strong>Add Stop</strong>
+      <span>Log next stop</span>
+    </a>
+    {% endif %}
     {% for route_action in board_ctas %}
       <a class="md-flow-action-tab primary" href="{{ urls.get(route_action.action) }}" data-flow-open-url="{{ urls.get(route_action.action) }}" data-flow-panel-title="{{ route_action.label }}">
         <strong>{{ route_action.label.replace(' Route', '').replace(' Document', '') }}</strong>
@@ -399,8 +408,7 @@
             </button>
           {% endfor %}
           {% if primary_stop %}
-            {% set primary_risk = primary_stop.has_damage or primary_stop.has_issue %}
-            <button class="md-flow-row tone-{{ 'blocked' if primary_risk else 'active' }}" type="button"
+            <button class="md-flow-row tone-{{ primary_stop.badge.row_tone }}" type="button"
                     data-flow-row
                     data-detail-template="primary-stop"
                     data-title="Stop {{ primary_stop.sequence }} - {{ primary_stop.plant_name }}"
@@ -411,17 +419,33 @@
                     data-document-url="{{ document_url or '#' }}">
               <span class="flow-code">{{ primary_stop.board_code or 'STP-' ~ primary_stop.sequence }}</span>
               <span class="flow-detail">{{ primary_stop.board_detail or (primary_stop.plant_name ~ ' · ' ~ primary_stop.arrived_with ~ ' → ' ~ primary_stop.departed_with) }}</span>
-              <span class="flow-status status-{{ 'blocked' if primary_risk else 'open' }}">{{ 'RISK' if primary_risk else 'OPEN' }}</span>
+              <span class="flow-status status-{{ primary_stop.badge.pill_tone }}">{{ primary_stop.badge.label }}</span>
             </button>
-          {% elif primary_event %}
+          {% endif %}
+          {% for stop in completed_stops %}
+            <button class="md-flow-row tone-{{ stop.badge.row_tone }}" type="button"
+                    data-flow-row
+                    data-detail-template="completed-stop-{{ loop.index0 }}"
+                    data-title="Stop {{ stop.sequence }} - {{ stop.plant_name }}"
+                    data-sheet-url="{{ route_sheet_url or stop.view_url or '#' }}"
+                    data-depart-url="#"
+                    data-proof-url="{{ stop.view_url or route_sheet_url or '#' }}"
+                    data-damage-url="{{ damage_url or '#' }}"
+                    data-document-url="{{ document_url or '#' }}">
+              <span class="flow-code">{{ stop.board_code or 'STP-' ~ stop.sequence }}</span>
+              <span class="flow-detail">{{ stop.board_detail or (stop.plant_name ~ ' · ' ~ stop.arrived_with ~ ' → ' ~ stop.departed_with) }}</span>
+              <span class="flow-status status-{{ stop.badge.pill_tone }}">{{ stop.badge.label }}</span>
+            </button>
+          {% endfor %}
+          {% if primary_event and not primary_stop %}
             {% set event_detail = primary_event.details[0] if primary_event.details else none %}
             {% set event_sheet_url = route_sheet_url or (event_detail.view_url if event_detail else '') %}
             {% set event_proof_url = (event_detail.view_url if event_detail else '') or route_sheet_url %}
-            {% set event_status_label = 'RISK' if primary_event.tone in ['blocked', 'needs_review'] else ('HOT' if primary_event.tone == 'hot' else ('EMPTY' if primary_event.kind == 'empty' else 'RECORDED')) %}
-            {% set event_status_tone = 'blocked' if primary_event.tone in ['blocked', 'needs_review'] else ('hot' if primary_event.tone == 'hot' else ('empty' if primary_event.kind == 'empty' else 'recorded')) %}
+            {% set event_status_label = primary_event.badge.label %}
+            {% set event_status_tone = primary_event.badge.pill_tone %}
             {% set event_code = event_detail.board_code if event_detail and event_detail.board_code else 'STP-' ~ (event_detail.sequence if event_detail else primary_event.count) %}
             {% set event_row_detail = event_detail.board_detail if event_detail and event_detail.board_detail else primary_event.board_detail or primary_event.route_line %}
-            <button class="md-flow-row tone-{{ primary_event.tone }}" type="button"
+            <button class="md-flow-row tone-{{ primary_event.badge.row_tone }}" type="button"
                     data-flow-row
                     data-detail-template="primary-event"
                     data-title="{{ primary_event.title }}"
@@ -434,32 +458,16 @@
               <span class="flow-detail">{{ event_row_detail }}{% if primary_event.kind != 'empty' and primary_event.load_count_label %} &middot; {{ primary_event.load_count_label }}{% endif %}</span>
               <span class="flow-status status-{{ event_status_tone }}">{{ event_status_label }}</span>
             </button>
-          {% elif completed_stops %}
-            {% set last_stop = completed_stops|last %}
-            {% set last_stop_risk = last_stop.has_damage or last_stop.has_issue %}
-            <button class="md-flow-row tone-{{ 'blocked' if last_stop_risk else 'completed' }}" type="button"
-                    data-flow-row
-                    data-detail-template="last-stop"
-                    data-title="Stop {{ last_stop.sequence }} - {{ last_stop.plant_name }}"
-                    data-sheet-url="{{ route_sheet_url or last_stop.view_url or '#' }}"
-                    data-depart-url="#"
-                    data-proof-url="{{ last_stop.view_url or route_sheet_url or '#' }}"
-                    data-damage-url="{{ damage_url or '#' }}"
-                    data-document-url="{{ document_url or '#' }}">
-              <span class="flow-code">{{ last_stop.board_code or 'STP-' ~ last_stop.sequence }}</span>
-              <span class="flow-detail">{{ last_stop.board_detail or (last_stop.plant_name ~ ' · ' ~ last_stop.arrived_with ~ ' → ' ~ last_stop.departed_with) }}</span>
-              <span class="flow-status status-{{ 'blocked' if last_stop_risk else 'completed' }}">{{ 'RISK' if last_stop_risk else 'CLOSED' }}</span>
-            </button>
           {% endif %}
           {% for item in recurring_events[:5] %}
             {% set detail = item.details[0] if item.details else none %}
             {% set item_sheet_url = route_sheet_url or (detail.view_url if detail else '') %}
             {% set item_proof_url = (detail.view_url if detail else '') or route_sheet_url %}
-            {% set item_status_label = 'RISK' if item.tone in ['blocked', 'needs_review'] else ('HOT' if item.tone == 'hot' else ('EMPTY' if item.kind == 'empty' else 'RECORDED')) %}
-            {% set item_status_tone = 'blocked' if item.tone in ['blocked', 'needs_review'] else ('hot' if item.tone == 'hot' else ('empty' if item.kind == 'empty' else 'recorded')) %}
+            {% set item_status_label = item.badge.label %}
+            {% set item_status_tone = item.badge.pill_tone %}
             {% set item_code = detail.board_code if detail and detail.board_code else 'STP-' ~ (detail.sequence if detail else item.count) %}
             {% set item_row_detail = detail.board_detail if detail and detail.board_detail else item.board_detail or item.route_line %}
-            <button class="md-flow-row tone-{{ item.tone }}" type="button"
+            <button class="md-flow-row tone-{{ item.badge.row_tone }}" type="button"
                     data-flow-row
                     data-detail-template="event-{{ loop.index0 }}"
                     data-title="{{ item.title }}"
@@ -524,7 +532,21 @@
             </div>
           </div>
         </template>
-      {% elif primary_event %}
+      {% endif %}
+      {% for stop in completed_stops %}
+        <template data-flow-detail-template="completed-stop-{{ loop.index0 }}">
+          <div class="flow-selected-detail">
+            <h4>Stop {{ stop.sequence }} route details</h4>
+            <div class="route-detail-grid">
+              <div><span>Arrived with</span><strong>{{ stop.arrived_with }}</strong></div>
+	              <div><span>Departed with</span><strong>{{ 'No Pickup' if stop.no_pickup else stop.departed_with }}</strong></div>
+              <div><span>Status</span><strong>{{ stop.status_label }}</strong></div>
+              <div><span>Next</span><strong>{{ stop.next_action }}</strong></div>
+            </div>
+          </div>
+        </template>
+      {% endfor %}
+      {% if primary_event and not primary_stop %}
         <template data-flow-detail-template="primary-event">
           <div class="flow-selected-detail">
             <h4>{{ primary_event.title }} details</h4>
@@ -548,19 +570,6 @@
                   </span>
                 </a>
               {% endfor %}
-            </div>
-          </div>
-        </template>
-      {% elif completed_stops %}
-        {% set last_stop = completed_stops|last %}
-        <template data-flow-detail-template="last-stop">
-          <div class="flow-selected-detail">
-            <h4>Stop {{ last_stop.sequence }} route details</h4>
-            <div class="route-detail-grid">
-              <div><span>Arrived with</span><strong>{{ last_stop.arrived_with }}</strong></div>
-	              <div><span>Departed with</span><strong>{{ 'No Pickup' if last_stop.no_pickup else last_stop.departed_with }}</strong></div>
-              <div><span>Status</span><strong>{{ last_stop.status_label }}</strong></div>
-              <div><span>Next</span><strong>{{ last_stop.next_action }}</strong></div>
             </div>
           </div>
         </template>

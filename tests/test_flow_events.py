@@ -163,4 +163,4 @@ def test_flow_map_dashboard_exposes_lane_first_contract(app):
     assert 'data-component="FlowMapDashboard"' in body
     assert "WIP / Production" in body
     assert "Manifested" in body
-    assert "The visual map is the product. The event ledger is the truth. Status is only a projection." in body
+    assert 'aria-label="View Production Flow facility map"' in body

@@ -330,7 +330,7 @@ def test_driver_dashboard_renders_route_narrative_cards(client, app):
     assert "LIVE FLOW BOARD" in body
     assert 'data-flow-row' in body
     assert 'data-flow-open-url' in body
-    assert 'data-live-flow-work-panel' in body
+    assert 'data-md-flow-work-panel' in body
     assert body.count('class="route-focus-card') == 0
     assert '<div class="compact-flow-canvas"' not in body
     assert 'class="route-narrative-count"' not in body
