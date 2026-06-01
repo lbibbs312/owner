@@ -26,7 +26,7 @@
     attributionTtlDays: 90,
     // Paste a form endpoint to make pilot/contact forms submit without a mail client.
     // e.g. Formspree: "https://formspree.io/f/xxxxxxx". Empty = fall back to the email app.
-    formEndpoint: ""
+    formEndpoint: "https://formspree.io/f/mdajrjvz"
   };
 </script>
 <script>
@@ -881,7 +881,10 @@
     <div class="cta-inner obs">
       <h2>See your plant floor<br>as one live board.</h2>
       <p>15-minute demo. We'll show how a mismatch alert fires from a real plant-floor scenario.</p>
-      <form id="pilot-form" class="lead-form" action="mailto:bibbstechnology@gmail.com" method="post" enctype="text/plain" data-md-form="pilot" data-md-mailto="bibbstechnology@gmail.com" data-md-subject="MoveDefense pilot request">
+      <form id="pilot-form" class="lead-form" action="https://formspree.io/f/mdajrjvz" method="POST" data-md-form="pilot" data-md-mailto="bibbstechnology@gmail.com" data-md-subject="MoveDefense pilot request">
+        <input type="hidden" name="_subject" value="MoveDefense — pilot request" />
+        <input type="hidden" name="form_type" value="pilot" />
+        <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none" />
         <div class="form-grid">
           <label class="form-field">
             <span>Name</span>
@@ -931,7 +934,10 @@
       <div class="contact-block" id="contact">
         <h3>Have a question first?</h3>
         <p>Send a short note. Attribution fields are attached only to this public marketing message.</p>
-        <form id="contact-form" class="contact-form" action="mailto:bibbstechnology@gmail.com" method="post" enctype="text/plain" data-md-form="contact" data-md-mailto="bibbstechnology@gmail.com" data-md-subject="MoveDefense contact request">
+        <form id="contact-form" class="contact-form" action="https://formspree.io/f/mdajrjvz" method="POST" data-md-form="contact" data-md-mailto="bibbstechnology@gmail.com" data-md-subject="MoveDefense contact request">
+          <input type="hidden" name="_subject" value="MoveDefense — contact request" />
+          <input type="hidden" name="form_type" value="contact" />
+          <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none" />
           <div class="form-grid">
             <label class="form-field">
               <span>Name</span>
