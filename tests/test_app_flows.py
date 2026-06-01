@@ -5472,6 +5472,11 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert b"PostTrip Due" in page.data
     assert "Production Flow" not in body
     assert "LIVE FLOW BOARD" in body
+    assert 'data-flow-open-panel="depart"' in body
+    assert "data-depart-wizard" in body
+    assert "live-flow-work-scrim" in body
+    assert "Did you get unloaded?" in body
+    assert "Depart / Load" not in body
     assert page.data.count(b"PostTrip Due") == 1
 
 

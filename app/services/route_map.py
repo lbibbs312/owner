@@ -140,7 +140,7 @@ def _service_board_detail(log, label, route_pretrip=None):
             delta = log.fuel_mileage - start_mileage
             return f"+{delta:,} mi from pre-trip"
         return f"{log.fuel_mileage:,} mi recorded"
-    return f"{label} - {service_stop_label(log).lower()}"
+    return f"{label} · {service_stop_label(log).lower()}"
 
 
 def _board_stop_detail(log, label, arrived_with, departed_with, wait_label="", route_pretrip=None):
@@ -152,11 +152,11 @@ def _board_stop_detail(log, label, arrived_with, departed_with, wait_label="", r
     departed = _board_cargo_label(departed_with) if closed else "--"
     no_pickup = bool(getattr(log, "no_pickup", False))
     if closed and no_pickup and arrived == "Empty" and departed == "Empty":
-        return f"{label} - empty return"
+        return f"{label} · empty return"
 
-    detail = f"{label} - {arrived} -> {departed}"
+    detail = f"{label} · {arrived} → {departed}"
     if wait_label and wait_label != NOT_TRACKED:
-        detail = f"{detail} - {wait_label}"
+        detail = f"{detail} · {wait_label}"
     return detail
 
 
@@ -546,6 +546,7 @@ def _add_narrative_detail(groups, key, group, detail):
     if key not in groups:
         groups[key] = group
     target = groups[key]
+    risk_flags = {"Hold", "Needs review", "Verify route"}
     target["count"] += 1
     target["load_count_label"] = _load_count_label(target["count"])
     target["stop_count_label"] = _stop_count_label(len(target["details"]) + 1)
@@ -556,6 +557,10 @@ def _add_narrative_detail(groups, key, group, detail):
     for flag in detail.get("flags") or []:
         if flag not in target["flags"]:
             target["flags"].append(flag)
+        if flag in risk_flags:
+            target["tone"] = "blocked"
+        elif flag == "Hot" and target.get("tone") != "blocked":
+            target["tone"] = "hot"
     target["details"].append(detail)
 
 
@@ -641,7 +646,7 @@ def _build_delivery_narratives(route_context):
                 "delivery",
                 title=f"{destination_label} delivery from {origin_label}",
                 route_line=f"{cargo_label} delivered from {origin_label} to {destination_label}",
-                board_detail=f"{origin_label} -> {destination_label} - {cargo_label}",
+                board_detail=f"{origin_label} → {destination_label} · {cargo_label}",
                 origin_label=origin_label,
                 destination_label=destination_label,
             )
@@ -656,7 +661,7 @@ def _build_delivery_narratives(route_context):
                 "empty",
                 title=f"{plant_label_text} empty load",
                 route_line=f"Arrived empty and departed empty at {plant_label_text}",
-                board_detail=f"{plant_label_text} - empty return",
+                board_detail=f"{plant_label_text} · empty return",
                 destination_label=plant_label_text,
             )
             detail = _base_stop_detail(log, row, route, cargo_label="Empty load")

@@ -110,7 +110,7 @@ def test_driver_route_map_with_driver_log_returns_stop_nodes(app):
     assert ctx["stops"][0]["status"] == "completed"
     assert ctx["stops"][1]["status"] == "active"
     assert ctx["stops"][0]["board_code"] == "STP-1"
-    assert ctx["stops"][1]["board_detail"].startswith("Paint West - Empty -> --")
+    assert ctx["stops"][1]["board_detail"].startswith("Paint West · Empty → --")
     assert ctx["route"]["current_stop_id"] == active.id
     assert ctx["route"]["current_location"] == "Paint West"
 
@@ -162,7 +162,7 @@ def test_driver_route_map_aggregates_delivery_and_empty_load_narratives(app):
     assert "Hot" in delivery["flags"]
     assert delivery["details"][0]["pickup_label"].startswith("Picked up at Paint Central")
     assert empty["title"] == "Paint Central empty load"
-    assert empty["board_detail"] == "Paint Central - empty return"
+    assert empty["board_detail"] == "Paint Central · empty return"
     assert empty["details"][0]["board_code"] == "STP-5"
     assert empty["count"] == 1
     assert "No pickup" in empty["flags"]

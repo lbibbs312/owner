@@ -99,7 +99,8 @@
   </div>
 
   <div class="live-flow-top-actions" aria-label="Live flow workflow actions">
-    <a class="live-flow-action-tab primary" href="{{ depart_url or add_stop_url or '#' }}" data-flow-open-url="{{ depart_url or add_stop_url or '#' }}" data-flow-panel-title="Record Departure">
+    <a class="live-flow-action-tab primary" href="{{ depart_url or add_stop_url or '#' }}"
+       {% if depart_url %}data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow"{% else %}data-flow-open-url="{{ add_stop_url or '#' }}" data-flow-panel-title="Add Stop"{% endif %}>
       <strong>Depart</strong>
       <span>Departure / proof</span>
     </a>
@@ -109,7 +110,7 @@
         <span>{% if route_action.action == 'finalize_route' %}Ready To Finalize{% elif route_action.action == 'print_route' %}Route packet{% elif route_action.action == 'attach_document' %}Proof document{% elif route_action.action == 'confirm_cargo' %}Cargo check{% else %}{{ cta.next_action or route_action.label }}{% endif %}</span>
       </a>
     {% endfor %}
-    <a class="live-flow-action-tab" href="{{ depart_url or route_sheet_url or '#' }}" data-flow-open-url="{{ depart_url or route_sheet_url or '#' }}" data-flow-panel-title="Camera / Proof">
+    <a class="live-flow-action-tab" href="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-open-url="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-panel-title="Camera / Proof">
       <strong>Camera</strong>
       <span>Photo proof</span>
     </a>
@@ -143,14 +144,116 @@
   {% endif %}
 
   <div class="live-flow-work-panel" data-live-flow-work-panel hidden>
-    <div class="live-flow-work-head">
-      <div>
-        <span>WORK WINDOW</span>
-        <strong data-live-flow-work-title>Route detail</strong>
+    <button class="live-flow-work-scrim" type="button" data-live-flow-close aria-label="Close work window"></button>
+    <div class="live-flow-work-card" role="dialog" aria-modal="true" aria-labelledby="liveFlowWorkTitle">
+      <div class="live-flow-work-head">
+        <div>
+          <span>WORK WINDOW</span>
+          <strong id="liveFlowWorkTitle" data-live-flow-work-title>Route detail</strong>
+        </div>
+        <button type="button" data-live-flow-close>Close</button>
       </div>
-      <button type="button" data-live-flow-close>Close</button>
-    </div>
-    <div class="live-flow-context" data-live-flow-context></div>
+      <div class="live-flow-context" data-live-flow-context></div>
+      <div class="live-flow-inline-panel depart-quick-flow" data-flow-inline-panel="depart" hidden>
+        {% if depart_url and primary_stop %}
+          {% set depart_code = primary_stop.board_code or 'STP-' ~ primary_stop.sequence %}
+          {% set is_service_depart = depart_code in ['FUEL', 'RYDR', 'MTN', 'MTG', 'SRVC'] %}
+          <form class="depart-wizard" method="POST" action="{{ depart_url }}" data-depart-wizard>
+            <input type="hidden" name="unloaded_on_departure" data-depart-field="unloaded_on_departure" value="{{ 'yes' if is_service_depart else '' }}">
+            <input type="hidden" name="unload_reason" data-depart-field="unload_reason" value="">
+            <input type="hidden" name="secondary_dropped_on_departure" data-depart-field="secondary_dropped_on_departure" value="{{ 'yes' if is_service_depart else '' }}">
+            <input type="hidden" name="secondary_unload_reason" data-depart-field="secondary_unload_reason" value="">
+            <input type="hidden" name="got_loaded" data-depart-field="got_loaded" value="{{ 'no' if is_service_depart else '' }}">
+            <input type="hidden" name="destination" data-depart-field="destination" value="">
+            <input type="hidden" name="secondary_destination" data-depart-field="secondary_destination" value="">
+            <input type="hidden" name="secondary_load_type" data-depart-field="secondary_load_type" value="load">
+            <input type="hidden" name="cargo_override_reason" data-depart-field="cargo_override_reason" value="">
+            <div class="depart-progress" aria-label="Depart progress">
+              <span class="is-active" data-depart-progress="0"></span>
+              <span data-depart-progress="1"></span>
+              <span data-depart-progress="2"></span>
+              <span data-depart-progress="3"></span>
+              <span data-depart-progress="4"></span>
+            </div>
+            <section class="depart-step is-active" data-depart-step="0">
+              <span class="depart-step-kicker">{{ depart_code }} &middot; depart</span>
+              <h4>{% if is_service_depart %}Close this service stop?{% else %}Did you get unloaded?{% endif %}</h4>
+              <div class="depart-choice-grid">
+                <button type="button" data-depart-choice data-field="unloaded_on_departure" data-value="yes" data-mirror-secondary="true" data-next-step="{{ 1 if not is_service_depart else 4 }}">Yes</button>
+                {% if not is_service_depart %}
+                  <button type="button" data-depart-choice data-field="unloaded_on_departure" data-value="no" data-mirror-secondary="true" data-show-reason="unload">No</button>
+                {% endif %}
+              </div>
+              {% if is_service_depart %}
+                <p class="depart-hint">Cargo questions stay skipped for fuel, Ryder, maintenance, and meeting stops.</p>
+              {% endif %}
+              <div class="depart-reason" data-depart-reason="unload" hidden>
+                <label for="departUnloadReason">Why not?</label>
+                <textarea id="departUnloadReason" data-depart-text="unload_reason" data-mirror-text="secondary_unload_reason" placeholder="Short reason for manager review"></textarea>
+                <button type="button" data-depart-next="1">Continue</button>
+              </div>
+            </section>
+            <section class="depart-step" data-depart-step="1">
+              <span class="depart-step-kicker">load check</span>
+              <h4>Did you get loaded?</h4>
+              <div class="depart-choice-grid">
+                <button type="button" data-depart-choice data-field="got_loaded" data-value="yes" data-next-step="2">Yes</button>
+                <button type="button" data-depart-choice data-field="got_loaded" data-value="no" data-next-step="3">No</button>
+              </div>
+            </section>
+            <section class="depart-step" data-depart-step="2">
+              <span class="depart-step-kicker">destination</span>
+              <h4>Where are you going next?</h4>
+              <label for="departDestination">Primary destination</label>
+              <select id="departDestination" data-depart-select="destination">
+                <option value="">Select destination</option>
+                {% for code, label in PLANT_LABELS.items() %}
+                  <option value="{{ code }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+              <p class="depart-error" data-depart-error hidden>Select a destination before confirming a loaded departure.</p>
+              <div class="depart-step-actions">
+                <button type="button" data-depart-prev="1">Back</button>
+                <button type="button" data-depart-next="3" data-require-destination>Continue</button>
+              </div>
+            </section>
+            <section class="depart-step" data-depart-step="3">
+              <span class="depart-step-kicker">exception check</span>
+              <h4>Any damage, issue, or proof note?</h4>
+              <div class="depart-choice-grid">
+                <button type="button" data-depart-choice data-field="cargo_override_reason" data-value="" data-next-step="4">No issue</button>
+                <a class="depart-risk-link" href="{{ damage_url or '#' }}">&#9650; Damage / missing proof</a>
+              </div>
+              <label for="departProofNote">Optional note</label>
+              <textarea id="departProofNote" data-depart-text="cargo_override_reason" placeholder="Short note only if something needs review"></textarea>
+              <div class="depart-step-actions">
+                <button type="button" data-depart-prev="2">Back</button>
+                <button type="button" data-depart-next="4">Continue</button>
+              </div>
+            </section>
+            <section class="depart-step" data-depart-step="4">
+              <span class="depart-step-kicker">confirm</span>
+              <h4>Confirm departure</h4>
+              <div class="depart-confirm-grid" aria-live="polite">
+                <div><span>Unloaded</span><strong data-depart-summary="unloaded_on_departure">--</strong></div>
+                <div><span>Loaded</span><strong data-depart-summary="got_loaded">--</strong></div>
+                <div><span>Next</span><strong data-depart-summary="destination">--</strong></div>
+              </div>
+              <div class="depart-step-actions">
+                <button type="button" data-depart-prev="3">Back</button>
+                <button class="depart-submit" type="submit">Record Departure</button>
+              </div>
+              <a class="live-flow-panel-link ghost" href="{{ url_for('driver.driver_logs') }}">Open DL</a>
+            </section>
+          </form>
+        {% else %}
+          <div class="depart-empty">
+            <h4>No open stop</h4>
+            <p>Start or open a stop before recording departure.</p>
+            <a class="live-flow-panel-link" href="{{ add_stop_url or url_for('driver.new_driving_log') }}">Add Stop</a>
+          </div>
+        {% endif %}
+      </div>
     <div class="live-flow-inline-panel" data-flow-inline-panel="maintenance" hidden>
       <div class="inline-maintenance-grid">
         <section>
@@ -269,6 +372,7 @@
     <div class="live-flow-embed-wrap" data-live-flow-embed-wrap hidden>
       <iframe title="Live flow work window" name="live-flow-work-frame" data-live-flow-frame loading="lazy"></iframe>
     </div>
+    </div>
   </div>
 
   {% if (rm and rm.stops) or board_tasks %}
@@ -293,7 +397,8 @@
             </button>
           {% endfor %}
           {% if primary_stop %}
-            <button class="live-flow-row tone-active" type="button"
+            {% set primary_risk = primary_stop.has_damage or primary_stop.has_issue %}
+            <button class="live-flow-row tone-{{ 'blocked' if primary_risk else 'active' }}" type="button"
                     data-flow-row
                     data-detail-template="primary-stop"
                     data-title="Stop {{ primary_stop.sequence }} - {{ primary_stop.plant_name }}"
@@ -303,15 +408,15 @@
                     data-damage-url="{{ damage_url or '#' }}"
                     data-document-url="{{ document_url or '#' }}">
               <span class="flow-code">{{ primary_stop.board_code or 'STP-' ~ primary_stop.sequence }}</span>
-              <span class="flow-detail">{{ primary_stop.board_detail or (primary_stop.plant_name ~ ' - ' ~ primary_stop.arrived_with ~ ' -> ' ~ primary_stop.departed_with) }}</span>
-              <span class="flow-status status-open">OPEN</span>
+              <span class="flow-detail">{{ primary_stop.board_detail or (primary_stop.plant_name ~ ' · ' ~ primary_stop.arrived_with ~ ' → ' ~ primary_stop.departed_with) }}</span>
+              <span class="flow-status status-{{ 'blocked' if primary_risk else 'open' }}">{{ 'RISK' if primary_risk else 'OPEN' }}</span>
             </button>
           {% elif primary_event %}
             {% set event_detail = primary_event.details[0] if primary_event.details else none %}
             {% set event_sheet_url = route_sheet_url or (event_detail.view_url if event_detail else '') %}
             {% set event_proof_url = (event_detail.view_url if event_detail else '') or route_sheet_url %}
-            {% set event_status_label = 'EMPTY' if primary_event.kind == 'empty' else 'RECORDED' %}
-            {% set event_status_tone = 'empty' if primary_event.kind == 'empty' else 'recorded' %}
+            {% set event_status_label = 'RISK' if primary_event.tone in ['blocked', 'needs_review'] else ('HOT' if primary_event.tone == 'hot' else ('EMPTY' if primary_event.kind == 'empty' else 'RECORDED')) %}
+            {% set event_status_tone = 'blocked' if primary_event.tone in ['blocked', 'needs_review'] else ('hot' if primary_event.tone == 'hot' else ('empty' if primary_event.kind == 'empty' else 'recorded')) %}
             {% set event_code = event_detail.board_code if event_detail and event_detail.board_code else 'STP-' ~ (event_detail.sequence if event_detail else primary_event.count) %}
             {% set event_row_detail = event_detail.board_detail if event_detail and event_detail.board_detail else primary_event.board_detail or primary_event.route_line %}
             <button class="live-flow-row tone-{{ primary_event.tone }}" type="button"
@@ -329,7 +434,8 @@
             </button>
           {% elif completed_stops %}
             {% set last_stop = completed_stops|last %}
-            <button class="live-flow-row tone-completed" type="button"
+            {% set last_stop_risk = last_stop.has_damage or last_stop.has_issue %}
+            <button class="live-flow-row tone-{{ 'blocked' if last_stop_risk else 'completed' }}" type="button"
                     data-flow-row
                     data-detail-template="last-stop"
                     data-title="Stop {{ last_stop.sequence }} - {{ last_stop.plant_name }}"
@@ -339,16 +445,16 @@
                     data-damage-url="{{ damage_url or '#' }}"
                     data-document-url="{{ document_url or '#' }}">
               <span class="flow-code">{{ last_stop.board_code or 'STP-' ~ last_stop.sequence }}</span>
-              <span class="flow-detail">{{ last_stop.board_detail or (last_stop.plant_name ~ ' - ' ~ last_stop.arrived_with ~ ' -> ' ~ last_stop.departed_with) }}</span>
-              <span class="flow-status status-completed">CLOSED</span>
+              <span class="flow-detail">{{ last_stop.board_detail or (last_stop.plant_name ~ ' · ' ~ last_stop.arrived_with ~ ' → ' ~ last_stop.departed_with) }}</span>
+              <span class="flow-status status-{{ 'blocked' if last_stop_risk else 'completed' }}">{{ 'RISK' if last_stop_risk else 'CLOSED' }}</span>
             </button>
           {% endif %}
           {% for item in recurring_events[:5] %}
             {% set detail = item.details[0] if item.details else none %}
             {% set item_sheet_url = route_sheet_url or (detail.view_url if detail else '') %}
             {% set item_proof_url = (detail.view_url if detail else '') or route_sheet_url %}
-            {% set item_status_label = 'EMPTY' if item.kind == 'empty' else 'RECORDED' %}
-            {% set item_status_tone = 'empty' if item.kind == 'empty' else 'recorded' %}
+            {% set item_status_label = 'RISK' if item.tone in ['blocked', 'needs_review'] else ('HOT' if item.tone == 'hot' else ('EMPTY' if item.kind == 'empty' else 'RECORDED')) %}
+            {% set item_status_tone = 'blocked' if item.tone in ['blocked', 'needs_review'] else ('hot' if item.tone == 'hot' else ('empty' if item.kind == 'empty' else 'recorded')) %}
             {% set item_code = detail.board_code if detail and detail.board_code else 'STP-' ~ (detail.sequence if detail else item.count) %}
             {% set item_row_detail = detail.board_detail if detail and detail.board_detail else item.board_detail or item.route_line %}
             <button class="live-flow-row tone-{{ item.tone }}" type="button"
