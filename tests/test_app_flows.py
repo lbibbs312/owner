@@ -5481,7 +5481,8 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "content: '→'" in body
     assert "content: '•'" in body
     assert "content: '▲'" in body
-    assert "&diams; ROUTE LOGS" in body
+    assert "ROUTE LOGS &nbsp; PLANT TRANSFERS" in body
+    assert "&diams;" not in body
     assert ".live-flow-work-card::before" in body
     assert ".flow-status::after" in body
     assert page.data.count(b"PostTrip Due") == 1
