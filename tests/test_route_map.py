@@ -286,11 +286,15 @@ def test_driver_dashboard_renders_route_narrative_cards(client, app):
     body = resp.get_data(as_text=True)
     assert "Raleigh East delivery from Paint Central" in body
     assert "Raleigh East Load delivered from Paint Central to Raleigh East" in body
-    assert "x2" in body
+    assert "2 loads" in body
+    assert "2 stops" in body
     assert "P-RE-8" in body
     assert "HOT P-RE-10" in body
     assert "Paint Central empty load" in body
     assert "Arrived empty and departed empty at Paint Central" in body
+    assert body.count('class="route-focus-card') == 1
+    assert '<div class="compact-flow-canvas"' not in body
+    assert 'class="route-narrative-count"' not in body
 
 
 def test_driver_dashboard_renders_with_no_assigned_requests(client, app):

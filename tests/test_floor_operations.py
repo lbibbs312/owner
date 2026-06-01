@@ -240,4 +240,4 @@ def test_driver_dashboard_survives_no_assigned_requests(client, app):
     assert "No route stops logged for this date." in body
     assert "Assigned Move Queue" not in body
     assert "No assigned moves" not in body
-    assert "Next Action" in body
+    assert "Next Action" not in body

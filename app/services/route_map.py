@@ -583,7 +583,15 @@ def _build_delivery_narratives(route_context):
             pending_by_cargo[_norm_key(cargo_label)] = info
             pending_by_destination[destination_key] = info
 
-    return list(groups.values())
+    return sorted(
+        groups.values(),
+        key=lambda item: (
+            item.get("count") or 0,
+            item.get("kind") == "delivery",
+            item.get("latest_departure_at") or "",
+        ),
+        reverse=True,
+    )
 
 
 def _plant_seed(plants, label, *, role="driver"):

@@ -536,7 +536,8 @@ def test_mobile_dashboard_uses_compact_shared_production_flow(client, app):
     assert "Production Flow" not in body
     assert 'data-production-flow-lazy' not in body
     assert "/mobile/production-flow-fragment" not in body
-    assert '<section class="driver-next-card">' in body
+    assert '<section class="driver-next-card">' not in body
+    assert '<div class="compact-flow-canvas"' not in body
     assert "full 2D" not in body
 
     fragment = client.get("/mobile/production-flow-fragment")

@@ -14,19 +14,17 @@
     {% endif %}
   {% endfor %}
 {% endif %}
-{% set map_stops = [] %}
-{% if active_stops %}
-  {% if completed_stops %}
-    {% set _ = map_stops.append(completed_stops|last) %}
-  {% endif %}
-  {% for stop in active_stops[:4] %}
-    {% set _ = map_stops.append(stop) %}
-  {% endfor %}
-  {% elif rm and rm.stops %}
-  {% for stop in rm.stops[:5] %}
-    {% set _ = map_stops.append(stop) %}
+{% set primary_stop = active_stops[0] if active_stops else none %}
+{% set primary_event = rm.delivery_narratives[0] if rm and rm.delivery_narratives else none %}
+{% set recurring_events = [] %}
+{% if rm and rm.delivery_narratives %}
+  {% for item in rm.delivery_narratives %}
+    {% if primary_stop or not primary_event or item.key != primary_event.key %}
+      {% set _ = recurring_events.append(item) %}
+    {% endif %}
   {% endfor %}
 {% endif %}
+
 <section class="compact-route-map" data-route-map-shell data-route-map-mode="route">
   <div class="compact-map-head">
     <div>
@@ -37,142 +35,148 @@
       <strong>{{ rm.route.next_action or 'No action needed' }}</strong>
     {% endif %}
   </div>
+  {% if map_mode == 'route_replay' %}
+    <p class="compact-map-note">Last Route / Route Replay. Live route actions are hidden.</p>
+  {% endif %}
 
   {% if rm and rm.stops %}
-    {% if map_stops %}
-      <div class="compact-flow-canvas" aria-label="Route locations">
-        <div class="compact-map-nodes" style="--node-count: {{ map_stops|length }};">
-          {% for stop in map_stops %}
-            <button class="compact-route-node status-{{ stop.status }} {% if rm.route.current_stop_id == stop.stop_id %}active{% endif %}"
-                    type="button"
-                    data-route-map-open="stop"
-                    data-route-map-id="{{ stop.stop_id }}">
-              <span class="compact-route-code">{{ stop.short_code or stop.sequence }}</span>
-              <span class="compact-route-label">{{ stop.plant_name }}</span>
-              <small>{{ stop.status_label }}</small>
-            </button>
-            {% if not loop.last %}<span class="compact-route-lane status-{{ stop.status }}" aria-hidden="true"></span>{% endif %}
-          {% endfor %}
-        </div>
-	        <p class="compact-map-note">
-	          {% if map_mode == 'route_replay' %}
-	            Last Route / Route Replay. Live route actions are hidden.
-	          {% elif active_stops %}
-	            Current work first. Completed stops stay collapsed below.
-	          {% else %}
-	            Current work is closed. Completed stops are below.
-          {% endif %}
-        </p>
-      </div>
-    {% endif %}
-
-    <div class="compact-stop-list">
-      {% for stop in active_stops %}
-        <button class="compact-stop status-{{ stop.status }} {% if rm.route.current_stop_id == stop.stop_id %}active{% endif %}"
-                type="button"
-                data-route-map-open="stop"
-                data-route-map-id="{{ stop.stop_id }}">
-          <span class="compact-stop-marker">{{ stop.sequence }}</span>
-          <span class="compact-stop-main">
-            <strong>{{ stop.plant_name }}</strong>
-            <small>{{ stop.arrival_at|display_time if stop.arrival_at else 'No current data' }}{% if stop.departure_at %} &rarr; {{ stop.departure_at|to_12h_format }}{% else %} &rarr; open{% endif %}</small>
-            <small>{{ stop.cargo_status }} &middot; {{ stop.next_action }}</small>
+    {% if primary_stop %}
+      <details class="route-focus-card tone-{{ primary_stop.status }}">
+        <summary>
+          <span class="route-focus-rail">STOP {{ primary_stop.sequence }}</span>
+          <span class="route-focus-main">
+            <strong>{{ primary_stop.plant_name }}</strong>
+            <small>
+              Arrived {{ primary_stop.arrival_at|display_time if primary_stop.arrival_at else 'with no arrival time' }}
+              with {{ primary_stop.arrived_with }}.
+              {% if primary_stop.departure_at %}
+                Departed {{ primary_stop.departure_at|to_12h_format }} with {{ primary_stop.departed_with }}.
+              {% else %}
+                Departure is still open; {{ primary_stop.next_action|lower }}.
+              {% endif %}
+            </small>
+            <span class="route-focus-footer">
+              <em>Stop {{ primary_stop.sequence }}</em>
+              <em>{{ primary_stop.status_label }}</em>
+              <em>{{ primary_stop.arrived_with }} to {{ primary_stop.departed_with }}</em>
+            </span>
           </span>
-          <em>{{ stop.status_label }}</em>
-        </button>
-      {% else %}
-        {% if completed_stops %}
-          <p class="compact-empty">Current work is closed. Completed stops are below.</p>
-        {% else %}
-          <p class="compact-empty">No stops logged yet.</p>
-        {% endif %}
-      {% endfor %}
-    </div>
-
-    {% if rm.delivery_narratives %}
-      <div class="route-narrative-list" aria-label="Completed route narrative">
-        {% for item in rm.delivery_narratives %}
-          <details class="route-narrative-card tone-{{ item.tone }}">
-            <summary>
-              <span class="route-narrative-count">x{{ item.count }}</span>
-              <span class="route-narrative-main">
-                <strong>{{ item.title }}</strong>
-                <small>{{ item.route_line }} · {{ item.load_count_label }} / {{ item.stop_count_label }}</small>
-                {% if item.parts or item.flags %}
-                  <span class="route-narrative-chips">
-                    {% for part in item.parts[:5] %}<em>{{ part }}</em>{% endfor %}
-                    {% for flag in item.flags[:5] %}<em class="flag">{{ flag }}</em>{% endfor %}
-                  </span>
+        </summary>
+        <div class="route-focus-details">
+          <div class="route-detail-grid">
+            <div><span>Arrived with</span><strong>{{ primary_stop.arrived_with }}</strong></div>
+            <div><span>Departed with</span><strong>{{ primary_stop.departed_with }}</strong></div>
+            <div><span>Wait</span><strong>{{ primary_stop.wait_label }}</strong></div>
+            <div><span>Next</span><strong>{{ primary_stop.next_action }}</strong></div>
+          </div>
+          {% if primary_stop.notes %}
+            <p class="route-detail-note">{{ primary_stop.notes }}</p>
+          {% endif %}
+          {% if primary_stop.actions %}
+            <div class="route-detail-actions">
+              {% for action in primary_stop.actions %}
+                {% if action.url and action.method == 'get' %}
+                  <a class="route-detail-link" href="{{ action.url }}">{{ action.label|title }}</a>
                 {% endif %}
-              </span>
-            </summary>
-            <div class="route-narrative-details">
-              {% for detail in item.details %}
-                <a class="route-narrative-detail" href="{{ detail.view_url or '#' }}">
-                  <span class="detail-stop">Stop {{ detail.sequence }}</span>
-                  <span class="detail-main">
-                    <strong>{{ detail.plant }}</strong>
-                    <small>{{ detail.arrival_at|display_time if detail.arrival_at else 'No current data' }}{% if detail.departure_at %} &rarr; {{ detail.departure_at|to_12h_format }}{% endif %}</small>
-                    {% if detail.pickup_label %}<small>{{ detail.pickup_label }}</small>{% endif %}
-                    <small>In: {{ detail.arrived_with }} / Out: {{ detail.departed_with }}</small>
-                    {% if detail.parts or detail.flags or detail.wait_label %}
-                      <span class="route-narrative-chips">
-                        {% for part in detail.parts %}<em>{{ part }}</em>{% endfor %}
-                        {% if detail.wait_label %}<em>{{ detail.wait_label }}</em>{% endif %}
-                        {% for flag in detail.flags %}<em class="flag">{{ flag }}</em>{% endfor %}
-                      </span>
-                    {% endif %}
-                    {% if detail.note %}<small>{{ detail.note }}</small>{% endif %}
-                  </span>
-                </a>
               {% endfor %}
             </div>
-          </details>
-        {% endfor %}
-      </div>
-    {% elif completed_stops %}
-      <details class="completed-stops">
-        <summary>Show completed stops ({{ completed_stops|length }})</summary>
-        <div class="compact-stop-list">
-          {% for stop in completed_stops %}
-            <button class="compact-stop status-completed"
-                    type="button"
-                    data-route-map-open="stop"
-                    data-route-map-id="{{ stop.stop_id }}">
-              <span class="compact-stop-marker">&#10003;</span>
-              <span class="compact-stop-main">
-                <strong>{{ stop.plant_name }}</strong>
-                <small>{{ stop.arrival_at|display_time if stop.arrival_at else 'No current data' }}{% if stop.departure_at %} &rarr; {{ stop.departure_at|to_12h_format }}{% endif %}</small>
-                <small>{{ stop.cargo_status }}</small>
+          {% elif primary_stop.view_url %}
+            <a class="route-detail-link" href="{{ primary_stop.view_url }}">Open Stop Details</a>
+          {% endif %}
+        </div>
+      </details>
+    {% elif primary_event %}
+      <details class="route-focus-card tone-{{ primary_event.tone }}">
+        <summary>
+          <span class="route-focus-rail">{% if primary_event.kind == 'empty' %}EMPTY LOAD{% else %}ROUTE EVENT{% endif %}</span>
+          <span class="route-focus-main">
+            <strong>{{ primary_event.title }}</strong>
+            <small>{{ primary_event.route_line }}.</small>
+            {% if primary_event.parts or primary_event.flags %}
+              <span class="route-focus-chips">
+                {% for part in primary_event.parts[:5] %}<em>{{ part }}</em>{% endfor %}
+                {% for flag in primary_event.flags[:5] %}<em class="flag">{{ flag }}</em>{% endfor %}
               </span>
-              <em>{{ stop.status_label }}</em>
-            </button>
+            {% endif %}
+            <span class="route-focus-footer">
+              <em>{{ primary_event.load_count_label }}</em>
+              <em>{{ primary_event.stop_count_label }}</em>
+              {% if primary_event.latest_departure_at %}<em>Latest {{ primary_event.latest_departure_at|to_12h_format }}</em>{% endif %}
+            </span>
+          </span>
+        </summary>
+        <div class="route-focus-details">
+          {% for detail in primary_event.details %}
+            <a class="route-detail-row" href="{{ detail.view_url or '#' }}">
+              <span class="detail-stop">Stop {{ detail.sequence }}</span>
+              <span class="detail-main">
+                <strong>{{ detail.plant }}</strong>
+                <small>
+                  {{ detail.arrival_at|display_time if detail.arrival_at else 'No arrival time' }}
+                  {% if detail.departure_at %} to {{ detail.departure_at|to_12h_format }}{% endif %}
+                </small>
+                {% if detail.pickup_label %}<small>{{ detail.pickup_label }}</small>{% endif %}
+                <small>In: {{ detail.arrived_with }} / Out: {{ detail.departed_with }}</small>
+                {% if detail.parts or detail.flags or detail.wait_label %}
+                  <span class="route-focus-chips">
+                    {% for part in detail.parts %}<em>{{ part }}</em>{% endfor %}
+                    {% if detail.wait_label %}<em>{{ detail.wait_label }}</em>{% endif %}
+                    {% for flag in detail.flags %}<em class="flag">{{ flag }}</em>{% endfor %}
+                  </span>
+                {% endif %}
+                {% if detail.note %}<small>{{ detail.note }}</small>{% endif %}
+              </span>
+            </a>
           {% endfor %}
         </div>
       </details>
+    {% elif completed_stops %}
+      {% set last_stop = completed_stops|last %}
+      <details class="route-focus-card tone-completed">
+        <summary>
+          <span class="route-focus-rail">STOP {{ last_stop.sequence }}</span>
+          <span class="route-focus-main">
+            <strong>{{ last_stop.plant_name }}</strong>
+            <small>Completed route stop. Arrived with {{ last_stop.arrived_with }} and departed with {{ last_stop.departed_with }}.</small>
+            <span class="route-focus-footer">
+              <em>Stop {{ last_stop.sequence }}</em>
+              <em>{{ completed_stops|length }} completed</em>
+              <em>{{ last_stop.status_label }}</em>
+            </span>
+          </span>
+        </summary>
+        <div class="route-focus-details">
+          {% if last_stop.view_url %}<a class="route-detail-link" href="{{ last_stop.view_url }}">Open stop details</a>{% endif %}
+        </div>
+      </details>
     {% endif %}
-	  {% else %}
-	    <p class="compact-empty">
-	      {{ rm.map_empty_message if rm and rm.map_empty_message else 'No stops logged yet for this route date.' }}
-	    </p>
-	    <div class="compact-map-actions {% if not cta.has_route_history %}single{% endif %}">
-	      {% if urls.get('start_shift') %}
-	        <a class="button primary" href="{{ urls.get('start_shift') }}">Start Shift / PreTrip</a>
-	      {% endif %}
-	      {% if urls.get('route_history') %}
-	        <a class="button ghost" href="{{ urls.get('route_history') }}">View Last Route</a>
-	      {% endif %}
-	    </div>
-	  {% endif %}
 
-  <div class="route-map-drawer" data-route-map-drawer hidden aria-hidden="true">
-    <button class="route-map-drawer-backdrop" type="button" data-route-map-close aria-label="Close details"></button>
-    <aside class="route-map-drawer-panel" role="dialog" aria-modal="true" aria-label="Route map details">
-      <div class="drawer-grip"></div>
-      <button class="drawer-close" type="button" data-route-map-close>Close</button>
-      <div data-route-map-drawer-content></div>
-    </aside>
-  </div>
-
-  {% include "partials/_stop_detail_drawer.html" %}
+    {% if recurring_events %}
+      <div class="route-event-strip" aria-label="Recurring route events">
+        <div class="route-event-head">
+          <span>Recurring route events</span>
+          <strong>{{ recurring_events|length }}</strong>
+        </div>
+        {% for item in recurring_events[:4] %}
+          <div class="route-event-pill tone-{{ item.tone }}">
+            <strong>{{ item.title }}</strong>
+            <small>{{ item.route_line }}.</small>
+            <span>{{ item.load_count_label }} / {{ item.stop_count_label }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% else %}
+    <p class="compact-empty">
+      {{ rm.map_empty_message if rm and rm.map_empty_message else 'No route stops logged for this date.' }}
+    </p>
+    <div class="compact-map-actions {% if not cta.has_route_history %}single{% endif %}">
+      {% if urls.get('start_shift') %}
+        <a class="button primary" href="{{ urls.get('start_shift') }}">Start Shift / PreTrip</a>
+      {% endif %}
+      {% if urls.get('route_history') %}
+        <a class="button ghost" href="{{ urls.get('route_history') }}">View Last Route</a>
+      {% endif %}
+    </div>
+  {% endif %}
 </section>

@@ -149,22 +149,24 @@
     .hero-actions.single { grid-template-columns: 1fr; }
     .hero-actions.tri { grid-template-columns: repeat(3, 1fr); }
 
-    .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
     .wide-actions { display: none; }
     .quick-card {
-      background: rgba(17, 24, 39, 0.96);
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 14px;
-      min-height: 104px;
-      display: flex;
-      gap: 12px;
-      align-items: center;
+      background: linear-gradient(180deg, rgba(15,23,42,.92), rgba(2,6,23,.84));
+      border: 1px solid rgba(148,163,184,.2);
+      border-radius: 16px;
+      padding: 13px 10px;
+      min-height: 92px;
+      display: grid;
+      gap: 5px;
+      align-content: center;
+      text-align: center;
+      box-shadow: 0 14px 30px rgba(0,0,0,.14);
     }
-    .quick-icon { width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: rgba(127, 29, 45, 0.2); color: #f3c7cf; font-weight: 950; flex: 0 0 auto; }
+    .quick-icon { display: none; }
     .quick-icon.green { background: rgba(16, 185, 129, 0.16); color: #86efac; }
-    .quick-card strong { display: block; margin-top: 0; font-size: 0.95rem; }
-    .quick-card span { display: block; margin-top: 3px; color: var(--muted); font-size: 0.74rem; line-height: 1.25; }
+    .quick-card strong { display: block; margin-top: 0; color: #f8fafc; font-size: 0.9rem; line-height: 1.08; }
+    .quick-card span { display: block; margin-top: 4px; color: var(--muted); font-size: 0.68rem; line-height: 1.25; font-weight: 800; }
     .timing-card { padding: 15px; display: grid; gap: 12px; border-color: rgba(245,158,11,.28); }
     .timing-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
     .timing-title { margin:0; font-weight:950; font-size:1rem; }
@@ -998,6 +1000,211 @@
       font-weight: 700;
       overflow-wrap: anywhere;
     }
+    .route-focus-card {
+      border: 1px solid rgba(148,163,184,.2);
+      border-left: 4px solid #f59e0b;
+      border-radius: 16px;
+      background:
+        linear-gradient(180deg, rgba(15,23,42,.94), rgba(2,6,23,.82));
+      overflow: hidden;
+    }
+    .route-focus-card.tone-delivery,
+    .route-focus-card.tone-completed { border-left-color: #10b981; }
+    .route-focus-card.tone-empty { border-left-color: #94a3b8; }
+    .route-focus-card.tone-blocked,
+    .route-focus-card.tone-needs_review { border-left-color: #ef4444; }
+    .route-focus-card summary {
+      display: grid;
+      grid-template-columns: minmax(58px, 74px) minmax(0, 1fr);
+      gap: 12px;
+      padding: 13px;
+      list-style: none;
+      cursor: pointer;
+    }
+    .route-focus-card summary::-webkit-details-marker { display: none; }
+    .route-focus-rail {
+      color: #fbbf24;
+      font-size: .62rem;
+      line-height: 1.15;
+      font-weight: 950;
+      text-transform: uppercase;
+      align-self: start;
+    }
+    .route-focus-main {
+      min-width: 0;
+      display: grid;
+      gap: 5px;
+    }
+    .route-focus-main strong {
+      color: #fff;
+      font-size: 1.02rem;
+      line-height: 1.08;
+      font-weight: 950;
+      overflow-wrap: anywhere;
+    }
+    .route-focus-main small {
+      color: #cbd5e1;
+      font-size: .78rem;
+      line-height: 1.34;
+      font-style: italic;
+      font-weight: 750;
+      overflow-wrap: anywhere;
+    }
+    .route-focus-footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding-top: 2px;
+    }
+    .route-focus-footer em {
+      min-height: 23px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid rgba(148,163,184,.22);
+      border-radius: 999px;
+      background: rgba(148,163,184,.12);
+      color: #cbd5e1;
+      padding: 3px 7px;
+      font-size: .58rem;
+      font-style: normal;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+    .route-focus-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    .route-focus-chips em {
+      padding: 3px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,.22);
+      background: rgba(148,163,184,.12);
+      color: #cbd5e1;
+      font-size: .58rem;
+      font-style: normal;
+      font-weight: 900;
+    }
+    .route-focus-chips em.flag {
+      border-color: rgba(245,158,11,.32);
+      background: rgba(245,158,11,.12);
+      color: #fde68a;
+    }
+    .route-focus-details {
+      display: grid;
+      gap: 8px;
+      padding: 0 13px 13px 13px;
+      border-top: 1px solid rgba(148,163,184,.14);
+    }
+    .route-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      padding-top: 11px;
+    }
+    .route-detail-grid div,
+    .route-detail-row {
+      display: grid;
+      gap: 3px;
+      border: 1px solid rgba(148,163,184,.16);
+      border-radius: 11px;
+      background: rgba(15,23,42,.62);
+      padding: 9px;
+      color: #f8fafc;
+    }
+    .route-detail-grid span,
+    .detail-stop {
+      color: #94a3b8;
+      font-size: .58rem;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+    .route-detail-grid strong,
+    .detail-main strong {
+      color: #f8fafc;
+      font-size: .72rem;
+      line-height: 1.15;
+      overflow-wrap: anywhere;
+    }
+    .route-detail-row {
+      grid-template-columns: 58px minmax(0, 1fr);
+      text-decoration: none;
+    }
+    .route-detail-note {
+      margin: 0;
+      color: #cbd5e1;
+      font-size: .72rem;
+      line-height: 1.3;
+      font-weight: 750;
+    }
+    .route-detail-link {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(243,199,207,.22);
+      border-radius: 10px;
+      background: rgba(127,29,45,.18);
+      color: #f8fafc;
+      font-size: .72rem;
+      font-weight: 900;
+    }
+    .route-detail-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .route-event-strip {
+      display: grid;
+      gap: 7px;
+      padding: 10px;
+      border: 1px solid rgba(148,163,184,.16);
+      border-radius: 14px;
+      background: rgba(2,6,23,.28);
+    }
+    .route-event-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      color: #94a3b8;
+      font-size: .62rem;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+    .route-event-head strong {
+      min-width: 24px;
+      min-height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: rgba(245,158,11,.16);
+      color: #fde68a;
+    }
+    .route-event-pill {
+      display: grid;
+      gap: 2px;
+      border: 1px solid rgba(148,163,184,.16);
+      border-radius: 11px;
+      background: rgba(15,23,42,.56);
+      padding: 8px 9px;
+    }
+    .route-event-pill.tone-delivery { border-color: rgba(16,185,129,.25); }
+    .route-event-pill.tone-empty { border-color: rgba(148,163,184,.18); }
+    .route-event-pill strong {
+      color: #f8fafc;
+      font-size: .72rem;
+      line-height: 1.14;
+      overflow-wrap: anywhere;
+    }
+    .route-event-pill small,
+    .route-event-pill span {
+      color: #94a3b8;
+      font-size: .64rem;
+      line-height: 1.24;
+      font-weight: 750;
+      overflow-wrap: anywhere;
+    }
     .compact-move-strip {
       display: grid;
       gap: 8px;
@@ -1408,28 +1615,20 @@
       {% endif %}
     {% endwith %}
 
-	    <div class="wide-body">
-	    <main>
-	      {% set cta = route_cta if route_cta is defined and route_cta else {} %}
-	      {% set primary = cta.primary_cta if cta.primary_cta is defined else none %}
-	      {% set secondary = cta.secondary_cta if cta.secondary_cta is defined else none %}
-	      {% set cta_urls = route_cta_urls if route_cta_urls is defined else {} %}
-	      {% if route_date_options %}
+    <div class="wide-body">
+    <main>
+      {% set cta = route_cta if route_cta is defined and route_cta else {} %}
+      {% set primary = cta.primary_cta if cta.primary_cta is defined else none %}
+      {% set secondary = cta.secondary_cta if cta.secondary_cta is defined else none %}
+      {% set cta_urls = route_cta_urls if route_cta_urls is defined else {} %}
+      {% if route_date_options %}
 	      <nav class="date-context" aria-label="Route date">
 	        {% for option in route_date_options %}
 	          <a class="{% if option.active %}active{% endif %}" href="{{ option.url }}">{{ option.label }} · {{ option.date.strftime('%b %d') if option.date else '' }}</a>
 	        {% endfor %}
 	      </nav>
-	      {% endif %}
-	      {% if pending_posttrip and active_pretrip %}
-	      <section class="quick-grid" aria-label="Required shift action">
-	        <a class="quick-card" href="{{ url_for('driver.do_posttrip', pretrip_id=active_pretrip.id) }}">
-	          <div class="quick-icon green">IN</div>
-	          <div><strong>PostTrip Due</strong><span>Finish inspection and end shift</span></div>
-	        </a>
-	      </section>
-	      {% endif %}
-	      {% if active_task or not flow_first_current %}
+      {% endif %}
+      {% if active_task or not flow_first_current %}
 	      <section class="card hero">
         {% if active_task %}
           <div class="eyebrow"><span class="bolt"></span>{% if active_task.is_hot %}Active Hot Move{% else %}Active Task{% endif %}</div>
@@ -1499,25 +1698,6 @@
           {% include "partials/_compact_route_map.html" %}
         {% endif %}
 
-        {% if not flow_first_current %}
-          {% include "partials/_next_action_card.html" %}
-        {% endif %}
-
-        {% if route_context and route_context.current_stop and not flow_first_current %}
-        {% set cs = route_context.current_stop %}
-        <div class="ops-panel current-work-card">
-          <div class="ops-head"><h3>Current Work</h3><span class="ops-sub">{{ route_panel_title }}</span></div>
-          <div class="ops-body cw-grid">
-            <div><span class="cw-lbl">Stop</span><span class="cw-val">{{ cs.plant_name }}</span></div>
-            <div><span class="cw-lbl">Status</span><span class="cw-val">{{ (route_context.current_stop_status or 'open')|title }}</span></div>
-            <div><span class="cw-lbl">Arrived</span><span class="cw-val">{{ cs.arrive_time|display_time or '—' }}</span></div>
-            <div><span class="cw-lbl">Wait</span><span class="cw-val">{{ wait_label_for_log(cs) or '—' }}</span></div>
-            <div><span class="cw-lbl">Cargo</span><span class="cw-val">{{ cargo_state_for_log(cs).label }}{% if cs.load_size %} ({{ cs.load_size }}){% endif %}</span></div>
-            <div><span class="cw-lbl">Equipment</span><span class="cw-val">{{ current_truck_number or '—' }}</span></div>
-          </div>
-        </div>
-        {% endif %}
-
       </section>
 
       {% if task_queue %}
@@ -1556,26 +1736,17 @@
       </section>
       {% endif %}
 
-      <section class="quick-grid">
-        {% if active_task %}
-          {% if route_context and route_context.current_stop %}
-            <a class="quick-card" href="{{ url_for('driver.depart_driver_log', log_id=route_context.current_stop.id) }}">
-              <div class="quick-icon">DL</div>
-              <div><strong>Record Departure</strong><span>Close current stop before adding another</span></div>
-            </a>
-          {% else %}
-            <a class="quick-card" href="{{ url_for('driver.new_driving_log') }}">
-              <div class="quick-icon">DL</div>
-              <div><strong>Create Driver Log</strong><span>Record plant arrival, load, and parts</span></div>
-            </a>
-          {% endif %}
-        {% else %}
-          <a class="quick-card" href="{{ url_for('driver.new_plant_transfer') }}">
-            <div class="quick-icon">PT</div>
-            <div><strong>Plant Transfer</strong><span>{{ latest_transfer.ship_from ~ ' to ' ~ latest_transfer.ship_to if latest_transfer else 'Create a transfer sheet' }}</span></div>
+      <section class="quick-grid" aria-label="Shift actions">
+        <a class="quick-card" href="{{ url_for('driver.new_plant_transfer') }}">
+          <div class="quick-icon">PT</div>
+          <div><strong>Plant Transfer</strong><span>{{ latest_transfer.ship_from ~ ' to ' ~ latest_transfer.ship_to if latest_transfer else 'Create a transfer sheet' }}</span></div>
+        </a>
+        {% if pending_posttrip and active_pretrip %}
+          <a class="quick-card" href="{{ url_for('driver.do_posttrip', pretrip_id=active_pretrip.id) }}">
+            <div class="quick-icon green">IN</div>
+            <div><strong>PostTrip Due</strong><span>Finish inspection and end shift</span></div>
           </a>
-        {% endif %}
-        {% if not pending_posttrip %}
+        {% else %}
           <a class="quick-card" href="{{ url_for('driver.new_pretrip') }}">
             <div class="quick-icon green">IN</div>
             <div><strong>PreTrip / Shift</strong><span>{{ 'Shift started from PreTrip' if active_pretrip else 'Start shift with PreTrip' }}</span></div>
