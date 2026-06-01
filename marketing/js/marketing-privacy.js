@@ -475,7 +475,6 @@
 
     var decline = banner.querySelector("[data-consent-decline]");
     var save = banner.querySelector("[data-consent-save]");
-    var acceptAnalytics = banner.querySelector("[data-consent-analytics]");
 
     if (decline) decline.addEventListener("click", function () {
       persist({ analytics: false, marketing: false });
@@ -485,9 +484,6 @@
         analytics: analytics ? analytics.checked : false,
         marketing: marketing ? marketing.checked : false
       });
-    });
-    if (acceptAnalytics) acceptAnalytics.addEventListener("click", function () {
-      persist({ analytics: true, marketing: false });
     });
   }
 

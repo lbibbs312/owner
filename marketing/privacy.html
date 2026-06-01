@@ -46,18 +46,24 @@
     border:1px solid var(--line);text-decoration:none;color:var(--text);font-weight:700}
   .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
   footer{border-top:1px solid var(--line-soft);padding-top:22px;margin-top:30px;color:var(--muted-2);font-family:var(--mono);font-size:.8rem}
-  .consent-banner{position:fixed;left:18px;right:18px;bottom:18px;z-index:100;display:none;justify-content:center;pointer-events:none}
-  .consent-banner.show{display:flex}
-  .consent-panel{width:min(920px,100%);border:1px solid var(--line);border-radius:12px;background:rgba(7,11,18,.96);
-    box-shadow:0 28px 80px rgba(0,0,0,.55);padding:18px;pointer-events:auto}
-  .consent-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
-  .consent-top h2{font-size:1rem;margin-bottom:6px}
-  .consent-options{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}
-  .consent-option{border:1px solid var(--line-soft);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:9px;color:var(--muted);font-size:.88rem}
+  .consent-banner{position:relative;z-index:1;display:none;border-top:1px solid rgba(255,255,255,.05)}
+  .consent-banner.show{display:block}
+  .consent-panel{width:100%;max-width:920px;margin:0 auto;padding:18px 24px 22px;
+    display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:18px;
+    background:transparent;border:0;border-radius:0;box-shadow:none}
+  .consent-top{display:block;min-width:0}
+  .consent-top h2{display:inline;font-family:var(--mono);font-size:.74rem;text-transform:uppercase;
+    letter-spacing:.12em;color:var(--muted);margin:0}
+  .consent-top h2::after{content:" · ";color:var(--muted-2);letter-spacing:0}
+  .consent-top p{display:inline;color:var(--muted-2);font-size:.82rem}
+  .consent-options{display:flex;gap:14px;flex-wrap:wrap;margin:0}
+  .consent-option{border:0;border-radius:0;padding:0;display:flex;align-items:center;gap:7px;color:var(--muted);font-size:.82rem;white-space:nowrap}
   .consent-option input{accent-color:var(--blue)}
-  .consent-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px}
+  .consent-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin:0}
+  .consent-actions .btn{padding:8px 14px;font-size:.82rem;color:var(--muted);box-shadow:none}
+  .consent-actions .btn:hover{color:var(--blue-bright)}
   .consent-link{color:var(--blue-bright);text-decoration:none}
-  @media(max-width:560px){.wrap{padding:30px 18px 70px}.consent-top{display:block}.consent-actions{justify-content:flex-start}}
+  @media(max-width:560px){.wrap{padding:30px 18px 70px}.consent-panel{grid-template-columns:1fr;padding:18px}.consent-actions{justify-content:flex-start}}
 </style>
 </head>
 <body>
@@ -126,9 +132,8 @@
     <div class="consent-top">
       <div>
         <h2>Privacy choices</h2>
-        <p>Necessary storage keeps consent and form attribution working. Analytics tools load only if you allow analytics. Marketing cookies and ad pixels stay off unless you grant marketing consent.</p>
+        <p>Necessary storage keeps consent and public form attribution working. Analytics and marketing are optional. <a class="consent-link" href="privacy.html">Privacy policy</a></p>
       </div>
-      <a class="consent-link" href="privacy.html">Privacy policy</a>
     </div>
     <div class="consent-options">
       <label class="consent-option"><input type="checkbox" checked disabled> Necessary</label>
@@ -137,8 +142,7 @@
     </div>
     <div class="consent-actions">
       <button type="button" class="btn" data-consent-decline>Decline optional</button>
-      <button type="button" class="btn" data-consent-save>Save choices</button>
-      <button type="button" class="btn primary" data-consent-analytics>Accept analytics</button>
+      <button type="button" class="btn" data-consent-save>Save &amp; close</button>
     </div>
   </div>
 </div>
