@@ -334,24 +334,21 @@
   }
 
   function loadAnalytics() {
-    if (analyticsLoaded || !analyticsAllowed()) return;
+    if (analyticsLoaded) return;
     var selected = provider();
 
     if (selected === "ga4" && config.ga4MeasurementId) {
       window.dataLayer = window.dataLayer || [];
       window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
-      window.gtag("consent", "default", {
-        ad_storage: "denied",
-        ad_user_data: "denied",
-        ad_personalization: "denied",
-        analytics_storage: "granted"
-      });
+      updateGoogleConsent(analyticsAllowed());
       injectScript("https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(config.ga4MeasurementId));
       window.gtag("js", new Date());
       window.gtag("config", config.ga4MeasurementId, { send_page_view: false });
       analyticsLoaded = true;
       return;
     }
+
+    if (!analyticsAllowed()) return;
 
     if (selected === "plausible" && config.plausibleDomain) {
       window.plausible = window.plausible || function () {

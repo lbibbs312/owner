@@ -26,6 +26,28 @@
     attributionTtlDays: 90
   };
 </script>
+<script>
+  (function () {
+    var config = window.MoveDefenseMarketingConfig || {};
+    var consent = null;
+    try {
+      consent = JSON.parse(window.localStorage.getItem("md_consent_v1") || "null");
+      if (!consent || consent.version !== 1) consent = null;
+    } catch (err) {
+      consent = null;
+    }
+    var analyticsGranted = consent ? consent.analytics === true : config.analyticsDefault !== false;
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
+    window.gtag("consent", "default", {
+      ad_storage: "denied",
+      ad_user_data: "denied",
+      ad_personalization: "denied",
+      analytics_storage: analyticsGranted ? "granted" : "denied"
+    });
+    window.gtag("set", "ads_data_redaction", true);
+  })();
+</script>
 
 <!-- Open Graph / social preview -->
 <meta property="og:type" content="website" />

@@ -8,6 +8,7 @@ The page is a single static file: `marketing/index.html`. No build step. Pick on
 - `TODO_GOOGLE_SEARCH_CONSOLE_TOKEN` -> your Google Search Console verification token in `index.html` and `privacy.html`.
 - `window.MoveDefenseMarketingConfig.analyticsProvider` -> set to `ga4`, `plausible`, `umami`, or keep `none`.
 - `ga4MeasurementId`, `plausibleDomain`, or `umamiWebsiteId` -> fill only for the provider you use.
+- Keep the inline consent-mode bootstrap in the `<head>` before any Google tag code so Tag Assistant sees the default consent state before tags fire.
 - `https://movedefense.com/` -> your real domain in canonical, OG, `robots.txt`, and `sitemap.xml`.
 - `https://movedefense.com/og-image.png` -> add a real 1200x630 social preview image
   named `og-image.png` in the `marketing/` folder (or update the path)
