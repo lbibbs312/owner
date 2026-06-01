@@ -1500,12 +1500,7 @@
             <div><strong>Plant Transfer</strong><span>{{ latest_transfer.ship_from ~ ' to ' ~ latest_transfer.ship_to if latest_transfer else 'Create a transfer sheet' }}</span></div>
           </a>
         {% endif %}
-        {% if pending_posttrip and active_pretrip %}
-          <a class="quick-card" href="{{ url_for('driver.do_posttrip', pretrip_id=active_pretrip.id) }}">
-            <div class="quick-icon green">IN</div>
-            <div><strong>PostTrip Due</strong><span>Finish inspection and end shift</span></div>
-          </a>
-        {% else %}
+        {% if not pending_posttrip %}
           <a class="quick-card" href="{{ url_for('driver.new_pretrip') }}">
             <div class="quick-icon green">IN</div>
             <div><strong>PreTrip / Shift</strong><span>{{ 'Shift started from PreTrip' if active_pretrip else 'Start shift with PreTrip' }}</span></div>

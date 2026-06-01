@@ -2204,14 +2204,17 @@ def do_posttrip(pretrip_id):
         else:
             miles_val = None
 
-        new_posttrip = PostTrip(
-            pretrip_id=pretrip_id,
-            end_mileage=end_mileage_val,
-            remarks=form.remarks.data,
-            miles_driven=miles_val,
+        posttrip = (
+            PostTrip.query.filter_by(pretrip_id=pretrip_id)
+            .order_by(PostTrip.created_at.asc(), PostTrip.id.asc())
+            .first()
         )
-        db.session.add(new_posttrip)
-        db.session.commit()
+        if posttrip is None:
+            posttrip = PostTrip(pretrip_id=pretrip_id)
+            db.session.add(posttrip)
+        posttrip.end_mileage = end_mileage_val
+        posttrip.remarks = form.remarks.data
+        posttrip.miles_driven = miles_val
 
         _end_open_shifts_for_driver(pt.user_id)
         db.session.commit()
@@ -2223,7 +2226,7 @@ def do_posttrip(pretrip_id):
             title="PostTrip completed",
             details=f"PreTrip #{pt.id}; miles driven: {miles_val if miles_val is not None else 'not calculated'}.",
             target_type="posttrip",
-            target_id=new_posttrip.id,
+            target_id=posttrip.id,
         )
 
         flash("PostTrip completed successfully and shift clock ended!", "success")

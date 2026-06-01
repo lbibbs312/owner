@@ -2416,6 +2416,48 @@ def test_posttrip_ends_unlinked_manual_shift_timer(client, app):
         assert ShiftRecord.query.filter_by(user_id=driver_id, end_time=None).count() == 0
 
 
+def test_posttrip_submit_reuses_existing_posttrip(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import PreTrip
+
+        driver = create_user("driver1", "driver1@example.com", "driver", first_name="Driver", last_name="One")
+        pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="BT-1",
+            pretrip_date=date.today(),
+            start_mileage=1000,
+        )
+        db.session.add(pretrip)
+        db.session.commit()
+        pretrip_id = pretrip.id
+
+    login(client, "driver1")
+    first = client.post(
+        f"/do_posttrip/{pretrip_id}",
+        data={"end_mileage": "1042", "remarks": "first submit"},
+        follow_redirects=False,
+    )
+    second = client.post(
+        f"/do_posttrip/{pretrip_id}",
+        data={"end_mileage": "1060", "remarks": "second submit"},
+        follow_redirects=False,
+    )
+
+    assert first.status_code == 302
+    assert second.status_code == 302
+    with app.app_context():
+        from app.models import PostTrip
+
+        saved = PostTrip.query.filter_by(pretrip_id=pretrip_id).all()
+        assert len(saved) == 1
+        assert saved[0].end_mileage == 1060
+        assert saved[0].miles_driven == 60
+        assert saved[0].remarks == "second submit"
+
+
 def test_driver_log_form_ignores_unchecked_hot_part_and_truck_issue_fields(client, app):
     with app.app_context():
         create_user("driver1", "driver1@example.com", "driver")
@@ -5427,6 +5469,7 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert b"1 stop" in page.data
     assert b"Kraft" in page.data
     assert b"PostTrip Due" in page.data
+    assert page.data.count(b"PostTrip Due") == 1
     assert body.index("PostTrip Due") < body.index("Live Flow Map")
 
 
