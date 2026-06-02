@@ -118,6 +118,221 @@ def _status_label(status):
     return status.title() if status else SAFE_EMPTY
 
 
+def _board_badge_display(label, *, pill_tone="recorded", row_tone="completed", severity="ok"):
+    label = _clean(label).upper() or "RECORDED"
+    return {
+        "label": label,
+        "short": label,
+        "pill_tone": pill_tone,
+        "row_tone": row_tone,
+        "severity": severity,
+    }
+
+
+def _first_issue_code(issues):
+    for item in issues or []:
+        code = item.get("code")
+        if code:
+            return code
+    return ""
+
+
+def _qa_hold_label(flags, notes=""):
+    if "Hold" not in (flags or ()):
+        return ""
+    text = _clean(notes).lower()
+    if "qa" in text or "quality" in text:
+        return "HOLD · QA"
+    return "HOLD"
+
+
+def _stop_board_badge(log, *, movement, issues=(), evidence=None, flags=(), notes="", departed=False):
+    """Display-only badge for the Home Live Flow Board.
+
+    The ledger badge stays source/issue centric. This badge uses the same
+    source facts but chooses operational labels that read like a live board.
+    """
+    evidence = evidence or {}
+    issue_code = _first_issue_code(issues)
+    issue_badge = board_badge(
+        issues,
+        ok_label=movement["label"],
+        ok_pill_tone=movement["pill_tone"],
+        ok_row_tone=movement["row_tone"],
+        ok_severity=movement["severity"],
+    )
+
+    if issue_code and issue_code != "needs_departure":
+        if issue_code == "hold":
+            hold_label = _qa_hold_label(flags, notes) or issue_badge["short"]
+            return _board_badge_display(hold_label, pill_tone="attention", row_tone="hot", severity="attention")
+        return issue_badge
+
+    if is_service_stop(log):
+        if getattr(log, "maintenance", False):
+            label = "DEFECT" if _clean(getattr(log, "downtime_reason", "")) else "TRUCK OK"
+            tone = "risk" if label == "DEFECT" else "recorded"
+            row_tone = "blocked" if label == "DEFECT" else "completed"
+            severity = "risk" if label == "DEFECT" else "ok"
+            return _board_badge_display(label, pill_tone=tone, row_tone=row_tone, severity=severity)
+        if getattr(log, "fuel", False):
+            return _board_badge_display("RECORDED", pill_tone="recorded")
+        return _board_badge_display("RECORDED", pill_tone="recorded")
+
+    if not departed:
+        return _board_badge_display("OPEN", pill_tone="open", row_tone="active", severity="info")
+
+    code = movement["code"]
+    proof_count = int(evidence.get("proof_count") or 0)
+    valid_scan_count = int(evidence.get("valid_scan_count") or 0)
+    transfer_count = int(evidence.get("transfer_count") or 0)
+    has_driver_confirmation = evidence.get("driver_confirmation") == "Drop confirmed"
+
+    if code == "route_start":
+        return _board_badge_display("START", pill_tone="open", row_tone="completed", severity="info")
+    if code in {"empty_return", "no_pickup"}:
+        return _board_badge_display("NO PICKUP" if code == "no_pickup" else "CLOSED", pill_tone="recorded")
+    if code == "loaded":
+        return _board_badge_display("IN TRANSIT", pill_tone="open", row_tone="completed", severity="info")
+    if code == "in_transit":
+        return _board_badge_display("IN TRANSIT", pill_tone="open", row_tone="completed", severity="info")
+    if code == "dropped":
+        if proof_count or has_driver_confirmation:
+            return _board_badge_display("DELIVERED", pill_tone="delivery", row_tone="delivery", severity="ok")
+        return _board_badge_display("DROPPED", pill_tone="delivery", row_tone="delivery", severity="ok")
+    if valid_scan_count:
+        return _board_badge_display("SCANNED", pill_tone="recorded", row_tone="completed", severity="ok")
+    if transfer_count:
+        return _board_badge_display("SHEET ATTACHED", pill_tone="recorded", row_tone="completed", severity="ok")
+    return _board_badge_display("CLOSED", pill_tone="recorded", row_tone="completed", severity="ok")
+
+
+def _move_board_badge(req, *, cargo=None, has_issue=False, has_damage=False):
+    status = _clean(getattr(req, "status", "")).lower().replace("-", "_") or "open"
+    cargo = cargo or {}
+    cargo_state = cargo.get("state")
+    note_text = " ".join(
+        _clean(getattr(req, attr, ""))
+        for attr in ("blocked_reason", "closed_reason", "notes", "parse_warnings")
+    )
+
+    if has_damage or cargo_state == "damaged":
+        return _board_badge_display("DAMAGE", pill_tone="risk", row_tone="blocked", severity="risk")
+    if has_issue or status in {"blocked", "needs_review"}:
+        label = _qa_hold_label(("Hold",), note_text) or "HOLD"
+        return _board_badge_display(label, pill_tone="attention", row_tone="hot", severity="attention")
+    if status == "completed":
+        if getattr(req, "linked_document_id", None) or getattr(req, "linked_plant_transfer_id", None):
+            return _board_badge_display("DELIVERED", pill_tone="delivery", row_tone="delivery", severity="ok")
+        return _board_badge_display("RECORDED", pill_tone="recorded", row_tone="completed", severity="ok")
+    if cargo_state == "delivered":
+        return _board_badge_display("DELIVERED", pill_tone="delivery", row_tone="delivery", severity="ok")
+    if cargo_state in {"loaded", "onboard"}:
+        linked_log = getattr(req, "linked_driver_log", None)
+        if linked_log is not None and getattr(linked_log, "depart_time", None):
+            return _board_badge_display("IN TRANSIT", pill_tone="open", row_tone="completed", severity="info")
+        return _board_badge_display("LOADED", pill_tone="open", row_tone="active", severity="info")
+    if status in {"open", "acknowledged", "assigned"}:
+        return _board_badge_display("STAGED", pill_tone="open", row_tone="active", severity="info")
+    return _board_badge_display("RECORDED", pill_tone="recorded", row_tone="completed", severity="ok")
+
+
+def _move_board_code(req):
+    request_type = _clean(getattr(req, "request_type", "")).lower()
+    if "transfer" in request_type or getattr(req, "linked_plant_transfer_id", None):
+        return "XFER"
+    return "LOAD"
+
+
+def _move_board_detail(req, *, origin, destination):
+    detail_bits = []
+    cargo = _clean(getattr(req, "cargo_text", ""))
+    part = _clean(getattr(req, "part_number", ""))
+    quantity = _quantity_text(req)
+    if cargo:
+        detail_bits.append(cargo)
+    if part and part not in detail_bits:
+        detail_bits.append(part)
+    if quantity:
+        detail_bits.append(quantity)
+    suffix = f" · {' · '.join(detail_bits)}" if detail_bits else ""
+    return f"{origin} → {destination}{suffix}"
+
+
+def _line_count_label(count):
+    return f"{count} line{'s' if count != 1 else ''}"
+
+
+def _transfer_board_detail(transfer):
+    origin = _location_label(transfer.ship_from) or NOT_TRACKED
+    destination = _location_label(transfer.ship_to) or NOT_TRACKED
+    lines = list(getattr(transfer, "lines", []) or [])
+    skids = [value for value in (_clean(getattr(line, "skids", "")) for line in lines) if value]
+    quantities = [value for value in (_clean(getattr(line, "quantity", "")) for line in lines) if value]
+    parts = [value for value in (_clean(getattr(line, "part_number", "")) for line in lines) if value]
+    detail_bits = []
+    if skids:
+        detail_bits.append(f"{', '.join(dict.fromkeys(skids))} LP")
+    if quantities:
+        detail_bits.append(f"{', '.join(dict.fromkeys(quantities))} pcs")
+    if parts and not detail_bits:
+        detail_bits.append(", ".join(dict.fromkeys(parts[:2])))
+    if lines:
+        detail_bits.append(_line_count_label(len(lines)))
+    suffix = f" · {' · '.join(detail_bits)}" if detail_bits else ""
+    return f"{origin} → {destination}{suffix}"
+
+
+def _transfer_board_item(transfer):
+    badge = _board_badge_display("SHEET ATTACHED", pill_tone="recorded", row_tone="completed", severity="ok")
+    origin = _location_label(transfer.ship_from) or NOT_TRACKED
+    destination = _location_label(transfer.ship_to) or NOT_TRACKED
+    return {
+        "key": f"transfer-{transfer.id}",
+        "kind": "transfer",
+        "code": "XFER",
+        "title": transfer.transfer_number or f"Transfer {transfer.id}",
+        "text": _transfer_board_detail(transfer),
+        "meta": f"{origin} to {destination}",
+        "board_badge": badge,
+        "view_url": _safe_url("driver.view_plant_transfer", transfer_id=transfer.id),
+    }
+
+
+def _truck_board_item(route_pretrip, *, pending_posttrip=False):
+    if not route_pretrip:
+        return None
+    has_defect = bool(_clean(getattr(route_pretrip, "damage_report", "")))
+    if has_defect:
+        badge = _board_badge_display("DEFECT", pill_tone="risk", row_tone="blocked", severity="risk")
+        text = "Pretrip defect noted"
+    elif getattr(route_pretrip, "posttrip", None):
+        badge = _board_badge_display("POSTTRIP DONE", pill_tone="recorded", row_tone="completed", severity="ok")
+        text = "PostTrip completed"
+    elif pending_posttrip:
+        badge = _board_badge_display("POSTTRIP NEEDED", pill_tone="attention", row_tone="hot", severity="attention")
+        text = "PostTrip needed"
+    else:
+        badge = _board_badge_display("INSPECTED", pill_tone="recorded", row_tone="completed", severity="ok")
+        text = "Pretrip completed"
+    truck = _clean(getattr(route_pretrip, "truck_number", ""))
+    trailer = _clean(getattr(route_pretrip, "trailer_number", ""))
+    if truck:
+        text = f"{text} · truck {truck}"
+    if trailer:
+        text = f"{text} · trailer {trailer}"
+    return {
+        "key": f"truck-{route_pretrip.id}",
+        "kind": "truck",
+        "code": "TRUCK",
+        "title": "Vehicle inspection",
+        "text": text,
+        "meta": _clean(getattr(route_pretrip, "damage_report", "")) or "Inspection record on file",
+        "board_badge": badge,
+        "view_url": None,
+    }
+
+
 def _norm_key(value):
     return re.sub(r"[^a-z0-9]+", "_", _clean(value).lower()).strip("_") or "unspecified"
 
@@ -166,6 +381,7 @@ def _board_flow_summary(
     *,
     sequence=None,
     has_prior_movement=False,
+    wait_minutes=None,
 ):
     """Compact display copy for the live board.
 
@@ -185,8 +401,9 @@ def _board_flow_summary(
     arrived_destination = _cargo_destination_label(arrived_with)
     departed_destination = _cargo_destination_label(departed_with) if closed else ""
 
+    wait_suffix = f" · wait {int(wait_minutes)}m" if wait_minutes else ""
     if arrived == "Empty" and not closed and sequence == 1:
-        return {"mode": "plain", "text": f"{label} · route start · arrived empty"}
+        return {"mode": "plain", "text": f"{label} · route start · arrived empty{wait_suffix} · needs departure"}
     if closed and no_pickup and arrived == "Empty" and departed == "Empty":
         if sequence == 1:
             return {"mode": "plain", "text": f"{label} · route start · arrived empty"}
@@ -194,14 +411,8 @@ def _board_flow_summary(
             return {"mode": "plain", "text": f"{label} · empty return"}
         return {"mode": "plain", "text": f"{label} · no pickup"}
     if not closed:
-        summary = {"mode": "action", "plant": label, "action": "Arrived with", "cargo": arrived}
-        if arrived != "Empty":
-            return _with_route_pair(
-                summary,
-                pickup=pickup_label or "Earlier stop",
-                deliver=delivery_label or arrived_destination or "Next stop",
-            )
-        return summary
+        cargo_text = f" · arrived with {arrived}" if arrived != "Empty" else ""
+        return {"mode": "plain", "text": f"{label}{cargo_text}{wait_suffix} · needs departure"}
     if arrived == "Empty" and departed != "Empty":
         return _with_route_pair(
             {"mode": "action", "plant": label, "action": "Picked up", "cargo": departed},
@@ -540,10 +751,15 @@ def _move_view_model(req, *, damaged_log_ids=frozenset(), issue_request_ids=froz
     priority = (req.priority or "normal").lower()
     origin = _location_label(req.origin_location_text) or NOT_TRACKED
     destination = _location_label(req.destination_location_text) or NOT_TRACKED
+    board_status_badge = _move_board_badge(req, cargo=cargo, has_issue=has_issue, has_damage=has_damage)
     edit_url = _safe_url("manager.edit_move_request", request_id=req.id)
     return {
         "move_request_id": req.id,
         "request_number": req.display_number,
+        "request_type": _clean(req.request_type) or "move",
+        "board_code": _move_board_code(req),
+        "board_detail": _move_board_detail(req, origin=origin, destination=destination),
+        "board_badge": board_status_badge,
         "raw_text": _clean(req.raw_text) or SAFE_EMPTY,
         "source": _clean(req.source) or NOT_TRACKED,
         "requested_by": _clean(req.requested_by) or NOT_TRACKED,
@@ -856,6 +1072,15 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             ok_row_tone=movement["row_tone"],
             ok_severity=movement["severity"],
         )
+        board_status_badge = _stop_board_badge(
+            log,
+            movement=movement,
+            issues=stop_issues,
+            evidence=stop_evidence,
+            flags=flags,
+            notes=f"{row.get('note') or ''} {getattr(log, 'downtime_reason', '') or ''}",
+            departed=departed,
+        )
         stops.append({
             "stop_id": log.id,
             "sequence": sequence,
@@ -880,6 +1105,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
                 route_pretrip=route_pretrip,
                 sequence=sequence,
                 has_prior_movement=prior_cargo_movement_seen,
+                wait_minutes=wait_minutes,
             ),
             "movement_code": movement["code"],
             "movement_label": movement["label"],
@@ -911,6 +1137,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             "issues": stop_issues,
             "evidence": stop_evidence,
             "badge": stop_badge,
+            "board_badge": board_status_badge,
             "notes": row.get("note") or "",
             "next_action": _stop_next_action(log, status=status, cargo=cargo, linked_move=linked_move, issues=stop_issues),
             "view_url": _safe_url("manager.view_driver_log" if role == "manager" else "driver.view_driver_log", log_id=log.id),
@@ -1066,6 +1293,7 @@ def _base_stop_detail(log, row, route, *, cargo_label, pickup=None, has_prior_mo
             pickup_label=(pickup or {}).get("plant_label"),
             sequence=row.get("index"),
             has_prior_movement=has_prior_movement,
+            wait_minutes=wait_minutes,
         ),
         "plant": row.get("plant") or plant_label(getattr(log, "plant_name", None)) or SAFE_EMPTY,
         "arrival_at": getattr(log, "arrive_time", ""),
@@ -1165,6 +1393,12 @@ def _build_delivery_narratives(route_context):
             ok_pill_tone="empty" if group.get("kind") == "empty" else "recorded",
             ok_row_tone="empty" if group.get("kind") == "empty" else ("delivery" if group.get("kind") == "delivery" else "completed"),
         )
+        group["board_badge"] = board_badge(
+            narrative_issues,
+            ok_label="CLOSED" if group.get("kind") == "empty" else "DROPPED",
+            ok_pill_tone="recorded" if group.get("kind") == "empty" else "delivery",
+            ok_row_tone="completed" if group.get("kind") == "empty" else ("delivery" if group.get("kind") == "delivery" else "completed"),
+        )
 
     return sorted(
         groups.values(),
@@ -1175,6 +1409,35 @@ def _build_delivery_narratives(route_context):
         ),
         reverse=True,
     )
+
+
+def _move_board_item(move):
+    badge = move.get("board_badge") or _board_badge_display("RECORDED")
+    return {
+        "key": f"move-{move.get('move_request_id')}",
+        "kind": "move",
+        "code": move.get("board_code") or "LOAD",
+        "title": move.get("request_number") or "Move request",
+        "text": move.get("board_detail") or move.get("raw_text") or SAFE_EMPTY,
+        "meta": move.get("raw_text") or move.get("next_action") or "",
+        "board_badge": badge,
+        "view_url": move.get("view_url"),
+    }
+
+
+def _ops_board_items(moves, transfers, *, route_pretrip=None, pending_posttrip=False):
+    items = []
+    linked_transfer_ids = {move.get("linked_plant_transfer_id") for move in moves if move.get("linked_plant_transfer_id")}
+    for move in moves:
+        items.append(_move_board_item(move))
+    for transfer in transfers:
+        if transfer.id in linked_transfer_ids:
+            continue
+        items.append(_transfer_board_item(transfer))
+    truck_item = _truck_board_item(route_pretrip, pending_posttrip=pending_posttrip)
+    if truck_item:
+        items.append(truck_item)
+    return items
 
 
 def _plant_seed(plants, label, *, role="driver"):
@@ -1542,7 +1805,9 @@ def build_driver_map_mode_context(route_context, route_map=None, production_flow
     route_map = route_map or {}
     production_flow_context = production_flow_context or {}
     stops = route_map.get("stops") or []
+    ops_board_items = route_map.get("ops_board_items") or []
     has_route_history = bool(stops)
+    has_board_activity = bool(stops or route_map.get("moves") or ops_board_items)
     has_production = bool(
         production_flow_context.get("flow_nodes")
         or production_flow_context.get("flow_lanes")
@@ -1551,7 +1816,7 @@ def build_driver_map_mode_context(route_context, route_map=None, production_flow
     current_stop = getattr(route_context, "current_stop", None)
     is_today = bool(route_date and today_local_date and route_date == today_local_date)
 
-    if current_stop is not None or (route_is_active and has_route_history) or (is_today and has_route_history):
+    if current_stop is not None or (route_is_active and has_board_activity) or (is_today and has_board_activity):
         mode = "live_current_work"
         label = "Active Route Map"
         empty = ""
@@ -1613,14 +1878,21 @@ def build_driver_route_map_context(
     delivery_narratives = _build_delivery_narratives(route_context)
     transfers = _transfers_for_view(driver_id=driver_id, target=target)
     plants, lanes = _build_plants_and_lanes(stops, moves, transfers, role="driver")
+    ops_board_items = _ops_board_items(
+        moves,
+        transfers,
+        route_pretrip=route_pretrip,
+        pending_posttrip=pending_posttrip,
+    )
     route = _route_summary(route_context, moves=moves, stops=stops, driver=driver)
     dispatch_messages = _dispatch_messages(stops, moves)
     return {
-        "map_mode": "live_current_work" if stops or moves or plants else "no_current_activity",
-        "map_label": "Active Route Map" if stops or moves or plants else "No Current Activity",
-        "map_empty_message": "No route stops logged for this date." if not stops else "",
+        "map_mode": "live_current_work" if stops or moves or plants or ops_board_items else "no_current_activity",
+        "map_label": "Active Route Map" if stops or moves or plants or ops_board_items else "No Current Activity",
+        "map_empty_message": "No route stops logged for this date." if not (stops or ops_board_items) else "",
         "route": route,
         "stops": stops,
+        "ops_board_items": ops_board_items,
         "delivery_narratives": delivery_narratives,
         "dispatch_messages": dispatch_messages,
         "dispatch_ticker_text": " · ".join(message["text"] for message in dispatch_messages),

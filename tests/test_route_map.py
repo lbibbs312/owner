@@ -82,6 +82,35 @@ def _move_request(creator_id, **kw):
     return req
 
 
+def _plant_transfer(driver, **kw):
+    from app.extensions import db
+    from app.models import PlantTransfer, PlantTransferLine
+
+    base = dict(
+        user_id=driver.id,
+        transfer_date=date.today(),
+        ship_from="PC",
+        ship_to="RE",
+        transfer_number="PT-001",
+    )
+    base.update(kw)
+    transfer = PlantTransfer(**base)
+    db.session.add(transfer)
+    db.session.flush()
+    db.session.add(
+        PlantTransferLine(
+            plant_transfer_id=transfer.id,
+            line_number=1,
+            side="left",
+            part_number="3034",
+            quantity="1600",
+            skids="10",
+        )
+    )
+    db.session.commit()
+    return transfer
+
+
 def test_driver_route_map_no_data_returns_safe_empty_state(app):
     from app.services.route_map import build_driver_route_map_context
 
@@ -154,6 +183,7 @@ def test_first_empty_stop_is_route_start_without_issue(app):
 
     assert stop["movement_code"] == "route_start"
     assert stop["badge"]["label"] == "ROUTE START"
+    assert stop["board_badge"]["label"] == "START"
     assert stop["board_detail"] == "Paint Central · route start · arrived empty"
     assert "empty return" not in stop["board_detail"].lower()
     assert stop["issues"] == []
@@ -173,6 +203,7 @@ def test_later_empty_movement_is_empty_return(app):
 
     assert stop["movement_code"] == "empty_return"
     assert stop["badge"]["label"] == "EMPTY RETURN"
+    assert stop["board_badge"]["label"] == "CLOSED"
     assert stop["board_detail"] == "Paint Central · empty return"
     assert stop["issues"] == []
 
@@ -187,6 +218,7 @@ def test_picked_up_load_shows_loaded_info(app):
     stop = ctx["stops"][0]
 
     assert stop["badge"]["label"] == "LOADED"
+    assert stop["board_badge"]["label"] == "IN TRANSIT"
     assert stop["badge"]["severity"] == "info"
     assert stop["issues"] == []
 
@@ -256,6 +288,7 @@ def test_missing_proof_is_specific_issue(app):
     stop = ctx["stops"][0]
 
     assert stop["badge"]["label"] == "MISSING PROOF"
+    assert stop["board_badge"]["label"] == "MISSING PROOF"
     assert stop["issues"][0]["code"] == "missing_proof"
     assert stop["evidence"]["proof"] == "None on file"
     assert ctx["dispatch_messages"][0]["text"].startswith("MISSING PROOF")
@@ -357,6 +390,8 @@ def test_open_stop_without_departure_is_actionable_needs_departure(app):
     stop = ctx["stops"][0]
 
     assert stop["badge"]["label"] == "NEEDS DEPARTURE"
+    assert stop["board_badge"]["label"] == "OPEN"
+    assert "needs departure" in stop["board_flow"]["text"]
     assert stop["badge"]["severity"] == "attention"
     assert stop["next_action"] == "Record departure"
     assert ctx["cta_pulse"]["key"] == "depart"
@@ -521,6 +556,54 @@ def test_completed_request_and_linked_stop_statuses(app):
     assert ctx["moves"][0]["linked_stop_id"] == stop.id
 
 
+def test_assigned_move_request_adds_staged_ops_board_row(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    manager = _user("ops_mgr", "management")
+    driver = _user("staged_driver", "driver")
+    _move_request(
+        manager.id,
+        status="assigned",
+        assigned_driver_id=driver.id,
+        origin_location_text="Paint Central",
+        destination_location_text="Raleigh East",
+        cargo_text="parts",
+        quantity_text="1600 pcs",
+    )
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    item = ctx["ops_board_items"][0]
+
+    assert item["code"] == "LOAD"
+    assert item["board_badge"]["label"] == "STAGED"
+    assert item["board_badge"]["pill_tone"] == "open"
+    assert "Paint Central → Raleigh East" in item["text"]
+    assert "1600 pcs" in item["text"]
+
+
+def test_transfer_sheet_and_pretrip_add_driver_board_statuses(app):
+    from app.extensions import db
+    from app.models import PreTrip
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("ops_status_driver", "driver")
+    pretrip = PreTrip(user_id=driver.id, pretrip_date=date.today(), truck_number="T-12")
+    db.session.add(pretrip)
+    db.session.commit()
+    _plant_transfer(driver)
+
+    ctx = build_driver_route_map_context(
+        driver=driver,
+        date=date.today(),
+        route_pretrip=pretrip,
+    )
+    by_code = {item["code"]: item for item in ctx["ops_board_items"]}
+
+    assert by_code["XFER"]["board_badge"]["label"] == "SHEET ATTACHED"
+    assert "10 LP" in by_code["XFER"]["text"]
+    assert by_code["TRUCK"]["board_badge"]["label"] == "INSPECTED"
+
+
 def test_route_map_drawer_partials_render(app):
     from flask import render_template
     from app.services.route_map import build_manager_route_map_context
@@ -557,7 +640,7 @@ def test_add_stop_action_copy_stays_route_specific(app):
     assert "<strong>Add Stop</strong>\n      <span>Attach document</span>" not in html
 
 
-def test_driver_dashboard_keeps_assigned_queue_off_main_route_display(client, app):
+def test_driver_dashboard_shows_assigned_move_as_staged_board_row(client, app):
     driver = None
     with app.app_context():
         manager = _user("mgr", "management")
@@ -575,9 +658,9 @@ def test_driver_dashboard_keeps_assigned_queue_off_main_route_display(client, ap
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "LIVE FLOW BOARD" in body
-    assert "No route stops logged for this date." in body
     assert "Assigned Move Queue" not in body
-    assert "MR-REAL-1" not in body
+    assert "MR-REAL-1" in body
+    assert ">STAGED<" in body
     assert "Production Flow" not in body
 
 
@@ -736,7 +819,7 @@ def test_completed_stop_states_reflect_cargo_action(client, app):
                     depart_time="09:20", load_size="Raleigh East Load", depart_load_size="Empty")
     _login(client, "driver_states")
     body = client.get("/mobile").get_data(as_text=True)
-    assert "LOADED" in body          # Empty -> Load = picked up
+    assert "IN TRANSIT" in body      # Empty -> Load, then departed pickup
     assert "DROPPED" in body         # Load -> Empty = dropped at destination
     assert "Picked up <strong>Parts</strong>" in body
     assert "Dropped <strong>Parts</strong>" in body
@@ -744,7 +827,7 @@ def test_completed_stop_states_reflect_cargo_action(client, app):
     assert "<em>Deliver</em><strong>Raleigh East</strong>" in body
     assert '<span class="flow-arrow flow-route-arrow" aria-hidden="true">→</span>' in body
     assert "Raleigh East Load &rarr; Empty" not in body
-    assert ">DELIVERED<" not in body  # no generic catch-all label
+    assert ">DELIVERED<" in body      # confirmed drop can graduate from DROPPED
     assert 'class="flow-code"' not in body
 
 

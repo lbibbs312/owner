@@ -111,7 +111,13 @@
     {% set _ = board_tasks.append(task) %}
   {% endfor %}
 {% endif %}
-{% set board_count = (board_tasks|length) + (1 if primary_stop else 0) + (completed_stops|length) + (1 if primary_event and not primary_stop else 0) + (recurring_events|length) %}
+{% set ops_board_items = [] %}
+{% if rm and rm.ops_board_items is defined and rm.ops_board_items %}
+  {% for item in rm.ops_board_items[:6] %}
+    {% set _ = ops_board_items.append(item) %}
+  {% endfor %}
+{% endif %}
+{% set board_count = (board_tasks|length) + (ops_board_items|length) + (1 if primary_stop else 0) + (completed_stops|length) + (1 if primary_event and not primary_stop else 0) + (recurring_events|length) %}
 {% set route_sheet_url = urls.get('view_route') or urls.get('route_history') %}
 {% set depart_url = urls.get('record_departure') %}
 {% set damage_url = urls.get('add_damage') %}
@@ -478,7 +484,7 @@
     </div>
   </div>
 
-  {% if (rm and rm.stops) or board_tasks %}
+  {% if (rm and (rm.stops or ops_board_items)) or board_tasks %}
     <div class="md-flow-window" aria-label="Live route flow">
       <div class="md-flow-track" style="--flow-rows: {{ board_count if board_count > 0 else 1 }};">
         {% for _pass in range(1) %}
@@ -498,8 +504,24 @@
 	              <span class="flow-status status-{{ task_status_tone }}">{{ task_status_text }}</span>
 	            </button>
           {% endfor %}
+          {% for item in ops_board_items %}
+            {% set item_badge = item.board_badge %}
+            <button class="md-flow-row tone-{{ item_badge.row_tone }}" type="button"
+                    data-flow-row
+                    data-detail-template="ops-item-{{ loop.index0 }}"
+                    data-title="{{ item.title or item.code }}"
+                    data-sheet-url="{{ item.view_url or route_sheet_url or '#' }}"
+	                    data-depart-url="#"
+	                    data-proof-url="{{ item.view_url or route_sheet_url or '#' }}"
+	                    data-damage-url="{{ damage_url or '#' }}"
+	                    data-document-url="{{ item.view_url or document_url or '#' }}">
+	              <span class="flow-detail"><span class="flow-main-line"><strong>{{ item.code }}</strong> {{ item.text }}</span></span>
+	              <span class="flow-status status-{{ item_badge.pill_tone }}">{{ item_badge.short }}</span>
+	            </button>
+          {% endfor %}
           {% if primary_stop %}
-            <button class="md-flow-row tone-{{ primary_stop.badge.row_tone }}" type="button"
+            {% set primary_badge = primary_stop.board_badge if primary_stop.board_badge is defined and primary_stop.board_badge else primary_stop.badge %}
+            <button class="md-flow-row tone-{{ primary_badge.row_tone }}" type="button"
                     data-flow-row
                     data-detail-template="primary-stop"
                     data-title="Stop {{ primary_stop.sequence }} - {{ primary_stop.plant_name }}"
@@ -509,13 +531,14 @@
 	                    data-damage-url="{{ damage_url or '#' }}"
 	                    data-document-url="{{ document_url or '#' }}">
 	              <span class="flow-detail">{{ board_flow_text(primary_stop.board_flow, primary_stop.board_detail or (primary_stop.plant_name ~ ' · ' ~ primary_stop.arrived_with ~ ' → ' ~ primary_stop.departed_with)) }}</span>
-	              {% if not (primary_stop.badge.short == 'NEEDS DEPARTURE' and pulse_key == 'depart' and depart_url) %}
-	                <span class="flow-status status-{{ primary_stop.badge.pill_tone }}">{{ primary_stop.badge.short }}</span>
+	              {% if primary_badge.short %}
+	                <span class="flow-status status-{{ primary_badge.pill_tone }}">{{ primary_badge.short }}</span>
 	              {% endif %}
 	            </button>
 	          {% endif %}
           {% for stop in completed_stops %}
-            <button class="md-flow-row tone-{{ stop.badge.row_tone }}" type="button"
+            {% set stop_badge = stop.board_badge if stop.board_badge is defined and stop.board_badge else stop.badge %}
+            <button class="md-flow-row tone-{{ stop_badge.row_tone }}" type="button"
                     data-flow-row
                     data-detail-template="completed-stop-{{ loop.index0 }}"
                     data-title="Stop {{ stop.sequence }} - {{ stop.plant_name }}"
@@ -525,18 +548,19 @@
 	                    data-damage-url="{{ damage_url or '#' }}"
 	                    data-document-url="{{ document_url or '#' }}">
 	              <span class="flow-detail">{{ board_flow_text(stop.board_flow, stop.board_detail or (stop.plant_name ~ ' · ' ~ stop.arrived_with ~ ' → ' ~ stop.departed_with)) }}</span>
-	              <span class="flow-status status-{{ stop.badge.pill_tone }}">{{ stop.badge.short }}</span>
+	              <span class="flow-status status-{{ stop_badge.pill_tone }}">{{ stop_badge.short }}</span>
 	            </button>
 	          {% endfor %}
           {% if primary_event and not primary_stop %}
             {% set event_detail = primary_event.details[0] if primary_event.details else none %}
             {% set event_sheet_url = route_sheet_url or (event_detail.view_url if event_detail else '') %}
             {% set event_proof_url = (event_detail.view_url if event_detail else '') or route_sheet_url %}
-            {% set event_status_label = primary_event.badge.short %}
-            {% set event_status_tone = primary_event.badge.pill_tone %}
+            {% set event_badge = primary_event.board_badge if primary_event.board_badge is defined and primary_event.board_badge else primary_event.badge %}
+            {% set event_status_label = event_badge.short %}
+            {% set event_status_tone = event_badge.pill_tone %}
             {% set event_code = event_detail.board_code if event_detail and event_detail.board_code else 'STP-' ~ (event_detail.sequence if event_detail else primary_event.count) %}
             {% set event_row_detail = event_detail.board_detail if event_detail and event_detail.board_detail else primary_event.board_detail or primary_event.route_line %}
-            <button class="md-flow-row tone-{{ primary_event.badge.row_tone }}" type="button"
+            <button class="md-flow-row tone-{{ event_badge.row_tone }}" type="button"
                     data-flow-row
                     data-detail-template="primary-event"
                     data-title="{{ primary_event.title }}"
@@ -553,11 +577,12 @@
             {% set detail = item.details[0] if item.details else none %}
             {% set item_sheet_url = route_sheet_url or (detail.view_url if detail else '') %}
             {% set item_proof_url = (detail.view_url if detail else '') or route_sheet_url %}
-            {% set item_status_label = item.badge.short %}
-            {% set item_status_tone = item.badge.pill_tone %}
+            {% set narrative_badge = item.board_badge if item.board_badge is defined and item.board_badge else item.badge %}
+            {% set item_status_label = narrative_badge.short %}
+            {% set item_status_tone = narrative_badge.pill_tone %}
             {% set item_code = detail.board_code if detail and detail.board_code else 'STP-' ~ (detail.sequence if detail else item.count) %}
             {% set item_row_detail = detail.board_detail if detail and detail.board_detail else item.board_detail or item.route_line %}
-            <button class="md-flow-row tone-{{ item.badge.row_tone }}" type="button"
+            <button class="md-flow-row tone-{{ narrative_badge.row_tone }}" type="button"
                     data-flow-row
                     data-detail-template="event-{{ loop.index0 }}"
                     data-title="{{ item.title }}"
@@ -608,6 +633,25 @@
                 </form>
               {% endif %}
             </div>
+          </div>
+        </template>
+      {% endfor %}
+      {% for item in ops_board_items %}
+        {% set item_badge = item.board_badge %}
+        <template data-flow-detail-template="ops-item-{{ loop.index0 }}">
+          <div class="flow-selected-detail">
+            <h4>{{ item.code }} details</h4>
+            <div class="route-detail-grid">
+              <div><span>Status</span><strong>{{ item_badge.label }}</strong></div>
+              <div><span>Type</span><strong>{{ item.title or item.kind|title }}</strong></div>
+              <div><span>Detail</span><strong>{{ item.text }}</strong></div>
+              <div><span>Source</span><strong>{{ item.meta or 'Driver route record' }}</strong></div>
+            </div>
+            {% if item.view_url %}
+              <div class="route-detail-actions">
+                <a class="route-detail-link" href="{{ item.view_url }}">Open {{ item.kind|title }}</a>
+              </div>
+            {% endif %}
           </div>
         </template>
       {% endfor %}
