@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
+{% if current_user.role != 'management' %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+{% endif %}
 <div class="container fade-in">
   <h2 class="mt-4 mb-3">End of Day Summary (Interactive)</h2>
 
@@ -289,4 +293,5 @@
   }
 })();
 </script>
+{% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

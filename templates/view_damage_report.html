@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
+{% if current_user.role != 'management' %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+{% endif %}
 {% set photo_endpoint = 'manager.damage_photo' if manager_view|default(false) else 'driver.damage_photo' %}
 <style>
   .damage-shell { max-width:1120px; margin:0 auto; }
@@ -137,4 +141,5 @@
     </div>
   </section>
 </div>
+{% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

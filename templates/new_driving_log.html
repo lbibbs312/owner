@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
+{% if current_user.role != 'management' %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+{% endif %}
 
 <div class="container">
   <h2 class="mt-3">{{ 'Record Next Stop' if has_today_logs else 'Start Shift Location' }}</h2>
@@ -111,4 +115,5 @@ document.addEventListener('DOMContentLoaded', function () {
 {% endif %}
 </script>
 
+{% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

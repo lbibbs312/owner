@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
+{% if current_user.role != 'management' %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+{% endif %}
 <div class="container">
   {% set pretrip_print_endpoint = 'manager.pretrip_printable' if current_user.role == 'management' else 'driver.pretrip_printable' %}
   <h2>View PreTrip (ID: {{ pretrip.id }})</h2>
@@ -137,4 +141,5 @@
     {% endif %}
   </div>
 </div>
+{% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

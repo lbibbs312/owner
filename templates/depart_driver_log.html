@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
+{% if current_user.role != 'management' %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+{% endif %}
 <style>
   .cargo-scan-panel { border:1px solid #cbd5e1; border-radius:10px; background:#f8fafc; padding:14px; margin:14px 0; }
   .scan-actions { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
@@ -286,4 +290,5 @@
   if (stopScannerBtn) stopScannerBtn.addEventListener('click', stopScanner);
 })();
 </script>
+{% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

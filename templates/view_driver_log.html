@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
+{% if current_user.role != 'management' %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+{% endif %}
 <div class="container">
   {% set logs_endpoint = 'manager.driver_logs' if current_user.role == 'management' else 'driver.driver_logs' %}
   <style>
@@ -472,4 +476,5 @@
     {% endif %}
   </div>
 </div>
+{% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}
