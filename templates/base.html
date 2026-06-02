@@ -304,11 +304,11 @@
         {% if current_user.is_authenticated %}
           {% if current_user.role == "management" %}
             <a class="navbar-brand glow-text" href="{{ url_for('manager.manager_dashboard') }}">
-              MoveDefense (Manager)
+              {% include 'partials/_md_logo.html' %}MoveDefense (Manager)
             </a>
           {% else %}
             <a class="navbar-brand glow-text" href="{{ url_for('driver.mobile_dashboard') }}">
-              MoveDefense
+              {% include 'partials/_md_logo.html' %}MoveDefense
             </a>
             <!-- Driver bell icon (mobile only) -->
             <a class="nav-link text-white d-md-none position-relative"
@@ -322,7 +322,7 @@
           {% endif %}
         {% else %}
           <a class="navbar-brand glow-text" href="{{ url_for('public.welcome') }}">
-            MoveDefense
+            {% include 'partials/_md_logo.html' %}MoveDefense
           </a>
         {% endif %}
 
