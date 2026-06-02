@@ -34,7 +34,7 @@ from app.services.document_numbers import (
 from app.extensions import db, socketio
 from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
-from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DispatchCapture, DriverLog, DriverLogPhoto, HotPartPhoto, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, ShiftRecord, Task, User
+from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DispatchCapture, DriverLog, DriverLogPhoto, ExceptionEvent, HotPartPhoto, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, ShiftRecord, Task, User
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
 from app.services.dispatch_capture import create_dispatch_capture, convert_dispatch_capture, dismiss_dispatch_capture, open_dispatch_captures
@@ -1878,6 +1878,130 @@ def close_followup(followup_id):
     return redirect(url_for("manager.review_dashboard"))
 
 
+def _pending_review_stop_ids():
+    """Stop ids that a driver flagged for manager review and that have not yet
+    been resolved.
+
+    Mirrors the IN REVIEW contract in app/services/route_map.py: a stop is in
+    review when it has a ``manager_review_requested`` ExceptionEvent and no
+    matching ``manager_review_resolved`` ExceptionEvent for the same stop_id.
+    """
+    requested = {
+        stop_id
+        for (stop_id,) in ExceptionEvent.query.with_entities(ExceptionEvent.stop_id)
+        .filter(
+            ExceptionEvent.event_type == "manager_review_requested",
+            ExceptionEvent.stop_id.isnot(None),
+        )
+        .all()
+    }
+    if not requested:
+        return set()
+    resolved = {
+        stop_id
+        for (stop_id,) in ExceptionEvent.query.with_entities(ExceptionEvent.stop_id)
+        .filter(
+            ExceptionEvent.event_type == "manager_review_resolved",
+            ExceptionEvent.stop_id.in_(requested),
+        )
+        .all()
+    }
+    return requested - resolved
+
+
+def _pending_review_rows():
+    """Build display rows for every stop currently awaiting manager review.
+
+    One row per pending stop, using the most recent ``manager_review_requested``
+    event for that stop so the reason/requester reflect the latest flag.
+    """
+    pending_ids = _pending_review_stop_ids()
+    if not pending_ids:
+        return []
+    requests = (
+        ExceptionEvent.query.filter(
+            ExceptionEvent.event_type == "manager_review_requested",
+            ExceptionEvent.stop_id.in_(pending_ids),
+        )
+        .order_by(ExceptionEvent.created_at.desc(), ExceptionEvent.id.desc())
+        .all()
+    )
+    latest_by_stop = {}
+    for event in requests:
+        latest_by_stop.setdefault(event.stop_id, event)
+
+    rows = []
+    for stop_id, event in latest_by_stop.items():
+        log = event.stop or DriverLog.query.get(stop_id)
+        if log is None or log.deleted_at is not None:
+            continue
+        requester = event.driver or (log.driver if log else None)
+        plant = _plant_label(log.plant_name)
+        rows.append({
+            "log": log,
+            "log_id": log.id,
+            "event": event,
+            "plant": plant,
+            "stop_label": f"{plant} - {log.date.isoformat() if log.date else 'no date'}",
+            "reason": (event.details or "").strip() or event.summary or "Driver requested manager review",
+            "requested_by": requester.display_name if requester else "Driver",
+            "requested_at": event.created_at,
+            "arrive_time": log.arrive_time or "--",
+            "depart_time": log.depart_time or "--",
+            "arrived_cargo": log.load_size or "--",
+            "departed_cargo": log.depart_load_size or "--",
+            "url": url_for("manager.view_driver_log", log_id=log.id),
+        })
+    rows.sort(key=lambda row: row["requested_at"] or datetime.min, reverse=True)
+    return rows
+
+
+def _pending_review_count():
+    return len(_pending_review_stop_ids())
+
+
+@bp.route("/reviews")
+def review_queue():
+    rows = _pending_review_rows()
+    return render_template(
+        "manager_reviews.html",
+        review_rows=rows,
+        pending_review_count=len(rows),
+        today=date.today(),
+    )
+
+
+@bp.route("/reviews/<int:log_id>/resolve", methods=["POST"])
+def resolve_review(log_id):
+    if current_user.role != "management":
+        flash("Manager credentials required.", "warning")
+        return redirect(url_for("manager.review_queue"))
+    log = DriverLog.query.get_or_404(log_id)
+    db.session.add(ExceptionEvent(
+        event_type="manager_review_resolved",
+        severity="medium",
+        stop_id=log_id,
+        driver_log_id=log_id,
+        driver_id=current_user.id,
+        plant_name=getattr(log, "plant_name", None),
+        event_date=getattr(log, "date", None),
+        summary="Manager resolved review",
+        details=(request.form.get("note") or "").strip() or None,
+    ))
+    db.session.commit()
+    record_activity(
+        user_id=current_user.id,
+        category="exception",
+        action="reviewed",
+        title="Manager review resolved",
+        details=f"Resolved manager review for stop #{log_id} ({_plant_label(log.plant_name)}).",
+        target_type="driver_log",
+        target_id=log_id,
+    )
+    flash("Stop review resolved.", "success")
+    return redirect(url_for("manager.review_queue"))
+
+
 @bp.route("/damage-photos/<int:photo_id>")
 def damage_photo(photo_id):
     photo = DamagePhoto.query.get_or_404(photo_id)
@@ -2110,6 +2234,8 @@ def manager_dashboard():
     critical_exceptions = _critical_exception_rows(live_stop_rows, live_logs)
     followup_cases = build_followup_cases(anchor=today)
     live_problem_count = len(critical_exceptions)
+    review_rows = _pending_review_rows()
+    pending_review_count = len(review_rows)
 
     active_driver_ids = {log.driver_id for log in todays_logs}
     active_drivers = [driver for driver in drivers if driver.id in active_driver_ids]
@@ -2148,6 +2274,8 @@ def manager_dashboard():
         reported_delay_count=reported_delay_count,
         live_problem_count=live_problem_count,
         critical_exceptions=critical_exceptions,
+        review_rows=review_rows,
+        pending_review_count=pending_review_count,
         followup_cases=followup_cases,
         plant_forecasts=plant_forecast_rows(today)[:6],
         has_drivers=bool(drivers),

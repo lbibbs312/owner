@@ -6330,3 +6330,138 @@ def test_current_open_stop_wording_parity_across_rendered_surfaces(client, app):
     login(client, "render_context_driver")
     denied_debug = client.get(f"/debug/route-context/driver:{driver_id}:date:{route_date.isoformat()}")
     assert denied_debug.status_code == 404
+
+
+def test_manager_review_queue_lists_and_resolves_flagged_stop(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, ExceptionEvent
+
+        manager = create_user(
+            "review_manager", "review_manager@example.com", role="management",
+            first_name="Reggie", last_name="Manager",
+        )
+        driver = create_user(
+            "review_driver", "review_driver@example.com",
+            first_name="Dana", last_name="Driver",
+        )
+        manager_id = manager.id
+        driver_id = driver.id
+        route_date = date.today()
+
+        log = DriverLog(
+            driver_id=driver_id,
+            date=route_date,
+            plant_name="KP",
+            load_size="Empty",
+            depart_load_size="Raleigh East Load",
+            arrive_time="08:00",
+            depart_time="08:30",
+        )
+        db.session.add(log)
+        db.session.commit()
+        log_id = log.id
+
+        # Driver flags the stop for manager review (the contract event).
+        db.session.add(ExceptionEvent(
+            event_type="manager_review_requested",
+            severity="medium",
+            stop_id=log_id,
+            driver_log_id=log_id,
+            driver_id=driver_id,
+            plant_name="KP",
+            event_date=route_date,
+            summary="Driver requested manager review",
+            details="Skid looked unbalanced before departure.",
+        ))
+        db.session.commit()
+
+    login(client, "review_manager")
+
+    # 1) The flagged stop appears in the dedicated review queue.
+    queue = client.get("/manager/reviews")
+    assert queue.status_code == 200
+    assert b"Stops Awaiting Manager Review" in queue.data
+    assert b"Skid looked unbalanced before departure." in queue.data
+    assert b"Dana Driver" in queue.data
+    # Cargo arrived -> departed is shown.
+    assert b"Empty" in queue.data
+    assert b"Raleigh East Load" in queue.data
+
+    # Pending-review count surfaces on the manager dashboard as a badge.
+    dashboard = client.get("/manager/dashboard")
+    assert dashboard.status_code == 200
+    assert b"Pending Reviews" in dashboard.data
+
+    # 2) Resolving creates a manager_review_resolved event.
+    resolved = client.post(
+        f"/manager/reviews/{log_id}/resolve",
+        data={"note": "Checked with driver; load was fine."},
+        follow_redirects=True,
+    )
+    assert resolved.status_code == 200
+
+    with app.app_context():
+        from app.models import ExceptionEvent
+
+        resolved_events = ExceptionEvent.query.filter_by(
+            event_type="manager_review_resolved", stop_id=log_id,
+        ).all()
+        assert len(resolved_events) == 1
+        event = resolved_events[0]
+        assert event.driver_log_id == log_id
+        assert event.driver_id == manager_id
+        assert event.summary == "Manager resolved review"
+        assert event.details == "Checked with driver; load was fine."
+
+    # 3) After resolving, the stop is gone from the queue.
+    queue_after = client.get("/manager/reviews")
+    assert queue_after.status_code == 200
+    assert b"Skid looked unbalanced before departure." not in queue_after.data
+    assert b"No stops are awaiting manager review" in queue_after.data
+
+
+def test_manager_review_resolve_requires_management_role(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, ExceptionEvent
+
+        create_user("rq_manager", "rq_manager@example.com", role="management")
+        driver = create_user("rq_driver", "rq_driver@example.com")
+        driver_id = driver.id
+        route_date = date.today()
+
+        log = DriverLog(
+            driver_id=driver_id, date=route_date, plant_name="RE",
+            load_size="Empty", depart_load_size="Empty",
+        )
+        db.session.add(log)
+        db.session.commit()
+        log_id = log.id
+        db.session.add(ExceptionEvent(
+            event_type="manager_review_requested", severity="medium",
+            stop_id=log_id, driver_log_id=log_id, driver_id=driver_id,
+            plant_name="RE", event_date=route_date,
+            summary="Driver requested manager review",
+        ))
+        db.session.commit()
+
+    # A driver may not reach the manager-gated resolve endpoint; the manager
+    # before_request bounces them to login with the management role required.
+    login(client, "rq_driver")
+    denied = client.post(f"/manager/reviews/{log_id}/resolve", follow_redirects=False)
+    assert denied.status_code in (301, 302)
+    location = denied.headers.get("Location", "")
+    assert "/login" in location
+    assert "required_role=management" in location
+
+    with app.app_context():
+        from app.models import ExceptionEvent
+
+        assert ExceptionEvent.query.filter_by(
+            event_type="manager_review_resolved", stop_id=log_id,
+        ).count() == 0
