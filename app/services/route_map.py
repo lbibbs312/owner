@@ -25,6 +25,9 @@ from app.services.load_state import (
     is_empty_load,
     is_service_stop,
     load_display,
+    route_problem_reason,
+    secondary_not_dropped,
+    secondary_not_dropped_reason,
     service_stop_label,
 )
 from app.services.plant_addresses import PLANT_LABELS, plant_label
@@ -399,6 +402,17 @@ def _stop_next_action(log, *, status, cargo, linked_move=None):
     return "No action needed"
 
 
+def _plant_code(name):
+    """Resolve a plant name/label to its canonical plant code, or None."""
+    n = _norm_key(name)
+    if not n:
+        return None
+    for code, lbl in PLANT_LABELS.items():
+        if _norm_key(code) == n or _norm_key(lbl) == n:
+            return code
+    return None
+
+
 def _build_stops(route_context, *, role="driver", move_requests=None, route_pretrip=None):
     move_requests = move_requests or []
     linked_by_log = {req.linked_driver_log_id: req for req in move_requests if req.linked_driver_log_id}
@@ -436,11 +450,52 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
         departed_with = row.get("cargo_out") or log.depart_load_size or NOT_TRACKED
         wait_label = f"{wait_minutes} min" if wait_minutes is not None else NOT_TRACKED
         departed = bool(log.depart_time)
+        # --- Real drop / proof / destination evidence (not flag relabeling) ---
+        dropped_loads = [load_display(it) for it in (row.get("cargo_removed") or ()) if not is_empty_load(it)]
+        added_loads = [load_display(it) for it in (row.get("cargo_added") or ()) if not is_empty_load(it)]
+        proof_present = bool(getattr(log, "photos", None)) or bool(getattr(linked_move, "linked_document_id", None))
+        stop_code = _plant_code(log.plant_name) or _plant_code(label)
+        expected_dests = []
+        dest_mismatch = False
+        for dropped in dropped_loads:
+            dest = destination_from_load(dropped)
+            if dest:
+                expected_dests.append(plant_label(dest))
+                if stop_code and dest != stop_code:
+                    dest_mismatch = True
+        drop_unconfirmed = bool(
+            route.get("unload_blocked")
+            or route.get("secondary_drop_blocked")
+            or secondary_not_dropped(log)
+        )
+        # Classify an already-flagged drop by real evidence (item 3 of the spec).
+        mismatch = bool(dropped_loads) and drop_unconfirmed and dest_mismatch
+        missing_proof = bool(dropped_loads) and drop_unconfirmed and not proof_present and not mismatch
+        unconfirmed_only = drop_unconfirmed and not mismatch and not missing_proof
+        drop_reason = _clean(
+            route.get("unload_reason")
+            or route.get("secondary_drop_reason")
+            or secondary_not_dropped_reason(log)
+            or route_problem_reason(log)
+        )
+        stop_evidence = {
+            "arrived_with": arrived_with,
+            "departed_with": departed_with,
+            "dropped": dropped_loads,
+            "picked_up": added_loads,
+            "expected_destination": ", ".join(dict.fromkeys(expected_dests)) or None,
+            "proof": "Attached" if proof_present else "None on file",
+            "reason": drop_reason or None,
+        }
         stop_issues = derive_issues(
             flags,
             has_damage=has_damage,
             departed=departed,
             wait_minutes=wait_minutes,
+            unconfirmed_drop=unconfirmed_only,
+            destination_mismatch=mismatch,
+            missing_proof=missing_proof,
+            evidence=stop_evidence,
         )
         stop_badge = board_badge(
             stop_issues,
@@ -485,6 +540,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             "has_issue": has_issue,
             "flags": flags,
             "issues": stop_issues,
+            "evidence": stop_evidence,
             "badge": stop_badge,
             "notes": row.get("note") or "",
             "next_action": _stop_next_action(log, status=status, cargo=cargo, linked_move=linked_move),
