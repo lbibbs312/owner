@@ -4425,6 +4425,9 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"content:'['" not in logs_page.data
     assert b"calc(100% - 8px)" not in logs_page.data
     assert b"calc(100% - 10px)" not in logs_page.data
+    assert b"border-left:3px solid rgba(91,157,255" not in logs_page.data
+    assert b"border-left:3px solid rgba(255,178,36" not in logs_page.data
+    assert b"border-left:3px solid rgba(255,82,71" not in logs_page.data
     assert b"Print Route Record" in logs_page.data
     assert f"/driver_logs_print?date={selected_date.isoformat()}".encode() in logs_page.data
     assert f"/driver_logs_print?date={selected_date.isoformat()}&amp;autoprint=1".encode() in logs_page.data
@@ -5506,6 +5509,9 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "window.requestAnimationFrame(step)" in body
     assert "calc(100% - 8px)" not in body
     assert "calc(100% - 10px)" not in body
+    assert "border-left: 3px solid rgba(91,157,255" not in body
+    assert "border-left: 3px solid rgba(255,178,36" not in body
+    assert "border-left: 3px solid rgba(255,82,71" not in body
     assert "content: none!important" in body
     assert "ROUTE LOGS &nbsp; PLANT TRANSFERS" in body
     assert "&diams;" not in body
