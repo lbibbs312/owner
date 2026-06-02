@@ -304,9 +304,11 @@ def test_destination_mismatch_is_specific_issue(app):
     ctx = build_driver_route_map_context(driver=driver, date=date.today())
     stop = ctx["stops"][0]
 
-    assert stop["badge"]["label"] == "DEST MISMATCH"
+    assert stop["badge"]["label"] == "DESTINATION MISMATCH"
     assert stop["issues"][0]["code"] == "destination_mismatch"
     assert stop["evidence"]["expected_destination"] == "PPL"
+    assert stop["evidence"]["actual_stop"] == "Raleigh East"
+    assert stop["evidence"]["action_needed"] == "Confirm destination or send to manager review"
 
 
 def test_load_disappears_with_proof_but_without_confirmation_is_unconfirmed_drop(app):
@@ -380,6 +382,33 @@ def test_damage_report_shows_damage_issue(app):
     assert stop["issues"][0]["code"] == "damage"
 
 
+def test_driver_closeout_can_clear_damage_board_blocker(app):
+    from app.extensions import db
+    from app.models import DamageReport
+    from app.models.case import ExceptionEvent
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("damage_closeout_driver")
+    log = _driver_log(driver, plant_name="RE", depart_time="09:20", load_size="Raleigh East Load", depart_load_size="Empty")
+    db.session.add(DamageReport(reported_by_id=driver.id, driver_log_id=log.id, plant_name="RE", description="Rack damage", status="open"))
+    db.session.add(ExceptionEvent(
+        event_type="manager_review_resolved",
+        severity="medium",
+        stop_id=log.id,
+        driver_log_id=log.id,
+        driver_id=driver.id,
+        summary="Driver closed issue to continue",
+        details="Issue: Damage. Action: Close issue to continue. Reason: damage photo attached and route can continue.",
+    ))
+    db.session.commit()
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    assert stop["issues"] == []
+    assert stop["badge"]["label"] == "DROPPED"
+
+
 def test_open_stop_without_departure_is_actionable_needs_departure(app):
     from app.services.route_map import build_driver_route_map_context
 
@@ -432,6 +461,56 @@ def test_manager_resolved_review_clears_derived_issue(app):
 
     assert stop["issues"] == []
     assert stop["badge"]["label"] == "DROPPED"
+
+
+def test_driver_closeout_clears_issue_and_remains_manager_visible(client, app):
+    from app.models.case import ExceptionEvent
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("closeout_driver", "driver")
+    _user("closeout_manager", "management")
+    log = _driver_log(
+        driver,
+        plant_name="RE",
+        depart_time="09:20",
+        load_size="Raleigh East Load",
+        depart_load_size="Empty",
+        downtime_reason="missing proof on this drop",
+    )
+
+    _login(client, "closeout_driver")
+    response = client.post(
+        f"/driver_logs/{log.id}/close_issue",
+        data={
+            "issue_type": "missing_proof",
+            "resolution_action": "Close proof issue to continue",
+            "reason": "Proof camera failed; load was dropped at assigned dock.",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    event = ExceptionEvent.query.filter_by(
+        event_type="manager_review_resolved",
+        stop_id=log.id,
+    ).one()
+    assert event.driver_id == driver.id
+    assert event.summary == "Driver closed issue to continue"
+    assert "Proof camera failed" in event.details
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+    assert stop["issues"] == []
+    assert stop["badge"]["label"] == "DROPPED"
+
+    client.get("/logout")
+    _login(client, "closeout_manager")
+    queue = client.get("/manager/reviews")
+    assert queue.status_code == 200
+    body = queue.get_data(as_text=True)
+    assert "Driver-Closed Issue Closeouts" in body
+    assert "Proof camera failed; load was dropped at assigned dock." in body
+    assert "closeout_driver" in body
 
 
 def test_driver_route_map_flags_real_exception_states_for_warning_rows(app):
@@ -789,8 +868,8 @@ def test_board_issue_drawer_explains_reason_and_offers_actions(client, app):
     body = resp.get_data(as_text=True)
     assert "MISSING PROOF" in body              # explicit reason, never generic RISK
     assert "no photo, scan, or driver confirmation" in body   # drawer "why"
-    assert "Add proof / photo" in body          # action
-    assert "Send to manager" in body            # action
+    assert "Add proof photo" in body            # action
+    assert "Send to manager review" in body     # action
     assert "/request_review" in body            # manager-review endpoint wired
 
 

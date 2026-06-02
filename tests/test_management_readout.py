@@ -27,7 +27,7 @@ def test_management_narrative_reports_completed_route_without_exceptions():
         {
             "log": second,
             "day_logs": [first, second],
-            "log_routes": {1: {"plant": "Kraft Plant"}, 2: {"plant": "Paint East"}},
+            "log_routes": {1: {"plant": "Kraft Plant"}, 2: {"plant": "Unknown plant / needs confirmation"}},
             "delay_logs": [],
             "damage_reports": [],
             "truck_context": {"truck_id": "st4"},

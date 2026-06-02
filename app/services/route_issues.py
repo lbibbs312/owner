@@ -14,7 +14,7 @@ Issue object shape (item 2 of the spec)::
         "label": "UNCONFIRMED DROP",         # shown on the pill
         "severity": "risk",                  # ok | info | attention | risk
         "reason": "A load left the truck ...",  # shown to driver/manager
-        "action": "Confirm delivered here",  # what to do next
+        "action": "Confirm drop or send to manager review",  # what to do next
         "evidence": {...},                   # fields used to derive it
         "resolved": False,                   # unresolved by default
     }
@@ -40,14 +40,14 @@ ISSUE_CATALOG = {
         "Add proof photo",
     ),
     "destination_mismatch": (
-        "DEST MISMATCH", "risk",
-        "The load destination does not match where it was dropped.",
-        "Confirm destination",
+        "DESTINATION MISMATCH", "risk",
+        "The load destination does not match where the load was dropped.",
+        "Confirm destination or send to manager review",
     ),
     "unconfirmed_drop": (
         "UNCONFIRMED DROP", "risk",
         "A load left the truck here, but the drop is not confirmed with proof.",
-        "Confirm delivered here",
+        "Confirm drop or send to manager review",
     ),
     "count_short": (
         "COUNT SHORT", "risk",
@@ -90,7 +90,7 @@ FLAG_TO_CODE = {
 SHORT_LABEL = {
     "damage": "DAMAGE",
     "missing_proof": "MISSING PROOF",
-    "destination_mismatch": "DEST MISMATCH",
+    "destination_mismatch": "DESTINATION MISMATCH",
     "unconfirmed_drop": "UNCONFIRMED DROP",
     "count_short": "COUNT SHORT",
     "hold": "HOLD",

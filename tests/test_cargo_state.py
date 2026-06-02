@@ -8,6 +8,8 @@ from app.services.cargo_state import (
     cargo_state_label,
     normalize_cargo_state,
 )
+from app.services.load_state import destination_from_load, load_display
+from app.services.plant_addresses import UNKNOWN_LOAD_LABEL, UNKNOWN_PLANT_LABEL, plant_label
 
 
 def _log(**kw):
@@ -85,3 +87,11 @@ def test_request_prefers_linked_log_truth():
 def test_label_lookup():
     assert cargo_state_label("pending_document") == "Document Needed"
     assert cargo_state_label("nonsense") == STATE_LABELS["unknown"]
+
+
+def test_ambiguous_paint_east_tokens_need_confirmation():
+    assert plant_label("PE") == UNKNOWN_PLANT_LABEL
+    assert plant_label("Paint East") == UNKNOWN_PLANT_LABEL
+    assert destination_from_load("PE Load") is None
+    assert load_display("PE Load") == UNKNOWN_LOAD_LABEL
+    assert load_display("Paint East Load") == UNKNOWN_LOAD_LABEL

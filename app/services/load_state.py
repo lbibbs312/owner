@@ -1,7 +1,13 @@
 from datetime import date, datetime
 import pytz
 
-from app.services.plant_addresses import PLANT_LABELS, plant_label
+from app.services.plant_addresses import (
+    PLANT_LABELS,
+    UNKNOWN_LOAD_LABEL,
+    UNKNOWN_PLANT_LABEL,
+    is_ambiguous_plant,
+    plant_label,
+)
 
 LOAD_SUFFIX = " Load"
 HOT_PART_SUFFIX = " Hot Part"
@@ -28,6 +34,8 @@ def _norm(value):
 def _plant_code(value):
     wanted = _norm(value)
     if not wanted:
+        return None
+    if is_ambiguous_plant(value):
         return None
     for code, label in PLANT_LABELS.items():
         if wanted in {_norm(code), _norm(label)}:
@@ -82,6 +90,8 @@ def destination_from_load(value):
         if lowered.endswith(_norm(suffix)):
             text = text[: -len(suffix)].strip()
             break
+    if is_ambiguous_plant(text):
+        return None
     for code, label in PLANT_LABELS.items():
         if _norm(text) in {_norm(code), _norm(label)}:
             return code
@@ -91,12 +101,20 @@ def destination_from_load(value):
 def load_display(value):
     if is_empty_load(value):
         return "Empty"
+    text = _clean(value)
+    normalized_text = text
+    for suffix in (LOAD_SUFFIX, HOT_PART_SUFFIX):
+        if _norm(normalized_text).endswith(_norm(suffix)):
+            normalized_text = normalized_text[: -len(suffix)].strip()
+            break
+    if is_ambiguous_plant(normalized_text):
+        return UNKNOWN_LOAD_LABEL
     destination = destination_from_load(value)
     if destination and _norm(value).endswith(_norm(HOT_PART_SUFFIX)):
         return hot_part_load_value(destination)
     if destination:
         return destination_load_value(destination)
-    return _clean(value)
+    return text
 
 
 def normalize_cargo_value(value):
@@ -385,7 +403,7 @@ def build_driver_log_route_context(logs):
         for index, log in enumerate(sorted_logs):
             next_log = sorted_logs[index + 1] if index + 1 < len(sorted_logs) else None
             next_plant = _plant_code(getattr(next_log, "plant_name", None)) if next_log else None
-            plant = _plant_code(log.plant_name) or "Unknown"
+            plant = _plant_code(log.plant_name) or UNKNOWN_PLANT_LABEL
             completed = bool(log.depart_time)
             arrival_destination = destination_from_load(log.load_size)
             service_stop = is_service_stop(log)
@@ -485,7 +503,7 @@ def build_driver_log_route_context(logs):
             if previous_log:
                 previous_departure = _depart_local_datetime(previous_log)
                 current_arrival = _arrival_local_datetime(log)
-                previous_plant = _plant_code(previous_log.plant_name) or "Unknown"
+                previous_plant = _plant_code(previous_log.plant_name) or UNKNOWN_PLANT_LABEL
                 if previous_departure and current_arrival:
                     transit_minutes = int((current_arrival - previous_departure).total_seconds() // 60)
                     if transit_minutes < 0:

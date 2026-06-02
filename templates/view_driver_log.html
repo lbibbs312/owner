@@ -51,6 +51,13 @@
     .detail-pair strong { color:#0f172a; font-weight:900; text-align:right; }
     .empty-proof { margin:0; color:#64748b; font-weight:700; }
     .active-note { margin:0; color:#0f172a; line-height:1.45; font-weight:800; }
+    .driver-issue-actions { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
+    .driver-issue-actions form { margin:0; }
+    .driver-issue-actions .btn, .driver-issue-actions button { width:100%; }
+    .driver-issue-closeout { grid-column:1 / -1; display:grid; gap:8px; padding:10px; border:1px solid #fde68a; border-radius:8px; background:#fffbeb; }
+    .driver-issue-closeout label { margin:0; color:#92400e; font-size:.72rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+    .driver-issue-closeout textarea { min-height:74px; resize:vertical; border:1px solid #fcd34d; border-radius:8px; padding:9px 10px; font:inherit; color:#0f172a; background:#fff; }
+    .driver-closeout-audit { margin:0; padding:10px 12px; border:1px solid #bbf7d0; border-radius:8px; background:#f0fdf4; color:#166534; font-weight:800; }
     .severity-list { display:grid; gap:8px; }
     .severity-item { border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:10px 12px; }
     .severity-item strong { display:block; color:#0f172a; font-weight:900; }
@@ -181,6 +188,19 @@
             </div>
           {% endfor %}
         </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if issue_closeout %}
+    <div class="report-section">
+      <div class="report-section-head green">{{ 'Driver Issue Closeout' if issue_closeout.summary == 'Driver closed issue to continue' else 'Manager Review Closeout' }}</div>
+      <div class="report-section-body">
+        <p class="driver-closeout-audit">
+          Closed by {{ issue_closeout.driver.display_name if issue_closeout.driver else 'driver' }}
+          {% if issue_closeout.created_at %}at {{ issue_closeout.created_at.strftime('%b %d, %I:%M %p') }}{% endif %}.
+          {{ issue_closeout.details or issue_closeout.summary }}
+        </p>
       </div>
     </div>
     {% endif %}
@@ -426,6 +446,64 @@
       <p><strong>Parts:</strong> <span class="badge bg-dark">No Pickup</span></p>
     {% else %}
       <p><strong>Parts:</strong> {% if log.hot_parts %}<span class="badge bg-danger">Hot</span>{% endif %} {{ log.part_number or "N/A" }}</p>
+    {% endif %}
+    {% set primary_issue = issue_review.issues[0] if issue_review and issue_review.issues else none %}
+    {% if primary_issue %}
+      {% set ev = issue_review.evidence or {} %}
+      {% set closeout_label = 'Confirm correct destination' if primary_issue.code == 'destination_mismatch' else ('Close proof issue to continue' if primary_issue.code == 'missing_proof' else ('Confirm drop and continue' if primary_issue.code == 'unconfirmed_drop' else 'Close issue to continue')) %}
+      <div class="report-section">
+        <div class="report-section-head {% if primary_issue.severity == 'risk' %}red{% else %}amber{% endif %}">Issue Review</div>
+        <div class="report-section-body">
+          <div class="severity-item">
+            <span class="severity-pill {% if primary_issue.severity == 'risk' %}critical{% else %}review{% endif %}">{{ primary_issue.label }}</span>
+            <strong>{{ primary_issue.reason }}</strong>
+          </div>
+          <div class="detail-pairs">
+            {% if ev.load or ev.dropped %}<p class="detail-pair"><span>Load</span><strong>{{ ev.load or ev.dropped|join(', ') }}</strong></p>{% endif %}
+            {% if ev.expected_destination %}<p class="detail-pair"><span>Expected destination</span><strong>{{ ev.expected_destination }}</strong></p>{% endif %}
+            {% if ev.actual_stop %}<p class="detail-pair"><span>Actual stop</span><strong>{{ ev.actual_stop }}</strong></p>{% endif %}
+            <p class="detail-pair"><span>Arrived with</span><strong>{{ ev.arrived_with or log.load_size or '--' }}</strong></p>
+            <p class="detail-pair"><span>Departed with</span><strong>{{ ev.departed_with or log.depart_load_size or '--' }}</strong></p>
+            <p class="detail-pair"><span>Proof found</span><strong>{{ ev.proof or 'None on file' }}</strong></p>
+            <p class="detail-pair"><span>Action needed</span><strong>{{ ev.action_needed or primary_issue.action }}</strong></p>
+          </div>
+          <div class="driver-issue-actions">
+            <form class="driver-issue-closeout" action="{{ url_for('driver.close_driver_log_issue', log_id=log.id) }}" method="POST">
+              <input type="hidden" name="issue_type" value="{{ primary_issue.code }}">
+              <input type="hidden" name="resolution_action" value="{{ closeout_label }}">
+              <input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}">
+              <label for="issueCloseoutReason">Closeout reason required</label>
+              <textarea id="issueCloseoutReason" name="reason" required placeholder="Tell the manager why this can be closed and the route can continue."></textarea>
+              <button class="btn btn-success" type="submit">{{ closeout_label }}</button>
+            </form>
+            {% if primary_issue.code == 'destination_mismatch' %}
+              <a class="btn btn-warning" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Change destination</a>
+            {% endif %}
+            {% if primary_issue.code == 'missing_proof' %}
+              <a class="btn btn-primary" href="{{ url_for('driver.new_plant_transfer') }}">Attach transfer sheet</a>
+            {% endif %}
+            {% if not log.depart_time %}
+              <a class="btn btn-success" href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}">Record departure</a>
+            {% endif %}
+            <form action="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}" method="POST" enctype="multipart/form-data">
+              <input type="hidden" name="source" value="proof">
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <label class="btn btn-primary mb-0" style="cursor:pointer">Attach proof<input type="file" name="photo" accept="image/*" capture="environment" style="display:none" onchange="if(this.files.length){this.form.submit();}"></label>
+            </form>
+            <form action="{{ url_for('driver.request_manager_review', log_id=log.id) }}" method="POST">
+              <input type="hidden" name="reason" value="{{ primary_issue.label }}: {{ primary_issue.reason }}">
+              <button class="btn btn-outline-danger" type="submit">Send to manager review</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% elif issue_closeout %}
+      <div class="report-section">
+        <div class="report-section-head green">Issue Closeout</div>
+        <div class="report-section-body">
+          <p class="driver-closeout-audit">{{ issue_closeout.details or issue_closeout.summary }}</p>
+        </div>
+      </div>
     {% endif %}
     {% if driver_log_photos %}
       <div class="report-section">

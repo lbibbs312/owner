@@ -9,9 +9,12 @@ from flask_wtf import FlaskForm
 from wtforms import BooleanField, IntegerField, SelectField, StringField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, Optional
 
-from app.services.plant_addresses import PLANT_LABELS
+from app.services.plant_addresses import PLANT_LABELS, UNKNOWN_PLANT_LABEL
 
-PLANT_CHOICES = [("", "Select Plant...")] + [(code, label) for code, label in PLANT_LABELS.items()]
+ACTIVE_PLANT_CHOICES = [(code, label) for code, label in PLANT_LABELS.items()]
+LEGACY_PLANT_CHOICES = [("PE", UNKNOWN_PLANT_LABEL)]
+PLANT_CHOICES = [("", "Select Plant...")] + ACTIVE_PLANT_CHOICES + LEGACY_PLANT_CHOICES
+DESTINATION_PLANT_CHOICES = [("", "Select destination...")] + ACTIVE_PLANT_CHOICES
 
 LOAD_SIZE_CHOICES = [
     ("", "Select Load..."),
@@ -60,12 +63,12 @@ class DriverLogForm(FlaskForm):
     )
     departure_destination = SelectField(
         "Departed With",
-        choices=[("", "No pickup / empty")] + [(code, label) for code, label in PLANT_LABELS.items()],
+        choices=[("", "No pickup / empty")] + ACTIVE_PLANT_CHOICES,
         validators=[Optional()],
     )
     secondary_departure_dest = SelectField(
         "Also loaded for (second stop)",
-        choices=[("", "None / not applicable")] + [(code, label) for code, label in PLANT_LABELS.items()],
+        choices=[("", "None / not applicable")] + ACTIVE_PLANT_CHOICES,
         validators=[Optional()],
     )
     secondary_departure_type = SelectField(
@@ -131,12 +134,12 @@ class DepartForm(FlaskForm):
     )
     destination = SelectField(
         "Primary destination",
-        choices=PLANT_CHOICES,
+        choices=DESTINATION_PLANT_CHOICES,
         validators=[Optional()],
     )
     secondary_destination = SelectField(
         "Optional second stop destination",
-        choices=PLANT_CHOICES,
+        choices=DESTINATION_PLANT_CHOICES,
         validators=[Optional()],
     )
     secondary_load_type = SelectField(

@@ -1029,8 +1029,11 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             "arrived_with": arrived_with,
             "departed_with": departed_with,
             "dropped": dropped_loads,
+            "load": ", ".join(dict.fromkeys(dropped_loads)) or None,
             "picked_up": added_loads,
             "expected_destination": ", ".join(dict.fromkeys(expected_dests)) or None,
+            "actual_stop": label,
+            "action_needed": "Confirm destination or send to manager review" if mismatch else None,
             "proof": "Attached" if proof_present else "None on file",
             "proof_count": proof_count,
             "scan_count": len(scan_events_for_stop),
@@ -1052,16 +1055,18 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             evidence=stop_evidence,
             extra_codes=("count_short",) if short_scan_count else (),
         )
-        if log.id in _review_done and not has_damage:
+        is_review_closed = log.id in _review_done
+        if is_review_closed:
             stop_issues = []
         has_issue = bool(stop_issues)
+        active_damage_blocker = has_damage and not is_review_closed
         issue_severity = "risk" if any(item.get("severity") == "risk" for item in stop_issues) else ("attention" if stop_issues else "ok")
         status = _stop_status(
             row,
             log,
             current_stop_id=current_stop_id,
             has_issue=has_issue,
-            has_damage=has_damage,
+            has_damage=active_damage_blocker,
             linked_move=linked_move,
             issue_severity=issue_severity,
         )

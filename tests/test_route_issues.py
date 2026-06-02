@@ -16,7 +16,7 @@ def test_known_flags_map_to_explicit_reason_codes():
     assert derive_issues(["Needs review"])[0]["code"] == "unconfirmed_drop"
     assert derive_issues(["Needs review"])[0]["label"] == "UNCONFIRMED DROP"
     assert derive_issues(["Missing proof"])[0]["label"] == "MISSING PROOF"
-    assert derive_issues(["Mismatch"])[0]["label"] == "DEST MISMATCH"
+    assert derive_issues(["Mismatch"])[0]["label"] == "DESTINATION MISMATCH"
     assert derive_issues(["Shortage"])[0]["label"] == "COUNT SHORT"
     assert derive_issues(["Hold"])[0]["label"] == "HOLD"
     assert derive_issues([], has_damage=True)[0]["label"] == "DAMAGE"

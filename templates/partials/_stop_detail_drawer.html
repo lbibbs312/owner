@@ -29,14 +29,15 @@
               <h4>{{ issue.label }}</h4>
               <p>{{ issue.reason }}</p>
               <dl class="drawer-facts">
-                {% if ev.dropped %}<div><dt>Affected load</dt><dd>{{ ev.dropped|join(', ') }}</dd></div>{% endif %}
+                {% if ev.load or ev.dropped %}<div><dt>Load</dt><dd>{{ ev.load or ev.dropped|join(', ') }}</dd></div>{% endif %}
                 {% if ev.expected_destination %}<div><dt>Expected destination</dt><dd>{{ ev.expected_destination }}</dd></div>{% endif %}
+                {% if ev.actual_stop %}<div><dt>Actual stop</dt><dd>{{ ev.actual_stop }}</dd></div>{% endif %}
                 <div><dt>Arrived with</dt><dd>{{ ev.arrived_with or stop.arrived_with }}</dd></div>
                 <div><dt>Departed with</dt><dd>{{ ev.departed_with or stop.departed_with }}</dd></div>
                 <div><dt>Proof found</dt><dd>{{ ev.proof or 'None on file' }}</dd></div>
                 {% if ev.proof_count is defined %}<div><dt>Proof count</dt><dd>{{ ev.proof_count }}</dd></div>{% endif %}
                 {% if ev.reason %}<div><dt>Why flagged</dt><dd>{{ ev.reason }}</dd></div>{% endif %}
-                <div><dt>Required action</dt><dd>{{ issue.action }}</dd></div>
+                <div><dt>Action needed</dt><dd>{{ ev.action_needed or issue.action }}</dd></div>
               </dl>
             </section>
           {% endfor %}

@@ -3576,11 +3576,27 @@ def view_driver_log(log_id):
     if current_user.role == "driver" and log.driver_id != current_user.id:
         flash("Not authorized to view someone else's log!", "danger")
         return redirect(url_for("driver.driver_logs"))
+    issue_review = None
+    issue_closeout = (
+        ExceptionEvent.query.filter(
+            ExceptionEvent.event_type == "manager_review_resolved",
+            ExceptionEvent.stop_id == log.id,
+        )
+        .order_by(ExceptionEvent.created_at.desc(), ExceptionEvent.id.desc())
+        .first()
+    )
+    route_map_context = build_driver_route_map_context(driver=log.driver, date=log.date)
+    for stop in route_map_context.get("stops", []):
+        if stop.get("stop_id") == log.id:
+            issue_review = stop
+            break
     return render_template(
         "view_driver_log.html",
         log=log,
         today_local_date=_today_local_date(),
         driver_log_photos=list(log.photos),
+        issue_review=issue_review,
+        issue_closeout=issue_closeout,
     )
 
 
@@ -3910,6 +3926,48 @@ def request_manager_review(log_id):
     db.session.commit()
     flash("Sent to manager review.", "info")
     return redirect(url_for("driver.mobile_dashboard"))
+
+
+@bp.route("/driver_logs/<int:log_id>/close_issue", methods=["POST"], strict_slashes=False)
+@login_required
+def close_driver_log_issue(log_id):
+    log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
+    if current_user.role != "driver" or log.driver_id != current_user.id:
+        flash("Only the assigned driver can close this issue to continue.", "warning")
+        return redirect(url_for("driver.view_driver_log", log_id=log.id))
+
+    issue_type = (request.form.get("issue_type") or "route_issue").strip()
+    resolution_action = (request.form.get("resolution_action") or "Close issue to continue").strip()
+    reason = (request.form.get("reason") or "").strip()
+    if not reason:
+        flash("Add a closeout reason so the manager can review why the route continued.", "warning")
+        return redirect(request.form.get("next") or url_for("driver.view_driver_log", log_id=log.id))
+
+    details = f"Issue: {issue_type.replace('_', ' ').title()}. Action: {resolution_action}. Reason: {reason}"
+    db.session.add(ExceptionEvent(
+        event_type="manager_review_resolved",
+        severity="medium",
+        stop_id=log.id,
+        driver_log_id=log.id,
+        driver_id=current_user.id,
+        plant_name=getattr(log, "plant_name", None),
+        event_date=getattr(log, "date", None),
+        summary="Driver closed issue to continue",
+        details=details,
+    ))
+    db.session.commit()
+    record_activity(
+        user_id=current_user.id,
+        category="exception",
+        action="driver_closed",
+        title="Driver issue closed to continue",
+        details=f"{_plant_label(log.plant_name)} stop #{log.id}; {details}",
+        target_type="driver_log",
+        target_id=log.id,
+    )
+    _emit_driver_log_updated(log, "issue_closed")
+    flash("Issue closed with driver reason. Manager can still review the closeout.", "success")
+    return redirect(request.form.get("next") or url_for("driver.mobile_dashboard"))
 
 
 @bp.route("/damage_reports/new", methods=["GET", "POST"])

@@ -2700,7 +2700,7 @@ def test_edit_driver_log_rejects_impossible_depart_to_next_arrival(client, app):
         },
         follow_redirects=True,
     )
-    assert b"Only 1 min from Paint East to Raleigh West" in response.data
+    assert b"Only 1 min from Unknown plant / needs confirmation to Raleigh West" in response.data
 
     with app.app_context():
         from app.models import DriverLog
@@ -3008,16 +3008,16 @@ def test_manager_driver_day_log_uses_management_readout_narrative(client, app):
     assert b"Truck ID" not in page.data
     assert b"Lamar completed 2 of 3 stops." in page.data
     assert b"Current Active Stop" in page.data
-    assert b"Current Active Stop: Paint East" in page.data
+    assert b"Current Active Stop: Unknown plant / needs confirmation" in page.data
     assert b"Open Route Stop" not in page.data
-    assert b"Stop #3 - Paint East" in page.data
+    assert b"Stop #3 - Unknown plant / needs confirmation" in page.data
     assert b"Damage / Delay" in page.data
     assert b"Damage Evidence" not in page.data
     assert b"Cargo Scan Proof" not in page.data
     assert b"Signature / Audit Footer" in page.data
     assert b"Selected Stop" in page.data
     assert b"Stop #1 - Raleigh East" in page.data
-    assert b"Stop #3 - Paint East" in page.data
+    assert b"Stop #3 - Unknown plant / needs confirmation" in page.data
     assert b"2 delay events and 1 damage report need review" in page.data
     assert b"Delay Event" in page.data
     assert b"Damage Event" in page.data
@@ -3638,7 +3638,7 @@ def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_rev
             driver_id=driver.id,
             date=route_date,
             plant_name="PE",
-            load_size="Paint East Load",
+            load_size="PE Load",
             arrive_time=f"{route_date.isoformat()} 04:00:00",
             created_at=datetime(2026, 5, 20, 8, 0),
         )
@@ -4315,7 +4315,7 @@ def test_driver_logs_flags_impossible_plant_transfer_timing(client, app):
     login(client, "driver1")
     page = client.get("/driver_logs?date=2026-05-16")
     assert page.status_code == 200
-    assert b"Only 1 min from Paint East to Raleigh West" in page.data
+    assert b"Only 1 min from Unknown plant / needs confirmation to Raleigh West" in page.data
     assert b"Open stop - record departure/load before creating the next stop" in page.data
 
 

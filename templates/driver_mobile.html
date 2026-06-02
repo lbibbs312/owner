@@ -391,6 +391,16 @@
     .driver-active-wait-time { display:grid; gap:1px; text-align:center; font-variant-numeric:tabular-nums; font-size:1rem; font-weight:950; color:#fef3c7; }
     .driver-active-wait-unit { color:#fde68a; font-size:.58rem; font-weight:900; text-transform:uppercase; }
     .driver-active-wait-action { grid-column:1 / -1; display:grid; place-items:center; min-height:34px; border-radius:10px; background:#fbbf24; color:#111827; font-size:.75rem; font-weight:950; text-transform:uppercase; }
+    body.has-active-wait {
+      --active-stop-sticky-offset: 138px;
+    }
+    body.has-active-wait .mobile-shell,
+    body.has-active-wait main {
+      scroll-padding-top: var(--active-stop-sticky-offset);
+    }
+    body.has-active-wait main {
+      padding-top: 20px;
+    }
 
     @media (min-width: 600px) {
       body { background: #111827; }
@@ -1249,6 +1259,20 @@
       font-size: .72rem;
       font-weight: 900;
     }
+    .route-detail-closeout {
+      width: 100%;
+      min-height: 32px;
+      margin: 0 0 6px;
+      border: 1px solid rgba(255,178,36,.28);
+      border-radius: 8px;
+      background: rgba(2,6,23,.46);
+      color: #eaf0f8;
+      font-size: .72rem;
+      font-weight: 750;
+      padding: 6px 8px;
+      outline: none;
+    }
+    .route-detail-closeout::placeholder { color: rgba(203,213,225,.7); }
     .route-detail-actions {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1988,7 +2012,7 @@
     .md-flow-work-panel {
       position: fixed;
       inset: 0;
-      z-index: 90;
+      z-index: 120;
       display: grid;
       place-items: center;
       padding: 16px 12px calc(var(--nav-height) + 18px);
@@ -2742,7 +2766,7 @@
 </head>
   {% set flow_first_current = production_flow and route_map and route_map.map_mode == 'live_current_work' %}
   {% set board_only_home = true %}
-<body class="{% if flow_first_current %}flow-first-body{% endif %}">
+<body class="{% if flow_first_current %}flow-first-body{% endif %}{% if active_driver_wait %} has-active-wait{% endif %}">
   <div class="mobile-shell move-defense-mobile driver-ops-shell{% if flow_first_current %} flow-first-shell{% endif %}{% if board_only_home %} board-only-shell{% endif %}">
     <header class="topbar">
       <div class="driver-row">
@@ -3177,6 +3201,7 @@
       board.dataset.flowBoardReady = '1';
       var panel = board.querySelector('[data-md-flow-work-panel]');
       var panelTitle = board.querySelector('[data-md-flow-work-title]');
+      var panelKicker = board.querySelector('[data-md-flow-work-kicker]');
       var context = board.querySelector('[data-md-flow-context]');
 	      var embedWrap = board.querySelector('[data-md-flow-embed-wrap]');
 	      var frame = board.querySelector('[data-md-flow-frame]');
@@ -3283,11 +3308,12 @@
         });
       }
 
-      function showPanel(title) {
+      function showPanel(title, kicker) {
         if (!panel) return;
         panel.hidden = false;
         board.classList.add('is-interacting');
-        if (panelTitle) panelTitle.textContent = title || 'Route detail';
+        if (panelTitle) panelTitle.textContent = title || 'Route quick action';
+        if (panelKicker) panelKicker.textContent = kicker || 'QUICK ACTION MODAL';
       }
 
       function showContextFor(row) {
@@ -3299,7 +3325,7 @@
 
       function showEmbed(url, title, trigger) {
         if (!usableUrl(url) || !frame || !embedWrap) return;
-        showPanel(title || 'Route work');
+        showPanel(title || 'Route detail', 'FULL PAGE REVIEW');
         hideInlinePanels();
         if (context) context.innerHTML = '';
         embedWrap.hidden = false;
@@ -3311,7 +3337,8 @@
       function showInline(name, title, trigger) {
         var inlinePanel = board.querySelector('[data-flow-inline-panel="' + name + '"]');
         if (!inlinePanel) return;
-        showPanel(title || 'Route work');
+        var kicker = trigger ? trigger.getAttribute('data-flow-panel-kicker') : '';
+        showPanel(title || 'Route quick action', kicker || 'QUICK ACTION MODAL');
         hideInlinePanels();
         if (context) context.innerHTML = '';
         if (embedWrap) embedWrap.hidden = true;
@@ -3527,11 +3554,7 @@
           var url = urlTrigger.getAttribute('data-flow-open-url');
           if (usableUrl(url)) {
             event.preventDefault();
-            if (activeTrigger === urlTrigger && usableUrl(routeSheetUrl)) {
-              showEmbed(routeSheetUrl, 'Full Route Sheet', null);
-              return;
-            }
-            showEmbed(url, urlTrigger.getAttribute('data-flow-panel-title'), urlTrigger);
+            window.location.href = url;
           }
           return;
         }
@@ -3539,6 +3562,12 @@
         var row = event.target.closest('[data-flow-row]');
         if (!row || !board.contains(row)) return;
         event.preventDefault();
+
+        var fullUrl = row.getAttribute('data-flow-full-url') || row.getAttribute('data-sheet-url');
+        if (usableUrl(fullUrl)) {
+          window.location.href = fullUrl;
+          return;
+        }
 
         if (selectedRow === row) {
           showEmbed(row.getAttribute('data-sheet-url'), 'Full Route Sheet', null);

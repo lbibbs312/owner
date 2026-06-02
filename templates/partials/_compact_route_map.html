@@ -1,6 +1,7 @@
 {% macro issue_panel(obj, log_id, depart_url) %}
   {% if obj.issues %}
   {% set ev = obj.evidence or {} %}
+  {% set primary_code = obj.issues[0].code if obj.issues else '' %}
   <div class="flow-issue-panel sev-{{ obj.badge.severity }}">
     {% for pi in obj.issues %}
       <div class="flow-issue-head">
@@ -9,26 +10,81 @@
       </div>
       <div class="flow-issue-evidence">
         <div><span>Stop</span><strong>{{ obj.board_code or ('STP-' ~ obj.sequence) }} · {{ obj.plant_name }}</strong></div>
-        {% if ev.dropped %}<div><span>Affected load</span><strong>{{ ev.dropped|join(', ') }}</strong></div>{% endif %}
-        {% if ev.expected_destination %}<div><span>Expected dest</span><strong>{{ ev.expected_destination }}</strong></div>{% endif %}
+        {% if ev.load or ev.dropped %}<div><span>Load</span><strong>{{ ev.load or ev.dropped|join(', ') }}</strong></div>{% endif %}
+        {% if ev.expected_destination %}<div><span>Expected destination</span><strong>{{ ev.expected_destination }}</strong></div>{% endif %}
+        {% if ev.actual_stop %}<div><span>Actual stop</span><strong>{{ ev.actual_stop }}</strong></div>{% endif %}
         <div><span>Arrived with</span><strong>{{ ev.arrived_with }}</strong></div>
         <div><span>Departed with</span><strong>{{ ev.departed_with }}</strong></div>
         <div><span>Proof found</span><strong class="{{ 'ev-missing' if ev.proof != 'Attached' else 'ev-found' }}">{{ ev.proof or 'None on file' }}</strong></div>
         {% if ev.proof_count is defined %}<div><span>Proof count</span><strong>{{ ev.proof_count }}</strong></div>{% endif %}
         {% if ev.reason %}<div><span>Why flagged</span><strong>{{ ev.reason }}</strong></div>{% endif %}
-        <div><span>Required action</span><strong>{{ pi.action }}</strong></div>
+        <div><span>Action needed</span><strong>{{ ev.action_needed or pi.action }}</strong></div>
       </div>
     {% endfor %}
     <div class="flow-issue-actions">
-      <form action="{{ url_for('driver.record_driver_log_photo', log_id=log_id) }}" method="POST" enctype="multipart/form-data">
-        <input type="hidden" name="source" value="proof">
-        <input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}">
-        <label class="route-detail-link" style="cursor:pointer">Add proof / photo<input type="file" name="photo" accept="image/*" capture="environment" style="display:none" onchange="if(this.files.length){this.form.submit();}"></label>
-      </form>
-      <a class="route-detail-link" href="{{ url_for('driver.new_plant_transfer') }}">Attach transfer sheet</a>
-      <a class="route-detail-link" href="{{ url_for('driver.pickup_driver_log', log_id=log_id) }}">Confirm delivered</a>
-      <form action="{{ url_for('driver.no_pickup_driver_log', log_id=log_id) }}" method="POST"><button class="route-detail-link" type="submit">Mark no pickup</button></form>
-      <form action="{{ url_for('driver.request_manager_review', log_id=log_id) }}" method="POST"><button class="route-detail-link danger" type="submit">Send to manager</button></form>
+      {% if primary_code == 'destination_mismatch' %}
+        <form action="{{ url_for('driver.close_driver_log_issue', log_id=log_id) }}" method="POST">
+          <input type="hidden" name="issue_type" value="{{ primary_code }}">
+          <input type="hidden" name="resolution_action" value="Confirm correct destination">
+          <input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}">
+          <input class="route-detail-closeout" name="reason" placeholder="Closeout reason" required>
+          <button class="route-detail-link" type="submit">Confirm correct destination</button>
+        </form>
+        <a class="route-detail-link" href="{{ url_for('driver.edit_driver_log', log_id=log_id) }}">Change destination</a>
+        <form action="{{ url_for('driver.record_driver_log_photo', log_id=log_id) }}" method="POST" enctype="multipart/form-data">
+          <input type="hidden" name="source" value="proof">
+          <input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}">
+          <label class="route-detail-link" style="cursor:pointer">Attach proof<input type="file" name="photo" accept="image/*" capture="environment" style="display:none" onchange="if(this.files.length){this.form.submit();}"></label>
+        </form>
+        <form action="{{ url_for('driver.request_manager_review', log_id=log_id) }}" method="POST"><button class="route-detail-link danger" type="submit">Send to manager review</button></form>
+      {% elif primary_code == 'missing_proof' %}
+        <form action="{{ url_for('driver.record_driver_log_photo', log_id=log_id) }}" method="POST" enctype="multipart/form-data">
+          <input type="hidden" name="source" value="proof">
+          <input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}">
+          <label class="route-detail-link" style="cursor:pointer">Add proof photo<input type="file" name="photo" accept="image/*" capture="environment" style="display:none" onchange="if(this.files.length){this.form.submit();}"></label>
+        </form>
+        <a class="route-detail-link" href="{{ url_for('driver.new_plant_transfer') }}">Attach transfer sheet</a>
+        <a class="route-detail-link" href="{{ url_for('driver.view_driver_log', log_id=log_id) }}">Scan cargo</a>
+        <form action="{{ url_for('driver.close_driver_log_issue', log_id=log_id) }}" method="POST">
+          <input type="hidden" name="issue_type" value="{{ primary_code }}">
+          <input type="hidden" name="resolution_action" value="Close proof issue to continue">
+          <input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}">
+          <input class="route-detail-closeout" name="reason" placeholder="Closeout reason" required>
+          <button class="route-detail-link" type="submit">Close proof issue to continue</button>
+        </form>
+        <form action="{{ url_for('driver.request_manager_review', log_id=log_id) }}" method="POST"><button class="route-detail-link danger" type="submit">Send to manager review</button></form>
+      {% elif primary_code == 'needs_departure' %}
+        <a class="route-detail-link" href="{{ depart_url or url_for('driver.view_driver_log', log_id=log_id) }}">Record departure</a>
+        <form action="{{ url_for('driver.record_driver_log_photo', log_id=log_id) }}" method="POST" enctype="multipart/form-data">
+          <input type="hidden" name="source" value="proof">
+          <input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}">
+          <label class="route-detail-link" style="cursor:pointer">Add proof<input type="file" name="photo" accept="image/*" capture="environment" style="display:none" onchange="if(this.files.length){this.form.submit();}"></label>
+        </form>
+        <a class="route-detail-link" href="{{ url_for('driver.edit_driver_log', log_id=log_id) }}">Add note</a>
+      {% elif obj.no_pickup %}
+        <form action="{{ url_for('driver.no_pickup_driver_log', log_id=log_id) }}" method="POST"><button class="route-detail-link" type="submit">Confirm no pickup</button></form>
+        <a class="route-detail-link" href="{{ url_for('driver.edit_driver_log', log_id=log_id) }}">Add reason</a>
+        <form action="{{ url_for('driver.record_driver_log_photo', log_id=log_id) }}" method="POST" enctype="multipart/form-data">
+          <input type="hidden" name="source" value="proof">
+          <input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}">
+          <label class="route-detail-link" style="cursor:pointer">Attach proof if needed<input type="file" name="photo" accept="image/*" capture="environment" style="display:none" onchange="if(this.files.length){this.form.submit();}"></label>
+        </form>
+      {% else %}
+        <form action="{{ url_for('driver.close_driver_log_issue', log_id=log_id) }}" method="POST">
+          <input type="hidden" name="issue_type" value="{{ primary_code }}">
+          <input type="hidden" name="resolution_action" value="Close issue to continue">
+          <input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}">
+          <input class="route-detail-closeout" name="reason" placeholder="Closeout reason" required>
+          <button class="route-detail-link" type="submit">Close issue to continue</button>
+        </form>
+        <form action="{{ url_for('driver.record_driver_log_photo', log_id=log_id) }}" method="POST" enctype="multipart/form-data">
+          <input type="hidden" name="source" value="proof">
+          <input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}">
+          <label class="route-detail-link" style="cursor:pointer">Add proof<input type="file" name="photo" accept="image/*" capture="environment" style="display:none" onchange="if(this.files.length){this.form.submit();}"></label>
+        </form>
+        <a class="route-detail-link" href="{{ url_for('driver.edit_driver_log', log_id=log_id) }}">Review stop</a>
+        <form action="{{ url_for('driver.request_manager_review', log_id=log_id) }}" method="POST"><button class="route-detail-link danger" type="submit">Send to manager review</button></form>
+      {% endif %}
     </div>
   </div>
   {% endif %}
@@ -197,7 +253,7 @@
   {% if map_mode != 'route_replay' %}
   <div class="md-flow-top-actions" aria-label="Live flow workflow actions">
     {% if depart_url and primary_stop %}
-    <a class="md-flow-action-tab primary {% if pulse_key == 'depart' %}is-next-required{% endif %}" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow">
+    <a class="md-flow-action-tab primary {% if pulse_key == 'depart' %}is-next-required{% endif %}" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow" data-flow-panel-kicker="DEPART QUICK FLOW">
       <strong>Depart / Load</strong>
       <span>Departure / proof</span>
     </a>
@@ -226,10 +282,10 @@
       <strong>{{ shift_label }}</strong>
       <span>{{ shift_note }}</span>
     </a>
-    <button class="md-flow-action-tab" type="button" data-flow-open-panel="maintenance" data-flow-panel-title="Maintenance / Ryder">
+    <a class="md-flow-action-tab" href="{{ history_url }}" data-flow-open-url="{{ history_url }}" data-flow-panel-title="TRUCK DETAIL">
       <strong>Maintenance</strong>
       <span>Ryder / truck</span>
-    </button>
+    </a>
     <a class="md-flow-action-tab" href="{{ route_sheet_url or '#' }}" data-flow-open-url="{{ route_sheet_url or '#' }}" data-flow-panel-title="Full Route Sheet">
       <strong>Sheet</strong>
       <span>Full details</span>
@@ -251,12 +307,12 @@
   {% endif %}
 
   <div class="md-flow-work-panel" data-md-flow-work-panel hidden>
-    <button class="md-flow-work-scrim" type="button" data-md-flow-close aria-label="Close work window"></button>
+    <button class="md-flow-work-scrim" type="button" data-md-flow-close aria-label="Close quick action"></button>
     <div class="md-flow-work-card" role="dialog" aria-modal="true" aria-labelledby="liveFlowWorkTitle">
       <div class="md-flow-work-head">
         <div>
-          <span>WORK WINDOW</span>
-          <strong id="liveFlowWorkTitle" data-md-flow-work-title>Route detail</strong>
+          <span data-md-flow-work-kicker>QUICK ACTION MODAL</span>
+          <strong id="liveFlowWorkTitle" data-md-flow-work-title>Route quick action</strong>
         </div>
         <button type="button" data-md-flow-close>Close</button>
       </div>
@@ -479,7 +535,7 @@
       </div>
     </div>
     <div class="md-flow-embed-wrap" data-md-flow-embed-wrap hidden>
-      <iframe title="Live flow work window" name="md-flow-work-frame" data-md-flow-frame loading="lazy"></iframe>
+      <iframe title="Live flow page preview" name="md-flow-work-frame" data-md-flow-frame loading="lazy"></iframe>
     </div>
     </div>
   </div>
@@ -496,6 +552,7 @@
                     data-detail-template="task-{{ loop.index0 }}"
                     data-title="Dispatch task"
                     data-sheet-url="{{ url_for('driver.view_task', task_id=task.id) }}"
+                    data-flow-full-url="{{ url_for('driver.view_task', task_id=task.id) }}"
 	                    data-depart-url="#"
 	                    data-proof-url="{{ url_for('driver.view_task', task_id=task.id) }}"
 	                    data-damage-url="{{ damage_url or '#' }}"
@@ -511,6 +568,7 @@
                     data-detail-template="ops-item-{{ loop.index0 }}"
                     data-title="{{ item.title or item.code }}"
                     data-sheet-url="{{ item.view_url or route_sheet_url or '#' }}"
+                    data-flow-full-url="{{ item.view_url or route_sheet_url or '#' }}"
 	                    data-depart-url="#"
 	                    data-proof-url="{{ item.view_url or route_sheet_url or '#' }}"
 	                    data-damage-url="{{ damage_url or '#' }}"
@@ -526,6 +584,7 @@
                     data-detail-template="primary-stop"
                     data-title="Stop {{ primary_stop.sequence }} - {{ primary_stop.plant_name }}"
                     data-sheet-url="{{ route_sheet_url or primary_stop.view_url or '#' }}"
+                    data-flow-full-url="{{ primary_stop.view_url or route_sheet_url or '#' }}"
 	                    data-depart-url="{{ depart_url or '#' }}"
 	                    data-proof-url="{{ depart_url or primary_stop.view_url or route_sheet_url or '#' }}"
 	                    data-damage-url="{{ damage_url or '#' }}"
@@ -543,6 +602,7 @@
                     data-detail-template="completed-stop-{{ loop.index0 }}"
                     data-title="Stop {{ stop.sequence }} - {{ stop.plant_name }}"
                     data-sheet-url="{{ route_sheet_url or stop.view_url or '#' }}"
+                    data-flow-full-url="{{ stop.view_url or route_sheet_url or '#' }}"
 	                    data-depart-url="#"
 	                    data-proof-url="{{ stop.view_url or route_sheet_url or '#' }}"
 	                    data-damage-url="{{ damage_url or '#' }}"
@@ -565,6 +625,7 @@
                     data-detail-template="primary-event"
                     data-title="{{ primary_event.title }}"
                     data-sheet-url="{{ event_sheet_url or '#' }}"
+                    data-flow-full-url="{{ event_detail.view_url if event_detail and event_detail.view_url else event_sheet_url or '#' }}"
 	                    data-depart-url="#"
 	                    data-proof-url="{{ event_proof_url or '#' }}"
 	                    data-damage-url="{{ damage_url or '#' }}"
@@ -587,6 +648,7 @@
                     data-detail-template="event-{{ loop.index0 }}"
                     data-title="{{ item.title }}"
                     data-sheet-url="{{ item_sheet_url or '#' }}"
+                    data-flow-full-url="{{ detail.view_url if detail and detail.view_url else item_sheet_url or '#' }}"
 	                    data-depart-url="#"
 	                    data-proof-url="{{ item_proof_url or '#' }}"
 	                    data-damage-url="{{ damage_url or '#' }}"

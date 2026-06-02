@@ -11,7 +11,6 @@ PLANT_LABELS = {
     "RE": "Raleigh East",
     "RW": "Raleigh West",
     "PC": "Paint Central",
-    "PE": "Paint East",
     "PW": "Paint West",
     "KP": "Kraft Plater",
     "PPL": "PPL",
@@ -36,10 +35,26 @@ PLANT_LABELS = {
     "PPM": "PPM Monroe",
 }
 
+UNKNOWN_PLANT_LABEL = "Unknown plant / needs confirmation"
+UNKNOWN_LOAD_LABEL = "Unknown destination load / needs confirmation"
+AMBIGUOUS_PLANT_TOKENS = {"PE", "Paint East"}
+_AMBIGUOUS_PLANT_KEYS = {" ".join(token.strip().lower().split()) for token in AMBIGUOUS_PLANT_TOKENS}
+
+
+def _norm(value):
+    return " ".join((value or "").strip().lower().split())
+
+
+def is_ambiguous_plant(value):
+    """Return true for legacy/non-canonical plant names that must not be invented."""
+    return _norm(value) in _AMBIGUOUS_PLANT_KEYS
+
 
 def plant_label(value):
     """Return the display name for a plant code, falling back to the code itself."""
     value = (value or "").strip()
+    if is_ambiguous_plant(value):
+        return UNKNOWN_PLANT_LABEL
     return PLANT_LABELS.get(value, value)
 
 
@@ -47,7 +62,6 @@ PLANT_ADDRESSES = {
     "RE": "3505 Kraft Ave SE",
     "RW": "3500 Raleigh Dr SE",
     "PC": "4315 52nd st se",
-    "PE": "4245 52nd St SE",
     "PW": "4245 52nd st",
     "KP": "5711 North Kraft SE",
     "PPL": "5357 52nd St SE",

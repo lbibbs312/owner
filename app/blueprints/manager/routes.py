@@ -1956,6 +1956,34 @@ def _pending_review_rows():
     return rows
 
 
+def _recent_driver_closeout_rows(limit=20):
+    events = (
+        ExceptionEvent.query.filter(
+            ExceptionEvent.event_type == "manager_review_resolved",
+            ExceptionEvent.summary == "Driver closed issue to continue",
+        )
+        .order_by(ExceptionEvent.created_at.desc(), ExceptionEvent.id.desc())
+        .limit(limit)
+        .all()
+    )
+    rows = []
+    for event in events:
+        log = event.stop or DriverLog.query.get(event.stop_id)
+        if log is None or log.deleted_at is not None:
+            continue
+        closer = event.driver or log.driver
+        rows.append({
+            "log": log,
+            "log_id": log.id,
+            "plant": _plant_label(log.plant_name),
+            "closed_by": closer.display_name if closer else "Driver",
+            "closed_at": event.created_at,
+            "reason": (event.details or "").strip() or event.summary,
+            "url": url_for("manager.view_driver_log", log_id=log.id),
+        })
+    return rows
+
+
 def _pending_review_count():
     return len(_pending_review_stop_ids())
 
@@ -1963,9 +1991,11 @@ def _pending_review_count():
 @bp.route("/reviews")
 def review_queue():
     rows = _pending_review_rows()
+    driver_closeouts = _recent_driver_closeout_rows()
     return render_template(
         "manager_reviews.html",
         review_rows=rows,
+        driver_closeout_rows=driver_closeouts,
         pending_review_count=len(rows),
         today=date.today(),
     )
@@ -2445,6 +2475,14 @@ def view_driver_log(log_id):
             .all()
         )
     hot_part_proof = build_route_hot_part_proof(day_logs, related_task)
+    issue_closeout = (
+        ExceptionEvent.query.filter(
+            ExceptionEvent.event_type == "manager_review_resolved",
+            ExceptionEvent.stop_id == log.id,
+        )
+        .order_by(ExceptionEvent.created_at.desc(), ExceptionEvent.id.desc())
+        .first()
+    )
     management_narrative = build_management_narrative(
         {
             "log": log,
@@ -2479,6 +2517,7 @@ def view_driver_log(log_id):
         part_scan_events=part_scan_events,
         hot_part_proof=hot_part_proof,
         driver_log_photos=driver_log_photos,
+        issue_closeout=issue_closeout,
     )
 
 
