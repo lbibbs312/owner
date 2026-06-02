@@ -2414,10 +2414,23 @@
 	      font-size: .78rem;
 	      font-weight: 500;
 	      line-height: 1.28;
+	      overflow: hidden;
+		    }
+		    .flow-line {
 	      display: -webkit-box;
 	      -webkit-line-clamp: 2;
 	      -webkit-box-orient: vertical;
-	      overflow: hidden;
+		    }
+		    .flow-detail {
+		      display: grid;
+		      gap: 4px;
+		    }
+		    .flow-main-line {
+		      min-width: 0;
+		      display: block;
+		      overflow: hidden;
+		      text-overflow: ellipsis;
+		      white-space: nowrap;
 		    }
 		    .flow-arrow {
 		      color: var(--md-blue-bright);
@@ -2434,6 +2447,47 @@
 	      display: inline;
 	      font-weight: 800;
 	      letter-spacing: .04em;
+	    }
+	    .flow-route-pair {
+	      min-width: 0;
+	      display: grid;
+	      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+	      align-items: center;
+	      gap: 5px;
+	    }
+	    .flow-route-end {
+	      min-width: 0;
+	      display: grid;
+	      grid-template-columns: auto minmax(0, 1fr);
+	      align-items: center;
+	      gap: 5px;
+	      overflow: hidden;
+	    }
+	    .flow-route-end em {
+	      color: var(--md-blue-bright);
+	      font-size: .56rem;
+	      font-style: normal;
+	      font-weight: 900;
+	      letter-spacing: .08em;
+	      line-height: 1;
+	      text-transform: uppercase;
+	      white-space: nowrap;
+	    }
+	    .flow-route-end strong {
+	      display: block;
+	      min-width: 0;
+	      color: var(--md-text);
+	      font-size: .68rem;
+	      font-weight: 850;
+	      letter-spacing: 0;
+	      overflow: hidden;
+	      text-overflow: ellipsis;
+	      white-space: nowrap;
+	    }
+	    .flow-route-arrow {
+	      align-self: center;
+	      padding: 0;
+	      transform: translateY(-1px);
 	    }
 	    .flow-status {
 	      justify-self: end;

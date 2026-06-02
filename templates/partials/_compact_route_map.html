@@ -28,20 +28,29 @@
 {% macro bold_cargo(value) -%}
   {%- if value and value != '--' -%}<strong>{{ value }}</strong>{%- else -%}{{ value or '--' }}{%- endif -%}
 {%- endmacro %}
+{% macro flow_route_pair(pickup, deliver) -%}
+  {%- if pickup or deliver -%}
+    <span class="flow-route-pair">
+      <span class="flow-route-end"><em>Pickup</em><strong>{{ pickup or '--' }}</strong></span>
+      <span class="flow-arrow flow-route-arrow" aria-hidden="true">↓</span>
+      <span class="flow-route-end"><em>Deliver</em><strong>{{ deliver or '--' }}</strong></span>
+    </span>
+  {%- endif -%}
+{%- endmacro %}
 {% macro board_flow_text(flow, fallback) -%}
   {%- if flow and flow.mode == 'action' -%}
-    {{ flow.plant }} &middot; {{ flow.action }} {{ bold_cargo(flow.cargo) }}
+    <span class="flow-main-line">{{ flow.plant }} &middot; {{ flow.action }} {{ bold_cargo(flow.cargo) }}</span>{{ flow_route_pair(flow.pickup, flow.deliver) }}
   {%- elif flow and flow.mode == 'change' -%}
-    {{ flow.plant }} &middot; {{ bold_cargo(flow['from']) }} &rarr; {{ bold_cargo(flow['to']) }}
+    <span class="flow-main-line">{{ flow.plant }} &middot; {{ bold_cargo(flow['from']) }} &rarr; {{ bold_cargo(flow['to']) }}</span>{{ flow_route_pair(flow.pickup, flow.deliver) }}
   {%- elif flow and flow.mode == 'plain' -%}
-    {{ flow.text }}
+    <span class="flow-main-line">{{ flow.text }}</span>{{ flow_route_pair(flow.pickup, flow.deliver) }}
   {%- else -%}
-    {{ fallback }}
+    <span class="flow-main-line">{{ fallback }}</span>
   {%- endif -%}
 {%- endmacro %}
 {% macro narrative_flow_text(item, detail, fallback) -%}
   {%- if item and item.kind == 'delivery' -%}
-    {{ item.destination_label or (detail.plant if detail else 'Stop') }} &middot; Dropped <strong>{{ item.load_count_label or '1 load' }}</strong> of <strong>Parts</strong>
+    <span class="flow-main-line">{{ item.destination_label or (detail.plant if detail else 'Stop') }} &middot; Dropped <strong>{{ item.load_count_label or '1 load' }}</strong> of <strong>Parts</strong></span>{{ flow_route_pair(item.origin_label, item.destination_label) }}
   {%- else -%}
     {{ board_flow_text(detail.board_flow if detail else none, fallback) }}
   {%- endif -%}

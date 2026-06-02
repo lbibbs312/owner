@@ -347,6 +347,10 @@ def test_driver_dashboard_renders_route_narrative_cards(client, app):
     assert "Raleigh East delivery from Paint Central" in body
     assert "Raleigh East Load delivered from Paint Central to Raleigh East" in body
     assert "Dropped <strong>2 loads</strong> of <strong>Parts</strong>" in body
+    assert "flow-route-pair" in body
+    assert '<span class="flow-arrow flow-route-arrow" aria-hidden="true">↓</span>' in body
+    assert "<em>Pickup</em><strong>Paint Central</strong>" in body
+    assert "<em>Deliver</em><strong>Raleigh East</strong>" in body
     assert "2 loads" in body
     assert "2 stops" in body
     assert "P-RE-8" in body
@@ -461,6 +465,9 @@ def test_completed_stop_states_reflect_cargo_action(client, app):
     assert "DROPPED" in body         # Load -> Empty = dropped at destination
     assert "Picked up <strong>Parts</strong>" in body
     assert "Dropped <strong>Parts</strong>" in body
+    assert "<em>Pickup</em><strong>Paint Central</strong>" in body
+    assert "<em>Deliver</em><strong>Raleigh East</strong>" in body
+    assert '<span class="flow-arrow flow-route-arrow" aria-hidden="true">↓</span>' in body
     assert "Raleigh East Load &rarr; Empty" not in body
     assert ">DELIVERED<" not in body  # no generic catch-all label
     assert 'class="flow-code"' not in body  # STP- code column removed

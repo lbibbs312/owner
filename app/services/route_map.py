@@ -139,7 +139,24 @@ def _compact_cargo_label(value):
     return "Parts"
 
 
-def _board_flow_summary(log, label, arrived_with, departed_with, route_pretrip=None):
+def _cargo_destination_label(value):
+    destination = destination_from_load(value)
+    if not destination:
+        return ""
+    return plant_label(destination) or ""
+
+
+def _with_route_pair(summary, *, pickup="", deliver=""):
+    pickup = _clean(pickup)
+    deliver = _clean(deliver)
+    if pickup:
+        summary["pickup"] = pickup
+    if deliver:
+        summary["deliver"] = deliver
+    return summary
+
+
+def _board_flow_summary(log, label, arrived_with, departed_with, route_pretrip=None, pickup_label=None, delivery_label=None):
     """Compact display copy for the live board.
 
     Keep detailed cargo names in the underlying route model, but collapse
@@ -153,18 +170,45 @@ def _board_flow_summary(log, label, arrived_with, departed_with, route_pretrip=N
     closed = bool(getattr(log, "depart_time", None))
     departed = _compact_cargo_label(departed_with) if closed else "--"
     no_pickup = bool(getattr(log, "no_pickup", False))
+    pickup_label = _clean(pickup_label)
+    delivery_label = _clean(delivery_label)
+    arrived_destination = _cargo_destination_label(arrived_with)
+    departed_destination = _cargo_destination_label(departed_with) if closed else ""
 
     if closed and no_pickup and arrived == "Empty" and departed == "Empty":
         return {"mode": "plain", "text": f"{label} · empty return"}
     if not closed:
-        return {"mode": "action", "plant": label, "action": "Arrived with", "cargo": arrived}
+        summary = {"mode": "action", "plant": label, "action": "Arrived with", "cargo": arrived}
+        if arrived != "Empty":
+            return _with_route_pair(
+                summary,
+                pickup=pickup_label or "Earlier stop",
+                deliver=delivery_label or arrived_destination or "Next stop",
+            )
+        return summary
     if arrived == "Empty" and departed != "Empty":
-        return {"mode": "action", "plant": label, "action": "Picked up", "cargo": departed}
+        return _with_route_pair(
+            {"mode": "action", "plant": label, "action": "Picked up", "cargo": departed},
+            pickup=label,
+            deliver=delivery_label or departed_destination or "Next stop",
+        )
     if arrived != "Empty" and departed == "Empty":
-        return {"mode": "action", "plant": label, "action": "Dropped", "cargo": arrived}
+        return _with_route_pair(
+            {"mode": "action", "plant": label, "action": "Dropped", "cargo": arrived},
+            pickup=pickup_label or "Earlier stop",
+            deliver=delivery_label or label,
+        )
     if arrived == departed and arrived != "Empty":
-        return {"mode": "action", "plant": label, "action": "Carrying", "cargo": arrived}
-    return {"mode": "change", "plant": label, "from": arrived, "to": departed}
+        return _with_route_pair(
+            {"mode": "action", "plant": label, "action": "Carrying", "cargo": arrived},
+            pickup=pickup_label or "Earlier stop",
+            deliver=delivery_label or departed_destination or arrived_destination or "Next stop",
+        )
+    return _with_route_pair(
+        {"mode": "change", "plant": label, "from": arrived, "to": departed},
+        pickup=pickup_label or (label if departed != "Empty" else "Earlier stop"),
+        deliver=delivery_label or departed_destination or arrived_destination or "Next stop",
+    )
 
 
 def _service_board_code(log):
@@ -758,6 +802,7 @@ def _base_stop_detail(log, row, route, *, cargo_label, pickup=None):
             row.get("plant") or plant_label(getattr(log, "plant_name", None)) or SAFE_EMPTY,
             row.get("cargo_in") or route.get("arrive_cargo_desc") or load_display(getattr(log, "load_size", "")),
             row.get("cargo_out") or route.get("depart_cargo_desc") or load_display(getattr(log, "depart_load_size", "")),
+            pickup_label=(pickup or {}).get("plant_label"),
         ),
         "plant": row.get("plant") or plant_label(getattr(log, "plant_name", None)) or SAFE_EMPTY,
         "arrival_at": getattr(log, "arrive_time", ""),
