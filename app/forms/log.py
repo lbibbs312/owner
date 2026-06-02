@@ -13,7 +13,7 @@ from app.services.plant_addresses import PLANT_LABELS, UNKNOWN_PLANT_LABEL
 
 ACTIVE_PLANT_CHOICES = [(code, label) for code, label in PLANT_LABELS.items()]
 LEGACY_PLANT_CHOICES = [("PE", UNKNOWN_PLANT_LABEL)]
-PLANT_CHOICES = [("", "Select Plant...")] + ACTIVE_PLANT_CHOICES + LEGACY_PLANT_CHOICES
+PLANT_CHOICES = [("", "Select Plant...")] + ACTIVE_PLANT_CHOICES
 DESTINATION_PLANT_CHOICES = [("", "Select destination...")] + ACTIVE_PLANT_CHOICES
 
 LOAD_SIZE_CHOICES = [
@@ -156,3 +156,14 @@ class DepartForm(FlaskForm):
     )
     dock_wait_minutes = IntegerField("Dock Wait Minutes", validators=[Optional()])
     submit = SubmitField("Record Departure")
+
+
+def ensure_legacy_plant_choice(field, value):
+    """Allow existing legacy logs to render/edit without offering legacy plants for new stops."""
+    value = (value or "").strip()
+    if not value:
+        return
+    choices = list(field.choices or [])
+    if value not in {code for code, _label in choices}:
+        label = dict(LEGACY_PLANT_CHOICES).get(value, value)
+        field.choices = choices + [(value, label)]

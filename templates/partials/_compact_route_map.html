@@ -327,11 +327,13 @@
         {% if depart_url and primary_stop %}
           {% set depart_code = primary_stop.board_code or 'STP-' ~ primary_stop.sequence %}
           {% set is_service_depart = depart_code in ['FUEL', 'RYDR', 'MTN', 'MTG', 'SRVC'] %}
-          <form class="depart-wizard" method="POST" action="{{ depart_url }}" data-depart-wizard>
+          {% set requires_unload_check = primary_stop.requires_unload_check if primary_stop.requires_unload_check is defined else false %}
+          {% set start_depart_step = 0 if is_service_depart or requires_unload_check else 1 %}
+          <form class="depart-wizard" method="POST" action="{{ depart_url }}" data-depart-wizard data-depart-start-step="{{ start_depart_step }}">
             {% if depart_form is defined and depart_form %}{{ depart_form.hidden_tag() }}{% endif %}
             <input type="hidden" name="next" value="mobile">
             <input type="hidden" name="source" value="live_flow">
-            <input type="hidden" name="unloaded_on_departure" data-depart-field="unloaded_on_departure" value="{{ 'yes' if is_service_depart else '' }}">
+            <input type="hidden" name="unloaded_on_departure" data-depart-field="unloaded_on_departure" value="{{ 'yes' if is_service_depart or not requires_unload_check else '' }}">
             <input type="hidden" name="unload_reason" data-depart-field="unload_reason" value="">
             <input type="hidden" name="secondary_dropped_on_departure" data-depart-field="secondary_dropped_on_departure" value="{{ 'yes' if is_service_depart else '' }}">
             <input type="hidden" name="secondary_unload_reason" data-depart-field="secondary_unload_reason" value="">
@@ -341,13 +343,13 @@
             <input type="hidden" name="secondary_load_type" data-depart-field="secondary_load_type" value="load">
             <input type="hidden" name="cargo_override_reason" data-depart-field="cargo_override_reason" value="">
             <div class="depart-progress" aria-label="Depart progress">
-              <span class="is-active" data-depart-progress="0"></span>
-              <span data-depart-progress="1"></span>
+              <span class="{% if start_depart_step >= 0 %}is-active{% endif %}" data-depart-progress="0"></span>
+              <span class="{% if start_depart_step >= 1 %}is-active{% endif %}" data-depart-progress="1"></span>
               <span data-depart-progress="2"></span>
               <span data-depart-progress="3"></span>
               <span data-depart-progress="4"></span>
             </div>
-            <section class="depart-step is-active" data-depart-step="0">
+            <section class="depart-step {% if start_depart_step == 0 %}is-active{% endif %}" data-depart-step="0">
               <span class="depart-step-kicker">{{ depart_code }} &middot; depart</span>
               <h4>{% if is_service_depart %}Close this service stop?{% else %}Did you get unloaded?{% endif %}</h4>
               <div class="depart-choice-grid">
@@ -365,7 +367,7 @@
                 <button type="button" data-depart-next="1">Continue</button>
               </div>
             </section>
-            <section class="depart-step" data-depart-step="1">
+            <section class="depart-step {% if start_depart_step == 1 %}is-active{% endif %}" data-depart-step="1">
               <span class="depart-step-kicker">load check</span>
               <h4>Did you get loaded?</h4>
               <div class="depart-choice-grid">

@@ -941,7 +941,18 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
     stops = []
     prior_cargo_movement_seen = False
     current_stop_id = getattr(getattr(route_context, "current_stop", None), "id", None)
-    for row in getattr(route_context, "rows", []) or []:
+    route_rows = list(getattr(route_context, "rows", []) or [])
+    future_removed_by_log_id = {}
+    future_removed_keys = set()
+    for future_row in reversed(route_rows):
+        future_log = future_row.get("log")
+        if future_log:
+            future_removed_by_log_id[getattr(future_log, "id", None)] = set(future_removed_keys)
+        for removed in future_row.get("cargo_removed") or ():
+            if not is_empty_load(removed):
+                future_removed_keys.add(_norm_key(load_display(removed)))
+
+    for row in route_rows:
         log = row.get("log")
         if not log:
             continue
@@ -1078,6 +1089,17 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             notes=f"{row.get('note') or ''} {getattr(log, 'downtime_reason', '') or ''}",
             departed=departed,
         )
+        added_load_keys = {
+            _norm_key(load_display(load))
+            for load in added_loads
+            if not is_empty_load(load)
+        }
+        if (
+            movement["code"] == "loaded"
+            and added_load_keys
+            and added_load_keys.issubset(future_removed_by_log_id.get(log.id, set()))
+        ):
+            board_status_badge = _board_badge_display("DELIVERED", pill_tone="delivery", row_tone="delivery", severity="ok")
         stops.append({
             "stop_id": log.id,
             "sequence": sequence,
@@ -1117,6 +1139,8 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             "wait_label": wait_label,
             "arrived_with": arrived_with,
             "departed_with": departed_with,
+            "requires_unload_check": bool(route.get("arrived_at_primary_destination") and not is_service_stop(log)),
+            "requires_secondary_drop_check": bool(route.get("arrived_at_secondary_destination") and not is_service_stop(log)),
             "no_pickup": bool(getattr(log, "no_pickup", False)),
             "cargo_status": cargo["label"],
             "linked_move_request_id": getattr(linked_move, "id", None),

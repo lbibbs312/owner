@@ -3349,7 +3349,7 @@
       function setupDepartWizard() {
         var form = board.querySelector('[data-depart-wizard]');
         if (!form) return;
-        var currentStep = 0;
+        var currentStep = Number(form.getAttribute('data-depart-start-step')) || 0;
 
         function field(name) {
           return form.querySelector('[data-depart-field="' + name + '"]');
@@ -3514,7 +3514,7 @@
           }
         });
 
-        setStep(0);
+        setStep(currentStep);
       }
 
       setupDepartWizard();

@@ -5673,6 +5673,47 @@ def test_mobile_route_map_fragment_refresh_uses_route_state(client, app):
     assert "<html" not in body.lower()
 
 
+def test_new_stop_form_does_not_offer_legacy_pe_choice(client, app):
+    with app.app_context():
+        create_user("no_pe_driver", "no-pe@example.com", "driver")
+
+    login(client, "no_pe_driver")
+    page = client.get("/new_driving_log")
+
+    assert page.status_code == 200
+    assert b'value="PE"' not in page.data
+    assert b"Paint East" not in page.data
+
+
+def test_empty_active_stop_quick_depart_starts_at_load_check(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("empty_depart_driver", "empty-depart@example.com", "driver")
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=date.today(),
+                plant_name="RE",
+                load_size="Empty",
+                arrive_time="00:01",
+            )
+        )
+        db.session.commit()
+
+    login(client, "empty_depart_driver")
+    page = client.get("/mobile")
+    body = page.get_data(as_text=True)
+
+    assert page.status_code == 200
+    assert 'data-depart-start-step="1"' in body
+    assert '<section class="depart-step " data-depart-step="0">' in body
+    assert '<section class="depart-step is-active" data-depart-step="1">' in body
+
+
 def test_mobile_quick_depart_returns_to_live_board_without_full_depart_form(client, app):
     from datetime import date
 

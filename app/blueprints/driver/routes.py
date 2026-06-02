@@ -21,7 +21,7 @@ from app.extensions import db
 from app.extensions import socketio
 from app.models.case import ExceptionEvent
 from app.forms.damage import DamageReportForm
-from app.forms.log import DepartForm, DriverLogForm, TRUCK_ISSUE_CHOICES, TRUCK_ISSUE_LABELS
+from app.forms.log import DepartForm, DriverLogForm, TRUCK_ISSUE_CHOICES, TRUCK_ISSUE_LABELS, ensure_legacy_plant_choice
 from app.forms.plant_transfer import PlantTransferForm
 from app.forms.messaging import DirectMessageForm
 from app.forms.shift import EndOfDayForm
@@ -2989,6 +2989,7 @@ def edit_driver_log(log_id):
         return redirect(url_for("driver.driver_logs"))
 
     form = DriverLogForm(obj=log)
+    ensure_legacy_plant_choice(form.plant_name, log.plant_name)
     if request.method == "GET":
         form.arrive_time.data = _arrival_utc_to_local_hhmm(log.arrive_time)
         issue_code, issue_notes = _split_truck_issue_text(truck_issue_reason(log) or route_problem_reason(log))

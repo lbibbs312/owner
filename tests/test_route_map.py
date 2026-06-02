@@ -910,7 +910,7 @@ def test_completed_stop_states_reflect_cargo_action(client, app):
                     depart_time="09:20", load_size="Raleigh East Load", depart_load_size="Empty")
     _login(client, "driver_states")
     body = client.get("/mobile").get_data(as_text=True)
-    assert "IN TRANSIT" in body      # Empty -> Load, then departed pickup
+    assert "IN TRANSIT" not in body  # Pickup load was later dropped, so it is no longer live in transit.
     assert "DROPPED" in body         # Load -> Empty = dropped at destination
     assert "Picked up <strong>Parts</strong>" in body
     assert "Dropped <strong>Parts</strong>" in body
