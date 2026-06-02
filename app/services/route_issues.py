@@ -83,6 +83,11 @@ ISSUE_CATALOG = {
         "Hot / priority load that needs to keep moving.",
         "Prioritize move",
     ),
+    "review_requested": (
+        "IN REVIEW", "attention",
+        "Sent to a manager for review; awaiting their decision.",
+        "Awaiting manager",
+    ),
 }
 
 # raw flag string (from route_map._detail_flags / RISK_FLAGS) -> issue code.
@@ -99,6 +104,14 @@ FLAG_TO_CODE = {
     "Verify route": "route_deviation",
     "Delay": "open_wait",
     "Hot": "hot",
+}
+
+# Compact pill text; the full label + reason live in the issue drawer.
+SHORT_LABEL = {
+    "damage": "DAMAGE", "missing_proof": "PROOF", "destination_mismatch": "MISMATCH",
+    "unconfirmed_drop": "DROP?", "count_short": "SHORT", "hold": "HOLD",
+    "open_wait": "WAIT", "needs_departure": "DEPART", "audit_risk": "AUDIT",
+    "route_deviation": "ROUTE?", "hot": "HOT", "review_requested": "REVIEW",
 }
 
 
@@ -126,6 +139,7 @@ def derive_issues(
     unconfirmed_drop=False,
     destination_mismatch=False,
     missing_proof=False,
+    review_requested=False,
     evidence=None,
     extra_codes=(),
 ):
@@ -147,6 +161,8 @@ def derive_issues(
         codes.append("destination_mismatch")
     if unconfirmed_drop:
         codes.append("unconfirmed_drop")
+    if review_requested:
+        codes.append("review_requested")
 
     for flag in flags or ():
         code = FLAG_TO_CODE.get(flag)
@@ -196,17 +212,15 @@ def status_pill(issues, *, ok_label, ok_tone="recorded"):
     return worst["label"], ("risk" if worst["severity"] == "risk" else "attention")
 
 
-def board_badge(issues, *, ok_label, ok_pill_tone="recorded", ok_row_tone="completed"):
-    """Resolve the full pill + row badge for a board row.
-
-    Returns ``{label, pill_tone, row_tone, severity}``. ``pill_tone`` maps to
-    ``.flow-status.status-*`` and ``row_tone`` to ``.md-flow-row.tone-*``. A
-    clean row uses the caller's OK label/tones; an issue row is never green:
-    risk -> red, attention -> amber.
-    """
+def board_badge(issues, *, ok_label, ok_pill_tone="recorded", ok_row_tone="completed", ok_short=None):
+    """Resolve the pill + row badge. ``short`` is the compact pill text; the full
+    ``label`` and reason live in the issue drawer. An issue is never green."""
+    if any(i.get("code") == "review_requested" for i in issues):
+        return {"label": "IN REVIEW", "short": "REVIEW", "pill_tone": "review", "row_tone": "active", "severity": "attention"}
     worst = primary_issue(issues)
     if worst is None:
-        return {"label": ok_label, "pill_tone": ok_pill_tone, "row_tone": ok_row_tone, "severity": "ok"}
+        return {"label": ok_label, "short": ok_short or ok_label, "pill_tone": ok_pill_tone, "row_tone": ok_row_tone, "severity": "ok"}
+    short = SHORT_LABEL.get(worst["code"], worst["label"])
     if worst["severity"] == "risk":
-        return {"label": worst["label"], "pill_tone": "risk", "row_tone": "blocked", "severity": "risk"}
-    return {"label": worst["label"], "pill_tone": "attention", "row_tone": "hot", "severity": "attention"}
+        return {"label": worst["label"], "short": short, "pill_tone": "risk", "row_tone": "blocked", "severity": "risk"}
+    return {"label": worst["label"], "short": short, "pill_tone": "attention", "row_tone": "hot", "severity": "attention"}

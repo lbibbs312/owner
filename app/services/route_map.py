@@ -33,6 +33,7 @@ from app.services.load_state import (
 from app.services.plant_addresses import PLANT_LABELS, plant_label
 from app.services.route_context import build_route_context
 from app.services.route_issues import board_badge, derive_issues
+from app.models.case import ExceptionEvent
 
 
 SAFE_EMPTY = "No current data"
@@ -415,6 +416,13 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
     linked_by_log = {req.linked_driver_log_id: req for req in move_requests if req.linked_driver_log_id}
     log_ids = [row["log"].id for row in getattr(route_context, "rows", []) if row.get("log")]
     damaged_log_ids = _damage_log_ids(log_ids)
+    review_requested_ids = (
+        {e.stop_id for e in ExceptionEvent.query.filter(
+            ExceptionEvent.event_type == "manager_review_requested",
+            ExceptionEvent.stop_id.in_(log_ids),
+        ).all()}
+        if log_ids else set()
+    )
     issue_stop_ids = set()
     for item in (getattr(route_context, "true_exceptions", None) or []) + (getattr(route_context, "review_items", None) or []):
         if item.get("stop_id"):
@@ -492,6 +500,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             unconfirmed_drop=unconfirmed_only,
             destination_mismatch=mismatch,
             missing_proof=missing_proof,
+            review_requested=log.id in review_requested_ids,
             evidence=stop_evidence,
         )
         stop_badge = board_badge(

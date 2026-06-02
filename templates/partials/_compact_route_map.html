@@ -442,7 +442,7 @@
                     data-document-url="{{ document_url or '#' }}">
               <span class="flow-code">{{ primary_stop.board_code or 'STP-' ~ primary_stop.sequence }}</span>
               <span class="flow-detail">{{ primary_stop.board_detail or (primary_stop.plant_name ~ ' · ' ~ primary_stop.arrived_with ~ ' → ' ~ primary_stop.departed_with) }}</span>
-              <span class="flow-status status-{{ primary_stop.badge.pill_tone }}">{{ primary_stop.badge.label }}</span>
+              <span class="flow-status status-{{ primary_stop.badge.pill_tone }}">{{ primary_stop.badge.short }}</span>
             </button>
           {% endif %}
           {% for stop in completed_stops %}
@@ -457,14 +457,14 @@
                     data-document-url="{{ document_url or '#' }}">
               <span class="flow-code">{{ stop.board_code or 'STP-' ~ stop.sequence }}</span>
               <span class="flow-detail">{{ stop.board_detail or (stop.plant_name ~ ' · ' ~ stop.arrived_with ~ ' → ' ~ stop.departed_with) }}</span>
-              <span class="flow-status status-{{ stop.badge.pill_tone }}">{{ stop.badge.label }}</span>
+              <span class="flow-status status-{{ stop.badge.pill_tone }}">{{ stop.badge.short }}</span>
             </button>
           {% endfor %}
           {% if primary_event and not primary_stop %}
             {% set event_detail = primary_event.details[0] if primary_event.details else none %}
             {% set event_sheet_url = route_sheet_url or (event_detail.view_url if event_detail else '') %}
             {% set event_proof_url = (event_detail.view_url if event_detail else '') or route_sheet_url %}
-            {% set event_status_label = primary_event.badge.label %}
+            {% set event_status_label = primary_event.badge.short %}
             {% set event_status_tone = primary_event.badge.pill_tone %}
             {% set event_code = event_detail.board_code if event_detail and event_detail.board_code else 'STP-' ~ (event_detail.sequence if event_detail else primary_event.count) %}
             {% set event_row_detail = event_detail.board_detail if event_detail and event_detail.board_detail else primary_event.board_detail or primary_event.route_line %}
@@ -486,7 +486,7 @@
             {% set detail = item.details[0] if item.details else none %}
             {% set item_sheet_url = route_sheet_url or (detail.view_url if detail else '') %}
             {% set item_proof_url = (detail.view_url if detail else '') or route_sheet_url %}
-            {% set item_status_label = item.badge.label %}
+            {% set item_status_label = item.badge.short %}
             {% set item_status_tone = item.badge.pill_tone %}
             {% set item_code = detail.board_code if detail and detail.board_code else 'STP-' ~ (detail.sequence if detail else item.count) %}
             {% set item_row_detail = detail.board_detail if detail and detail.board_detail else item.board_detail or item.route_line %}

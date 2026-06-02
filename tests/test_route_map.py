@@ -429,3 +429,19 @@ def test_board_issue_drawer_explains_reason_and_offers_actions(client, app):
     assert "Add proof / photo" in body          # action
     assert "Send to manager" in body            # action
     assert "/request_review" in body            # manager-review endpoint wired
+
+
+def test_manager_review_request_shows_in_review_state(client, app):
+    with app.app_context():
+        from app.extensions import db
+        from app.models.case import ExceptionEvent
+        driver = _user("driver_review_state", "driver")
+        log = _driver_log(driver, plant_name="RE", arrive_time="2026-05-28 10:00:00",
+                          depart_time="10:15", load_size="Raleigh East Load", depart_load_size="Empty")
+        db.session.add(ExceptionEvent(event_type="manager_review_requested", severity="medium",
+                                      stop_id=log.id, summary="review"))
+        db.session.commit()
+    _login(client, "driver_review_state")
+    body = client.get("/mobile").get_data(as_text=True)
+    assert ">REVIEW<" in body
+    assert "IN REVIEW" in body
