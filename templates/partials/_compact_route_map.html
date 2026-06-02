@@ -49,7 +49,7 @@
   {%- if flow and flow.mode == 'action' -%}
     <span class="flow-main-line">{{ flow.plant }} &middot; {{ flow.action }} {{ bold_cargo(flow.cargo) }}</span>{{ flow_route_pair(flow.pickup, flow.deliver) }}
   {%- elif flow and flow.mode == 'change' -%}
-    <span class="flow-main-line">{{ flow.plant }} &middot; {{ bold_cargo(flow['from']) }} &rarr; {{ bold_cargo(flow['to']) }}</span>{{ flow_route_pair(flow.pickup, flow.deliver) }}
+	    <span class="flow-main-line">{{ flow.plant }} &middot; {{ bold_cargo(flow['from']) }} <span class="flow-arrow" aria-hidden="true">&rarr;</span> {{ bold_cargo(flow['to']) }}</span>{{ flow_route_pair(flow.pickup, flow.deliver) }}
   {%- elif flow and flow.mode == 'plain' -%}
     <span class="flow-main-line">{{ flow.text }}</span>{{ flow_route_pair(flow.pickup, flow.deliver) }}
   {%- else -%}
@@ -490,13 +490,14 @@
                     data-detail-template="task-{{ loop.index0 }}"
                     data-title="Dispatch task"
                     data-sheet-url="{{ url_for('driver.view_task', task_id=task.id) }}"
-                    data-depart-url="#"
-                    data-proof-url="{{ url_for('driver.view_task', task_id=task.id) }}"
-                    data-damage-url="{{ damage_url or '#' }}"
-                    data-document-url="{{ document_url or '#' }}">
-              <span class="flow-detail"><strong>{{ task.title }}</strong>{% if task.part_number %} &middot; Part {{ task.part_number }}{% elif task.details %} &middot; {{ task.details|truncate(38, true) }}{% endif %}</span>
-              <span class="flow-status status-{{ task_status_tone }}">{{ task_status_text }}</span>
-            </button>
+	                    data-depart-url="#"
+	                    data-proof-url="{{ url_for('driver.view_task', task_id=task.id) }}"
+	                    data-damage-url="{{ damage_url or '#' }}"
+	                    data-document-url="{{ document_url or '#' }}">
+	              <span class="flow-code">TASK</span>
+	              <span class="flow-detail"><strong>{{ task.title }}</strong>{% if task.part_number %} &middot; Part {{ task.part_number }}{% elif task.details %} &middot; {{ task.details|truncate(38, true) }}{% endif %}</span>
+	              <span class="flow-status status-{{ task_status_tone }}">{{ task_status_text }}</span>
+	            </button>
           {% endfor %}
           {% if primary_stop %}
             <button class="md-flow-row tone-{{ primary_stop.badge.row_tone }}" type="button"
@@ -504,28 +505,32 @@
                     data-detail-template="primary-stop"
                     data-title="Stop {{ primary_stop.sequence }} - {{ primary_stop.plant_name }}"
                     data-sheet-url="{{ route_sheet_url or primary_stop.view_url or '#' }}"
-                    data-depart-url="{{ depart_url or '#' }}"
-                    data-proof-url="{{ depart_url or primary_stop.view_url or route_sheet_url or '#' }}"
-                    data-damage-url="{{ damage_url or '#' }}"
-                    data-document-url="{{ document_url or '#' }}">
-              <span class="flow-detail">{{ board_flow_text(primary_stop.board_flow, primary_stop.board_detail or (primary_stop.plant_name ~ ' · ' ~ primary_stop.arrived_with ~ ' → ' ~ primary_stop.departed_with)) }}</span>
-              <span class="flow-status status-{{ primary_stop.badge.pill_tone }}">{{ primary_stop.badge.short }}</span>
-            </button>
-          {% endif %}
+	                    data-depart-url="{{ depart_url or '#' }}"
+	                    data-proof-url="{{ depart_url or primary_stop.view_url or route_sheet_url or '#' }}"
+	                    data-damage-url="{{ damage_url or '#' }}"
+	                    data-document-url="{{ document_url or '#' }}">
+	              <span class="flow-code">{{ primary_stop.board_code or ('STP-' ~ primary_stop.sequence) }}</span>
+	              <span class="flow-detail">{{ board_flow_text(primary_stop.board_flow, primary_stop.board_detail or (primary_stop.plant_name ~ ' · ' ~ primary_stop.arrived_with ~ ' → ' ~ primary_stop.departed_with)) }}</span>
+	              {% if not (primary_stop.badge.short == 'NEEDS DEPARTURE' and pulse_key == 'depart' and depart_url) %}
+	                <span class="flow-status status-{{ primary_stop.badge.pill_tone }}">{{ primary_stop.badge.short }}</span>
+	              {% endif %}
+	            </button>
+	          {% endif %}
           {% for stop in completed_stops %}
             <button class="md-flow-row tone-{{ stop.badge.row_tone }}" type="button"
                     data-flow-row
                     data-detail-template="completed-stop-{{ loop.index0 }}"
                     data-title="Stop {{ stop.sequence }} - {{ stop.plant_name }}"
                     data-sheet-url="{{ route_sheet_url or stop.view_url or '#' }}"
-                    data-depart-url="#"
-                    data-proof-url="{{ stop.view_url or route_sheet_url or '#' }}"
-                    data-damage-url="{{ damage_url or '#' }}"
-                    data-document-url="{{ document_url or '#' }}">
-              <span class="flow-detail">{{ board_flow_text(stop.board_flow, stop.board_detail or (stop.plant_name ~ ' · ' ~ stop.arrived_with ~ ' → ' ~ stop.departed_with)) }}</span>
-              <span class="flow-status status-{{ stop.badge.pill_tone }}">{{ stop.badge.short }}</span>
-            </button>
-          {% endfor %}
+	                    data-depart-url="#"
+	                    data-proof-url="{{ stop.view_url or route_sheet_url or '#' }}"
+	                    data-damage-url="{{ damage_url or '#' }}"
+	                    data-document-url="{{ document_url or '#' }}">
+	              <span class="flow-code">{{ stop.board_code or ('STP-' ~ stop.sequence) }}</span>
+	              <span class="flow-detail">{{ board_flow_text(stop.board_flow, stop.board_detail or (stop.plant_name ~ ' · ' ~ stop.arrived_with ~ ' → ' ~ stop.departed_with)) }}</span>
+	              <span class="flow-status status-{{ stop.badge.pill_tone }}">{{ stop.badge.short }}</span>
+	            </button>
+	          {% endfor %}
           {% if primary_event and not primary_stop %}
             {% set event_detail = primary_event.details[0] if primary_event.details else none %}
             {% set event_sheet_url = route_sheet_url or (event_detail.view_url if event_detail else '') %}
@@ -539,14 +544,15 @@
                     data-detail-template="primary-event"
                     data-title="{{ primary_event.title }}"
                     data-sheet-url="{{ event_sheet_url or '#' }}"
-                    data-depart-url="#"
-                    data-proof-url="{{ event_proof_url or '#' }}"
-                    data-damage-url="{{ damage_url or '#' }}"
-                    data-document-url="{{ document_url or '#' }}">
-              <span class="flow-detail">{{ narrative_flow_text(primary_event, event_detail, event_row_detail) }}</span>
-              <span class="flow-status status-{{ event_status_tone }}">{{ event_status_label }}</span>
-            </button>
-          {% endif %}
+	                    data-depart-url="#"
+	                    data-proof-url="{{ event_proof_url or '#' }}"
+	                    data-damage-url="{{ damage_url or '#' }}"
+	                    data-document-url="{{ document_url or '#' }}">
+	              <span class="flow-code">{{ event_code }}</span>
+	              <span class="flow-detail">{{ narrative_flow_text(primary_event, event_detail, event_row_detail) }}</span>
+	              <span class="flow-status status-{{ event_status_tone }}">{{ event_status_label }}</span>
+	            </button>
+	          {% endif %}
           {% for item in recurring_events[:5] %}
             {% set detail = item.details[0] if item.details else none %}
             {% set item_sheet_url = route_sheet_url or (detail.view_url if detail else '') %}
@@ -560,22 +566,25 @@
                     data-detail-template="event-{{ loop.index0 }}"
                     data-title="{{ item.title }}"
                     data-sheet-url="{{ item_sheet_url or '#' }}"
-                    data-depart-url="#"
-                    data-proof-url="{{ item_proof_url or '#' }}"
-                    data-damage-url="{{ damage_url or '#' }}"
-                    data-document-url="{{ document_url or '#' }}">
-              <span class="flow-detail">{{ narrative_flow_text(item, detail, item_row_detail) }}</span>
-              <span class="flow-status status-{{ item_status_tone }}">{{ item_status_label }}</span>
-            </button>
+	                    data-depart-url="#"
+	                    data-proof-url="{{ item_proof_url or '#' }}"
+	                    data-damage-url="{{ damage_url or '#' }}"
+	                    data-document-url="{{ document_url or '#' }}">
+	              <span class="flow-code">{{ item_code }}</span>
+	              <span class="flow-detail">{{ narrative_flow_text(item, detail, item_row_detail) }}</span>
+	              <span class="flow-status status-{{ item_status_tone }}">{{ item_status_label }}</span>
+	            </button>
           {% endfor %}
         {% endfor %}
       </div>
     </div>
 
-    <div class="md-flow-ticker" aria-hidden="true">
-      <span>{{ dispatch_ticker_text }}</span>
-      <span>{{ dispatch_ticker_text }}</span>
-    </div>
+	    <div class="md-flow-ticker" aria-hidden="true">
+	      <div class="md-flow-ticker-track">
+	        <span>{{ dispatch_ticker_text }}</span>
+	        <span>{{ dispatch_ticker_text }}</span>
+	      </div>
+	    </div>
 
     <div class="md-flow-templates" hidden>
       {% for task in board_tasks %}
@@ -694,9 +703,11 @@
     <p class="compact-empty">
       {{ rm.map_empty_message if rm and rm.map_empty_message else 'No route stops logged for this date.' }}
     </p>
-    <div class="md-flow-ticker" aria-hidden="true">
-      <span>{{ dispatch_ticker_text }}</span>
-      <span>{{ dispatch_ticker_text }}</span>
-    </div>
+	    <div class="md-flow-ticker" aria-hidden="true">
+	      <div class="md-flow-ticker-track">
+	        <span>{{ dispatch_ticker_text }}</span>
+	        <span>{{ dispatch_ticker_text }}</span>
+	      </div>
+	    </div>
   {% endif %}
 </section>
