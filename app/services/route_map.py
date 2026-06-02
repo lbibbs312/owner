@@ -692,8 +692,6 @@ def _detail_flags(log, row, route):
         flags.append("Scrap")
     if route.get("unload_blocked") or route.get("secondary_drop_blocked"):
         flags.append("Needs review")
-    if route.get("deviation"):
-        flags.append("Verify route")
     if getattr(log, "maintenance", False):
         flags.append("Maintenance")
     if getattr(log, "fuel", False):

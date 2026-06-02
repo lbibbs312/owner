@@ -282,6 +282,22 @@ def test_route_map_drawer_partials_render(app):
     assert "Original request" in move_html
 
 
+def test_add_stop_action_copy_stays_route_specific(app):
+    from flask import render_template
+
+    with app.test_request_context("/mobile"):
+        html = render_template(
+            "partials/_compact_route_map.html",
+            route_map={"map_mode": "live_current_work", "stops": [], "route": {"next_action": "Attach document"}},
+            route_cta={"next_action": "Attach document"},
+            route_cta_urls={"add_stop": "/new_driving_log", "attach_document": "/driver/transfers/new"},
+        )
+
+    assert "<strong>Add Stop</strong>" in html
+    assert "<span>Continue route</span>" in html
+    assert "<strong>Add Stop</strong>\n      <span>Attach document</span>" not in html
+
+
 def test_driver_dashboard_keeps_assigned_queue_off_main_route_display(client, app):
     driver = None
     with app.app_context():
@@ -471,3 +487,36 @@ def test_completed_stop_states_reflect_cargo_action(client, app):
     assert "Raleigh East Load &rarr; Empty" not in body
     assert ">DELIVERED<" not in body  # no generic catch-all label
     assert 'class="flow-code"' not in body  # STP- code column removed
+
+
+def test_partial_drop_is_recorded_not_route_review(client, app):
+    with app.app_context():
+        driver = _user("driver_partial_drop", "driver")
+        _driver_log(
+            driver,
+            plant_name="PC",
+            arrive_time="2026-05-28 08:00:00",
+            depart_time="08:15",
+            load_size="Empty",
+            depart_load_size="Raleigh East Load",
+            secondary_load="PPL Load",
+            created_at=datetime(2026, 5, 28, 8, 0),
+        )
+        _driver_log(
+            driver,
+            plant_name="PPL",
+            arrive_time="2026-05-28 09:00:00",
+            depart_time="09:20",
+            load_size="Raleigh East Load",
+            depart_load_size="Raleigh East Load",
+            created_at=datetime(2026, 5, 28, 9, 0),
+        )
+
+    _login(client, "driver_partial_drop")
+    body = client.get("/mobile").get_data(as_text=True)
+
+    assert "PPL &middot; Dropped <strong>1 load</strong> of <strong>Parts</strong>" in body
+    assert "<em>Pickup</em><strong>Paint Central</strong>" in body
+    assert "<em>Deliver</em><strong>PPL</strong>" in body
+    assert "ROUTE?" not in body
+    assert "Verify route" not in body
