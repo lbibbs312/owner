@@ -236,7 +236,9 @@ def test_driver_dashboard_survives_no_assigned_requests(client, app):
     resp = client.get("/mobile")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "Today&#39;s Route" in body or "Today's Route" in body
+    assert "LIVE FLOW BOARD" in body
+    assert "Today&#39;s Route" not in body
+    assert "Today's Route" not in body
     assert "No route stops logged for this date." in body
     assert "Assigned Move Queue" not in body
     assert "No assigned moves" not in body

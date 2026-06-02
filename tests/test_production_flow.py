@@ -392,7 +392,8 @@ def test_flow_map_uses_large_objects_and_compact_stop_chips(client, app):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "LIVE FLOW BOARD" in body
-    assert "Today&#39;s Route" in body or "Today's Route" in body
+    assert "Today&#39;s Route" not in body
+    assert "Today's Route" not in body
     assert "Raleigh West" in body
     assert "Trim DC" in body
     assert "flow-object-card" not in body
@@ -476,7 +477,8 @@ def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "LIVE FLOW BOARD" in body
-    assert "Today&#39;s Route" in body or "Today's Route" in body
+    assert "Today&#39;s Route" not in body
+    assert "Today's Route" not in body
     assert "Trim DC" in body
     assert "FlowMapAnimator" not in body
     assert "data-flow-edge-data" not in body
