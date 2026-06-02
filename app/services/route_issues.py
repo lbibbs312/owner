@@ -216,7 +216,7 @@ def board_badge(issues, *, ok_label, ok_pill_tone="recorded", ok_row_tone="compl
     """Resolve the pill + row badge. ``short`` is the compact pill text; the full
     ``label`` and reason live in the issue drawer. An issue is never green."""
     if any(i.get("code") == "review_requested" for i in issues):
-        return {"label": "IN REVIEW", "short": "REVIEW", "pill_tone": "review", "row_tone": "active", "severity": "attention"}
+        return {"label": "IN REVIEW", "short": "REVIEW", "pill_tone": "review", "row_tone": "hot", "severity": "attention"}
     worst = primary_issue(issues)
     if worst is None:
         return {"label": ok_label, "short": ok_short or ok_label, "pill_tone": ok_pill_tone, "row_tone": ok_row_tone, "severity": "ok"}

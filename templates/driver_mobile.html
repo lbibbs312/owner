@@ -1831,29 +1831,18 @@
     }
     .md-flow-action-tab::before {
       content: "";
-      width: 7px;
-      height: 7px;
+      width: 6px;
+      height: 6px;
       border-radius: 999px;
-      background: var(--md-blue-bright);
-      box-shadow:
-        0 0 0 1px rgba(91,157,255,.2),
-        0 0 12px rgba(91,157,255,.42);
+      background: rgba(138,153,179,.5);
       grid-column: 1;
       grid-row: 1 / span 2;
       align-self: center;
-      animation: actionDotPulse 1.9s ease-in-out infinite;
-    }
-    .md-flow-action-tab.primary::before {
-      background: var(--md-amber);
-      box-shadow:
-        0 0 0 1px rgba(255,178,36,.24),
-        0 0 14px rgba(255,178,36,.5);
     }
     .md-flow-action-tab.is-active::before {
-      background: var(--md-green);
-      box-shadow:
-        0 0 0 1px rgba(70,244,162,.28),
-        0 0 16px rgba(70,244,162,.58);
+      background: var(--md-amber);
+      box-shadow: 0 0 0 1px rgba(255,178,36,.3), 0 0 14px rgba(255,178,36,.55);
+      animation: actionDotPulse 1.9s ease-in-out infinite;
     }
     .md-flow-action-tab::after {
       content: "";
@@ -2380,7 +2369,6 @@
 	      box-shadow:
 	        inset 0 0 0 1px rgba(91,157,255,.12),
 	        0 0 22px rgba(91,157,255,.16);
-	      animation: activeRowPulse 2.8s ease-in-out infinite;
 	    }
 	    .md-flow-row.tone-empty {
 	      background: rgba(138,153,179,.025);

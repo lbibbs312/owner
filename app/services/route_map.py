@@ -510,7 +510,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
         elif dropped_loads:
             ok_label, ok_pill, ok_row = "DROPPED", "delivery", "completed"
         elif added_loads:
-            ok_label, ok_pill, ok_row = "LOADED", "open", "active"
+            ok_label, ok_pill, ok_row = "LOADED", "open", "completed"
         elif not is_empty_load(arrived_with) and _board_cargo_label(arrived_with) == _board_cargo_label(departed_with):
             ok_label, ok_pill, ok_row = "CARRIED", "recorded", "completed"
         elif is_empty_load(arrived_with) and is_empty_load(departed_with):

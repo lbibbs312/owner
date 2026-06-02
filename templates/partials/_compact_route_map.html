@@ -13,8 +13,12 @@
       {% if ev.reason %}<div><span>Note</span><strong>{{ ev.reason }}</strong></div>{% endif %}
     </div>
     <div class="flow-issue-actions">
-      <a class="route-detail-link" href="{{ url_for('driver.new_damage_report') }}">Add proof / photo</a>
-      {% if depart_url %}<a class="route-detail-link" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow">Confirm delivered</a>{% endif %}
+      <form action="{{ url_for('driver.record_driver_log_photo', log_id=log_id) }}" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="source" value="proof">
+        <input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}">
+        <label class="route-detail-link" style="cursor:pointer">Add proof / photo<input type="file" name="photo" accept="image/*" capture="environment" style="display:none" onchange="if(this.files.length){this.form.submit();}"></label>
+      </form>
+      <a class="route-detail-link" href="{{ url_for('driver.pickup_driver_log', log_id=log_id) }}">Confirm delivered</a>
       <form action="{{ url_for('driver.no_pickup_driver_log', log_id=log_id) }}" method="POST"><button class="route-detail-link" type="submit">Mark no pickup</button></form>
       <form action="{{ url_for('driver.request_manager_review', log_id=log_id) }}" method="POST"><button class="route-detail-link danger" type="submit">Send to manager</button></form>
     </div>
@@ -107,6 +111,17 @@
 {% else %}
   {% set route_status_label = route_status_raw|upper %}
   {% set route_status_tone = 'ready' %}
+{% endif %}
+{% set _rev = namespace(open=0, risk=0) %}
+{% if rm and rm.stops %}
+  {% for _st in rm.stops %}
+    {% if _st.badge and _st.badge.severity == 'risk' %}{% set _rev.open = _rev.open + 1 %}{% set _rev.risk = _rev.risk + 1 %}
+    {% elif _st.badge and _st.badge.severity == 'attention' %}{% set _rev.open = _rev.open + 1 %}{% endif %}
+  {% endfor %}
+{% endif %}
+{% if _rev.open > 0 %}
+  {% set route_status_label = (_rev.open ~ ' TO REVIEW') %}
+  {% set route_status_tone = 'risk' if _rev.risk else 'attention' %}
 {% endif %}
 
 <section class="compact-route-map md-flow-board" data-route-map-shell data-route-map-mode="route" data-route-sheet-url="{{ route_sheet_url or '#' }}">
