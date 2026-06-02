@@ -130,6 +130,43 @@ def _board_cargo_label(value):
     return load_display(text)
 
 
+def _compact_cargo_label(value):
+    text = _board_cargo_label(value)
+    if text in {"--", NOT_TRACKED}:
+        return "--"
+    if is_empty_load(text):
+        return "Empty"
+    return "Parts"
+
+
+def _board_flow_summary(log, label, arrived_with, departed_with, route_pretrip=None):
+    """Compact display copy for the live board.
+
+    Keep detailed cargo names in the underlying route model, but collapse
+    plant-specific load labels in the narrow mobile board so rows read like
+    actions instead of cargo arithmetic.
+    """
+    if is_service_stop(log):
+        return {"mode": "plain", "text": _service_board_detail(log, label, route_pretrip=route_pretrip)}
+
+    arrived = _compact_cargo_label(arrived_with)
+    closed = bool(getattr(log, "depart_time", None))
+    departed = _compact_cargo_label(departed_with) if closed else "--"
+    no_pickup = bool(getattr(log, "no_pickup", False))
+
+    if closed and no_pickup and arrived == "Empty" and departed == "Empty":
+        return {"mode": "plain", "text": f"{label} · empty return"}
+    if not closed:
+        return {"mode": "action", "plant": label, "action": "Arrived with", "cargo": arrived}
+    if arrived == "Empty" and departed != "Empty":
+        return {"mode": "action", "plant": label, "action": "Picked up", "cargo": departed}
+    if arrived != "Empty" and departed == "Empty":
+        return {"mode": "action", "plant": label, "action": "Dropped", "cargo": arrived}
+    if arrived == departed and arrived != "Empty":
+        return {"mode": "action", "plant": label, "action": "Carrying", "cargo": arrived}
+    return {"mode": "change", "plant": label, "from": arrived, "to": departed}
+
+
 def _service_board_code(log):
     if getattr(log, "fuel", False):
         return "FUEL"
@@ -539,6 +576,13 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
                 wait_label=wait_label,
                 route_pretrip=route_pretrip,
             ),
+            "board_flow": _board_flow_summary(
+                log,
+                label,
+                arrived_with,
+                departed_with,
+                route_pretrip=route_pretrip,
+            ),
             "status": status,
             "status_label": _status_label(status),
             "arrival_at": log.arrive_time or "",
@@ -708,6 +752,12 @@ def _base_stop_detail(log, row, route, *, cargo_label, pickup=None):
             row.get("cargo_in") or route.get("arrive_cargo_desc") or load_display(getattr(log, "load_size", "")),
             row.get("cargo_out") or route.get("depart_cargo_desc") or load_display(getattr(log, "depart_load_size", "")),
             wait_label=wait_label.replace("Wait ", "", 1) if wait_label else "",
+        ),
+        "board_flow": _board_flow_summary(
+            log,
+            row.get("plant") or plant_label(getattr(log, "plant_name", None)) or SAFE_EMPTY,
+            row.get("cargo_in") or route.get("arrive_cargo_desc") or load_display(getattr(log, "load_size", "")),
+            row.get("cargo_out") or route.get("depart_cargo_desc") or load_display(getattr(log, "depart_load_size", "")),
         ),
         "plant": row.get("plant") or plant_label(getattr(log, "plant_name", None)) or SAFE_EMPTY,
         "arrival_at": getattr(log, "arrive_time", ""),

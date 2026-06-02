@@ -25,6 +25,27 @@
   </div>
   {% endif %}
 {% endmacro %}
+{% macro bold_cargo(value) -%}
+  {%- if value and value != '--' -%}<strong>{{ value }}</strong>{%- else -%}{{ value or '--' }}{%- endif -%}
+{%- endmacro %}
+{% macro board_flow_text(flow, fallback) -%}
+  {%- if flow and flow.mode == 'action' -%}
+    {{ flow.plant }} &middot; {{ flow.action }} {{ bold_cargo(flow.cargo) }}
+  {%- elif flow and flow.mode == 'change' -%}
+    {{ flow.plant }} &middot; {{ bold_cargo(flow['from']) }} &rarr; {{ bold_cargo(flow['to']) }}
+  {%- elif flow and flow.mode == 'plain' -%}
+    {{ flow.text }}
+  {%- else -%}
+    {{ fallback }}
+  {%- endif -%}
+{%- endmacro %}
+{% macro narrative_flow_text(item, detail, fallback) -%}
+  {%- if item and item.kind == 'delivery' -%}
+    {{ item.destination_label or (detail.plant if detail else 'Stop') }} &middot; Dropped <strong>{{ item.load_count_label or '1 load' }}</strong> of <strong>Parts</strong>
+  {%- else -%}
+    {{ board_flow_text(detail.board_flow if detail else none, fallback) }}
+  {%- endif -%}
+{%- endmacro %}
 {% set rm = route_map if route_map is defined else none %}
 {% set map_mode = rm.map_mode if rm and rm.map_mode is defined else 'live_current_work' %}
 {% set cta = route_cta if route_cta is defined and route_cta else {} %}
@@ -454,7 +475,7 @@
                     data-proof-url="{{ depart_url or primary_stop.view_url or route_sheet_url or '#' }}"
                     data-damage-url="{{ damage_url or '#' }}"
                     data-document-url="{{ document_url or '#' }}">
-              <span class="flow-detail">{{ primary_stop.board_detail or (primary_stop.plant_name ~ ' · ' ~ primary_stop.arrived_with ~ ' → ' ~ primary_stop.departed_with) }}</span>
+              <span class="flow-detail">{{ board_flow_text(primary_stop.board_flow, primary_stop.board_detail or (primary_stop.plant_name ~ ' · ' ~ primary_stop.arrived_with ~ ' → ' ~ primary_stop.departed_with)) }}</span>
               <span class="flow-status status-{{ primary_stop.badge.pill_tone }}">{{ primary_stop.badge.short }}</span>
             </button>
           {% endif %}
@@ -468,7 +489,7 @@
                     data-proof-url="{{ stop.view_url or route_sheet_url or '#' }}"
                     data-damage-url="{{ damage_url or '#' }}"
                     data-document-url="{{ document_url or '#' }}">
-              <span class="flow-detail">{{ stop.board_detail or (stop.plant_name ~ ' · ' ~ stop.arrived_with ~ ' → ' ~ stop.departed_with) }}</span>
+              <span class="flow-detail">{{ board_flow_text(stop.board_flow, stop.board_detail or (stop.plant_name ~ ' · ' ~ stop.arrived_with ~ ' → ' ~ stop.departed_with)) }}</span>
               <span class="flow-status status-{{ stop.badge.pill_tone }}">{{ stop.badge.short }}</span>
             </button>
           {% endfor %}
@@ -489,7 +510,7 @@
                     data-proof-url="{{ event_proof_url or '#' }}"
                     data-damage-url="{{ damage_url or '#' }}"
                     data-document-url="{{ document_url or '#' }}">
-              <span class="flow-detail">{{ event_row_detail }}{% if primary_event.kind != 'empty' and primary_event.load_count_label %} &middot; {{ primary_event.load_count_label }}{% endif %}</span>
+              <span class="flow-detail">{{ narrative_flow_text(primary_event, event_detail, event_row_detail) }}</span>
               <span class="flow-status status-{{ event_status_tone }}">{{ event_status_label }}</span>
             </button>
           {% endif %}
@@ -510,7 +531,7 @@
                     data-proof-url="{{ item_proof_url or '#' }}"
                     data-damage-url="{{ damage_url or '#' }}"
                     data-document-url="{{ document_url or '#' }}">
-              <span class="flow-detail">{{ item_row_detail }}{% if item.kind != 'empty' and item.load_count_label %} &middot; {{ item.load_count_label }}{% endif %}</span>
+              <span class="flow-detail">{{ narrative_flow_text(item, detail, item_row_detail) }}</span>
               <span class="flow-status status-{{ item_status_tone }}">{{ item_status_label }}</span>
             </button>
           {% endfor %}

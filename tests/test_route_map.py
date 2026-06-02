@@ -346,6 +346,7 @@ def test_driver_dashboard_renders_route_narrative_cards(client, app):
     body = resp.get_data(as_text=True)
     assert "Raleigh East delivery from Paint Central" in body
     assert "Raleigh East Load delivered from Paint Central to Raleigh East" in body
+    assert "Dropped <strong>2 loads</strong> of <strong>Parts</strong>" in body
     assert "2 loads" in body
     assert "2 stops" in body
     assert "P-RE-8" in body
@@ -458,5 +459,8 @@ def test_completed_stop_states_reflect_cargo_action(client, app):
     body = client.get("/mobile").get_data(as_text=True)
     assert "LOADED" in body          # Empty -> Load = picked up
     assert "DROPPED" in body         # Load -> Empty = dropped at destination
+    assert "Picked up <strong>Parts</strong>" in body
+    assert "Dropped <strong>Parts</strong>" in body
+    assert "Raleigh East Load &rarr; Empty" not in body
     assert ">DELIVERED<" not in body  # no generic catch-all label
     assert 'class="flow-code"' not in body  # STP- code column removed

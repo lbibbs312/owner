@@ -5500,7 +5500,7 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "driver-active-wait-action" in body
     assert "Depart / Load" in body
     assert "→" in body
-    assert "·" in body
+    assert "&middot;" in body
     assert "flow-arrow" in body
     assert ".md-flow-ticker span::before" in body
     assert "border-radius: 2px" in body
