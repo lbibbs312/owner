@@ -494,7 +494,6 @@
 	                    data-proof-url="{{ url_for('driver.view_task', task_id=task.id) }}"
 	                    data-damage-url="{{ damage_url or '#' }}"
 	                    data-document-url="{{ document_url or '#' }}">
-	              <span class="flow-code">TASK</span>
 	              <span class="flow-detail"><strong>{{ task.title }}</strong>{% if task.part_number %} &middot; Part {{ task.part_number }}{% elif task.details %} &middot; {{ task.details|truncate(38, true) }}{% endif %}</span>
 	              <span class="flow-status status-{{ task_status_tone }}">{{ task_status_text }}</span>
 	            </button>
@@ -509,7 +508,6 @@
 	                    data-proof-url="{{ depart_url or primary_stop.view_url or route_sheet_url or '#' }}"
 	                    data-damage-url="{{ damage_url or '#' }}"
 	                    data-document-url="{{ document_url or '#' }}">
-	              <span class="flow-code">{{ primary_stop.board_code or ('STP-' ~ primary_stop.sequence) }}</span>
 	              <span class="flow-detail">{{ board_flow_text(primary_stop.board_flow, primary_stop.board_detail or (primary_stop.plant_name ~ ' · ' ~ primary_stop.arrived_with ~ ' → ' ~ primary_stop.departed_with)) }}</span>
 	              {% if not (primary_stop.badge.short == 'NEEDS DEPARTURE' and pulse_key == 'depart' and depart_url) %}
 	                <span class="flow-status status-{{ primary_stop.badge.pill_tone }}">{{ primary_stop.badge.short }}</span>
@@ -526,7 +524,6 @@
 	                    data-proof-url="{{ stop.view_url or route_sheet_url or '#' }}"
 	                    data-damage-url="{{ damage_url or '#' }}"
 	                    data-document-url="{{ document_url or '#' }}">
-	              <span class="flow-code">{{ stop.board_code or ('STP-' ~ stop.sequence) }}</span>
 	              <span class="flow-detail">{{ board_flow_text(stop.board_flow, stop.board_detail or (stop.plant_name ~ ' · ' ~ stop.arrived_with ~ ' → ' ~ stop.departed_with)) }}</span>
 	              <span class="flow-status status-{{ stop.badge.pill_tone }}">{{ stop.badge.short }}</span>
 	            </button>
@@ -548,7 +545,6 @@
 	                    data-proof-url="{{ event_proof_url or '#' }}"
 	                    data-damage-url="{{ damage_url or '#' }}"
 	                    data-document-url="{{ document_url or '#' }}">
-	              <span class="flow-code">{{ event_code }}</span>
 	              <span class="flow-detail">{{ narrative_flow_text(primary_event, event_detail, event_row_detail) }}</span>
 	              <span class="flow-status status-{{ event_status_tone }}">{{ event_status_label }}</span>
 	            </button>
@@ -570,7 +566,6 @@
 	                    data-proof-url="{{ item_proof_url or '#' }}"
 	                    data-damage-url="{{ damage_url or '#' }}"
 	                    data-document-url="{{ document_url or '#' }}">
-	              <span class="flow-code">{{ item_code }}</span>
 	              <span class="flow-detail">{{ narrative_flow_text(item, detail, item_row_detail) }}</span>
 	              <span class="flow-status status-{{ item_status_tone }}">{{ item_status_label }}</span>
 	            </button>

@@ -745,8 +745,7 @@ def test_completed_stop_states_reflect_cargo_action(client, app):
     assert '<span class="flow-arrow flow-route-arrow" aria-hidden="true">→</span>' in body
     assert "Raleigh East Load &rarr; Empty" not in body
     assert ">DELIVERED<" not in body  # no generic catch-all label
-    assert '<span class="flow-code">STP-1</span>' in body
-    assert '<span class="flow-code">STP-2</span>' in body
+    assert 'class="flow-code"' not in body
 
 
 def test_partial_drop_is_recorded_not_route_review(client, app):

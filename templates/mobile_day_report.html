@@ -113,7 +113,8 @@
               {% if can_manage_log %}
                 <a class="mini-btn primary" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Edit</a>
                 {% if not log.depart_time %}
-                  <a class="mini-btn" href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}">Depart / Load</a>
+                  {% set depart_href = url_for('driver.mobile_dashboard', flow='depart') if active_driver_wait is defined and active_driver_wait and active_driver_wait.log_id == log.id else url_for('driver.depart_driver_log', log_id=log.id) %}
+                  <a class="mini-btn" href="{{ depart_href }}">Depart / Load</a>
                 {% endif %}
                 <form action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" method="POST" onsubmit="return confirm('Delete this driver log?');">
                   <button type="submit" class="mini-btn danger">Delete</button>

@@ -2400,9 +2400,9 @@
 	      width: 100%;
 	      min-height: 0;
 	      display: grid;
-		      grid-template-columns: 72px minmax(0, 1fr) max-content;
+		      grid-template-columns: minmax(0, 1fr) max-content;
 		      align-items: center;
-		      gap: 14px;
+		      gap: 10px;
 		      padding: 13px 14px;
 	      border: 1px solid transparent;
 	      border-radius: 9px;
@@ -2458,22 +2458,6 @@
 		      border-color: rgba(255,82,71,.4);
 		      animation: alertpulse 2.4s ease-in-out infinite;
 	    }
-		    .flow-code {
-		      min-width: 0;
-		      color: var(--md-board-value);
-		      font-family: var(--md-mono);
-		      font-size: .82rem;
-		      font-weight: 600;
-		      letter-spacing: .04em;
-		      text-transform: uppercase;
-		      white-space: nowrap;
-		      overflow: hidden;
-		      text-overflow: ellipsis;
-		    }
-		    .md-flow-row.tone-blocked .flow-code,
-		    .md-flow-row.tone-needs_review .flow-code {
-		      color: #ffd2cd;
-		    }
 		    .flow-detail,
 		    .flow-line {
 		      min-width: 0;
@@ -2490,6 +2474,7 @@
 	      -webkit-box-orient: vertical;
 		    }
 		    .flow-detail {
+		      position: relative;
 		      display: grid;
 		      gap: 4px;
 		    }
@@ -2620,17 +2605,21 @@
 	    .flow-status.status-review { color: var(--md-board-blue-bright); background: rgba(91,157,255,.12); border: 1px solid rgba(91,157,255,.3); border-radius: 999px; }
     .route-detail-grid div { border: 0 !important; background: transparent !important; border-radius: 0 !important; padding: 4px 0 !important; }
 
-	    .md-flow-row.tone-blocked .flow-code::before,
-	    .md-flow-row.tone-needs_review .flow-code::before {
+	    .md-flow-row.tone-blocked .flow-detail,
+	    .md-flow-row.tone-needs_review .flow-detail {
+	      padding-left: 20px;
+	    }
+	    .md-flow-row.tone-blocked .flow-detail::before,
+	    .md-flow-row.tone-needs_review .flow-detail::before {
 	      content: "";
-	      display: inline-block;
+	      position: absolute;
+	      left: 0;
+	      top: 2px;
 	      width: 0;
 	      height: 0;
-	      margin-right: 8px;
 	      border-left: 6px solid transparent;
 	      border-right: 6px solid transparent;
 	      border-bottom: 11px solid var(--md-board-red);
-	      vertical-align: -1px;
 	    }
 
 			    .md-flow-ticker {
@@ -3615,7 +3604,25 @@
       }
     }
 
+    function openRequestedFlowPanel() {
+      var requested = '';
+      try {
+        var currentUrl = new URL(window.location.href);
+        requested = currentUrl.searchParams.get('flow') || '';
+        if (!requested && currentUrl.hash === '#depart') requested = 'depart';
+        if (requested) {
+          currentUrl.searchParams.delete('flow');
+          window.history.replaceState(null, '', currentUrl.pathname + currentUrl.search + currentUrl.hash);
+        }
+      } catch (error) {}
+      if (requested !== 'depart') return;
+      var board = document.querySelector('[data-route-map-shell].md-flow-board');
+      var trigger = board ? board.querySelector('[data-flow-open-panel="depart"]') : null;
+      if (trigger) trigger.click();
+    }
+
     document.querySelectorAll('[data-route-map-shell].md-flow-board').forEach(setupMoveDefenseFlowBoard);
+    openRequestedFlowPanel();
   })();
 </script>
 

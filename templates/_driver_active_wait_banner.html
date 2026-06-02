@@ -10,7 +10,7 @@
     <span class="driver-active-wait-unit">elapsed</span>
   </div>
   {% if show_wait_action %}
-    <a class="driver-active-wait-action" href="{{ url_for('driver.depart_driver_log', log_id=active_driver_wait.log_id) }}">Depart / Load</a>
+    <a class="driver-active-wait-action" href="{{ url_for('driver.mobile_dashboard', flow='depart') }}">Depart / Load</a>
   {% endif %}
 </section>
 {% endif %}

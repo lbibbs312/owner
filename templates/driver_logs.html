@@ -370,23 +370,13 @@
       list-style:none;
       cursor:pointer;
       display:grid;
-      grid-template-columns:72px minmax(0,1fr) max-content;
+      grid-template-columns:minmax(0,1fr) max-content;
       gap:10px;
       align-items:center;
       min-height:68px;
       padding:12px;
     }
     .md-ledger-summary::-webkit-details-marker { display:none; }
-    .md-row-code {
-      min-width:0;
-      color:var(--md-text);
-      font-family:var(--md-mono);
-      font-size:.82rem;
-      font-weight:900;
-      letter-spacing:.06em;
-      text-transform:uppercase;
-      white-space:nowrap;
-    }
     .md-row-detail {
       min-width:0;
       color:var(--md-muted);
@@ -724,7 +714,7 @@
       .md-ledger-head-side { justify-items:start; }
       .md-ledger-filter { grid-template-columns:1fr; max-width:none; }
       .md-action-rail { grid-template-columns:repeat(2,minmax(0,1fr)); }
-      .md-ledger-summary { grid-template-columns:62px minmax(0,1fr) max-content; gap:8px; padding:11px 10px; }
+      .md-ledger-summary { grid-template-columns:minmax(0,1fr) max-content; gap:8px; padding:11px 10px; }
       .md-row-grid { grid-template-columns:1fr; }
       .md-ledger-btn, .md-row-action, .md-row-action-form button { font-size:.68rem; }
     }
@@ -836,7 +826,6 @@
           {% set can_manage_log = log.driver_id == current_user.id %}
           {% set can_delete_log = can_manage_log and log.date == today_local_date %}
           {% set wait_label = wait_label_for_log(log) %}
-          {% set stop_code = stop_vm.board_code if stop_vm and stop_vm.board_code else ('FUEL' if log.fuel else ('MTN' if log.maintenance else ('MTG' if log.meeting else 'STP-' ~ (logs|length - loop.index0)))) %}
           {% set arrive_label = route.arrive_cargo_desc if route else (log.load_size or 'Empty') %}
           {% if route and route.depart_desc is none %}
             {% set depart_label = '--' %}
@@ -878,7 +867,6 @@
           {% set ledger_meta = stop_vm.ledger_meta if stop_vm and stop_vm.ledger_meta else (arrive_label ~ ' → ' ~ depart_label) %}
           <details class="md-ledger-row md-flow-row tone-{{ row_tone }} {% if not log.depart_time %}is-open{% endif %} {% if route and route.warnings %}has-warning{% endif %} {% if log.maintenance or (has_stop_issue and stop_vm.badge.severity == 'risk') %}has-risk{% endif %}" data-flow-row {% if not log.depart_time %}open{% endif %}>
             <summary class="md-ledger-summary">
-              <span class="md-row-code flow-code">{{ stop_code }}</span>
               <span class="md-row-detail flow-detail">
                 <strong>{{ ledger_title }}</strong>
                 <small>{{ ledger_meta }}{% if wait_label %} · Wait {{ wait_label }}{% endif %}</small>
@@ -1146,7 +1134,8 @@
                     Edit
                   </a>
                   {% if not log.depart_time %}
-                    <a href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" class="btn btn-sm btn-success hover-btn">Depart / Load</a>
+                    {% set depart_href = url_for('driver.mobile_dashboard', flow='depart') if active_driver_wait is defined and active_driver_wait and active_driver_wait.log_id == log.id else url_for('driver.depart_driver_log', log_id=log.id) %}
+                    <a href="{{ depart_href }}" class="btn btn-sm btn-success hover-btn">Depart / Load</a>
                   {% endif %}
                   {% if can_delete_log %}
                     {% if log.hot_parts or log.part_number %}

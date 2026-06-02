@@ -2512,6 +2512,7 @@ def test_first_driver_log_is_start_location_not_pickup(client, app):
     assert b"data-active-wait-minutes" in next_page.data
     assert b"data-active-wait-seconds" in next_page.data
     assert b"driver-active-wait.js?v=2" in next_page.data
+    assert b"/mobile?flow=depart" in next_page.data
     assert b"Kraft Plater" in next_page.data
 
 
@@ -4421,7 +4422,7 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"LIVE FLOW BOARD" not in logs_page.data
     assert b"md-ledger-board compact-route-map md-flow-board" in logs_page.data
     assert b"md-ledger-row md-flow-row tone-completed" in logs_page.data
-    assert b"md-row-code flow-code" in logs_page.data
+    assert b"md-row-code flow-code" not in logs_page.data
     assert b"md-row-detail flow-detail" in logs_page.data
     assert b"md-row-state" in logs_page.data
     assert b"md-row-status flow-status empty status-empty" not in logs_page.data
@@ -5103,6 +5104,7 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"data-active-wait-minutes" in page.data
     assert b"data-active-wait-seconds" in page.data
     assert b"driver-active-wait.js?v=2" in page.data
+    assert b"/mobile?flow=depart" in page.data
     assert b"Save Ryder Status" in page.data
     assert b"CEL light" in page.data
     assert b"Need tow" in page.data
@@ -5144,6 +5146,7 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"Edit" in today_report.data
     assert b"Pickup" not in today_report.data
     assert b"Depart / Load" in today_report.data
+    assert b"/mobile?flow=depart" in today_report.data
     assert b"Delete" in today_report.data
     assert b"13:30" not in today_report.data
 
@@ -5573,15 +5576,15 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "→" in body
     assert "&middot;" in body
     assert "flow-arrow" in body
-    assert ".md-flow-ticker span::before" in body
-    assert "border-radius: 2px" in body
-    assert "animation: liveTicker 36s linear infinite" in body
-    assert ".md-flow-ticker span + span { display: inline-flex; }" in body
+    assert ".md-flow-ticker-track span::after" in body
+    assert "animation: liveTicker 32s linear infinite" in body
+    assert ".md-flow-ticker-track span + span { display: inline-flex; }" in body
     assert "animation: none" not in body
     assert "America/Detroit" in body
     assert "hour12: true" in body
     assert "setupFlowAutoScroll" in body
     assert "window.requestAnimationFrame(step)" in body
+    assert "openRequestedFlowPanel" in body
     assert "calc(100% - 8px)" not in body
     assert "calc(100% - 10px)" not in body
     assert "border-left: 3px solid rgba(91,157,255" not in body
