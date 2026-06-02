@@ -406,3 +406,26 @@ def test_manager_dashboard_uses_issue_terminology(client, app):
     assert "Needs Attention" in body
     assert "Live Flow Map" in body
     assert "Critical Exceptions" not in body
+
+
+def test_board_issue_drawer_explains_reason_and_offers_actions(client, app):
+    with app.app_context():
+        driver = _user("driver_issue_drawer", "driver")
+        _driver_log(
+            driver,
+            plant_name="RE",
+            arrive_time="2026-05-28 09:00:00",
+            depart_time="09:20",
+            load_size="Raleigh East Load",
+            depart_load_size="Empty",
+            downtime_reason="missing proof on this drop",
+        )
+    _login(client, "driver_issue_drawer")
+    resp = client.get("/mobile")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "MISSING PROOF" in body              # explicit reason, never generic RISK
+    assert "no photo, scan, or driver confirmation" in body   # drawer "why"
+    assert "Add proof / photo" in body          # action
+    assert "Send to manager" in body            # action
+    assert "/request_review" in body            # manager-review endpoint wired

@@ -19,6 +19,7 @@ from werkzeug.utils import secure_filename
 from app.blueprints.driver import bp
 from app.extensions import db
 from app.extensions import socketio
+from app.models.case import ExceptionEvent
 from app.forms.damage import DamageReportForm
 from app.forms.log import DepartForm, DriverLogForm, TRUCK_ISSUE_CHOICES, TRUCK_ISSUE_LABELS
 from app.forms.plant_transfer import PlantTransferForm
@@ -3862,6 +3863,24 @@ def damage_reports():
         can_modify_damage_report=_can_modify_damage_report,
         route_finalized_for_report=_is_damage_report_route_finalized,
     )
+
+
+@bp.route("/driver_logs/<int:log_id>/request_review", methods=["POST"], strict_slashes=False)
+@login_required
+def request_manager_review(log_id):
+    log = DriverLog.query.get_or_404(log_id)
+    db.session.add(ExceptionEvent(
+        event_type="manager_review_requested", severity="medium",
+        stop_id=log.id, driver_log_id=log.id,
+        driver_id=getattr(current_user, "id", None),
+        plant_name=getattr(log, "plant_name", None),
+        event_date=getattr(log, "date", None),
+        summary="Driver requested manager review",
+        details=(request.form.get("reason") or "").strip() or None,
+    ))
+    db.session.commit()
+    flash("Sent to manager review.", "info")
+    return redirect(url_for("driver.mobile_dashboard"))
 
 
 @bp.route("/damage_reports/new", methods=["GET", "POST"])

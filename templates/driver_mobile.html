@@ -2561,6 +2561,23 @@
 	      background: rgba(255,82,71,.12);
 	      color: #ffc9c5;
 	    }
+    .flow-issue-panel { display:grid; gap:10px; padding:11px 12px; margin-top:4px; border-radius:10px; border:1px solid var(--md-line); background:rgba(8,19,34,.6); }
+    .flow-issue-panel.sev-risk { border-color:rgba(255,82,71,.42); background:rgba(255,82,71,.08); box-shadow:inset 0 0 0 1px rgba(255,82,71,.16), 0 0 22px rgba(255,82,71,.12); }
+    .flow-issue-panel.sev-attention { border-color:rgba(255,178,36,.4); background:rgba(255,178,36,.07); box-shadow:inset 0 0 0 1px rgba(255,178,36,.14); }
+    .flow-issue-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .flow-issue-head p { margin:0; color:var(--md-text); font-size:.8rem; font-weight:650; line-height:1.3; }
+    .flow-issue-evidence { display:grid; gap:6px; }
+    .flow-issue-evidence div { display:grid; grid-template-columns:104px minmax(0,1fr); gap:10px; align-items:center; }
+    .flow-issue-evidence span { color:var(--md-amber); font-family:var(--md-mono); font-size:.6rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+    .flow-issue-evidence strong { color:var(--md-text); font-size:.78rem; overflow-wrap:anywhere; }
+    .flow-issue-evidence strong.ev-missing { color:var(--md-red); }
+    .flow-issue-evidence strong.ev-found { color:var(--md-green); }
+    .flow-issue-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .flow-issue-actions form { margin:0; min-width:0; }
+    .flow-issue-actions .route-detail-link { width:100%; }
+    .num-neg { color:var(--md-red); font-weight:800; }
+    .num-pos { color:var(--md-green); font-weight:800; }
+
     .move-defense-mobile .route-detail-grid,
     .move-defense-mobile .route-focus-details {
       padding: 0;

@@ -1,3 +1,26 @@
+{% macro issue_panel(obj, log_id, depart_url) %}
+  {% if obj.issues %}
+  {% set pi = obj.issues[0] %}
+  {% set ev = obj.evidence or {} %}
+  <div class="flow-issue-panel sev-{{ obj.badge.severity }}">
+    <div class="flow-issue-head"><span class="flow-status status-{{ obj.badge.pill_tone }}">{{ obj.badge.label }}</span><p>{{ pi.reason }}</p></div>
+    <div class="flow-issue-evidence">
+      {% if ev.dropped %}<div><span>Dropped</span><strong>{{ ev.dropped|join(', ') }}</strong></div>{% endif %}
+      {% if ev.expected_destination %}<div><span>Expected dest</span><strong>{{ ev.expected_destination }}</strong></div>{% endif %}
+      <div><span>Arrived</span><strong>{{ ev.arrived_with }}</strong></div>
+      <div><span>Departed</span><strong>{{ ev.departed_with }}</strong></div>
+      <div><span>Proof</span><strong class="{{ 'ev-missing' if ev.proof != 'Attached' else 'ev-found' }}">{{ ev.proof or 'None on file' }}</strong></div>
+      {% if ev.reason %}<div><span>Note</span><strong>{{ ev.reason }}</strong></div>{% endif %}
+    </div>
+    <div class="flow-issue-actions">
+      <a class="route-detail-link" href="{{ url_for('driver.new_damage_report') }}">Add proof / photo</a>
+      {% if depart_url %}<a class="route-detail-link" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow">Confirm delivered</a>{% endif %}
+      <form action="{{ url_for('driver.no_pickup_driver_log', log_id=log_id) }}" method="POST"><button class="route-detail-link" type="submit">Mark no pickup</button></form>
+      <form action="{{ url_for('driver.request_manager_review', log_id=log_id) }}" method="POST"><button class="route-detail-link danger" type="submit">Send to manager</button></form>
+    </div>
+  </div>
+  {% endif %}
+{% endmacro %}
 {% set rm = route_map if route_map is defined else none %}
 {% set map_mode = rm.map_mode if rm and rm.map_mode is defined else 'live_current_work' %}
 {% set cta = route_cta if route_cta is defined and route_cta else {} %}
@@ -530,6 +553,7 @@
               <div><span>Wait</span><strong>{{ primary_stop.wait_label }}</strong></div>
               <div><span>Next</span><strong>{{ primary_stop.next_action }}</strong></div>
             </div>
+            {{ issue_panel(primary_stop, primary_stop.stop_id, depart_url) }}
           </div>
         </template>
       {% endif %}
@@ -543,6 +567,7 @@
               <div><span>Status</span><strong>{{ stop.status_label }}</strong></div>
               <div><span>Next</span><strong>{{ stop.next_action }}</strong></div>
             </div>
+            {{ issue_panel(stop, stop.stop_id, depart_url) }}
           </div>
         </template>
       {% endfor %}
