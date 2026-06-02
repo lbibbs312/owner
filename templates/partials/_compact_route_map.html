@@ -6,7 +6,7 @@
 {% set secondary_cta = cta.secondary_cta if cta.secondary_cta is defined else none %}
 {% set board_ctas = [] %}
 {% for route_action in [primary_cta, secondary_cta] %}
-  {% if route_action and route_action.action not in ['record_departure', 'add_damage', 'view_route', 'route_history'] and urls.get(route_action.action) %}
+  {% if route_action and route_action.action not in ['record_departure', 'add_stop', 'add_damage', 'view_route', 'route_history'] and urls.get(route_action.action) %}
     {% set _ = board_ctas.append(route_action) %}
   {% endif %}
 {% endfor %}
@@ -110,7 +110,7 @@
     {% elif add_stop_url %}
     <a class="md-flow-action-tab primary" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}" data-flow-panel-title="Add Stop">
       <strong>Add Stop</strong>
-      <span>Log next stop</span>
+      <span>{{ cta.next_action or 'Log next stop' }}</span>
     </a>
     {% endif %}
     {% for route_action in board_ctas %}

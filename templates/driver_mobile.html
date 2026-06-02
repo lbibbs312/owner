@@ -2334,12 +2334,11 @@
 	      overflow-y: auto;
 	      overscroll-behavior: contain;
 	      scroll-behavior: smooth;
-	      padding-right: 2px;
-	      scrollbar-width: thin;
-	      scrollbar-color: rgba(91,157,255,.34) rgba(6,10,18,.28);
+	      padding-right: 0;
+	      scrollbar-width: none;
 	    }
-	    .md-flow-track::-webkit-scrollbar { width: 6px; }
-	    .md-flow-track::-webkit-scrollbar-thumb { background: rgba(91,157,255,.34); border-radius: 999px; }
+	    .md-flow-track::-webkit-scrollbar { display: none; width: 0; height: 0; }
+	    .md-flow-track::-webkit-scrollbar-thumb { background: transparent; }
 	    .md-flow-row {
 	      appearance: none;
 	      width: 100%;

@@ -4270,8 +4270,10 @@ def test_premature_finalized_event_does_not_lock_active_shift_new_logs(client, a
     login(client, "active_after_final")
     mobile = client.get("/mobile")
     assert mobile.status_code == 200
+    body = mobile.get_data(as_text=True)
     assert b"Continue route" in mobile.data
     assert b"Add Stop" in mobile.data
+    assert body.count('data-flow-panel-title="Add Stop"') == 1
     assert b"Finalize Route" not in mobile.data
 
     new_log = client.get("/new_driving_log")
@@ -5491,6 +5493,7 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "LIVE FLOW BOARD" in body
     assert 'data-flow-open-panel="depart"' in body
     assert "data-depart-wizard" in body
+    assert body.count('data-flow-panel-title="Add Stop"') <= 1
     assert 'name="next" value="mobile"' in body
     assert "md-flow-work-scrim" in body
     assert "Did you get unloaded?" in body
@@ -5520,6 +5523,8 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "border: 1px solid rgba(91,157,255,.28)" not in body
     assert "linear-gradient(180deg, rgba(47,109,240,.22)" not in body
     assert "inset 0 0 18px rgba(91,157,255,.04)" not in body
+    assert ".md-flow-track::-webkit-scrollbar { display: none; width: 0; height: 0; }" in body
+    assert "scrollbar-color: rgba(91,157,255,.34)" not in body
     assert "ROUTE LOGS &nbsp; PLANT TRANSFERS" in body
     assert "&diams;" not in body
     assert ".md-flow-work-card::before" in body

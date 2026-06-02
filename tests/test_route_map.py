@@ -115,6 +115,31 @@ def test_driver_route_map_with_driver_log_returns_stop_nodes(app):
     assert ctx["route"]["current_location"] == "Paint West"
 
 
+def test_fuel_stop_uses_neutral_mileage_when_pretrip_delta_is_impossible(app):
+    from app.extensions import db
+    from app.models import PreTrip
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user()
+    pretrip = PreTrip(user_id=driver.id, pretrip_date=date.today(), start_mileage=150000)
+    db.session.add(pretrip)
+    db.session.commit()
+
+    _driver_log(
+        driver,
+        plant_name="FUEL",
+        fuel=True,
+        fuel_mileage=1572,
+        depart_time="12:20",
+    )
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today(), route_pretrip=pretrip)
+
+    assert ctx["stops"][0]["board_code"] == "FUEL"
+    assert ctx["stops"][0]["board_detail"] == "1,572 mi recorded"
+    assert "+-" not in ctx["stops"][0]["board_detail"]
+
+
 def test_driver_route_map_flags_real_exception_states_for_warning_rows(app):
     from app.extensions import db
     from app.models import DamageReport

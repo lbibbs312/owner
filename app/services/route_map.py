@@ -150,6 +150,8 @@ def _service_board_detail(log, label, route_pretrip=None):
         start_mileage = getattr(route_pretrip, "start_mileage", None)
         if start_mileage is not None:
             delta = log.fuel_mileage - start_mileage
+            if delta < 0:
+                return f"{log.fuel_mileage:,} mi recorded"
             return f"+{delta:,} mi from pre-trip"
         return f"{log.fuel_mileage:,} mi recorded"
     return f"{label} · {service_stop_label(log).lower()}"
