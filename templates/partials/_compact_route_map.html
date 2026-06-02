@@ -128,7 +128,7 @@
   <div class="md-flow-head">
 	    <div>
 	      <span class="md-flow-kicker"><i></i> LIVE FLOW BOARD</span>
-	      <h3>{{ route_panel_title or "Today's Route" }}</h3>
+	      
 	      {% if rm and rm.stops %}
 	        <p class="md-flow-subline">{{ rm.stops|length }} stop{{ 's' if rm.stops|length != 1 else '' }}</p>
 	      {% endif %}
