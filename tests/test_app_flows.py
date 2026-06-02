@@ -5513,6 +5513,13 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "border-left: 3px solid rgba(255,178,36" not in body
     assert "border-left: 3px solid rgba(255,82,71" not in body
     assert "content: none!important" in body
+    assert ".md-flow-action-tab::before" in body
+    assert "animation: actionDotPulse 1.9s ease-in-out infinite" in body
+    assert "@keyframes actionDotPulse" in body
+    assert "grid-template-columns: 9px max-content" in body
+    assert "border: 1px solid rgba(91,157,255,.28)" not in body
+    assert "linear-gradient(180deg, rgba(47,109,240,.22)" not in body
+    assert "inset 0 0 18px rgba(91,157,255,.04)" not in body
     assert "ROUTE LOGS &nbsp; PLANT TRANSFERS" in body
     assert "&diams;" not in body
     assert ".md-flow-work-card::before" in body
