@@ -1743,23 +1743,23 @@
 	      font-weight: 700;
 	      text-transform: uppercase;
 	    }
-	    .md-flow-kicker i {
-	      position: relative;
-	      width: 8px;
-	      height: 8px;
-	      border-radius: 50%;
-	      background: var(--md-green);
-	      box-shadow: 0 0 12px rgba(43,213,118,.82), 0 0 28px rgba(43,213,118,.32);
-	      animation: livePulse 1.8s ease-in-out infinite;
-	    }
-	    .md-flow-kicker i::after {
-	      content: "";
-	      position: absolute;
-	      inset: -7px;
-	      border: 1px solid rgba(43,213,118,.48);
-	      border-radius: 50%;
-	      animation: livePulseRing 1.8s ease-out infinite;
-	    }
+		    .md-flow-kicker i {
+		      position: relative;
+		      width: 10px;
+		      height: 10px;
+		      border-radius: 50%;
+		      background: var(--md-green);
+		      box-shadow: 0 0 14px rgba(43,213,118,.92), 0 0 30px rgba(43,213,118,.42);
+		      animation: livePulse 1.65s ease-in-out infinite;
+		    }
+		    .md-flow-kicker i::after {
+		      content: "";
+		      position: absolute;
+		      inset: -9px;
+		      border: 1px solid rgba(43,213,118,.56);
+		      border-radius: 50%;
+		      animation: livePulseRing 1.65s ease-out infinite;
+		    }
 	    .md-flow-head h3 {
 	      margin: 6px 0 0;
 	      color: var(--md-text);
@@ -2262,13 +2262,24 @@
       transition: opacity .18s ease;
     }
     .md-flow-embed-wrap iframe.is-ready { opacity: 1; }
-    .md-flow-window {
-      position: relative;
-      padding: 10px;
-    }
-    .md-flow-track {
-      display: grid;
-    }
+	    .md-flow-window {
+	      position: relative;
+	      padding: 10px;
+	      max-height: min(56vh, 520px);
+	      overflow: hidden;
+	    }
+	    .md-flow-track {
+	      display: grid;
+	      max-height: inherit;
+	      overflow-y: auto;
+	      overscroll-behavior: contain;
+	      scroll-behavior: smooth;
+	      padding-right: 2px;
+	      scrollbar-width: thin;
+	      scrollbar-color: rgba(91,157,255,.34) rgba(6,10,18,.28);
+	    }
+	    .md-flow-track::-webkit-scrollbar { width: 6px; }
+	    .md-flow-track::-webkit-scrollbar-thumb { background: rgba(91,157,255,.34); border-radius: 999px; }
 	    .md-flow-row {
 	      appearance: none;
 	      width: 100%;
@@ -2348,8 +2359,8 @@
 	      overflow: hidden;
 	      text-overflow: ellipsis;
 	    }
-	    .flow-detail,
-	    .flow-line {
+		    .flow-detail,
+		    .flow-line {
 	      min-width: 0;
 	      color: var(--md-muted);
 	      font-family: var(--md-mono);
@@ -2360,7 +2371,16 @@
 	      -webkit-line-clamp: 2;
 	      -webkit-box-orient: vertical;
 	      overflow: hidden;
-	    }
+		    }
+		    .flow-arrow {
+		      color: var(--md-blue-bright);
+		      display: inline-block;
+		      font-size: 1.12em;
+		      font-weight: 950;
+		      line-height: 1;
+		      padding: 0 2px;
+		      text-shadow: 0 0 10px rgba(91,157,255,.34);
+		    }
 	    .flow-detail strong,
 	    .flow-line strong {
 	      color: var(--md-text);
@@ -2383,15 +2403,15 @@
 	      white-space: nowrap;
 	      box-shadow: inset 0 0 14px rgba(255,255,255,.025);
 	    }
-	    .flow-status.status-active,
-	    .flow-status.status-pickup,
-	    .flow-status.status-open {
-	      color: var(--md-blue-bright);
-	      background: rgba(91,157,255,.12);
-	      border: 1px solid rgba(91,157,255,.3);
-	      border-left: 3px solid rgba(91,157,255,.78);
-	      border-radius: 6px 12px 12px 6px;
-	    }
+		    .flow-status.status-active,
+		    .flow-status.status-pickup,
+		    .flow-status.status-open {
+		      color: var(--md-blue-bright);
+		      background: rgba(91,157,255,.12);
+		      border: 1px solid rgba(91,157,255,.3);
+		      border-left: 3px solid rgba(91,157,255,.78);
+		      border-radius: 6px 12px 12px 6px;
+		    }
 		    .flow-status.status-delivery,
 		    .flow-status.status-completed,
 		    .flow-status.status-ready,
@@ -2408,8 +2428,8 @@
 	      color: var(--md-amber);
 	      background: rgba(255,178,36,.12);
 	      border: 1px solid rgba(255,178,36,.3);
-	      border-radius: 4px;
-	      clip-path: polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+	      border-left: 3px solid rgba(255,178,36,.72);
+	      border-radius: 7px;
 	    }
 	    .flow-status.status-hold,
 	    .flow-status.status-blocked,
@@ -2417,26 +2437,27 @@
 	      color: var(--md-red);
 	      background: rgba(255,82,71,.12);
 	      border: 1px solid rgba(255,82,71,.32);
-	      border-radius: 3px;
-	      clip-path: polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%);
+	      border-left: 3px solid rgba(255,82,71,.78);
+	      border-radius: 6px;
 	    }
 	    .flow-status.status-risk {
 	      color: var(--md-red);
 	      background: rgba(255,82,71,.14);
 	      border: 1px solid rgba(255,82,71,.42);
-	      border-radius: 3px;
-	      clip-path: polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%);
+	      border-left: 3px solid rgba(255,82,71,.82);
+	      border-radius: 6px;
 	    }
 	    .flow-status.status-attention {
 	      color: var(--md-amber);
 	      background: rgba(255,178,36,.14);
 	      border: 1px solid rgba(255,178,36,.4);
-	      border-radius: 4px;
-	      clip-path: polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+	      border-left: 3px solid rgba(255,178,36,.78);
+	      border-radius: 7px;
 	    }
-	    .md-flow-ticker {
-	      display: flex;
-	      overflow: hidden;
+		    .md-flow-ticker {
+		      display: flex;
+		      gap: 34px;
+		      overflow: hidden;
       border-top: 1px solid var(--md-line-soft);
       border-bottom: 1px solid var(--md-line-soft);
       background: var(--md-ink);
@@ -2452,10 +2473,11 @@
 	      display: inline-flex;
 	      align-items: center;
 	      gap: 12px;
-	      min-width: max-content;
-	      padding: 0;
-	      animation: none;
-	    }
+		      min-width: max-content;
+		      padding: 0 38px 0 0;
+		      animation: liveTicker 36s linear infinite;
+		      will-change: transform;
+		    }
 	    .md-flow-ticker span::before {
 	      content: "";
 	      width: 7px;
@@ -2466,7 +2488,7 @@
 	      box-shadow: 0 0 10px rgba(255,178,36,.24);
 	      transform: rotate(45deg);
 	    }
-	    .md-flow-ticker span + span { display: none; }
+		    .md-flow-ticker span + span { display: inline-flex; }
 	    .route-detail-actions form {
 	      min-width: 0;
 	      margin: 0;
@@ -2929,25 +2951,98 @@
       var panel = board.querySelector('[data-md-flow-work-panel]');
       var panelTitle = board.querySelector('[data-md-flow-work-title]');
       var context = board.querySelector('[data-md-flow-context]');
-      var embedWrap = board.querySelector('[data-md-flow-embed-wrap]');
-      var frame = board.querySelector('[data-md-flow-frame]');
-      var clock = board.querySelector('[data-md-flow-clock]');
-      var routeSheetUrl = board.getAttribute('data-route-sheet-url') || '';
-      var selectedRow = null;
-      var activeTrigger = null;
+	      var embedWrap = board.querySelector('[data-md-flow-embed-wrap]');
+	      var frame = board.querySelector('[data-md-flow-frame]');
+	      var clock = board.querySelector('[data-md-flow-clock]');
+	      var flowTrack = board.querySelector('.md-flow-track');
+	      var routeSheetUrl = board.getAttribute('data-route-sheet-url') || '';
+	      var selectedRow = null;
+	      var activeTrigger = null;
 
-      function updateClock() {
-        if (!clock) return;
-        clock.textContent = new Date().toLocaleTimeString([], {
-          hour12: false,
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        });
-      }
+	      function updateClock() {
+	        if (!clock) return;
+	        clock.textContent = new Date().toLocaleTimeString('en-US', {
+	          timeZone: 'America/Detroit',
+	          hour12: true,
+	          hour: 'numeric',
+	          minute: '2-digit',
+	          second: '2-digit'
+	        });
+	      }
 
-      updateClock();
-      if (clock) window.setInterval(updateClock, 1000);
+	      updateClock();
+	      if (clock) window.setInterval(updateClock, 1000);
+
+	      function emphasizeFlowArrows() {
+	        board.querySelectorAll('.flow-detail, .flow-line').forEach(function (node) {
+	          var walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+	          var replacements = [];
+	          while (walker.nextNode()) {
+	            if (walker.currentNode.nodeValue.indexOf('→') !== -1) {
+	              replacements.push(walker.currentNode);
+	            }
+	          }
+	          replacements.forEach(function (textNode) {
+	            var parts = textNode.nodeValue.split('→');
+	            var fragment = document.createDocumentFragment();
+	            parts.forEach(function (part, index) {
+	              if (part) fragment.appendChild(document.createTextNode(part));
+	              if (index < parts.length - 1) {
+	                var arrow = document.createElement('span');
+	                arrow.className = 'flow-arrow';
+	                arrow.textContent = '→';
+	                fragment.appendChild(arrow);
+	              }
+	            });
+	            textNode.parentNode.replaceChild(fragment, textNode);
+	          });
+	        });
+	      }
+
+	      function setupFlowAutoScroll() {
+	        if (!flowTrack || flowTrack.scrollHeight <= flowTrack.clientHeight + 8) return;
+	        var direction = 1;
+	        var last = null;
+	        var pausedUntil = 0;
+	        var speed = 10;
+
+	        function pause() {
+	          pausedUntil = Date.now() + 4200;
+	        }
+
+	        ['pointerdown', 'touchstart', 'wheel', 'focusin'].forEach(function (eventName) {
+	          flowTrack.addEventListener(eventName, pause, { passive: true });
+	        });
+
+	        function step(timestamp) {
+	          if (!last) last = timestamp;
+	          var delta = Math.min(timestamp - last, 80);
+	          last = timestamp;
+
+	          if (!board.classList.contains('is-interacting') && Date.now() >= pausedUntil) {
+	            var maxScroll = flowTrack.scrollHeight - flowTrack.clientHeight;
+	            if (maxScroll > 8) {
+	              flowTrack.scrollTop += direction * speed * (delta / 1000);
+	              if (flowTrack.scrollTop >= maxScroll - 1) {
+	                flowTrack.scrollTop = maxScroll;
+	                direction = -1;
+	                pausedUntil = Date.now() + 1400;
+	              } else if (flowTrack.scrollTop <= 1) {
+	                flowTrack.scrollTop = 0;
+	                direction = 1;
+	                pausedUntil = Date.now() + 1400;
+	              }
+	            }
+	          }
+
+	          window.requestAnimationFrame(step);
+	        }
+
+	        window.requestAnimationFrame(step);
+	      }
+
+	      emphasizeFlowArrows();
+	      setupFlowAutoScroll();
 
       function setActiveTrigger(trigger) {
         if (activeTrigger) activeTrigger.classList.remove('is-active');

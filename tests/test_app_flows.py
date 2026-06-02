@@ -4423,6 +4423,8 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"md-ledger-ticker md-flow-ticker" in logs_page.data
     assert b'content:"["' not in logs_page.data
     assert b"content:'['" not in logs_page.data
+    assert b"calc(100% - 8px)" not in logs_page.data
+    assert b"calc(100% - 10px)" not in logs_page.data
     assert b"Print Route Record" in logs_page.data
     assert f"/driver_logs_print?date={selected_date.isoformat()}".encode() in logs_page.data
     assert f"/driver_logs_print?date={selected_date.isoformat()}&amp;autoprint=1".encode() in logs_page.data
@@ -5492,8 +5494,18 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "Depart / Load" not in body
     assert "→" in body
     assert "·" in body
+    assert "flow-arrow" in body
     assert ".md-flow-ticker span::before" in body
     assert "border-radius: 2px" in body
+    assert "animation: liveTicker 36s linear infinite" in body
+    assert ".md-flow-ticker span + span { display: inline-flex; }" in body
+    assert "animation: none" not in body
+    assert "America/Detroit" in body
+    assert "hour12: true" in body
+    assert "setupFlowAutoScroll" in body
+    assert "window.requestAnimationFrame(step)" in body
+    assert "calc(100% - 8px)" not in body
+    assert "calc(100% - 10px)" not in body
     assert "content: none!important" in body
     assert "ROUTE LOGS &nbsp; PLANT TRANSFERS" in body
     assert "&diams;" not in body
