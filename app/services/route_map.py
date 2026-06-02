@@ -1133,7 +1133,7 @@ def build_driver_map_mode_context(route_context, route_map=None, production_flow
     current_stop = getattr(route_context, "current_stop", None)
     is_today = bool(route_date and today_local_date and route_date == today_local_date)
 
-    if current_stop is not None or (route_is_active and has_route_history):
+    if current_stop is not None or (route_is_active and has_route_history) or (is_today and has_route_history):
         mode = "live_current_work"
         label = "Active Route Map"
         empty = ""

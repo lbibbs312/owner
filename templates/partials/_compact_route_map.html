@@ -169,6 +169,7 @@
     </div>
   </div>
 
+  {% if map_mode != 'route_replay' %}
   <div class="md-flow-top-actions" aria-label="Live flow workflow actions">
     {% if depart_url and primary_stop %}
     <a class="md-flow-action-tab primary" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow">
@@ -208,6 +209,7 @@
       <span>Full details</span>
     </a>
   </div>
+  {% endif %}
 
   {% if pending_ryder %}
     <div class="md-flow-alert">
@@ -217,7 +219,9 @@
   {% endif %}
 
   {% if map_mode == 'route_replay' %}
-    <p class="compact-map-note">Last Route Replay. Last Route / Route Replay. Live route actions are hidden.</p>
+    <div class="md-flow-replay-state" role="status" aria-label="Replay mode. Actions disabled.">
+      <span>REPLAY MODE</span><i aria-hidden="true"></i><span>ACTIONS DISABLED</span>
+    </div>
   {% endif %}
 
   <div class="md-flow-work-panel" data-md-flow-work-panel hidden>

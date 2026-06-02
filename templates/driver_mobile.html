@@ -807,12 +807,32 @@
     .compact-route-lane.status-needs_review {
       background: repeating-linear-gradient(90deg, #ef4444 0 8px, transparent 8px 14px);
     }
-	    .compact-map-note {
-	      margin: 0;
-	      padding-top: 2px;
-	      color: #cbd5e1;
-	      font-size: .72rem;
-	      font-weight: 800;
+	    .md-flow-replay-state {
+	      width: max-content;
+	      max-width: calc(100% - 24px);
+	      display: inline-flex;
+	      align-items: center;
+	      gap: 8px;
+	      margin: 8px 12px 4px;
+	      padding: 5px 9px;
+	      border: 1px solid rgba(255,178,36,.34);
+	      border-radius: 8px;
+	      background: rgba(255,178,36,.08);
+	      color: var(--md-amber);
+	      font-family: var(--md-mono);
+	      font-size: .62rem;
+	      font-weight: 900;
+	      letter-spacing: .1em;
+	      line-height: 1;
+	      text-transform: uppercase;
+	      box-shadow: inset 0 0 0 1px rgba(255,178,36,.08);
+	    }
+	    .md-flow-replay-state i {
+	      width: 4px;
+	      height: 4px;
+	      border-radius: 999px;
+	      background: currentColor;
+	      opacity: .76;
 	    }
 	    .compact-map-actions {
 	      display: grid;

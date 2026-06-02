@@ -5300,12 +5300,19 @@ def test_mobile_dashboard_route_panel_falls_back_to_latest_route_when_today_is_e
     page = client.get("/mobile")
 
     assert page.status_code == 200
-    assert b"Last Route" in page.data
+    assert b"Last Route" not in page.data
+    assert b"REPLAY MODE" in page.data
+    assert b"ACTIONS DISABLED" in page.data
+    assert b"Last Route Replay" not in page.data
+    assert b"Last Route / Route Replay" not in page.data
+    assert b"Live route actions are hidden" not in page.data
+    assert b'<div class="md-flow-top-actions"' not in page.data
+    assert b'data-flow-panel-title="Add Stop"' not in page.data
     assert b"1 stop" in page.data
     assert b"Raleigh East" in page.data
     assert f"/driver_logs?date={route_date.isoformat()}".encode() in page.data
     assert b"No stops logged yet today." not in page.data
-    assert b"Start shift with PreTrip" in page.data
+    assert b"Start shift with PreTrip" not in page.data
 
 
 def test_mobile_dashboard_selected_date_renders_route_replay(client, app):
@@ -5347,8 +5354,13 @@ def test_mobile_dashboard_selected_date_renders_route_replay(client, app):
     page = client.get("/mobile?date=2026-05-28")
 
     assert page.status_code == 200
-    assert b"Last Route Replay" in page.data
-    assert b"Last Route / Route Replay" in page.data
+    assert b"REPLAY MODE" in page.data
+    assert b"ACTIONS DISABLED" in page.data
+    assert b"Last Route Replay" not in page.data
+    assert b"Last Route / Route Replay" not in page.data
+    assert b"Live route actions are hidden" not in page.data
+    assert b'<div class="md-flow-top-actions"' not in page.data
+    assert b'data-flow-panel-title="Add Stop"' not in page.data
     assert b"Raleigh East" in page.data
     assert b"/driver_logs?date=2026-05-28" in page.data
     assert b"Finalize Route" not in page.data
