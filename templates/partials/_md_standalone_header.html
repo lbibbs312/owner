@@ -1,0 +1,10 @@
+{#
+  MoveDefense header for standalone driver pages (no base.html chrome).
+  Mirrors the dark topbar look of the mobile shell.
+#}
+<header class="md-standalone-topbar">
+  <a class="md-standalone-brand" href="{% if current_user.is_authenticated and current_user.role != 'management' %}{{ url_for('driver.mobile_dashboard') }}{% else %}{{ url_for('public.welcome') }}{% endif %}">MoveDefense</a>
+  {% if current_user.is_authenticated %}
+    <a class="md-logout" href="{{ url_for('auth.logout') }}">Logout</a>
+  {% endif %}
+</header>

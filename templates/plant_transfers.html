@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
+{% if current_user.role != 'management' %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+{% endif %}
 <div class="container">
   {% set transfer_view_endpoint = 'manager.view_plant_transfer' if current_user.role == 'management' else 'driver.view_plant_transfer' %}
   {% set transfer_print_endpoint = 'manager.plant_transfer_printable' if current_user.role == 'management' else 'driver.plant_transfer_printable' %}
@@ -11,7 +15,7 @@
   </div>
 
   {% if transfers %}
-    <div class="table-responsive">
+    <div class="table-responsive md-glow">
       <table class="table table-striped align-middle">
         <thead>
           <tr>
@@ -58,4 +62,6 @@
     <p class="text-muted">No Plant Transfers yet.</p>
   {% endif %}
 </div>
+{% set md_nav_active = 'transfers' %}
+{% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

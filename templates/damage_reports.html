@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
+{% if current_user.role != 'management' %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+{% endif %}
 {% set is_manager_history = current_user.role == 'management' %}
 <div class="container-fluid py-4 responsive-workspace">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -9,7 +13,7 @@
     </div>
     <a class="btn btn-primary" href="{{ url_for('driver.new_damage_report') }}">New Report</a>
   </div>
-  <div class="table-responsive route-workspace-table">
+  <div class="table-responsive route-workspace-table md-glow">
     <table class="table table-sm align-middle">
       <thead>
         <tr>
@@ -62,4 +66,6 @@
     </table>
   </div>
 </div>
+{% set md_nav_active = 'damage' %}
+{% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

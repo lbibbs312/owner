@@ -1,0 +1,247 @@
+{#
+  MoveDefense dark shell for STANDALONE pages (those that do NOT extend
+  base.html and have no app chrome of their own). Goes inside <head>.
+  Pair with: <body class="md-shell md-standalone">, _md_standalone_header.html,
+  and _md_bottom_nav.html.
+#}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body.md-shell {
+    --md-ink:#060a12;
+    --md-bg:#0a0f18;
+    --md-panel:#0f1a29;
+    --md-panel-deep:#0c1521;
+    --md-line:#22324a;
+    --md-text:#eaf0f8;
+    --md-muted:#8a99b3;
+    --md-blue:#2f6df0;
+    --md-blue-bright:#5b9dff;
+    --md-amber:#ffb224;
+    --md-red:#ff5247;
+    --md-green:#2bd576;
+    --md-display:'Archivo','Montserrat',sans-serif;
+    --md-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --md-body:'IBM Plex Sans','Montserrat',Arial,sans-serif;
+    --md-nav-height:74px;
+  }
+  html, body.md-shell.md-standalone {
+    margin:0;
+    min-height:100%;
+    background:
+      linear-gradient(rgba(34,50,74,.55) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34,50,74,.55) 1px, transparent 1px),
+      radial-gradient(circle at 50% -8%, rgba(47,109,240,.20), transparent 60%),
+      var(--md-bg);
+    background-size:34px 34px, 34px 34px, 100% 100%, 100% 100%;
+    background-attachment:fixed;
+    color:var(--md-text);
+    font-family:var(--md-body);
+  }
+  body.md-standalone { padding-bottom:calc(var(--md-nav-height) + 26px); }
+  body.md-standalone .container.my-4 { max-width:760px; }
+  body.md-standalone a { color:var(--md-blue-bright); }
+
+  body.md-standalone h1, body.md-standalone h2,
+  body.md-standalone h3, body.md-standalone h4 {
+    font-family:var(--md-display);
+    color:var(--md-text);
+    font-weight:900;
+    letter-spacing:.01em;
+  }
+  body.md-standalone h4 {
+    border-left:4px solid var(--md-blue-bright);
+    padding-left:.7rem;
+    margin-top:.25rem;
+    text-transform:uppercase;
+    font-size:1rem;
+  }
+  body.md-standalone h1 {
+    border-left:4px solid var(--md-blue-bright);
+    padding-left:.8rem;
+  }
+  body.md-standalone .text-muted { color:var(--md-muted) !important; }
+  body.md-standalone hr { border-color:var(--md-line); opacity:.8; }
+
+  /* Glass form panel */
+  body.md-standalone .md-glass {
+    background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(12,21,33,.96));
+    border:1px solid var(--md-line);
+    border-radius:18px;
+    box-shadow:0 18px 40px rgba(0,0,0,.4), inset 0 1px 0 rgba(91,157,255,.06);
+    color:var(--md-text);
+  }
+  body.md-standalone .md-glow {
+    border-color:rgba(47,109,240,.45);
+    box-shadow:0 0 0 1px rgba(47,109,240,.25), 0 18px 44px rgba(8,15,30,.55), inset 0 1px 0 rgba(91,157,255,.12);
+  }
+
+  /* Labels: explicit .form-label and bare WTForms labels both go gold */
+  body.md-standalone .form-label,
+  body.md-standalone .col-form-label,
+  body.md-standalone .md-glass > .row > [class^="col-"] > label:first-child,
+  body.md-standalone .md-glass > .mb-3 > label:first-child {
+    color:var(--md-amber);
+    font-family:var(--md-display);
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    font-size:.72rem;
+    display:inline-block;
+    margin-bottom:.25rem;
+  }
+  body.md-standalone .form-text { color:var(--md-muted) !important; }
+  body.md-standalone .form-check-label { color:var(--md-text); }
+  body.md-standalone .form-check-label.text-success { color:var(--md-green) !important; }
+  body.md-standalone .form-check-label.text-danger,
+  body.md-standalone .text-danger { color:var(--md-red) !important; }
+
+  /* Form controls */
+  body.md-standalone .form-control,
+  body.md-standalone .form-select {
+    background:rgba(6,10,18,.85);
+    border:1px solid var(--md-line);
+    color:var(--md-text);
+    border-radius:12px;
+    min-height:44px;
+  }
+  body.md-standalone textarea.form-control { min-height:auto; }
+  body.md-standalone .form-control:focus,
+  body.md-standalone .form-select:focus {
+    border-color:var(--md-blue-bright);
+    box-shadow:0 0 0 .2rem rgba(47,109,240,.3);
+    background:rgba(6,10,18,.95);
+    color:var(--md-text);
+  }
+  body.md-standalone .form-control::placeholder { color:rgba(138,153,179,.7); }
+  body.md-standalone .form-select option { background:var(--md-panel); color:var(--md-text); }
+  body.md-standalone .form-check-input {
+    background-color:rgba(6,10,18,.85);
+    border:1px solid var(--md-line);
+  }
+  body.md-standalone .form-check-input:checked {
+    background-color:var(--md-blue);
+    border-color:var(--md-blue-bright);
+  }
+  body.md-standalone input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(1) opacity(.7); }
+
+  /* Buttons */
+  body.md-standalone .btn {
+    border-radius:12px;
+    font-family:var(--md-display);
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+    font-size:.82rem;
+  }
+  body.md-standalone .btn-primary {
+    background:var(--md-blue);
+    border-color:var(--md-blue-bright);
+    color:#fff;
+    box-shadow:0 8px 20px rgba(47,109,240,.35);
+  }
+  body.md-standalone .btn-primary:hover {
+    background:var(--md-blue-bright);
+    border-color:var(--md-blue-bright);
+    color:#06101f;
+  }
+
+  /* MoveDefense header for standalone pages */
+  .md-standalone-topbar {
+    position:sticky;
+    top:0;
+    z-index:20;
+    background:rgba(8,13,22,.94);
+    backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--md-line);
+    padding:14px 18px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .md-standalone-brand {
+    display:inline-flex;
+    align-items:center;
+    gap:.55rem;
+    font-family:var(--md-display);
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    color:var(--md-text);
+    text-decoration:none;
+    font-size:1.05rem;
+  }
+  .md-standalone-brand::before {
+    content:"";
+    display:inline-block;
+    width:.55rem;
+    height:1.5rem;
+    background:linear-gradient(180deg, var(--md-blue-bright), var(--md-blue));
+    border-radius:2px;
+    box-shadow:0 0 12px rgba(91,157,255,.6);
+  }
+  .md-standalone-topbar .md-logout {
+    min-height:34px;
+    display:inline-flex;
+    align-items:center;
+    padding:0 12px;
+    border-radius:10px;
+    border:1px solid var(--md-line);
+    background:rgba(47,109,240,.12);
+    color:var(--md-blue-bright);
+    font-family:var(--md-display);
+    font-size:.7rem;
+    font-weight:800;
+    text-transform:uppercase;
+    text-decoration:none;
+  }
+
+  /* Bottom nav (shared look) */
+  body.md-standalone .md-driver-bottom-nav {
+    position:fixed;
+    left:50%;
+    bottom:0;
+    transform:translateX(-50%);
+    width:min(760px, 100vw);
+    height:var(--md-nav-height);
+    background:rgba(8,13,22,.96);
+    backdrop-filter:blur(16px);
+    border-top:1px solid var(--md-line);
+    display:grid;
+    grid-template-columns:repeat(5, 1fr);
+    gap:4px;
+    padding:8px 12px max(10px, env(safe-area-inset-bottom));
+    z-index:1040;
+  }
+  body.md-standalone .md-driver-bottom-nav .md-nav-link {
+    display:grid;
+    place-items:center;
+    gap:4px;
+    color:var(--md-muted);
+    font-family:var(--md-display);
+    font-size:.62rem;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    text-decoration:none;
+  }
+  body.md-standalone .md-driver-bottom-nav .md-nav-link strong {
+    width:30px;
+    height:30px;
+    border-radius:999px;
+    display:grid;
+    place-items:center;
+    font-size:.72rem;
+    background:rgba(255,255,255,.06);
+    border:1px solid var(--md-line);
+    color:inherit;
+  }
+  body.md-standalone .md-driver-bottom-nav .md-nav-link.active { color:var(--md-blue-bright); }
+  body.md-standalone .md-driver-bottom-nav .md-nav-link.active strong {
+    background:rgba(47,109,240,.2);
+    border-color:rgba(91,157,255,.5);
+    box-shadow:0 0 14px rgba(47,109,240,.4);
+  }
+</style>
