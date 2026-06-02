@@ -2344,7 +2344,7 @@
 	      width: 100%;
 	      min-height: 0;
 	      display: grid;
-	      grid-template-columns: 60px minmax(0, 1fr) auto;
+	      grid-template-columns: minmax(0, 1fr) auto;
 	      align-items: center;
 	      gap: 10px;
 	      padding: 12px 12px;
@@ -2509,6 +2509,7 @@
 	      border-radius: 7px;
 	    }
     .flow-status.status-review { color: var(--md-blue-bright); background: rgba(91,157,255,.14); border: 1px solid rgba(91,157,255,.36); }
+    .route-detail-grid div { border: 0 !important; background: transparent !important; border-radius: 0 !important; padding: 4px 0 !important; }
 
     .md-flow-row.tone-blocked .flow-code::before,
     .md-flow-row.tone-needs_review .flow-code::before { content: "▲\00a0"; color: var(--md-red); font-size: .72em; font-weight: 900; }

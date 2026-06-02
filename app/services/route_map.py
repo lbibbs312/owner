@@ -503,11 +503,22 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             review_requested=log.id in review_requested_ids,
             evidence=stop_evidence,
         )
+        if not departed:
+            ok_label, ok_pill, ok_row = "OPEN", "open", "active"
+        elif is_service_stop(log):
+            ok_label, ok_pill, ok_row = ("FUELED", "recorded", "completed") if getattr(log, "fuel", False) else ("DONE", "recorded", "completed")
+        elif dropped_loads:
+            ok_label, ok_pill, ok_row = "DROPPED", "delivery", "completed"
+        elif added_loads:
+            ok_label, ok_pill, ok_row = "LOADED", "open", "active"
+        elif not is_empty_load(arrived_with) and _board_cargo_label(arrived_with) == _board_cargo_label(departed_with):
+            ok_label, ok_pill, ok_row = "CARRIED", "recorded", "completed"
+        elif is_empty_load(arrived_with) and is_empty_load(departed_with):
+            ok_label, ok_pill, ok_row = "EMPTY", "empty", "empty"
+        else:
+            ok_label, ok_pill, ok_row = "RECORDED", "recorded", "completed"
         stop_badge = board_badge(
-            stop_issues,
-            ok_label="DELIVERED" if departed else "OPEN",
-            ok_pill_tone="delivery" if departed else "open",
-            ok_row_tone="completed" if departed else "active",
+            stop_issues, ok_label=ok_label, ok_pill_tone=ok_pill, ok_row_tone=ok_row,
         )
         stops.append({
             "stop_id": log.id,

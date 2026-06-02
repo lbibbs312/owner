@@ -445,3 +445,18 @@ def test_manager_review_request_shows_in_review_state(client, app):
     body = client.get("/mobile").get_data(as_text=True)
     assert ">REVIEW<" in body
     assert "IN REVIEW" in body
+
+
+def test_completed_stop_states_reflect_cargo_action(client, app):
+    with app.app_context():
+        driver = _user("driver_states", "driver")
+        _driver_log(driver, plant_name="PC", arrive_time="2026-05-28 08:00:00",
+                    depart_time="08:15", load_size="Empty", depart_load_size="Raleigh East Load")
+        _driver_log(driver, plant_name="RE", arrive_time="2026-05-28 09:00:00",
+                    depart_time="09:20", load_size="Raleigh East Load", depart_load_size="Empty")
+    _login(client, "driver_states")
+    body = client.get("/mobile").get_data(as_text=True)
+    assert "LOADED" in body          # Empty -> Load = picked up
+    assert "DROPPED" in body         # Load -> Empty = dropped at destination
+    assert ">DELIVERED<" not in body  # no generic catch-all label
+    assert 'class="flow-code"' not in body  # STP- code column removed
