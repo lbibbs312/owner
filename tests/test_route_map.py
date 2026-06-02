@@ -299,7 +299,7 @@ def test_driver_dashboard_keeps_assigned_queue_off_main_route_display(client, ap
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "Today&#39;s Route" in body or "Today's Route" in body
+    assert "LIVE FLOW BOARD" in body
     assert "No route stops logged for this date." in body
     assert "Assigned Move Queue" not in body
     assert "MR-REAL-1" not in body
@@ -370,7 +370,7 @@ def test_driver_dashboard_renders_with_no_assigned_requests(client, app):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "Today&#39;s Route" in body or "Today's Route" in body
+    assert "LIVE FLOW BOARD" in body
     assert "No route stops logged for this date." in body
     assert "Assigned Move Queue" not in body
     assert "Live Flow Map" not in body
@@ -391,7 +391,7 @@ def test_mobile_production_flow_view_is_not_driver_scoped(client, app):
     assert 'data-production-flow-mode="mobile"' not in body
     assert "Production Flow" not in body
     assert "MR-BROAD-1" not in body
-    assert "Today&#39;s Route" in body or "Today's Route" in body
+    assert "LIVE FLOW BOARD" in body
 
 
 def test_manager_dashboard_uses_issue_terminology(client, app):
