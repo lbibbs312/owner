@@ -1,9 +1,76 @@
 {#
-  MoveDefense driver bottom nav. Render only for drivers (not management).
-  Requires the _md_shell styles to be included on the page.
+  MoveDefense driver bottom nav. This is the single source of truth for the
+  authenticated driver mobile shell; page templates may set md_nav_active, and
+  this partial infers it from request.endpoint when they do not.
 #}
 {% if current_user.is_authenticated and current_user.role != 'management' %}
-{% set md_nav_active = md_nav_active|default('') %}
+{% set md_nav_active = md_nav_active|default('', true) %}
+{% set endpoint = request.endpoint|default('', true) %}
+{% if not md_nav_active %}
+  {% if 'plant_transfer' in endpoint %}
+    {% set md_nav_active = 'transfers' %}
+  {% elif 'damage_report' in endpoint or endpoint == 'driver.damage_reports' %}
+    {% set md_nav_active = 'damage' %}
+  {% elif 'pretrip' in endpoint or 'posttrip' in endpoint or 'truck_maintenance' in endpoint %}
+    {% set md_nav_active = 'pretrip' %}
+  {% elif 'driver_log' in endpoint or endpoint in ['driver.driver_logs', 'driver.new_driving_log', 'driver.add_stop', 'driver.mobile_history', 'driver.mobile_day_report', 'driver.end_of_day_summary'] %}
+    {% set md_nav_active = 'logs' %}
+  {% elif endpoint in ['driver.mobile_dashboard', 'driver.profile'] %}
+    {% set md_nav_active = 'home' %}
+  {% endif %}
+{% endif %}
+<style>
+  .md-driver-bottom-nav {
+    position:fixed;
+    left:50%;
+    bottom:0;
+    transform:translateX(-50%);
+    width:min(760px, 100vw);
+    height:var(--md-nav-height, 74px);
+    background:rgba(8,13,22,.96);
+    backdrop-filter:blur(16px);
+    border-top:1px solid var(--md-line, #22324a);
+    display:grid;
+    grid-template-columns:repeat(5, 1fr);
+    gap:4px;
+    padding:8px 12px max(10px, env(safe-area-inset-bottom));
+    z-index:1040;
+  }
+  .md-driver-bottom-nav .md-nav-link {
+    display:grid;
+    place-items:center;
+    gap:4px;
+    color:var(--md-muted, #8a99b3);
+    font-family:var(--md-display, 'Archivo', system-ui, sans-serif);
+    font-size:.62rem;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    text-decoration:none;
+  }
+  .md-driver-bottom-nav .md-nav-link strong {
+    width:30px;
+    height:30px;
+    border-radius:999px;
+    display:grid;
+    place-items:center;
+    font-size:.72rem;
+    background:rgba(255,255,255,.06);
+    border:1px solid var(--md-line, #22324a);
+    color:inherit;
+  }
+  .md-driver-bottom-nav .md-nav-link.active {
+    color:var(--md-blue-bright, #5b9dff);
+  }
+  .md-driver-bottom-nav .md-nav-link.active strong {
+    background:rgba(47,109,240,.2);
+    border-color:rgba(91,157,255,.5);
+    box-shadow:0 0 14px rgba(47,109,240,.4), 0 0 22px rgba(255,178,36,.12);
+  }
+  @media print {
+    .md-driver-bottom-nav { display:none !important; }
+  }
+</style>
 <nav class="md-driver-bottom-nav" aria-label="Driver mobile navigation">
   <a class="md-nav-link {% if md_nav_active == 'home' %}active{% endif %}" href="{{ url_for('driver.mobile_dashboard') }}"><strong>HM</strong><span>Home</span></a>
   <a class="md-nav-link {% if md_nav_active == 'transfers' %}active{% endif %}" href="{{ url_for('driver.plant_transfers') }}"><strong>PT</strong><span>Transfer</span></a>

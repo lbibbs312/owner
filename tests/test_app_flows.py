@@ -5189,6 +5189,54 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
 
 
 
+def test_driver_mobile_pages_share_single_five_tab_bottom_nav(client, app):
+    with app.app_context():
+        create_user(
+            "nav_driver",
+            "nav-driver@example.com",
+            "driver",
+            first_name="Nav",
+            last_name="Driver",
+        )
+
+    login(client, "nav_driver")
+
+    expected_items = [
+        "<strong>HM</strong><span>Home</span>",
+        "<strong>PT</strong><span>Transfer</span>",
+        "<strong>DL</strong><span>Logs</span>",
+        "<strong>DR</strong><span>Damage</span>",
+        "<strong>PI</strong><span>PreTrip</span>",
+    ]
+    pages = [
+        ("/mobile", "Home"),
+        ("/plant_transfers", "Transfer"),
+        ("/driver_logs", "Logs"),
+        ("/damage_reports", "Damage"),
+        ("/new_pretrip", "PreTrip"),
+        ("/profile", "Home"),
+    ]
+
+    for path, active_label in pages:
+        response = client.get(path)
+        assert response.status_code == 200
+        body = response.data.decode()
+        assert body.count('<nav class="md-driver-bottom-nav"') == 1
+        nav_start = body.index('<nav class="md-driver-bottom-nav"')
+        nav_end = body.index("</nav>", nav_start)
+        nav = body[nav_start:nav_end]
+        positions = [nav.index(item) for item in expected_items]
+        assert positions == sorted(positions)
+        assert nav.count('class="md-nav-link active"') == 1
+        active_start = nav.index('class="md-nav-link active"')
+        active_end = nav.index("</a>", active_start)
+        assert f"<span>{active_label}</span>" in nav[active_start:active_end]
+        assert "<span>Driver</span>" not in nav
+        assert '<nav class="bottom-nav"' not in body
+        assert ".bottom-nav" not in body
+        assert "side-nav" not in body
+
+
 def test_completed_posttrip_route_shows_ended_across_driver_and_manager_surfaces(client, app):
     from datetime import date, datetime
 

@@ -51,11 +51,12 @@
     letter-spacing:.01em;
   }
   body.md-standalone h4 {
-    border-left:4px solid var(--md-blue-bright);
-    padding-left:.7rem;
     margin-top:.25rem;
+    color:var(--md-amber);
+    font-family:var(--md-mono);
     text-transform:uppercase;
-    font-size:1rem;
+    letter-spacing:.12em;
+    font-size:.82rem;
   }
   body.md-standalone h1 {
     border-left:4px solid var(--md-blue-bright);
@@ -182,10 +183,17 @@
     border-radius:2px;
     box-shadow:0 0 12px rgba(91,157,255,.6);
   }
+  .md-standalone-actions {
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .md-standalone-topbar .md-icon-button,
   .md-standalone-topbar .md-logout {
     min-height:34px;
     display:inline-flex;
     align-items:center;
+    justify-content:center;
     padding:0 12px;
     border-radius:10px;
     border:1px solid var(--md-line);
@@ -197,51 +205,19 @@
     text-transform:uppercase;
     text-decoration:none;
   }
+  .md-standalone-topbar .md-icon-button {
+    width:38px;
+    padding:0;
+    position:relative;
+  }
+  .md-standalone-topbar .md-icon-button svg {
+    width:19px;
+    height:19px;
+    stroke:currentColor;
+  }
+  .md-standalone-topbar .activityBellBadge {
+    background:var(--md-red) !important;
+    font-family:var(--md-mono);
+  }
 
-  /* Bottom nav (shared look) */
-  body.md-standalone .md-driver-bottom-nav {
-    position:fixed;
-    left:50%;
-    bottom:0;
-    transform:translateX(-50%);
-    width:min(760px, 100vw);
-    height:var(--md-nav-height);
-    background:rgba(8,13,22,.96);
-    backdrop-filter:blur(16px);
-    border-top:1px solid var(--md-line);
-    display:grid;
-    grid-template-columns:repeat(5, 1fr);
-    gap:4px;
-    padding:8px 12px max(10px, env(safe-area-inset-bottom));
-    z-index:1040;
-  }
-  body.md-standalone .md-driver-bottom-nav .md-nav-link {
-    display:grid;
-    place-items:center;
-    gap:4px;
-    color:var(--md-muted);
-    font-family:var(--md-display);
-    font-size:.62rem;
-    font-weight:800;
-    text-transform:uppercase;
-    letter-spacing:.05em;
-    text-decoration:none;
-  }
-  body.md-standalone .md-driver-bottom-nav .md-nav-link strong {
-    width:30px;
-    height:30px;
-    border-radius:999px;
-    display:grid;
-    place-items:center;
-    font-size:.72rem;
-    background:rgba(255,255,255,.06);
-    border:1px solid var(--md-line);
-    color:inherit;
-  }
-  body.md-standalone .md-driver-bottom-nav .md-nav-link.active { color:var(--md-blue-bright); }
-  body.md-standalone .md-driver-bottom-nav .md-nav-link.active strong {
-    background:rgba(47,109,240,.2);
-    border-color:rgba(91,157,255,.5);
-    box-shadow:0 0 14px rgba(47,109,240,.4);
-  }
 </style>

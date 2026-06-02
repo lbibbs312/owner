@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
+{% if current_user.role != 'management' %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+{% endif %}
 <div class="container fade-in" style="overflow-x: auto;">
   <h2 class="mt-4 mb-3">Profile</h2>
 
@@ -59,4 +63,6 @@
     {{ profile_form.submit(class="btn btn-primary hover-btn") }}
   </form>
 </div>
+{% set md_nav_active = 'home' %}
+{% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}
