@@ -416,13 +416,18 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
     linked_by_log = {req.linked_driver_log_id: req for req in move_requests if req.linked_driver_log_id}
     log_ids = [row["log"].id for row in getattr(route_context, "rows", []) if row.get("log")]
     damaged_log_ids = _damage_log_ids(log_ids)
-    review_requested_ids = (
-        {e.stop_id for e in ExceptionEvent.query.filter(
+    if log_ids:
+        _review_req = {e.stop_id for e in ExceptionEvent.query.filter(
             ExceptionEvent.event_type == "manager_review_requested",
             ExceptionEvent.stop_id.in_(log_ids),
         ).all()}
-        if log_ids else set()
-    )
+        _review_done = {e.stop_id for e in ExceptionEvent.query.filter(
+            ExceptionEvent.event_type == "manager_review_resolved",
+            ExceptionEvent.stop_id.in_(log_ids),
+        ).all()}
+        review_requested_ids = _review_req - _review_done
+    else:
+        review_requested_ids = set()
     issue_stop_ids = set()
     for item in (getattr(route_context, "true_exceptions", None) or []) + (getattr(route_context, "review_items", None) or []):
         if item.get("stop_id"):
