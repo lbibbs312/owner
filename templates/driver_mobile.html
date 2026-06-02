@@ -2344,7 +2344,7 @@
 	      width: 100%;
 	      min-height: 0;
 	      display: grid;
-	      grid-template-columns: 72px minmax(0, 1fr) max-content;
+	      grid-template-columns: 60px minmax(0, 1fr) auto;
 	      align-items: center;
 	      gap: 10px;
 	      padding: 12px 12px;
@@ -2508,6 +2508,9 @@
 	      border: 1px solid rgba(255,178,36,.4);
 	      border-radius: 7px;
 	    }
+    .md-flow-row.tone-blocked .flow-code::before,
+    .md-flow-row.tone-needs_review .flow-code::before { content: "▲\00a0"; color: var(--md-red); font-size: .72em; font-weight: 900; }
+
 		    .md-flow-ticker {
 		      display: flex;
 		      gap: 34px;

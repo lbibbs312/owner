@@ -171,10 +171,7 @@ def _board_stop_detail(log, label, arrived_with, departed_with, wait_label="", r
     if closed and no_pickup and arrived == "Empty" and departed == "Empty":
         return f"{label} · empty return"
 
-    detail = f"{label} · {arrived} → {departed}"
-    if wait_label and wait_label != NOT_TRACKED:
-        detail = f"{detail} · {wait_label}"
-    return detail
+    return f"{label} · {arrived} → {departed}"
 
 
 def _date_label(value):
