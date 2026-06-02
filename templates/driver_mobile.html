@@ -2374,54 +2374,66 @@
 	      align-items: center;
 	      min-height: 0;
 	      padding: 4px 10px;
-      border-radius: 999px;
-      font-family: var(--md-mono);
-      font-size: .68rem;
+	      border-radius: 8px;
+	      font-family: var(--md-mono);
+	      font-size: .68rem;
 	      font-weight: 700;
 	      letter-spacing: .08em;
 	      text-transform: uppercase;
 	      white-space: nowrap;
+	      box-shadow: inset 0 0 14px rgba(255,255,255,.025);
 	    }
-    .flow-status.status-active,
-    .flow-status.status-pickup,
-    .flow-status.status-open {
-      color: var(--md-blue-bright);
-      background: rgba(91,157,255,.12);
-      border: 1px solid rgba(91,157,255,.3);
-    }
-	    .flow-status.status-delivery,
-	    .flow-status.status-completed,
-	    .flow-status.status-ready,
-	    .flow-status.status-recorded,
-	    .flow-status.status-progress,
-	    .flow-status.status-no_action {
-	      color: var(--md-green);
-	      background: rgba(43,213,118,.12);
-	      border: 1px solid rgba(43,213,118,.3);
-    }
-    .flow-status.status-empty,
-    .flow-status.status-hot {
-      color: var(--md-amber);
-      background: rgba(255,178,36,.12);
-      border: 1px solid rgba(255,178,36,.3);
-    }
-    .flow-status.status-hold,
-    .flow-status.status-blocked,
-    .flow-status.status-needs_review {
-      color: var(--md-red);
-      background: rgba(255,82,71,.12);
-      border: 1px solid rgba(255,82,71,.32);
-    }
-    .flow-status.status-risk {
-      color: var(--md-red);
-      background: rgba(255,82,71,.14);
-      border: 1px solid rgba(255,82,71,.42);
-    }
-    .flow-status.status-attention {
-      color: var(--md-amber);
-      background: rgba(255,178,36,.14);
-      border: 1px solid rgba(255,178,36,.4);
-    }
+	    .flow-status.status-active,
+	    .flow-status.status-pickup,
+	    .flow-status.status-open {
+	      color: var(--md-blue-bright);
+	      background: rgba(91,157,255,.12);
+	      border: 1px solid rgba(91,157,255,.3);
+	      border-left: 3px solid rgba(91,157,255,.78);
+	      border-radius: 6px 12px 12px 6px;
+	    }
+		    .flow-status.status-delivery,
+		    .flow-status.status-completed,
+		    .flow-status.status-ready,
+		    .flow-status.status-recorded,
+		    .flow-status.status-progress,
+		    .flow-status.status-no_action {
+		      color: var(--md-green);
+		      background: rgba(43,213,118,.12);
+		      border: 1px solid rgba(43,213,118,.3);
+		      border-radius: 999px;
+	    }
+	    .flow-status.status-empty,
+	    .flow-status.status-hot {
+	      color: var(--md-amber);
+	      background: rgba(255,178,36,.12);
+	      border: 1px solid rgba(255,178,36,.3);
+	      border-radius: 4px;
+	      clip-path: polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+	    }
+	    .flow-status.status-hold,
+	    .flow-status.status-blocked,
+	    .flow-status.status-needs_review {
+	      color: var(--md-red);
+	      background: rgba(255,82,71,.12);
+	      border: 1px solid rgba(255,82,71,.32);
+	      border-radius: 3px;
+	      clip-path: polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%);
+	    }
+	    .flow-status.status-risk {
+	      color: var(--md-red);
+	      background: rgba(255,82,71,.14);
+	      border: 1px solid rgba(255,82,71,.42);
+	      border-radius: 3px;
+	      clip-path: polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%);
+	    }
+	    .flow-status.status-attention {
+	      color: var(--md-amber);
+	      background: rgba(255,178,36,.14);
+	      border: 1px solid rgba(255,178,36,.4);
+	      border-radius: 4px;
+	      clip-path: polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+	    }
 	    .md-flow-ticker {
 	      display: flex;
 	      overflow: hidden;

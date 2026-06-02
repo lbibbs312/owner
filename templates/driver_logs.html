@@ -388,33 +388,54 @@
       align-items:center;
       min-height:30px;
       padding:4px 10px;
-      border-radius:999px;
+      border-radius:8px;
       font-family:var(--md-mono);
       font-size:.68rem;
       font-weight:900;
       letter-spacing:.08em;
       text-transform:uppercase;
       white-space:nowrap;
+      box-shadow:inset 0 0 14px rgba(255,255,255,.025);
     }
-    .md-row-status.closed,
-    .md-row-status.ready {
+    .md-row-status.delivered,
+    .md-row-status.ready,
+    .md-row-status.status-delivery,
+    .md-row-status.status-ready,
+    .md-row-status.status-recorded {
       color:var(--md-green);
       border:1px solid rgba(43,213,118,.32);
+      border-radius:999px;
       background:rgba(43,213,118,.12);
     }
-    .md-row-status.open {
+    .md-row-status.open,
+    .md-row-status.status-open,
+    .md-row-status.status-active,
+    .md-row-status.status-pickup {
       color:var(--md-blue);
       border:1px solid rgba(91,157,255,.34);
+      border-left:3px solid rgba(91,157,255,.76);
+      border-radius:6px 12px 12px 6px;
       background:rgba(91,157,255,.12);
     }
-    .md-row-status.warn {
+    .md-row-status.warn,
+    .md-row-status.status-attention,
+    .md-row-status.status-empty,
+    .md-row-status.status-hot {
       color:var(--md-amber);
       border:1px solid rgba(255,178,36,.38);
+      border-radius:4px;
+      clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
       background:rgba(255,178,36,.12);
     }
-    .md-row-status.risk {
+    .md-row-status.risk,
+    .md-row-status.status-risk,
+    .md-row-status.status-hold,
+    .md-row-status.status-blocked,
+    .md-row-status.status-needs_review {
       color:var(--md-red);
       border:1px solid rgba(255,82,71,.44);
+      border-radius:3px;
+      clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%);
       background:rgba(255,82,71,.13);
     }
     .md-row-panel {
@@ -823,9 +844,9 @@
             {% set flow_status_tone = 'open' %}
             {% set row_tone = 'active' %}
           {% else %}
-            {% set status_label = 'CLOSED' %}
-            {% set status_tone = 'closed' %}
-            {% set flow_status_tone = 'ready' %}
+            {% set status_label = 'DELIVERED' %}
+            {% set status_tone = 'delivered' %}
+            {% set flow_status_tone = 'delivery' %}
             {% set row_tone = 'completed' %}
           {% endif %}
           <details class="md-ledger-row md-flow-row tone-{{ row_tone }} {% if not log.depart_time %}is-open{% endif %} {% if route and route.warnings %}has-warning{% endif %} {% if log.maintenance %}has-risk{% endif %}" data-flow-row {% if not log.depart_time %}open{% endif %}>

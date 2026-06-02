@@ -442,8 +442,8 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
         )
         stop_badge = board_badge(
             stop_issues,
-            ok_label="CLOSED" if departed else "OPEN",
-            ok_pill_tone="completed" if departed else "open",
+            ok_label="DELIVERED" if departed else "OPEN",
+            ok_pill_tone="delivery" if departed else "open",
             ok_row_tone="completed" if departed else "active",
         )
         stops.append({

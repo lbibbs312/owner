@@ -955,7 +955,7 @@ def test_driver_mobile_shows_full_parts_queue_and_route_task_events(client, app)
     assert b"Hot Part: P-HOT-1" not in route_page.data
     assert b"Raleigh East Load" in route_page.data
     assert b"12 min" in route_page.data
-    assert b"CLOSED" in route_page.data
+    assert b"DELIVERED" in route_page.data
 
 
 def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
@@ -4418,7 +4418,8 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"md-ledger-row md-flow-row tone-completed" in logs_page.data
     assert b"md-row-code flow-code" in logs_page.data
     assert b"md-row-detail flow-detail" in logs_page.data
-    assert b"md-row-status flow-status closed status-ready" in logs_page.data
+    assert b"md-row-status flow-status delivered status-delivery" in logs_page.data
+    assert b"DELIVERED" in logs_page.data
     assert b"md-ledger-ticker md-flow-ticker" in logs_page.data
     assert b'content:"["' not in logs_page.data
     assert b"content:'['" not in logs_page.data
