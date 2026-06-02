@@ -370,7 +370,7 @@
       list-style:none;
       cursor:pointer;
       display:grid;
-      grid-template-columns:minmax(0,1fr) max-content;
+      grid-template-columns:minmax(0,1fr);
       gap:10px;
       align-items:center;
       min-height:68px;
@@ -470,6 +470,25 @@
       border:1px solid rgba(255,82,71,.44);
       border-radius:6px;
       background:rgba(255,82,71,.13);
+    }
+    .md-ledger-row .route-warnings {
+      display:grid;
+      gap:5px;
+    }
+    .md-ledger-row .route-warning {
+      display:block;
+      border:0;
+      border-radius:0;
+      background:transparent;
+      padding:0;
+      color:var(--md-amber);
+      font-family:var(--md-mono);
+      font-size:.72rem;
+      font-weight:850;
+      letter-spacing:.02em;
+    }
+    .md-ledger-row .route-warning-danger {
+      color:var(--md-red);
     }
     .md-row-panel {
       display:grid;
@@ -714,7 +733,7 @@
       .md-ledger-head-side { justify-items:start; }
       .md-ledger-filter { grid-template-columns:1fr; max-width:none; }
       .md-action-rail { grid-template-columns:repeat(2,minmax(0,1fr)); }
-      .md-ledger-summary { grid-template-columns:minmax(0,1fr) max-content; gap:8px; padding:11px 10px; }
+      .md-ledger-summary { grid-template-columns:minmax(0,1fr); gap:8px; padding:11px 10px; }
       .md-row-grid { grid-template-columns:1fr; }
       .md-ledger-btn, .md-row-action, .md-row-action-form button { font-size:.68rem; }
     }
@@ -865,23 +884,35 @@
           {% endif %}
           {% set ledger_title = stop_vm.ledger_title if stop_vm and stop_vm.ledger_title else ((route.plant if route else log.plant_name) ~ ' · Logged stop') %}
           {% set ledger_meta = stop_vm.ledger_meta if stop_vm and stop_vm.ledger_meta else (arrive_label ~ ' → ' ~ depart_label) %}
+          {% set ledger_meta_lower = (ledger_meta or '')|lower %}
+          {% set first_issue = stop_vm.issues[0] if stop_vm and stop_vm.issues else none %}
+          {% set route_line = '' %}
+          {% if stop_vm and stop_vm.board_flow %}
+            {% set flow = stop_vm.board_flow %}
+            {% if flow.pickup or flow.deliver %}
+              {% set route_line = (flow.pickup or (route.plant if route else log.plant_name)) ~ ' → ' ~ (flow.deliver or 'Next stop') %}
+            {% elif flow.plant %}
+              {% set route_line = flow.plant %}
+            {% endif %}
+          {% endif %}
+          {% if not route_line and route and route.next_stop %}
+            {% set route_line = (route.plant if route.plant else log.plant_name) ~ ' → ' ~ route.next_stop %}
+          {% elif not route_line and route %}
+            {% set route_line = route.plant if route.plant else log.plant_name %}
+          {% endif %}
           <details class="md-ledger-row md-flow-row tone-{{ row_tone }} {% if not log.depart_time %}is-open{% endif %} {% if route and route.warnings %}has-warning{% endif %} {% if log.maintenance or (has_stop_issue and stop_vm.badge.severity == 'risk') %}has-risk{% endif %}" data-flow-row {% if not log.depart_time %}open{% endif %}>
             <summary class="md-ledger-summary">
               <span class="md-row-detail flow-detail">
                 <strong>{{ ledger_title }}</strong>
-                <small>{{ ledger_meta }}{% if wait_label %} · Wait {{ wait_label }}{% endif %}</small>
+                <small>{{ ledger_meta }}{% if wait_label and 'wait' not in ledger_meta_lower %} · Wait {{ wait_label }}{% endif %}</small>
               </span>
-              {% if has_stop_issue %}
-                <span class="md-row-status flow-status {{ status_tone }} status-{{ flow_status_tone }}">{{ status_label }}</span>
-              {% else %}
-                <span class="md-row-state">{{ status_label }}</span>
-              {% endif %}
             </summary>
 
             <div class="md-row-panel">
               <div class="md-row-grid">
                 <div class="md-row-fact"><span>Driver</span><strong>{{ log.driver.display_name }}{% if log.driver.employee_id %} · ID {{ log.driver.employee_id }}{% endif %}{% if log.driver.department %} · {{ log.driver.department }}{% endif %}</strong></div>
-                <div class="md-row-fact"><span>Move</span><strong>{% if stop_vm and stop_vm.issues %}{{ stop_vm.issues[0].label }} · {{ stop_vm.issues[0].reason }}{% elif stop_vm and stop_vm.movement_summary %}{{ stop_vm.movement_summary }}{% elif route %}{{ route.action }} · {{ route.state }}{% else %}Logged stop{% endif %}{% if route and route.next_stop %} · Next {{ route.next_stop }}{% endif %}</strong></div>
+                <div class="md-row-fact"><span>Route</span><strong>{{ route_line or 'Route not confirmed' }}</strong></div>
+                <div class="md-row-fact"><span>Move</span><strong>{% if first_issue and first_issue.code != 'needs_departure' %}{{ first_issue.label }} · {{ first_issue.reason }}{% elif not log.depart_time %}Open stop · record departure/load before the next stop{% elif stop_vm and stop_vm.movement_summary %}{{ stop_vm.movement_summary }}{% elif route %}{{ route.action }} · {{ route.state }}{% else %}Logged stop{% endif %}{% if route and route.next_stop %} · Next {{ route.next_stop }}{% endif %}</strong></div>
                 <div class="md-row-fact"><span>Arrive</span><strong>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</strong></div>
                 <div class="md-row-fact"><span>Depart</span><strong>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</strong></div>
                 <div class="md-row-fact"><span>In</span><strong>{{ arrive_label }}</strong></div>
@@ -903,7 +934,9 @@
               {% if stop_vm and stop_vm.issues %}
                 <div class="route-warnings">
                   {% for issue in stop_vm.issues %}
-                    <span class="route-warning {% if issue.severity == 'risk' %}route-warning-danger{% endif %}">{{ issue.label }}: {{ issue.action }}</span>
+                    {% if issue.code != 'needs_departure' %}
+                      <span class="route-warning {% if issue.severity == 'risk' %}route-warning-danger{% endif %}">{{ issue.label }}: {{ issue.action }}</span>
+                    {% endif %}
                   {% endfor %}
                 </div>
               {% endif %}
@@ -911,7 +944,7 @@
               <div class="md-ledger-notes">
                 {% if log.no_pickup %}<span><strong>No pickup:</strong> driver departed without cargo pickup.</span>{% endif %}
                 {% if log.hot_parts %}<span><strong>Hot part:</strong> {{ log.part_number or 'part number not recorded' }}</span>{% elif log.part_number %}<span><strong>Part:</strong> {{ log.part_number }}</span>{% endif %}
-                <span><strong>Truck:</strong> {{ 'Issue recorded' if log.maintenance else 'OK' }}{% if log.maintenance and log.fuel_mileage %} · {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>
+                {% if log.maintenance %}<span><strong>Truck issue:</strong> {{ log.downtime_reason or 'Issue recorded' }}{% if log.fuel_mileage %} · {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>{% endif %}
                 {% if log.fuel %}<span><strong>Fuel:</strong>{% if log.fuel_mileage %} {{ "{:,}".format(log.fuel_mileage) }} mi{% else %} recorded{% endif %}</span>{% endif %}
                 {% if wait_label %}<span><strong>Wait:</strong> {{ wait_label }}</span>{% endif %}
                 {% if log.meeting %}<span><strong>Meeting:</strong> recorded service stop.</span>{% endif %}

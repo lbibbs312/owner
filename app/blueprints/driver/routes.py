@@ -585,6 +585,12 @@ def _route_cta_urls(route_date, current_stop=None):
     return urls
 
 
+def _posttrip_due_for_route(active_pretrip, route_context):
+    if not active_pretrip or active_pretrip.posttrip:
+        return False
+    return getattr(route_context, "route_status", None) != "active"
+
+
 def _soft_delete_record(record):
     record.deleted_at = datetime.utcnow()
     record.deleted_by_id = current_user.id
@@ -4278,7 +4284,7 @@ def _mobile_route_map_fragment_context(route_date=None):
     open_shift_route_date = _shift_route_date(open_shift)
     route_is_active = bool((open_shift and (not open_shift_route_date or open_shift_route_date == route_date)) or (route_pretrip and not route_pretrip.posttrip))
     active_pretrip = todays_pretrip or (route_pretrip if route_is_active else None)
-    pending_posttrip = bool(active_pretrip and not active_pretrip.posttrip)
+    pending_posttrip = False
     latest_transfer = (
         _active_plant_transfers_query().filter_by(user_id=current_user.id)
         .order_by(PlantTransfer.created_at.desc())
@@ -4300,6 +4306,7 @@ def _mobile_route_map_fragment_context(route_date=None):
     )
     route_context = build_route_context(driver_id=current_user.id, route_date=route_date, now=now_local)
     current_stop = route_context.current_stop
+    pending_posttrip = _posttrip_due_for_route(active_pretrip, route_context)
     departed_today = any(getattr(log, "depart_time", None) for log in todays_logs)
     has_transfer_today = bool(
         _active_plant_transfers_query()
@@ -4380,6 +4387,7 @@ def _mobile_route_map_fragment_context(route_date=None):
         "truck_maintenance_history": truck_maintenance_history,
         "truck_issue_choices": TRUCK_ISSUE_CHOICES,
         "recent_ryder_events": recent_ryder_events,
+        "depart_form": DepartForm(),
         **ryder_context,
     }
 
@@ -4425,7 +4433,7 @@ def mobile_dashboard():
     open_shift_route_date = _shift_route_date(open_shift)
     route_is_active = bool((open_shift and (not open_shift_route_date or open_shift_route_date == route_date)) or (route_pretrip and not route_pretrip.posttrip))
     active_pretrip = todays_pretrip or (route_pretrip if route_is_active else None)
-    pending_posttrip = bool(active_pretrip and not active_pretrip.posttrip)
+    pending_posttrip = False
     latest_transfer = (
         _active_plant_transfers_query().filter_by(user_id=current_user.id)
         .order_by(PlantTransfer.created_at.desc())
@@ -4508,6 +4516,7 @@ def mobile_dashboard():
     )
     production_flow = None
     proof_missing = bool(departed_today and not has_transfer_today)
+    pending_posttrip = _posttrip_due_for_route(active_pretrip, route_context)
     route_map = build_driver_route_map_context(
         driver=current_user,
         date=route_date,
@@ -4580,6 +4589,7 @@ def mobile_dashboard():
         current_truck_number=current_truck_number,
         truck_maintenance_history=truck_maintenance_history,
         truck_issue_choices=TRUCK_ISSUE_CHOICES,
+        depart_form=DepartForm(),
         **ryder_context,
     )
 

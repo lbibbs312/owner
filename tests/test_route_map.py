@@ -680,7 +680,19 @@ def test_transfer_sheet_and_pretrip_add_driver_board_statuses(app):
 
     assert by_code["XFER"]["board_badge"]["label"] == "SHEET ATTACHED"
     assert "10 LP" in by_code["XFER"]["text"]
-    assert by_code["TRUCK"]["board_badge"]["label"] == "INSPECTED"
+    assert "TRUCK" not in by_code
+
+    pretrip.damage_report = "CEL light"
+    db.session.commit()
+
+    ctx = build_driver_route_map_context(
+        driver=driver,
+        date=date.today(),
+        route_pretrip=pretrip,
+    )
+    by_code = {item["code"]: item for item in ctx["ops_board_items"]}
+
+    assert by_code["TRUCK"]["board_badge"]["label"] == "DEFECT"
 
 
 def test_route_map_drawer_partials_render(app):

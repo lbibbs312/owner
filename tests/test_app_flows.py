@@ -4424,9 +4424,9 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"md-ledger-row md-flow-row tone-completed" in logs_page.data
     assert b"md-row-code flow-code" not in logs_page.data
     assert b"md-row-detail flow-detail" in logs_page.data
-    assert b"md-row-state" in logs_page.data
+    assert b'<span class="md-row-state">' not in logs_page.data
     assert b"md-row-status flow-status empty status-empty" not in logs_page.data
-    assert b"ROUTE START" in logs_page.data
+    assert b"<span>Route</span>" in logs_page.data
     assert b"md-ledger-ticker md-flow-ticker" in logs_page.data
     assert b'content:"["' not in logs_page.data
     assert b"content:'['" not in logs_page.data
@@ -5093,8 +5093,7 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"RW to KP hot move" in page.data
     assert page.data.count(b"RW to KP hot move") == 1
     assert b"Part P0903110 needs trailer assignment." in page.data
-    assert b"PostTrip Due" in page.data
-    assert page.data.count(b"PostTrip Due") == 1
+    assert b"PostTrip Due" not in page.data
     assert b"Logout" in page.data
     assert b"Parts Queue" not in page.data
     assert b"RW to KP" in page.data
@@ -5563,7 +5562,7 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "Active Route" not in body
     assert b"1 stop" in page.data
     assert b"Kraft" in page.data
-    assert b"PostTrip Due" in page.data
+    assert b"PostTrip Due" not in page.data
     assert "Production Flow" not in body
     assert 'data-flow-open-panel="depart"' in body
     assert "data-depart-wizard" in body
@@ -5605,7 +5604,41 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "&diams;" not in body
     assert ".md-flow-work-card::before" in body
     assert ".flow-status::after" in body
-    assert page.data.count(b"PostTrip Due") == 1
+    assert page.data.count(b"PostTrip Due") == 0
+
+
+def test_mobile_dashboard_shows_posttrip_due_after_route_close_not_as_board_row(client, app):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip
+
+        driver = create_user("posttrip_due_driver", "posttrip-due@example.com", "driver")
+        db.session.add(PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=379000))
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="RE",
+                load_size="Empty",
+                depart_load_size="Empty",
+                no_pickup=True,
+                arrive_time=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                depart_time="08:20",
+            )
+        )
+        db.session.commit()
+
+    login(client, "posttrip_due_driver")
+    page = client.get("/mobile")
+    body = page.get_data(as_text=True)
+
+    assert page.status_code == 200
+    assert b"PostTrip Due" in page.data
+    assert "POSTTRIP NEEDED" not in body
+    assert "<strong>TRUCK</strong>" not in body
 
 
 def test_mobile_route_map_fragment_refresh_uses_route_state(client, app):

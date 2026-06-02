@@ -303,18 +303,10 @@ def _truck_board_item(route_pretrip, *, pending_posttrip=False):
     if not route_pretrip:
         return None
     has_defect = bool(_clean(getattr(route_pretrip, "damage_report", "")))
-    if has_defect:
-        badge = _board_badge_display("DEFECT", pill_tone="risk", row_tone="blocked", severity="risk")
-        text = "Pretrip defect noted"
-    elif getattr(route_pretrip, "posttrip", None):
-        badge = _board_badge_display("POSTTRIP DONE", pill_tone="recorded", row_tone="completed", severity="ok")
-        text = "PostTrip completed"
-    elif pending_posttrip:
-        badge = _board_badge_display("POSTTRIP NEEDED", pill_tone="attention", row_tone="hot", severity="attention")
-        text = "PostTrip needed"
-    else:
-        badge = _board_badge_display("INSPECTED", pill_tone="recorded", row_tone="completed", severity="ok")
-        text = "Pretrip completed"
+    if not has_defect:
+        return None
+    badge = _board_badge_display("DEFECT", pill_tone="risk", row_tone="blocked", severity="risk")
+    text = "Pretrip defect noted"
     truck = _clean(getattr(route_pretrip, "truck_number", ""))
     trailer = _clean(getattr(route_pretrip, "trailer_number", ""))
     if truck:
@@ -1390,7 +1382,11 @@ def _build_delivery_narratives(route_context):
             prior_cargo_movement_seen = True
 
     for group in groups.values():
-        narrative_issues = derive_issues(group.get("flags") or ())
+        narrative_issues = [
+            issue
+            for issue in derive_issues(group.get("flags") or ())
+            if issue.get("code") != "needs_departure"
+        ]
         group["issues"] = narrative_issues
         group["badge"] = board_badge(
             narrative_issues,

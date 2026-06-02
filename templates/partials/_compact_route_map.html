@@ -1,9 +1,15 @@
 {% macro issue_panel(obj, log_id, depart_url) %}
   {% if obj.issues %}
+  {% set visible_issues = [] %}
+  {% for pi in obj.issues %}
+    {% if pi.code != 'needs_departure' or obj.issues|length == 1 %}
+      {% set _ = visible_issues.append(pi) %}
+    {% endif %}
+  {% endfor %}
   {% set ev = obj.evidence or {} %}
-  {% set primary_code = obj.issues[0].code if obj.issues else '' %}
+  {% set primary_code = visible_issues[0].code if visible_issues else '' %}
   <div class="flow-issue-panel sev-{{ obj.badge.severity }}">
-    {% for pi in obj.issues %}
+    {% for pi in visible_issues %}
       <div class="flow-issue-head">
         <span class="flow-status status-{{ 'risk' if pi.severity == 'risk' else 'attention' }}">{{ pi.label }}</span>
         <p>{{ pi.reason }}</p>
@@ -322,6 +328,7 @@
           {% set depart_code = primary_stop.board_code or 'STP-' ~ primary_stop.sequence %}
           {% set is_service_depart = depart_code in ['FUEL', 'RYDR', 'MTN', 'MTG', 'SRVC'] %}
           <form class="depart-wizard" method="POST" action="{{ depart_url }}" data-depart-wizard>
+            {% if depart_form is defined and depart_form %}{{ depart_form.hidden_tag() }}{% endif %}
             <input type="hidden" name="next" value="mobile">
             <input type="hidden" name="source" value="live_flow">
             <input type="hidden" name="unloaded_on_departure" data-depart-field="unloaded_on_departure" value="{{ 'yes' if is_service_depart else '' }}">
