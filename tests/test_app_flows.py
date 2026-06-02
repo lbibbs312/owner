@@ -4412,6 +4412,16 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     login(client, "dated_print_driver")
     logs_page = client.get(f"/driver_logs?date={selected_date.isoformat()}")
     assert logs_page.status_code == 200
+    assert b"driver-ledger-active" in logs_page.data
+    assert b"LIVE FLOW BOARD" in logs_page.data
+    assert b"md-ledger-board compact-route-map md-flow-board" in logs_page.data
+    assert b"md-ledger-row md-flow-row tone-completed" in logs_page.data
+    assert b"md-row-code flow-code" in logs_page.data
+    assert b"md-row-detail flow-detail" in logs_page.data
+    assert b"md-row-status flow-status closed status-ready" in logs_page.data
+    assert b"md-ledger-ticker md-flow-ticker" in logs_page.data
+    assert b'content:"["' not in logs_page.data
+    assert b"content:'['" not in logs_page.data
     assert b"Print Route Record" in logs_page.data
     assert f"/driver_logs_print?date={selected_date.isoformat()}".encode() in logs_page.data
     assert f"/driver_logs_print?date={selected_date.isoformat()}&amp;autoprint=1".encode() in logs_page.data

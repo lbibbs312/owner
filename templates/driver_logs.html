@@ -2,10 +2,612 @@
 {% block content %}
 <div class="container-fluid driver-log-shell slide-in">
   {% set logs_endpoint = 'manager.driver_logs' if current_user.role == 'management' else 'driver.driver_logs' %}
-  <script>document.body.classList.add('manager-logs-active');</script>
+  <script>document.body.classList.add('{{ 'manager-logs-active' if current_user.role == 'management' else 'driver-ledger-active' }}');</script>
   <style>
     body.manager-logs-active .container.mt-4.fade-in { max-width:none; width:100%; padding-left:0; padding-right:0; }
     .driver-log-shell { width:100%; max-width:none; padding-left:16px; padding-right:16px; }
+    body.driver-ledger-active {
+      --md-ink:#050a12;
+      --md-panel:#0b1422;
+      --md-panel-soft:#101d2e;
+      --md-blue:#5b9dff;
+      --md-amber:#ffb224;
+      --md-green:#2bd576;
+      --md-red:#ff5247;
+      --md-text:#f6f8fb;
+      --md-muted:#8a99b3;
+      --md-line:rgba(91,157,255,.22);
+      --md-line-soft:rgba(138,153,179,.14);
+      --md-mono:"JetBrains Mono","SFMono-Regular",Consolas,monospace;
+      --md-display:"Montserrat",system-ui,sans-serif;
+      background:
+        linear-gradient(rgba(91,157,255,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(91,157,255,.035) 1px, transparent 1px),
+        radial-gradient(circle at 95% 8%, rgba(47,109,240,.22), transparent 32%),
+        linear-gradient(180deg, #060b14 0%, #08111f 54%, #050a12 100%);
+      background-size:34px 34px,34px 34px,auto,auto;
+      color:var(--md-text);
+    }
+    body.driver-ledger-active .navbar { display:none; }
+    body.driver-ledger-active .driver-active-wait {
+      border-bottom:1px solid rgba(255,178,36,.28);
+      background:rgba(6,10,18,.94);
+      box-shadow:0 12px 34px rgba(0,0,0,.28);
+    }
+    body.driver-ledger-active #pageContent > .container.mt-4.fade-in {
+      width:100%;
+      max-width:none;
+      margin-top:0!important;
+      padding:0;
+    }
+    body.driver-ledger-active .driver-log-shell {
+      min-height:100vh;
+      padding:0 0 108px;
+      background:transparent;
+    }
+    .md-ledger-shell {
+      width:min(1040px,100%);
+      margin:0 auto;
+      padding:16px 14px 0;
+    }
+    .md-ledger-topbar {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      padding:12px 2px 18px;
+    }
+    .md-ledger-driver {
+      display:flex;
+      align-items:center;
+      gap:11px;
+      min-width:0;
+    }
+    .md-ledger-avatar {
+      width:48px;
+      height:48px;
+      flex:0 0 48px;
+      display:grid;
+      place-items:center;
+      border-radius:50%;
+      background:linear-gradient(135deg,#2bd576,#5b9dff);
+      color:#06101d;
+      font-family:var(--md-display);
+      font-weight:900;
+      box-shadow:0 0 0 2px rgba(91,157,255,.24),0 0 28px rgba(43,213,118,.18);
+    }
+    .md-ledger-driver strong {
+      display:block;
+      color:var(--md-text);
+      font-family:var(--md-display);
+      font-size:1.08rem;
+      line-height:1.1;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .md-ledger-driver span,
+    .md-ledger-shift {
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.72rem;
+      font-weight:800;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .md-ledger-shift {
+      display:inline-flex;
+      align-items:center;
+      min-height:38px;
+      padding:0 12px;
+      border:1px solid var(--md-line);
+      border-radius:10px;
+      background:rgba(12,21,33,.8);
+    }
+    .md-ledger-board {
+      overflow:hidden;
+      border:1px solid rgba(91,157,255,.28);
+      border-radius:18px;
+      background:
+        linear-gradient(rgba(91,157,255,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(91,157,255,.035) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(15,26,41,.92), rgba(6,10,18,.96));
+      background-size:18px 18px,18px 18px,auto;
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,.04),
+        inset 0 0 38px rgba(91,157,255,.08),
+        0 0 34px rgba(91,157,255,.16),
+        0 24px 70px rgba(0,0,0,.45);
+    }
+    .md-ledger-board.md-flow-board {
+      gap:0;
+      padding:0;
+    }
+    .md-ledger-head {
+      display:grid;
+      grid-template-columns:minmax(0,1fr) max-content;
+      gap:12px;
+      align-items:start;
+      padding:18px 18px 16px;
+      border-bottom:1px solid var(--md-line-soft);
+    }
+    .md-ledger-kicker {
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      color:var(--md-text);
+      font-family:var(--md-mono);
+      font-size:.74rem;
+      font-weight:900;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+    }
+    .md-ledger-live-dot {
+      position:relative;
+      width:12px;
+      height:12px;
+      border-radius:50%;
+      background:var(--md-green);
+      box-shadow:0 0 12px rgba(43,213,118,.7),0 0 0 8px rgba(43,213,118,.08);
+      animation:mdLivePulse 1.8s ease-out infinite;
+    }
+    .md-ledger-live-dot::after {
+      content:"";
+      position:absolute;
+      inset:-7px;
+      border:1px solid rgba(43,213,118,.46);
+      border-radius:50%;
+      animation:mdLivePulseRing 1.8s ease-out infinite;
+    }
+    @keyframes mdLivePulse {
+      0% { box-shadow:0 0 12px rgba(43,213,118,.7),0 0 0 0 rgba(43,213,118,.28); }
+      100% { box-shadow:0 0 12px rgba(43,213,118,.7),0 0 0 16px rgba(43,213,118,0); }
+    }
+    @keyframes mdLivePulseRing {
+      0% { opacity:.85; transform:scale(.72); }
+      100% { opacity:0; transform:scale(1.8); }
+    }
+    .md-ledger-head h2 {
+      margin:10px 0 4px;
+      color:var(--md-text);
+      font-family:var(--md-display);
+      font-size:clamp(1.55rem,6vw,2.3rem);
+      font-weight:900;
+      letter-spacing:0;
+      border:0;
+      padding:0;
+    }
+    .md-ledger-subline {
+      margin:0;
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.82rem;
+      font-weight:850;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .md-ledger-head-side {
+      display:grid;
+      justify-items:end;
+      gap:8px;
+      min-width:0;
+    }
+    .md-ledger-pill,
+    .md-ledger-status {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:32px;
+      padding:4px 12px;
+      border-radius:999px;
+      font-family:var(--md-mono);
+      font-size:.72rem;
+      font-weight:900;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      white-space:nowrap;
+    }
+    .md-ledger-pill {
+      color:var(--md-green);
+      border:1px solid rgba(43,213,118,.32);
+      background:rgba(43,213,118,.12);
+    }
+    .md-ledger-status {
+      color:var(--md-amber);
+      border:1px solid rgba(255,178,36,.32);
+      background:rgba(255,178,36,.1);
+    }
+    .md-ledger-actions {
+      display:grid;
+      gap:12px;
+      padding:14px 18px;
+      border-bottom:1px solid var(--md-line-soft);
+      background:rgba(5,10,18,.35);
+    }
+    .md-ledger-filter {
+      display:grid;
+      grid-template-columns:auto minmax(0,160px) max-content;
+      gap:9px;
+      align-items:center;
+      max-width:390px;
+    }
+    .md-ledger-filter label,
+    .md-ledger-label {
+      color:var(--md-amber);
+      font-family:var(--md-mono);
+      font-size:.64rem;
+      font-weight:900;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+    }
+    .md-ledger-filter input,
+    .md-ledger-filter select {
+      min-height:42px;
+      border:1px solid var(--md-line);
+      border-radius:9px;
+      background:rgba(12,21,33,.9);
+      color:var(--md-text);
+      font-family:var(--md-mono);
+      font-weight:800;
+      box-shadow:none;
+    }
+    .md-ledger-filter input:focus,
+    .md-ledger-filter select:focus {
+      border-color:var(--md-amber);
+      box-shadow:0 0 0 2px rgba(255,178,36,.16),0 0 22px rgba(91,157,255,.1);
+    }
+    .md-action-rail {
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:10px;
+    }
+    .md-ledger-btn,
+    .md-row-action,
+    .md-row-action-form button {
+      min-height:42px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      border-radius:10px;
+      border:1px solid rgba(91,157,255,.34);
+      background:rgba(47,109,240,.14);
+      color:var(--md-text);
+      font-family:var(--md-mono);
+      font-size:.74rem;
+      font-weight:900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      text-decoration:none;
+      text-align:center;
+      box-shadow:inset 0 0 18px rgba(91,157,255,.08);
+    }
+    .md-ledger-btn:hover,
+    .md-row-action:hover,
+    .md-row-action-form button:hover {
+      color:var(--md-text);
+      border-color:rgba(255,178,36,.58);
+      box-shadow:inset 0 0 22px rgba(91,157,255,.16),0 0 18px rgba(255,178,36,.12);
+    }
+    .md-ledger-btn.primary {
+      border-color:rgba(255,178,36,.45);
+      background:rgba(255,178,36,.12);
+    }
+    .md-ledger-btn.success {
+      border-color:rgba(43,213,118,.34);
+      background:rgba(43,213,118,.1);
+    }
+    .md-ledger-btn .md-btn-icon,
+    .md-row-action .md-btn-icon,
+    .md-row-action-form .md-btn-icon {
+      width:18px;
+      height:18px;
+      display:inline-grid;
+      place-items:center;
+      border-radius:5px;
+      border:1px solid rgba(255,178,36,.34);
+      color:var(--md-amber);
+      font-size:.72rem;
+      line-height:1;
+    }
+    .md-ledger-list {
+      display:grid;
+      padding:10px;
+    }
+    .md-ledger-row {
+      appearance:none;
+      border:1px solid transparent;
+      border-radius:12px;
+      background:rgba(8,19,34,.42);
+      overflow:hidden;
+    }
+    .md-ledger-row + .md-ledger-row { margin-top:8px; }
+    .md-ledger-row[open],
+    .md-ledger-row.is-open {
+      border-color:rgba(91,157,255,.36);
+      box-shadow:inset 0 0 0 1px rgba(91,157,255,.1),0 0 22px rgba(91,157,255,.12);
+    }
+    .md-ledger-row.has-warning {
+      border-color:rgba(255,178,36,.36);
+      box-shadow:inset 0 0 0 1px rgba(255,178,36,.08),0 0 22px rgba(255,178,36,.12);
+    }
+    .md-ledger-row.has-risk {
+      border-color:rgba(255,82,71,.42);
+      background:rgba(255,82,71,.08);
+      box-shadow:inset 0 0 0 1px rgba(255,82,71,.12),0 0 24px rgba(255,82,71,.12);
+    }
+    .md-ledger-row::before,
+    .md-ledger-row::after,
+    .md-row-status::before,
+    .md-row-status::after,
+    .flow-status::before,
+    .flow-status::after {
+      content:none!important;
+      display:none!important;
+    }
+    .md-ledger-summary {
+      list-style:none;
+      cursor:pointer;
+      display:grid;
+      grid-template-columns:72px minmax(0,1fr) max-content;
+      gap:10px;
+      align-items:center;
+      min-height:68px;
+      padding:12px;
+    }
+    .md-ledger-summary::-webkit-details-marker { display:none; }
+    .md-row-code {
+      min-width:0;
+      color:var(--md-text);
+      font-family:var(--md-mono);
+      font-size:.82rem;
+      font-weight:900;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      white-space:nowrap;
+    }
+    .md-row-detail {
+      min-width:0;
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.82rem;
+      font-weight:650;
+      line-height:1.3;
+      display:-webkit-box;
+      -webkit-line-clamp:2;
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+    }
+    .md-row-detail strong {
+      color:var(--md-text);
+      font-weight:900;
+    }
+    .md-row-status {
+      justify-self:end;
+      display:inline-flex;
+      align-items:center;
+      min-height:30px;
+      padding:4px 10px;
+      border-radius:999px;
+      font-family:var(--md-mono);
+      font-size:.68rem;
+      font-weight:900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      white-space:nowrap;
+    }
+    .md-row-status.closed,
+    .md-row-status.ready {
+      color:var(--md-green);
+      border:1px solid rgba(43,213,118,.32);
+      background:rgba(43,213,118,.12);
+    }
+    .md-row-status.open {
+      color:var(--md-blue);
+      border:1px solid rgba(91,157,255,.34);
+      background:rgba(91,157,255,.12);
+    }
+    .md-row-status.warn {
+      color:var(--md-amber);
+      border:1px solid rgba(255,178,36,.38);
+      background:rgba(255,178,36,.12);
+    }
+    .md-row-status.risk {
+      color:var(--md-red);
+      border:1px solid rgba(255,82,71,.44);
+      background:rgba(255,82,71,.13);
+    }
+    .md-row-panel {
+      display:grid;
+      gap:12px;
+      padding:0 12px 12px;
+    }
+    .md-row-grid {
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:9px;
+    }
+    .md-row-fact {
+      min-width:0;
+      padding:10px;
+      border:1px solid rgba(52,120,246,.16);
+      border-radius:9px;
+      background:rgba(12,21,33,.78);
+    }
+    .md-row-fact span {
+      display:block;
+      color:var(--md-amber);
+      font-family:var(--md-mono);
+      font-size:.62rem;
+      font-weight:900;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+    }
+    .md-row-fact strong {
+      display:block;
+      margin-top:4px;
+      color:var(--md-text);
+      font-family:var(--md-display);
+      font-size:.95rem;
+      font-weight:900;
+      overflow-wrap:anywhere;
+    }
+    .md-row-chips,
+    .md-row-actions {
+      display:flex;
+      flex-wrap:wrap;
+      gap:7px;
+      align-items:center;
+    }
+    .route-chip {
+      display:inline-flex;
+      align-items:center;
+      min-height:26px;
+      border-radius:999px;
+      padding:4px 9px;
+      background:rgba(138,153,179,.12);
+      border:1px solid rgba(138,153,179,.2);
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.66rem;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+    }
+    .route-chip::before {
+      content:"";
+      width:5px;
+      height:5px;
+      margin-right:7px;
+      border-radius:50%;
+      background:currentColor;
+      opacity:.78;
+    }
+    .route-chip.danger { background:rgba(255,82,71,.12); border-color:rgba(255,82,71,.34); color:#ff8b84; }
+    .route-chip.ok { background:rgba(43,213,118,.12); border-color:rgba(43,213,118,.28); color:var(--md-green); }
+    .route-chip.warn { background:rgba(255,178,36,.12); border-color:rgba(255,178,36,.34); color:var(--md-amber); }
+    .route-chip.task-chip { text-transform:none; letter-spacing:0; font-size:.7rem; }
+    .route-chip.dark { background:rgba(8,19,34,.84); border-color:rgba(91,157,255,.22); color:var(--md-text); }
+    .route-warning {
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+      max-width:100%;
+      overflow-wrap:anywhere;
+      border:1px solid rgba(255,178,36,.34);
+      background:rgba(255,178,36,.1);
+      color:var(--md-amber);
+      border-radius:8px;
+      padding:6px 8px;
+      font-family:var(--md-mono);
+      font-size:.7rem;
+      font-weight:850;
+      line-height:1.25;
+    }
+    .route-warning::before { content:"▲"; font-size:.72rem; }
+    .route-warning.route-warning-danger { border-color:rgba(255,82,71,.38); background:rgba(255,82,71,.12); color:#ff8b84; }
+    .route-photo-strip { display:flex; flex-wrap:wrap; gap:8px; align-items:stretch; }
+    .route-photo-card { display:inline-flex; align-items:stretch; max-width:100%; border:1px solid rgba(91,157,255,.3); background:rgba(47,109,240,.12); border-radius:9px; overflow:hidden; }
+    .route-photo-link { display:inline-flex; align-items:center; gap:8px; max-width:100%; border:0; background:transparent; color:var(--md-text); padding:6px 8px; text-decoration:none; font-family:var(--md-mono); font-size:.72rem; font-weight:900; line-height:1.2; }
+    .route-photo-link:hover { color:var(--md-text); background:rgba(91,157,255,.1); }
+    .route-photo-missing { color:var(--md-amber); background:rgba(255,178,36,.08); }
+    .route-photo-link img { width:86px; height:64px; object-fit:contain; border:1px solid rgba(91,157,255,.24); border-radius:6px; background:rgba(5,10,18,.78); flex:0 0 auto; }
+    .route-photo-link span { min-width:0; overflow-wrap:anywhere; }
+    .route-photo-note { display:block; color:var(--md-muted); font-size:.66rem; font-weight:800; margin-top:1px; }
+    .route-photo-delete-form { display:flex; margin:0; }
+    .route-photo-delete { border:0; border-left:1px solid rgba(91,157,255,.24); background:rgba(255,82,71,.12); color:#ff8b84; padding:0 8px; font-family:var(--md-mono); font-size:.66rem; font-weight:900; }
+    .md-row-action-form { margin:0; min-width:0; flex:1 1 120px; }
+    .md-row-action { flex:1 1 120px; }
+    .md-row-action.danger,
+    .md-row-action-form.danger button {
+      border-color:rgba(255,82,71,.38);
+      background:rgba(255,82,71,.1);
+      color:#ffbbb7;
+    }
+    .md-row-action.warn { border-color:rgba(255,178,36,.42); background:rgba(255,178,36,.12); }
+    .md-ledger-ticker {
+      display:flex;
+      overflow:hidden;
+      border-top:1px solid var(--md-line-soft);
+      background:var(--md-ink);
+      color:var(--md-amber);
+      font-family:var(--md-mono);
+      font-size:.68rem;
+      font-weight:850;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      white-space:nowrap;
+      padding:9px 12px;
+    }
+    .md-ledger-ticker span {
+      display:inline-flex;
+      align-items:center;
+      gap:12px;
+      min-width:max-content;
+    }
+    .md-ledger-ticker span::before {
+      content:"";
+      width:7px;
+      height:7px;
+      flex:0 0 7px;
+      border-radius:2px;
+      background:linear-gradient(135deg,var(--md-amber),rgba(255,178,36,.44));
+      box-shadow:0 0 10px rgba(255,178,36,.24);
+      transform:rotate(45deg);
+    }
+    .md-ledger-empty {
+      margin:0;
+      padding:28px 18px;
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.86rem;
+      font-weight:800;
+      text-align:center;
+    }
+    .md-driver-bottom-nav {
+      position:fixed;
+      left:0;
+      right:0;
+      bottom:0;
+      z-index:50;
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:4px;
+      padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+      border-top:1px solid rgba(91,157,255,.16);
+      background:rgba(5,10,18,.96);
+      backdrop-filter:blur(12px);
+      box-shadow:0 -18px 48px rgba(0,0,0,.36);
+    }
+    .md-driver-bottom-nav a {
+      display:grid;
+      place-items:center;
+      gap:6px;
+      min-height:54px;
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.66rem;
+      font-weight:900;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      text-decoration:none;
+    }
+    .md-driver-bottom-nav i {
+      width:31px;
+      height:31px;
+      display:grid;
+      place-items:center;
+      border-radius:50%;
+      background:rgba(138,153,179,.12);
+      color:var(--md-muted);
+      font-style:normal;
+    }
+    .md-driver-bottom-nav a.is-active { color:var(--md-amber); }
+    .md-driver-bottom-nav a.is-active i {
+      background:rgba(255,178,36,.12);
+      color:var(--md-amber);
+      box-shadow:0 0 0 1px rgba(255,178,36,.22),0 0 18px rgba(91,157,255,.14),0 0 14px rgba(255,178,36,.1);
+    }
     .driver-log-shell .table-responsive { overflow-x:auto; -webkit-overflow-scrolling:touch; }
     .driver-log-table { width:100%; min-width:1500px; table-layout:auto; }
     .driver-log-table th, .driver-log-table td { vertical-align:middle; padding:.7rem .55rem; font-size:.88rem; overflow-wrap:normal; word-break:normal; }
@@ -27,14 +629,14 @@
     .route-state.open { color:#be123c; }
     .route-state.no-pickup { color:#334155; }
     .route-warnings { display:grid; gap:4px; margin-top:6px; }
-    .route-warning { display:inline-block; width:auto; max-width:100%; overflow-wrap:anywhere; border:1px solid #f59e0b; background:#fffbeb; color:#92400e; border-radius:6px; padding:3px 6px; font-size:.68rem; font-weight:800; line-height:1.2; }
-    .route-warning.route-warning-danger { border-color:#fecaca; background:#fef2f2; color:#991b1b; }
+    body:not(.driver-ledger-active) .route-warning { display:inline-block; width:auto; max-width:100%; overflow-wrap:anywhere; border:1px solid #f59e0b; background:#fffbeb; color:#92400e; border-radius:6px; padding:3px 6px; font-size:.68rem; font-weight:800; line-height:1.2; }
+    body:not(.driver-ledger-active) .route-warning.route-warning-danger { border-color:#fecaca; background:#fef2f2; color:#991b1b; }
     .cargo-stack { display:grid; gap:2px; line-height:1.2; }
     .cargo-label { color:#64748b; font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
-    .driver-route-list { display:grid; gap:12px; max-width:1120px; }
-    .driver-route-card { border:1px solid #dbe3ec; border-left:5px solid #64748b; background:#fff; border-radius:10px; padding:14px; box-shadow:0 8px 20px rgba(15,23,42,.04); }
-    .driver-route-card.is-open { border-left-color:#be123c; background:#fff7f8; }
-    .driver-route-card.has-warning { border-left-color:#f59e0b; }
+    body:not(.driver-ledger-active) .driver-route-list { display:grid; gap:12px; max-width:1120px; }
+    body:not(.driver-ledger-active) .driver-route-card { border:1px solid #dbe3ec; border-left:5px solid #64748b; background:#fff; border-radius:10px; padding:14px; box-shadow:0 8px 20px rgba(15,23,42,.04); }
+    body:not(.driver-ledger-active) .driver-route-card.is-open { border-left-color:#be123c; background:#fff7f8; }
+    body:not(.driver-ledger-active) .driver-route-card.has-warning { border-left-color:#f59e0b; }
     .route-card-top { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:start; }
     .route-card-eyebrow { color:#64748b; font-size:.7rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; }
     .route-card-title { margin:2px 0 4px; font-size:1.1rem; font-weight:900; color:#111827; overflow-wrap:anywhere; }
@@ -46,24 +648,24 @@
     .route-cargo-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px; }
     .cargo-panel { border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; padding:9px; min-width:0; }
     .cargo-panel .cargo-value { color:#111827; font-size:.95rem; font-weight:900; overflow-wrap:anywhere; }
-    .route-chip-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; align-items:center; }
-    .route-chip { display:inline-flex; align-items:center; min-height:24px; border-radius:999px; padding:3px 8px; background:#e2e8f0; color:#334155; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em; }
-    .route-chip.danger { background:#fee2e2; color:#991b1b; }
-    .route-chip.ok { background:#dcfce7; color:#166534; }
-    .route-chip.warn { background:#fef3c7; color:#92400e; }
-    .route-chip.task-chip { text-transform:none; letter-spacing:0; font-size:.72rem; }
-    .route-chip.dark { background:#111827; color:#fff; }
-    .route-photo-strip { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:stretch; }
-    .route-photo-card { display:inline-flex; align-items:stretch; max-width:100%; border:1px solid #bfdbfe; background:#eff6ff; border-radius:8px; overflow:hidden; }
-    .route-photo-link { display:inline-flex; align-items:center; gap:8px; max-width:100%; border:0; background:#eff6ff; color:#1d4ed8; padding:5px 8px; text-decoration:none; font-size:.72rem; font-weight:900; line-height:1.2; }
-    .route-photo-link:hover { color:#1e40af; background:#dbeafe; }
-    .route-photo-missing { color:#92400e; background:#fff7ed; }
-    .route-photo-missing:hover { color:#92400e; background:#fff7ed; }
-    .route-photo-link img { width:96px; height:76px; object-fit:contain; border:1px solid #bfdbfe; border-radius:5px; background:#fff; flex:0 0 auto; }
-    .route-photo-link span { min-width:0; overflow-wrap:anywhere; }
-    .route-photo-note { display:block; color:#334155; font-size:.68rem; font-weight:800; margin-top:1px; }
-    .route-photo-delete-form { display:flex; margin:0; }
-    .route-photo-delete { border:0; border-left:1px solid #bfdbfe; background:#fff1f2; color:#be123c; padding:0 8px; font-size:.68rem; font-weight:900; }
+    body:not(.driver-ledger-active) .route-chip-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; align-items:center; }
+    body:not(.driver-ledger-active) .route-chip { display:inline-flex; align-items:center; min-height:24px; border-radius:999px; padding:3px 8px; background:#e2e8f0; color:#334155; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em; }
+    body:not(.driver-ledger-active) .route-chip.danger { background:#fee2e2; color:#991b1b; }
+    body:not(.driver-ledger-active) .route-chip.ok { background:#dcfce7; color:#166534; }
+    body:not(.driver-ledger-active) .route-chip.warn { background:#fef3c7; color:#92400e; }
+    body:not(.driver-ledger-active) .route-chip.task-chip { text-transform:none; letter-spacing:0; font-size:.72rem; }
+    body:not(.driver-ledger-active) .route-chip.dark { background:#111827; color:#fff; }
+    body:not(.driver-ledger-active) .route-photo-strip { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:stretch; }
+    body:not(.driver-ledger-active) .route-photo-card { display:inline-flex; align-items:stretch; max-width:100%; border:1px solid #bfdbfe; background:#eff6ff; border-radius:8px; overflow:hidden; }
+    body:not(.driver-ledger-active) .route-photo-link { display:inline-flex; align-items:center; gap:8px; max-width:100%; border:0; background:#eff6ff; color:#1d4ed8; padding:5px 8px; text-decoration:none; font-size:.72rem; font-weight:900; line-height:1.2; }
+    body:not(.driver-ledger-active) .route-photo-link:hover { color:#1e40af; background:#dbeafe; }
+    body:not(.driver-ledger-active) .route-photo-missing { color:#92400e; background:#fff7ed; }
+    body:not(.driver-ledger-active) .route-photo-missing:hover { color:#92400e; background:#fff7ed; }
+    body:not(.driver-ledger-active) .route-photo-link img { width:96px; height:76px; object-fit:contain; border:1px solid #bfdbfe; border-radius:5px; background:#fff; flex:0 0 auto; }
+    body:not(.driver-ledger-active) .route-photo-link span { min-width:0; overflow-wrap:anywhere; }
+    body:not(.driver-ledger-active) .route-photo-note { display:block; color:#334155; font-size:.68rem; font-weight:800; margin-top:1px; }
+    body:not(.driver-ledger-active) .route-photo-delete-form { display:flex; margin:0; }
+    body:not(.driver-ledger-active) .route-photo-delete { border:0; border-left:1px solid #bfdbfe; background:#fff1f2; color:#be123c; padding:0 8px; font-size:.68rem; font-weight:900; }
     .route-card-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
     .route-card-actions .btn, .route-card-actions form { flex:1 1 130px; min-width:0; }
     .route-card-actions .btn { width:100%; white-space:normal; }
@@ -72,31 +674,81 @@
       .route-card-top { grid-template-columns:1fr; }
       .route-card-times, .route-cargo-grid { grid-template-columns:1fr; }
       .route-card-actions .btn, .route-card-actions form { flex-basis:100%; }
+      .md-ledger-shell { padding:12px 10px 0; }
+      .md-ledger-head { grid-template-columns:1fr; }
+      .md-ledger-head-side { justify-items:start; }
+      .md-ledger-filter { grid-template-columns:1fr; max-width:none; }
+      .md-action-rail { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .md-ledger-summary { grid-template-columns:62px minmax(0,1fr) max-content; gap:8px; padding:11px 10px; }
+      .md-row-grid { grid-template-columns:1fr; }
+      .md-ledger-btn, .md-row-action, .md-row-action-form button { font-size:.68rem; }
     }
     @media (min-width:1200px) { .driver-log-shell { padding-left:24px; padding-right:24px; } }
   </style>
-  {% set log_view_endpoint = 'manager.view_driver_log' if current_user.role == 'management' else 'driver.view_driver_log' %}
-  <h2 class="mt-3">Driver Logs</h2>
-  
-  <!-- Search form: Date filter (and driver filter for management) -->
-  <form method="GET" action="{{ url_for(logs_endpoint) }}" class="mb-4">
-    <div class="row g-2 align-items-center">
-      <!-- Date Filter -->
-      <div class="col-auto">
-        <label for="dateFilter" class="col-form-label fw-bold">Date:</label>
+	  {% set log_view_endpoint = 'manager.view_driver_log' if current_user.role == 'management' else 'driver.view_driver_log' %}
+	  {% if current_user.role == 'driver' %}
+	    {% set log_count = logs|length if logs else 0 %}
+	    <div class="md-ledger-shell">
+      <div class="md-ledger-topbar">
+        <div class="md-ledger-driver">
+          <div class="md-ledger-avatar">{{ (current_user.first_name[:1] if current_user.first_name else current_user.username[:1])|upper }}{{ (current_user.last_name[:1] if current_user.last_name else '')|upper }}</div>
+          <div>
+            <strong>{{ current_user.display_name }}</strong>
+            <span>{{ current_user.employee_id or 'No ID' }}{% if current_user.department %} · {{ current_user.department }}{% endif %}</span>
+          </div>
+        </div>
+        <a class="md-ledger-shift" href="{{ url_for('driver.mobile_dashboard') }}">Home</a>
       </div>
-      <div class="col-auto">
-        <input
-          type="date"
-          name="date"
-          id="dateFilter"
-          class="form-control"
-          value="{{ search_date.strftime('%Y-%m-%d') }}"
-        >
-      </div>
-      
-      <!-- Driver Filter (Management Only) -->
-      {% if current_user.role == 'management' %}
+
+	      <section class="md-ledger-board compact-route-map md-flow-board" data-route-map-shell data-route-map-mode="driver-ledger" aria-label="Driver log ledger">
+	        <div class="md-ledger-head md-flow-head">
+	          <div>
+	            <span class="md-ledger-kicker md-flow-kicker"><i class="md-ledger-live-dot"></i> LIVE FLOW BOARD</span>
+	            <h2>Driver Logs</h2>
+	            <p class="md-ledger-subline md-flow-subline">{{ search_date.strftime('%m/%d/%Y') }} · {{ log_count }} stop{{ 's' if log_count != 1 else '' }}</p>
+	          </div>
+	          <div class="md-ledger-head-side">
+	            <span class="md-ledger-pill">{{ 'Live Route' if search_date == today_local_date else 'Route Replay' }}</span>
+            <time class="md-ledger-status">{{ search_date.strftime('%b %d') }}</time>
+          </div>
+        </div>
+
+        <div class="md-ledger-actions">
+          <form method="GET" action="{{ url_for(logs_endpoint) }}" class="md-ledger-filter">
+            <label for="dateFilter">Date</label>
+            <input type="date" name="date" id="dateFilter" value="{{ search_date.strftime('%Y-%m-%d') }}">
+            <button type="submit" class="md-ledger-btn"><span class="md-btn-icon">⌕</span> Search</button>
+          </form>
+
+	          <div class="md-action-rail md-flow-top-actions" aria-label="Driver log actions">
+	            <a href="{{ url_for('driver.new_driving_log') }}" class="md-ledger-btn md-flow-action-tab primary"><span class="md-btn-icon">+</span> Record Current Stop</a>
+	            <a href="{{ url_for('driver.add_stop') }}" class="md-ledger-btn md-flow-action-tab"><span class="md-btn-icon">↧</span> Add Missed Stop</a>
+	            {% if logs %}
+	              <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d')) }}" class="md-ledger-btn md-flow-action-tab success"><span class="md-btn-icon">P</span> Print Route Record</a>
+	              <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d'), autoprint=1) }}" class="md-ledger-btn md-flow-action-tab success"><span class="md-btn-icon">↓</span> Save Route PDF</a>
+	            {% endif %}
+	          </div>
+	        </div>
+	  {% else %}
+	    <h2 class="mt-3">Driver Logs</h2>
+
+    <!-- Search form: Date filter (and driver filter for management) -->
+    <form method="GET" action="{{ url_for(logs_endpoint) }}" class="mb-4">
+      <div class="row g-2 align-items-center">
+        <!-- Date Filter -->
+        <div class="col-auto">
+          <label for="dateFilter" class="col-form-label fw-bold">Date:</label>
+        </div>
+        <div class="col-auto">
+          <input
+            type="date"
+            name="date"
+            id="dateFilter"
+            class="form-control"
+            value="{{ search_date.strftime('%Y-%m-%d') }}"
+          >
+        </div>
+
         <div class="col-auto">
           <label for="driverFilter" class="col-form-label fw-bold">Driver:</label>
         </div>
@@ -113,158 +765,161 @@
             {% endfor %}
           </select>
         </div>
-      {% endif %}
-      
-      <div class="col-auto">
-        <button type="submit" class="btn btn-primary hover-btn">
-          Search
-        </button>
-      </div>
-    </div>
-  </form>
 
-  {% if current_user.role == 'management' and selected_driver_id and logs %}
-    <div class="alert alert-light border d-flex flex-wrap align-items-center gap-2 mb-3">
-      <strong>Manager review:</strong>
-      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('manager.driver_route_print', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d')) }}">Manager Route Review</a>
-      <a class="btn btn-sm btn-outline-success" href="{{ url_for('manager.driver_route_print', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d'), autoprint=1) }}">Save Manager Review PDF</a>
-      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('manager.driver_route_export', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d'), type='csv') }}">CSV</a>
-      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('manager.driver_route_export', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d'), type='sheets') }}">Sheets</a>
-    </div>
-  {% elif current_user.role == 'management' and logs %}
-    <div class="alert alert-light border small mb-3">Choose a driver to print or download that driver's full route for this date.</div>
-  {% endif %}
-  
-  <!-- Driver route actions -->
-  {% if current_user.role == 'driver' %}
-    <div class="d-flex flex-wrap gap-2 mb-3">
-      <a href="{{ url_for('driver.new_driving_log') }}" class="btn btn-primary hover-btn">Record Current Stop</a>
-      <a href="{{ url_for('driver.add_stop') }}" class="btn btn-outline-primary hover-btn">Add Missed Stop</a>
-      {% if logs %}
-        <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d')) }}" class="btn btn-success hover-btn">Print Route Record</a>
-        <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d'), autoprint=1) }}" class="btn btn-outline-success hover-btn">Save Route PDF</a>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-primary hover-btn">
+            Search
+          </button>
+        </div>
+      </div>
+    </form>
+
+    {% if selected_driver_id and logs %}
+      <div class="alert alert-light border d-flex flex-wrap align-items-center gap-2 mb-3">
+        <strong>Manager review:</strong>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('manager.driver_route_print', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d')) }}">Manager Route Review</a>
+        <a class="btn btn-sm btn-outline-success" href="{{ url_for('manager.driver_route_print', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d'), autoprint=1) }}">Save Manager Review PDF</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('manager.driver_route_export', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d'), type='csv') }}">CSV</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('manager.driver_route_export', driver_id=selected_driver_id, date=search_date.strftime('%Y-%m-%d'), type='sheets') }}">Sheets</a>
+      </div>
+    {% elif logs %}
+      <div class="alert alert-light border small mb-3">Choose a driver to print or download that driver's full route for this date.</div>
+    {% endif %}
       {% endif %}
-    </div>
-  {% endif %}
   
   {% if logs %}
     {% if current_user.role == 'driver' %}
-      <div class="driver-route-list">
+      <div class="md-ledger-list md-flow-window">
+        <div class="md-flow-track">
         {% for log in logs %}
           {% set route = (log_routes or {}).get(log.id) %}
           {% set can_manage_log = log.driver_id == current_user.id %}
           {% set can_delete_log = can_manage_log and log.date == today_local_date %}
-          <article class="driver-route-card {% if not log.depart_time %}is-open{% endif %} {% if route and route.warnings %}has-warning{% endif %}">
-            <div class="route-card-top">
-              <div>
-                <div class="route-card-eyebrow">{{ 'At stop - needs departure' if not log.depart_time else 'Departed stop' }}</div>
-                <h3 class="route-card-title">{{ route.plant if route else log.plant_name }}</h3>
-                <div class="route-card-meta">
-                  {{ log.driver.display_name }}{% if log.driver.employee_id %} - ID {{ log.driver.employee_id }}{% endif %}{% if log.driver.department %} - {{ log.driver.department }}{% endif %}
-                  {% if route %}<br>{{ route.action }} - <span class="route-state {{ 'no-pickup' if route.state == 'No pickup' else route.class }}">{{ route.state }}</span>{% if route.next_stop %}<br>First stop after departure: {{ route.next_stop }}{% endif %}{% endif %}
-                  {% if log.plant_name in PLANT_ADDRESSES %}<br>{{ PLANT_ADDRESSES[log.plant_name] }}{% endif %}
-                </div>
-              </div>
-              <div class="route-card-times" aria-label="Stop times">
-                <div class="time-pill">
-                  <span>Arrive</span>
-                  <strong>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</strong>
-                </div>
-                <div class="time-pill">
-                  <span>Depart</span>
-                  <strong>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</strong>
-                </div>
-              </div>
-            </div>
+          {% set wait_label = wait_label_for_log(log) %}
+          {% set stop_code = 'FUEL' if log.fuel else ('MTN' if log.maintenance else ('MTG' if log.meeting else 'STP-' ~ (logs|length - loop.index0))) %}
+          {% set arrive_label = route.arrive_cargo_desc if route else (log.load_size or 'Empty') %}
+          {% if route and route.depart_desc is none %}
+            {% set depart_label = '--' %}
+          {% elif log.no_pickup %}
+            {% set depart_label = 'No Pickup' %}
+          {% elif route %}
+            {% set depart_label = route.depart_cargo_desc %}
+          {% else %}
+            {% set depart_label = log.depart_load_size or '--' %}
+          {% endif %}
+          {% if log.maintenance %}
+            {% set status_label = 'TRUCK ISSUE' %}
+            {% set status_tone = 'risk' %}
+            {% set flow_status_tone = 'risk' %}
+            {% set row_tone = 'blocked' %}
+          {% elif route and route.warnings %}
+            {% set status_label = 'VERIFY' %}
+            {% set status_tone = 'warn' %}
+            {% set flow_status_tone = 'attention' %}
+            {% set row_tone = 'needs_review' %}
+          {% elif not log.depart_time %}
+            {% set status_label = 'OPEN' %}
+            {% set status_tone = 'open' %}
+            {% set flow_status_tone = 'open' %}
+            {% set row_tone = 'active' %}
+          {% else %}
+            {% set status_label = 'CLOSED' %}
+            {% set status_tone = 'closed' %}
+            {% set flow_status_tone = 'ready' %}
+            {% set row_tone = 'completed' %}
+          {% endif %}
+          <details class="md-ledger-row md-flow-row tone-{{ row_tone }} {% if not log.depart_time %}is-open{% endif %} {% if route and route.warnings %}has-warning{% endif %} {% if log.maintenance %}has-risk{% endif %}" data-flow-row {% if not log.depart_time %}open{% endif %}>
+            <summary class="md-ledger-summary">
+              <span class="md-row-code flow-code">{{ stop_code }}</span>
+              <span class="md-row-detail flow-detail">
+                <strong>{{ route.plant if route else log.plant_name }}</strong> · {{ arrive_label }} → {{ depart_label }}{% if wait_label %} · {{ wait_label }}{% endif %}
+              </span>
+              <span class="md-row-status flow-status {{ status_tone }} status-{{ flow_status_tone }}">{{ status_label }}</span>
+            </summary>
 
-            {% if route and route.warnings %}
-              <div class="route-warnings">
-                {% for warning in route.warnings %}
-                  <span class="route-warning {% if 'before departure' in warning or 'Only ' in warning or 'still marked onboard' in warning %}route-warning-danger{% endif %}">{{ warning }}</span>
-                {% endfor %}
+            <div class="md-row-panel">
+              <div class="md-row-grid">
+                <div class="md-row-fact"><span>Driver</span><strong>{{ log.driver.display_name }}{% if log.driver.employee_id %} · ID {{ log.driver.employee_id }}{% endif %}{% if log.driver.department %} · {{ log.driver.department }}{% endif %}</strong></div>
+                <div class="md-row-fact"><span>Move</span><strong>{% if route %}{{ route.action }} · {{ route.state }}{% else %}Logged stop{% endif %}{% if route and route.next_stop %} · Next {{ route.next_stop }}{% endif %}</strong></div>
+                <div class="md-row-fact"><span>Arrive</span><strong>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</strong></div>
+                <div class="md-row-fact"><span>Depart</span><strong>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</strong></div>
+                <div class="md-row-fact"><span>In</span><strong>{{ arrive_label }}</strong></div>
+                <div class="md-row-fact"><span>Out</span><strong>{{ depart_label }}</strong></div>
               </div>
-            {% endif %}
 
-            <div class="route-cargo-grid">
-              <div class="cargo-panel">
-                <span class="cargo-label">In</span>
-                <div class="cargo-value">{{ route.arrive_cargo_desc if route else log.load_size }}</div>
-              </div>
-              <div class="cargo-panel">
-                <span class="cargo-label">Out</span>
-                <div class="cargo-value">
-                  {% if route and route.depart_desc is none %}
-                    --
-                  {% elif log.no_pickup %}
-                    No Pickup
-                  {% elif route %}
-                    {{ route.depart_cargo_desc }}
-                  {% else %}
-                    {{ log.depart_load_size or '--' }}
-                  {% endif %}
-                </div>
-              </div>
-            </div>
-
-            <div class="route-chip-row">
-              {% if log.no_pickup %}<span class="route-chip dark">No Pickup</span>{% endif %}
-              {% if log.hot_parts %}<span class="route-chip danger">Hot {{ log.part_number or '' }}</span>{% elif log.part_number %}<span class="route-chip">{{ log.part_number }}</span>{% endif %}
-              <span class="route-chip {% if log.maintenance %}danger{% else %}ok{% endif %}">Truck {{ 'Issue' if log.maintenance else 'OK' }}{% if log.maintenance and log.fuel_mileage %} - {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>
-              {% if log.fuel %}<span class="route-chip">Fuel{% if log.fuel_mileage %} - {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>{% endif %}
-              {% set wait_label = wait_label_for_log(log) %}
-              {% if wait_label %}<span class="route-chip danger">{{ wait_label }}</span>{% endif %}
-              {% if log.meeting %}<span class="route-chip">Meeting</span>{% endif %}
-              {% for event in (route_task_events or {}).get(log.id, []) %}
-                <span class="route-chip task-chip {% if event.is_hot %}danger{% elif event.completed_at %}ok{% else %}warn{% endif %}">{{ event.kind_label }}: {{ event.label }} - {{ event.status }}{% if event.completed_at %} / Unloaded{% endif %}</span>
-              {% endfor %}
-            </div>
-
-            {% if log.photos %}
-              <div class="route-photo-strip" aria-label="Stop photo proof">
-                {% for photo in log.photos %}
-                  {% set photo_url = url_for('manager.driver_log_photo', photo_id=photo.id) if current_user.role == 'management' else url_for('driver.driver_log_photo', photo_id=photo.id) %}
-                  {% set photo_delete_url = url_for('manager.delete_driver_log_photo', photo_id=photo.id) if current_user.role == 'management' else url_for('driver.delete_driver_log_photo', photo_id=photo.id) %}
-                  <div class="route-photo-card">
-                    {% if photo.file_available %}
-                      <a class="route-photo-link" href="{{ photo_url }}" target="_blank" rel="noopener">
-                        <img src="{{ photo_url }}" alt="Stop proof photo {{ loop.index }}">
-                        <span>Photo proof {{ loop.index }}<small class="route-photo-note">{{ photo.note or ((photo.source or 'photo')|replace('_', ' ')|title) }}</small></span>
-                      </a>
-                    {% else %}
-                      <div class="route-photo-link route-photo-missing">
-                        <span>Photo file missing<small class="route-photo-note">{{ photo.note or ((photo.source or 'photo')|replace('_', ' ')|title) }}</small></span>
-                      </div>
-                    {% endif %}
-                    <form class="route-photo-delete-form" method="POST" action="{{ photo_delete_url }}" onsubmit="return confirm('Delete this stop photo proof?');">
-                      <input type="hidden" name="next" value="{{ request.full_path }}">
-                      <button class="route-photo-delete" type="submit">Delete</button>
-                    </form>
-                  </div>
-                {% endfor %}
-              </div>
-            {% endif %}
-
-            <div class="route-card-actions">
-              <a href="{{ url_for(log_view_endpoint, log_id=log.id) }}" class="btn btn-sm btn-info hover-btn">View</a>
-              {% if can_manage_log %}
-                <a href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}" class="btn btn-sm btn-warning hover-btn">Edit</a>
-                {% if not log.depart_time %}
-                  <a href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" class="btn btn-sm btn-success hover-btn">Depart / Load</a>
-                {% endif %}
-                {% if can_delete_log %}
-                  {% if log.hot_parts or log.part_number %}
-                    <form action="{{ url_for('driver.clear_driver_log_hot_part', log_id=log.id) }}" method="POST" onsubmit="return confirm('Clear the hot-part flag and part number from this stop?');">
-                      <button type="submit" class="btn btn-sm btn-outline-secondary hover-btn">Clear Hot</button>
-                    </form>
-                  {% endif %}
-                  <form action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" method="POST" onsubmit="return confirm('Delete this driver log?');">
-                    <button type="submit" class="btn btn-sm btn-outline-danger hover-btn">Delete</button>
-                  </form>
-                {% endif %}
+              {% if log.plant_name in PLANT_ADDRESSES %}
+                <div class="md-row-fact"><span>Address</span><strong>{{ PLANT_ADDRESSES[log.plant_name] }}</strong></div>
               {% endif %}
+
+              {% if route and route.warnings %}
+                <div class="route-warnings">
+                  {% for warning in route.warnings %}
+                    <span class="route-warning {% if 'before departure' in warning or 'Only ' in warning or 'still marked onboard' in warning %}route-warning-danger{% endif %}">{{ warning }}</span>
+                  {% endfor %}
+                </div>
+              {% endif %}
+
+              <div class="md-row-chips">
+                {% if log.no_pickup %}<span class="route-chip dark">No Pickup</span>{% endif %}
+                {% if log.hot_parts %}<span class="route-chip danger">Hot {{ log.part_number or '' }}</span>{% elif log.part_number %}<span class="route-chip">{{ log.part_number }}</span>{% endif %}
+                <span class="route-chip {% if log.maintenance %}danger{% else %}ok{% endif %}">Truck {{ 'Issue' if log.maintenance else 'OK' }}{% if log.maintenance and log.fuel_mileage %} - {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>
+                {% if log.fuel %}<span class="route-chip">Fuel{% if log.fuel_mileage %} - {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>{% endif %}
+                {% if wait_label %}<span class="route-chip warn">{{ wait_label }}</span>{% endif %}
+                {% if log.meeting %}<span class="route-chip">Meeting</span>{% endif %}
+                {% for event in (route_task_events or {}).get(log.id, []) %}
+                  <span class="route-chip task-chip {% if event.is_hot %}danger{% elif event.completed_at %}ok{% else %}warn{% endif %}">{{ event.kind_label }}: {{ event.label }} - {{ event.status }}{% if event.completed_at %} / Unloaded{% endif %}</span>
+                {% endfor %}
+              </div>
+
+              {% if log.photos %}
+                <div class="route-photo-strip" aria-label="Stop photo proof">
+                  {% for photo in log.photos %}
+                    {% set photo_url = url_for('manager.driver_log_photo', photo_id=photo.id) if current_user.role == 'management' else url_for('driver.driver_log_photo', photo_id=photo.id) %}
+                    {% set photo_delete_url = url_for('manager.delete_driver_log_photo', photo_id=photo.id) if current_user.role == 'management' else url_for('driver.delete_driver_log_photo', photo_id=photo.id) %}
+                    <div class="route-photo-card">
+                      {% if photo.file_available %}
+                        <a class="route-photo-link" href="{{ photo_url }}" target="_blank" rel="noopener">
+                          <img src="{{ photo_url }}" alt="Stop proof photo {{ loop.index }}">
+                          <span>Photo proof {{ loop.index }}<small class="route-photo-note">{{ photo.note or ((photo.source or 'photo')|replace('_', ' ')|title) }}</small></span>
+                        </a>
+                      {% else %}
+                        <div class="route-photo-link route-photo-missing">
+                          <span>Photo file missing<small class="route-photo-note">{{ photo.note or ((photo.source or 'photo')|replace('_', ' ')|title) }}</small></span>
+                        </div>
+                      {% endif %}
+                      <form class="route-photo-delete-form" method="POST" action="{{ photo_delete_url }}" onsubmit="return confirm('Delete this stop photo proof?');">
+                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                        <button class="route-photo-delete" type="submit">Delete</button>
+                      </form>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+
+              <div class="md-row-actions">
+                <a href="{{ url_for(log_view_endpoint, log_id=log.id) }}" class="md-row-action"><span class="md-btn-icon">O</span> View</a>
+                {% if can_manage_log %}
+                  <a href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}" class="md-row-action warn"><span class="md-btn-icon">E</span> Edit</a>
+                  {% if not log.depart_time %}
+                    <a href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" class="md-row-action"><span class="md-btn-icon">→</span> Depart / Load</a>
+                  {% endif %}
+                  {% if can_delete_log %}
+                    {% if log.hot_parts or log.part_number %}
+                      <form action="{{ url_for('driver.clear_driver_log_hot_part', log_id=log.id) }}" method="POST" class="md-row-action-form" onsubmit="return confirm('Clear the hot-part flag and part number from this stop?');">
+                        <button type="submit"><span class="md-btn-icon">×</span> Clear Hot</button>
+                      </form>
+                    {% endif %}
+                    <form action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" method="POST" class="md-row-action-form danger" onsubmit="return confirm('Delete this driver log?');">
+                      <button type="submit"><span class="md-btn-icon">!</span> Delete</button>
+                    </form>
+                  {% endif %}
+                {% endif %}
+              </div>
             </div>
-          </article>
+          </details>
         {% endfor %}
+        </div>
+        <div class="md-ledger-ticker md-flow-ticker" aria-hidden="true"><span>ROUTE LOGS · PROOF PHOTOS · TRANSFERS · DAMAGE · HOT MOVES · POSTTRIP</span></div>
       </div>
     {% else %}
     <div class="table-responsive">
@@ -454,7 +1109,21 @@
     </div>
     {% endif %}
   {% else %}
-    <p>No logs found for {{ search_date.strftime('%Y-%m-%d') }}.</p>
+    {% if current_user.role == 'driver' %}
+      <p class="md-ledger-empty">No logs found for {{ search_date.strftime('%Y-%m-%d') }}.</p>
+    {% else %}
+      <p>No logs found for {{ search_date.strftime('%Y-%m-%d') }}.</p>
+    {% endif %}
+  {% endif %}
+  {% if current_user.role == 'driver' %}
+      </section>
+      <nav class="md-driver-bottom-nav" aria-label="Driver navigation">
+        <a href="{{ url_for('driver.mobile_dashboard') }}"><i>HM</i><span>Home</span></a>
+        <a href="{{ url_for('driver.plant_transfers') }}"><i>PT</i><span>Transfer</span></a>
+        <a href="{{ url_for('driver.driver_logs', date=search_date.strftime('%Y-%m-%d')) }}" class="is-active"><i>DL</i><span>Logs</span></a>
+        <a href="{{ url_for('driver.profile') }}"><i>DR</i><span>Driver</span></a>
+      </nav>
+    </div>
   {% endif %}
 </div>
 {% endblock %}
