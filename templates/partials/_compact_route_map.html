@@ -1,23 +1,31 @@
 {% macro issue_panel(obj, log_id, depart_url) %}
   {% if obj.issues %}
-  {% set pi = obj.issues[0] %}
   {% set ev = obj.evidence or {} %}
   <div class="flow-issue-panel sev-{{ obj.badge.severity }}">
-    <div class="flow-issue-head"><span class="flow-status status-{{ obj.badge.pill_tone }}">{{ obj.badge.label }}</span><p>{{ pi.reason }}</p></div>
-    <div class="flow-issue-evidence">
-      {% if ev.dropped %}<div><span>Dropped</span><strong>{{ ev.dropped|join(', ') }}</strong></div>{% endif %}
-      {% if ev.expected_destination %}<div><span>Expected dest</span><strong>{{ ev.expected_destination }}</strong></div>{% endif %}
-      <div><span>Arrived</span><strong>{{ ev.arrived_with }}</strong></div>
-      <div><span>Departed</span><strong>{{ ev.departed_with }}</strong></div>
-      <div><span>Proof</span><strong class="{{ 'ev-missing' if ev.proof != 'Attached' else 'ev-found' }}">{{ ev.proof or 'None on file' }}</strong></div>
-      {% if ev.reason %}<div><span>Note</span><strong>{{ ev.reason }}</strong></div>{% endif %}
-    </div>
+    {% for pi in obj.issues %}
+      <div class="flow-issue-head">
+        <span class="flow-status status-{{ 'risk' if pi.severity == 'risk' else 'attention' }}">{{ pi.label }}</span>
+        <p>{{ pi.reason }}</p>
+      </div>
+      <div class="flow-issue-evidence">
+        <div><span>Stop</span><strong>{{ obj.board_code or ('STP-' ~ obj.sequence) }} · {{ obj.plant_name }}</strong></div>
+        {% if ev.dropped %}<div><span>Affected load</span><strong>{{ ev.dropped|join(', ') }}</strong></div>{% endif %}
+        {% if ev.expected_destination %}<div><span>Expected dest</span><strong>{{ ev.expected_destination }}</strong></div>{% endif %}
+        <div><span>Arrived with</span><strong>{{ ev.arrived_with }}</strong></div>
+        <div><span>Departed with</span><strong>{{ ev.departed_with }}</strong></div>
+        <div><span>Proof found</span><strong class="{{ 'ev-missing' if ev.proof != 'Attached' else 'ev-found' }}">{{ ev.proof or 'None on file' }}</strong></div>
+        {% if ev.proof_count is defined %}<div><span>Proof count</span><strong>{{ ev.proof_count }}</strong></div>{% endif %}
+        {% if ev.reason %}<div><span>Why flagged</span><strong>{{ ev.reason }}</strong></div>{% endif %}
+        <div><span>Required action</span><strong>{{ pi.action }}</strong></div>
+      </div>
+    {% endfor %}
     <div class="flow-issue-actions">
       <form action="{{ url_for('driver.record_driver_log_photo', log_id=log_id) }}" method="POST" enctype="multipart/form-data">
         <input type="hidden" name="source" value="proof">
         <input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}">
         <label class="route-detail-link" style="cursor:pointer">Add proof / photo<input type="file" name="photo" accept="image/*" capture="environment" style="display:none" onchange="if(this.files.length){this.form.submit();}"></label>
       </form>
+      <a class="route-detail-link" href="{{ url_for('driver.new_plant_transfer') }}">Attach transfer sheet</a>
       <a class="route-detail-link" href="{{ url_for('driver.pickup_driver_log', log_id=log_id) }}">Confirm delivered</a>
       <form action="{{ url_for('driver.no_pickup_driver_log', log_id=log_id) }}" method="POST"><button class="route-detail-link" type="submit">Mark no pickup</button></form>
       <form action="{{ url_for('driver.request_manager_review', log_id=log_id) }}" method="POST"><button class="route-detail-link danger" type="submit">Send to manager</button></form>
@@ -66,6 +74,10 @@
   {% if route_action and route_action.action not in ['record_departure', 'add_stop', 'add_damage', 'view_route', 'route_history'] and urls.get(route_action.action) %}
     {% set _ = board_ctas.append(route_action) %}
   {% endif %}
+{% endfor %}
+{% set route_action_keys = [] %}
+{% for route_action in board_ctas %}
+  {% set _ = route_action_keys.append('finalize' if route_action.action == 'finalize_route' else ('transfer' if route_action.action == 'attach_document' else route_action.action)) %}
 {% endfor %}
 {% set active_pt = active_pretrip if active_pretrip is defined else none %}
 {% set pending_pt = pending_posttrip if pending_posttrip is defined else false %}
@@ -118,13 +130,20 @@
 {% set ryder_choices = truck_issue_choices if truck_issue_choices is defined else [] %}
 {% set ryder_events = recent_ryder_events if recent_ryder_events is defined else [] %}
 {% set pending_ryder = pending_ryder_event if pending_ryder_event is defined else none %}
+{% set cta_pulse = rm.cta_pulse if rm and rm.cta_pulse is defined else {} %}
+{% set pulse_key = cta_pulse.key|default('none') %}
+{% set dispatch_messages = rm.dispatch_messages if rm and rm.dispatch_messages is defined else [] %}
+{% if not dispatch_messages %}
+  {% set dispatch_messages = [{'text': 'NO ALERTS FROM DISPATCH'}] %}
+{% endif %}
+{% set dispatch_ticker_text = rm.dispatch_ticker_text if rm and rm.dispatch_ticker_text is defined else 'NO ALERTS FROM DISPATCH' %}
 {% set route_status_raw = (rm.route.next_action if rm and rm.route else cta.next_action if cta.next_action is defined else 'Ready')|default('Ready', true) %}
 {% set route_status_lower = route_status_raw|lower %}
 {% if 'no action' in route_status_lower %}
-  {% set route_status_label = 'NO ACTION' %}
-  {% set route_status_tone = 'no_action' %}
+  {% set route_status_label = 'COMPLETE' %}
+  {% set route_status_tone = 'ready' %}
 {% elif 'finalize' in route_status_lower or 'ready' in route_status_lower or 'complete' in route_status_lower %}
-  {% set route_status_label = 'READY' %}
+  {% set route_status_label = 'READY TO FINALIZE' if 'finalize' in route_status_lower else 'COMPLETE' %}
   {% set route_status_tone = 'ready' %}
 {% elif 'hold' in route_status_lower %}
   {% set route_status_label = 'HOLD' %}
@@ -136,25 +155,25 @@
   {% set route_status_label = 'OPEN' %}
   {% set route_status_tone = 'open' %}
 {% elif 'review' in route_status_lower or 'issue' in route_status_lower or 'blocked' in route_status_lower or 'blocker' in route_status_lower %}
-  {% set route_status_label = 'REVIEW ISSUE' %}
-  {% set route_status_tone = 'risk' %}
+  {% set route_status_label = 'OPEN ISSUES' %}
+  {% set route_status_tone = 'attention' %}
 {% else %}
   {% set route_status_label = route_status_raw|upper %}
   {% set route_status_tone = 'ready' %}
 {% endif %}
-{% set _rev = namespace(open=0, risk=0) %}
+{% set _rev = namespace(open=0, risk=0, first='') %}
 {% if rm and rm.stops %}
   {% for _st in rm.stops %}
-    {% if _st.badge and _st.badge.severity == 'risk' %}{% set _rev.open = _rev.open + 1 %}{% set _rev.risk = _rev.risk + 1 %}
-    {% elif _st.badge and _st.badge.severity == 'attention' %}{% set _rev.open = _rev.open + 1 %}{% endif %}
+    {% if _st.badge and _st.badge.severity == 'risk' %}{% set _rev.open = _rev.open + 1 %}{% set _rev.risk = _rev.risk + 1 %}{% if not _rev.first %}{% set _rev.first = _st.badge.label %}{% endif %}
+    {% elif _st.badge and _st.badge.severity == 'attention' %}{% set _rev.open = _rev.open + 1 %}{% if not _rev.first %}{% set _rev.first = _st.badge.label %}{% endif %}{% endif %}
   {% endfor %}
 {% endif %}
 {% if _rev.open > 0 %}
-  {% set route_status_label = (_rev.open ~ ' TO REVIEW') %}
+  {% set route_status_label = _rev.first if _rev.open == 1 else (_rev.open ~ ' OPEN ISSUES') %}
   {% set route_status_tone = 'risk' if _rev.risk else 'attention' %}
 {% endif %}
 
-<section class="compact-route-map md-flow-board" data-route-map-shell data-route-map-mode="route" data-route-sheet-url="{{ route_sheet_url or '#' }}">
+<section class="compact-route-map md-flow-board" data-route-map-shell data-route-map-mode="route" data-route-sheet-url="{{ route_sheet_url or '#' }}" data-route-refresh-url="{{ url_for('driver.mobile_route_map_fragment', date=route_date.isoformat()) if route_date is defined and route_date else url_for('driver.mobile_route_map_fragment') }}">
   <div class="md-flow-head">
 	    <div>
 	      <span class="md-flow-kicker"><i></i> LIVE FLOW BOARD</span>
@@ -172,31 +191,32 @@
   {% if map_mode != 'route_replay' %}
   <div class="md-flow-top-actions" aria-label="Live flow workflow actions">
     {% if depart_url and primary_stop %}
-    <a class="md-flow-action-tab primary" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow">
-      <strong>Depart</strong>
+    <a class="md-flow-action-tab primary {% if pulse_key == 'depart' %}is-next-required{% endif %}" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow">
+      <strong>Depart / Load</strong>
       <span>Departure / proof</span>
     </a>
     {% elif add_stop_url %}
-    <a class="md-flow-action-tab primary" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}" data-flow-panel-title="Add Stop">
+    <a class="md-flow-action-tab primary {% if pulse_key == 'add_stop' %}is-next-required{% endif %}" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}" data-flow-panel-title="Add Stop">
       <strong>Add Stop</strong>
       <span>Continue route</span>
     </a>
     {% endif %}
     {% for route_action in board_ctas %}
-      <a class="md-flow-action-tab primary" href="{{ urls.get(route_action.action) }}" data-flow-open-url="{{ urls.get(route_action.action) }}" data-flow-panel-title="{{ route_action.label }}">
+      {% set route_action_key = 'finalize' if route_action.action == 'finalize_route' else ('transfer' if route_action.action == 'attach_document' else route_action.action) %}
+      <a class="md-flow-action-tab primary {% if pulse_key == route_action_key %}is-next-required{% endif %}" href="{{ urls.get(route_action.action) }}" data-flow-open-url="{{ urls.get(route_action.action) }}" data-flow-panel-title="{{ route_action.label }}">
         <strong>{{ route_action.label.replace(' Route', '').replace(' Document', '') }}</strong>
         <span>{% if route_action.action == 'finalize_route' %}Ready To Finalize{% elif route_action.action == 'print_route' %}Route packet{% elif route_action.action == 'attach_document' %}Proof document{% elif route_action.action == 'confirm_cargo' %}Cargo check{% else %}{{ cta.next_action or route_action.label }}{% endif %}</span>
       </a>
     {% endfor %}
-    <a class="md-flow-action-tab" href="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-open-url="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-panel-title="Camera / Proof">
+    <a class="md-flow-action-tab {% if pulse_key == 'camera' %}is-next-required{% endif %}" href="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-open-url="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-panel-title="Camera / Proof">
       <strong>Camera</strong>
       <span>Photo proof</span>
     </a>
-    <a class="md-flow-action-tab" href="{{ transfer_url }}" data-flow-open-url="{{ transfer_url }}" data-flow-panel-title="Plant Transfer">
+    <a class="md-flow-action-tab {% if pulse_key == 'transfer' and 'transfer' not in route_action_keys %}is-next-required{% endif %}" href="{{ transfer_url }}" data-flow-open-url="{{ transfer_url }}" data-flow-panel-title="Plant Transfer">
       <strong>Transfer</strong>
       <span>{{ transfer_note }}</span>
     </a>
-    <a class="md-flow-action-tab" href="{{ shift_url }}" data-flow-open-url="{{ shift_url }}" data-flow-panel-title="{{ 'PostTrip Work' if posttrip_url else 'PreTrip / Shift' }}">
+    <a class="md-flow-action-tab {% if pulse_key == 'posttrip' %}is-next-required{% endif %}" href="{{ shift_url }}" data-flow-open-url="{{ shift_url }}" data-flow-panel-title="{{ 'PostTrip Work' if posttrip_url else 'PreTrip / Shift' }}">
       <strong>{{ shift_label }}</strong>
       <span>{{ shift_note }}</span>
     </a>
@@ -553,8 +573,8 @@
     </div>
 
     <div class="md-flow-ticker" aria-hidden="true">
-      <span>ROUTE LOGS &nbsp; PLANT TRANSFERS &nbsp; PARTS &nbsp; DAMAGE &nbsp; HOLDS &nbsp; SCRAP &nbsp; HOT MOVES &nbsp; POSTTRIP</span>
-      <span>ROUTE LOGS &nbsp; PLANT TRANSFERS &nbsp; PARTS &nbsp; DAMAGE &nbsp; HOLDS &nbsp; SCRAP &nbsp; HOT MOVES &nbsp; POSTTRIP</span>
+      <span>{{ dispatch_ticker_text }}</span>
+      <span>{{ dispatch_ticker_text }}</span>
     </div>
 
     <div class="md-flow-templates" hidden>
@@ -633,7 +653,6 @@
                       <span class="route-focus-chips">
                         {% for part in detail.parts %}<em>{{ part }}</em>{% endfor %}
                         {% if detail.wait_label %}<em>{{ detail.wait_label }}</em>{% endif %}
-                        {% for flag in detail.flags %}<em class="flag">{{ flag }}</em>{% endfor %}
                       </span>
                     {% endif %}
                   </span>
@@ -661,7 +680,6 @@
                       <span class="route-focus-chips">
                         {% for part in detail.parts %}<em>{{ part }}</em>{% endfor %}
                         {% if detail.wait_label %}<em>{{ detail.wait_label }}</em>{% endif %}
-                        {% for flag in detail.flags %}<em class="flag">{{ flag }}</em>{% endfor %}
                       </span>
                     {% endif %}
                   </span>
@@ -677,8 +695,8 @@
       {{ rm.map_empty_message if rm and rm.map_empty_message else 'No route stops logged for this date.' }}
     </p>
     <div class="md-flow-ticker" aria-hidden="true">
-      <span>ROUTE LOGS &nbsp; PLANT TRANSFERS &nbsp; PARTS &nbsp; DAMAGE &nbsp; HOLDS &nbsp; SCRAP &nbsp; HOT MOVES &nbsp; POSTTRIP</span>
-      <span>ROUTE LOGS &nbsp; PLANT TRANSFERS &nbsp; PARTS &nbsp; DAMAGE &nbsp; HOLDS &nbsp; SCRAP &nbsp; HOT MOVES &nbsp; POSTTRIP</span>
+      <span>{{ dispatch_ticker_text }}</span>
+      <span>{{ dispatch_ticker_text }}</span>
     </div>
   {% endif %}
 </section>

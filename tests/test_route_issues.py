@@ -25,6 +25,8 @@ def test_known_flags_map_to_explicit_reason_codes():
 def test_no_catalog_entry_is_a_generic_risk_label():
     for label, *_ in ISSUE_CATALOG.values():
         assert label != "RISK"
+        assert label != "VERIFY ROUTE"
+        assert label != "REVIEW ISSUE"
 
 
 def test_state_only_flags_are_not_issues():
@@ -33,8 +35,9 @@ def test_state_only_flags_are_not_issues():
     assert derive_issues(["Fuel", "Meeting"]) == []
 
 
-def test_open_wait_only_when_open_and_over_threshold():
-    assert derive_issues([], departed=False, wait_minutes=45)[0]["code"] == "open_wait"
+def test_open_wait_becomes_specific_departure_issue():
+    assert derive_issues([], departed=False, wait_minutes=45)[0]["code"] == "needs_departure"
+    assert derive_issues([], departed=False, needs_departure=True)[0]["label"] == "NEEDS DEPARTURE"
     assert derive_issues([], departed=False, wait_minutes=5) == []
     assert derive_issues([], departed=True, wait_minutes=120) == []
 
@@ -44,7 +47,7 @@ def test_every_issue_has_reason_action_and_unresolved_state():
         obj = issue(code)
         assert obj["reason"], code
         assert obj["action"], code
-        assert obj["severity"] in ("ok", "attention", "risk"), code
+        assert obj["severity"] in ("ok", "info", "attention", "risk"), code
         assert obj["resolved"] is False, code
 
 
@@ -56,10 +59,15 @@ def test_badge_is_never_green_for_an_issue():
 
     attention = board_badge(derive_issues(["Hold"]), ok_label="RECORDED")
     assert attention["pill_tone"] == "attention"  # amber
+    assert attention["short"] == "HOLD"
 
     clean = board_badge([], ok_label="RECORDED", ok_pill_tone="recorded")
     assert clean["severity"] == "ok"
     assert clean["pill_tone"] == "recorded"
+
+    loaded = board_badge([], ok_label="LOADED", ok_pill_tone="open", ok_severity="info")
+    assert loaded["severity"] == "info"
+    assert loaded["label"] == "LOADED"
 
 
 def test_primary_issue_picks_worst_severity():

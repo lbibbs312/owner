@@ -1,0 +1,61 @@
+<style>
+  .pretrip-checklist .form-check {
+    padding:.45rem .7rem .45rem 2.2rem;
+    border:1px solid rgba(91,157,255,.14);
+    border-radius:10px;
+    background:rgba(6,10,18,.28);
+    margin-bottom:.35rem;
+  }
+  .pretrip-checklist .form-check-label.text-danger,
+  .pretrip-checklist .form-check-label.text-success {
+    color:var(--md-text) !important;
+  }
+  .pretrip-checklist .form-check-input:checked + .form-check-label.text-danger,
+  .pretrip-checklist .form-check-input:checked + label.text-danger {
+    color:var(--md-red) !important;
+    font-weight:900;
+  }
+  .pretrip-checklist .form-check-input:checked + .form-check-label.text-success,
+  .pretrip-checklist .form-check-input:checked + label.text-success {
+    color:var(--md-green) !important;
+    font-weight:900;
+  }
+  .pretrip-checklist .form-check:has(.form-check-input:checked + .text-danger) {
+    border-color:rgba(255,82,71,.42);
+    background:rgba(255,82,71,.1);
+  }
+  .pretrip-checklist .form-check:has(.form-check-input:checked + .text-success) {
+    border-color:rgba(43,213,118,.36);
+    background:rgba(43,213,118,.1);
+  }
+</style>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var groups = [
+      { ok: 'gc_no_defects', defects: ['cab_doors_windows', 'body_doors', 'oil_leak', 'grease_leak', 'coolant_leak', 'fuel_leak'] },
+      { ok: 'incab_no_defects', defects: ['gauges_warning', 'wipers', 'horn', 'heater_defroster', 'mirrors', 'seat_belts_steering', 'clutch', 'service_brakes', 'parking_brake', 'emergency_brakes', 'triangles', 'fire_extinguisher', 'safety_equipment'] },
+      { ok: 'ec_no_defects', defects: ['oil_level', 'coolant_level', 'belts', 'hoses'] },
+      { ok: 'exterior_no_defects', defects: ['lights_working', 'reflectors', 'suspension', 'tires', 'wheels_rims', 'battery', 'exhaust', 'brakes', 'air_lines', 'light_line', 'fifth_wheel', 'coupling', 'tie_downs', 'rear_end_protection'] },
+      { ok: 'towed_no_defects', defects: ['towed_bodydoors', 'towed_tiedowns', 'towed_lights', 'towed_reflectors', 'towed_suspension', 'towed_tires', 'towed_wheels', 'towed_brakes', 'towed_landing_gear', 'towed_kingpin', 'towed_fifthwheel', 'towed_othercoupling', 'towed_rearend'] }
+    ];
+
+    groups.forEach(function (group) {
+      var ok = document.getElementById(group.ok);
+      var defects = group.defects.map(function (id) { return document.getElementById(id); }).filter(Boolean);
+      if (!ok || !defects.length) return;
+
+      defects.forEach(function (input) {
+        input.addEventListener('change', function () {
+          if (input.checked) ok.checked = false;
+        });
+      });
+
+      ok.addEventListener('change', function () {
+        if (!ok.checked) return;
+        defects.forEach(function (input) {
+          input.checked = false;
+        });
+      });
+    });
+  });
+</script>

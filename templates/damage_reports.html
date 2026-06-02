@@ -8,11 +8,127 @@
 <div class="container-fluid py-4 responsive-workspace">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <div>
-      <h1 class="h3 mb-1">Damage Reports</h1>
-      <p class="text-muted mb-0 small">Open driver reports can be edited, submitted, or deleted until the route is finalized.</p>
+      <p class="md-section-label mb-1">ISSUE LEDGER</p>
+      <h1 class="h3 mb-1 md-page-title">Damage Reports</h1>
+      <p class="text-muted mb-0 small">Driver damage reports, evidence status, and actions.</p>
     </div>
     <a class="btn btn-primary" href="{{ url_for('driver.new_damage_report') }}">New Report</a>
   </div>
+  {% if current_user.role != 'management' %}
+    <style>
+      .damage-card-list { display:grid; gap:12px; }
+      .damage-report-card {
+        display:grid;
+        gap:12px;
+        padding:14px;
+        border:1px solid var(--md-line);
+        border-radius:16px;
+        background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(12,21,33,.96));
+        box-shadow:0 18px 40px rgba(0,0,0,.32), inset 0 1px 0 rgba(91,157,255,.08);
+      }
+      .damage-report-top {
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        gap:10px;
+        align-items:start;
+      }
+      .damage-report-title {
+        margin:0;
+        color:var(--md-text);
+        font-family:var(--md-display);
+        font-weight:900;
+        text-transform:uppercase;
+        letter-spacing:.02em;
+      }
+      .damage-report-meta {
+        margin:3px 0 0;
+        color:var(--md-muted);
+        font-family:var(--md-mono);
+        font-size:.78rem;
+        font-weight:800;
+        line-height:1.35;
+      }
+      .damage-report-facts {
+        display:grid;
+        grid-template-columns:repeat(3,minmax(0,1fr));
+        gap:8px;
+      }
+      .damage-report-fact {
+        min-width:0;
+        padding:9px;
+        border:1px solid rgba(91,157,255,.18);
+        border-radius:10px;
+        background:rgba(6,10,18,.5);
+      }
+      .damage-report-fact span {
+        display:block;
+        color:var(--md-amber);
+        font-family:var(--md-mono);
+        font-size:.62rem;
+        font-weight:900;
+        letter-spacing:.1em;
+        text-transform:uppercase;
+      }
+      .damage-report-fact strong {
+        display:block;
+        margin-top:3px;
+        color:var(--md-text);
+        overflow-wrap:anywhere;
+      }
+      .damage-report-actions {
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+      }
+      .damage-report-actions .btn,
+      .damage-report-actions form {
+        flex:1 1 110px;
+      }
+      .damage-report-actions .btn,
+      .damage-report-actions button {
+        width:100%;
+      }
+      @media (max-width:620px) {
+        .damage-report-facts { grid-template-columns:1fr; }
+        .damage-report-top { grid-template-columns:1fr; }
+      }
+    </style>
+    <div class="damage-card-list">
+      {% for report in reports %}
+        {% set can_modify = can_modify_damage_report(report) if can_modify_damage_report is defined else false %}
+        {% set finalized = route_finalized_for_report(report) if route_finalized_for_report is defined else false %}
+        {% set status_label = 'COMPLETE' if report.status == 'submitted' or report.status == 'closed' else 'OPEN' %}
+        <article class="damage-report-card">
+          <div class="damage-report-top">
+            <div>
+              <p class="damage-report-title">Damage Report</p>
+              <p class="damage-report-meta">{{ report.created_at|to_detroit_datetime }} · {{ report.plant_name or 'Plant not set' }} · Truck {{ report.truck_number or 'not set' }}</p>
+            </div>
+            <span class="badge text-bg-{{ 'success' if status_label == 'COMPLETE' else 'warning' }}">{{ status_label }}</span>
+          </div>
+          <div class="damage-report-facts">
+            <div class="damage-report-fact"><span>Plant</span><strong>{{ report.plant_name or 'Not set' }}</strong></div>
+            <div class="damage-report-fact"><span>Trailer</span><strong>{{ report.trailer_number or 'Not set' }}</strong></div>
+            <div class="damage-report-fact"><span>Lock</span><strong>{% if finalized %}Route finalized{% elif report.status != 'open' %}Submitted{% else %}Editable{% endif %}</strong></div>
+          </div>
+          <div class="damage-report-actions">
+            <a class="btn btn-outline-primary" href="{{ url_for('driver.view_damage_report', report_id=report.id) }}">View</a>
+            {% if can_modify %}
+              <a class="btn btn-outline-secondary" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Edit</a>
+              <form method="POST" action="{{ url_for('driver.submit_damage_report', report_id=report.id) }}">
+                <button class="btn btn-success" type="submit">Submit</button>
+              </form>
+              <form method="POST" action="{{ url_for('driver.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Delete this damage report?');">
+                <button class="btn btn-outline-danger" type="submit">Delete</button>
+              </form>
+            {% endif %}
+          </div>
+        </article>
+      {% else %}
+        <div class="md-glass md-glow p-3 text-muted">No damage reports.</div>
+      {% endfor %}
+    </div>
+  {% else %}
   <div class="table-responsive route-workspace-table md-glow">
     <table class="table table-sm align-middle">
       <thead>
@@ -65,6 +181,7 @@
       </tbody>
     </table>
   </div>
+  {% endif %}
 </div>
 {% set md_nav_active = 'damage' %}
 {% include 'partials/_md_bottom_nav.html' %}

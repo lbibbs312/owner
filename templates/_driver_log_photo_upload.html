@@ -1,18 +1,19 @@
 <style>
-  .stop-photo-panel { border:2px solid #9f1239; border-radius:10px; background:#fff7f9; padding:14px; margin:14px 0 18px; }
+  .stop-photo-panel { border:1px solid rgba(91,157,255,.32); border-radius:10px; background:linear-gradient(180deg,rgba(15,26,41,.94),rgba(8,19,34,.96)); color:#f6f8fb; padding:14px; margin:14px 0 18px; box-shadow:inset 0 0 24px rgba(91,157,255,.08),0 0 22px rgba(91,157,255,.12); }
   .stop-photo-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:10px 0; }
-  .stop-photo-actions button { border:1px solid #9f1239; background:#9f1239; color:#fff; border-radius:8px; padding:12px 10px; font-weight:900; font-size:.95rem; }
-  .stop-photo-actions button.secondary { background:#fff; color:#9f1239; }
-  .stop-photo-status { margin-top:4px; color:#475569; font-size:.82rem; font-weight:800; min-height:1.2em; }
+  .stop-photo-actions button { border:1px solid rgba(255,178,36,.44); background:rgba(255,178,36,.16); color:#f6f8fb; border-radius:8px; padding:12px 10px; font-weight:900; font-size:.95rem; }
+  .stop-photo-actions button.secondary { border-color:rgba(91,157,255,.36); background:rgba(47,109,240,.16); color:#f6f8fb; }
+  .stop-photo-status { margin-top:4px; color:#8a99b3; font-size:.82rem; font-weight:800; min-height:1.2em; }
   .stop-photo-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,260px)); gap:12px; margin-top:10px; }
-  .stop-photo-card { display:block; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; background:#fff; color:#0f172a; }
-  .stop-photo-card .stop-photo-image-link { display:block; color:#0f172a; text-decoration:none; }
-  .stop-photo-card .stop-photo-missing { padding:9px; background:#fff7ed; color:#92400e; }
-  .stop-photo-card img { display:block; width:100%; height:180px; object-fit:contain; background:#f8fafc; }
-  .stop-photo-card span { display:block; padding:6px 8px; color:#475569; font-size:.72rem; font-weight:900; }
-  .stop-photo-card small { display:block; padding:0 8px 7px; color:#334155; font-size:.72rem; font-weight:800; line-height:1.25; }
-  .stop-photo-delete { width:100%; border:0; border-top:1px solid #e2e8f0; background:#fff1f2; color:#be123c; padding:7px 8px; font-weight:900; font-size:.72rem; }
-  .stop-photo-empty { color:#64748b; font-size:.86rem; font-weight:700; }
+  .stop-photo-card { display:block; border:1px solid rgba(91,157,255,.24); border-radius:8px; overflow:hidden; background:rgba(6,10,18,.64); color:#f6f8fb; }
+  .stop-photo-card .stop-photo-image-link { display:block; color:#f6f8fb; text-decoration:none; }
+  .stop-photo-card .stop-photo-missing { padding:9px; background:rgba(255,178,36,.1); color:#ffcf6f; }
+  .stop-photo-card img { display:block; width:100%; height:180px; object-fit:contain; background:rgba(5,10,18,.78); }
+  .stop-photo-card span { display:block; padding:6px 8px; color:#f6f8fb; font-size:.72rem; font-weight:900; }
+  .stop-photo-card small { display:block; padding:0 8px 7px; color:#8a99b3; font-size:.72rem; font-weight:800; line-height:1.25; }
+  .stop-photo-delete { width:100%; border:0; border-top:1px solid rgba(255,82,71,.28); background:rgba(255,82,71,.12); color:#ffbbb7; padding:7px 8px; font-weight:900; font-size:.72rem; }
+  .stop-photo-empty { color:#8a99b3; font-size:.86rem; font-weight:700; }
+  .stop-photo-panel .text-muted { color:#8a99b3!important; }
 </style>
 {% set photo_source_prefix = photo_source_prefix|default('stop') %}
 <section class="stop-photo-panel" data-stop-photo-panel data-upload-url="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}">

@@ -13,10 +13,11 @@
 </head>
 <body class="md-shell md-standalone">
 {% include 'partials/_md_standalone_header.html' %}
+{% include 'partials/_pretrip_defect_controls.html' %}
 <div class="container my-4">
   <h1 class="mb-3">New PreTrip Inspection</h1>
 
-  <form method="POST" action="" enctype="multipart/form-data" class="md-glass md-glow p-3" data-autosave="true" data-autosave-key="pretrip-new">
+  <form method="POST" action="" enctype="multipart/form-data" class="md-glass md-glow p-3 pretrip-checklist" data-autosave="true" data-autosave-key="pretrip-new">
     <!-- CRITICAL: ensures CSRF token is included -->
     {{ form.hidden_tag() }}
 

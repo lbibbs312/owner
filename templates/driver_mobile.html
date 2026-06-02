@@ -1894,6 +1894,10 @@
       align-self: center;
     }
     .md-flow-action-tab.is-active::before {
+      background: var(--md-blue);
+      box-shadow: 0 0 0 1px rgba(91,157,255,.28), 0 0 10px rgba(91,157,255,.35);
+    }
+    .md-flow-action-tab.is-next-required::before {
       background: var(--md-amber);
       box-shadow: 0 0 0 1px rgba(255,178,36,.3), 0 0 14px rgba(255,178,36,.55);
       animation: actionDotPulse 1.9s ease-in-out infinite;
@@ -1935,14 +1939,16 @@
       outline: 0;
     }
     .md-flow-action-tab:focus-visible strong,
-    .md-flow-action-tab.is-active strong {
+    .md-flow-action-tab.is-active strong,
+    .md-flow-action-tab.is-next-required strong {
       color: var(--md-amber);
       text-shadow:
         0 0 10px rgba(255,178,36,.28),
         0 0 18px rgba(91,157,255,.18);
     }
     .md-flow-action-tab:focus-visible::after,
-    .md-flow-action-tab.is-active::after {
+    .md-flow-action-tab.is-active::after,
+    .md-flow-action-tab.is-next-required::after {
       background: rgba(255,178,36,.68);
       box-shadow:
         0 0 12px rgba(255,178,36,.42),
@@ -3094,6 +3100,15 @@
 <script src="{{ url_for('static', filename='js/live_route_map.js') }}"></script>
 <script>
   (function () {
+    var mobileDashboardPath = {{ url_for('driver.mobile_dashboard')|tojson }};
+    var routeRefreshReturnPaths = [
+      mobileDashboardPath,
+      {{ url_for('driver.driver_logs')|tojson }},
+      {{ url_for('driver.plant_transfers')|tojson }},
+      {{ url_for('driver.damage_reports')|tojson }},
+      {{ url_for('driver.end_of_day_summary')|tojson }}
+    ];
+
     function usableUrl(url) {
       return url && url !== '#';
     }
@@ -3109,7 +3124,46 @@
       }
     }
 
-    document.querySelectorAll('[data-route-map-shell].md-flow-board').forEach(function (board) {
+    function routeToast(title, detail, type) {
+      if (window.MoveDefenseToast && typeof window.MoveDefenseToast.show === 'function') {
+        window.MoveDefenseToast.show(title || 'ROUTE UPDATED', detail || 'Route board refreshed', type || 'success');
+      } else if (window.MoveDefenseToast && typeof window.MoveDefenseToast.success === 'function') {
+        window.MoveDefenseToast.success(title || 'ROUTE UPDATED', detail || 'Route board refreshed');
+      }
+    }
+
+    async function refreshRouteBoard(detail) {
+      var boards = Array.prototype.slice.call(document.querySelectorAll('[data-route-map-shell].md-flow-board'));
+      if (!boards.length || !window.fetch) return;
+      await Promise.all(boards.map(async function (board) {
+        var refreshUrl = board.getAttribute('data-route-refresh-url');
+        if (!usableUrl(refreshUrl)) return;
+        var response = await fetch(refreshUrl, {
+          credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'fetch' }
+        });
+        if (!response.ok) throw new Error('Route board refresh failed.');
+        var html = await response.text();
+        var wrapper = document.createElement('div');
+        wrapper.innerHTML = html.trim();
+        var nextBoard = wrapper.querySelector('[data-route-map-shell].md-flow-board');
+        if (!nextBoard) return;
+        board.replaceWith(nextBoard);
+        setupMoveDefenseFlowBoard(nextBoard);
+      }));
+      if (detail && detail.title && !detail.silent) routeToast(detail.title, detail.detail);
+    }
+
+    window.MoveDefenseRefreshRouteBoard = refreshRouteBoard;
+    document.addEventListener('movedefense:route-updated', function (event) {
+      refreshRouteBoard(event.detail || {}).catch(function (error) {
+        console.error(error);
+      });
+    });
+
+    function setupMoveDefenseFlowBoard(board) {
+      if (!board || board.dataset.flowBoardReady === '1') return;
+      board.dataset.flowBoardReady = '1';
       var panel = board.querySelector('[data-md-flow-work-panel]');
       var panelTitle = board.querySelector('[data-md-flow-work-title]');
       var context = board.querySelector('[data-md-flow-context]');
@@ -3385,9 +3439,40 @@
           });
         });
 
-        form.addEventListener('submit', function (event) {
+        form.addEventListener('submit', async function (event) {
           if (!requireUnloadReason() || !requireDestination()) {
             event.preventDefault();
+            return;
+          }
+          if (!window.fetch || form.dataset.ajaxSubmitting === '1') {
+            return;
+          }
+          event.preventDefault();
+          form.dataset.ajaxSubmitting = '1';
+          try {
+            var response = await fetch(form.action, {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'X-Requested-With': 'fetch' },
+              body: new FormData(form)
+            });
+            if (!response.ok) throw new Error('Departure was not saved.');
+            if (panel) panel.hidden = true;
+            if (frame) {
+              frame.classList.remove('is-ready');
+              frame.removeAttribute('src');
+            }
+            if (context) context.innerHTML = '';
+            hideInlinePanels();
+            if (embedWrap) embedWrap.hidden = true;
+            board.classList.remove('is-interacting');
+            document.dispatchEvent(new CustomEvent('movedefense:route-updated', {
+              detail: { title: 'DEPARTURE RECORDED', detail: 'Route board updated' }
+            }));
+          } catch (error) {
+            routeToast('SAVE FAILED', error.message || 'Open the stop and try again.', 'error');
+          } finally {
+            form.dataset.ajaxSubmitting = '';
           }
         });
 
@@ -3462,6 +3547,18 @@
       if (frame) {
         frame.addEventListener('load', function () {
           try {
+            var childUrl = new URL(frame.contentWindow.location.href);
+            if (routeRefreshReturnPaths.indexOf(childUrl.pathname) !== -1) {
+              if (panel) panel.hidden = true;
+              if (context) context.innerHTML = '';
+              hideInlinePanels();
+              if (embedWrap) embedWrap.hidden = true;
+              board.classList.remove('is-interacting');
+              document.dispatchEvent(new CustomEvent('movedefense:route-updated', {
+                detail: { title: 'ROUTE UPDATED', detail: 'Route board refreshed' }
+              }));
+              return;
+            }
             var doc = frame.contentDocument;
             if (!doc || doc.getElementById('liveFlowEmbedStyle')) return;
             var style = doc.createElement('style');
@@ -3494,7 +3591,9 @@
           } catch (error) {}
         });
       }
-    });
+    }
+
+    document.querySelectorAll('[data-route-map-shell].md-flow-board').forEach(setupMoveDefenseFlowBoard);
   })();
 </script>
 

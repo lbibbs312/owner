@@ -12,19 +12,20 @@ Issue object shape (item 2 of the spec)::
     {
         "code": "unconfirmed_drop",          # stable machine code
         "label": "UNCONFIRMED DROP",         # shown on the pill
-        "severity": "risk",                  # ok | attention | risk
+        "severity": "risk",                  # ok | info | attention | risk
         "reason": "A load left the truck ...",  # shown to driver/manager
         "action": "Confirm delivered here",  # what to do next
         "evidence": {...},                   # fields used to derive it
         "resolved": False,                   # unresolved by default
     }
 
-Severity drives colour: ``risk`` -> red, ``attention`` -> amber, ``ok`` -> green.
+Severity drives colour: ``risk`` -> red, ``attention`` -> amber, ``info`` ->
+blue, and ``ok`` -> green.
 A pill is only green when there are **no** issues.
 """
 
-# severity ranks for picking the worst issue. ok < attention < risk
-_SEVERITY_RANK = {"ok": 0, "attention": 1, "risk": 2}
+# severity ranks for picking the worst issue. ok < info < attention < risk
+_SEVERITY_RANK = {"ok": 0, "info": 1, "attention": 2, "risk": 3}
 
 # code -> (label, severity, reason, action)
 ISSUE_CATALOG = {
@@ -58,30 +59,10 @@ ISSUE_CATALOG = {
         "This stop is on hold and is waiting on a decision.",
         "Review hold",
     ),
-    "open_wait": (
-        "OPEN WAIT", "attention",
-        "This stop has been open past the wait threshold without a departure.",
-        "Record departure",
-    ),
     "needs_departure": (
         "NEEDS DEPARTURE", "attention",
         "Arrived at the stop but the departure has not been recorded.",
         "Record departure",
-    ),
-    "audit_risk": (
-        "AUDIT RISK", "risk",
-        "This entry was flagged as an audit risk.",
-        "Review entry",
-    ),
-    "route_deviation": (
-        "VERIFY ROUTE", "attention",
-        "A route deviation was detected and needs verification.",
-        "Verify route",
-    ),
-    "hot": (
-        "HOT", "attention",
-        "Hot / priority load that needs to keep moving.",
-        "Prioritize move",
     ),
     "review_requested": (
         "IN REVIEW", "attention",
@@ -100,18 +81,21 @@ FLAG_TO_CODE = {
     "Needs review": "unconfirmed_drop",
     "Shortage": "count_short",
     "Hold": "hold",
-    "Audit risk": "audit_risk",
-    "Verify route": "route_deviation",
-    "Delay": "open_wait",
-    "Hot": "hot",
+    "Delay": "needs_departure",
 }
 
-# Compact pill text; the full label + reason live in the issue drawer.
+# Driver-facing pill text must stay explicit. The issue drawer carries the
+# longer reason/evidence, but the row itself should never show mystery tokens
+# such as "DROP?", "PROOF", or "ROUTE?".
 SHORT_LABEL = {
-    "damage": "DAMAGE", "missing_proof": "PROOF", "destination_mismatch": "MISMATCH",
-    "unconfirmed_drop": "DROP?", "count_short": "SHORT", "hold": "HOLD",
-    "open_wait": "WAIT", "needs_departure": "DEPART", "audit_risk": "AUDIT",
-    "route_deviation": "ROUTE?", "hot": "HOT", "review_requested": "REVIEW",
+    "damage": "DAMAGE",
+    "missing_proof": "MISSING PROOF",
+    "destination_mismatch": "DEST MISMATCH",
+    "unconfirmed_drop": "UNCONFIRMED DROP",
+    "count_short": "COUNT SHORT",
+    "hold": "HOLD",
+    "needs_departure": "NEEDS DEPARTURE",
+    "review_requested": "IN REVIEW",
 }
 
 
@@ -139,6 +123,7 @@ def derive_issues(
     unconfirmed_drop=False,
     destination_mismatch=False,
     missing_proof=False,
+    needs_departure=False,
     review_requested=False,
     evidence=None,
     extra_codes=(),
@@ -161,6 +146,8 @@ def derive_issues(
         codes.append("destination_mismatch")
     if unconfirmed_drop:
         codes.append("unconfirmed_drop")
+    if needs_departure:
+        codes.append("needs_departure")
     if review_requested:
         codes.append("review_requested")
 
@@ -169,13 +156,13 @@ def derive_issues(
         if code:
             codes.append(code)
 
-    # A stop that is still open and has been waiting too long is an open wait.
+    # A stop that is still open and has been waiting too long needs a departure.
     if (
         not departed
         and wait_minutes is not None
         and wait_minutes >= wait_threshold
     ):
-        codes.append("open_wait")
+        codes.append("needs_departure")
 
     codes.extend(code for code in extra_codes if code in ISSUE_CATALOG)
 
@@ -194,7 +181,7 @@ def primary_issue(issues):
 
 
 def overall_severity(issues):
-    """Return ``risk`` / ``attention`` / ``ok`` for a list of issues."""
+    """Return ``risk`` / ``attention`` / ``info`` / ``ok`` for issues."""
     worst = primary_issue(issues)
     return worst["severity"] if worst else "ok"
 
@@ -212,14 +199,22 @@ def status_pill(issues, *, ok_label, ok_tone="recorded"):
     return worst["label"], ("risk" if worst["severity"] == "risk" else "attention")
 
 
-def board_badge(issues, *, ok_label, ok_pill_tone="recorded", ok_row_tone="completed", ok_short=None):
+def board_badge(
+    issues,
+    *,
+    ok_label,
+    ok_pill_tone="recorded",
+    ok_row_tone="completed",
+    ok_short=None,
+    ok_severity="ok",
+):
     """Resolve the pill + row badge. ``short`` is the compact pill text; the full
     ``label`` and reason live in the issue drawer. An issue is never green."""
     if any(i.get("code") == "review_requested" for i in issues):
-        return {"label": "IN REVIEW", "short": "REVIEW", "pill_tone": "review", "row_tone": "hot", "severity": "attention"}
+        return {"label": "IN REVIEW", "short": "IN REVIEW", "pill_tone": "review", "row_tone": "hot", "severity": "attention"}
     worst = primary_issue(issues)
     if worst is None:
-        return {"label": ok_label, "short": ok_short or ok_label, "pill_tone": ok_pill_tone, "row_tone": ok_row_tone, "severity": "ok"}
+        return {"label": ok_label, "short": ok_short or ok_label, "pill_tone": ok_pill_tone, "row_tone": ok_row_tone, "severity": ok_severity}
     short = SHORT_LABEL.get(worst["code"], worst["label"])
     if worst["severity"] == "risk":
         return {"label": worst["label"], "short": short, "pill_tone": "risk", "row_tone": "blocked", "severity": "risk"}

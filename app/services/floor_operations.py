@@ -124,11 +124,11 @@ def next_action_for_request(req, *, declined=False, has_open_issue=False, cargo=
     if status == "cancelled":
         return "No action needed"
     if status == "completed":
-        return "Review issue" if has_open_issue else "No action needed"
+        return "Resolve cargo review" if has_open_issue else "No action needed"
     if status == "blocked":
-        return "Review blocker"
+        return "Resolve blocker"
     if status == "needs_review":
-        return "Review issue"
+        return "Resolve cargo review"
 
     if status in ("open", "acknowledged") and _is_unassigned(req):
         return "Assign driver"
@@ -150,7 +150,7 @@ def next_action_for_request(req, *, declined=False, has_open_issue=False, cargo=
     if not (req.linked_document_id or req.linked_plant_transfer_id):
         return "Attach document"
     if has_open_issue:
-        return "Review issue"
+        return "Resolve cargo review"
     # Completion proof present, nothing open, but not yet marked completed.
     if state == "delivered":
         return "Close request"
@@ -160,7 +160,7 @@ def next_action_for_request(req, *, declined=False, has_open_issue=False, cargo=
 def route_next_action(route_context, *, has_high_issue=False, missing_document=False):
     """Route-level next action for the driver dashboard (from route context)."""
     if has_high_issue:
-        return "Review issue"
+        return "Open issue details"
     current = getattr(route_context, "current_stop", None)
     if current is not None and not _departed(current):
         if cargo_state_for_log(current)["state"] == "unknown":

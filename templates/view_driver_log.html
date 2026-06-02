@@ -226,7 +226,7 @@
               <td style="font-weight:900;color:#475569;">
                 {{ loop.index }}
                 {% if dl.id == log.id %}<span class="current-stop-marker">selected</span>{% endif %}
-                {% if is_active_stop %}<span class="active-stop-marker">active</span>{% elif is_open_exception %}<span class="open-stop-marker">critical</span>{% endif %}
+                {% if is_active_stop %}<span class="active-stop-marker">active</span>{% elif is_open_exception %}<span class="open-stop-marker">needs departure</span>{% endif %}
               </td>
               <td>
                 {% if r %}
@@ -239,7 +239,7 @@
               </td>
               <td style="white-space:nowrap;">{{ dl.arrive_time|to_local_time if dl.arrive_time else '--' }}</td>
               <td style="white-space:nowrap;">
-                {% if dl.depart_time %}{{ dl.depart_time|to_12h_format }}{% elif is_active_stop %}<span style="color:#0e7490;font-weight:900;">Active</span>{% else %}<span style="color:#be123c;font-weight:900;">Missing</span>{% endif %}
+                {% if dl.depart_time %}{{ dl.depart_time|to_12h_format }}{% elif is_active_stop %}<span style="color:#0e7490;font-weight:900;">Active</span>{% else %}<span style="color:#be123c;font-weight:900;">Needs departure</span>{% endif %}
               </td>
               <td>
                 {% if dl.no_pickup %}<em style="color:#475569;">No Pickup</em>

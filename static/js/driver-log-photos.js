@@ -52,6 +52,18 @@
       addPhotoCard(list, payload.photo);
       if (noteInput) noteInput.value = '';
       status.textContent = 'Photo saved to this stop.';
+      if (window.MoveDefenseToast && typeof window.MoveDefenseToast.success === 'function') {
+        window.MoveDefenseToast.success('PHOTO ATTACHED', 'Stop proof saved');
+      }
+      const routeUpdated = { title: 'PHOTO ATTACHED', detail: 'Stop proof saved', silent: true };
+      document.dispatchEvent(new CustomEvent('movedefense:route-updated', { detail: routeUpdated }));
+      try {
+        if (window.parent && window.parent !== window && window.parent.document) {
+          window.parent.document.dispatchEvent(new CustomEvent('movedefense:route-updated', {
+            detail: { title: 'PHOTO ATTACHED', detail: 'Stop proof saved' }
+          }));
+        }
+      } catch (err) {}
     }
 
     panel.querySelectorAll('[data-stop-photo-trigger]').forEach(function (button) {

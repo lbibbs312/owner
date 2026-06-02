@@ -4,9 +4,10 @@
       <div class="drawer-kicker">Stop {{ stop.sequence }} · {{ stop.short_code or 'No current data' }}</div>
       <h3>{{ stop.plant_name or 'No current data' }}</h3>
       <div class="drawer-badges">
-        <span class="route-status-badge status-{{ stop.status }}">{{ stop.status_label }}</span>
-        {% if stop.has_damage %}<span class="route-status-badge status-blocked">Damage</span>{% endif %}
-        {% if stop.has_issue %}<span class="route-status-badge status-needs_review">Needs Review</span>{% endif %}
+        <span class="route-status-badge status-{{ stop.badge.pill_tone if stop.badge else stop.status }}">{{ stop.badge.label if stop.badge else stop.status_label }}</span>
+        {% for issue in stop.issues %}
+          <span class="route-status-badge status-{{ 'blocked' if issue.severity == 'risk' else 'waiting' }}">{{ issue.label }}</span>
+        {% endfor %}
       </div>
       <dl class="drawer-facts">
         <div><dt>Arrival</dt><dd>{{ stop.arrival_at|display_time if stop.arrival_at else 'No current data' }}</dd></div>
@@ -17,9 +18,30 @@
         <div><dt>Cargo / load</dt><dd>{{ stop.cargo_status or 'No current data' }}</dd></div>
         <div><dt>Linked move</dt><dd>{% if stop.linked_move_request_id %}{{ stop.linked_move_request_number or ('Move #' ~ stop.linked_move_request_id) }}{% else %}No linked move request{% endif %}</dd></div>
         <div><dt>Transfer / document</dt><dd>{% if stop.linked_plant_transfer_id %}Plant Transfer #{{ stop.linked_plant_transfer_id }}{% elif stop.linked_document_id %}Document #{{ stop.linked_document_id }}{% else %}Document not attached{% endif %}</dd></div>
-        <div><dt>Issue status</dt><dd>{% if stop.has_issue or stop.has_damage %}Needs review{% else %}No open issues{% endif %}</dd></div>
+        <div><dt>Issue status</dt><dd>{% if stop.issues %}{{ stop.issues|length }} open issue{{ 's' if stop.issues|length != 1 else '' }}{% else %}No open issues{% endif %}</dd></div>
         <div><dt>Next action</dt><dd>{{ stop.next_action or 'No action needed' }}</dd></div>
       </dl>
+      {% if stop.issues %}
+        <div class="drawer-issue-list">
+          {% for issue in stop.issues %}
+            {% set ev = stop.evidence or {} %}
+            <section class="drawer-issue severity-{{ issue.severity }}">
+              <h4>{{ issue.label }}</h4>
+              <p>{{ issue.reason }}</p>
+              <dl class="drawer-facts">
+                {% if ev.dropped %}<div><dt>Affected load</dt><dd>{{ ev.dropped|join(', ') }}</dd></div>{% endif %}
+                {% if ev.expected_destination %}<div><dt>Expected destination</dt><dd>{{ ev.expected_destination }}</dd></div>{% endif %}
+                <div><dt>Arrived with</dt><dd>{{ ev.arrived_with or stop.arrived_with }}</dd></div>
+                <div><dt>Departed with</dt><dd>{{ ev.departed_with or stop.departed_with }}</dd></div>
+                <div><dt>Proof found</dt><dd>{{ ev.proof or 'None on file' }}</dd></div>
+                {% if ev.proof_count is defined %}<div><dt>Proof count</dt><dd>{{ ev.proof_count }}</dd></div>{% endif %}
+                {% if ev.reason %}<div><dt>Why flagged</dt><dd>{{ ev.reason }}</dd></div>{% endif %}
+                <div><dt>Required action</dt><dd>{{ issue.action }}</dd></div>
+              </dl>
+            </section>
+          {% endfor %}
+        </div>
+      {% endif %}
       {% if stop.notes %}
         <p class="drawer-note">{{ stop.notes }}</p>
       {% endif %}

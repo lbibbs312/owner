@@ -95,6 +95,8 @@ def test_driver_route_map_no_data_returns_safe_empty_state(app):
     assert ctx["stops"] == []
     assert ctx["delivery_narratives"] == []
     assert ctx["moves"] == []
+    assert ctx["dispatch_ticker_text"] == "NO ALERTS FROM DISPATCH"
+    assert ctx["cta_pulse"]["key"] == "none"
 
 
 def test_driver_route_map_with_driver_log_returns_stop_nodes(app):
@@ -137,7 +139,264 @@ def test_fuel_stop_uses_neutral_mileage_when_pretrip_delta_is_impossible(app):
 
     assert ctx["stops"][0]["board_code"] == "FUEL"
     assert ctx["stops"][0]["board_detail"] == "1,572 mi recorded"
+    assert ctx["stops"][0]["badge"]["label"] == "FUELED"
     assert "+-" not in ctx["stops"][0]["board_detail"]
+
+
+def test_first_empty_stop_is_route_start_without_issue(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("route_start_driver")
+    _driver_log(driver, plant_name="PC", depart_time="08:20", load_size="Empty", depart_load_size="Empty", no_pickup=True)
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    assert stop["movement_code"] == "route_start"
+    assert stop["badge"]["label"] == "ROUTE START"
+    assert stop["board_detail"] == "Paint Central · route start · arrived empty"
+    assert "empty return" not in stop["board_detail"].lower()
+    assert stop["issues"] == []
+    assert ctx["dispatch_ticker_text"] == "NO ALERTS FROM DISPATCH"
+
+
+def test_later_empty_movement_is_empty_return(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("empty_return_driver")
+    _driver_log(driver, plant_name="PC", arrive_time="2026-05-28 08:00:00", depart_time="08:20", load_size="Empty", depart_load_size="Raleigh East Load")
+    _driver_log(driver, plant_name="RE", arrive_time="2026-05-28 09:00:00", depart_time="09:20", load_size="Raleigh East Load", depart_load_size="Empty")
+    _driver_log(driver, plant_name="PC", arrive_time="2026-05-28 10:00:00", depart_time="10:10", load_size="Empty", depart_load_size="Empty", no_pickup=True)
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][2]
+
+    assert stop["movement_code"] == "empty_return"
+    assert stop["badge"]["label"] == "EMPTY RETURN"
+    assert stop["board_detail"] == "Paint Central · empty return"
+    assert stop["issues"] == []
+
+
+def test_picked_up_load_shows_loaded_info(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("loaded_driver")
+    _driver_log(driver, plant_name="PC", depart_time="08:20", load_size="Empty", depart_load_size="Raleigh East Load")
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    assert stop["badge"]["label"] == "LOADED"
+    assert stop["badge"]["severity"] == "info"
+    assert stop["issues"] == []
+
+
+def test_valid_drop_at_expected_destination_shows_dropped(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("valid_drop_driver")
+    _driver_log(driver, plant_name="PPL", depart_time="09:20", load_size="PPL Load", depart_load_size="Empty")
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    assert stop["badge"]["label"] == "DROPPED"
+    assert stop["badge"]["severity"] == "ok"
+    assert stop["issues"] == []
+
+
+def test_valid_partial_drop_has_no_verify_or_risk_issue(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("valid_partial_drop_driver")
+    _driver_log(
+        driver,
+        plant_name="PC",
+        arrive_time="2026-05-28 08:00:00",
+        depart_time="08:15",
+        load_size="Empty",
+        depart_load_size="Raleigh East Load",
+        secondary_load="PPL Load",
+    )
+    _driver_log(
+        driver,
+        plant_name="PPL",
+        arrive_time="2026-05-28 09:00:00",
+        depart_time="09:20",
+        load_size="Raleigh East Load",
+        depart_load_size="Raleigh East Load",
+    )
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][1]
+    labels = [issue["label"] for issue in stop["issues"]]
+
+    assert stop["badge"]["label"] == "DROPPED"
+    assert stop["badge"]["severity"] == "ok"
+    assert stop["issues"] == []
+    assert "VERIFY" not in labels
+    assert "RISK" not in labels
+
+
+def test_missing_proof_is_specific_issue(app):
+    from app.services.load_state import UNLOAD_NOT_COMPLETED_PREFIX
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("missing_proof_driver")
+    _driver_log(
+        driver,
+        plant_name="PPL",
+        depart_time="09:20",
+        load_size="PPL Load",
+        depart_load_size="Empty",
+        downtime_reason=f"{UNLOAD_NOT_COMPLETED_PREFIX} delivery proof not attached",
+    )
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    assert stop["badge"]["label"] == "MISSING PROOF"
+    assert stop["issues"][0]["code"] == "missing_proof"
+    assert stop["evidence"]["proof"] == "None on file"
+    assert ctx["dispatch_messages"][0]["text"].startswith("MISSING PROOF")
+    assert ctx["cta_pulse"]["key"] == "camera"
+
+
+def test_destination_mismatch_is_specific_issue(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("dest_mismatch_driver")
+    _driver_log(driver, plant_name="RE", depart_time="09:20", load_size="PPL Load", depart_load_size="Empty")
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    assert stop["badge"]["label"] == "DEST MISMATCH"
+    assert stop["issues"][0]["code"] == "destination_mismatch"
+    assert stop["evidence"]["expected_destination"] == "PPL"
+
+
+def test_load_disappears_with_proof_but_without_confirmation_is_unconfirmed_drop(app):
+    from app.extensions import db
+    from app.models import DriverLogPhoto
+    from app.services.load_state import UNLOAD_NOT_COMPLETED_PREFIX
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("unconfirmed_drop_driver")
+    log = _driver_log(
+        driver,
+        plant_name="PPL",
+        depart_time="09:20",
+        load_size="PPL Load",
+        depart_load_size="Empty",
+        downtime_reason=f"{UNLOAD_NOT_COMPLETED_PREFIX} driver did not confirm delivery",
+    )
+    db.session.add(DriverLogPhoto(driver_log_id=log.id, filename="proof.jpg", original_filename="proof.jpg", source="proof"))
+    db.session.commit()
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    assert stop["badge"]["label"] == "UNCONFIRMED DROP"
+    assert stop["issues"][0]["code"] == "unconfirmed_drop"
+    assert stop["evidence"]["proof_count"] == 1
+
+
+def test_count_short_comes_from_scan_validation(app):
+    from app.extensions import db
+    from app.models import PartScanEvent
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("count_short_driver")
+    log = _driver_log(driver, plant_name="RE", depart_time="09:20", load_size="Raleigh East Load", depart_load_size="Empty")
+    db.session.add(
+        PartScanEvent(
+            raw_value="RE-1",
+            normalized_value="RE-1",
+            stop_id=log.id,
+            driver_log_id=log.id,
+            driver_id=driver.id,
+            scan_context="drop_scan",
+            validation_status="missing",
+            validation_message="Count short by 1 rack",
+        )
+    )
+    db.session.commit()
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    assert stop["badge"]["label"] == "COUNT SHORT"
+    assert stop["issues"][0]["code"] == "count_short"
+
+
+def test_damage_report_shows_damage_issue(app):
+    from app.extensions import db
+    from app.models import DamageReport
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("damage_issue_driver")
+    log = _driver_log(driver, plant_name="RE", depart_time="09:20", load_size="Raleigh East Load", depart_load_size="Empty")
+    db.session.add(DamageReport(reported_by_id=driver.id, driver_log_id=log.id, plant_name="RE", description="Rack damage", status="open"))
+    db.session.commit()
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    assert stop["badge"]["label"] == "DAMAGE"
+    assert stop["issues"][0]["code"] == "damage"
+
+
+def test_open_stop_without_departure_is_actionable_needs_departure(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("needs_departure_driver")
+    _driver_log(driver, plant_name="RE", load_size="Empty")
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    assert stop["badge"]["label"] == "NEEDS DEPARTURE"
+    assert stop["badge"]["severity"] == "attention"
+    assert stop["next_action"] == "Record departure"
+    assert ctx["cta_pulse"]["key"] == "depart"
+
+
+def test_pending_posttrip_pulses_posttrip_after_clean_route(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("posttrip_cta_driver")
+    _driver_log(driver, plant_name="RE", depart_time="08:20", load_size="Empty", depart_load_size="Empty", no_pickup=True)
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today(), pending_posttrip=True)
+
+    assert ctx["stops"][0]["movement_code"] == "route_start"
+    assert ctx["dispatch_ticker_text"] == "NO ALERTS FROM DISPATCH"
+    assert ctx["cta_pulse"]["key"] == "posttrip"
+
+
+def test_manager_resolved_review_clears_derived_issue(app):
+    from app.extensions import db
+    from app.models.case import ExceptionEvent
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("resolved_issue_driver")
+    log = _driver_log(
+        driver,
+        plant_name="RE",
+        depart_time="09:20",
+        load_size="Raleigh East Load",
+        depart_load_size="Empty",
+        downtime_reason="missing proof on this drop",
+    )
+    db.session.add(ExceptionEvent(event_type="manager_review_resolved", severity="medium", stop_id=log.id, summary="Manager override"))
+    db.session.commit()
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    assert stop["issues"] == []
+    assert stop["badge"]["label"] == "DROPPED"
 
 
 def test_driver_route_map_flags_real_exception_states_for_warning_rows(app):
@@ -168,7 +427,7 @@ def test_driver_route_map_flags_real_exception_states_for_warning_rows(app):
     assert stop["status"] == "needs_review"
     assert stop["has_damage"] is True
     assert stop["has_issue"] is True
-    assert {"Missing proof", "Mismatch", "Shortage", "Delay", "Audit risk", "Hold"}.issubset(set(stop["flags"]))
+    assert {"Missing proof", "Mismatch", "Shortage", "Delay", "Hold"}.issubset(set(stop["flags"]))
 
 
 def test_driver_route_map_aggregates_delivery_and_empty_load_narratives(app):
@@ -464,7 +723,7 @@ def test_manager_review_request_shows_in_review_state(client, app):
         db.session.commit()
     _login(client, "driver_review_state")
     body = client.get("/mobile").get_data(as_text=True)
-    assert ">REVIEW<" in body
+    assert ">IN REVIEW<" in body
     assert "IN REVIEW" in body
 
 

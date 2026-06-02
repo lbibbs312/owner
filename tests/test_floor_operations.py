@@ -172,8 +172,8 @@ def test_next_action_map(app):
     assert na(_mk(user.id, status="acknowledged")) == "Assign driver"
     assert na(_mk(user.id, status="open", assigned_driver_id=user.id)) == "Acknowledge request"
     assert na(_mk(user.id, status="assigned", assigned_driver_id=user.id)) == "Start or link route"
-    assert na(_mk(user.id, status="blocked")) == "Review blocker"
-    assert na(_mk(user.id, status="needs_review")) == "Review issue"
+    assert na(_mk(user.id, status="blocked")) == "Resolve blocker"
+    assert na(_mk(user.id, status="needs_review")) == "Resolve cargo review"
 
 
 def test_next_action_decline_signal_wins(app):

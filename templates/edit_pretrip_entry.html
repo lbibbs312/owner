@@ -1,9 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
+{% if current_user.role != 'management' %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+{% include 'partials/_pretrip_defect_controls.html' %}
+{% endif %}
 <div class="container my-4">
   <h1 class="mb-3">Edit PreTrip Entry (ID: {{ pretrip.id }})</h1>
 
-  <form method="POST" action="" enctype="multipart/form-data" data-autosave="true" data-autosave-key="pretrip-entry-{{ pretrip.id }}">
+  <form method="POST" action="" enctype="multipart/form-data" class="md-glass md-glow p-3 pretrip-checklist" data-autosave="true" data-autosave-key="pretrip-entry-{{ pretrip.id }}">
     <!-- CRITICAL: ensures CSRF token is included -->
     {{ form.hidden_tag() }}
 
@@ -325,4 +330,6 @@
     <a href="{{ url_for('driver.view_pretrip', pretrip_id=pretrip.id) }}" class="btn btn-secondary mt-3 ms-2">Back</a>
   </form>
 </div>
+{% set md_nav_active = 'pretrip' %}
+{% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

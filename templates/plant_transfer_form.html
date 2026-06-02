@@ -3,8 +3,78 @@
 <script>document.body.classList.add('md-shell');</script>
 {% include 'partials/_md_shell.html' %}
 <div class="container">
-  <h2 class="mt-3">{{ 'Edit' if transfer else 'New' }} Plant Transfer</h2>
-  <p class="text-muted">Fill this like the paper plant-transfer sheet: ship-to/from, date, part lines, trailer, driver, time, and loaded-by.</p>
+  <p class="md-section-label mt-3 mb-1">TRANSFER BUILDER</p>
+  <h2 class="mt-0 md-page-title">{{ 'Edit' if transfer else 'New' }} Plant Transfer</h2>
+  <p class="text-muted">Build transfer lines for the route record. The white paper sheet stays in print/PDF output.</p>
+  <style>
+    .transfer-line-toolbar {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      margin:14px 0 10px;
+    }
+    .transfer-line-count {
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.75rem;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+    }
+    .transfer-line-list { display:grid; gap:10px; margin-bottom:1rem; }
+    .transfer-line-card {
+      border:1px solid var(--md-line);
+      border-radius:14px;
+      background:rgba(6,10,18,.46);
+      overflow:hidden;
+    }
+    .transfer-line-card[hidden] { display:none; }
+    .transfer-line-card[open] {
+      border-color:rgba(91,157,255,.45);
+      box-shadow:0 0 0 1px rgba(47,109,240,.18), 0 16px 34px rgba(0,0,0,.24);
+    }
+    .transfer-line-summary {
+      list-style:none;
+      cursor:pointer;
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      gap:10px;
+      align-items:center;
+      padding:12px;
+      color:var(--md-text);
+      font-family:var(--md-display);
+      font-weight:900;
+      text-transform:uppercase;
+    }
+    .transfer-line-summary::-webkit-details-marker { display:none; }
+    .transfer-line-summary span {
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.7rem;
+      font-weight:900;
+      letter-spacing:.08em;
+    }
+    .transfer-line-body {
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+      padding:0 12px 12px;
+    }
+    .transfer-line-body .grid-full { grid-column:1 / -1; }
+    .transfer-proof-actions {
+      grid-column:1 / -1;
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      padding-top:2px;
+    }
+    .transfer-proof-actions .btn { flex:1 1 150px; }
+    @media (max-width:640px) {
+      .transfer-line-toolbar { align-items:stretch; flex-direction:column; }
+      .transfer-line-body { grid-template-columns:1fr; }
+    }
+  </style>
 
   <form method="POST" action="" class="md-glass md-glow p-3" data-autosave="true" data-autosave-key="plant-transfer-{{ transfer.id if transfer else 'new' }}">
     {{ form.hidden_tag() }}
@@ -28,37 +98,50 @@
       </div>
     </div>
 
-    <div class="table-responsive mb-3">
-      <table class="table table-bordered table-sm align-middle plant-transfer-entry">
-        <thead>
-          <tr>
-            <th>Part Number</th>
-            <th>Quantity</th>
-            <th>Skids</th>
-            <th>Remarks</th>
-            <th>Part Number</th>
-            <th>Quantity</th>
-            <th>Skids</th>
-            <th>Remarks</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in range(10) %}
-            {% set left = lines[row] %}
-            {% set right = lines[row + 10] %}
-            <tr>
-              <td><input name="part_number_{{ left.index }}" class="form-control form-control-sm" value="{{ left.part_number }}"></td>
-              <td><input name="quantity_{{ left.index }}" class="form-control form-control-sm" value="{{ left.quantity }}"></td>
-              <td><input name="skids_{{ left.index }}" class="form-control form-control-sm" value="{{ left.skids }}"></td>
-              <td><input name="remarks_{{ left.index }}" class="form-control form-control-sm" value="{{ left.remarks }}"></td>
-              <td><input name="part_number_{{ right.index }}" class="form-control form-control-sm" value="{{ right.part_number }}"></td>
-              <td><input name="quantity_{{ right.index }}" class="form-control form-control-sm" value="{{ right.quantity }}"></td>
-              <td><input name="skids_{{ right.index }}" class="form-control form-control-sm" value="{{ right.skids }}"></td>
-              <td><input name="remarks_{{ right.index }}" class="form-control form-control-sm" value="{{ right.remarks }}"></td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="transfer-line-toolbar">
+      <div>
+        <p class="md-section-label mb-0">PART LINES</p>
+        <div class="transfer-line-count">Part Number · Quantity · Skids · Remarks · LP IDs</div>
+      </div>
+      <button type="button" class="btn btn-outline-primary" data-add-transfer-line>Add Part Line</button>
+    </div>
+
+    <div class="transfer-line-list" data-transfer-line-list>
+      {% for line in lines %}
+        {% set line_has_value = line.part_number or line.quantity or line.skids or line.remarks or line.lp_ids %}
+        <details class="transfer-line-card" data-transfer-line-card {% if not line_has_value and line.index > 2 %}hidden{% endif %} {% if line_has_value or line.index == 0 %}open{% endif %}>
+          <summary class="transfer-line-summary">
+            <strong>Line {{ line.index + 1 }}</strong>
+            <span>{{ line.part_number or 'Part line' }}</span>
+          </summary>
+          <div class="transfer-line-body">
+            <div>
+              <label class="form-label" for="partNumber{{ line.index }}">Part Number</label>
+              <input id="partNumber{{ line.index }}" name="part_number_{{ line.index }}" class="form-control" value="{{ line.part_number }}" autocomplete="off">
+            </div>
+            <div>
+              <label class="form-label" for="quantity{{ line.index }}">Quantity</label>
+              <input id="quantity{{ line.index }}" name="quantity_{{ line.index }}" class="form-control" value="{{ line.quantity }}" inputmode="decimal">
+            </div>
+            <div>
+              <label class="form-label" for="skids{{ line.index }}">Skids</label>
+              <input id="skids{{ line.index }}" name="skids_{{ line.index }}" class="form-control" value="{{ line.skids }}" inputmode="decimal">
+            </div>
+            <div>
+              <label class="form-label" for="lpIds{{ line.index }}">LP IDs</label>
+              <input id="lpIds{{ line.index }}" name="lp_ids_{{ line.index }}" class="form-control" value="{{ line.lp_ids }}" placeholder="Scan or type LP IDs">
+            </div>
+            <div class="grid-full">
+              <label class="form-label" for="remarks{{ line.index }}">Remarks</label>
+              <input id="remarks{{ line.index }}" name="remarks_{{ line.index }}" class="form-control" value="{{ line.remarks }}">
+            </div>
+            <div class="transfer-proof-actions">
+              <button type="button" class="btn btn-outline-primary" data-focus-lp="lpIds{{ line.index }}">Scan LP IDs</button>
+              <button type="button" class="btn btn-outline-secondary" data-focus-lp="remarks{{ line.index }}">Attach proof note</button>
+            </div>
+          </div>
+        </details>
+      {% endfor %}
     </div>
 
     <div class="row g-3 mb-3">
@@ -88,6 +171,37 @@
     <a href="{{ url_for('driver.plant_transfers') }}" class="btn btn-secondary">Cancel</a>
   </form>
 </div>
+<script>
+  (function () {
+    var cards = Array.from(document.querySelectorAll('[data-transfer-line-card]'));
+    var addButton = document.querySelector('[data-add-transfer-line]');
+    function nextHiddenCard() {
+      return cards.find(function (card) { return card.hidden; });
+    }
+    function updateButton() {
+      if (!addButton) return;
+      addButton.disabled = !nextHiddenCard();
+    }
+    if (addButton) {
+      addButton.addEventListener('click', function () {
+        var card = nextHiddenCard();
+        if (!card) return;
+        card.hidden = false;
+        card.open = true;
+        var input = card.querySelector('input');
+        if (input) input.focus();
+        updateButton();
+      });
+      updateButton();
+    }
+    document.querySelectorAll('[data-focus-lp]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var target = document.getElementById(button.getAttribute('data-focus-lp'));
+        if (target) target.focus();
+      });
+    });
+  })();
+</script>
 {% set md_nav_active = 'transfers' %}
 {% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

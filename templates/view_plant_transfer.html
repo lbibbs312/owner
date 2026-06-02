@@ -8,7 +8,10 @@
   {% set transfers_endpoint = 'manager.plant_transfers' if current_user.role == 'management' else 'driver.plant_transfers' %}
   {% set transfer_print_endpoint = 'manager.plant_transfer_printable' if current_user.role == 'management' else 'driver.plant_transfer_printable' %}
   <div class="d-flex justify-content-between align-items-center mt-3 mb-3 gap-3 flex-wrap">
-    <h2 class="mb-0">Plant Transfer #{{ transfer.transfer_number or transfer.id }}</h2>
+    <div>
+      <p class="md-section-label mb-1">TRANSFER BUILDER</p>
+      <h2 class="mb-0 md-page-title">Plant Transfer #{{ transfer.transfer_number or transfer.id }}</h2>
+    </div>
     <div class="d-flex flex-wrap gap-2">
       {% set can_manage_transfer = current_user.role == 'driver' and transfer.user_id == current_user.id %}
       {% set can_delete_transfer = can_manage_transfer and transfer.transfer_date == today_local_date %}
@@ -35,13 +38,93 @@
     <div class="col-md-3"><strong>Loaded By:</strong> {{ transfer.loaded_by or '' }}</div>
   </div>
 
-  <div class="copy-legend mb-3">
-    <span class="badge text-bg-light border">White - Data Input</span>
-    <span class="badge text-bg-warning">Canary - Receiving Plant</span>
-    <span class="badge" style="background:#f6a6c8;color:#111;">Pink - Driver</span>
-    <span class="badge text-bg-info">Blue - Shipping Plant</span>
+  <div class="copy-legend mb-3 text-muted small">
+    White - Data Input · Canary - Receiving Plant · Pink - Driver · Blue - Shipping Plant
   </div>
 
+  {% if current_user.role != 'management' %}
+    <style>
+      .transfer-detail-lines { display:grid; gap:10px; }
+      .transfer-detail-card {
+        border:1px solid var(--md-line);
+        border-radius:14px;
+        background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(12,21,33,.96));
+        padding:12px;
+        box-shadow:0 16px 36px rgba(0,0,0,.26);
+      }
+      .transfer-detail-top {
+        display:flex;
+        justify-content:space-between;
+        gap:10px;
+        align-items:flex-start;
+        margin-bottom:10px;
+      }
+      .transfer-detail-title {
+        margin:0;
+        color:var(--md-text);
+        font-family:var(--md-display);
+        font-weight:900;
+      }
+      .transfer-detail-index {
+        color:var(--md-amber);
+        font-family:var(--md-mono);
+        font-size:.72rem;
+        font-weight:900;
+        letter-spacing:.08em;
+        text-transform:uppercase;
+        white-space:nowrap;
+      }
+      .transfer-detail-grid {
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:8px;
+      }
+      .transfer-detail-fact {
+        min-width:0;
+        padding:9px;
+        border:1px solid rgba(91,157,255,.18);
+        border-radius:10px;
+        background:rgba(6,10,18,.5);
+      }
+      .transfer-detail-fact span {
+        display:block;
+        color:var(--md-amber);
+        font-family:var(--md-mono);
+        font-size:.62rem;
+        font-weight:900;
+        letter-spacing:.1em;
+        text-transform:uppercase;
+      }
+      .transfer-detail-fact strong {
+        display:block;
+        margin-top:3px;
+        color:var(--md-text);
+        overflow-wrap:anywhere;
+      }
+      @media (max-width:620px) { .transfer-detail-grid { grid-template-columns:1fr; } }
+    </style>
+    <div class="transfer-detail-lines">
+      {% for line in transfer.lines %}
+        {% set remark_parts = (line.remarks or '').split('LP IDs:', 1) %}
+        {% set clean_remarks = remark_parts[0].rstrip(' |') %}
+        {% set lp_ids = remark_parts[1].strip() if remark_parts|length > 1 else '' %}
+        <article class="transfer-detail-card">
+          <div class="transfer-detail-top">
+            <p class="transfer-detail-title">{{ line.part_number or 'No part number' }}</p>
+            <span class="transfer-detail-index">Line {{ line.line_number }}</span>
+          </div>
+          <div class="transfer-detail-grid">
+            <div class="transfer-detail-fact"><span>Quantity</span><strong>{{ line.quantity or '--' }}</strong></div>
+            <div class="transfer-detail-fact"><span>Skids</span><strong>{{ line.skids or '--' }}</strong></div>
+            <div class="transfer-detail-fact"><span>LP IDs</span><strong>{{ lp_ids or '--' }}</strong></div>
+            <div class="transfer-detail-fact"><span>Remarks</span><strong>{{ clean_remarks or '--' }}</strong></div>
+          </div>
+        </article>
+      {% else %}
+        <div class="md-glass md-glow p-3 text-muted">No part lines recorded.</div>
+      {% endfor %}
+    </div>
+  {% else %}
   <div class="table-responsive">
     <table class="table table-bordered table-sm align-middle">
       <thead>
@@ -61,6 +144,7 @@
       </tbody>
     </table>
   </div>
+  {% endif %}
 </div>
 {% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

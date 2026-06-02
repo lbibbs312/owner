@@ -4403,7 +4403,8 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
                 date=selected_date,
                 plant_name="RE",
                 load_size="Empty",
-                depart_load_size="No Pickup",
+                depart_load_size="Empty",
+                no_pickup=True,
                 arrive_time="2026-05-20 21:12:00",
                 depart_time="22:00",
             )
@@ -4414,13 +4415,17 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     logs_page = client.get(f"/driver_logs?date={selected_date.isoformat()}")
     assert logs_page.status_code == 200
     assert b"driver-ledger-active" in logs_page.data
-    assert b"LIVE FLOW BOARD" in logs_page.data
+    assert b"AUDIT LEDGER" in logs_page.data
+    assert b"PAST ROUTE" in logs_page.data
+    assert b"REPLAY MODE" in logs_page.data
+    assert b"LIVE FLOW BOARD" not in logs_page.data
     assert b"md-ledger-board compact-route-map md-flow-board" in logs_page.data
     assert b"md-ledger-row md-flow-row tone-completed" in logs_page.data
     assert b"md-row-code flow-code" in logs_page.data
     assert b"md-row-detail flow-detail" in logs_page.data
-    assert b"md-row-status flow-status delivered status-delivery" in logs_page.data
-    assert b"DELIVERED" in logs_page.data
+    assert b"md-row-state" in logs_page.data
+    assert b"md-row-status flow-status empty status-empty" not in logs_page.data
+    assert b"ROUTE START" in logs_page.data
     assert b"md-ledger-ticker md-flow-ticker" in logs_page.data
     assert b'content:"["' not in logs_page.data
     assert b"content:'['" not in logs_page.data
@@ -4932,6 +4937,7 @@ def test_plant_transfer_flow_and_eod_includes_transfer(client, app):
             "quantity_0": "10",
             "skids_0": "1",
             "remarks_0": "Gauge transfer",
+            "lp_ids_0": "LP-100 LP-101",
             "part_number_10": "GAUGE-2",
             "quantity_10": "5",
             "skids_10": "1",
@@ -4948,7 +4954,12 @@ def test_plant_transfer_flow_and_eod_includes_transfer(client, app):
         assert transfer.ship_to == "RE"
         assert transfer.ship_from == "RW"
         assert len(transfer.lines) == 2
+        assert "LP IDs: LP-100 LP-101" in transfer.lines[0].remarks
         transfer_id = transfer.id
+
+    detail = client.get(f"/plant_transfers/{transfer_id}")
+    assert detail.status_code == 200
+    assert b"LP-100 LP-101" in detail.data
 
     printable = client.get(f"/plant_transfers/{transfer_id}/print")
     assert printable.status_code == 200
@@ -5586,11 +5597,44 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "inset 0 0 18px rgba(91,157,255,.04)" not in body
     assert ".md-flow-track::-webkit-scrollbar { display: none; width: 0; height: 0; }" in body
     assert "scrollbar-color: rgba(91,157,255,.34)" not in body
-    assert "ROUTE LOGS &nbsp; PLANT TRANSFERS" in body
+    assert "ROUTE LOGS &nbsp; PLANT TRANSFERS" not in body
+    assert "NEEDS DEPARTURE" in body
     assert "&diams;" not in body
     assert ".md-flow-work-card::before" in body
     assert ".flow-status::after" in body
     assert page.data.count(b"PostTrip Due") == 1
+
+
+def test_mobile_route_map_fragment_refresh_uses_route_state(client, app):
+    from datetime import date
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("fragment_driver", "fragment-driver@example.com", "driver")
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="RE",
+                load_size="Empty",
+                arrive_time=f"{today.isoformat()} 08:00:00",
+            )
+        )
+        db.session.commit()
+
+    login(client, "fragment_driver")
+    fragment = client.get(f"/mobile/route-map-fragment?date={today.isoformat()}")
+
+    assert fragment.status_code == 200
+    body = fragment.get_data(as_text=True)
+    assert "compact-route-map md-flow-board" in body
+    assert "data-route-refresh-url=" in body
+    assert "NEEDS DEPARTURE" in body
+    assert "ROUTE LOGS &nbsp; PLANT TRANSFERS" not in body
+    assert "<html" not in body.lower()
 
 
 def test_mobile_quick_depart_returns_to_live_board_without_full_depart_form(client, app):

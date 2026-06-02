@@ -938,6 +938,9 @@ def _plant_transfer_line_from_request(index):
     quantity = request.form.get(f"quantity_{index}", "").strip()
     skids = request.form.get(f"skids_{index}", "").strip()
     remarks = request.form.get(f"remarks_{index}", "").strip()
+    lp_ids = request.form.get(f"lp_ids_{index}", "").strip()
+    if lp_ids:
+        remarks = f"{remarks} | LP IDs: {lp_ids}" if remarks else f"LP IDs: {lp_ids}"
     if not any([part_number, quantity, skids, remarks]):
         return None
     return PlantTransferLine(
@@ -950,6 +953,17 @@ def _plant_transfer_line_from_request(index):
     )
 
 
+def _split_transfer_line_remarks(raw):
+    remarks = (raw or "").strip()
+    lp_ids = ""
+    marker = "LP IDs:"
+    if marker in remarks:
+        before, after = remarks.split(marker, 1)
+        remarks = before.rstrip(" |").strip()
+        lp_ids = after.strip()
+    return remarks, lp_ids
+
+
 def _plant_transfer_form_lines(transfer=None):
     rows = []
     existing = {}
@@ -957,6 +971,7 @@ def _plant_transfer_form_lines(transfer=None):
         existing = {line.line_number - 1: line for line in transfer.lines}
     for index in range(PLANT_TRANSFER_LINE_COUNT):
         line = existing.get(index)
+        stored_remarks, stored_lp_ids = _split_transfer_line_remarks(line.remarks if line else "")
         rows.append(
             {
                 "index": index,
@@ -968,7 +983,10 @@ def _plant_transfer_form_lines(transfer=None):
                 ),
                 "skids": request.form.get(f"skids_{index}", line.skids if line else ""),
                 "remarks": request.form.get(
-                    f"remarks_{index}", line.remarks if line else ""
+                    f"remarks_{index}", stored_remarks
+                ),
+                "lp_ids": request.form.get(
+                    f"lp_ids_{index}", stored_lp_ids
                 ),
             }
         )
@@ -2741,10 +2759,18 @@ def driver_logs():
         if selected_driver_id:
             query = query.filter_by(driver_id=selected_driver_id)
         logs = query.all()
+        selected_driver = User.query.get(selected_driver_id) if selected_driver_id else None
+        route_map_stops_by_id = {}
+        route_map_ctx = {}
+        if selected_driver:
+            route_map_ctx = build_driver_route_map_context(driver=selected_driver, date=search_date)
+            route_map_stops_by_id = {stop["stop_id"]: stop for stop in route_map_ctx.get("stops", [])}
         return render_template(
             "driver_logs.html",
             logs=logs,
             log_routes=_driver_log_route_context(logs),
+            route_map=route_map_ctx,
+            route_map_stops_by_id=route_map_stops_by_id,
             route_task_events=_task_route_events_for_logs(logs),
             all_drivers=all_drivers,
             selected_driver_id=selected_driver_id,
@@ -2757,10 +2783,13 @@ def driver_logs():
             .order_by(DriverLog.created_at.desc())
             .all()
         )
+        route_map_ctx = build_driver_route_map_context(driver=current_user, date=search_date)
         return render_template(
             "driver_logs.html",
             logs=logs,
             log_routes=_driver_log_route_context(logs),
+            route_map=route_map_ctx,
+            route_map_stops_by_id={stop["stop_id"]: stop for stop in route_map_ctx.get("stops", [])},
             route_task_events=_task_route_events_for_logs(logs),
             search_date=search_date,
             today_local_date=_today_local_date(),
@@ -4158,6 +4187,145 @@ def mobile_day_report(report_date):
     )
 
 
+def _mobile_route_map_fragment_context(route_date=None):
+    now_local, _ = _now_local_and_utc()
+    today_local_date = now_local.date()
+    open_shift = _open_shift_for_driver(current_user.id)
+    route_date = route_date or _requested_mobile_route_date() or _dashboard_route_date_for_driver(
+        current_user.id,
+        today_local_date,
+        open_shift=open_shift,
+    )
+    if route_date == today_local_date:
+        _repair_today_driver_log_dates(current_user.id, today_local_date)
+
+    tasks = _driver_task_queue(current_user.id)
+    active_task = tasks[0] if tasks else None
+    task_queue = [task for task in tasks if not active_task or task.id != active_task.id]
+    latest_pretrip = (
+        _active_pretrips_query().filter_by(user_id=current_user.id)
+        .order_by(PreTrip.created_at.desc())
+        .first()
+    )
+    todays_pretrip = (
+        _active_pretrips_query().filter_by(user_id=current_user.id, pretrip_date=today_local_date)
+        .order_by(PreTrip.created_at.desc())
+        .first()
+    )
+    route_pretrip = (
+        _active_pretrips_query().filter_by(user_id=current_user.id, pretrip_date=route_date)
+        .order_by(PreTrip.created_at.desc())
+        .first()
+    )
+    open_shift_route_date = _shift_route_date(open_shift)
+    route_is_active = bool((open_shift and (not open_shift_route_date or open_shift_route_date == route_date)) or (route_pretrip and not route_pretrip.posttrip))
+    active_pretrip = todays_pretrip or (route_pretrip if route_is_active else None)
+    pending_posttrip = bool(active_pretrip and not active_pretrip.posttrip)
+    latest_transfer = (
+        _active_plant_transfers_query().filter_by(user_id=current_user.id)
+        .order_by(PlantTransfer.created_at.desc())
+        .first()
+    )
+    recent_ryder_events = (
+        ActivityEvent.query.filter_by(
+            user_id=current_user.id,
+            category="ryder",
+        )
+        .order_by(ActivityEvent.created_at.desc())
+        .limit(3)
+        .all()
+    )
+
+    todays_logs = sorted(
+        _active_driver_logs_query().filter_by(driver_id=current_user.id, date=route_date).all(),
+        key=_driver_log_sort_key,
+    )
+    route_context = build_route_context(driver_id=current_user.id, route_date=route_date, now=now_local)
+    current_stop = route_context.current_stop
+    departed_today = any(getattr(log, "depart_time", None) for log in todays_logs)
+    has_transfer_today = bool(
+        _active_plant_transfers_query()
+        .filter_by(user_id=current_user.id, transfer_date=route_date)
+        .first()
+    )
+    proof_missing = bool(departed_today and not has_transfer_today)
+    production_flow = None
+    route_map = build_driver_route_map_context(
+        driver=current_user,
+        date=route_date,
+        selected_stop_id=current_stop.id if current_stop else None,
+        route_pretrip=route_pretrip,
+        proof_missing=proof_missing,
+        pending_posttrip=pending_posttrip,
+    )
+    route_cta = build_route_cta_context(
+        route_context,
+        production_flow_context=production_flow,
+        proof_missing=proof_missing,
+        has_active_shift=bool(open_shift),
+        route_is_active=route_is_active,
+        route_date=route_date,
+        today_local_date=today_local_date,
+        has_last_route=bool(todays_logs),
+        selected_date_forced=bool(request.args.get("date")),
+        pending_posttrip=pending_posttrip,
+    )
+    route_map_mode = build_driver_map_mode_context(
+        route_context,
+        route_map,
+        production_flow,
+        route_date=route_date,
+        today_local_date=today_local_date,
+        route_is_active=route_is_active,
+    )
+    route_map.update(route_map_mode)
+    route_cta_urls = _route_cta_urls(route_date, current_stop=current_stop)
+
+    truck_source_pretrip = active_pretrip or route_pretrip or latest_pretrip
+    current_truck_number = _normalize_truck_number(
+        truck_source_pretrip.truck_number if truck_source_pretrip else ""
+    )
+    if current_truck_number:
+        recent_ryder_events = [
+            event
+            for event in recent_ryder_events
+            if _same_truck_number(_detail_value(event.details, "Truck"), current_truck_number)
+        ][:3]
+    truck_maintenance_history = _truck_maintenance_history(
+        current_truck_number,
+        current_pretrip_id=active_pretrip.id if active_pretrip else None,
+        limit=6,
+    )
+    ryder_context = _ryder_followup_context(current_user.id)
+
+    return {
+        "route_map": route_map,
+        "production_flow": production_flow,
+        "route_map_mode": route_map_mode,
+        "route_cta": route_cta,
+        "route_cta_urls": route_cta_urls,
+        "active_task": active_task,
+        "task_queue": task_queue,
+        "latest_pretrip": latest_pretrip,
+        "todays_pretrip": todays_pretrip,
+        "route_pretrip": route_pretrip,
+        "active_pretrip": active_pretrip,
+        "pending_posttrip": pending_posttrip,
+        "latest_transfer": latest_transfer,
+        "open_shift": open_shift,
+        "today_local_date": today_local_date,
+        "route_date": route_date,
+        "route_is_active": route_is_active,
+        "todays_logs": todays_logs,
+        "current_stop": current_stop,
+        "current_truck_number": current_truck_number,
+        "truck_maintenance_history": truck_maintenance_history,
+        "truck_issue_choices": TRUCK_ISSUE_CHOICES,
+        "recent_ryder_events": recent_ryder_events,
+        **ryder_context,
+    }
+
+
 @bp.route("/mobile")
 @login_required
 def mobile_dashboard():
@@ -4280,14 +4448,16 @@ def mobile_dashboard():
         .filter_by(user_id=current_user.id, transfer_date=route_date)
         .first()
     )
+    production_flow = None
+    proof_missing = bool(departed_today and not has_transfer_today)
     route_map = build_driver_route_map_context(
         driver=current_user,
         date=route_date,
         selected_stop_id=current_stop.id if current_stop else None,
         route_pretrip=route_pretrip,
+        proof_missing=proof_missing,
+        pending_posttrip=pending_posttrip,
     )
-    production_flow = None
-    proof_missing = bool(departed_today and not has_transfer_today)
     route_cta = build_route_cta_context(
         route_context,
         production_flow_context=production_flow,
@@ -4353,6 +4523,17 @@ def mobile_dashboard():
         truck_maintenance_history=truck_maintenance_history,
         truck_issue_choices=TRUCK_ISSUE_CHOICES,
         **ryder_context,
+    )
+
+
+@bp.route("/mobile/route-map-fragment")
+@login_required
+def mobile_route_map_fragment():
+    if current_user.role == "management":
+        return redirect(url_for("manager.manager_dashboard"))
+    return render_template(
+        "partials/_compact_route_map.html",
+        **_mobile_route_map_fragment_context(),
     )
 
 

@@ -2,7 +2,10 @@
 {% block content %}
 <div class="container-fluid driver-log-shell slide-in">
   {% set logs_endpoint = 'manager.driver_logs' if current_user.role == 'management' else 'driver.driver_logs' %}
-  <script>document.body.classList.add('{{ 'manager-logs-active' if current_user.role == 'management' else 'driver-ledger-active' }}');</script>
+  <script>document.body.classList.add({% if current_user.role == 'management' %}'manager-logs-active'{% else %}'md-shell','driver-ledger-active'{% endif %});</script>
+  {% if current_user.role == 'driver' %}
+    {% include 'partials/_md_shell.html' %}
+  {% endif %}
   <style>
     body.manager-logs-active .container.mt-4.fade-in { max-width:none; width:100%; padding-left:0; padding-right:0; }
     .driver-log-shell { width:100%; max-width:none; padding-left:16px; padding-right:16px; }
@@ -28,11 +31,11 @@
       background-size:34px 34px,34px 34px,auto,auto;
       color:var(--md-text);
     }
-    body.driver-ledger-active .navbar { display:none; }
     body.driver-ledger-active .driver-active-wait {
       border-bottom:1px solid rgba(255,178,36,.28);
       background:rgba(6,10,18,.94);
       box-shadow:0 12px 34px rgba(0,0,0,.28);
+      margin-bottom:14px;
     }
     body.driver-ledger-active #pageContent > .container.mt-4.fade-in {
       width:100%;
@@ -100,9 +103,6 @@
       align-items:center;
       min-height:38px;
       padding:0 12px;
-      border:1px solid var(--md-line);
-      border-radius:10px;
-      background:rgba(12,21,33,.8);
     }
     .md-ledger-board {
       overflow:hidden;
@@ -192,6 +192,17 @@
       gap:8px;
       min-width:0;
     }
+    .md-ledger-mode,
+    .md-ledger-state {
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.72rem;
+      font-weight:900;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      white-space:nowrap;
+    }
+    .md-ledger-state { color:var(--md-amber); }
     .md-ledger-pill,
     .md-ledger-status {
       display:inline-flex;
@@ -216,6 +227,15 @@
       color:var(--md-amber);
       border:1px solid rgba(255,178,36,.32);
       background:rgba(255,178,36,.1);
+    }
+    .md-ledger-meta {
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.72rem;
+      font-weight:900;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      white-space:nowrap;
     }
     .md-ledger-actions {
       display:grid;
@@ -320,6 +340,7 @@
       border-radius:12px;
       background:rgba(8,19,34,.42);
       overflow:hidden;
+      scroll-margin-top:96px;
     }
     .md-ledger-row + .md-ledger-row { margin-top:8px; }
     .md-ledger-row[open],
@@ -379,8 +400,33 @@
       overflow:hidden;
     }
     .md-row-detail strong {
+      display:block;
       color:var(--md-text);
       font-weight:900;
+    }
+    .md-row-detail small {
+      display:block;
+      margin-top:3px;
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.72rem;
+      font-weight:750;
+      letter-spacing:.02em;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .md-row-state {
+      justify-self:end;
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.66rem;
+      font-weight:900;
+      letter-spacing:.08em;
+      line-height:1.2;
+      text-align:right;
+      text-transform:uppercase;
+      white-space:nowrap;
     }
     .md-row-status {
       justify-self:end;
@@ -401,7 +447,8 @@
     .md-row-status.ready,
     .md-row-status.status-delivery,
     .md-row-status.status-ready,
-    .md-row-status.status-recorded {
+    .md-row-status.status-recorded,
+    .md-row-status.status-empty {
       color:var(--md-green);
       border:1px solid rgba(43,213,118,.32);
       border-radius:999px;
@@ -418,7 +465,6 @@
     }
     .md-row-status.warn,
     .md-row-status.status-attention,
-    .md-row-status.status-empty,
     .md-row-status.status-hot {
       color:var(--md-amber);
       border:1px solid rgba(255,178,36,.38);
@@ -476,6 +522,24 @@
       flex-wrap:wrap;
       gap:7px;
       align-items:center;
+    }
+    .md-ledger-notes {
+      display:grid;
+      gap:5px;
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.72rem;
+      font-weight:800;
+      letter-spacing:.02em;
+    }
+    .md-ledger-notes span {
+      display:block;
+      min-width:0;
+      overflow-wrap:anywhere;
+    }
+    .md-ledger-notes strong {
+      color:var(--md-text);
+      font-weight:900;
     }
     .route-chip {
       display:inline-flex;
@@ -562,7 +626,10 @@
       align-items:center;
       gap:12px;
       min-width:max-content;
+      padding-right:28px;
+      animation:mdLedgerTicker 34s linear infinite;
     }
+    .md-ledger-ticker span + span { display:inline-flex; }
     .md-ledger-ticker span::before {
       content:"";
       width:7px;
@@ -573,6 +640,10 @@
       box-shadow:0 0 10px rgba(255,178,36,.24);
       transform:rotate(45deg);
     }
+    @keyframes mdLedgerTicker {
+      from { transform:translateX(0); }
+      to { transform:translateX(-100%); }
+    }
     .md-ledger-empty {
       margin:0;
       padding:28px 18px;
@@ -581,50 +652,6 @@
       font-size:.86rem;
       font-weight:800;
       text-align:center;
-    }
-    .md-driver-bottom-nav {
-      position:fixed;
-      left:0;
-      right:0;
-      bottom:0;
-      z-index:50;
-      display:grid;
-      grid-template-columns:repeat(4,1fr);
-      gap:4px;
-      padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-      border-top:1px solid rgba(91,157,255,.16);
-      background:rgba(5,10,18,.96);
-      backdrop-filter:blur(12px);
-      box-shadow:0 -18px 48px rgba(0,0,0,.36);
-    }
-    .md-driver-bottom-nav a {
-      display:grid;
-      place-items:center;
-      gap:6px;
-      min-height:54px;
-      color:var(--md-muted);
-      font-family:var(--md-mono);
-      font-size:.66rem;
-      font-weight:900;
-      letter-spacing:.1em;
-      text-transform:uppercase;
-      text-decoration:none;
-    }
-    .md-driver-bottom-nav i {
-      width:31px;
-      height:31px;
-      display:grid;
-      place-items:center;
-      border-radius:50%;
-      background:rgba(138,153,179,.12);
-      color:var(--md-muted);
-      font-style:normal;
-    }
-    .md-driver-bottom-nav a.is-active { color:var(--md-amber); }
-    .md-driver-bottom-nav a.is-active i {
-      background:rgba(255,178,36,.12);
-      color:var(--md-amber);
-      box-shadow:0 0 0 1px rgba(255,178,36,.22),0 0 18px rgba(91,157,255,.14),0 0 14px rgba(255,178,36,.1);
     }
     .driver-log-shell .table-responsive { overflow-x:auto; -webkit-overflow-scrolling:touch; }
     .driver-log-table { width:100%; min-width:1500px; table-layout:auto; }
@@ -706,28 +733,22 @@
 	  {% set log_view_endpoint = 'manager.view_driver_log' if current_user.role == 'management' else 'driver.view_driver_log' %}
 	  {% if current_user.role == 'driver' %}
 	    {% set log_count = logs|length if logs else 0 %}
+	    {% set is_current_route = search_date == today_local_date and log_count > 0 %}
+	    {% set is_replay_route = search_date != today_local_date and log_count > 0 %}
+	    {% set route_mode_label = 'CURRENT ROUTE' if is_current_route else ('PAST ROUTE' if log_count > 0 else 'NO LOGS') %}
+	    {% set dispatch_ticker_text = route_map.dispatch_ticker_text if route_map is defined and route_map and route_map.dispatch_ticker_text is defined else 'NO ALERTS FROM DISPATCH' %}
 	    <div class="md-ledger-shell">
-      <div class="md-ledger-topbar">
-        <div class="md-ledger-driver">
-          <div class="md-ledger-avatar">{{ (current_user.first_name[:1] if current_user.first_name else current_user.username[:1])|upper }}{{ (current_user.last_name[:1] if current_user.last_name else '')|upper }}</div>
-          <div>
-            <strong>{{ current_user.display_name }}</strong>
-            <span>{{ current_user.employee_id or 'No ID' }}{% if current_user.department %} · {{ current_user.department }}{% endif %}</span>
-          </div>
-        </div>
-        <a class="md-ledger-shift" href="{{ url_for('driver.mobile_dashboard') }}">Home</a>
-      </div>
-
 	      <section class="md-ledger-board compact-route-map md-flow-board" data-route-map-shell data-route-map-mode="driver-ledger" aria-label="Driver log ledger">
 	        <div class="md-ledger-head md-flow-head">
 	          <div>
-	            <span class="md-ledger-kicker md-flow-kicker"><i class="md-ledger-live-dot"></i> LIVE FLOW BOARD</span>
-	            <h2>Driver Logs</h2>
+	            <span class="md-ledger-kicker md-flow-kicker">{% if is_current_route %}<i class="md-ledger-live-dot"></i>{% endif %} DRIVER LOGS</span>
+	            <h2>AUDIT LEDGER</h2>
 	            <p class="md-ledger-subline md-flow-subline">{{ search_date.strftime('%m/%d/%Y') }} · {{ log_count }} stop{{ 's' if log_count != 1 else '' }}</p>
 	          </div>
 	          <div class="md-ledger-head-side">
-	            <span class="md-ledger-pill">{{ 'Live Route' if search_date == today_local_date else 'Route Replay' }}</span>
-            <time class="md-ledger-status">{{ search_date.strftime('%b %d') }}</time>
+	            <span class="md-ledger-mode">{{ route_mode_label }}</span>
+	            {% if is_replay_route %}<span class="md-ledger-state">REPLAY MODE</span>{% endif %}
+            <time class="md-ledger-meta">{{ search_date.strftime('%b %d') }}</time>
           </div>
         </div>
 
@@ -811,10 +832,11 @@
         <div class="md-flow-track">
         {% for log in logs %}
           {% set route = (log_routes or {}).get(log.id) %}
+          {% set stop_vm = (route_map_stops_by_id or {}).get(log.id) %}
           {% set can_manage_log = log.driver_id == current_user.id %}
           {% set can_delete_log = can_manage_log and log.date == today_local_date %}
           {% set wait_label = wait_label_for_log(log) %}
-          {% set stop_code = 'FUEL' if log.fuel else ('MTN' if log.maintenance else ('MTG' if log.meeting else 'STP-' ~ (logs|length - loop.index0))) %}
+          {% set stop_code = stop_vm.board_code if stop_vm and stop_vm.board_code else ('FUEL' if log.fuel else ('MTN' if log.maintenance else ('MTG' if log.meeting else 'STP-' ~ (logs|length - loop.index0)))) %}
           {% set arrive_label = route.arrive_cargo_desc if route else (log.load_size or 'Empty') %}
           {% if route and route.depart_desc is none %}
             {% set depart_label = '--' %}
@@ -825,40 +847,53 @@
           {% else %}
             {% set depart_label = log.depart_load_size or '--' %}
           {% endif %}
-          {% if log.maintenance %}
-            {% set status_label = 'TRUCK ISSUE' %}
-            {% set status_tone = 'risk' %}
-            {% set flow_status_tone = 'risk' %}
-            {% set row_tone = 'blocked' %}
-          {% elif route and route.warnings %}
-            {% set status_label = 'VERIFY' %}
-            {% set status_tone = 'warn' %}
+          {% set has_stop_issue = stop_vm and stop_vm.issues %}
+          {% if has_stop_issue %}
+            {% set status_label = stop_vm.badge.label %}
+            {% set status_tone = stop_vm.badge.pill_tone %}
+            {% set flow_status_tone = stop_vm.badge.pill_tone %}
+            {% set row_tone = stop_vm.badge.row_tone %}
+          {% elif stop_vm %}
+            {% set status_label = stop_vm.movement_label %}
+            {% set status_tone = stop_vm.badge.pill_tone if stop_vm.badge else 'recorded' %}
+            {% set flow_status_tone = status_tone %}
+            {% set row_tone = stop_vm.badge.row_tone if stop_vm.badge else 'completed' %}
+          {% elif log.maintenance %}
+            {% set status_label = 'DAMAGE' if 'damage' in (log.downtime_reason or '')|lower else 'HOLD' %}
+            {% set status_tone = 'attention' %}
             {% set flow_status_tone = 'attention' %}
-            {% set row_tone = 'needs_review' %}
+            {% set row_tone = 'hot' %}
           {% elif not log.depart_time %}
-            {% set status_label = 'OPEN' %}
-            {% set status_tone = 'open' %}
-            {% set flow_status_tone = 'open' %}
+            {% set status_label = 'NEEDS DEPARTURE' %}
+            {% set status_tone = 'attention' %}
+            {% set flow_status_tone = 'attention' %}
             {% set row_tone = 'active' %}
           {% else %}
-            {% set status_label = 'DELIVERED' %}
-            {% set status_tone = 'delivered' %}
-            {% set flow_status_tone = 'delivery' %}
+            {% set status_label = 'RECORDED' %}
+            {% set status_tone = 'recorded' %}
+            {% set flow_status_tone = 'recorded' %}
             {% set row_tone = 'completed' %}
           {% endif %}
-          <details class="md-ledger-row md-flow-row tone-{{ row_tone }} {% if not log.depart_time %}is-open{% endif %} {% if route and route.warnings %}has-warning{% endif %} {% if log.maintenance %}has-risk{% endif %}" data-flow-row {% if not log.depart_time %}open{% endif %}>
+          {% set ledger_title = stop_vm.ledger_title if stop_vm and stop_vm.ledger_title else ((route.plant if route else log.plant_name) ~ ' · Logged stop') %}
+          {% set ledger_meta = stop_vm.ledger_meta if stop_vm and stop_vm.ledger_meta else (arrive_label ~ ' → ' ~ depart_label) %}
+          <details class="md-ledger-row md-flow-row tone-{{ row_tone }} {% if not log.depart_time %}is-open{% endif %} {% if route and route.warnings %}has-warning{% endif %} {% if log.maintenance or (has_stop_issue and stop_vm.badge.severity == 'risk') %}has-risk{% endif %}" data-flow-row {% if not log.depart_time %}open{% endif %}>
             <summary class="md-ledger-summary">
               <span class="md-row-code flow-code">{{ stop_code }}</span>
               <span class="md-row-detail flow-detail">
-                <strong>{{ route.plant if route else log.plant_name }}</strong> · {{ arrive_label }} → {{ depart_label }}{% if wait_label %} · {{ wait_label }}{% endif %}
+                <strong>{{ ledger_title }}</strong>
+                <small>{{ ledger_meta }}{% if wait_label %} · Wait {{ wait_label }}{% endif %}</small>
               </span>
-              <span class="md-row-status flow-status {{ status_tone }} status-{{ flow_status_tone }}">{{ status_label }}</span>
+              {% if has_stop_issue %}
+                <span class="md-row-status flow-status {{ status_tone }} status-{{ flow_status_tone }}">{{ status_label }}</span>
+              {% else %}
+                <span class="md-row-state">{{ status_label }}</span>
+              {% endif %}
             </summary>
 
             <div class="md-row-panel">
               <div class="md-row-grid">
                 <div class="md-row-fact"><span>Driver</span><strong>{{ log.driver.display_name }}{% if log.driver.employee_id %} · ID {{ log.driver.employee_id }}{% endif %}{% if log.driver.department %} · {{ log.driver.department }}{% endif %}</strong></div>
-                <div class="md-row-fact"><span>Move</span><strong>{% if route %}{{ route.action }} · {{ route.state }}{% else %}Logged stop{% endif %}{% if route and route.next_stop %} · Next {{ route.next_stop }}{% endif %}</strong></div>
+                <div class="md-row-fact"><span>Move</span><strong>{% if stop_vm and stop_vm.issues %}{{ stop_vm.issues[0].label }} · {{ stop_vm.issues[0].reason }}{% elif stop_vm and stop_vm.movement_summary %}{{ stop_vm.movement_summary }}{% elif route %}{{ route.action }} · {{ route.state }}{% else %}Logged stop{% endif %}{% if route and route.next_stop %} · Next {{ route.next_stop }}{% endif %}</strong></div>
                 <div class="md-row-fact"><span>Arrive</span><strong>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</strong></div>
                 <div class="md-row-fact"><span>Depart</span><strong>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</strong></div>
                 <div class="md-row-fact"><span>In</span><strong>{{ arrive_label }}</strong></div>
@@ -877,15 +912,23 @@
                 </div>
               {% endif %}
 
-              <div class="md-row-chips">
-                {% if log.no_pickup %}<span class="route-chip dark">No Pickup</span>{% endif %}
-                {% if log.hot_parts %}<span class="route-chip danger">Hot {{ log.part_number or '' }}</span>{% elif log.part_number %}<span class="route-chip">{{ log.part_number }}</span>{% endif %}
-                <span class="route-chip {% if log.maintenance %}danger{% else %}ok{% endif %}">Truck {{ 'Issue' if log.maintenance else 'OK' }}{% if log.maintenance and log.fuel_mileage %} - {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>
-                {% if log.fuel %}<span class="route-chip">Fuel{% if log.fuel_mileage %} - {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>{% endif %}
-                {% if wait_label %}<span class="route-chip warn">{{ wait_label }}</span>{% endif %}
-                {% if log.meeting %}<span class="route-chip">Meeting</span>{% endif %}
+              {% if stop_vm and stop_vm.issues %}
+                <div class="route-warnings">
+                  {% for issue in stop_vm.issues %}
+                    <span class="route-warning {% if issue.severity == 'risk' %}route-warning-danger{% endif %}">{{ issue.label }}: {{ issue.action }}</span>
+                  {% endfor %}
+                </div>
+              {% endif %}
+
+              <div class="md-ledger-notes">
+                {% if log.no_pickup %}<span><strong>No pickup:</strong> driver departed without cargo pickup.</span>{% endif %}
+                {% if log.hot_parts %}<span><strong>Hot part:</strong> {{ log.part_number or 'part number not recorded' }}</span>{% elif log.part_number %}<span><strong>Part:</strong> {{ log.part_number }}</span>{% endif %}
+                <span><strong>Truck:</strong> {{ 'Issue recorded' if log.maintenance else 'OK' }}{% if log.maintenance and log.fuel_mileage %} · {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>
+                {% if log.fuel %}<span><strong>Fuel:</strong>{% if log.fuel_mileage %} {{ "{:,}".format(log.fuel_mileage) }} mi{% else %} recorded{% endif %}</span>{% endif %}
+                {% if wait_label %}<span><strong>Wait:</strong> {{ wait_label }}</span>{% endif %}
+                {% if log.meeting %}<span><strong>Meeting:</strong> recorded service stop.</span>{% endif %}
                 {% for event in (route_task_events or {}).get(log.id, []) %}
-                  <span class="route-chip task-chip {% if event.is_hot %}danger{% elif event.completed_at %}ok{% else %}warn{% endif %}">{{ event.kind_label }}: {{ event.label }} - {{ event.status }}{% if event.completed_at %} / Unloaded{% endif %}</span>
+                  <span><strong>{{ event.kind_label }}:</strong> {{ event.label }} · {{ event.status }}{% if event.completed_at %} · Unloaded{% endif %}</span>
                 {% endfor %}
               </div>
 
@@ -918,9 +961,7 @@
                 <a href="{{ url_for(log_view_endpoint, log_id=log.id) }}" class="md-row-action"><span class="md-btn-icon">O</span> View</a>
                 {% if can_manage_log %}
                   <a href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}" class="md-row-action warn"><span class="md-btn-icon">E</span> Edit</a>
-                  {% if not log.depart_time %}
-                    <a href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}" class="md-row-action"><span class="md-btn-icon">→</span> Depart / Load</a>
-                  {% endif %}
+                  <a href="{{ url_for('driver.view_driver_log', log_id=log.id) }}" class="md-row-action"><span class="md-btn-icon">P</span> Add Proof</a>
                   {% if can_delete_log %}
                     {% if log.hot_parts or log.part_number %}
                       <form action="{{ url_for('driver.clear_driver_log_hot_part', log_id=log.id) }}" method="POST" class="md-row-action-form" onsubmit="return confirm('Clear the hot-part flag and part number from this stop?');">
@@ -937,7 +978,7 @@
           </details>
         {% endfor %}
         </div>
-        <div class="md-ledger-ticker md-flow-ticker" aria-hidden="true"><span>ROUTE LOGS · PROOF PHOTOS · TRANSFERS · DAMAGE · HOT MOVES · POSTTRIP</span></div>
+        <div class="md-ledger-ticker md-flow-ticker" aria-hidden="true"><span>{{ dispatch_ticker_text }}</span><span>{{ dispatch_ticker_text }}</span></div>
       </div>
     {% else %}
     <div class="table-responsive">
@@ -1038,7 +1079,7 @@
               {% if log.arrive_time %}
                 {{ log.arrive_time|to_local_time }}
               {% else %}
-                <span class="badge bg-danger">Missing</span>
+                <span class="badge bg-danger">Photo file missing</span>
               {% endif %}
             </td>
             
@@ -1135,12 +1176,8 @@
   {% endif %}
   {% if current_user.role == 'driver' %}
       </section>
-      <nav class="md-driver-bottom-nav" aria-label="Driver navigation">
-        <a href="{{ url_for('driver.mobile_dashboard') }}"><i>HM</i><span>Home</span></a>
-        <a href="{{ url_for('driver.plant_transfers') }}"><i>PT</i><span>Transfer</span></a>
-        <a href="{{ url_for('driver.driver_logs', date=search_date.strftime('%Y-%m-%d')) }}" class="is-active"><i>DL</i><span>Logs</span></a>
-        <a href="{{ url_for('driver.profile') }}"><i>DR</i><span>Driver</span></a>
-      </nav>
+      {% set md_nav_active = 'logs' %}
+      {% include 'partials/_md_bottom_nav.html' %}
     </div>
   {% endif %}
 </div>

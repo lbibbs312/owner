@@ -313,10 +313,12 @@
             <!-- Driver bell icon (mobile only) -->
             <a class="nav-link text-white d-md-none position-relative"
                href="{{ url_for('messaging.recent_activity') }}"
-               style="font-size: 1.25rem; margin-right: 1rem;"
                aria-label="Recent activity"
             >
-              &#128276;
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+                <path d="M13.7 21a2 2 0 0 1-3.4 0"></path>
+              </svg>
               <span class="activityBellBadge position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
             </a>
           {% endif %}
@@ -361,7 +363,10 @@
                      href="{{ url_for('messaging.recent_activity') }}"
                      aria-label="Recent activity"
                   >
-                    &#128276;
+                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+                      <path d="M13.7 21a2 2 0 0 1-3.4 0"></path>
+                    </svg>
                     <span class="activityBellBadge position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
                   </a>
                 </li>
@@ -566,6 +571,106 @@
   </script>
   <script src="{{ url_for('static', filename='js/autosave-drafts.js') }}"></script>
   <script src="{{ url_for('static', filename='js/driver-active-wait.js', v='2') }}"></script>
+  <style>
+    .md-toast-stack {
+      position: fixed;
+      left: 14px;
+      right: 14px;
+      bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+      z-index: 4000;
+      display: grid;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .md-toast {
+      justify-self: center;
+      width: min(420px, 100%);
+      display: grid;
+      grid-template-columns: 12px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      border: 1px solid rgba(91, 157, 255, .42);
+      border-radius: 10px;
+      background: rgba(6, 10, 18, .92);
+      color: #f6f8fb;
+      padding: 11px 13px;
+      box-shadow: inset 0 0 26px rgba(91, 157, 255, .12), 0 0 28px rgba(91, 157, 255, .2), 0 20px 46px rgba(0, 0, 0, .36);
+      backdrop-filter: blur(14px);
+      transform: translateY(8px);
+      opacity: 0;
+      animation: mdToastIn .16s ease-out forwards;
+    }
+    .md-toast.is-leaving { animation: mdToastOut .16s ease-in forwards; }
+    .md-toast-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #2bd576;
+      box-shadow: 0 0 0 4px rgba(43, 213, 118, .12), 0 0 16px rgba(43, 213, 118, .62);
+    }
+    .md-toast[data-type="error"] .md-toast-dot { background: #ff5247; box-shadow: 0 0 0 4px rgba(255, 82, 71, .12), 0 0 16px rgba(255, 82, 71, .62); }
+    .md-toast[data-type="warning"] .md-toast-dot { background: #ffb224; box-shadow: 0 0 0 4px rgba(255, 178, 36, .12), 0 0 16px rgba(255, 178, 36, .62); }
+    .md-toast-title {
+      display: block;
+      color: #f6f8fb;
+      font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: .74rem;
+      font-weight: 900;
+      letter-spacing: .12em;
+      line-height: 1.1;
+      text-transform: uppercase;
+    }
+    .md-toast-detail {
+      display: block;
+      margin-top: 3px;
+      color: #8a99b3;
+      font-size: .82rem;
+      line-height: 1.25;
+    }
+    @keyframes mdToastIn {
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes mdToastOut {
+      to { transform: translateY(8px); opacity: 0; }
+    }
+  </style>
+  <script>
+    window.MoveDefenseToast = window.MoveDefenseToast || (function () {
+      function stack() {
+        var existing = document.querySelector('[data-md-toast-stack]');
+        if (existing) return existing;
+        var node = document.createElement('div');
+        node.className = 'md-toast-stack';
+        node.setAttribute('data-md-toast-stack', 'true');
+        document.body.appendChild(node);
+        return node;
+      }
+      function dismiss(node) {
+        if (!node || node.dataset.dismissed === '1') return;
+        node.dataset.dismissed = '1';
+        node.classList.add('is-leaving');
+        window.setTimeout(function () { node.remove(); }, 180);
+      }
+      function show(title, detail, type) {
+        var node = document.createElement('div');
+        node.className = 'md-toast';
+        node.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        node.setAttribute('data-type', type || 'success');
+        node.innerHTML = '<i class="md-toast-dot" aria-hidden="true"></i><span><strong class="md-toast-title"></strong><small class="md-toast-detail"></small></span>';
+        node.querySelector('.md-toast-title').textContent = title || 'RECORDED';
+        node.querySelector('.md-toast-detail').textContent = detail || '';
+        stack().appendChild(node);
+        window.setTimeout(function () { dismiss(node); }, type === 'error' ? 4200 : 2600);
+        return node;
+      }
+      return {
+        show: show,
+        success: function (title, detail) { return show(title, detail, 'success'); },
+        warning: function (title, detail) { return show(title, detail, 'warning'); },
+        error: function (title, detail) { return show(title, detail, 'error'); }
+      };
+    })();
+  </script>
   {% endif %}
 
   <!-- OneSignal, SweetAlert, etc. (if used) -->
@@ -588,7 +693,11 @@
         <script>
           {% for category, message in messages %}
             {% if category == 'success' %}
-              swal({ title: "Success!", text: "{{ message|safe }}", icon: "success", button: "OK" });
+              if (window.MoveDefenseToast) {
+                window.MoveDefenseToast.success("RECORDED", {{ message|striptags|tojson }});
+              } else {
+                swal({ title: "Success!", text: "{{ message|safe }}", icon: "success", button: "OK" });
+              }
             {% elif category == 'danger' %}
               swal({ title: "Error!", text: "{{ message|safe }}", icon: "error", button: "OK" });
             {% elif category == 'warning' %}

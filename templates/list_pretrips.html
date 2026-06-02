@@ -6,7 +6,8 @@
 {% endif %}
 <div class="container">
   {% set pretrip_view_endpoint = 'manager.view_pretrip' if current_user.role == 'management' else 'driver.view_pretrip' %}
-  <h2 class="mt-3">All PreTrips</h2>
+  <p class="md-section-label mt-3 mb-1">INSPECTION CHECKLIST</p>
+  <h2 class="mt-0 md-page-title">All PreTrips</h2>
   {% if current_user.role == 'driver' %}
     <a href="{{ url_for('driver.new_pretrip') }}" class="btn btn-sm btn-primary mb-3">
       Create PreTrip
@@ -14,6 +15,79 @@
   {% endif %}
 
   {% if pretrips %}
+    {% if current_user.role != 'management' %}
+      <style>
+        .pretrip-card-list { display:grid; gap:12px; }
+        .pretrip-card {
+          display:grid;
+          gap:12px;
+          padding:14px;
+          border:1px solid var(--md-line);
+          border-radius:16px;
+          background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(12,21,33,.96));
+          box-shadow:0 18px 40px rgba(0,0,0,.32), inset 0 1px 0 rgba(91,157,255,.08);
+        }
+        .pretrip-card-top {
+          display:grid;
+          grid-template-columns:minmax(0,1fr) auto;
+          gap:10px;
+          align-items:start;
+        }
+        .pretrip-card-title {
+          margin:0;
+          color:var(--md-text);
+          font-family:var(--md-display);
+          font-weight:900;
+        }
+        .pretrip-card-meta {
+          margin:4px 0 0;
+          color:var(--md-muted);
+          font-family:var(--md-mono);
+          font-size:.78rem;
+          font-weight:800;
+          line-height:1.35;
+        }
+        .pretrip-card-actions { display:flex; flex-wrap:wrap; gap:8px; }
+        .pretrip-card-actions .btn,
+        .pretrip-card-actions form { flex:1 1 120px; }
+        .pretrip-card-actions .btn,
+        .pretrip-card-actions button { width:100%; }
+        @media (max-width:620px) { .pretrip-card-top { grid-template-columns:1fr; } }
+      </style>
+      <div class="pretrip-card-list">
+        {% for pt in pretrips %}
+          {% set can_manage_pretrip = current_user.role == 'driver' and pt.user_id == current_user.id %}
+          {% set can_delete_pretrip = can_manage_pretrip and pt.pretrip_date == today_local_date %}
+          <article class="pretrip-card">
+            <div class="pretrip-card-top">
+              <div>
+                <p class="pretrip-card-title">Truck {{ pt.truck_number or 'not set' }}</p>
+                <p class="pretrip-card-meta">{{ pt.pretrip_date }} · {{ pt.shift or 'Shift not set' }} · Start {{ pt.start_mileage or 'N/A' }}</p>
+              </div>
+              {% if pt.posttrip %}
+                <span class="badge bg-success align-self-start">COMPLETE</span>
+              {% else %}
+                <span class="badge bg-warning align-self-start">OPEN</span>
+              {% endif %}
+            </div>
+            <div class="pretrip-card-actions">
+              <a href="{{ url_for(pretrip_view_endpoint, pretrip_id=pt.id) }}" class="btn btn-info">View</a>
+              {% if not pt.posttrip and can_manage_pretrip %}
+                <a href="{{ url_for('driver.do_posttrip', pretrip_id=pt.id) }}" class="btn btn-warning">Complete PostTrip</a>
+              {% endif %}
+              {% if can_manage_pretrip %}
+                <a href="{{ url_for('driver.edit_pretrip_entry', pretrip_id=pt.id) }}" class="btn btn-secondary">Edit</a>
+              {% endif %}
+              {% if can_delete_pretrip %}
+                <form action="{{ url_for('driver.delete_pretrip', pretrip_id=pt.id) }}" method="POST" onsubmit="return confirm('Delete this PreTrip?');">
+                  <button type="submit" class="btn btn-outline-danger">Delete</button>
+                </form>
+              {% endif %}
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
     <table class="table table-bordered">
       <thead>
         <tr>
@@ -62,9 +136,11 @@
         {% endfor %}
       </tbody>
     </table>
+    {% endif %}
   {% else %}
     <p>No PreTrip records.</p>
   {% endif %}
 </div>
+{% set md_nav_active = 'pretrip' %}
 {% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

@@ -3,10 +3,20 @@
 {% if current_user.role != 'management' %}
 <script>document.body.classList.add('md-shell');</script>
 {% include 'partials/_md_shell.html' %}
+<style>
+  body.md-shell .border.rounded {
+    border-color:var(--md-line) !important;
+    background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(12,21,33,.96));
+    color:var(--md-text);
+  }
+  body.md-shell .bg-light {
+    background:rgba(6,10,18,.62) !important;
+  }
+</style>
 {% endif %}
 <div class="container">
   {% set pretrip_print_endpoint = 'manager.pretrip_printable' if current_user.role == 'management' else 'driver.pretrip_printable' %}
-  <h2>View PreTrip (ID: {{ pretrip.id }})</h2>
+  <h2 class="md-page-title">View PreTrip (ID: {{ pretrip.id }})</h2>
 
   <div class="mb-3">
     {% if pretrip.posttrip %}
