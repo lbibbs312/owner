@@ -5289,21 +5289,26 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     workspace_start = page.data.index(b'<section class="desktop-ops-workspace"')
     workspace = page.data[workspace_start: page.data.index(b"<script>", workspace_start)]
     assert b"Live Ops Board" in workspace
-    assert b"Detail Workspace" in workspace
+    assert b"Route Workspace" in workspace
+    assert b"ROUTE WORKSPACE" in workspace
     assert b'data-desktop-row' in workspace
     assert b'data-desktop-detail-template="desktop-transfer-' in workspace
     assert b"TRX-DESK" in workspace
-    assert b"Document Discipline" in workspace
-    assert b"Sensitive previews" in workspace
+    assert b"Driver Credentials / Truck Documents" in workspace
+    assert b"Visibility" in workspace
     assert b"Stop Summary" in workspace
     assert b"Load / Transfer Detail" in workspace
-    assert b"Paperwork / Evidence" in workspace
-    assert b"BOL Summary" in workspace
+    assert b"Paperwork / Proof" in workspace
+    assert b"BOL" in workspace
     assert b"Transfer Sheet" in workspace
     assert b"LP-778 LP-779" in workspace
-    assert b"Evidence</h4>" in workspace
+    assert b"Paperwork / Proof</h4>" in workspace
     assert b"Route</h4>" in workspace
     assert b"Review</h4>" in workspace
+    assert b"Scan cargo" not in workspace
+    assert b"Operations Desk" not in workspace
+    assert b"Audit readiness" not in workspace
+    assert b"Evidence Coverage" not in workspace
     assert b"desk-timing-strip" in workspace
     assert b"Truck inspections" in workspace
     assert b"Fuel at start" in workspace

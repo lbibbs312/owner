@@ -20,6 +20,14 @@
 {% set route_transfers = route_transfers|default([]) %}
 {% set route_damage_reports = route_damage_reports|default([]) %}
 {% set current_stop_id = current_stop.id if current_stop else none %}
+{% set desktop = namespace(load_items=[]) %}
+{% for item in rm.delivery_narratives|default([]) if rm %}
+  {% if item.kind != 'empty' %}
+    {% set _ = desktop.load_items.append(item) %}
+  {% endif %}
+{% endfor %}
+{% set paperwork_attached = desk.proof_items + route_transfers|length %}
+{% set paperwork_needed = desk.proof_gaps + (1 if desktop.load_items and not route_transfers else 0) %}
 
 {% macro clean_value(value, action='ACTION REQUIRED') -%}
   {%- set text = (value|string).strip() if value is not none else '' -%}
@@ -44,9 +52,9 @@
 <section class="desktop-ops-workspace" data-desktop-ops-workspace aria-label="MoveDefense widescreen operations workspace">
   <div class="desk-route-strip">
     <div>
-      <span class="desk-kicker">Operations Desk</span>
-      <strong>{{ clean_value(rm.route.current_location if rm and rm.route else none, 'ROUTE LOCATION REQUIRED') }}</strong>
-      <small>{{ current_user.display_name }}{% if current_user.department %} / {{ current_user.department }}{% endif %} / {{ route_date.strftime('%b %d, %Y') if route_date else today_local_date.strftime('%b %d, %Y') }}</small>
+      <span class="desk-kicker">Route Workspace</span>
+      <strong>ROUTE WORKSPACE</strong>
+      <small>{{ current_user.display_name|lower }} &middot; {{ route_date.strftime('%b %d, %Y') if route_date else today_local_date.strftime('%b %d, %Y') }} &middot; {{ (current_truck_number or 'truck required')|lower }}{% if current_user.department %} &middot; {{ current_user.department|lower }}{% endif %}</small>
     </div>
     <div class="desk-current-action">
       <span>Current Action</span>
@@ -61,8 +69,8 @@
 
   <div class="desktop-metrics-strip" aria-label="Route health metrics">
     <div><span>Stops</span><strong>{{ desk.completed }}/{{ todays_logs|length }}</strong><small>{{ desk.open }} open</small></div>
-    <div><span>Proof Coverage</span><strong>{{ desk.proof_items }} item{{ 's' if desk.proof_items != 1 else '' }}</strong><small>{{ desk.proof_gaps }} proof gap{{ 's' if desk.proof_gaps != 1 else '' }}</small></div>
-    <div><span>Documents</span><strong>{{ route_transfers|length }} transfer{{ 's' if route_transfers|length != 1 else '' }}</strong><small>{{ rm.route.document_summary if rm and rm.route else 'Route documents only' }}</small></div>
+    <div><span>Paperwork</span><strong>{{ paperwork_attached }} attached</strong><small>{% if paperwork_needed %}{{ paperwork_needed }} needed{% else %}none required flagged{% endif %}</small></div>
+    <div><span>Transfer Sheets</span><strong>{{ route_transfers|length }} attached</strong><small>{% if desktop.load_items and not route_transfers %}needed when cargo moves{% else %}matched if present{% endif %}</small></div>
     <div><span>Issues</span><strong>{{ desk.issues + route_damage_reports|length }}</strong><small>{{ route_damage_reports|length }} damage report{{ 's' if route_damage_reports|length != 1 else '' }}</small></div>
     {% if current_stop_forecast %}
       <div><span>Current Wait</span><strong>{{ current_stop_forecast.elapsed_label }}</strong><small>Today avg {{ current_stop_forecast.today_average_label }}</small></div>
@@ -74,9 +82,10 @@
     <aside class="desktop-ops-board" aria-label="Selectable live operations board">
       <div class="desk-panel-head">
         <span>Live Ops Board</span>
-        <strong>{{ (rm.stops|length if rm else 0) + (rm.delivery_narratives|length if rm else 0) + route_transfers|length }} objects</strong>
+        <strong>{{ (rm.stops|length if rm else 0) + desktop.load_items|length + route_transfers|length }} objects</strong>
       </div>
       <div class="desk-row-group">
+        <h3>Stops</h3>
         {% if rm and rm.stops %}
           {% for stop in rm.stops %}
             {% set log = route_logs_by_id.get(stop.stop_id) %}
@@ -87,27 +96,21 @@
             {{ row_button('desktop-stop-' ~ stop.stop_id, row_code, stop.plant_name, (stop.ledger_meta or stop.movement_summary or stop.next_action), row_tone, is_default) }}
           {% endfor %}
         {% else %}
-          {{ row_button('desktop-route-empty', 'ROUTE', 'No route stops recorded', 'Add the first stop to start route evidence.', 'warn', true) }}
+          {{ row_button('desktop-route-empty', 'ROUTE', 'No route stops recorded', 'Add the first stop to start route paperwork.', 'warn', true) }}
           {% set desk.default_set = true %}
         {% endif %}
       </div>
 
-      {% if rm and rm.delivery_narratives %}
+      {% if desktop.load_items or route_transfers %}
         <div class="desk-row-group">
           <h3>Loads / Parts</h3>
-          {% for item in rm.delivery_narratives %}
+          {% for item in desktop.load_items %}
             {% set detail = item.details[0] if item.details else none %}
             {% set is_default = not desk.default_set %}
             {% if is_default %}{% set desk.default_set = true %}{% endif %}
             {% set row_meta %}{{ clean_value(item.origin_label, 'SOURCE NOT CAPTURED') }} to {{ clean_value(item.destination_label, 'DESTINATION REQUIRED') }} / {{ item.load_count_label or item.route_line }}{% endset %}
             {{ row_button('desktop-load-' ~ loop.index0, 'LOAD', item.title, row_meta, 'normal', is_default) }}
           {% endfor %}
-        </div>
-      {% endif %}
-
-      {% if route_transfers %}
-        <div class="desk-row-group">
-          <h3>Transfers</h3>
           {% for transfer in route_transfers %}
             {% set line_count = transfer.lines|length %}
             {% set is_default = not desk.default_set %}
@@ -118,10 +121,14 @@
       {% endif %}
 
       <div class="desk-row-group">
-        <h3>Evidence / Paperwork</h3>
-        {% set evidence_default = not desk.default_set %}
-        {% if evidence_default %}{% set desk.default_set = true %}{% endif %}
-        {{ row_button('desktop-evidence-route', 'DOC', 'Route evidence and paperwork', (desk.proof_items ~ ' proof item' ~ ('s' if desk.proof_items != 1 else '') ~ ' / ' ~ route_transfers|length ~ ' transfer sheet' ~ ('s' if route_transfers|length != 1 else '')), 'warn' if desk.proof_gaps else 'normal', evidence_default) }}
+        <h3>Paperwork</h3>
+        {% set paperwork_default = not desk.default_set %}
+        {% if paperwork_default %}{% set desk.default_set = true %}{% endif %}
+        {{ row_button('desktop-paperwork-route', 'DOC', 'Route packet / proof', (paperwork_attached ~ ' attached / ' ~ (paperwork_needed ~ ' needed' if paperwork_needed else 'none required flagged')), 'warn' if paperwork_needed else 'normal', paperwork_default) }}
+      </div>
+
+      <div class="desk-row-group">
+        <h3>Inspections</h3>
         {{ row_button('desktop-inspection-route', 'INSP', 'Truck inspections', ((current_truck_number or 'TRUCK REQUIRED') ~ ' / pretrip ' ~ ('recorded' if route_pretrip else 'needed') ~ ' / posttrip ' ~ ('complete' if route_pretrip and route_pretrip.posttrip else 'pending')), 'warn' if pending_posttrip else 'normal', false) }}
       </div>
 
@@ -144,11 +151,11 @@
 
     <section class="desktop-detail-workspace" aria-label="Detail workspace">
       <div class="desk-work-head">
-        <span data-desktop-work-kicker>Detail Workspace</span>
+        <span data-desktop-work-kicker>Route Workspace</span>
         <strong data-desktop-work-title>Route object detail</strong>
       </div>
       <div class="desk-work-body" data-desktop-work-body>
-        <p class="desk-empty">Select an operation on the left to inspect evidence, paperwork, metrics, and actions.</p>
+        <p class="desk-empty">Select an operation on the left to inspect paperwork, proof, route metrics, and actions.</p>
       </div>
     </section>
   </div>
@@ -158,7 +165,7 @@
   </div>
 
   <div class="desktop-detail-templates" hidden>
-    <template data-desktop-detail-template="desktop-route-empty" data-title="Route setup" data-kicker="Route">
+    <template data-desktop-detail-template="desktop-route-empty" data-title="Route setup" data-kicker="ROUTE WORKSPACE">
       <div class="desk-detail-stack">
         <section class="desk-detail-section">
           <h3>Start route capture</h3>
@@ -185,7 +192,13 @@
       {% set transfer_remark_parts = (transfer_line.remarks or '').split('LP IDs:', 1) if transfer_line else [] %}
       {% set transfer_remarks = transfer_remark_parts[0].rstrip(' |') if transfer_line else '' %}
       {% set transfer_lp_ids = transfer_remark_parts[1].strip() if transfer_line and transfer_remark_parts|length > 1 else '' %}
-      <template data-desktop-detail-template="desktop-stop-{{ stop.stop_id }}" data-title="Stop {{ stop.sequence }} / {{ stop.plant_name }}" data-kicker="Stop Detail">
+      {% set arrived_text = (stop.arrived_with|string).strip()|lower if stop.arrived_with is not none else '' %}
+      {% set departed_text = (stop.departed_with|string).strip()|lower if stop.departed_with is not none else '' %}
+      {% set empty_tokens = ['', 'empty', 'none', 'no load', 'no pickup', 'no-pickup', 'n/a', 'na', '--'] %}
+      {% set arrived_empty = arrived_text in empty_tokens %}
+      {% set departed_empty = departed_text in empty_tokens %}
+      {% set cargo_expected = transfer or not (arrived_empty and departed_empty) %}
+      <template data-desktop-detail-template="desktop-stop-{{ stop.stop_id }}" data-title="Stop {{ stop.sequence }} / {{ stop.plant_name }}" data-kicker="STOP DETAIL">
         <div class="desk-detail-stack">
           <section class="desk-detail-section desk-stop-summary">
             <div class="desk-section-title"><span>Stop Summary</span><strong>{{ stop.board_code or ('STP-' ~ stop.sequence) }}</strong></div>
@@ -194,8 +207,8 @@
               {{ fact('Plant', stop.plant_name) }}
               {{ fact('Arrival', stop.arrival_at|display_time if stop.arrival_at else none, 'ARRIVAL REQUIRED') }}
               {{ fact('Departure', stop.departure_at|to_12h_format if stop.departure_at else none, 'DEPARTURE REQUIRED') }}
-              {{ fact('Arrived with', stop.arrived_with, 'SOURCE NOT CAPTURED') }}
-              {{ fact('Departed with', ('No Pickup' if stop.no_pickup else stop.departed_with), 'DESTINATION REQUIRED') }}
+              {{ fact('Arrived with', 'No load captured for this stop' if not cargo_expected and arrived_empty else stop.arrived_with, 'SOURCE NOT CAPTURED' if cargo_expected else 'EMPTY MOVEMENT') }}
+              {{ fact('Departed with', 'No load captured for this stop' if not cargo_expected and departed_empty else ('No pickup / empty' if stop.no_pickup and departed_empty else stop.departed_with), 'DESTINATION REQUIRED' if cargo_expected else 'EMPTY MOVEMENT') }}
               {{ fact('Wait', stop.wait_label) }}
               {{ fact('Last action', stop.next_action) }}
               {{ fact('Next action / route issue', stop.badge.label if stop.badge else stop.next_action) }}
@@ -222,21 +235,25 @@
           {% endif %}
 
           <section class="desk-detail-section desk-load-paperwork">
-            <div class="desk-section-title"><span>Load / Transfer Detail</span><strong>{{ transfer.transfer_number if transfer else 'Transfer sheet needed' }}</strong></div>
-            <div class="desk-fact-grid">
-              {{ fact('Part number / item number', (transfer_line.part_number if transfer_line else log.part_number if log else none), 'ITEM NUMBER REQUIRED') }}
-              {{ fact('Part description', transfer_remarks, 'DESCRIPTION NOT CAPTURED') }}
-              {{ fact('JO / load reference', (log.depart_load_size if log and log.depart_load_size else stop.departed_with), 'LOAD REFERENCE REQUIRED') }}
-              {{ fact('LP IDs', transfer_lp_ids, 'LP IDS REQUIRED') }}
-              {{ fact('Lot', none, 'LOT NOT CAPTURED') }}
-              {{ fact('Quantity', transfer_line.quantity if transfer_line else none, 'COUNT REQUIRED') }}
-              {{ fact('Rack / pallet / container count', transfer_line.skids if transfer_line else none, 'COUNT REQUIRED') }}
-              {{ fact('From site', transfer.ship_from if transfer else none, 'SOURCE NOT CAPTURED') }}
-              {{ fact('To site', transfer.ship_to if transfer else stop.plant_name, 'DESTINATION REQUIRED') }}
-              {{ fact('Expected destination', stop.departed_with, 'DESTINATION REQUIRED') }}
-              {{ fact('Actual destination', stop.plant_name, 'DROP LOCATION REQUIRED') }}
-              {{ fact('Movement status', stop.badge.label if stop.badge else stop.next_action) }}
-            </div>
+            <div class="desk-section-title"><span>Load / Transfer Detail</span><strong>{% if transfer %}{{ transfer.transfer_number }}{% elif cargo_expected %}Paperwork photo needed{% else %}Empty movement{% endif %}</strong></div>
+            {% if cargo_expected %}
+              <div class="desk-fact-grid">
+                {{ fact('Part number / item number', (transfer_line.part_number if transfer_line else log.part_number if log else none), 'CAPTURE PAPERWORK FIRST') }}
+                {{ fact('Part description', transfer_remarks, 'CAPTURE PAPERWORK FIRST') }}
+                {{ fact('JO / load reference', (log.depart_load_size if log and log.depart_load_size else stop.departed_with), 'LOAD REFERENCE NEEDED') }}
+                {{ fact('LP IDs', transfer_lp_ids, 'CAPTURE PAPERWORK FIRST') }}
+                {{ fact('Lot', none, 'CAPTURE PAPERWORK FIRST') }}
+                {{ fact('Quantity', transfer_line.quantity if transfer_line else none, 'CAPTURE PAPERWORK FIRST') }}
+                {{ fact('Rack / pallet / container count', transfer_line.skids if transfer_line else none, 'CAPTURE PAPERWORK FIRST') }}
+                {{ fact('From site', transfer.ship_from if transfer else none, 'PAPERWORK PHOTO NEEDED') }}
+                {{ fact('To site', transfer.ship_to if transfer else stop.plant_name, 'DESTINATION REQUIRED') }}
+                {{ fact('Expected destination', stop.departed_with, 'DESTINATION REQUIRED') }}
+                {{ fact('Actual destination', stop.plant_name, 'DROP LOCATION REQUIRED') }}
+                {{ fact('Movement status', stop.badge.label if stop.badge else stop.next_action) }}
+              </div>
+            {% else %}
+              <div class="desk-warning-strip"><strong>No load captured</strong><span>This stop is an empty or no-pickup movement. Cargo paperwork fields are not required by the current route data.</span></div>
+            {% endif %}
             {% if transfer %}
               <div class="desk-transfer-matrix" aria-label="Transfer sheet fields">
                 {% for line in transfer.lines[:4] %}
@@ -245,33 +262,33 @@
                   {% set line_lp_ids = line_remark_parts[1].strip() if line_remark_parts|length > 1 else '' %}
                   <div class="desk-transfer-mini-row">
                     <span>LINE {{ line.line_number }}</span>
-                    <strong>{{ line.part_number or 'ITEM NUMBER REQUIRED' }}</strong>
-                    <small>From {{ transfer.ship_from }} / To {{ transfer.ship_to }} / Location {{ line.side|upper }} / LP {{ line_lp_ids or 'LP REQUIRED' }} / Lot {{ line_clean_remarks or 'LOT NOT CAPTURED' }} / Qty {{ line.quantity or 'COUNT REQUIRED' }}</small>
+                    <strong>{{ line.part_number or 'ITEM NUMBER NOT CAPTURED' }}</strong>
+                    <small>From {{ transfer.ship_from }} / To {{ transfer.ship_to }} / Location {{ line.side|upper }} / LP {{ line_lp_ids or 'NOT CAPTURED' }} / Lot {{ line_clean_remarks or 'NOT CAPTURED' }} / Qty {{ line.quantity or 'NOT CAPTURED' }}</small>
                   </div>
                 {% endfor %}
               </div>
-            {% else %}
-              <div class="desk-warning-strip tone-warn"><strong>TRANSFER SHEET NEEDED</strong><span>No transfer sheet is matched to this stop. Attach the inter-site inventory transfer sheet to populate item, LP, lot, and quantity fields.</span></div>
+            {% elif cargo_expected %}
+              <div class="desk-warning-strip tone-warn"><strong>PAPERWORK PHOTO NEEDED</strong><span>Take or upload a BOL, transfer sheet, route sheet, or paperwork photo. The app or manager can extract part, LP, lot, and quantity fields later.</span></div>
             {% endif %}
           </section>
 
           <section class="desk-detail-section desk-paperwork-section">
-            <div class="desk-section-title"><span>Paperwork / Evidence</span><strong>{{ log.photos|length if log else 0 }} proof photo{{ 's' if log and log.photos|length != 1 else '' }}</strong></div>
+            <div class="desk-section-title"><span>Paperwork / Proof</span><strong>{{ log.photos|length if log else 0 }} proof photo{{ 's' if log and log.photos|length != 1 else '' }}</strong></div>
             <div class="desk-doc-grid">
-              <div class="desk-doc-row tone-missing">
-                <span>BOL Summary</span>
-                <strong>BOL MISSING</strong>
-                <small>BOL number, ship date, customer, carrier, pieces / pallets / weight, references, stop 1, and stop 2 will appear after a BOL is attached.</small>
+              <div class="desk-doc-row {{ 'tone-missing' if cargo_expected else '' }}">
+                <span>BOL</span>
+                <strong>{% if cargo_expected %}Not attached{% else %}Not required flagged{% endif %}</strong>
+                <small>{% if cargo_expected %}Take or upload a BOL photo. BOL number, ship date, customer, carrier, pieces / pallets / weight, references, stop 1, and stop 2 can be confirmed later.{% else %}Current route data does not require BOL paperwork for this empty/no-pickup stop.{% endif %}</small>
               </div>
-              <div class="desk-doc-row {{ 'tone-attached' if transfer else 'tone-missing' }}">
+              <div class="desk-doc-row {{ 'tone-attached' if transfer else ('tone-missing' if cargo_expected else '') }}">
                 <span>Transfer Sheet</span>
-                <strong>{{ transfer.transfer_number if transfer else 'MISSING' }}</strong>
-                <small>{% if transfer %}{{ transfer.ship_from }} to {{ transfer.ship_to }} / {{ transfer.lines|length }} line{{ 's' if transfer.lines|length != 1 else '' }} / uploaded by {{ transfer.driver_name or current_user.display_name }}{% if transfer.created_at %} at {{ transfer.created_at|to_detroit_datetime }}{% endif %}{% else %}Attach transfer sheet to verify part movement.{% endif %}</small>
+                <strong>{{ transfer.transfer_number if transfer else ('Not attached' if cargo_expected else 'Not required flagged') }}</strong>
+                <small>{% if transfer %}{{ transfer.ship_from }} to {{ transfer.ship_to }} / {{ transfer.lines|length }} line{{ 's' if transfer.lines|length != 1 else '' }} / uploaded by {{ transfer.driver_name or current_user.display_name }}{% if transfer.created_at %} at {{ transfer.created_at|to_detroit_datetime }}{% endif %}{% elif cargo_expected %}Take or upload the transfer sheet image; structured fields can be confirmed later.{% else %}No transfer sheet requirement is flagged for this stop.{% endif %}</small>
               </div>
               <div class="desk-doc-row tone-attached">
-                <span>Route Sheet</span>
+                <span>Route Packet</span>
                 <strong>{{ desk.completed }}/{{ todays_logs|length }} stops</strong>
-                <small>{{ desk.proof_items }} proof item{{ 's' if desk.proof_items != 1 else '' }} / {{ desk.proof_gaps }} proof gap{{ 's' if desk.proof_gaps != 1 else '' }} / {{ desk.scans }} scan{{ 's' if desk.scans != 1 else '' }}</small>
+                <small>{{ desk.proof_items }} proof photo{{ 's' if desk.proof_items != 1 else '' }} / {% if desk.proof_gaps %}{{ desk.proof_gaps }} proof gap{{ 's' if desk.proof_gaps != 1 else '' }}{% else %}no proof gap flagged{% endif %}</small>
               </div>
             </div>
             {% if log and log.photos %}
@@ -294,16 +311,26 @@
               <div class="desk-section-title"><span>Actions</span><strong>Workspace actions</strong></div>
               <div class="desk-action-groups">
                 <div class="desk-action-group">
-                  <h4>Evidence</h4>
+                  <h4>Paperwork / Proof</h4>
                   <div class="desk-action-grid">
                     <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}" enctype="multipart/form-data">
                       <input type="hidden" name="source" value="proof">
+                      <input type="hidden" name="note" value="Proof photo from route workspace">
                       <input type="hidden" name="next" value="{{ request.full_path }}">
-                      <label class="desk-action-link">Add proof<input type="file" name="photo" accept="image/*" capture="environment" onchange="if(this.files.length){this.form.submit();}"></label>
+                      <label class="desk-action-link">Take proof photo<input type="file" name="photo" accept="image/*" capture="environment" onchange="if(this.files.length){this.form.submit();}"></label>
                     </form>
-                    <a class="desk-action-link" href="{{ url_for('driver.new_plant_transfer') }}">Attach paperwork</a>
-                    <a class="desk-action-link" href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}">Scan cargo</a>
-                    <a class="desk-action-link" href="{{ url_for('driver.new_plant_transfer') }}">Attach BOL / transfer sheet</a>
+                    <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}" enctype="multipart/form-data">
+                      <input type="hidden" name="source" value="paperwork">
+                      <input type="hidden" name="note" value="Paperwork document image from route workspace">
+                      <input type="hidden" name="next" value="{{ request.full_path }}">
+                      <label class="desk-action-link">Upload document image<input type="file" name="photo" accept="image/*" onchange="if(this.files.length){this.form.submit();}"></label>
+                    </form>
+                    <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}" enctype="multipart/form-data">
+                      <input type="hidden" name="source" value="bol_transfer_sheet">
+                      <input type="hidden" name="note" value="BOL or transfer sheet photo from route workspace">
+                      <input type="hidden" name="next" value="{{ request.full_path }}">
+                      <label class="desk-action-link">Attach BOL / transfer sheet<input type="file" name="photo" accept="image/*" capture="environment" onchange="if(this.files.length){this.form.submit();}"></label>
+                    </form>
                     <a class="desk-action-link" href="{{ url_for('driver.new_damage_report') }}">Add damage photo</a>
                   </div>
                 </div>
@@ -320,7 +347,6 @@
                   <h4>Review</h4>
                   <div class="desk-action-grid">
                     <form class="desk-action-form" method="POST" action="{{ url_for('driver.request_manager_review', log_id=log.id) }}"><button class="desk-action-link" type="submit">Manager review</button></form>
-                    <form class="desk-action-form" method="POST" action="{{ url_for('driver.request_manager_review', log_id=log.id) }}"><button class="desk-action-link" type="submit">Resolve issue</button></form>
                     {% if not route_context.route_finalized %}<form class="desk-action-form danger" method="POST" action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" onsubmit="return confirm('Delete this driver log?');"><button class="desk-action-link danger" type="submit">Delete if allowed</button></form>{% endif %}
                   </div>
                 </div>
@@ -331,9 +357,9 @@
       </template>
     {% endfor %}
 
-    {% for item in rm.delivery_narratives|default([]) if rm %}
+    {% for item in desktop.load_items %}
       {% set detail = item.details[0] if item.details else none %}
-      <template data-desktop-detail-template="desktop-load-{{ loop.index0 }}" data-title="{{ item.title }}" data-kicker="Load / Part Detail">
+      <template data-desktop-detail-template="desktop-load-{{ loop.index0 }}" data-title="{{ item.title }}" data-kicker="LOAD DETAIL">
         <div class="desk-detail-stack">
           <section class="desk-detail-section">
             <div class="desk-section-title"><span>Load / Part Detail</span><strong>{{ item.load_count_label or 'Route load' }}</strong></div>
@@ -345,14 +371,20 @@
               {{ fact('Current state', item.board_badge.label if item.board_badge else 'Recorded') }}
               {{ fact('Last seen stop', ('Stop ' ~ detail.sequence ~ ' / ' ~ detail.plant) if detail else none, 'LAST STOP REQUIRED') }}
               {{ fact('Proof attached', detail.evidence.proof if detail and detail.evidence else none, 'PROOF NEEDED') }}
-              {{ fact('Scans attached', desk.scans ~ ' scan' ~ ('s' if desk.scans != 1 else '')) }}
+              {{ fact('Paperwork status', 'Attached' if route_transfers else none, 'PAPERWORK PHOTO NEEDED') }}
             </div>
           </section>
           <section class="desk-detail-section">
             <div class="desk-section-title"><span>Actions</span><strong>Load controls</strong></div>
             <div class="desk-action-grid">
-              <a class="desk-action-link" href="{{ url_for('driver.new_plant_transfer') }}">Attach transfer sheet</a>
-              {% if detail and detail.stop_id %}<a class="desk-action-link" href="{{ url_for('driver.depart_driver_log', log_id=detail.stop_id) }}">Scan cargo</a>{% endif %}
+              {% if detail and detail.stop_id %}
+                <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=detail.stop_id) }}" enctype="multipart/form-data">
+                  <input type="hidden" name="source" value="load_paperwork">
+                  <input type="hidden" name="note" value="Load paperwork image from route workspace">
+                  <input type="hidden" name="next" value="{{ request.full_path }}">
+                  <label class="desk-action-link primary">Upload document image<input type="file" name="photo" accept="image/*" onchange="if(this.files.length){this.form.submit();}"></label>
+                </form>
+              {% endif %}
               {% if detail and detail.stop_id %}<a class="desk-action-link" href="{{ url_for('driver.edit_driver_log', log_id=detail.stop_id) }}">Change destination</a>{% endif %}
               {% if detail and detail.stop_id %}<form class="desk-action-form" method="POST" action="{{ url_for('driver.request_manager_review', log_id=detail.stop_id) }}"><button class="desk-action-link" type="submit">Send to manager review</button></form>{% endif %}
             </div>
@@ -362,7 +394,7 @@
     {% endfor %}
 
     {% for transfer in route_transfers %}
-      <template data-desktop-detail-template="desktop-transfer-{{ transfer.id }}" data-title="{{ transfer.transfer_number or ('Transfer ' ~ transfer.id) }}" data-kicker="Transfer Detail">
+      <template data-desktop-detail-template="desktop-transfer-{{ transfer.id }}" data-title="{{ transfer.transfer_number or ('Transfer ' ~ transfer.id) }}" data-kicker="TRANSFER SHEET">
         <div class="desk-detail-stack">
           <section class="desk-detail-section">
             <div class="desk-section-title"><span>Transfer Detail</span><strong>{{ transfer.transfer_number or transfer.id }}</strong></div>
@@ -378,9 +410,9 @@
             </div>
             <div class="desk-transfer-lines">
               {% for line in transfer.lines %}
-                <div class="desk-transfer-line"><span>{{ line.line_number }}</span><strong>{{ line.part_number or 'ITEM NUMBER REQUIRED' }}</strong><small>{{ line.skids or 'LP REQUIRED' }} LP / {{ line.quantity or 'COUNT REQUIRED' }} pcs{% if line.remarks %} / {{ line.remarks }}{% endif %}</small></div>
+                <div class="desk-transfer-line"><span>{{ line.line_number }}</span><strong>{{ line.part_number or 'ITEM NUMBER NOT CAPTURED' }}</strong><small>{{ line.skids or 'LP NOT CAPTURED' }} LP / {{ line.quantity or 'COUNT NOT CAPTURED' }} pcs{% if line.remarks %} / {{ line.remarks }}{% endif %}</small></div>
               {% else %}
-                <div class="desk-warning-strip tone-warn"><strong>COUNT REQUIRED</strong><span>No transfer lines are recorded.</span></div>
+                <div class="desk-warning-strip tone-warn"><strong>COUNT NOT CAPTURED</strong><span>No transfer lines are recorded.</span></div>
               {% endfor %}
             </div>
           </section>
@@ -388,7 +420,6 @@
             <div class="desk-section-title"><span>Actions</span><strong>Transfer controls</strong></div>
             <div class="desk-action-grid">
               <a class="desk-action-link primary" href="{{ url_for('driver.view_plant_transfer', transfer_id=transfer.id) }}">Open sheet</a>
-              <a class="desk-action-link" href="{{ url_for('driver.edit_plant_transfer', transfer_id=transfer.id) }}">Edit sheet</a>
               <a class="desk-action-link" href="{{ url_for('driver.plant_transfer_printable', transfer_id=transfer.id) }}">Print</a>
               <a class="desk-action-link" href="{{ url_for('driver.plant_transfer_attachment', transfer_id=transfer.id) }}">Save PDF</a>
             </div>
@@ -397,37 +428,51 @@
       </template>
     {% endfor %}
 
-    <template data-desktop-detail-template="desktop-evidence-route" data-title="Route evidence and paperwork" data-kicker="Evidence / Paperwork">
+    <template data-desktop-detail-template="desktop-paperwork-route" data-title="Route packet / paperwork" data-kicker="PAPERWORK DETAIL">
       <div class="desk-detail-stack">
         <section class="desk-detail-section">
-          <div class="desk-section-title"><span>Evidence Coverage</span><strong>{{ desk.proof_items }} proof item{{ 's' if desk.proof_items != 1 else '' }}</strong></div>
+          <div class="desk-section-title"><span>Paperwork / Proof</span><strong>{{ paperwork_attached }} attached</strong></div>
           <div class="desk-fact-grid">
             {{ fact('Route stops', todays_logs|length) }}
             {{ fact('Proof photos', desk.proof_items) }}
             {{ fact('Transfer sheets', route_transfers|length) }}
-            {{ fact('Proof gaps', desk.proof_gaps) }}
-            {{ fact('Part scans', desk.scans) }}
-            {{ fact('Audit readiness', 'Needs review' if desk.proof_gaps or desk.issues else 'Ready') }}
+            {{ fact('Paperwork needed', paperwork_needed) }}
+            {{ fact('Route rule status', 'Needs review' if paperwork_needed or desk.issues else 'No required paperwork flagged') }}
+            {{ fact('Packet basis', 'Ready based on current route rules' if not paperwork_needed and not desk.issues else 'Review flagged items') }}
           </div>
           {% if desk.proof_gaps %}
-            <div class="desk-warning-strip tone-warn"><strong>PROOF NEEDED</strong><span>{{ desk.proof_gaps }} stop{{ 's' if desk.proof_gaps != 1 else '' }} need proof before this route is audit-ready.</span></div>
+            <div class="desk-warning-strip tone-warn"><strong>PROOF NEEDED</strong><span>{{ desk.proof_gaps }} stop{{ 's' if desk.proof_gaps != 1 else '' }} need proof before this route packet is ready for review.</span></div>
           {% endif %}
         </section>
         <section class="desk-detail-section">
-          <div class="desk-section-title"><span>Document Discipline</span><strong>Right workspace only</strong></div>
+          <div class="desk-section-title"><span>Driver Credentials / Truck Documents</span><strong>Right workspace only</strong></div>
           <div class="desk-policy-grid">
-            <div><span>Required</span><strong>Document type</strong><small>Transfer sheet, proof photo, damage photo, BOL, license, DOT card, insurance, registration, inspection, maintenance, override.</small></div>
-            <div><span>Required</span><strong>Related entity</strong><small>Driver, truck, stop, load, route, damage, or transfer must own the file.</small></div>
+            <div><span>Required</span><strong>Document type</strong><small>BOL, transfer sheet, route packet, proof photo, damage photo, license, DOT card, insurance, registration, inspection, maintenance, or manager note.</small></div>
+            <div><span>Required</span><strong>Related entity</strong><small>Driver, truck, stop, load, route, damage report, or transfer sheet must own the file.</small></div>
             <div><span>Captured</span><strong>Uploaded by / at</strong><small>Existing proof and damage uploads preserve uploader and timestamp.</small></div>
-            <div><span>Restricted</span><strong>Sensitive previews</strong><small>License, DOT card, insurance, and registration stay out of the live board.</small></div>
-            <div><span>Controlled</span><strong>Expiration status</strong><small>Use inspection/document records for expiring driver or truck paperwork.</small></div>
-            <div><span>Audit</span><strong>Verify / replace trail</strong><small>Replace, delete, verify, and override actions must write an audit event.</small></div>
+            <div><span>Restricted</span><strong>Visibility</strong><small>License, DOT card, insurance, and registration previews stay out of the live board.</small></div>
+            <div><span>Controlled</span><strong>Expiration date</strong><small>Use credential and truck-document records for expiring driver or truck paperwork.</small></div>
+            <div><span>Verified</span><strong>Status / audit trail</strong><small>Replace, delete, verify, and manager-review actions must write an audit event.</small></div>
           </div>
         </section>
         <section class="desk-detail-section">
-          <div class="desk-section-title"><span>Actions</span><strong>Evidence controls</strong></div>
+          <div class="desk-section-title"><span>Actions</span><strong>Paperwork controls</strong></div>
           <div class="desk-action-grid">
-            <a class="desk-action-link" href="{{ url_for('driver.new_plant_transfer') }}">Attach transfer sheet</a>
+            {% set upload_log = current_stop or (todays_logs|last if todays_logs else none) %}
+            {% if upload_log %}
+              <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=upload_log.id) }}" enctype="multipart/form-data">
+                <input type="hidden" name="source" value="route_paperwork">
+                <input type="hidden" name="note" value="Route paperwork image from route workspace">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                <label class="desk-action-link primary">Take paperwork photo<input type="file" name="photo" accept="image/*" capture="environment" onchange="if(this.files.length){this.form.submit();}"></label>
+              </form>
+              <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=upload_log.id) }}" enctype="multipart/form-data">
+                <input type="hidden" name="source" value="route_document">
+                <input type="hidden" name="note" value="Route document image from route workspace">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                <label class="desk-action-link">Upload document image<input type="file" name="photo" accept="image/*" onchange="if(this.files.length){this.form.submit();}"></label>
+              </form>
+            {% endif %}
             <a class="desk-action-link" href="{{ url_for('driver.new_damage_report') }}">Add damage photo</a>
             <a class="desk-action-link" href="{{ url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) }}">Open route audit</a>
             <a class="desk-action-link" href="{{ url_for('driver.list_pretrips', truck_number=current_truck_number) if current_truck_number else url_for('driver.list_pretrips') }}">Inspection records</a>
@@ -436,10 +481,10 @@
       </div>
     </template>
 
-    <template data-desktop-detail-template="desktop-inspection-route" data-title="Truck inspections" data-kicker="Inspection Detail">
+    <template data-desktop-detail-template="desktop-inspection-route" data-title="Truck inspections" data-kicker="INSPECTION RECORD">
       <div class="desk-detail-stack">
         <section class="desk-detail-section">
-          <div class="desk-section-title"><span>Vehicle / Shift Detail</span><strong>{{ clean_value(current_truck_number, 'TRUCK REQUIRED') }}</strong></div>
+          <div class="desk-section-title"><span>Inspection Record</span><strong>{{ clean_value(current_truck_number, 'TRUCK REQUIRED') }}</strong></div>
           <div class="desk-fact-grid">
             {{ fact('PreTrip', 'Recorded' if route_pretrip else none, 'PRETRIP REQUIRED') }}
             {{ fact('PostTrip', 'Complete' if route_pretrip and route_pretrip.posttrip else none, 'POSTTRIP REQUIRED') }}
@@ -450,7 +495,7 @@
           </div>
         </section>
         <section class="desk-detail-section">
-          <div class="desk-section-title"><span>Maintenance History</span><strong>{{ truck_maintenance_history|length }} records</strong></div>
+          <div class="desk-section-title"><span>Truck Documents</span><strong>{{ truck_maintenance_history|length }} records</strong></div>
           <div class="desk-evidence-list">
             {% for row in truck_maintenance_history %}
               <div class="desk-evidence-row"><span>{{ row.kind|upper if row.kind is defined else 'TRUCK' }}</span><strong>{{ row.title if row.title is defined else row }}</strong><small>{{ row.detail if row.detail is defined else '' }}</small></div>
@@ -474,7 +519,7 @@
       {% set log = route_logs_by_id.get(stop.stop_id) %}
       {% for issue in stop.issues|default([]) %}
         {% if issue.code != 'needs_departure' %}
-          <template data-desktop-detail-template="desktop-issue-{{ stop.stop_id }}-{{ issue.code }}" data-title="{{ issue.label }}" data-kicker="Issue Review">
+          <template data-desktop-detail-template="desktop-issue-{{ stop.stop_id }}-{{ issue.code }}" data-title="{{ issue.label }}" data-kicker="ISSUE REVIEW">
             <div class="desk-detail-stack">
               <section class="desk-detail-section">
                 <div class="desk-section-title"><span>Issue Review</span><strong>{{ issue.severity|upper }}</strong></div>
@@ -482,7 +527,7 @@
                   {{ fact('Issue type', issue.label) }}
                   {{ fact('Affected stop', 'Stop ' ~ stop.sequence ~ ' / ' ~ stop.plant_name) }}
                   {{ fact('Why flagged', issue.reason) }}
-                  {{ fact('Evidence found', stop.evidence.proof if stop.evidence else none, 'EVIDENCE MISSING') }}
+                  {{ fact('Evidence found', stop.evidence.proof if stop.evidence else none, 'PROOF MISSING') }}
                   {{ fact('Required action', issue.action) }}
                   {{ fact('Review owner', 'Driver / manager review') }}
                 </div>
@@ -496,11 +541,11 @@
                     {% if issue.code in ['missing_proof', 'unconfirmed_drop'] %}
                       <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}" enctype="multipart/form-data">
                         <input type="hidden" name="source" value="proof">
+                        <input type="hidden" name="note" value="Proof photo from issue review">
                         <input type="hidden" name="next" value="{{ request.full_path }}">
                         <label class="desk-action-link primary">Attach proof<input type="file" name="photo" accept="image/*" capture="environment" onchange="if(this.files.length){this.form.submit();}"></label>
                       </form>
                     {% endif %}
-                    <a class="desk-action-link" href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}">Scan cargo</a>
                     <a class="desk-action-link" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Add note</a>
                     <form class="desk-action-form" method="POST" action="{{ url_for('driver.request_manager_review', log_id=log.id) }}"><button class="desk-action-link" type="submit">Manager override / review</button></form>
                   </div>
