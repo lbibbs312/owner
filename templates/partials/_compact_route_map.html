@@ -100,11 +100,13 @@
   {%- if value and value != '--' -%}<strong>{{ value }}</strong>{%- else -%}{{ value or '--' }}{%- endif -%}
 {%- endmacro %}
 {% macro flow_route_pair(pickup, deliver) -%}
-  {%- if pickup or deliver -%}
+  {%- set pk = '' if (not pickup or pickup == 'Pickup source unknown') else pickup -%}
+  {%- set dv = '' if (not deliver or deliver == 'Destination needs confirmation') else deliver -%}
+  {%- if pk or dv -%}
     <span class="flow-route-pair">
-      <span class="flow-route-end"><em>Pickup</em><strong>{{ pickup or '--' }}</strong></span>
+      <span class="flow-route-end"><em>Pickup</em><strong>{{ pk or '—' }}</strong></span>
       <span class="flow-arrow flow-route-arrow" aria-hidden="true">→</span>
-      <span class="flow-route-end"><em>Deliver</em><strong>{{ deliver or '--' }}</strong></span>
+      <span class="flow-route-end"><em>Deliver</em><strong>{{ dv or '—' }}</strong></span>
     </span>
   {%- endif -%}
 {%- endmacro %}
