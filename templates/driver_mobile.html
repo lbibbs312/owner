@@ -3587,17 +3587,15 @@
             });
             if (!response.ok) throw new Error('Departure was not saved.');
             if (panel) panel.hidden = true;
-            if (frame) {
-              frame.classList.remove('is-ready');
-              frame.removeAttribute('src');
-            }
-            if (context) context.innerHTML = '';
-            hideInlinePanels();
-            if (embedWrap) embedWrap.hidden = true;
-            board.classList.remove('is-interacting');
-            document.dispatchEvent(new CustomEvent('movedefense:route-updated', {
-              detail: { title: 'DEPARTURE RECORDED', detail: 'Route board updated' }
-            }));
+            // Reload the whole page, not just the board fragment: the active-stop
+            // wait banner ("DEPART / LOAD", elapsed timer) is rendered OUTSIDE the
+            // board, so a soft refresh leaves it stale and the stop appears to
+            // "still say depart". Drop ?flow so the wizard doesn't re-open, and
+            // any server-side validation flash surfaces on reload.
+            var nextUrl = new URL(window.location.href);
+            nextUrl.searchParams.delete('flow');
+            window.location.assign(nextUrl.toString());
+            return;
           } catch (error) {
             routeToast('SAVE FAILED', error.message || 'Open the stop and try again.', 'error');
           } finally {
