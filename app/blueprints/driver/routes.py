@@ -1544,6 +1544,7 @@ def _driver_route_audit_summary(driver_id, route_date, logs, route_map_ctx=None,
             delta = log.fuel_mileage - start_mileage
         fuel_events.append(
             {
+                "log_id": log.id,
                 "sequence": stop_vm.get("sequence"),
                 "plant": stop_vm.get("plant_name") or log.plant_name,
                 "mileage": log.fuel_mileage,

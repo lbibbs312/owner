@@ -4471,6 +4471,18 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
             imported_odometer_pretrip,
         ])
         db.session.flush()
+        fuel_log = DriverLog(
+            driver_id=driver.id,
+            date=selected_date,
+            plant_name="RE",
+            load_size="Empty",
+            depart_load_size="Empty",
+            no_pickup=True,
+            arrive_time="2026-05-20 21:12:00",
+            depart_time="22:00",
+            fuel=True,
+            fuel_mileage=1045,
+        )
         db.session.add_all([
             PostTrip(
                 pretrip_id=prior_pretrip.id,
@@ -4504,19 +4516,11 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
                 miles_driven=17465,
                 created_at=datetime(2026, 5, 17, 18, 0, 0),
             ),
-            DriverLog(
-                driver_id=driver.id,
-                date=selected_date,
-                plant_name="RE",
-                load_size="Empty",
-                depart_load_size="Empty",
-                no_pickup=True,
-                arrive_time="2026-05-20 21:12:00",
-                depart_time="22:00",
-                fuel=True,
-                fuel_mileage=1045,
-            ),
+            fuel_log,
         ])
+        db.session.flush()
+        current_pretrip_id = current_pretrip.id
+        fuel_log_id = fuel_log.id
         db.session.commit()
 
     login(client, "dated_print_driver")
@@ -4543,6 +4547,12 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"<span>Route</span>" in logs_page.data
     assert b"Numbered Stops" in logs_page.data
     assert b"Route Miles" in logs_page.data
+    assert b'href="#route-stops" aria-label="View numbered stops"' in logs_page.data
+    assert f'href="/pretrip_printable/{current_pretrip_id}" aria-label="View route mileage inspection record"'.encode() in logs_page.data
+    assert b'href="/list_pretrips?truck_number=BT-1" aria-label="View truck inspections"' in logs_page.data
+    assert f'href="#route-stop-{fuel_log_id}" aria-label="View fuel stop details"'.encode() in logs_page.data
+    assert b'id="route-stops" class="md-ledger-list md-flow-window"' in logs_page.data
+    assert f'id="route-stop-{fuel_log_id}"'.encode() in logs_page.data
     assert b"120 mi" in logs_page.data
     assert "▲ +12 mi".encode() in logs_page.data
     assert b"md-route-audit-slot md-route-mile-slot" in logs_page.data
