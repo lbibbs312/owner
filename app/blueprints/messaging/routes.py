@@ -82,8 +82,13 @@ def recent_activity():
     if current_user.role != "management":
         activity_query = activity_query.filter_by(user_id=current_user.id)
     action_history = activity_query.limit(100).all()
+    template_name = (
+        "recent_activity.html"
+        if current_user.role == "management"
+        else "driver_recent_activity.html"
+    )
     return render_template(
-        "recent_activity.html",
+        template_name,
         new_announcements=new_ann,
         new_messages=new_dms,
         action_history=action_history,

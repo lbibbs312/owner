@@ -2363,6 +2363,8 @@ def test_pretrip_create_and_print_route(client, app):
 
     activity = client.get("/recent_activity")
     assert activity.status_code == 200
+    assert b"md-shell md-standalone" in activity.data
+    assert b"md-driver-bottom-nav" in activity.data
     assert b"PreTrip saved" in activity.data
     assert b"PreTrip printed" not in activity.data
 
@@ -2371,6 +2373,7 @@ def test_pretrip_create_and_print_route(client, app):
     assert mark_printed.get_json()["ok"] is True
 
     activity = client.get("/recent_activity")
+    assert b"md-shell md-standalone" in activity.data
     assert b"PreTrip printed" in activity.data
 
 
@@ -4385,6 +4388,7 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
 
     activity = client.get("/recent_activity")
     assert activity.status_code == 200
+    assert b"md-shell md-standalone" in activity.data
     assert b"Driver log submitted" in activity.data
     assert b"Driver logs printed" in activity.data
     assert b"End of day finalized" in activity.data
@@ -4991,6 +4995,7 @@ def test_plant_transfer_flow_and_eod_includes_transfer(client, app):
     assert mark_printed.get_json()["ok"] is True
 
     activity = client.get("/recent_activity")
+    assert b"md-shell md-standalone" in activity.data
     assert b"Plant Transfer PDF downloaded" in activity.data
     assert b"Plant Transfer printed" in activity.data
 

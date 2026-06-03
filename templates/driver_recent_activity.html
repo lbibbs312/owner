@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Recent Activity</title>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  >
+  {% include 'partials/_md_standalone_head.html' %}
+  <style>
+    .md-activity-page {
+      display:grid;
+      gap:16px;
+    }
+    .md-activity-hero {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:14px;
+      padding:18px;
+      border:1px solid rgba(91,157,255,.28);
+      border-radius:18px;
+      background:
+        linear-gradient(135deg, rgba(47,109,240,.18), rgba(15,26,41,.96) 48%),
+        rgba(12,21,33,.96);
+      box-shadow:0 18px 40px rgba(0,0,0,.35), inset 0 1px 0 rgba(91,157,255,.12);
+    }
+    .md-activity-hero h1 {
+      margin:0;
+    }
+    .md-activity-hero p {
+      margin:.45rem 0 0;
+      color:var(--md-muted);
+      font-size:.95rem;
+    }
+    .md-activity-count {
+      min-width:64px;
+      border:1px solid rgba(255,178,36,.34);
+      border-radius:14px;
+      padding:10px 12px;
+      background:rgba(255,178,36,.09);
+      text-align:center;
+      color:var(--md-amber);
+      font-family:var(--md-mono);
+      font-weight:800;
+      line-height:1.1;
+    }
+    .md-activity-count strong {
+      display:block;
+      color:var(--md-text);
+      font-family:var(--md-display);
+      font-size:1.45rem;
+      line-height:1;
+    }
+    .md-activity-panel {
+      overflow:hidden;
+      border:1px solid var(--md-line);
+      border-radius:18px;
+      background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(12,21,33,.96));
+      box-shadow:0 16px 34px rgba(0,0,0,.32);
+    }
+    .md-activity-panel header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:14px 16px;
+      border-bottom:1px solid var(--md-line);
+      background:rgba(6,10,18,.32);
+    }
+    .md-activity-panel h2 {
+      margin:0;
+      color:var(--md-amber);
+      font-family:var(--md-mono);
+      font-size:.78rem;
+      font-weight:800;
+      letter-spacing:.13em;
+      text-transform:uppercase;
+    }
+    .md-panel-count {
+      min-width:30px;
+      border-radius:999px;
+      padding:4px 9px;
+      background:rgba(47,109,240,.18);
+      color:var(--md-blue-bright);
+      font-family:var(--md-mono);
+      font-size:.75rem;
+      font-weight:800;
+      text-align:center;
+    }
+    .md-activity-list {
+      display:grid;
+    }
+    .md-activity-item {
+      display:grid;
+      gap:8px;
+      padding:14px 16px;
+      border-bottom:1px solid rgba(34,50,74,.78);
+    }
+    .md-activity-item:last-child {
+      border-bottom:0;
+    }
+    .md-activity-main {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .md-activity-title {
+      min-width:0;
+      color:var(--md-text);
+      font-weight:800;
+      line-height:1.25;
+    }
+    .md-activity-detail {
+      color:var(--md-muted);
+      font-size:.93rem;
+      line-height:1.35;
+    }
+    .md-activity-time {
+      flex:0 0 auto;
+      max-width:45%;
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.72rem;
+      font-weight:700;
+      line-height:1.25;
+      text-align:right;
+    }
+    .md-activity-badge {
+      display:inline-flex;
+      align-items:center;
+      align-self:flex-start;
+      border-radius:7px;
+      padding:4px 7px;
+      background:rgba(138,153,179,.18);
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.68rem;
+      font-weight:800;
+      letter-spacing:.05em;
+      text-transform:uppercase;
+    }
+    .md-empty-state {
+      padding:18px 16px;
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.82rem;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+    }
+    @media (max-width: 520px) {
+      .md-activity-hero {
+        padding:16px;
+      }
+      .md-activity-hero p {
+        font-size:.88rem;
+      }
+      .md-activity-main {
+        display:grid;
+        gap:6px;
+      }
+      .md-activity-time {
+        max-width:none;
+        text-align:left;
+      }
+    }
+  </style>
+</head>
+<body class="md-shell md-standalone">
+{% include 'partials/_md_standalone_header.html' %}
+
+<div class="container my-4 md-activity-page">
+  <section class="md-activity-hero" aria-labelledby="activityTitle">
+    <div>
+      <h1 id="activityTitle">Recent Activity</h1>
+      <p>Action history, announcements, and recent messages.</p>
+    </div>
+    <div class="md-activity-count" aria-label="{{ action_history|length }} history entries">
+      <strong>{{ action_history|length }}</strong>
+      log
+    </div>
+  </section>
+
+  <section class="md-activity-panel" aria-labelledby="actionHistoryTitle">
+    <header>
+      <h2 id="actionHistoryTitle">Action History</h2>
+      <span class="md-panel-count">{{ action_history|length }}</span>
+    </header>
+    {% if action_history %}
+      <div class="md-activity-list">
+        {% for event in action_history %}
+          <article class="md-activity-item">
+            <div class="md-activity-main">
+              <div>
+                <span class="md-activity-badge">{{ event.category|upper }}</span>
+                <div class="md-activity-title mt-2">{{ event.title }}</div>
+              </div>
+              <time class="md-activity-time">{{ event.created_at|to_detroit_datetime }}</time>
+            </div>
+            {% if event.details %}
+              <div class="md-activity-detail">{{ event.details }}</div>
+            {% endif %}
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="md-empty-state">No action history yet.</div>
+    {% endif %}
+  </section>
+
+  <section class="md-activity-panel" aria-labelledby="announcementsTitle">
+    <header>
+      <h2 id="announcementsTitle">Announcements</h2>
+      <span class="md-panel-count">{{ new_announcements|length }}</span>
+    </header>
+    {% if new_announcements %}
+      <div class="md-activity-list">
+        {% for ann in new_announcements %}
+          <article class="md-activity-item">
+            <div class="md-activity-main">
+              <div class="md-activity-title">{{ ann.title }}</div>
+              <time class="md-activity-time">{{ ann.created_at|to_detroit_datetime }}</time>
+            </div>
+            <div class="md-activity-detail">{{ ann.body }}</div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="md-empty-state">No new announcements.</div>
+    {% endif %}
+  </section>
+
+  <section class="md-activity-panel" aria-labelledby="messagesTitle">
+    <header>
+      <h2 id="messagesTitle">Direct Messages</h2>
+      <span class="md-panel-count">{{ new_messages|length }}</span>
+    </header>
+    {% if new_messages %}
+      <div class="md-activity-list">
+        {% for dm in new_messages %}
+          <article class="md-activity-item">
+            <div class="md-activity-main">
+              <div class="md-activity-title">From {{ dm.sender.username }}</div>
+              <time class="md-activity-time">{{ dm.timestamp|to_detroit_datetime }}</time>
+            </div>
+            <div class="md-activity-detail">{{ dm.content }}</div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="md-empty-state">No new direct messages.</div>
+    {% endif %}
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+{% include 'partials/_md_bottom_nav.html' %}
+</body>
+</html>
