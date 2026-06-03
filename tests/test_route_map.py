@@ -586,6 +586,7 @@ def test_driver_route_map_aggregates_delivery_and_empty_load_narratives(app):
     assert delivery["title"] == "Raleigh East delivery from Paint Central"
     assert delivery["count"] == 2
     assert delivery["load_count_label"] == "2 loads"
+    assert delivery["board_badge"]["label"] == "DELIVERED"
     assert "P-RE-8" in delivery["parts"]
     assert "HOT P-RE-10" in delivery["parts"]
     assert "Hot" in delivery["flags"]
@@ -911,12 +912,15 @@ def test_completed_stop_states_reflect_cargo_action(client, app):
     _login(client, "driver_states")
     body = client.get("/mobile").get_data(as_text=True)
     assert "IN TRANSIT" not in body  # Pickup load was later dropped, so it is no longer live in transit.
-    assert "DROPPED" in body         # Load -> Empty = dropped at destination
+    assert ">DROPPED<" not in body   # Delivered work should not regress to a weaker board status.
     assert "Picked up <strong>Parts</strong>" in body
     assert "Dropped <strong>Parts</strong>" in body
     assert "<em>Pickup</em><strong>Paint Central</strong>" in body
-    assert "<em>Deliver</em><strong>Raleigh East</strong>" in body
+    assert '<span class="flow-route-end flow-route-end--deliver"><span class="flow-arrow flow-route-arrow" aria-hidden="true">→</span><em>Deliver</em><strong>Raleigh East</strong></span>' in body
     assert '<span class="flow-arrow flow-route-arrow" aria-hidden="true">→</span>' in body
+    assert "grid-template-columns: auto auto;" in body
+    assert "grid-template-columns: auto auto minmax(0, 1fr);" in body
+    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);" not in body
     assert "Raleigh East Load &rarr; Empty" not in body
     assert ">DELIVERED<" in body      # confirmed drop can graduate from DROPPED
     assert 'class="flow-code"' not in body

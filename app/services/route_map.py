@@ -1422,7 +1422,7 @@ def _build_delivery_narratives(route_context):
         )
         group["board_badge"] = board_badge(
             narrative_issues,
-            ok_label="CLOSED" if group.get("kind") == "empty" else "DROPPED",
+            ok_label="CLOSED" if group.get("kind") == "empty" else "DELIVERED",
             ok_pill_tone="recorded" if group.get("kind") == "empty" else "delivery",
             ok_row_tone="completed" if group.get("kind") == "empty" else ("delivery" if group.get("kind") == "delivery" else "completed"),
         )

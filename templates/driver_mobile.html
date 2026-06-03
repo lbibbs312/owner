@@ -2538,18 +2538,26 @@
 		    }
 	    .flow-route-pair {
 	      min-width: 0;
-	      display: grid;
-	      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+	      width: max-content;
+	      max-width: 100%;
+	      display: inline-grid;
+	      grid-template-columns: auto auto;
+	      justify-content: start;
 	      align-items: center;
-	      gap: 5px;
+	      column-gap: 14px;
 	    }
 	    .flow-route-end {
 	      min-width: 0;
-	      display: grid;
+	      display: inline-grid;
 	      grid-template-columns: auto minmax(0, 1fr);
 	      align-items: center;
 	      gap: 5px;
+	      max-width: min(38vw, 220px);
 	      overflow: hidden;
+	    }
+	    .flow-route-end--deliver {
+	      grid-template-columns: auto auto minmax(0, 1fr);
+	      column-gap: 5px;
 	    }
 		    .flow-route-end em {
 		      color: var(--md-board-gold);
