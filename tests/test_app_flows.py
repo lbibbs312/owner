@@ -4456,7 +4456,20 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
             start_mileage=700,
             created_at=datetime(2026, 5, 18, 8, 0, 0),
         )
-        db.session.add_all([prior_pretrip, current_pretrip, previous_day_pretrip, older_pretrip])
+        imported_odometer_pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="BT-1",
+            pretrip_date=selected_date - timedelta(days=3),
+            start_mileage=1,
+            created_at=datetime(2026, 5, 17, 8, 0, 0),
+        )
+        db.session.add_all([
+            prior_pretrip,
+            current_pretrip,
+            previous_day_pretrip,
+            older_pretrip,
+            imported_odometer_pretrip,
+        ])
         db.session.flush()
         db.session.add_all([
             PostTrip(
@@ -4475,15 +4488,21 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
             ),
             PostTrip(
                 pretrip_id=previous_day_pretrip.id,
-                end_mileage=908,
+                end_mileage=50908,
                 miles_driven=108,
                 created_at=datetime(2026, 5, 19, 18, 0, 0),
             ),
             PostTrip(
                 pretrip_id=older_pretrip.id,
-                end_mileage=790,
+                end_mileage=90790,
                 miles_driven=90,
                 created_at=datetime(2026, 5, 18, 18, 0, 0),
+            ),
+            PostTrip(
+                pretrip_id=imported_odometer_pretrip.id,
+                end_mileage=999999,
+                miles_driven=None,
+                created_at=datetime(2026, 5, 17, 18, 0, 0),
             ),
             DriverLog(
                 driver_id=driver.id,
@@ -4519,10 +4538,14 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"Route Miles" in logs_page.data
     assert b"120 mi" in logs_page.data
     assert "▲ +12 mi".encode() in logs_page.data
+    assert b"md-route-audit-slot md-route-mile-slot" in logs_page.data
     assert b"app-delta app-delta--up font-mono md-mileage-delta" in logs_page.data
+    assert b".md-route-mile-slot .md-mileage-delta.app-delta--up" in logs_page.data
+    assert b"color:var(--status-green)" in logs_page.data
     assert b"--status-green:oklch(0.72 0.17 150)" in logs_page.data
     assert b"--status-red:oklch(0.65 0.22 25)" in logs_page.data
     assert b"Avg: 99 mi/day" in logs_page.data
+    assert b"17,465 mi/day" not in logs_page.data
     assert b"Start 1,000" in logs_page.data
     assert b"End 1,120" in logs_page.data
     assert b"Start Fuel" in logs_page.data
@@ -4543,6 +4566,17 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"Print Route Record" in logs_page.data
     assert f"/driver_logs_print?date={selected_date.isoformat()}".encode() in logs_page.data
     assert f"/driver_logs_print?date={selected_date.isoformat()}&amp;autoprint=1".encode() in logs_page.data
+    action_start = logs_page.data.index(b'<div class="md-action-rail')
+    action_end = logs_page.data.index(b"</div>", action_start)
+    action_row = logs_page.data[action_start:action_end]
+    assert b'data-md-icon="record-stop"' in action_row
+    assert b'data-md-icon="add-stop"' in action_row
+    assert b'data-md-icon="print-route"' in action_row
+    assert b'data-md-icon="save-pdf"' in action_row
+    assert b'<span class="md-btn-icon">+</span>' not in action_row
+    assert '<span class="md-btn-icon">↧</span>'.encode() not in action_row
+    assert b'<span class="md-btn-icon">P</span>' not in action_row
+    assert '<span class="md-btn-icon">↓</span>'.encode() not in action_row
     assert (
         f'href="/driver_logs_print?date={selected_date.isoformat()}" class="md-row-action"><span class="md-btn-icon">O</span> View'.encode()
         in logs_page.data

@@ -1377,13 +1377,29 @@ def _today_damage_reports(driver_id, report_date):
     return [report for report in reports if _damage_report_date(report) == report_date]
 
 
+def _tracked_miles_for_pretrip(pretrip, *, allow_odometer_fallback=True):
+    posttrip = pretrip.posttrip if pretrip else None
+    if not posttrip:
+        return None
+    if posttrip.miles_driven is not None:
+        return posttrip.miles_driven
+    if (
+        allow_odometer_fallback
+        and pretrip.start_mileage is not None
+        and posttrip.end_mileage is not None
+    ):
+        return posttrip.end_mileage - pretrip.start_mileage
+    return None
+
+
 def _total_miles_for_pretrips(pretrips):
     total = 0
     has_mileage = False
     for pretrip in pretrips:
-        if pretrip.start_mileage is None or not pretrip.posttrip or pretrip.posttrip.end_mileage is None:
+        miles = _tracked_miles_for_pretrip(pretrip)
+        if miles is None:
             continue
-        total += pretrip.posttrip.end_mileage - pretrip.start_mileage
+        total += miles
         has_mileage = True
     return total if has_mileage else None
 
@@ -1394,8 +1410,7 @@ def _driver_mileage_totals_by_date(driver_id, *, before_date=None, through_date=
         .join(PostTrip, PostTrip.pretrip_id == PreTrip.id)
         .filter(
             PreTrip.user_id == driver_id,
-            PreTrip.start_mileage.isnot(None),
-            PostTrip.end_mileage.isnot(None),
+            PostTrip.miles_driven.isnot(None),
         )
     )
     if before_date is not None:
@@ -1404,14 +1419,13 @@ def _driver_mileage_totals_by_date(driver_id, *, before_date=None, through_date=
         query = query.filter(PreTrip.pretrip_date <= through_date)
 
     totals = {}
-    for route_date, start_mileage, end_mileage in query.with_entities(
+    for route_date, miles_driven in query.with_entities(
         PreTrip.pretrip_date,
-        PreTrip.start_mileage,
-        PostTrip.end_mileage,
+        PostTrip.miles_driven,
     ):
-        if route_date is None or start_mileage is None or end_mileage is None:
+        if route_date is None or miles_driven is None:
             continue
-        totals[route_date] = totals.get(route_date, 0) + (end_mileage - start_mileage)
+        totals[route_date] = totals.get(route_date, 0) + miles_driven
     return totals
 
 

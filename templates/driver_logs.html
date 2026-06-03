@@ -260,6 +260,13 @@
       background:rgba(12,21,33,.78);
       padding:10px;
     }
+    .md-route-audit-slot {
+      min-width:0;
+      position:relative;
+    }
+    .md-route-audit-slot > .md-route-audit-card {
+      height:100%;
+    }
     .md-route-audit-card span {
       display:block;
       color:var(--md-amber);
@@ -293,9 +300,25 @@
     .md-route-audit-card .md-mileage-average {
       color:rgba(138,153,179,.58);
     }
-    .md-route-audit-card .md-mileage-delta {
-      flex:0 0 auto;
+    .md-route-mile-slot .md-mileage-delta {
+      position:absolute;
+      top:-10px;
+      right:8px;
+      z-index:3;
+      padding:4px 6px;
+      border-radius:7px;
+      background:rgba(5,10,18,.9);
       font-size:.78rem;
+      text-shadow:0 0 16px currentColor;
+    }
+    .md-route-mile-slot .md-mileage-delta.app-delta--up {
+      color:var(--status-green);
+    }
+    .md-route-mile-slot .md-mileage-delta.app-delta--down {
+      color:var(--status-red);
+    }
+    .md-route-mile-slot .md-mileage-delta.app-delta--neutral {
+      color:rgba(138,153,179,.72);
     }
     .md-route-audit-card small {
       display:block;
@@ -385,13 +408,26 @@
     .md-row-action-form .md-btn-icon {
       width:18px;
       height:18px;
-      display:inline-grid;
-      place-items:center;
+      flex:0 0 18px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
       border-radius:5px;
       border:1px solid rgba(255,178,36,.34);
       color:var(--md-amber);
-      font-size:.72rem;
       line-height:1;
+    }
+    .md-ledger-btn .md-btn-icon svg,
+    .md-row-action .md-btn-icon svg,
+    .md-row-action-form .md-btn-icon svg {
+      width:13px;
+      height:13px;
+      display:block;
+      fill:none;
+      stroke:currentColor;
+      stroke-width:1.8;
+      stroke-linecap:round;
+      stroke-linejoin:round;
     }
     .md-ledger-list {
       display:grid;
@@ -850,16 +886,18 @@
             <strong>{{ log_count }} stop{{ 's' if log_count != 1 else '' }}</strong>
             <small>Rows show route-order stop numbers.</small>
           </div>
-          <div class="md-route-audit-card">
-            <span>Route Miles</span>
-            <div class="md-metric-line">
-              <strong>{% if audit.total_miles is not none %}{{ "{:,}".format(audit.total_miles) }} mi{% elif logs %}Pending PostTrip{% else %}Not recorded{% endif %}</strong>
-              {% if audit.mileage_variance is not none %}
-                {{ delta_value(audit.mileage_variance, 'mi', 'md-mileage-delta') }}
-              {% endif %}
+          <div class="md-route-audit-slot md-route-mile-slot">
+            <div class="md-route-audit-card">
+              <span>Route Miles</span>
+              <div class="md-metric-line">
+                <strong>{% if audit.total_miles is not none %}{{ "{:,}".format(audit.total_miles) }} mi{% elif logs %}Pending PostTrip{% else %}Not recorded{% endif %}</strong>
+              </div>
+              <small>{% if audit.start_mileage is not none %}Start {{ "{:,}".format(audit.start_mileage) }}{% endif %}{% if audit.end_mileage is not none %}{% if audit.start_mileage is not none %} → {% endif %}End {{ "{:,}".format(audit.end_mileage) }}{% endif %}{% if audit.pretrip_count %}{% if audit.start_mileage is not none or audit.end_mileage is not none %} · {% endif %}{{ audit.pretrip_count }} DVIR{% endif %}</small>
+              <small class="md-mileage-average">Avg: {% if audit.average_miles is not none %}{{ "{:,}".format(audit.average_miles) }} mi/day{% else %}not enough history{% endif %}</small>
             </div>
-            <small>{% if audit.start_mileage is not none %}Start {{ "{:,}".format(audit.start_mileage) }}{% endif %}{% if audit.end_mileage is not none %}{% if audit.start_mileage is not none %} → {% endif %}End {{ "{:,}".format(audit.end_mileage) }}{% endif %}{% if audit.pretrip_count %}{% if audit.start_mileage is not none or audit.end_mileage is not none %} · {% endif %}{{ audit.pretrip_count }} DVIR{% endif %}</small>
-            <small class="md-mileage-average">Avg: {% if audit.average_miles is not none %}{{ "{:,}".format(audit.average_miles) }} mi/day{% else %}not enough history{% endif %}</small>
+            {% if audit.mileage_variance is not none %}
+              {{ delta_value(audit.mileage_variance, 'mi', 'md-mileage-delta') }}
+            {% endif %}
           </div>
           <div class="md-route-audit-card">
             <span>Truck / Trailer</span>
@@ -882,15 +920,15 @@
           <form method="GET" action="{{ url_for(logs_endpoint) }}" class="md-ledger-filter">
             <label for="dateFilter">Date</label>
             <input type="date" name="date" id="dateFilter" value="{{ search_date.strftime('%Y-%m-%d') }}">
-            <button type="submit" class="md-ledger-btn"><span class="md-btn-icon">⌕</span> Search</button>
+            <button type="submit" class="md-ledger-btn"><span class="md-btn-icon" data-md-icon="search" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg></span> Search</button>
           </form>
 
 	          <div class="md-action-rail md-flow-top-actions" aria-label="Driver log actions">
-	            <a href="{{ url_for('driver.new_driving_log') }}" class="md-ledger-btn md-flow-action-tab primary"><span class="md-btn-icon">+</span> Record Current Stop</a>
-	            <a href="{{ url_for('driver.add_stop') }}" class="md-ledger-btn md-flow-action-tab"><span class="md-btn-icon">↧</span> Add Missed Stop</a>
+	            <a href="{{ url_for('driver.new_driving_log') }}" class="md-ledger-btn md-flow-action-tab primary"><span class="md-btn-icon" data-md-icon="record-stop" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="7"></circle><path d="M12 8v8"></path><path d="M8 12h8"></path></svg></span> Record Current Stop</a>
+	            <a href="{{ url_for('driver.add_stop') }}" class="md-ledger-btn md-flow-action-tab"><span class="md-btn-icon" data-md-icon="add-stop" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M5 7h8"></path><path d="M5 12h8"></path><path d="M5 17h6"></path><path d="M18 10v8"></path><path d="M14 14h8"></path></svg></span> Add Missed Stop</a>
 	            {% if logs %}
-	              <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d')) }}" class="md-ledger-btn md-flow-action-tab success"><span class="md-btn-icon">P</span> Print Route Record</a>
-	              <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d'), autoprint=1) }}" class="md-ledger-btn md-flow-action-tab success"><span class="md-btn-icon">↓</span> Save Route PDF</a>
+	              <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d')) }}" class="md-ledger-btn md-flow-action-tab success"><span class="md-btn-icon" data-md-icon="print-route" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 9V4h10v5"></path><path d="M6 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-1"></path><path d="M7 14h10v6H7z"></path><path d="M8 12h.01"></path></svg></span> Print Route Record</a>
+	              <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d'), autoprint=1) }}" class="md-ledger-btn md-flow-action-tab success"><span class="md-btn-icon" data-md-icon="save-pdf" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 3h7l4 4v14H7z"></path><path d="M14 3v5h4"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg></span> Save Route PDF</a>
 	            {% endif %}
 	          </div>
 	        </div>
