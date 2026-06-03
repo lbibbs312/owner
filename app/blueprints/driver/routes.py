@@ -1227,6 +1227,18 @@ def _driver_log_photo_default_note(source):
         return "BOL / manifest paperwork"
     if "transfer" in source_text:
         return "Transfer sheet paperwork"
+    if "route_sheet" in source_text or "route packet" in source_text:
+        return "Route sheet"
+    if "proof_photo" in source_text or "proof photo" in source_text:
+        return "Proof photo"
+    if "driver_credential" in source_text:
+        return "Driver credential"
+    if "truck_document" in source_text:
+        return "Truck document"
+    if "manager_note" in source_text:
+        return "Manager note"
+    if "inspection" in source_text:
+        return "Inspection record"
     if "route" in source_text and ("paperwork" in source_text or "document" in source_text):
         return "Route paperwork"
     if "paperwork" in source_text or "document" in source_text:
@@ -3552,15 +3564,18 @@ def record_driver_log_photo(log_id):
     log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
     if current_user.role == "driver" and log.driver_id != current_user.id:
         if _photo_upload_wants_json():
-            return jsonify({"error": "Not authorized to upload proof for this stop."}), 403
-        flash("Not authorized to upload proof for this stop.", "danger")
+            return jsonify({"error": "Not authorized to upload this document for this stop."}), 403
+        flash("Not authorized to upload this document for this stop.", "danger")
         return redirect(url_for("driver.driver_logs"))
 
     try:
+        document_type = (request.form.get("document_type") or "").strip()
+        capture_source = (request.form.get("source") or "gallery").strip() or "gallery"
+        upload_source = f"{document_type}_{capture_source}" if document_type else capture_source
         photo = _save_driver_log_photo(
             log,
             request.files.get("photo"),
-            source=request.form.get("source") or "gallery",
+            source=upload_source,
             note=request.form.get("note"),
             uploaded_by_id=current_user.id,
         )
@@ -3575,8 +3590,8 @@ def record_driver_log_photo(log_id):
         user_id=current_user.id,
         category="log_photo",
         action="created",
-        title="Stop paperwork / proof photo uploaded",
-        details=f"{_plant_label(log.plant_name)} stop photo: {photo.original_filename or photo.filename}. Type/note: {photo.note}",
+        title="Stop document uploaded",
+        details=f"{_plant_label(log.plant_name)} document: {photo.original_filename or photo.filename}. Type/note: {photo.note}",
         target_type="driver_log_photo",
         target_id=photo.id,
         commit=False,
@@ -3584,7 +3599,7 @@ def record_driver_log_photo(log_id):
     db.session.commit()
     if _photo_upload_wants_json():
         return jsonify({"photo": _driver_log_photo_payload(photo)})
-    flash("Stop paperwork / proof photo saved.", "success")
+    flash("Stop document saved.", "success")
     return redirect(request.form.get("next") or url_for("driver.edit_driver_log", log_id=log.id))
 
 

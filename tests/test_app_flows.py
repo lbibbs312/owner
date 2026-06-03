@@ -3474,7 +3474,11 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
 
     paperwork_upload = client.post(
         f"/driver_logs/{log_id}/photos",
-        data={"source": "bol_manifest_edit_gallery", "photo": (BytesIO(b"edit-gallery-photo"), "edit-gallery.jpg")},
+        data={
+            "document_type": "bol_manifest",
+            "source": "edit_gallery",
+            "photo": (BytesIO(b"edit-gallery-photo"), "edit-gallery.jpg"),
+        },
         headers={"Accept": "application/json"},
     )
     assert paperwork_upload.status_code == 200
@@ -5304,6 +5308,7 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert b".md-driver-bottom-nav { display:none !important; }" in page.data
     assert b".board-only-shell main > .ops-console { display:none; }" in page.data
     assert b"setupDesktopOpsWorkspace" in page.data
+    assert b"data-desktop-select-template" in page.data
 
     workspace_start = page.data.index(b'<section class="desktop-ops-workspace"')
     workspace = page.data[workspace_start: page.data.index(b"<script>", workspace_start)]
@@ -5312,16 +5317,24 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert b"ROUTE WORKSPACE" in workspace
     assert b'data-desktop-row' in workspace
     assert b'data-desktop-detail-template="desktop-transfer-' in workspace
+    assert b'data-desktop-detail-template="desktop-documents-route"' in workspace
     assert b"TRX-DESK" in workspace
     assert b"Driver Credentials / Truck Documents" in workspace
     assert b"Visibility" in workspace
     assert b"Stop Summary" in workspace
     assert b"Load / Transfer Detail" in workspace
-    assert b"Paperwork / Proof" in workspace
+    assert b"Documents" in workspace
+    assert b"Attach Document" in workspace
+    assert b"Take Photo" in workspace
+    assert b"Upload File/Image" in workspace
     assert b"BOL" in workspace
     assert b"Transfer Sheet" in workspace
     assert b"LP-778 LP-779" in workspace
-    assert b"Paperwork / Proof</h4>" in workspace
+    assert b"Paperwork / Proof" not in workspace
+    assert b"Attach BOL / transfer sheet" not in workspace
+    assert b"Take proof photo" not in workspace
+    assert b"Upload document image" not in workspace
+    assert b"Add damage photo" not in workspace
     assert b"Route</h4>" in workspace
     assert b"Review</h4>" in workspace
     assert b"Scan cargo" not in workspace

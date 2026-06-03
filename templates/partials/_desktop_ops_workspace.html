@@ -5,7 +5,7 @@
 {% for dl in todays_logs|default([]) %}
   {% set _ = route_logs_by_id.update({dl.id: dl}) %}
 {% endfor %}
-{% set desk = namespace(default_set=false, completed=0, open=0, proof_items=0, proof_gaps=0, issues=0, scans=0) %}
+{% set desk = namespace(default_set=false, completed=0, open=0, proof_items=0, proof_gaps=0, issues=0, mismatches=0, scans=0) %}
 {% for dl in todays_logs|default([]) %}
   {% if dl.depart_time %}{% set desk.completed = desk.completed + 1 %}{% else %}{% set desk.open = desk.open + 1 %}{% endif %}
   {% set desk.proof_items = desk.proof_items + (dl.photos|length) %}
@@ -14,6 +14,7 @@
 {% for stop in rm.stops|default([]) if rm %}
   {% for issue in stop.issues|default([]) %}
     {% if issue.code == 'missing_proof' %}{% set desk.proof_gaps = desk.proof_gaps + 1 %}{% endif %}
+    {% if issue.code in ['destination_mismatch', 'unconfirmed_drop', 'count_short'] %}{% set desk.mismatches = desk.mismatches + 1 %}{% endif %}
     {% if issue.code != 'needs_departure' %}{% set desk.issues = desk.issues + 1 %}{% endif %}
   {% endfor %}
 {% endfor %}
@@ -26,8 +27,13 @@
     {% set _ = desktop.load_items.append(item) %}
   {% endif %}
 {% endfor %}
-{% set paperwork_attached = desk.proof_items + route_transfers|length %}
-{% set paperwork_needed = desk.proof_gaps + (1 if desktop.load_items and not route_transfers else 0) %}
+{% set documents_attached = desk.proof_items + route_transfers|length %}
+{% set documents_needed = desk.proof_gaps + (1 if desktop.load_items and not route_transfers else 0) %}
+{% set attention_count = documents_needed + desk.issues + route_damage_reports|length + (1 if pending_posttrip else 0) %}
+{% set route_document_upload_log = current_stop or (todays_logs|last if todays_logs else none) %}
+{% set current_action_text = route_cta.next_action if route_cta and route_cta.next_action else (rm.route.next_action if rm and rm.route else none) %}
+{% set current_action_lower = (current_action_text|string)|lower if current_action_text is not none else '' %}
+{% set current_action_is_document = 'document' in current_action_lower or 'paperwork' in current_action_lower or 'proof' in current_action_lower %}
 
 {% macro clean_value(value, action='ACTION REQUIRED') -%}
   {%- set text = (value|string).strip() if value is not none else '' -%}
@@ -49,6 +55,43 @@
   </button>
 {%- endmacro %}
 
+{% macro document_row(label, status, detail='', tone='normal') -%}
+  <div class="desk-doc-row tone-{{ tone }}">
+    <span>{{ label }}</span>
+    <strong>{{ status }}</strong>
+    <small>{{ detail }}</small>
+  </div>
+{%- endmacro %}
+
+{% macro attach_document_control(log_id, owner_type='stop', owner_id='', primary=true) -%}
+  {% if log_id %}
+    <details class="desk-attach-doc">
+      <summary class="desk-action-link{% if primary %} primary{% endif %}">Attach Document</summary>
+      <form class="desk-attach-doc-panel" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=log_id) }}" enctype="multipart/form-data">
+        <input type="hidden" name="source" value="route_workspace">
+        <input type="hidden" name="owner_type" value="{{ owner_type }}">
+        <input type="hidden" name="owner_id" value="{{ owner_id }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <div class="desk-doc-type-grid" role="radiogroup" aria-label="Document type">
+          <label><input type="radio" name="document_type" value="bol_manifest" checked><span>BOL</span></label>
+          <label><input type="radio" name="document_type" value="transfer_sheet"><span>Transfer Sheet</span></label>
+          <label><input type="radio" name="document_type" value="route_sheet"><span>Route Sheet</span></label>
+          <label><input type="radio" name="document_type" value="proof_photo"><span>Proof Photo</span></label>
+          <label><input type="radio" name="document_type" value="damage_photo"><span>Damage Photo</span></label>
+          <label><input type="radio" name="document_type" value="driver_credential"><span>Driver Credential</span></label>
+          <label><input type="radio" name="document_type" value="truck_document"><span>Truck Document</span></label>
+          <label><input type="radio" name="document_type" value="other_document"><span>Other</span></label>
+        </div>
+        <label class="desk-attach-note">Optional note<textarea name="note" rows="2" maxlength="500" placeholder="Only add detail if this needs review."></textarea></label>
+        <div class="desk-attach-actions">
+          <label class="desk-action-link">Take Photo<input type="file" name="photo" accept="image/*" capture="environment" onchange="if(this.files.length){this.form.submit();}"></label>
+          <label class="desk-action-link">Upload File/Image<input type="file" name="photo" accept="image/*" onchange="if(this.files.length){this.form.submit();}"></label>
+        </div>
+      </form>
+    </details>
+  {% endif %}
+{%- endmacro %}
+
 <section class="desktop-ops-workspace" data-desktop-ops-workspace aria-label="MoveDefense widescreen operations workspace">
   <div class="desk-route-strip">
     <div>
@@ -58,8 +101,10 @@
     </div>
     <div class="desk-current-action">
       <span>Current Action</span>
-      <strong>{{ clean_value(route_cta.next_action if route_cta and route_cta.next_action else (rm.route.next_action if rm and rm.route else none), 'ACTION REQUIRED') }}</strong>
-      {% if current_stop and cta_urls.get('record_departure') %}
+      <strong>{{ clean_value(current_action_text, 'ACTION REQUIRED') }}</strong>
+      {% if current_action_is_document %}
+        <button type="button" data-desktop-select-template="{{ 'desktop-stop-' ~ current_stop.id if current_stop else 'desktop-documents-route' }}">Attach Document</button>
+      {% elif current_stop and cta_urls.get('record_departure') %}
         <a href="{{ cta_urls.get('record_departure') }}">Record departure</a>
       {% elif cta_urls.get('add_stop') %}
         <a href="{{ cta_urls.get('add_stop') }}">Add stop</a>
@@ -69,9 +114,10 @@
 
   <div class="desktop-metrics-strip" aria-label="Route health metrics">
     <div><span>Stops</span><strong>{{ desk.completed }}/{{ todays_logs|length }}</strong><small>{{ desk.open }} open</small></div>
-    <div><span>Paperwork</span><strong>{{ paperwork_attached }} attached</strong><small>{% if paperwork_needed %}{{ paperwork_needed }} needed{% else %}none required flagged{% endif %}</small></div>
-    <div><span>Transfer Sheets</span><strong>{{ route_transfers|length }} attached</strong><small>{% if desktop.load_items and not route_transfers %}needed when cargo moves{% else %}matched if present{% endif %}</small></div>
-    <div><span>Issues</span><strong>{{ desk.issues + route_damage_reports|length }}</strong><small>{{ route_damage_reports|length }} damage report{{ 's' if route_damage_reports|length != 1 else '' }}</small></div>
+    <div><span>Documents</span><strong>{{ documents_attached }} attached</strong><small>{% if documents_needed %}{{ documents_needed }} needed{% else %}none required flagged{% endif %}</small></div>
+    <div><span>Transfer Sheets</span><strong>{{ route_transfers|length }} attached</strong><small>{% if desktop.load_items and not route_transfers %}required for cargo moves{% else %}not required flagged{% endif %}</small></div>
+    <div><span>Attention</span><strong>{{ attention_count }}</strong><small>{{ 'item' if attention_count == 1 else 'items' }} need review</small></div>
+    <div><span>Issues</span><strong>{{ route_damage_reports|length }} damage</strong><small>{{ desk.mismatches }} mismatch</small></div>
     {% if current_stop_forecast %}
       <div><span>Current Wait</span><strong>{{ current_stop_forecast.elapsed_label }}</strong><small>Today avg {{ current_stop_forecast.today_average_label }}</small></div>
       <div><span>Plant Baseline</span><strong>{{ current_stop_forecast.history_average_label }}</strong><small>{% if current_stop_forecast.delay_minutes is not none %}Delta {{ delta_value(current_stop_forecast.delay_minutes, 'm', 'desk-delta') }}{% else %}{{ current_stop_forecast.confidence }}{% endif %}</small></div>
@@ -96,7 +142,7 @@
             {{ row_button('desktop-stop-' ~ stop.stop_id, row_code, stop.plant_name, (stop.ledger_meta or stop.movement_summary or stop.next_action), row_tone, is_default) }}
           {% endfor %}
         {% else %}
-          {{ row_button('desktop-route-empty', 'ROUTE', 'No route stops recorded', 'Add the first stop to start route paperwork.', 'warn', true) }}
+          {{ row_button('desktop-route-empty', 'ROUTE', 'No route stops recorded', 'Add the first stop to start route documents.', 'warn', true) }}
           {% set desk.default_set = true %}
         {% endif %}
       </div>
@@ -121,10 +167,10 @@
       {% endif %}
 
       <div class="desk-row-group">
-        <h3>Paperwork</h3>
-        {% set paperwork_default = not desk.default_set %}
-        {% if paperwork_default %}{% set desk.default_set = true %}{% endif %}
-        {{ row_button('desktop-paperwork-route', 'DOC', 'Route packet / proof', (paperwork_attached ~ ' attached / ' ~ (paperwork_needed ~ ' needed' if paperwork_needed else 'none required flagged')), 'warn' if paperwork_needed else 'normal', paperwork_default) }}
+        <h3>Documents</h3>
+        {% set documents_default = not desk.default_set %}
+        {% if documents_default %}{% set desk.default_set = true %}{% endif %}
+        {{ row_button('desktop-documents-route', 'DOC', 'Route documents', (documents_attached ~ ' attached / ' ~ (documents_needed ~ ' needed' if documents_needed else 'none required flagged')), 'warn' if documents_needed else 'normal', documents_default) }}
       </div>
 
       <div class="desk-row-group">
@@ -155,7 +201,7 @@
         <strong data-desktop-work-title>Route object detail</strong>
       </div>
       <div class="desk-work-body" data-desktop-work-body>
-        <p class="desk-empty">Select an operation on the left to inspect paperwork, proof, route metrics, and actions.</p>
+        <p class="desk-empty">Select an operation on the left to inspect documents, route metrics, and actions.</p>
       </div>
     </section>
   </div>
@@ -198,6 +244,10 @@
       {% set arrived_empty = arrived_text in empty_tokens %}
       {% set departed_empty = departed_text in empty_tokens %}
       {% set cargo_expected = transfer or not (arrived_empty and departed_empty) %}
+      {% set stop_docs = namespace(photo_required=false) %}
+      {% for issue in stop.issues|default([]) %}
+        {% if issue.code in ['missing_proof', 'unconfirmed_drop'] %}{% set stop_docs.photo_required = true %}{% endif %}
+      {% endfor %}
       <template data-desktop-detail-template="desktop-stop-{{ stop.stop_id }}" data-title="Stop {{ stop.sequence }} / {{ stop.plant_name }}" data-kicker="STOP DETAIL">
         <div class="desk-detail-stack">
           <section class="desk-detail-section desk-stop-summary">
@@ -235,24 +285,24 @@
           {% endif %}
 
           <section class="desk-detail-section desk-load-paperwork">
-            <div class="desk-section-title"><span>Load / Transfer Detail</span><strong>{% if transfer %}{{ transfer.transfer_number }}{% elif cargo_expected %}Paperwork photo needed{% else %}Empty movement{% endif %}</strong></div>
+            <div class="desk-section-title"><span>Load / Transfer Detail</span><strong>{% if transfer %}{{ transfer.transfer_number }}{% elif cargo_expected %}Document needed{% else %}Empty movement{% endif %}</strong></div>
             {% if cargo_expected %}
               <div class="desk-fact-grid">
-                {{ fact('Part number / item number', (transfer_line.part_number if transfer_line else log.part_number if log else none), 'CAPTURE PAPERWORK FIRST') }}
-                {{ fact('Part description', transfer_remarks, 'CAPTURE PAPERWORK FIRST') }}
+                {{ fact('Part number / item number', (transfer_line.part_number if transfer_line else log.part_number if log else none), 'DOCUMENT NEEDED') }}
+                {{ fact('Part description', transfer_remarks, 'DOCUMENT NEEDED') }}
                 {{ fact('JO / load reference', (log.depart_load_size if log and log.depart_load_size else stop.departed_with), 'LOAD REFERENCE NEEDED') }}
-                {{ fact('LP IDs', transfer_lp_ids, 'CAPTURE PAPERWORK FIRST') }}
-                {{ fact('Lot', none, 'CAPTURE PAPERWORK FIRST') }}
-                {{ fact('Quantity', transfer_line.quantity if transfer_line else none, 'CAPTURE PAPERWORK FIRST') }}
-                {{ fact('Rack / pallet / container count', transfer_line.skids if transfer_line else none, 'CAPTURE PAPERWORK FIRST') }}
-                {{ fact('From site', transfer.ship_from if transfer else none, 'PAPERWORK PHOTO NEEDED') }}
+                {{ fact('LP IDs', transfer_lp_ids, 'DOCUMENT NEEDED') }}
+                {{ fact('Lot', none, 'DOCUMENT NEEDED') }}
+                {{ fact('Quantity', transfer_line.quantity if transfer_line else none, 'DOCUMENT NEEDED') }}
+                {{ fact('Rack / pallet / container count', transfer_line.skids if transfer_line else none, 'DOCUMENT NEEDED') }}
+                {{ fact('From site', transfer.ship_from if transfer else none, 'DOCUMENT NEEDED') }}
                 {{ fact('To site', transfer.ship_to if transfer else stop.plant_name, 'DESTINATION REQUIRED') }}
                 {{ fact('Expected destination', stop.departed_with, 'DESTINATION REQUIRED') }}
                 {{ fact('Actual destination', stop.plant_name, 'DROP LOCATION REQUIRED') }}
                 {{ fact('Movement status', stop.badge.label if stop.badge else stop.next_action) }}
               </div>
             {% else %}
-              <div class="desk-warning-strip"><strong>No load captured</strong><span>This stop is an empty or no-pickup movement. Cargo paperwork fields are not required by the current route data.</span></div>
+              <div class="desk-warning-strip"><strong>No load captured</strong><span>This stop is an empty or no-pickup movement. Cargo document fields are not required by the current route data.</span></div>
             {% endif %}
             {% if transfer %}
               <div class="desk-transfer-matrix" aria-label="Transfer sheet fields">
@@ -268,72 +318,41 @@
                 {% endfor %}
               </div>
             {% elif cargo_expected %}
-              <div class="desk-warning-strip tone-warn"><strong>PAPERWORK PHOTO NEEDED</strong><span>Take or upload a BOL, transfer sheet, route sheet, or paperwork photo. The app or manager can extract part, LP, lot, and quantity fields later.</span></div>
+              <div class="desk-warning-strip tone-warn"><strong>DOCUMENT NEEDED</strong><span>Attach a BOL, transfer sheet, route sheet, or document photo. The app or manager can extract part, LP, lot, and quantity fields later.</span></div>
             {% endif %}
           </section>
 
           <section class="desk-detail-section desk-paperwork-section">
-            <div class="desk-section-title"><span>Paperwork / Proof</span><strong>{{ log.photos|length if log else 0 }} proof photo{{ 's' if log and log.photos|length != 1 else '' }}</strong></div>
+            <div class="desk-section-title"><span>Documents</span><strong>{{ log.photos|length if log else 0 }} attached</strong></div>
             <div class="desk-doc-grid">
-              <div class="desk-doc-row {{ 'tone-missing' if cargo_expected else '' }}">
-                <span>BOL</span>
-                <strong>{% if cargo_expected %}Not attached{% else %}Not required flagged{% endif %}</strong>
-                <small>{% if cargo_expected %}Take or upload a BOL photo. BOL number, ship date, customer, carrier, pieces / pallets / weight, references, stop 1, and stop 2 can be confirmed later.{% else %}Current route data does not require BOL paperwork for this empty/no-pickup stop.{% endif %}</small>
-              </div>
-              <div class="desk-doc-row {{ 'tone-attached' if transfer else ('tone-missing' if cargo_expected else '') }}">
-                <span>Transfer Sheet</span>
-                <strong>{{ transfer.transfer_number if transfer else ('Not attached' if cargo_expected else 'Not required flagged') }}</strong>
-                <small>{% if transfer %}{{ transfer.ship_from }} to {{ transfer.ship_to }} / {{ transfer.lines|length }} line{{ 's' if transfer.lines|length != 1 else '' }} / uploaded by {{ transfer.driver_name or current_user.display_name }}{% if transfer.created_at %} at {{ transfer.created_at|to_detroit_datetime }}{% endif %}{% elif cargo_expected %}Take or upload the transfer sheet image; structured fields can be confirmed later.{% else %}No transfer sheet requirement is flagged for this stop.{% endif %}</small>
-              </div>
-              <div class="desk-doc-row tone-attached">
-                <span>Route Packet</span>
-                <strong>{{ desk.completed }}/{{ todays_logs|length }} stops</strong>
-                <small>{{ desk.proof_items }} proof photo{{ 's' if desk.proof_items != 1 else '' }} / {% if desk.proof_gaps %}{{ desk.proof_gaps }} proof gap{{ 's' if desk.proof_gaps != 1 else '' }}{% else %}no proof gap flagged{% endif %}</small>
-              </div>
+              {{ document_row('Transfer Sheet', (transfer.transfer_number if transfer else ('Needed' if cargo_expected else 'Not required')), (transfer.ship_from ~ ' to ' ~ transfer.ship_to ~ ' / ' ~ transfer.lines|length ~ ' line' ~ ('s' if transfer.lines|length != 1 else '') if transfer else ('Required for cargo moves' if cargo_expected else 'Empty/no-pickup stop')), 'attached' if transfer else ('missing' if cargo_expected else 'normal')) }}
+              {{ document_row('BOL', 'Attach if issued' if cargo_expected else 'Not required', 'BOL number, ship date, customer, carrier, pieces, pallets, weight, references, stop 1, and stop 2 can be confirmed after upload.' if cargo_expected else 'No BOL requirement is flagged by the current route rules.', 'normal') }}
+              {{ document_row('Route Sheet', 'Route log active', (desk.completed ~ '/' ~ todays_logs|length ~ ' stops captured'), 'attached') }}
+              {{ document_row('Proof Photo', ((log.photos|length if log else 0) ~ ' attached') if log and log.photos else ('Needed' if stop_docs.photo_required else 'Optional'), 'Required only when the selected stop or route rule asks for a proof photo.', 'attached' if log and log.photos else ('missing' if stop_docs.photo_required else 'normal')) }}
             </div>
             {% if log and log.photos %}
-              <div class="desk-preview-strip" aria-label="Attached proof previews">
+              <div class="desk-preview-strip" aria-label="Attached document previews">
                 {% for photo in log.photos %}
                   <a class="desk-proof-thumb" href="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" target="_blank" rel="noopener">
-                    <img src="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" alt="Proof photo {{ loop.index }}">
+                    <img src="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" alt="Attached document {{ loop.index }}">
                     <span>{{ photo.source|replace('_', ' ')|title }}</span>
                     <small>{{ photo.uploaded_at|to_detroit_datetime }}{% if photo.uploaded_by %} / {{ photo.uploaded_by.display_name }}{% endif %}</small>
                   </a>
                 {% endfor %}
               </div>
-            {% else %}
-              <div class="desk-warning-strip tone-warn"><strong>PROOF NEEDED</strong><span>No proof photo is attached to this stop.</span></div>
             {% endif %}
+            {% if stop_docs.photo_required and not (log and log.photos) %}
+              <div class="desk-warning-strip tone-warn"><strong>DOCUMENT NEEDED</strong><span>A proof photo is required for this stop.</span></div>
+            {% elif cargo_expected and not transfer %}
+              <div class="desk-warning-strip tone-warn"><strong>DOCUMENT NEEDED</strong><span>A transfer sheet is required when cargo moves.</span></div>
+            {% endif %}
+            {{ attach_document_control(log.id if log else none, 'stop', log.id if log else '', true) }}
           </section>
 
           {% if log %}
             <section class="desk-detail-section desk-actions-panel">
               <div class="desk-section-title"><span>Actions</span><strong>Workspace actions</strong></div>
               <div class="desk-action-groups">
-                <div class="desk-action-group">
-                  <h4>Paperwork / Proof</h4>
-                  <div class="desk-action-grid">
-                    <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}" enctype="multipart/form-data">
-                      <input type="hidden" name="source" value="proof">
-                      <input type="hidden" name="note" value="Proof photo from route workspace">
-                      <input type="hidden" name="next" value="{{ request.full_path }}">
-                      <label class="desk-action-link">Take proof photo<input type="file" name="photo" accept="image/*" capture="environment" onchange="if(this.files.length){this.form.submit();}"></label>
-                    </form>
-                    <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}" enctype="multipart/form-data">
-                      <input type="hidden" name="source" value="paperwork">
-                      <input type="hidden" name="note" value="Paperwork document image from route workspace">
-                      <input type="hidden" name="next" value="{{ request.full_path }}">
-                      <label class="desk-action-link">Upload document image<input type="file" name="photo" accept="image/*" onchange="if(this.files.length){this.form.submit();}"></label>
-                    </form>
-                    <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}" enctype="multipart/form-data">
-                      <input type="hidden" name="source" value="bol_transfer_sheet">
-                      <input type="hidden" name="note" value="BOL or transfer sheet photo from route workspace">
-                      <input type="hidden" name="next" value="{{ request.full_path }}">
-                      <label class="desk-action-link">Attach BOL / transfer sheet<input type="file" name="photo" accept="image/*" capture="environment" onchange="if(this.files.length){this.form.submit();}"></label>
-                    </form>
-                    <a class="desk-action-link" href="{{ url_for('driver.new_damage_report') }}">Add damage photo</a>
-                  </div>
-                </div>
                 <div class="desk-action-group">
                   <h4>Route</h4>
                   <div class="desk-action-grid">
@@ -370,20 +389,15 @@
               {{ fact('Actual drop location', detail.plant if detail else item.destination_label, 'DROP LOCATION REQUIRED') }}
               {{ fact('Current state', item.board_badge.label if item.board_badge else 'Recorded') }}
               {{ fact('Last seen stop', ('Stop ' ~ detail.sequence ~ ' / ' ~ detail.plant) if detail else none, 'LAST STOP REQUIRED') }}
-              {{ fact('Proof attached', detail.evidence.proof if detail and detail.evidence else none, 'PROOF NEEDED') }}
-              {{ fact('Paperwork status', 'Attached' if route_transfers else none, 'PAPERWORK PHOTO NEEDED') }}
+              {{ fact('Documents', documents_attached ~ ' attached') }}
+              {{ fact('Transfer Sheet', 'Attached' if route_transfers else none, 'DOCUMENT NEEDED') }}
             </div>
           </section>
           <section class="desk-detail-section">
             <div class="desk-section-title"><span>Actions</span><strong>Load controls</strong></div>
             <div class="desk-action-grid">
               {% if detail and detail.stop_id %}
-                <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=detail.stop_id) }}" enctype="multipart/form-data">
-                  <input type="hidden" name="source" value="load_paperwork">
-                  <input type="hidden" name="note" value="Load paperwork image from route workspace">
-                  <input type="hidden" name="next" value="{{ request.full_path }}">
-                  <label class="desk-action-link primary">Upload document image<input type="file" name="photo" accept="image/*" onchange="if(this.files.length){this.form.submit();}"></label>
-                </form>
+                {{ attach_document_control(detail.stop_id, 'load', detail.stop_id, true) }}
               {% endif %}
               {% if detail and detail.stop_id %}<a class="desk-action-link" href="{{ url_for('driver.edit_driver_log', log_id=detail.stop_id) }}">Change destination</a>{% endif %}
               {% if detail and detail.stop_id %}<form class="desk-action-form" method="POST" action="{{ url_for('driver.request_manager_review', log_id=detail.stop_id) }}"><button class="desk-action-link" type="submit">Send to manager review</button></form>{% endif %}
@@ -405,7 +419,7 @@
               {{ fact('Printed time', transfer.transfer_time, 'PRINTED TIME REQUIRED') }}
               {{ fact('Loaded by', transfer.loaded_by, 'LOADED BY REQUIRED') }}
               {{ fact('Driver', transfer.driver_name or current_user.display_name) }}
-              {{ fact('Proof status', 'Transfer sheet recorded') }}
+              {{ fact('Document status', 'Transfer sheet recorded') }}
               {{ fact('Matched route stop', transfer.ship_to, 'MATCHED STOP REQUIRED') }}
             </div>
             <div class="desk-transfer-lines">
@@ -420,6 +434,7 @@
             <div class="desk-section-title"><span>Actions</span><strong>Transfer controls</strong></div>
             <div class="desk-action-grid">
               <a class="desk-action-link primary" href="{{ url_for('driver.view_plant_transfer', transfer_id=transfer.id) }}">Open sheet</a>
+              {{ attach_document_control(route_document_upload_log.id if route_document_upload_log else none, 'transfer', transfer.id, false) }}
               <a class="desk-action-link" href="{{ url_for('driver.plant_transfer_printable', transfer_id=transfer.id) }}">Print</a>
               <a class="desk-action-link" href="{{ url_for('driver.plant_transfer_attachment', transfer_id=transfer.id) }}">Save PDF</a>
             </div>
@@ -428,52 +443,43 @@
       </template>
     {% endfor %}
 
-    <template data-desktop-detail-template="desktop-paperwork-route" data-title="Route packet / paperwork" data-kicker="PAPERWORK DETAIL">
+    <template data-desktop-detail-template="desktop-documents-route" data-title="Route documents" data-kicker="DOCUMENT DETAIL">
       <div class="desk-detail-stack">
         <section class="desk-detail-section">
-          <div class="desk-section-title"><span>Paperwork / Proof</span><strong>{{ paperwork_attached }} attached</strong></div>
+          <div class="desk-section-title"><span>Documents</span><strong>{{ documents_attached }} attached</strong></div>
           <div class="desk-fact-grid">
             {{ fact('Route stops', todays_logs|length) }}
-            {{ fact('Proof photos', desk.proof_items) }}
+            {{ fact('Attached files', documents_attached) }}
             {{ fact('Transfer sheets', route_transfers|length) }}
-            {{ fact('Paperwork needed', paperwork_needed) }}
-            {{ fact('Route rule status', 'Needs review' if paperwork_needed or desk.issues else 'No required paperwork flagged') }}
-            {{ fact('Packet basis', 'Ready based on current route rules' if not paperwork_needed and not desk.issues else 'Review flagged items') }}
+            {{ fact('Documents needed', documents_needed) }}
+            {{ fact('Route rule status', 'Needs review' if documents_needed or desk.issues else 'No required documents flagged') }}
+            {{ fact('Packet basis', 'Ready based on current route rules' if not documents_needed and not desk.issues else 'Review flagged items') }}
           </div>
-          {% if desk.proof_gaps %}
-            <div class="desk-warning-strip tone-warn"><strong>PROOF NEEDED</strong><span>{{ desk.proof_gaps }} stop{{ 's' if desk.proof_gaps != 1 else '' }} need proof before this route packet is ready for review.</span></div>
+          <div class="desk-doc-grid">
+            {{ document_row('Transfer Sheet', (route_transfers|length ~ ' attached') if route_transfers else ('Needed' if desktop.load_items else 'Not required'), 'Required for cargo moves.' if desktop.load_items else 'No cargo movement requiring a transfer sheet is flagged.', 'attached' if route_transfers else ('missing' if desktop.load_items else 'normal')) }}
+            {{ document_row('BOL', 'Attach if issued' if desktop.load_items else 'Not required', 'BOL is a document type inside Attach Document, not a separate upload workflow.', 'normal') }}
+            {{ document_row('Route Sheet', 'Route log active', desk.completed ~ '/' ~ todays_logs|length ~ ' stops captured', 'attached') }}
+            {{ document_row('Photos', desk.proof_items ~ ' attached', (desk.proof_gaps ~ ' proof photo needed') if desk.proof_gaps else 'No photo requirement flagged', 'missing' if desk.proof_gaps else 'normal') }}
+          </div>
+          {% if documents_needed %}
+            <div class="desk-warning-strip tone-warn"><strong>DOCUMENT NEEDED</strong><span>{{ documents_needed }} route item{{ 's' if documents_needed != 1 else '' }} need a document before this route packet is ready for review.</span></div>
           {% endif %}
+          {{ attach_document_control(route_document_upload_log.id if route_document_upload_log else none, 'route', route_date.isoformat() if route_date else today_local_date.isoformat(), true) }}
         </section>
         <section class="desk-detail-section">
           <div class="desk-section-title"><span>Driver Credentials / Truck Documents</span><strong>Right workspace only</strong></div>
           <div class="desk-policy-grid">
-            <div><span>Required</span><strong>Document type</strong><small>BOL, transfer sheet, route packet, proof photo, damage photo, license, DOT card, insurance, registration, inspection, maintenance, or manager note.</small></div>
+            <div><span>Required</span><strong>Document type</strong><small>BOL, transfer sheet, route sheet, proof photo, damage photo, license, DOT card, insurance, registration, inspection record, maintenance note, or manager note.</small></div>
             <div><span>Required</span><strong>Related entity</strong><small>Driver, truck, stop, load, route, damage report, or transfer sheet must own the file.</small></div>
-            <div><span>Captured</span><strong>Uploaded by / at</strong><small>Existing proof and damage uploads preserve uploader and timestamp.</small></div>
+            <div><span>Captured</span><strong>Uploaded by / at</strong><small>Document uploads preserve uploader and timestamp.</small></div>
             <div><span>Restricted</span><strong>Visibility</strong><small>License, DOT card, insurance, and registration previews stay out of the live board.</small></div>
-            <div><span>Controlled</span><strong>Expiration date</strong><small>Use credential and truck-document records for expiring driver or truck paperwork.</small></div>
+            <div><span>Controlled</span><strong>Expiration date</strong><small>Use credential and truck-document records for expiring driver or truck documents.</small></div>
             <div><span>Verified</span><strong>Status / audit trail</strong><small>Replace, delete, verify, and manager-review actions must write an audit event.</small></div>
           </div>
         </section>
         <section class="desk-detail-section">
-          <div class="desk-section-title"><span>Actions</span><strong>Paperwork controls</strong></div>
+          <div class="desk-section-title"><span>Actions</span><strong>Route controls</strong></div>
           <div class="desk-action-grid">
-            {% set upload_log = current_stop or (todays_logs|last if todays_logs else none) %}
-            {% if upload_log %}
-              <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=upload_log.id) }}" enctype="multipart/form-data">
-                <input type="hidden" name="source" value="route_paperwork">
-                <input type="hidden" name="note" value="Route paperwork image from route workspace">
-                <input type="hidden" name="next" value="{{ request.full_path }}">
-                <label class="desk-action-link primary">Take paperwork photo<input type="file" name="photo" accept="image/*" capture="environment" onchange="if(this.files.length){this.form.submit();}"></label>
-              </form>
-              <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=upload_log.id) }}" enctype="multipart/form-data">
-                <input type="hidden" name="source" value="route_document">
-                <input type="hidden" name="note" value="Route document image from route workspace">
-                <input type="hidden" name="next" value="{{ request.full_path }}">
-                <label class="desk-action-link">Upload document image<input type="file" name="photo" accept="image/*" onchange="if(this.files.length){this.form.submit();}"></label>
-              </form>
-            {% endif %}
-            <a class="desk-action-link" href="{{ url_for('driver.new_damage_report') }}">Add damage photo</a>
             <a class="desk-action-link" href="{{ url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) }}">Open route audit</a>
             <a class="desk-action-link" href="{{ url_for('driver.list_pretrips', truck_number=current_truck_number) if current_truck_number else url_for('driver.list_pretrips') }}">Inspection records</a>
           </div>
@@ -527,7 +533,7 @@
                   {{ fact('Issue type', issue.label) }}
                   {{ fact('Affected stop', 'Stop ' ~ stop.sequence ~ ' / ' ~ stop.plant_name) }}
                   {{ fact('Why flagged', issue.reason) }}
-                  {{ fact('Evidence found', stop.evidence.proof if stop.evidence else none, 'PROOF MISSING') }}
+                  {{ fact('Document found', stop.evidence.proof if stop.evidence else none, 'DOCUMENT NEEDED') }}
                   {{ fact('Required action', issue.action) }}
                   {{ fact('Review owner', 'Driver / manager review') }}
                 </div>
@@ -539,12 +545,7 @@
                   <div class="desk-action-grid">
                     {% if issue.code == 'destination_mismatch' %}<a class="desk-action-link primary" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Confirm destination</a>{% endif %}
                     {% if issue.code in ['missing_proof', 'unconfirmed_drop'] %}
-                      <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}" enctype="multipart/form-data">
-                        <input type="hidden" name="source" value="proof">
-                        <input type="hidden" name="note" value="Proof photo from issue review">
-                        <input type="hidden" name="next" value="{{ request.full_path }}">
-                        <label class="desk-action-link primary">Attach proof<input type="file" name="photo" accept="image/*" capture="environment" onchange="if(this.files.length){this.form.submit();}"></label>
-                      </form>
+                      {{ attach_document_control(log.id, 'issue', stop.stop_id, true) }}
                     {% endif %}
                     <a class="desk-action-link" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Add note</a>
                     <form class="desk-action-form" method="POST" action="{{ url_for('driver.request_manager_review', log_id=log.id) }}"><button class="desk-action-link" type="submit">Manager override / review</button></form>
@@ -572,11 +573,18 @@
             </div>
           </section>
           <section class="desk-detail-section">
+            <div class="desk-section-title"><span>Documents</span><strong>{{ report.photos|length }} attached</strong></div>
+            <div class="desk-doc-grid">
+              {{ document_row('Damage Photo', (report.photos|length ~ ' attached') if report.photos else 'Needed', 'Damage reports require a photo or manager review note.', 'attached' if report.photos else 'missing') }}
+              {{ document_row('Manager Note', 'Review if needed', 'Manager-only classification happens inside the damage report workflow.', 'normal') }}
+            </div>
+          </section>
+          <section class="desk-detail-section">
             <div class="desk-section-title"><span>Actions</span><strong>Damage controls</strong></div>
             <div class="desk-action-grid">
               <a class="desk-action-link primary" href="{{ url_for('driver.view_damage_report', report_id=report.id) }}">Open damage report</a>
-              <a class="desk-action-link" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Add note / photo</a>
-              <a class="desk-action-link" href="{{ url_for('driver.damage_evidence_packet', report_id=report.id) }}">Evidence packet</a>
+              <a class="desk-action-link" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Edit report</a>
+              <a class="desk-action-link" href="{{ url_for('driver.damage_evidence_packet', report_id=report.id) }}">Open packet</a>
             </div>
           </section>
         </div>
