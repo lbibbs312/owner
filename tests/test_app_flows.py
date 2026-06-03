@@ -5283,14 +5283,15 @@ def test_driver_mobile_pages_share_single_five_tab_bottom_nav(client, app):
         "<strong>PT</strong><span>Transfer</span>",
         "<strong>DL</strong><span>Logs</span>",
         "<strong>DR</strong><span>Damage</span>",
-        "<strong>PI</strong><span>PreTrip</span>",
+        "<strong>IN</strong><span>Inspections</span>",
     ]
     pages = [
         ("/mobile", "Home"),
         ("/plant_transfers", "Transfer"),
         ("/driver_logs", "Logs"),
         ("/damage_reports", "Damage"),
-        ("/new_pretrip", "PreTrip"),
+        ("/list_pretrips", "Inspections"),
+        ("/new_pretrip", "Inspections"),
         ("/profile", "Home"),
     ]
 
@@ -5304,6 +5305,7 @@ def test_driver_mobile_pages_share_single_five_tab_bottom_nav(client, app):
         nav = body[nav_start:nav_end]
         positions = [nav.index(item) for item in expected_items]
         assert positions == sorted(positions)
+        assert 'href="/list_pretrips"' in nav
         assert nav.count('class="md-nav-link active"') == 1
         active_start = nav.index('class="md-nav-link active"')
         active_end = nav.index("</a>", active_start)
@@ -6150,6 +6152,152 @@ def test_mobile_dashboard_shows_truck_maintenance_history_from_previous_posttrip
     assert b"1/4" in detail.data
     assert b"Regen completed and cleared." in detail.data
     assert b"Other truck issue should not show" not in detail.data
+
+
+def test_driver_inspections_page_is_scoped_to_current_truck(client, app):
+    from datetime import date, datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PostTrip, PreTrip
+
+        current_driver = create_user(
+            "inspection_driver",
+            "inspection-driver@example.com",
+            "driver",
+            first_name="Current",
+            last_name="Driver",
+        )
+        prior_driver = create_user(
+            "inspection_prior",
+            "inspection-prior@example.com",
+            "driver",
+            first_name="Prior",
+            last_name="Driver",
+        )
+        other_driver = create_user("inspection_other", "inspection-other@example.com", "driver")
+        today = date.today()
+        prior_date = today - timedelta(days=1)
+
+        current_pretrip = PreTrip(
+            user_id=current_driver.id,
+            truck_number="ST4",
+            pretrip_date=today,
+            start_mileage=13000,
+            start_fuel_level="1/2",
+        )
+        prior_same_truck = PreTrip(
+            user_id=prior_driver.id,
+            truck_number="ST4",
+            pretrip_date=prior_date,
+            start_mileage=12000,
+            start_fuel_level="Full",
+        )
+        old_driver_truck = PreTrip(
+            user_id=current_driver.id,
+            truck_number="ST5",
+            pretrip_date=prior_date,
+            start_mileage=8000,
+        )
+        other_truck = PreTrip(
+            user_id=other_driver.id,
+            truck_number="ST5",
+            pretrip_date=prior_date,
+            start_mileage=7000,
+        )
+        db.session.add_all([current_pretrip, prior_same_truck, old_driver_truck, other_truck])
+        db.session.flush()
+        db.session.add_all(
+            [
+                PostTrip(
+                    pretrip_id=prior_same_truck.id,
+                    end_mileage=12140,
+                    end_fuel_level="1/4",
+                    miles_driven=140,
+                    remarks="Same truck low fuel at handoff.",
+                    created_at=datetime(2026, 5, 17, 21, 30, 0),
+                ),
+                PostTrip(
+                    pretrip_id=old_driver_truck.id,
+                    end_mileage=8080,
+                    miles_driven=80,
+                    remarks="Old driver truck should not show.",
+                    created_at=datetime(2026, 5, 17, 18, 30, 0),
+                ),
+                PostTrip(
+                    pretrip_id=other_truck.id,
+                    end_mileage=7100,
+                    miles_driven=100,
+                    remarks="Other truck issue should not show.",
+                    created_at=datetime(2026, 5, 17, 19, 30, 0),
+                ),
+                DriverLog(
+                    driver_id=prior_driver.id,
+                    date=prior_date,
+                    plant_name="RW",
+                    load_size="Empty",
+                    arrive_time=f"{prior_date.isoformat()} 16:30:00",
+                    fuel=True,
+                    fuel_mileage=12050,
+                ),
+                DriverLog(
+                    driver_id=prior_driver.id,
+                    date=prior_date,
+                    plant_name="DC",
+                    load_size="Empty",
+                    arrive_time=f"{prior_date.isoformat()} 17:00:00",
+                    maintenance=True,
+                    downtime_reason="Truck issue: Fuel level low at handoff",
+                    fuel_mileage=12080,
+                ),
+                DriverLog(
+                    driver_id=other_driver.id,
+                    date=prior_date,
+                    plant_name="RE",
+                    load_size="Empty",
+                    arrive_time=f"{prior_date.isoformat()} 18:00:00",
+                    maintenance=True,
+                    downtime_reason="Truck issue: Other truck issue should not show",
+                    fuel_mileage=7010,
+                ),
+            ]
+        )
+        db.session.commit()
+        prior_same_truck_id = prior_same_truck.id
+        other_truck_id = other_truck.id
+
+    login(client, "inspection_driver")
+
+    page = client.get("/list_pretrips")
+    assert page.status_code == 200
+    assert b"Truck Inspections" in page.data
+    assert b"Truck ST4" in page.data
+    assert b"Current Driver" in page.data
+    assert b"Prior Driver" in page.data
+    assert b"PostTrip Complete" in page.data
+    assert b"Start Fuel" in page.data
+    assert b"End Fuel" in page.data
+    assert b"1/4" in page.data
+    assert b"12,050 mi" in page.data
+    assert b"ST5" not in page.data
+    assert b"Other truck issue should not show" not in page.data
+
+    same_truck_record = client.get(f"/view_pretrip/{prior_same_truck_id}")
+    assert same_truck_record.status_code == 200
+    assert b"Truck / Tractor #:</strong> ST4" in same_truck_record.data
+    assert b"Ending Fuel:</strong> 1/4" in same_truck_record.data
+    assert b"Same truck low fuel at handoff." in same_truck_record.data
+
+    blocked = client.get(f"/view_pretrip/{other_truck_id}", follow_redirects=True)
+    assert blocked.status_code == 200
+    assert b"Not authorized to view that PreTrip." in blocked.data
+    assert b"Other truck issue should not show" not in blocked.data
+
+    restricted_history = client.get("/truck-maintenance-history?truck_number=ST5")
+    assert restricted_history.status_code == 200
+    assert b"Truck ST4" in restricted_history.data
+    assert b"Truck ST5" not in restricted_history.data
+    assert b"Other truck issue should not show" not in restricted_history.data
 
 
 def test_knowledge_base_uses_shared_app_shell(client, app):

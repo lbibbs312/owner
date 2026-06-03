@@ -76,6 +76,6 @@
   <a class="md-nav-link {% if md_nav_active == 'transfers' %}active{% endif %}" href="{{ url_for('driver.plant_transfers') }}"><strong>PT</strong><span>Transfer</span></a>
   <a class="md-nav-link {% if md_nav_active == 'logs' %}active{% endif %}" href="{{ url_for('driver.driver_logs') }}"><strong>DL</strong><span>Logs</span></a>
   <a class="md-nav-link {% if md_nav_active == 'damage' %}active{% endif %}" href="{{ url_for('driver.damage_reports') }}"><strong>DR</strong><span>Damage</span></a>
-  <a class="md-nav-link {% if md_nav_active == 'pretrip' %}active{% endif %}" href="{{ url_for('driver.new_pretrip') }}"><strong>PI</strong><span>PreTrip</span></a>
+  <a class="md-nav-link {% if md_nav_active == 'pretrip' %}active{% endif %}" href="{{ url_for('driver.list_pretrips') }}"><strong>IN</strong><span>Inspections</span></a>
 </nav>
 {% endif %}

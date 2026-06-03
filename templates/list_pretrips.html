@@ -4,143 +4,324 @@
 <script>document.body.classList.add('md-shell');</script>
 {% include 'partials/_md_shell.html' %}
 {% endif %}
+
 <div class="container">
   {% set pretrip_view_endpoint = 'manager.view_pretrip' if current_user.role == 'management' else 'driver.view_pretrip' %}
-  <p class="md-section-label mt-3 mb-1">INSPECTION CHECKLIST</p>
-  <h2 class="mt-0 md-page-title">All PreTrips</h2>
-  {% if current_user.role == 'driver' %}
-    <a href="{{ url_for('driver.new_pretrip') }}" class="btn btn-sm btn-primary mb-3">
-      Create PreTrip
-    </a>
-  {% endif %}
+  {% set inspection_trucks = inspection_trucks|default([]) %}
+  {% set selected_truck_number = selected_truck_number|default('', true) %}
+  {% set truck_history = truck_history|default([]) %}
 
-  {% if pretrips %}
-    {% if current_user.role != 'management' %}
-      <style>
-        .pretrip-card-list { display:grid; gap:12px; }
-        .pretrip-card {
-          display:grid;
-          gap:12px;
-          padding:14px;
-          border:1px solid var(--md-line);
-          border-radius:16px;
-          background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(12,21,33,.96));
-          box-shadow:0 18px 40px rgba(0,0,0,.32), inset 0 1px 0 rgba(91,157,255,.08);
-        }
-        .pretrip-card-top {
-          display:grid;
-          grid-template-columns:minmax(0,1fr) auto;
-          gap:10px;
-          align-items:start;
-        }
-        .pretrip-card-title {
-          margin:0;
-          color:var(--md-text);
-          font-family:var(--md-display);
-          font-weight:900;
-        }
-        .pretrip-card-meta {
-          margin:4px 0 0;
-          color:var(--md-muted);
-          font-family:var(--md-mono);
-          font-size:.78rem;
-          font-weight:800;
-          line-height:1.35;
-        }
-        .pretrip-card-actions { display:flex; flex-wrap:wrap; gap:8px; }
-        .pretrip-card-actions .btn,
-        .pretrip-card-actions form { flex:1 1 120px; }
-        .pretrip-card-actions .btn,
-        .pretrip-card-actions button { width:100%; }
-        @media (max-width:620px) { .pretrip-card-top { grid-template-columns:1fr; } }
-      </style>
-      <div class="pretrip-card-list">
-        {% for pt in pretrips %}
-          {% set can_manage_pretrip = current_user.role == 'driver' and pt.user_id == current_user.id %}
-          {% set can_delete_pretrip = can_manage_pretrip and pt.pretrip_date == today_local_date %}
-          <article class="pretrip-card">
-            <div class="pretrip-card-top">
-              <div>
-                <p class="pretrip-card-title">Truck {{ pt.truck_number or 'not set' }}</p>
-                <p class="pretrip-card-meta">{{ pt.pretrip_date }} · {{ pt.shift or 'Shift not set' }} · Start {{ pt.start_mileage or 'N/A' }}</p>
-              </div>
-              {% if pt.posttrip %}
-                <strong class="text-success align-self-start">Complete</strong>
-              {% else %}
-                <strong class="text-warning align-self-start">Open</strong>
-              {% endif %}
-            </div>
-            <div class="pretrip-card-actions">
-              <a href="{{ url_for(pretrip_view_endpoint, pretrip_id=pt.id) }}" class="btn btn-info">View</a>
-              {% if not pt.posttrip and can_manage_pretrip %}
-                <a href="{{ url_for('driver.do_posttrip', pretrip_id=pt.id) }}" class="btn btn-warning">Complete PostTrip</a>
-              {% endif %}
-              {% if can_manage_pretrip %}
-                <a href="{{ url_for('driver.edit_pretrip_entry', pretrip_id=pt.id) }}" class="btn btn-secondary">Edit</a>
-              {% endif %}
-              {% if can_delete_pretrip %}
-                <form action="{{ url_for('driver.delete_pretrip', pretrip_id=pt.id) }}" method="POST" onsubmit="return confirm('Delete this PreTrip?');">
-                  <button type="submit" class="btn btn-outline-danger">Delete</button>
-                </form>
-              {% endif %}
-            </div>
-          </article>
-        {% endfor %}
+  {% if current_user.role != 'management' %}
+    <style>
+      .inspection-shell { display:grid; gap:14px; padding-bottom:18px; }
+      .inspection-top {
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        gap:12px;
+        align-items:end;
+      }
+      .inspection-subline {
+        margin:4px 0 0;
+        color:var(--md-muted);
+        font-family:var(--md-mono);
+        font-size:.78rem;
+        font-weight:800;
+        line-height:1.35;
+      }
+      .inspection-truck-list {
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+        gap:10px;
+      }
+      .inspection-truck-tab,
+      .inspection-card,
+      .inspection-history-card,
+      .inspection-empty {
+        border:1px solid var(--md-line);
+        border-radius:16px;
+        background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(12,21,33,.96));
+        box-shadow:0 18px 40px rgba(0,0,0,.32), inset 0 1px 0 rgba(91,157,255,.08);
+      }
+      .inspection-truck-tab {
+        display:grid;
+        gap:5px;
+        padding:12px;
+        color:var(--md-text);
+        text-decoration:none;
+      }
+      .inspection-truck-tab.active {
+        border-color:rgba(91,157,255,.55);
+        box-shadow:0 0 18px rgba(47,109,240,.22), inset 0 1px 0 rgba(91,157,255,.16);
+      }
+      .inspection-truck-tab strong,
+      .inspection-card-title {
+        margin:0;
+        color:var(--md-text);
+        font-family:var(--md-display);
+        font-weight:950;
+        line-height:1.15;
+        overflow-wrap:anywhere;
+      }
+      .inspection-truck-tab small,
+      .inspection-meta,
+      .inspection-history-card small {
+        color:var(--md-muted);
+        font-family:var(--md-mono);
+        font-size:.72rem;
+        font-weight:800;
+        line-height:1.35;
+      }
+      .inspection-section-title {
+        margin:4px 0 -2px;
+        color:var(--md-amber);
+        font-family:var(--md-mono);
+        font-size:.72rem;
+        font-weight:950;
+        letter-spacing:.1em;
+        text-transform:uppercase;
+      }
+      .inspection-card-list,
+      .inspection-history-list {
+        display:grid;
+        gap:12px;
+      }
+      .inspection-card,
+      .inspection-history-card {
+        display:grid;
+        gap:12px;
+        padding:14px;
+      }
+      .inspection-card-top {
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        gap:10px;
+        align-items:start;
+      }
+      .inspection-status {
+        width:max-content;
+        border-radius:999px;
+        padding:5px 9px;
+        border:1px solid rgba(16,185,129,.28);
+        background:rgba(16,185,129,.12);
+        color:#a7f3d0;
+        font-family:var(--md-mono);
+        font-size:.64rem;
+        font-weight:950;
+        text-transform:uppercase;
+        white-space:nowrap;
+      }
+      .inspection-status.warn {
+        border-color:rgba(245,158,11,.32);
+        background:rgba(245,158,11,.14);
+        color:#fde68a;
+      }
+      .inspection-facts {
+        display:grid;
+        grid-template-columns:repeat(4,minmax(0,1fr));
+        gap:8px;
+      }
+      .inspection-fact {
+        min-width:0;
+        border:1px solid rgba(148,163,184,.16);
+        border-radius:12px;
+        padding:9px;
+        background:rgba(255,255,255,.035);
+      }
+      .inspection-fact span {
+        display:block;
+        color:var(--md-muted);
+        font-family:var(--md-mono);
+        font-size:.62rem;
+        font-weight:950;
+        text-transform:uppercase;
+      }
+      .inspection-fact strong {
+        display:block;
+        margin-top:3px;
+        color:var(--md-text);
+        font-size:.85rem;
+        overflow-wrap:anywhere;
+      }
+      .inspection-card-actions {
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+      }
+      .inspection-card-actions .btn,
+      .inspection-card-actions form {
+        flex:1 1 130px;
+      }
+      .inspection-card-actions .btn,
+      .inspection-card-actions button {
+        width:100%;
+      }
+      .inspection-empty {
+        padding:14px;
+        color:var(--md-muted);
+        font-family:var(--md-mono);
+        font-size:.82rem;
+        line-height:1.45;
+      }
+      @media (max-width:620px) {
+        .inspection-top,
+        .inspection-card-top { grid-template-columns:1fr; }
+        .inspection-facts { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      }
+    </style>
+
+    <section class="inspection-shell">
+      <div class="inspection-top">
+        <div>
+          <p class="md-section-label mt-3 mb-1">INSPECTIONS</p>
+          <h2 class="mt-0 md-page-title">Truck Inspections</h2>
+          <p class="inspection-subline">
+            {% if selected_truck_number %}
+              Truck {{ selected_truck_number }} only - PreTrips, PostTrips, fuel, mileage, and maintenance history.
+            {% else %}
+              Start a PreTrip with a truck number to load the truck inspection record.
+            {% endif %}
+          </p>
+        </div>
+        <a href="{{ url_for('driver.new_pretrip') }}" class="btn btn-sm btn-primary">New PreTrip</a>
       </div>
-    {% else %}
-    <table class="table table-bordered">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Truck</th>
-          <th>Shift</th>
-          <th>Start Mileage</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for pt in pretrips %}
-        <tr class="{% if not pt.posttrip %}table-danger{% endif %}">
-          <td>{{ pt.id }}</td>
-          <td>{{ pt.truck_number }}</td>
-          <td>{{ pt.shift }}</td>
-          <td>{{ pt.start_mileage or "N/A" }}</td>
-          <td>
-            {% set can_manage_pretrip = current_user.role == 'driver' and pt.user_id == current_user.id %}
-            {% set can_delete_pretrip = can_manage_pretrip and pt.pretrip_date == today_local_date %}
-            <div class="d-flex flex-wrap gap-1">
-              <a href="{{ url_for(pretrip_view_endpoint, pretrip_id=pt.id) }}" class="btn btn-sm btn-info">View</a>
-              {% if pt.posttrip %}
-                <strong class="text-success align-self-center">PostTrip done</strong>
-              {% else %}
-                <strong class="text-danger align-self-center">PostTrip needed</strong>
-                {% if can_manage_pretrip %}
-                  <a href="{{ url_for('driver.do_posttrip', pretrip_id=pt.id) }}" class="btn btn-sm btn-warning">
-                    Complete PostTrip
-                  </a>
-                {% endif %}
-              {% endif %}
-              {% if can_manage_pretrip %}
-                <a href="{{ url_for('driver.edit_pretrip_entry', pretrip_id=pt.id) }}" class="btn btn-sm btn-secondary">
-                  Edit
-                </a>
-              {% endif %}
-              {% if can_delete_pretrip %}
-                <form action="{{ url_for('driver.delete_pretrip', pretrip_id=pt.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this PreTrip?');">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                </form>
-              {% endif %}
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% endif %}
+
+      {% if inspection_trucks %}
+        <div class="inspection-truck-list" aria-label="Current truck inspection choices">
+          {% for truck in inspection_trucks %}
+            <a class="inspection-truck-tab {% if truck.truck_number == selected_truck_number %}active{% endif %}" href="{{ url_for('driver.list_pretrips', truck_number=truck.truck_number) }}">
+              <strong>Truck {{ truck.truck_number }}</strong>
+              <small>{% if truck.has_open %}Open inspection{% else %}Latest inspection{% endif %}{% if truck.latest_date %} - {{ truck.latest_date.strftime('%b %d, %Y') }}{% endif %}</small>
+            </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if selected_truck_number %}
+        <p class="inspection-section-title">PreTrip / PostTrip Records</p>
+        {% if pretrips %}
+          <div class="inspection-card-list">
+            {% for pt in pretrips %}
+              {% set can_manage_pretrip = pt.user_id == current_user.id %}
+              {% set can_delete_pretrip = can_manage_pretrip and pt.pretrip_date == today_local_date %}
+              <article class="inspection-card">
+                <div class="inspection-card-top">
+                  <div>
+                    <p class="inspection-card-title">Truck {{ pt.truck_number or selected_truck_number }}</p>
+                    <p class="inspection-meta">{{ pt.pretrip_date }} - {{ pt.driver.display_name if pt.driver else 'Unknown driver' }} - {{ pt.shift or 'Shift not set' }}</p>
+                  </div>
+                  {% if pt.posttrip %}
+                    <strong class="inspection-status">PostTrip Complete</strong>
+                  {% else %}
+                    <strong class="inspection-status warn">PostTrip Open</strong>
+                  {% endif %}
+                </div>
+
+                <div class="inspection-facts">
+                  <div class="inspection-fact"><span>Start Miles</span><strong>{% if pt.start_mileage is not none %}{{ "{:,}".format(pt.start_mileage) }}{% else %}Not recorded{% endif %}</strong></div>
+                  <div class="inspection-fact"><span>End Miles</span><strong>{% if pt.posttrip and pt.posttrip.end_mileage is not none %}{{ "{:,}".format(pt.posttrip.end_mileage) }}{% else %}Pending{% endif %}</strong></div>
+                  <div class="inspection-fact"><span>Start Fuel</span><strong>{{ pt.start_fuel_level or 'Not recorded' }}</strong></div>
+                  <div class="inspection-fact"><span>End Fuel</span><strong>{% if pt.posttrip %}{{ pt.posttrip.end_fuel_level or 'Not recorded' }}{% else %}Pending{% endif %}</strong></div>
+                </div>
+
+                <div class="inspection-card-actions">
+                  <a href="{{ url_for(pretrip_view_endpoint, pretrip_id=pt.id) }}" class="btn btn-info">View Inspection</a>
+                  {% if not pt.posttrip and can_manage_pretrip %}
+                    <a href="{{ url_for('driver.do_posttrip', pretrip_id=pt.id) }}" class="btn btn-warning">Complete PostTrip</a>
+                  {% endif %}
+                  {% if can_manage_pretrip %}
+                    <a href="{{ url_for('driver.edit_pretrip_entry', pretrip_id=pt.id) }}" class="btn btn-secondary">Edit</a>
+                  {% endif %}
+                  {% if can_delete_pretrip %}
+                    <form action="{{ url_for('driver.delete_pretrip', pretrip_id=pt.id) }}" method="POST" onsubmit="return confirm('Delete this PreTrip?');">
+                      <button type="submit" class="btn btn-outline-danger">Delete</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="inspection-empty">No inspection records found for truck {{ selected_truck_number }}.</div>
+        {% endif %}
+
+        <p class="inspection-section-title">Fuel / Maintenance History</p>
+        {% if truck_history %}
+          <div class="inspection-history-list">
+            {% for item in truck_history %}
+              <article class="inspection-history-card">
+                <div class="inspection-card-top">
+                  <div>
+                    <p class="inspection-card-title">{{ item.date.strftime('%b %d, %Y') if item.date else 'Date not set' }} - {{ item.driver_name }}</p>
+                    <small>{{ item.status_label }}{% if item.miles_driven is not none %} - {{ "{:,}".format(item.miles_driven) }} miles{% endif %}</small>
+                  </div>
+                  <a class="btn btn-sm btn-outline-info" href="{{ url_for('driver.truck_maintenance_history', truck_number=selected_truck_number) }}">Truck Detail</a>
+                </div>
+                <div class="inspection-facts">
+                  <div class="inspection-fact"><span>Start Fuel</span><strong>{{ item.start_fuel_level or 'Not recorded' }}</strong></div>
+                  <div class="inspection-fact"><span>End Fuel</span><strong>{{ item.end_fuel_level or 'Not recorded' }}</strong></div>
+                  <div class="inspection-fact"><span>Fuel Stops</span><strong>{{ item.fuel_count }}</strong></div>
+                  <div class="inspection-fact"><span>Issues</span><strong>{{ item.issues|length }}</strong></div>
+                </div>
+                <small>
+                  {% if item.fuel_logs %}
+                    {% for fuel in item.fuel_logs[:2] %}{% if not loop.first %}; {% endif %}{{ "{:,}".format(fuel.mileage) }} mi at {{ fuel.plant }}{% endfor %}
+                  {% elif item.remarks %}
+                    {{ item.remarks }}
+                  {% else %}
+                    No fuel or maintenance notes recorded.
+                  {% endif %}
+                </small>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="inspection-empty">No completed truck history found yet for truck {{ selected_truck_number }}.</div>
+        {% endif %}
+      {% else %}
+        <div class="inspection-empty">No truck is tied to your driver record yet. Create a PreTrip first, then Inspections will show that truck only.</div>
+      {% endif %}
+    </section>
   {% else %}
-    <p>No PreTrip records.</p>
+    <p class="md-section-label mt-3 mb-1">INSPECTION CHECKLIST</p>
+    <h2 class="mt-0 md-page-title">All PreTrips</h2>
+    {% if pretrips %}
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Truck</th>
+            <th>Shift</th>
+            <th>Start Mileage</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pt in pretrips %}
+          <tr class="{% if not pt.posttrip %}table-danger{% endif %}">
+            <td>{{ pt.id }}</td>
+            <td>{{ pt.truck_number }}</td>
+            <td>{{ pt.shift }}</td>
+            <td>{{ pt.start_mileage or "N/A" }}</td>
+            <td>
+              <div class="d-flex flex-wrap gap-1">
+                <a href="{{ url_for(pretrip_view_endpoint, pretrip_id=pt.id) }}" class="btn btn-sm btn-info">View</a>
+                {% if pt.posttrip %}
+                  <strong class="text-success align-self-center">PostTrip done</strong>
+                {% else %}
+                  <strong class="text-danger align-self-center">PostTrip needed</strong>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No PreTrip records.</p>
+    {% endif %}
   {% endif %}
 </div>
+
 {% set md_nav_active = 'pretrip' %}
 {% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

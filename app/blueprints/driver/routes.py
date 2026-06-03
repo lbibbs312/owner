@@ -1747,6 +1747,79 @@ def _same_truck_number(left, right):
     return bool(left_normalized and left_normalized == right_normalized)
 
 
+def _truck_pretrips_for_number(truck_number, limit=30):
+    truck_number = _normalize_truck_number(truck_number)
+    if not truck_number:
+        return []
+    query = (
+        _active_pretrips_query()
+        .filter(func.lower(func.trim(PreTrip.truck_number)) == truck_number.lower())
+        .order_by(PreTrip.pretrip_date.desc(), PreTrip.created_at.desc(), PreTrip.id.desc())
+    )
+    if limit:
+        query = query.limit(limit)
+    return query.all()
+
+
+def _driver_inspection_truck_choices(driver_id):
+    today_local_date = _today_local_date()
+    driver_pretrips = (
+        _active_pretrips_query()
+        .filter(
+            PreTrip.user_id == driver_id,
+            PreTrip.truck_number.isnot(None),
+            func.trim(PreTrip.truck_number) != "",
+        )
+        .order_by(PreTrip.pretrip_date.desc(), PreTrip.created_at.desc(), PreTrip.id.desc())
+        .limit(40)
+        .all()
+    )
+    choices = {}
+
+    def add_choice(pretrip):
+        truck_number = _normalize_truck_number(pretrip.truck_number)
+        if not truck_number:
+            return
+        key = truck_number.lower()
+        if key not in choices:
+            choices[key] = {
+                "truck_number": truck_number,
+                "latest_pretrip": pretrip,
+                "latest_date": pretrip.pretrip_date,
+                "has_open": not bool(pretrip.posttrip),
+            }
+        else:
+            choices[key]["has_open"] = choices[key]["has_open"] or not bool(pretrip.posttrip)
+
+    for pretrip in driver_pretrips:
+        if pretrip.pretrip_date == today_local_date or not pretrip.posttrip:
+            add_choice(pretrip)
+    if not choices and driver_pretrips:
+        add_choice(driver_pretrips[0])
+    return list(choices.values())
+
+
+def _driver_selected_inspection_truck(driver_id, requested_truck_number=None):
+    truck_choices = _driver_inspection_truck_choices(driver_id)
+    selected_truck = None
+    requested_truck_number = _normalize_truck_number(requested_truck_number)
+    if requested_truck_number:
+        selected_truck = next(
+            (truck for truck in truck_choices if _same_truck_number(truck["truck_number"], requested_truck_number)),
+            None,
+        )
+    if selected_truck is None and truck_choices:
+        selected_truck = truck_choices[0]
+    return selected_truck, truck_choices
+
+
+def _driver_can_view_inspection_pretrip(pretrip):
+    if current_user.role != "driver" or pretrip.user_id == current_user.id:
+        return True
+    _, truck_choices = _driver_selected_inspection_truck(current_user.id)
+    return any(_same_truck_number(pretrip.truck_number, truck["truck_number"]) for truck in truck_choices)
+
+
 def _truck_history_time_label(log):
     if not getattr(log, "arrive_time", None):
         return "time not set"
@@ -2230,15 +2303,29 @@ def _build_plant_transfer_pdf(transfer, requested_copy):
 def list_pretrips():
     if current_user.role == "management":
         pretrips = _active_pretrips_query().order_by(PreTrip.created_at.desc()).all()
+        selected_truck_number = ""
+        inspection_trucks = []
+        truck_history = []
     else:
-        pretrips = (
-            _active_pretrips_query().filter_by(user_id=current_user.id)
-            .order_by(PreTrip.created_at.desc())
-            .all()
+        selected_truck, inspection_trucks = _driver_selected_inspection_truck(
+            current_user.id,
+            request.args.get("truck_number"),
+        )
+        selected_truck_number = selected_truck["truck_number"] if selected_truck else ""
+        current_pretrip = selected_truck["latest_pretrip"] if selected_truck else None
+        current_pretrip_id = current_pretrip.id if current_pretrip and not current_pretrip.posttrip else None
+        pretrips = _truck_pretrips_for_number(selected_truck_number, limit=30)
+        truck_history = _truck_maintenance_history(
+            selected_truck_number,
+            current_pretrip_id=current_pretrip_id,
+            limit=8,
         )
     return render_template(
         "list_pretrips.html",
         pretrips=pretrips,
+        selected_truck_number=selected_truck_number,
+        inspection_trucks=inspection_trucks,
+        truck_history=truck_history,
         today_local_date=_today_local_date(),
     )
 
@@ -2432,13 +2519,13 @@ def do_posttrip(pretrip_id):
 @login_required
 def view_pretrip(pretrip_id):
     pt = _active_pretrips_query().filter_by(id=pretrip_id).first_or_404()
-    if current_user.role == "driver" and pt.user_id != current_user.id:
+    if current_user.role == "driver" and not _driver_can_view_inspection_pretrip(pt):
         flash("Not authorized to view that PreTrip.", "danger")
         return redirect(url_for("driver.list_pretrips"))
     return render_template(
         "view_pretrip.html",
         pretrip=pt,
-        readonly=(current_user.role == "management"),
+        readonly=(current_user.role == "management" or pt.user_id != current_user.id),
         today_local_date=_today_local_date(),
         pretrip_damage_reports=_pretrip_damage_reports(pt),
         document_meta=_pretrip_document_meta(pt),
@@ -2584,8 +2671,8 @@ def delete_pretrip(pretrip_id):
 @login_required
 def pretrip_printable(pretrip_id):
     pt = _active_pretrips_query().filter_by(id=pretrip_id).first_or_404()
-    if current_user.role == "driver" and pt.user_id != current_user.id:
-        flash("Not authorized to print another driver's PreTrip!", "danger")
+    if current_user.role == "driver" and not _driver_can_view_inspection_pretrip(pt):
+        flash("Not authorized to print that PreTrip.", "danger")
         return redirect(url_for("driver.list_pretrips"))
 
     ephemeral_driver = session.get("reviewing_driver")
@@ -4310,35 +4397,26 @@ def truck_maintenance_history():
     if current_user.role == "management":
         return redirect(url_for("manager.manager_dashboard"))
 
-    today_local_date = _today_local_date()
-    todays_pretrip = (
-        _active_pretrips_query().filter_by(user_id=current_user.id, pretrip_date=today_local_date)
-        .order_by(PreTrip.created_at.desc())
-        .first()
+    selected_truck, inspection_trucks = _driver_selected_inspection_truck(
+        current_user.id,
+        request.args.get("truck_number"),
     )
-    latest_pretrip = (
-        _active_pretrips_query().filter_by(user_id=current_user.id)
-        .order_by(PreTrip.created_at.desc())
-        .first()
-    )
-    truck_number = _normalize_truck_number(request.args.get("truck_number"))
-    if not truck_number:
-        source_pretrip = todays_pretrip or latest_pretrip
-        truck_number = _normalize_truck_number(source_pretrip.truck_number if source_pretrip else "")
-
+    truck_number = selected_truck["truck_number"] if selected_truck else ""
+    latest_pretrip = selected_truck["latest_pretrip"] if selected_truck else None
     current_pretrip_id = None
-    if todays_pretrip and _same_truck_number(todays_pretrip.truck_number, truck_number):
-        current_pretrip_id = todays_pretrip.id
+    if latest_pretrip and _same_truck_number(latest_pretrip.truck_number, truck_number) and not latest_pretrip.posttrip:
+        current_pretrip_id = latest_pretrip.id
 
     return render_template(
         "truck_maintenance_history.html",
         truck_number=truck_number,
+        inspection_trucks=inspection_trucks,
         history=_truck_maintenance_history(
             truck_number,
             current_pretrip_id=current_pretrip_id,
             limit=25,
         ),
-        todays_pretrip=todays_pretrip,
+        todays_pretrip=latest_pretrip if latest_pretrip and latest_pretrip.pretrip_date == _today_local_date() else None,
     )
 
 

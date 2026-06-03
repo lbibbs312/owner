@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>MoveDefense Truck Maintenance</title>
+  <title>MoveDefense Truck Inspections</title>
   <style>
     :root { --bg:#090d12; --panel:#151a20; --line:#303a47; --text:#f8fafc; --muted:#94a3b8; --maroon:#2f6df0; --green:#10b981; --amber:#f59e0b; --red:#ef4444; --nav-height:88px; }
     * { box-sizing:border-box; }
@@ -31,6 +31,9 @@
     .event-list { display:grid; gap:8px; }
     .event { border:1px solid rgba(148,163,184,.16); border-radius:12px; padding:10px; background:rgba(255,255,255,.035); display:grid; gap:5px; }
     .event-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .truck-tabs { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin-bottom:12px; }
+    .truck-tab { border:1px solid var(--line); border-radius:14px; padding:10px; background:rgba(255,255,255,.035); color:var(--muted); font-size:.78rem; font-weight:900; }
+    .truck-tab.active { border-color:rgba(91,157,255,.55); color:var(--text); background:rgba(47,109,240,.16); }
     .empty { padding:14px; color:var(--muted); font-size:.86rem; line-height:1.35; }
     @media (min-width:600px) { body{background:#111827;} .shell{max-width:760px;margin:18px auto;min-height:calc(100vh - 36px);border:1px solid var(--line);border-radius:28px;overflow:hidden;} }
     @media (min-width:960px) { .shell{max-width:1120px;margin:18px auto;} .fact-grid{grid-template-columns:repeat(4,minmax(0,1fr));} .history-card{padding:18px;} .event-list.two{grid-template-columns:repeat(2,minmax(0,1fr));} }
@@ -39,10 +42,18 @@
 <body>
   <div class="shell">
     <header class="top">
-      <a class="back" href="{{ url_for('driver.mobile_dashboard') }}">Back</a>
-      <h1>Truck Maintenance</h1>
-      <p class="sub">Truck {{ truck_number or 'not set' }} - previous completed PostTrips, fuel levels, fuel stops, and truck issues.</p>
+      <a class="back" href="{{ url_for('driver.list_pretrips', truck_number=truck_number) if truck_number else url_for('driver.list_pretrips') }}">Back</a>
+      <h1>Truck Inspections</h1>
+      <p class="sub">Truck {{ truck_number or 'not set' }} - PreTrips, completed PostTrips, fuel levels, fuel stops, and truck issues.</p>
     </header>
+
+    {% if inspection_trucks %}
+      <div class="truck-tabs" aria-label="Current truck inspection choices">
+        {% for truck in inspection_trucks %}
+          <a class="truck-tab {% if truck.truck_number == truck_number %}active{% endif %}" href="{{ url_for('driver.truck_maintenance_history', truck_number=truck.truck_number) }}">Truck {{ truck.truck_number }}</a>
+        {% endfor %}
+      </div>
+    {% endif %}
 
     <div class="list">
       {% if truck_number and history %}
