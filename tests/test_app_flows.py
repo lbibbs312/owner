@@ -5274,6 +5274,7 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     page = client.get("/mobile")
     assert page.status_code == 200
     assert b"desktop-header-context" in page.data
+    assert b"@media (min-width: 640px) and (min-height: 560px)" in page.data
     assert b".md-driver-bottom-nav { display:none !important; }" in page.data
     assert b".board-only-shell main > .ops-console { display:none; }" in page.data
     assert b"setupDesktopOpsWorkspace" in page.data
