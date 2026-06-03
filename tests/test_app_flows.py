@@ -954,7 +954,9 @@ def test_driver_mobile_shows_full_parts_queue_and_route_task_events(client, app)
     assert b"Task T" not in route_page.data
     assert b"Hot Part: P-HOT-1" not in route_page.data
     assert b"Raleigh East Load" in route_page.data
-    assert b"DROPPED" in route_page.data
+    # A stop that arrived loaded and departed empty renders as DELIVERED on the
+    # live board (status taxonomy updated 2026-06; was "DROPPED").
+    assert b"DELIVERED" in route_page.data
 
 
 def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
@@ -4160,7 +4162,10 @@ def test_truck_issue_records_odometer_without_fuel_stop(client, app):
         assert log.fuel_mileage == 12345
 
     page = client.get("/driver_logs")
-    assert b"Truck Issue - 12,345 mi" in page.data
+    # Truck-issue odometer renders as "Truck issue: ... · 12,345 mi"
+    # (label format updated 2026-06; was "Truck Issue - 12,345 mi").
+    assert b"Truck issue:" in page.data
+    assert b"12,345 mi" in page.data
 
 
 def test_new_log_load_state_ignores_previous_days_and_finalized_route(client, app):
