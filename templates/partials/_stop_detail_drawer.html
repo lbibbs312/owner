@@ -3,10 +3,10 @@
     <div class="route-map-detail-source" hidden data-route-map-detail="stop-{{ stop.stop_id }}">
       <div class="drawer-kicker">Stop {{ stop.sequence }} · {{ stop.short_code or 'No current data' }}</div>
       <h3>{{ stop.plant_name or 'No current data' }}</h3>
-      <div class="drawer-badges">
-        <span class="route-status-badge status-{{ stop.badge.pill_tone if stop.badge else stop.status }}">{{ stop.badge.label if stop.badge else stop.status_label }}</span>
+      <div class="drawer-status-lines">
+        <p><strong>Status:</strong> {{ stop.badge.label if stop.badge else stop.status_label }}</p>
         {% for issue in stop.issues %}
-          <span class="route-status-badge status-{{ 'blocked' if issue.severity == 'risk' else 'waiting' }}">{{ issue.label }}</span>
+          <p class="drawer-warning-line severity-{{ issue.severity }}"><strong>Issue:</strong> {{ issue.label }}</p>
         {% endfor %}
       </div>
       <dl class="drawer-facts">

@@ -5685,6 +5685,54 @@ def test_new_stop_form_does_not_offer_legacy_pe_choice(client, app):
     assert b"Paint East" not in page.data
 
 
+def test_driver_logs_ledger_uses_plain_status_text_and_explicit_unknowns(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("ledger_plain_driver", "ledger-plain@example.com", "driver")
+        db.session.add_all([
+            DriverLog(
+                driver_id=driver.id,
+                date=date.today(),
+                plant_name="PC",
+                load_size="Empty",
+                depart_load_size="Mystery Load",
+                arrive_time="2026-05-28 08:00:00",
+                depart_time="08:15",
+                dock_wait_minutes=1,
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=date.today(),
+                plant_name="RE",
+                load_size="Mystery Load",
+                depart_load_size="Empty",
+                arrive_time="2026-05-28 09:00:00",
+                depart_time="09:20",
+            ),
+        ])
+        db.session.commit()
+
+    login(client, "ledger_plain_driver")
+    page = client.get("/driver_logs")
+    body = page.get_data(as_text=True)
+
+    assert page.status_code == 200
+    assert "Destination needs confirmation" in body
+    assert "Pickup source unknown" in body
+    assert "Earlier stop" not in body
+    assert "Next stop" not in body
+    assert "Wait Wait" not in body
+    assert "Wait 1 min" in body
+    assert 'class="badge bg' not in body
+    assert "status-pill" not in body
+    assert "severity-pill" not in body
+    assert "route-status-badge" not in body
+
+
 def test_empty_active_stop_quick_depart_starts_at_load_check(client, app):
     from datetime import date
 

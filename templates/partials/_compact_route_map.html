@@ -8,10 +8,11 @@
   {% endfor %}
   {% set ev = obj.evidence or {} %}
   {% set primary_code = visible_issues[0].code if visible_issues else '' %}
-  <div class="flow-issue-panel sev-{{ obj.badge.severity }}">
+  {% set issue_panel_severity = obj.badge.severity %}
+  <div class="flow-issue-panel sev-{{ issue_panel_severity }}">
     {% for pi in visible_issues %}
       <div class="flow-issue-head">
-        <span class="flow-status status-{{ 'risk' if pi.severity == 'risk' else 'attention' }}">{{ pi.label }}</span>
+        <strong class="flow-issue-label severity-{{ pi.severity }}">{{ pi.label }}</strong>
         <p>{{ pi.reason }}</p>
       </div>
       <div class="flow-issue-evidence">
@@ -518,7 +519,7 @@
                           </td>
                           <td>
                             <div class="maintenance-list">
-                              {% if item.regen_events %}<span class="maintenance-chip warn">Regen</span>{% endif %}
+                              {% if item.regen_events %}<span class="maintenance-label warn">Regen</span>{% endif %}
                               {% for issue in item.issues[:2] %}
                                 <span><strong>{{ issue.opened_label }} at {{ issue.plant }}</strong>{{ issue.label }}{% if issue.mileage is not none %} - {{ "{:,}".format(issue.mileage) }} mi{% endif %}</span>
                               {% else %}
@@ -769,7 +770,7 @@
                     {% if detail.pickup_label %}<small>{{ detail.pickup_label }}</small>{% endif %}
 	                    <small>In: {{ detail.arrived_with }} / Out: {{ 'No Pickup' if detail.no_pickup else detail.departed_with }}</small>
                     {% if detail.parts or detail.flags or detail.wait_label %}
-                      <span class="route-focus-chips">
+                      <span class="route-focus-meta">
                         {% for part in detail.parts %}<em>{{ part }}</em>{% endfor %}
                         {% if detail.wait_label %}<em>{{ detail.wait_label }}</em>{% endif %}
                       </span>
@@ -796,7 +797,7 @@
                     {% if detail.pickup_label %}<small>{{ detail.pickup_label }}</small>{% endif %}
 	                    <small>In: {{ detail.arrived_with }} / Out: {{ 'No Pickup' if detail.no_pickup else detail.departed_with }}</small>
                     {% if detail.parts or detail.flags or detail.wait_label %}
-                      <span class="route-focus-chips">
+                      <span class="route-focus-meta">
                         {% for part in detail.parts %}<em>{{ part }}</em>{% endfor %}
                         {% if detail.wait_label %}<em>{{ detail.wait_label }}</em>{% endif %}
                       </span>

@@ -1643,11 +1643,28 @@ a.flow-node:hover, a.flow-lane:hover { border-color:#93c5fd; box-shadow:0 4px 14
   line-height: 1.1;
   font-weight: 950;
 }
-.drawer-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.drawer-status-lines {
+  display: grid;
+  gap: 5px;
   margin-bottom: 12px;
+}
+.drawer-status-lines p {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.drawer-status-lines strong {
+  color: #93c5fd;
+  font-weight: 950;
+}
+.drawer-warning-line {
+  border-left: 3px solid #f59e0b;
+  padding-left: 9px;
+}
+.drawer-warning-line.severity-risk {
+  border-left-color: #ef4444;
+  color: #fecaca;
 }
 .drawer-facts {
   display: grid;

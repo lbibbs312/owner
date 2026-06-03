@@ -24,6 +24,10 @@
   .history-item { border:1px solid #e2e8f0; border-radius:10px; padding:10px; background:#fff; }
   .history-item strong { color:#0f172a; }
   .history-item .meta { color:#64748b; font-size:.82rem; }
+  .plain-status { color:#334155; font-size:.76rem; font-weight:950; text-transform:uppercase; letter-spacing:.04em; }
+  .plain-status.ok { color:#166534; }
+  .plain-status.warn { color:#92400e; }
+  .plain-status.danger { color:#991b1b; }
   @media (max-width:800px) { .live-grid { grid-template-columns:1fr 1fr; } .live-top { flex-direction:column; } .hot-proof-actions { grid-template-columns:1fr 1fr; } .hot-scan-row { flex-direction:column; } }
 </style>
 <div class="container my-3">
@@ -34,7 +38,7 @@
         <h2 class="live-title">{{ task.title }}</h2>
         <div class="live-meta">Shift {{ task.shift or 'N/A' }}{% if task.is_hot %} | HOT MOVE{% endif %}</div>
       </div>
-      <span class="badge {% if task.status == 'completed' %}bg-success{% elif task.status == 'in-progress' %}bg-warning text-dark{% elif task.status == 'declined' %}bg-secondary{% else %}bg-danger{% endif %}" id="liveStatus">{{ task.status.replace('-', ' ')|title }}</span>
+      <strong class="plain-status {% if task.status == 'completed' %}ok{% elif task.status == 'in-progress' %}warn{% elif task.status == 'declined' %}{% else %}danger{% endif %}" id="liveStatus">{{ task.status.replace('-', ' ')|title }}</strong>
     </div>
     <div class="live-grid">
       <div class="live-stat"><p class="label">Part</p><p class="value">{{ task.part_number or 'Not recorded' }}</p></div>
@@ -63,7 +67,7 @@
         <p class="hot-proof-meta">Hot Part: {{ hot_part_proof.hot_part_number }}</p>
         <p class="hot-proof-meta">Move Status: <span id="hotMoveStatus">{{ hot_part_proof.current_status }}</span></p>
       </div>
-      {% if hot_part_proof.open_exception %}<span class="badge bg-warning text-dark">{{ hot_part_proof.open_exception }}</span>{% endif %}
+      {% if hot_part_proof.open_exception %}<strong class="plain-status warn">{{ hot_part_proof.open_exception }}</strong>{% endif %}
     </div>
     <div class="hot-scan-row">
       <input id="hotScanValue" autocomplete="off" inputmode="text" placeholder="Scan or enter part label">
@@ -88,7 +92,7 @@
   <div class="card mb-3">
     <div class="card-body">
       <h5 class="card-title">Dispatch Details</h5>
-      {% if task.part_number %}<p class="mb-2"><strong>Part Number:</strong> {{ task.part_number }}{% if task.is_hot %} <span class="badge bg-danger">Hot</span>{% endif %}</p>{% endif %}
+      {% if task.part_number %}<p class="mb-2"><strong>Part Number:</strong> {{ task.part_number }}{% if task.is_hot %} <strong class="plain-status danger">Hot</strong>{% endif %}</p>{% endif %}
       <p class="card-text" style="white-space:pre-wrap;">{{ task.details or 'No extra dispatch notes.' }}</p>
     </div>
   </div>
@@ -113,7 +117,7 @@
       {% if hot_part_logs %}
         <div class="history-list">
           {% for log in hot_part_logs %}
-            <div class="history-item"><strong>{{ log.plant_name }}</strong> <span class="badge {% if log.no_pickup %}bg-dark{% elif log.hot_parts %}bg-danger{% else %}bg-secondary{% endif %}">{{ 'No Pickup' if log.no_pickup else ('Hot' if log.hot_parts else log.load_size) }}</span><div class="meta">{{ log.date }} | Arrive {{ log.arrive_time|to_local_time if log.arrive_time else '--' }} | Depart {{ log.depart_time|to_12h_format if log.depart_time else '--' }}</div><div>{{ log.part_number or 'No part number recorded' }}</div></div>
+            <div class="history-item"><strong>{{ log.plant_name }}</strong> <strong class="plain-status {% if log.hot_parts %}danger{% endif %}">{{ 'No pickup' if log.no_pickup else ('Hot' if log.hot_parts else log.load_size) }}</strong><div class="meta">{{ log.date }} | Arrive {{ log.arrive_time|to_local_time if log.arrive_time else '--' }} | Depart {{ log.depart_time|to_12h_format if log.depart_time else '--' }}</div><div>{{ log.part_number or 'No part number recorded' }}</div></div>
           {% endfor %}
         </div>
       {% else %}

@@ -7,12 +7,6 @@
 <div class="container">
   {% set logs_endpoint = 'manager.driver_logs' if current_user.role == 'management' else 'driver.driver_logs' %}
   <style>
-    .status-chip { display:inline-flex; padding:4px 9px; border-radius:8px; background:#f1f5f9; color:#334155; font-weight:900; font-size:.78rem; }
-    .status-chip.open { background:#fff1f2; color:#be123c; }
-    .status-chip.done { background:#dcfce7; color:#166534; }
-    .move-chip { display:inline-flex; align-items:center; border-radius:999px; padding:3px 9px; margin-right:6px; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em; background:#dbeafe; color:#1d4ed8; }
-    .move-chip.hot { background:#fee2e2; color:#991b1b; }
-    .move-chip.done { background:#dcfce7; color:#166534; }
     .stop-help { display:block; width:100%; border-left:3px solid #93c5fd; padding-left:10px; writing-mode:horizontal-tb; white-space:normal; word-break:normal; overflow-wrap:normal; }
     .print-title { display:none; }
     .management-readout { margin:18px 0; border:1px solid #cbd5e1; border-radius:8px; background:#fff; overflow:hidden; }
@@ -62,9 +56,9 @@
     .severity-item { border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:10px 12px; }
     .severity-item strong { display:block; color:#0f172a; font-weight:900; }
     .severity-item span { color:#475569; font-size:.8rem; font-weight:800; }
-    .severity-pill { display:inline-flex; margin-bottom:5px; padding:2px 7px; border-radius:999px; background:#e0f2fe; color:#075985 !important; font-size:.65rem !important; text-transform:uppercase; letter-spacing:.05em; }
-    .severity-pill.review { background:#fef3c7; color:#92400e !important; }
-    .severity-pill.critical { background:#fee2e2; color:#991b1b !important; }
+    .severity-label { display:block; margin-bottom:5px; color:#075985 !important; font-size:.68rem !important; font-weight:950; text-transform:uppercase; letter-spacing:.05em; }
+    .severity-label.review { color:#92400e !important; }
+    .severity-label.critical { color:#991b1b !important; }
     .exception-subhead { margin:2px 0 0; color:#334155; font-size:.72rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; }
     .delay-item { background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:10px 12px; }
     .delay-item .plant { font-weight:900; color:#0f172a; font-size:.875rem; }
@@ -126,7 +120,6 @@
       .route-log-table tr.current-stop td { background:#e8f0ff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
       .route-log-table tr.active-stop td { background:#e6fffb !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
       .route-log-table tr.open-stop td { background:#ffe8e8 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-      .status-chip { border:1px solid #111; background:#fff !important; color:#000 !important; }
     }
   </style>
 
@@ -182,7 +175,7 @@
         <div class="severity-list">
           {% for item in management_narrative.needs_review_items %}
             <div class="severity-item">
-              <span class="severity-pill review">{{ item.severity }}</span>
+              <strong class="severity-label review">{{ item.severity }}</strong>
               <strong>{{ item.title }}</strong>
               <span>{{ item.text }}</span>
             </div>
@@ -212,7 +205,7 @@
         <div class="severity-list">
           {% for item in management_narrative.critical_exception_items %}
             <div class="severity-item">
-              <span class="severity-pill critical">{{ item.severity }}</span>
+              <strong class="severity-label critical">{{ item.severity }}</strong>
               <strong>{{ item.title }}</strong>
               <span>{{ item.text }}</span>
             </div>
@@ -443,9 +436,9 @@
     <p><strong>Arrive Time:</strong> {{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</p>
     <p><strong>Depart Time:</strong> {{ log.depart_time|to_12h_format if log.depart_time else '--' }}</p>
     {% if log.no_pickup %}
-      <p><strong>Parts:</strong> <span class="badge bg-dark">No Pickup</span></p>
+      <p><strong>Parts:</strong> No pickup</p>
     {% else %}
-      <p><strong>Parts:</strong> {% if log.hot_parts %}<span class="badge bg-danger">Hot</span>{% endif %} {{ log.part_number or "N/A" }}</p>
+      <p><strong>Parts:</strong> {% if log.hot_parts %}<strong>Hot</strong> {% endif %}{{ log.part_number or "N/A" }}</p>
     {% endif %}
     {% set primary_issue = issue_review.issues[0] if issue_review and issue_review.issues else none %}
     {% if primary_issue %}
@@ -455,7 +448,7 @@
         <div class="report-section-head {% if primary_issue.severity == 'risk' %}red{% else %}amber{% endif %}">Issue Review</div>
         <div class="report-section-body">
           <div class="severity-item">
-            <span class="severity-pill {% if primary_issue.severity == 'risk' %}critical{% else %}review{% endif %}">{{ primary_issue.label }}</span>
+            <strong class="severity-label {% if primary_issue.severity == 'risk' %}critical{% else %}review{% endif %}">{{ primary_issue.label }}</strong>
             <strong>{{ primary_issue.reason }}</strong>
           </div>
           <div class="detail-pairs">

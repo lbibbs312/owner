@@ -28,7 +28,7 @@
           <td>{{ log.plant }}</td>
           <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
           <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
-          <td>{% if log.no_pickup %}<span class="badge bg-dark">No Pickup</span>{% endif %} {% if log.hot_parts %}<span class="badge bg-danger">Hot</span>{% endif %} {{ log.part_number or "--" }}</td>
+          <td>{% if log.no_pickup %}<strong>No pickup</strong>{% endif %} {% if log.hot_parts %}<strong>Hot</strong>{% endif %} {{ log.part_number or "--" }}</td>
           <td>
             <!-- If you want an edit or delete button, add them here -->
             <!-- Example:

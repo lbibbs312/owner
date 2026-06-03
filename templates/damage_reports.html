@@ -75,6 +75,16 @@
         color:var(--md-text);
         overflow-wrap:anywhere;
       }
+      .damage-report-status {
+        color:var(--md-muted);
+        font-family:var(--md-mono);
+        font-size:.72rem;
+        font-weight:950;
+        letter-spacing:.08em;
+        text-transform:uppercase;
+      }
+      .damage-report-status.open { color:var(--md-amber); }
+      .damage-report-status.complete { color:var(--md-green); }
       .damage-report-actions {
         display:flex;
         flex-wrap:wrap;
@@ -104,7 +114,7 @@
               <p class="damage-report-title">Damage Report</p>
               <p class="damage-report-meta">{{ report.created_at|to_detroit_datetime }} · {{ report.plant_name or 'Plant not set' }} · Truck {{ report.truck_number or 'not set' }}</p>
             </div>
-            <span class="badge text-bg-{{ 'success' if status_label == 'COMPLETE' else 'warning' }}">{{ status_label }}</span>
+            <strong class="damage-report-status {{ 'complete' if status_label == 'COMPLETE' else 'open' }}">{{ status_label }}</strong>
           </div>
           <div class="damage-report-facts">
             <div class="damage-report-fact"><span>Plant</span><strong>{{ report.plant_name or 'Not set' }}</strong></div>
@@ -153,7 +163,7 @@
             <td>{{ report.truck_number or '' }}</td>
             <td>{{ report.trailer_number or '' }}</td>
             <td>{{ report.stage }}</td>
-            <td><span class="badge text-bg-{{ 'success' if report.status == 'submitted' else 'warning' }}">{{ report.status|title }}</span></td>
+            <td><strong class="text-{{ 'success' if report.status == 'submitted' else 'warning' }}">{{ report.status|title }}</strong></td>
             <td class="small text-muted">{% if finalized %}Route finalized{% elif report.status != 'open' %}Submitted{% else %}Editable{% endif %}</td>
             <td>
               <div class="d-flex flex-wrap gap-1 justify-content-end damage-actions">

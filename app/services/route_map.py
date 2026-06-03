@@ -39,6 +39,8 @@ from app.models.case import ExceptionEvent
 
 SAFE_EMPTY = "No current data"
 NOT_TRACKED = "Not tracked yet"
+UNKNOWN_PICKUP_SOURCE_LABEL = "Pickup source unknown"
+UNKNOWN_DESTINATION_LABEL = "Destination needs confirmation"
 DOCUMENT_MISSING = "Document not attached"
 DETROIT_TZ = pytz.timezone("America/Detroit")
 RISK_FLAGS = {
@@ -409,24 +411,24 @@ def _board_flow_summary(
         return _with_route_pair(
             {"mode": "action", "plant": label, "action": "Picked up", "cargo": departed},
             pickup=label,
-            deliver=delivery_label or departed_destination or "Next stop",
+            deliver=delivery_label or departed_destination or UNKNOWN_DESTINATION_LABEL,
         )
     if arrived != "Empty" and departed == "Empty":
         return _with_route_pair(
             {"mode": "action", "plant": label, "action": "Dropped", "cargo": arrived},
-            pickup=pickup_label or "Earlier stop",
+            pickup=pickup_label or UNKNOWN_PICKUP_SOURCE_LABEL,
             deliver=delivery_label or label,
         )
     if arrived == departed and arrived != "Empty":
         return _with_route_pair(
             {"mode": "action", "plant": label, "action": "Carrying", "cargo": arrived},
-            pickup=pickup_label or "Earlier stop",
-            deliver=delivery_label or departed_destination or arrived_destination or "Next stop",
+            pickup=pickup_label or UNKNOWN_PICKUP_SOURCE_LABEL,
+            deliver=delivery_label or departed_destination or arrived_destination or UNKNOWN_DESTINATION_LABEL,
         )
     return _with_route_pair(
         {"mode": "change", "plant": label, "from": arrived, "to": departed},
-        pickup=pickup_label or (label if departed != "Empty" else "Earlier stop"),
-        deliver=delivery_label or departed_destination or arrived_destination or "Next stop",
+        pickup=pickup_label or (label if departed != "Empty" else UNKNOWN_PICKUP_SOURCE_LABEL),
+        deliver=delivery_label or departed_destination or arrived_destination or UNKNOWN_DESTINATION_LABEL,
     )
 
 
@@ -1228,7 +1230,7 @@ def _delivery_destination(load_label, fallback_plant):
     destination = destination_from_load(load_label)
     if destination:
         return plant_label(destination), destination
-    return _location_label(fallback_plant) or SAFE_EMPTY, _location_key(fallback_plant)
+    return UNKNOWN_DESTINATION_LABEL, "destination-needs-confirmation"
 
 
 def _load_count_label(count):
@@ -1369,7 +1371,7 @@ def _build_delivery_narratives(route_context):
                 pending_by_destination.pop(destination_key, None)
             if pickup is None:
                 pickup = pending_by_destination.pop(destination_key, None)
-            origin_label = (pickup or {}).get("plant_label") or "Earlier stop"
+            origin_label = (pickup or {}).get("plant_label") or UNKNOWN_PICKUP_SOURCE_LABEL
             key = _norm_key(f"delivery:{origin_label}:{destination_label}")
             group = _new_narrative_group(
                 "delivery",

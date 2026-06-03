@@ -349,43 +349,35 @@
   body.md-shell .table-responsive > .table thead th { padding-top:.85rem; }
   body.md-shell .table-responsive > .table > :not(caption) > * > *:first-child { padding-left:1rem; }
 
-  /* ---- Status pills / badges ---- */
-  body.md-shell .badge {
-    border-radius:999px;
+  /* ---- Plain status labels outside the Home Live Flow Board ---- */
+  body.md-shell .badge:not(.activityBellBadge) {
+    border-radius:0;
     font-family:var(--md-display);
     font-weight:800;
     letter-spacing:.03em;
-    padding:.4em .7em;
+    padding:0;
+    background:transparent !important;
+    border:0 !important;
   }
-  body.md-shell .badge.bg-secondary,
-  body.md-shell .badge.text-bg-secondary {
-    background:rgba(138,153,179,.16) !important;
+  body.md-shell .badge.bg-secondary:not(.activityBellBadge),
+  body.md-shell .badge.text-bg-secondary:not(.activityBellBadge) {
     color:#c7d2e3 !important;
-    border:1px solid rgba(138,153,179,.3);
   }
-  body.md-shell .badge.bg-success,
-  body.md-shell .badge.text-bg-success {
-    background:rgba(43,213,118,.16) !important;
+  body.md-shell .badge.bg-success:not(.activityBellBadge),
+  body.md-shell .badge.text-bg-success:not(.activityBellBadge) {
     color:var(--md-green) !important;
-    border:1px solid rgba(43,213,118,.34);
   }
-  body.md-shell .badge.bg-warning,
-  body.md-shell .badge.text-bg-warning {
-    background:rgba(255,178,36,.16) !important;
+  body.md-shell .badge.bg-warning:not(.activityBellBadge),
+  body.md-shell .badge.text-bg-warning:not(.activityBellBadge) {
     color:var(--md-amber) !important;
-    border:1px solid rgba(255,178,36,.34);
   }
-  body.md-shell .badge.bg-danger,
-  body.md-shell .badge.text-bg-danger {
-    background:rgba(255,82,71,.18) !important;
+  body.md-shell .badge.bg-danger:not(.activityBellBadge),
+  body.md-shell .badge.text-bg-danger:not(.activityBellBadge) {
     color:#ffc7c2 !important;
-    border:1px solid rgba(255,82,71,.4);
   }
-  body.md-shell .badge.bg-info,
-  body.md-shell .badge.text-bg-info {
-    background:rgba(47,109,240,.18) !important;
+  body.md-shell .badge.bg-info:not(.activityBellBadge),
+  body.md-shell .badge.text-bg-info:not(.activityBellBadge) {
     color:var(--md-blue-bright) !important;
-    border:1px solid rgba(47,109,240,.4);
   }
   body.md-shell hr { border-color:var(--md-line); opacity:.8; }
 

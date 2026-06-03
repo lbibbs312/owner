@@ -925,7 +925,7 @@ def _route_timing_errors(driver_id, log_date, plant_name, arrive_time, depart_ti
         following_log, next_arrival = next_log
         minutes = int((next_arrival - compare_start).total_seconds() // 60)
         if minutes < 0:
-            errors.append(f"Next stop at {_plant_label(following_log.plant_name)} arrives before this departure.")
+            errors.append(f"Following stop at {_plant_label(following_log.plant_name)} arrives before this departure.")
         elif following_log.plant_name != plant_name and minutes < MIN_PLANT_TRANSFER_MINUTES:
             errors.append(f"Only {minutes} min from {_plant_label(plant_name)} to {_plant_label(following_log.plant_name)}. Fix the time or insert the missing stop in order.")
     return errors

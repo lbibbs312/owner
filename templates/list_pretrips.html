@@ -65,9 +65,9 @@
                 <p class="pretrip-card-meta">{{ pt.pretrip_date }} · {{ pt.shift or 'Shift not set' }} · Start {{ pt.start_mileage or 'N/A' }}</p>
               </div>
               {% if pt.posttrip %}
-                <span class="badge bg-success align-self-start">COMPLETE</span>
+                <strong class="text-success align-self-start">Complete</strong>
               {% else %}
-                <span class="badge bg-warning align-self-start">OPEN</span>
+                <strong class="text-warning align-self-start">Open</strong>
               {% endif %}
             </div>
             <div class="pretrip-card-actions">
@@ -111,9 +111,9 @@
             <div class="d-flex flex-wrap gap-1">
               <a href="{{ url_for(pretrip_view_endpoint, pretrip_id=pt.id) }}" class="btn btn-sm btn-info">View</a>
               {% if pt.posttrip %}
-                <span class="badge bg-success align-self-center">PostTrip Done</span>
+                <strong class="text-success align-self-center">PostTrip done</strong>
               {% else %}
-                <span class="badge bg-danger align-self-center">PostTrip Needed</span>
+                <strong class="text-danger align-self-center">PostTrip needed</strong>
                 {% if can_manage_pretrip %}
                   <a href="{{ url_for('driver.do_posttrip', pretrip_id=pt.id) }}" class="btn btn-sm btn-warning">
                     Complete PostTrip

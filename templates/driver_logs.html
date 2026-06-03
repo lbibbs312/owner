@@ -203,14 +203,14 @@
       white-space:nowrap;
     }
     .md-ledger-state { color:var(--md-amber); }
-    .md-ledger-pill,
-    .md-ledger-status {
+    .md-ledger-label,
+    .md-ledger-status-text {
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      min-height:32px;
-      padding:4px 12px;
-      border-radius:999px;
+      min-height:0;
+      padding:0;
+      border-radius:0;
       font-family:var(--md-mono);
       font-size:.72rem;
       font-weight:900;
@@ -218,15 +218,15 @@
       text-transform:uppercase;
       white-space:nowrap;
     }
-    .md-ledger-pill {
+    .md-ledger-label {
       color:var(--md-green);
-      border:1px solid rgba(43,213,118,.32);
-      background:rgba(43,213,118,.12);
+      border:0;
+      background:transparent;
     }
-    .md-ledger-status {
+    .md-ledger-status-text {
       color:var(--md-amber);
-      border:1px solid rgba(255,178,36,.32);
-      background:rgba(255,178,36,.1);
+      border:0;
+      background:transparent;
     }
     .md-ledger-meta {
       color:var(--md-muted);
@@ -525,7 +525,7 @@
       font-weight:900;
       overflow-wrap:anywhere;
     }
-    .md-row-chips,
+    .md-row-labels,
     .md-row-actions {
       display:flex;
       flex-wrap:wrap;
@@ -550,14 +550,14 @@
       color:var(--md-text);
       font-weight:900;
     }
-    .route-chip {
-      display:inline-flex;
+    .route-label {
+      display:inline;
       align-items:center;
-      min-height:26px;
-      border-radius:999px;
-      padding:4px 9px;
-      background:rgba(138,153,179,.12);
-      border:1px solid rgba(138,153,179,.2);
+      min-height:0;
+      border-radius:0;
+      padding:0;
+      background:transparent;
+      border:0;
       color:var(--md-muted);
       font-family:var(--md-mono);
       font-size:.66rem;
@@ -565,20 +565,14 @@
       text-transform:uppercase;
       letter-spacing:.06em;
     }
-    .route-chip::before {
-      content:"";
-      width:5px;
-      height:5px;
-      margin-right:7px;
-      border-radius:50%;
-      background:currentColor;
-      opacity:.78;
+    .route-label::before {
+      content:none;
     }
-    .route-chip.danger { background:rgba(255,82,71,.12); border-color:rgba(255,82,71,.34); color:#ff8b84; }
-    .route-chip.ok { background:rgba(43,213,118,.12); border-color:rgba(43,213,118,.28); color:var(--md-green); }
-    .route-chip.warn { background:rgba(255,178,36,.12); border-color:rgba(255,178,36,.34); color:var(--md-amber); }
-    .route-chip.task-chip { text-transform:none; letter-spacing:0; font-size:.7rem; }
-    .route-chip.dark { background:rgba(8,19,34,.84); border-color:rgba(91,157,255,.22); color:var(--md-text); }
+    .route-label.danger { color:#ff8b84; }
+    .route-label.ok { color:var(--md-green); }
+    .route-label.warn { color:var(--md-amber); }
+    .route-label.task-label { text-transform:none; letter-spacing:0; font-size:.7rem; }
+    .route-label.dark { color:var(--md-text); }
     .route-warning {
       display:inline-flex;
       align-items:center;
@@ -696,19 +690,19 @@
     .route-card-title { margin:2px 0 4px; font-size:1.1rem; font-weight:900; color:#111827; overflow-wrap:anywhere; }
     .route-card-meta { color:#64748b; font-size:.82rem; font-weight:700; line-height:1.25; }
     .route-card-times { display:grid; grid-template-columns:1fr 1fr; gap:6px; min-width:180px; }
-    .time-pill { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:7px 9px; text-align:center; }
-    .time-pill span { display:block; color:#64748b; font-size:.62rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
-    .time-pill strong { display:block; color:#0f172a; font-size:.9rem; margin-top:1px; white-space:nowrap; }
+    .time-box { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:7px 9px; text-align:center; }
+    .time-box span { display:block; color:#64748b; font-size:.62rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+    .time-box strong { display:block; color:#0f172a; font-size:.9rem; margin-top:1px; white-space:nowrap; }
     .route-cargo-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px; }
     .cargo-panel { border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; padding:9px; min-width:0; }
     .cargo-panel .cargo-value { color:#111827; font-size:.95rem; font-weight:900; overflow-wrap:anywhere; }
-    body:not(.driver-ledger-active) .route-chip-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; align-items:center; }
-    body:not(.driver-ledger-active) .route-chip { display:inline-flex; align-items:center; min-height:24px; border-radius:999px; padding:3px 8px; background:#e2e8f0; color:#334155; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em; }
-    body:not(.driver-ledger-active) .route-chip.danger { background:#fee2e2; color:#991b1b; }
-    body:not(.driver-ledger-active) .route-chip.ok { background:#dcfce7; color:#166534; }
-    body:not(.driver-ledger-active) .route-chip.warn { background:#fef3c7; color:#92400e; }
-    body:not(.driver-ledger-active) .route-chip.task-chip { text-transform:none; letter-spacing:0; font-size:.72rem; }
-    body:not(.driver-ledger-active) .route-chip.dark { background:#111827; color:#fff; }
+    body:not(.driver-ledger-active) .route-label-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; align-items:center; }
+    body:not(.driver-ledger-active) .route-label { display:inline; align-items:center; min-height:0; border-radius:0; padding:0; background:transparent; color:#334155; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em; }
+    body:not(.driver-ledger-active) .route-label.danger { color:#991b1b; }
+    body:not(.driver-ledger-active) .route-label.ok { color:#166534; }
+    body:not(.driver-ledger-active) .route-label.warn { color:#92400e; }
+    body:not(.driver-ledger-active) .route-label.task-label { text-transform:none; letter-spacing:0; font-size:.72rem; }
+    body:not(.driver-ledger-active) .route-label.dark { color:#111827; }
     body:not(.driver-ledger-active) .route-photo-strip { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:stretch; }
     body:not(.driver-ledger-active) .route-photo-card { display:inline-flex; align-items:stretch; max-width:100%; border:1px solid #bfdbfe; background:#eff6ff; border-radius:8px; overflow:hidden; }
     body:not(.driver-ledger-active) .route-photo-link { display:inline-flex; align-items:center; gap:8px; max-width:100%; border:0; background:#eff6ff; color:#1d4ed8; padding:5px 8px; text-decoration:none; font-size:.72rem; font-weight:900; line-height:1.2; }
@@ -845,6 +839,7 @@
           {% set can_manage_log = log.driver_id == current_user.id %}
           {% set can_delete_log = can_manage_log and log.date == today_local_date %}
           {% set wait_label = wait_label_for_log(log) %}
+          {% set wait_value = wait_label|replace('Active wait ', '', 1)|replace('Wait ', '', 1) if wait_label else '' %}
           {% set arrive_label = route.arrive_cargo_desc if route else (log.load_size or 'Empty') %}
           {% if route and route.depart_desc is none %}
             {% set depart_label = '--' %}
@@ -857,31 +852,17 @@
           {% endif %}
           {% set has_stop_issue = stop_vm and stop_vm.issues %}
           {% if has_stop_issue %}
-            {% set status_label = stop_vm.badge.label %}
-            {% set status_tone = stop_vm.badge.pill_tone %}
-            {% set flow_status_tone = stop_vm.badge.pill_tone %}
             {% set row_tone = stop_vm.badge.row_tone %}
           {% elif stop_vm %}
-            {% set status_label = stop_vm.movement_label %}
-            {% set status_tone = stop_vm.badge.pill_tone if stop_vm.badge else 'recorded' %}
-            {% set flow_status_tone = status_tone %}
             {% set row_tone = stop_vm.badge.row_tone if stop_vm.badge else 'completed' %}
           {% elif log.maintenance %}
-            {% set status_label = 'DAMAGE' if 'damage' in (log.downtime_reason or '')|lower else 'HOLD' %}
-            {% set status_tone = 'attention' %}
-            {% set flow_status_tone = 'attention' %}
             {% set row_tone = 'hot' %}
           {% elif not log.depart_time %}
-            {% set status_label = 'NEEDS DEPARTURE' %}
-            {% set status_tone = 'attention' %}
-            {% set flow_status_tone = 'attention' %}
             {% set row_tone = 'active' %}
           {% else %}
-            {% set status_label = 'RECORDED' %}
-            {% set status_tone = 'recorded' %}
-            {% set flow_status_tone = 'recorded' %}
             {% set row_tone = 'completed' %}
           {% endif %}
+          {% set row_has_risk = log.maintenance or (has_stop_issue and stop_vm.badge.severity == 'risk') %}
           {% set ledger_title = stop_vm.ledger_title if stop_vm and stop_vm.ledger_title else ((route.plant if route else log.plant_name) ~ ' · Logged stop') %}
           {% set ledger_meta = stop_vm.ledger_meta if stop_vm and stop_vm.ledger_meta else (arrive_label ~ ' → ' ~ depart_label) %}
           {% set ledger_meta_lower = (ledger_meta or '')|lower %}
@@ -890,7 +871,7 @@
           {% if stop_vm and stop_vm.board_flow %}
             {% set flow = stop_vm.board_flow %}
             {% if flow.pickup or flow.deliver %}
-              {% set route_line = (flow.pickup or (route.plant if route else log.plant_name)) ~ ' → ' ~ (flow.deliver or 'Next stop') %}
+              {% set route_line = (flow.pickup or 'Pickup source unknown') ~ ' → ' ~ (flow.deliver or 'Destination needs confirmation') %}
             {% elif flow.plant %}
               {% set route_line = flow.plant %}
             {% endif %}
@@ -900,11 +881,11 @@
           {% elif not route_line and route %}
             {% set route_line = route.plant if route.plant else log.plant_name %}
           {% endif %}
-          <details class="md-ledger-row md-flow-row tone-{{ row_tone }} {% if not log.depart_time %}is-open{% endif %} {% if route and route.warnings %}has-warning{% endif %} {% if log.maintenance or (has_stop_issue and stop_vm.badge.severity == 'risk') %}has-risk{% endif %}" data-flow-row {% if not log.depart_time %}open{% endif %}>
+          <details class="md-ledger-row md-flow-row tone-{{ row_tone }} {% if not log.depart_time %}is-open{% endif %} {% if route and route.warnings %}has-warning{% endif %} {% if row_has_risk %}has-risk{% endif %}" data-flow-row {% if not log.depart_time %}open{% endif %}>
             <summary class="md-ledger-summary">
               <span class="md-row-detail flow-detail">
                 <strong>{{ ledger_title }}</strong>
-                <small>{{ ledger_meta }}{% if wait_label and 'wait' not in ledger_meta_lower %} · Wait {{ wait_label }}{% endif %}</small>
+                <small>{{ ledger_meta }}{% if wait_value and 'wait' not in ledger_meta_lower %} · Wait {{ wait_value }}{% endif %}</small>
               </span>
             </summary>
 
@@ -912,7 +893,7 @@
               <div class="md-row-grid">
                 <div class="md-row-fact"><span>Driver</span><strong>{{ log.driver.display_name }}{% if log.driver.employee_id %} · ID {{ log.driver.employee_id }}{% endif %}{% if log.driver.department %} · {{ log.driver.department }}{% endif %}</strong></div>
                 <div class="md-row-fact"><span>Route</span><strong>{{ route_line or 'Route not confirmed' }}</strong></div>
-                <div class="md-row-fact"><span>Move</span><strong>{% if first_issue and first_issue.code != 'needs_departure' %}{{ first_issue.label }} · {{ first_issue.reason }}{% elif not log.depart_time %}Open stop · record departure/load before the next stop{% elif stop_vm and stop_vm.movement_summary %}{{ stop_vm.movement_summary }}{% elif route %}{{ route.action }} · {{ route.state }}{% else %}Logged stop{% endif %}{% if route and route.next_stop %} · Next {{ route.next_stop }}{% endif %}</strong></div>
+                <div class="md-row-fact"><span>Move</span><strong>{% if first_issue and first_issue.code != 'needs_departure' %}{{ first_issue.label }} · {{ first_issue.reason }}{% elif not log.depart_time %}Open stop · record departure/load before continuing route{% elif stop_vm and stop_vm.movement_summary %}{{ stop_vm.movement_summary }}{% elif route %}{{ route.action }} · {{ route.state }}{% else %}Logged stop{% endif %}{% if route and route.next_stop %} · Following {{ route.next_stop }}{% endif %}</strong></div>
                 <div class="md-row-fact"><span>Arrive</span><strong>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</strong></div>
                 <div class="md-row-fact"><span>Depart</span><strong>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</strong></div>
                 <div class="md-row-fact"><span>In</span><strong>{{ arrive_label }}</strong></div>
@@ -946,7 +927,7 @@
                 {% if log.hot_parts %}<span><strong>Hot part:</strong> {{ log.part_number or 'part number not recorded' }}</span>{% elif log.part_number %}<span><strong>Part:</strong> {{ log.part_number }}</span>{% endif %}
                 {% if log.maintenance %}<span><strong>Truck issue:</strong> {{ log.downtime_reason or 'Issue recorded' }}{% if log.fuel_mileage %} · {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>{% endif %}
                 {% if log.fuel %}<span><strong>Fuel:</strong>{% if log.fuel_mileage %} {{ "{:,}".format(log.fuel_mileage) }} mi{% else %} recorded{% endif %}</span>{% endif %}
-                {% if wait_label %}<span><strong>Wait:</strong> {{ wait_label }}</span>{% endif %}
+                {% if wait_value %}<span><strong>Wait:</strong> {{ wait_value }}</span>{% endif %}
                 {% if log.meeting %}<span><strong>Meeting:</strong> recorded service stop.</span>{% endif %}
                 {% for event in (route_task_events or {}).get(log.id, []) %}
                   <span><strong>{{ event.kind_label }}:</strong> {{ event.label }} · {{ event.status }}{% if event.completed_at %} · Unloaded{% endif %}</span>
@@ -1050,7 +1031,7 @@
               {% endif %}
             </td>
 
-            <!-- Cargo column: named loads (e.g. "Helios load"), not just badge sizes -->
+            <!-- Cargo column: named loads (e.g. "Helios load"), not just size text -->
             <td class="cargo-cell">
               {% if route %}
                 <div class="cargo-stack">
@@ -1060,7 +1041,7 @@
                 {% if route.depart_desc is none %}
                   <span class="text-muted">--</span>
                 {% elif log.no_pickup %}
-                  <span class="badge bg-dark">No Pickup</span>
+                  <strong class="route-label dark">No pickup</strong>
                 {% else %}
                   <span class="fw-semibold">{{ route.depart_cargo_desc }}</span>
                 {% endif %}
@@ -1071,36 +1052,36 @@
             </td>
             <td class="parts-cell">
               {% if log.no_pickup %}
-                <span class="badge bg-dark">No Pickup</span>
+                <strong class="route-label dark">No pickup</strong>
               {% else %}
-                {% if log.hot_parts %}<span class="badge bg-danger">Hot</span>{% endif %}
+                {% if log.hot_parts %}<strong class="route-label danger">Hot</strong>{% endif %}
                 {{ log.part_number or '--' }}
               {% endif %}
             </td>
             <td>
               {% if log.maintenance %}
-                <span class="badge bg-warning text-dark">Yes</span>
+                <strong class="route-label warn">Yes</strong>
                 {% if log.fuel_mileage %}<br><small class="text-muted fw-semibold">{{ "{:,}".format(log.fuel_mileage) }} mi</small>{% endif %}
               {% else %}
-                <span class="badge bg-success">No</span>
+                <strong class="route-label ok">No</strong>
               {% endif %}
             </td>
             <td>
               {% if log.fuel %}
-                <span class="badge bg-info text-dark">Yes</span>
+                <strong class="route-label">Yes</strong>
                 {% if log.fuel_mileage %}<br><small class="text-muted fw-semibold">{{ "{:,}".format(log.fuel_mileage) }} mi</small>{% endif %}
               {% else %}
-                <span class="badge bg-secondary">No</span>
+                <strong class="route-label">No</strong>
               {% endif %}
             </td>
-            <td>{% if log.meeting %}<span class="badge bg-info text-dark">Yes</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
+            <td>{% if log.meeting %}<strong class="route-label">Yes</strong>{% else %}<strong class="route-label">No</strong>{% endif %}</td>
             
             <!-- Arrival (assumes it's a full datetime) -->
             <td class="time-cell">
               {% if log.arrive_time %}
                 {{ log.arrive_time|to_local_time }}
               {% else %}
-                <span class="badge bg-danger">Photo file missing</span>
+                <strong class="route-label danger">Photo file missing</strong>
               {% endif %}
             </td>
             

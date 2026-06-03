@@ -922,6 +922,41 @@ def test_completed_stop_states_reflect_cargo_action(client, app):
     assert 'class="flow-code"' not in body
 
 
+def test_unknown_route_pair_labels_are_explicit_not_fake(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("driver_unknown_pair", "driver")
+    _driver_log(
+        driver,
+        plant_name="PC",
+        arrive_time="2026-05-28 08:00:00",
+        depart_time="08:15",
+        load_size="Empty",
+        depart_load_size="Mystery Load",
+    )
+    _driver_log(
+        driver,
+        plant_name="RE",
+        arrive_time="2026-05-28 09:00:00",
+        depart_time="09:20",
+        load_size="Mystery Load",
+        depart_load_size="Empty",
+    )
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    pickup_stop = ctx["stops"][0]
+    drop_stop = ctx["stops"][1]
+
+    assert pickup_stop["board_flow"]["deliver"] == "Destination needs confirmation"
+    assert drop_stop["board_flow"]["pickup"] == "Pickup source unknown"
+    combined = (
+        f"{pickup_stop['board_detail']} {drop_stop['board_detail']} "
+        f"{pickup_stop['board_flow']} {drop_stop['board_flow']}"
+    )
+    assert "Earlier stop" not in combined
+    assert "Next stop" not in combined
+
+
 def test_partial_drop_is_recorded_not_route_review(client, app):
     with app.app_context():
         driver = _user("driver_partial_drop", "driver")

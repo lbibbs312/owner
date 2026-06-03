@@ -20,11 +20,14 @@
     .row:last-child { border-bottom:0; }
     .title { margin:0 0 4px; font-weight:900; }
     .meta { margin:0; color:var(--muted); font-size:.82rem; line-height:1.35; }
-    .badge { display:inline-flex; align-items:center; border-radius:999px; padding:4px 8px; font-size:.66rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em; background:rgba(16,185,129,.14); color:#a7f3d0; border:1px solid rgba(16,185,129,.26); white-space:nowrap; }
-    .badge.warn { background:rgba(245,158,11,.16); color:#fde68a; border-color:rgba(245,158,11,.28); }
+    .row-action,
+    .plain-status { font-size:.66rem; font-weight:950; text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; }
+    .row-action { color:#5b9dff; }
+    .plain-status { color:#a7f3d0; }
+    .plain-status.warn { color:#fde68a; }
     .actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; max-width:132px; }
     .actions form { margin:0; }
-    .mini-btn { display:inline-flex; align-items:center; justify-content:center; min-height:28px; border-radius:999px; padding:5px 9px; border:1px solid rgba(148,163,184,.28); background:rgba(255,255,255,.06); color:#e2e8f0; font-size:.65rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em; font-family:inherit; cursor:pointer; white-space:nowrap; }
+    .mini-btn { display:inline-flex; align-items:center; justify-content:center; min-height:28px; border-radius:7px; padding:5px 9px; border:1px solid rgba(148,163,184,.28); background:rgba(255,255,255,.06); color:#e2e8f0; font-size:.65rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em; font-family:inherit; cursor:pointer; white-space:nowrap; }
     .mini-btn.primary { background:rgba(59,130,246,.16); color:#bfdbfe; border-color:rgba(59,130,246,.32); }
     .mini-btn.success { background:rgba(16,185,129,.14); color:#a7f3d0; border-color:rgba(16,185,129,.26); }
     .mini-btn.danger { background:rgba(244,63,94,.14); color:#fecdd3; border-color:rgba(244,63,94,.28); }
@@ -61,7 +64,7 @@
               <p class="meta">Trailer {{ summary.trailer }} - No. {{ summary.transfer_number }}</p>
               <p class="meta">Parts/skids: {{ summary.parts|join('; ') }}</p>
             </div>
-            <span class="badge">View</span>
+            <strong class="row-action">View</strong>
           </a>
         {% endfor %}
       {% else %}
@@ -78,7 +81,7 @@
               <p class="title">Truck {{ pretrip.truck_number or 'not set' }}</p>
               <p class="meta">Trailer {{ pretrip.trailer_number or 'not set' }} - {{ 'PostTrip complete' if pretrip.posttrip else 'PostTrip due' }}</p>
             </div>
-            <span class="badge {% if not pretrip.posttrip %}warn{% endif %}">{{ 'Done' if pretrip.posttrip else 'Due' }}</span>
+            <strong class="plain-status {% if not pretrip.posttrip %}warn{% endif %}">{{ 'Done' if pretrip.posttrip else 'Due' }}</strong>
           </a>
         {% endfor %}
       {% else %}

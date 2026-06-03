@@ -20,9 +20,9 @@
 
   <div class="mb-3">
     {% if pretrip.posttrip %}
-      <span class="badge bg-success">PostTrip Done</span>
+      <strong class="text-success">PostTrip done</strong>
     {% else %}
-      <span class="badge bg-danger">PostTrip Needed</span>
+      <strong class="text-danger">PostTrip needed</strong>
     {% endif %}
   </div>
 
@@ -35,19 +35,19 @@
   <p>
     <strong>Oil Leak?</strong>
     {% if pretrip.oil_leak %}
-      <span class="badge bg-danger">Yes - Error</span>
+      <strong class="text-danger">Yes - error</strong>
     {% else %}
-      <span class="badge bg-success">No</span>
+      <strong class="text-success">No</strong>
     {% endif %}
   </p>
 
   <p>
     <strong>Damage Report:</strong>
     {% if pretrip.damage_report %}
-      <span class="badge bg-warning text-dark">Reported</span>
+      <strong class="text-warning">Reported</strong>
       {{ pretrip.damage_report }}
     {% else %}
-      <span class="badge bg-success">None</span>
+      <strong class="text-success">None</strong>
     {% endif %}
   </p>
 
@@ -81,11 +81,11 @@
   <p>
     <strong>Oil System Status:</strong>
     {% if pretrip.oil_system_status == 'leaking' %}
-      <span class="badge bg-danger">Leaking - Error</span>
+      <strong class="text-danger">Leaking - error</strong>
     {% elif pretrip.oil_system_status == 'low' %}
-      <span class="badge bg-warning text-dark">Low</span>
+      <strong class="text-warning">Low</strong>
     {% else %}
-      <span class="badge bg-success">Good</span>
+      <strong class="text-success">Good</strong>
     {% endif %}
   </p>
 
@@ -107,11 +107,11 @@
                 <div class="col-sm-6 d-flex justify-content-between gap-2 border-bottom pb-1">
                   <span>{{ label }}</span>
                   {% if checked %}
-                    <span class="badge bg-success">Checked</span>
+                    <strong class="text-success">Checked</strong>
                   {% elif working_when_clear %}
-                    <span class="badge bg-success">Working</span>
+                    <strong class="text-success">Working</strong>
                   {% else %}
-                    <span class="badge bg-secondary">Not checked</span>
+                    <strong class="text-muted">Not checked</strong>
                   {% endif %}
                 </div>
               {% endfor %}

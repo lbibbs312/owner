@@ -20,8 +20,7 @@
     .row:last-child { border-bottom:0; }
     .title { margin:0 0 4px; font-weight:900; }
     .meta { margin:0; color:var(--muted); font-size:.82rem; line-height:1.35; }
-    .badge { display:inline-flex; align-items:center; border-radius:999px; padding:4px 8px; font-size:.66rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em; background:rgba(16,185,129,.14); color:#a7f3d0; border:1px solid rgba(16,185,129,.26); white-space:nowrap; }
-    .badge.warn { background:rgba(245,158,11,.16); color:#fde68a; border-color:rgba(245,158,11,.28); }
+    .row-action { color:#5b9dff; font-size:.68rem; font-weight:950; text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; }
     .section-title { margin:18px 4px 8px; font-size:1rem; }
     .driver-active-wait { margin:12px 0 0; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 12px; align-items:center; padding:10px 12px; border:1px solid rgba(245,158,11,.34); border-radius:12px; background:rgba(245,158,11,.12); }
     .driver-active-wait-main { min-width:0; display:grid; gap:2px; }
@@ -52,7 +51,7 @@
               <p class="title">{{ report.date.strftime('%b %d, %Y') }}</p>
               <p class="meta">{{ report.logs }} driver log(s) - {{ report.pretrips }} inspection(s) - {{ report.transfers }} transfer(s)</p>
             </div>
-            <span class="badge">Open</span>
+            <strong class="row-action">View</strong>
           </a>
         {% endfor %}
       {% else %}

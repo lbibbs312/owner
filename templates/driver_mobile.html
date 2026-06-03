@@ -283,11 +283,11 @@
     .timing-stat { border:1px solid rgba(148,163,184,.18); border-radius:12px; padding:9px 10px; background:rgba(255,255,255,.035); min-width:0; }
     .timing-stat span { display:block; color:var(--muted); font-size:.62rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
     .timing-stat strong { display:block; margin-top:4px; font-size:.92rem; overflow-wrap:anywhere; }
-    .timing-badge { display:inline-flex; align-items:center; min-height:26px; border-radius:999px; padding:3px 8px; font-size:.64rem; font-weight:950; text-transform:uppercase; white-space:nowrap; }
-    .timing-badge.ok { background:rgba(16,185,129,.16); color:#a7f3d0; border:1px solid rgba(16,185,129,.3); }
-    .timing-badge.warning { background:rgba(245,158,11,.16); color:#fde68a; border:1px solid rgba(245,158,11,.3); }
-    .timing-badge.high { background:rgba(239,68,68,.18); color:#fecaca; border:1px solid rgba(239,68,68,.34); }
-    .timing-badge.muted { background:rgba(148,163,184,.16); color:#cbd5e1; border:1px solid rgba(148,163,184,.24); }
+    .timing-label { display:inline-flex; align-items:center; min-height:0; padding:0; border-radius:0; border:0; background:transparent; font-size:.64rem; font-weight:950; text-transform:uppercase; white-space:nowrap; }
+    .timing-label.ok { color:#a7f3d0; }
+    .timing-label.warning { color:#fde68a; }
+    .timing-label.high { color:#fecaca; }
+    .timing-label.muted { color:#cbd5e1; }
     .timing-note { margin:0; color:var(--muted); font-size:.76rem; line-height:1.35; }
 
     .ryder-panel { padding: 16px; display: grid; gap: 12px; }
@@ -318,8 +318,8 @@
     .maintenance-table td strong, .maintenance-list strong { display: block; font-size: .78rem; }
     .maintenance-table td span, .maintenance-list span { display: block; color: var(--muted); line-height: 1.35; margin-top: 3px; }
     .maintenance-list { display: grid; gap: 4px; }
-    .maintenance-chip { display: inline-flex; width: max-content; align-items: center; border-radius: 999px; padding: 3px 7px; font-size: .64rem; font-weight: 900; text-transform: uppercase; white-space: nowrap; background: rgba(16,185,129,.14); color: #a7f3d0; border: 1px solid rgba(16,185,129,.26); }
-    .maintenance-chip.warn { background: rgba(245,158,11,.16); color: #fde68a; border-color: rgba(245,158,11,.28); }
+    .maintenance-label { color:#a7f3d0; font-size:.64rem; font-weight:950; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+    .maintenance-label.warn { color:#fde68a; }
     .maintenance-empty { padding: 3px 0; color: var(--muted); font-size: .8rem; }
 
 	    .section-head { display: flex; justify-content: space-between; align-items: end; padding: 0 4px; }
@@ -355,10 +355,10 @@
     .list { display: grid; gap: 10px; }
     .list-item { padding: 14px; border-bottom: 1px solid rgba(148,163,184,0.13); }
     .list-item:last-child { border-bottom: 0; }
-    .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 0.66rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; }
-    .badge.hot { background: rgba(239,68,68,0.16); color: #fecaca; border: 1px solid rgba(239,68,68,0.28); }
-    .badge.progress { background: rgba(245,158,11,0.16); color: #fde68a; border: 1px solid rgba(245,158,11,0.28); }
-    .badge.ok { background: rgba(16,185,129,0.14); color: #a7f3d0; border: 1px solid rgba(16,185,129,0.26); }
+    .mobile-label { display: inline-flex; align-items: center; padding: 0; border-radius: 0; border: 0; background: transparent; color: #cbd5e1; font-size: 0.66rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; }
+    .mobile-label.hot { color: #fecaca; }
+    .mobile-label.progress { color: #fde68a; }
+    .mobile-label.ok { color: #a7f3d0; }
     .task-queue { display:grid; gap:10px; padding:12px; }
     .task-row { display:grid; gap:9px; padding:12px; border:1px solid rgba(148,163,184,.18); border-radius:14px; background:rgba(255,255,255,.035); }
     .task-row.hot { border-color:rgba(239,68,68,.32); background:rgba(239,68,68,.08); }
@@ -366,7 +366,7 @@
     .task-title { margin:0; font-size:.92rem; font-weight:900; line-height:1.2; overflow-wrap:anywhere; }
     .task-detail { margin:3px 0 0; color:var(--muted); font-size:.74rem; line-height:1.3; overflow-wrap:anywhere; }
     .task-meta { display:flex; flex-wrap:wrap; gap:6px; }
-    .task-meta .badge { text-transform:none; letter-spacing:0; }
+    .task-meta .mobile-label { text-transform:none; letter-spacing:0; }
     .hero .task-meta { margin:-6px 0 16px; position:relative; z-index:2; }
     .queue-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
     .queue-actions.two { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -540,20 +540,22 @@
     .rp-current-tag { font-size: .58rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; background: rgba(47,109,240,.4); color: #5b9dff; padding: 2px 5px; border-radius: 5px; }
     .rp-times { font-size: .72rem; color: var(--muted); margin-top: 3px; font-weight: 700; }
     .rp-loads { font-size: .72rem; margin-top: 4px; display: flex; gap: 8px; flex-wrap: wrap; }
-    .rp-load-chip {
+    .rp-load-label {
       display: inline-flex;
       align-items: center;
       gap: 3px;
-      padding: 2px 7px;
-      border-radius: 6px;
+      padding: 0;
+      border-radius: 0;
+      border: 0;
+      background: transparent;
       font-weight: 900;
       font-size: .65rem;
       text-transform: uppercase;
       letter-spacing: .04em;
     }
-    .rp-load-chip.in { background: rgba(100,116,139,.18); color: #94a3b8; border: 1px solid rgba(100,116,139,.3); }
-    .rp-load-chip.out { background: rgba(47,109,240,.2); color: #5b9dff; border: 1px solid rgba(47,109,240,.35); }
-    .rp-load-chip.empty { background: rgba(30,41,59,.4); color: #64748b; border: 1px solid rgba(100,116,139,.18); }
+    .rp-load-label.in { color: #94a3b8; }
+    .rp-load-label.out { color: #5b9dff; }
+    .rp-load-label.empty { color: #64748b; }
     .rp-parts { font-size: .72rem; color: var(--muted); margin-top: 3px; }
     .rp-footer { padding: 10px 14px 14px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
     .rp-footer a { display: block; text-align: center; padding: 9px; border-radius: 12px; background: rgba(47,109,240,.18); border: 1px solid rgba(91,157,255,.22); font-size: .76rem; font-weight: 900; color: #f8fafc; }
@@ -1051,25 +1053,23 @@
       font-weight: 750;
       overflow-wrap: anywhere;
     }
-    .route-narrative-chips {
+    .route-narrative-meta {
       display: flex;
       flex-wrap: wrap;
       gap: 5px;
       margin-top: 2px;
     }
-    .route-narrative-chips em {
-      padding: 3px 6px;
-      border-radius: 999px;
-      border: 1px solid rgba(148,163,184,.2);
-      background: rgba(148,163,184,.12);
+    .route-narrative-meta em {
+      padding: 0;
+      border-radius: 0;
+      border: 0;
+      background: transparent;
       color: #cbd5e1;
       font-size: .58rem;
       font-style: normal;
       font-weight: 900;
     }
-    .route-narrative-chips em.flag {
-      border-color: rgba(245,158,11,.32);
-      background: rgba(245,158,11,.12);
+    .route-narrative-meta em.flag {
       color: #fde68a;
     }
     .route-narrative-details {
@@ -1180,24 +1180,22 @@
       font-weight: 950;
       text-transform: uppercase;
     }
-    .route-focus-chips {
+    .route-focus-meta {
       display: flex;
       flex-wrap: wrap;
       gap: 5px;
     }
-    .route-focus-chips em {
-      padding: 3px 7px;
-      border-radius: 999px;
-      border: 1px solid rgba(148,163,184,.22);
-      background: rgba(148,163,184,.12);
+    .route-focus-meta em {
+      padding: 0;
+      border-radius: 0;
+      border: 0;
+      background: transparent;
       color: #cbd5e1;
       font-size: .58rem;
       font-style: normal;
       font-weight: 900;
     }
-    .route-focus-chips em.flag {
-      border-color: rgba(245,158,11,.32);
-      background: rgba(245,158,11,.12);
+    .route-focus-meta em.flag {
       color: #fde68a;
     }
     .route-focus-details {
@@ -1305,7 +1303,7 @@
       background: rgba(245,158,11,.16);
       color: #fde68a;
     }
-    .route-event-pill {
+    .route-event-card {
       display: grid;
       gap: 2px;
       border: 1px solid rgba(148,163,184,.16);
@@ -1313,16 +1311,16 @@
       background: rgba(15,23,42,.56);
       padding: 8px 9px;
     }
-    .route-event-pill.tone-delivery { border-color: rgba(16,185,129,.25); }
-    .route-event-pill.tone-empty { border-color: rgba(148,163,184,.18); }
-    .route-event-pill strong {
+    .route-event-card.tone-delivery { border-color: rgba(16,185,129,.25); }
+    .route-event-card.tone-empty { border-color: rgba(148,163,184,.18); }
+    .route-event-card strong {
       color: #f8fafc;
       font-size: .72rem;
       line-height: 1.14;
       overflow-wrap: anywhere;
     }
-    .route-event-pill small,
-    .route-event-pill span {
+    .route-event-card small,
+    .route-event-card span {
       color: #94a3b8;
       font-size: .64rem;
       line-height: 1.24;
@@ -1642,17 +1640,17 @@
     .move-defense-mobile .route-stop-main { min-width:0; display:grid; gap:2px; }
     .move-defense-mobile .route-stop-main strong { font-size:.8rem; overflow-wrap:anywhere; }
     .move-defense-mobile .route-stop-main small { color:#94a3b8; font-size:.66rem; line-height:1.25; font-weight:700; overflow-wrap:anywhere; }
-    .move-defense-mobile .route-status-badge { display:inline-flex; align-items:center; justify-content:center; min-height:23px; padding:3px 8px; border-radius:999px; border:1px solid rgba(148,163,184,.22); background:rgba(148,163,184,.14); color:#e2e8f0; font-size:.58rem; font-weight:950; text-transform:uppercase; white-space:nowrap; }
+    .move-defense-mobile .route-status-badge { display:inline-flex; align-items:center; justify-content:center; min-height:0; padding:0; border-radius:0; border:0; background:transparent; color:#cbd5e1; font-size:.58rem; font-weight:950; text-transform:uppercase; white-space:nowrap; }
     .move-defense-mobile .route-status-badge.status-active,
     .move-defense-mobile .route-status-badge.status-open,
     .move-defense-mobile .route-status-badge.status-in_progress,
-    .move-defense-mobile .route-status-badge.status-assigned { background:rgba(59,130,246,.18); border-color:rgba(147,197,253,.35); color:#bfdbfe; }
-    .move-defense-mobile .route-status-badge.status-waiting { background:rgba(245,158,11,.18); border-color:rgba(245,158,11,.34); color:#fde68a; }
-    .move-defense-mobile .route-status-badge.status-completed { background:rgba(16,185,129,.18); border-color:rgba(16,185,129,.34); color:#bbf7d0; }
+    .move-defense-mobile .route-status-badge.status-assigned { color:#bfdbfe; }
+    .move-defense-mobile .route-status-badge.status-waiting { color:#fde68a; }
+    .move-defense-mobile .route-status-badge.status-completed { color:#bbf7d0; }
     .move-defense-mobile .route-status-badge.status-blocked,
-    .move-defense-mobile .route-status-badge.status-needs_review { background:rgba(239,68,68,.18); border-color:rgba(248,113,113,.38); color:#fecaca; }
+    .move-defense-mobile .route-status-badge.status-needs_review { color:#fecaca; }
     .move-defense-mobile .route-status-badge.status-future,
-    .move-defense-mobile .route-status-badge.status-none { background:rgba(148,163,184,.14); color:#cbd5e1; }
+    .move-defense-mobile .route-status-badge.status-none { color:#cbd5e1; }
     .move-defense-mobile .route-map-grid { display:grid; grid-template-columns:1fr; gap:10px; margin-top:10px; }
     .move-defense-mobile .route-map-section { min-width:0; border:1px solid rgba(148,163,184,.18); border-radius:14px; background:rgba(15,23,42,.68); overflow:hidden; }
     .move-defense-mobile .route-map-section-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid rgba(148,163,184,.16); }
@@ -1676,7 +1674,11 @@
     .move-defense-mobile .drawer-close { float:right; border:1px solid rgba(148,163,184,.28); border-radius:999px; background:rgba(148,163,184,.12); color:#e2e8f0; padding:5px 10px; font-size:.7rem; font-weight:900; }
     .move-defense-mobile .drawer-kicker { color:#5b9dff; font-size:.66rem; font-weight:950; text-transform:uppercase; letter-spacing:.08em; margin:8px 0 6px; }
     .move-defense-mobile .route-map-drawer-panel h3 { margin:0 42px 8px 0; font-size:1.25rem; line-height:1.1; font-weight:950; }
-    .move-defense-mobile .drawer-badges { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+	    .move-defense-mobile .drawer-status-lines { display:grid; gap:5px; margin-bottom:12px; }
+	    .move-defense-mobile .drawer-status-lines p { margin:0; color:#cbd5e1; font-size:.76rem; font-weight:800; }
+	    .move-defense-mobile .drawer-status-lines strong { color:#5b9dff; font-weight:950; }
+	    .move-defense-mobile .drawer-warning-line { border-left:3px solid #fbbf24; padding-left:9px; }
+	    .move-defense-mobile .drawer-warning-line.severity-risk { border-left-color:#ef4444; color:#fecaca; }
     .move-defense-mobile .drawer-facts { display:grid; gap:8px; margin:0; }
     .move-defense-mobile .drawer-facts div { display:grid; grid-template-columns:1fr; gap:3px; padding:8px 0; border-bottom:1px solid rgba(148,163,184,.14); }
     .move-defense-mobile .drawer-facts dt { color:#94a3b8; font-size:.66rem; font-weight:950; text-transform:uppercase; }
@@ -2702,6 +2704,8 @@
     .flow-issue-panel.sev-risk { border-color:rgba(255,82,71,.42); background:rgba(255,82,71,.08); box-shadow:inset 0 0 0 1px rgba(255,82,71,.16), 0 0 22px rgba(255,82,71,.12); }
     .flow-issue-panel.sev-attention { border-color:rgba(255,178,36,.4); background:rgba(255,178,36,.07); box-shadow:inset 0 0 0 1px rgba(255,178,36,.14); }
     .flow-issue-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .flow-issue-label { color:var(--md-amber); font-family:var(--md-mono); font-size:.68rem; font-weight:950; letter-spacing:.08em; text-transform:uppercase; }
+    .flow-issue-label.severity-risk { color:var(--md-red); }
     .flow-issue-head p { margin:0; color:var(--md-text); font-size:.8rem; font-weight:650; line-height:1.3; }
     .flow-issue-evidence { display:grid; gap:6px; }
     .flow-issue-evidence div { display:grid; grid-template-columns:104px minmax(0,1fr); gap:10px; align-items:center; }
@@ -2830,10 +2834,10 @@
           <h1>{{ active_task.title }}</h1>
           <p>{{ active_task.details or 'No extra dispatch notes.' }}</p>
           <div class="task-meta">
-            {% if active_task.part_number %}<span class="badge {% if active_task.is_hot %}hot{% endif %}">Part {{ active_task.part_number }}</span>{% endif %}
-            <span class="badge {% if active_task.is_hot %}hot{% elif active_task.status == 'in-progress' %}progress{% else %}ok{% endif %}">{{ 'HOT' if active_task.is_hot else active_task.status.replace('-', ' ')|title }}</span>
-            <span class="badge">{{ 'Open for any driver' if not active_task.assigned_to else 'Assigned to you' }}</span>
-            {% if active_task.accepted_at %}<span class="badge progress">Accepted {{ active_task.accepted_at|to_detroit_datetime }}</span>{% endif %}
+            {% if active_task.part_number %}<span class="mobile-label {% if active_task.is_hot %}hot{% endif %}">Part {{ active_task.part_number }}</span>{% endif %}
+            <span class="mobile-label {% if active_task.is_hot %}hot{% elif active_task.status == 'in-progress' %}progress{% else %}ok{% endif %}">{{ 'HOT' if active_task.is_hot else active_task.status.replace('-', ' ')|title }}</span>
+            <span class="mobile-label">{{ 'Open for any driver' if not active_task.assigned_to else 'Assigned to you' }}</span>
+            {% if active_task.accepted_at %}<span class="mobile-label progress">Accepted {{ active_task.accepted_at|to_detroit_datetime }}</span>{% endif %}
           </div>
           <div class="hero-actions {% if active_task.status == 'pending' %}tri{% else %}{% endif %}">
             <a class="button ghost" href="{{ url_for('driver.view_task', task_id=active_task.id) }}">Details</a>
@@ -2863,9 +2867,9 @@
             <h1>{{ next_load_prediction.predicted_load_label if next_load_prediction.is_known else 'Awaiting load intent' }}</h1>
             <p>{% if next_load_prediction.is_known %}Likely destination: {{ next_load_prediction.display_destination }}. Basis: {{ next_load_prediction.reason_text }}{% else %}Next load is unknown. {{ next_load_prediction.required_driver_action }}{% endif %}</p>
             <div class="task-meta">
-              {% if next_load_prediction.status %}<span class="badge progress">{{ next_load_prediction.status }}</span>{% endif %}
-              <span class="badge">Confidence: {{ next_load_prediction.confidence_label }}</span>
-              <span class="badge">Source: {{ next_load_prediction.source_label }}</span>
+              {% if next_load_prediction.status %}<span class="mobile-label progress">{{ next_load_prediction.status }}</span>{% endif %}
+              <span class="mobile-label">Confidence: {{ next_load_prediction.confidence_label }}</span>
+              <span class="mobile-label">Source: {{ next_load_prediction.source_label }}</span>
             </div>
 	          {% else %}
 	            <div class="eyebrow"><span class="bolt"></span>Ready For Dispatch</div>
@@ -2909,12 +2913,12 @@
                   <p class="task-title">{{ task.title }}</p>
                   <p class="task-detail">{{ task.details or 'No dispatch notes.' }}</p>
                 </div>
-                <span class="badge {% if task.is_hot %}hot{% elif task.status == 'in-progress' %}progress{% else %}ok{% endif %}">{{ 'HOT' if task.is_hot else task.status.replace('-', ' ')|title }}</span>
+                <span class="mobile-label {% if task.is_hot %}hot{% elif task.status == 'in-progress' %}progress{% else %}ok{% endif %}">{{ 'HOT' if task.is_hot else task.status.replace('-', ' ')|title }}</span>
               </div>
               <div class="task-meta">
-                {% if task.part_number %}<span class="badge">Part {{ task.part_number }}</span>{% endif %}
-                <span class="badge">{{ 'Open for any driver' if not task.assigned_to else 'Assigned to you' }}</span>
-                {% if task.accepted_at %}<span class="badge progress">Accepted {{ task.accepted_at|to_detroit_datetime }}</span>{% endif %}
+                {% if task.part_number %}<span class="mobile-label">Part {{ task.part_number }}</span>{% endif %}
+                <span class="mobile-label">{{ 'Open for any driver' if not task.assigned_to else 'Assigned to you' }}</span>
+                {% if task.accepted_at %}<span class="mobile-label progress">Accepted {{ task.accepted_at|to_detroit_datetime }}</span>{% endif %}
               </div>
               <div class="queue-actions {% if task.status == 'pending' %}{% else %}two{% endif %}">
                 <a class="button ghost" href="{{ url_for('driver.view_task', task_id=task.id) }}">Details</a>
@@ -2940,7 +2944,7 @@
             <p class="timing-title">{{ current_route.plant if current_route else current_stop.plant_name }} Load Timing</p>
             <p class="timing-sub">Arrived {{ fs.arrival_label or (current_stop.arrive_time|to_local_time) }}{% if current_stop.depart_time %}; departed {{ current_stop.depart_time|to_12h_format }}{% endif %}</p>
           </div>
-          <span class="timing-badge {{ fs.severity }}">{{ fs.status }}</span>
+          <span class="timing-label {{ fs.severity }}">{{ fs.status }}</span>
         </div>
         <div class="timing-grid">
           <div class="timing-stat"><span>Ready Estimate</span><strong>{{ fs.ready_at_label or fs.estimate_label }}</strong></div>
@@ -3058,15 +3062,15 @@
             </div>
             {% if r %}
             <div class="rp-loads">
-              <span class="rp-load-chip in {% if r.arrive_cargo_desc == 'Empty' %}empty{% endif %}">
+              <span class="rp-load-label in {% if r.arrive_cargo_desc == 'Empty' %}empty{% endif %}">
                 In: {{ r.arrive_cargo_desc }}
               </span>
               {% if dl.no_pickup %}
-                <span class="rp-load-chip out empty">Out: No Pickup</span>
+                <span class="rp-load-label out empty">Out: No Pickup</span>
               {% elif r.depart_cargo_desc is none %}
-                <span class="rp-load-chip out empty">Out: --</span>
+                <span class="rp-load-label out empty">Out: --</span>
               {% else %}
-                <span class="rp-load-chip out {% if r.depart_cargo_desc == 'Empty' %}empty{% endif %}">
+                <span class="rp-load-label out {% if r.depart_cargo_desc == 'Empty' %}empty{% endif %}">
                   Out: {{ r.depart_cargo_desc }}
                 </span>
               {% endif %}
