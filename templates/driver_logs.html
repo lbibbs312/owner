@@ -247,7 +247,7 @@
     }
     .md-route-audit-grid {
       display:grid;
-      grid-template-columns:repeat(5,minmax(0,1fr));
+      grid-template-columns:repeat(4,minmax(0,1fr));
       gap:10px;
       padding:14px 18px;
       border-bottom:1px solid var(--md-line-soft);
@@ -392,7 +392,7 @@
     }
     .md-action-rail {
       display:grid;
-      grid-template-columns:repeat(4,minmax(0,1fr));
+      grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
       gap:10px;
     }
     .md-ledger-btn,
@@ -460,6 +460,10 @@
     .md-ledger-list {
       display:grid;
       padding:10px;
+      scroll-margin-top:96px;
+    }
+    .md-ledger-list:target {
+      box-shadow:inset 0 0 0 1px rgba(255,178,36,.32),0 0 26px rgba(255,178,36,.16);
     }
     .md-ledger-row {
       appearance:none;
@@ -476,13 +480,18 @@
       box-shadow:inset 0 0 0 1px rgba(91,157,255,.1),0 0 22px rgba(91,157,255,.12);
     }
     .md-ledger-row.has-warning {
-      border-color:rgba(255,178,36,.36);
-      box-shadow:inset 0 0 0 1px rgba(255,178,36,.08),0 0 22px rgba(255,178,36,.12);
+      border-color:rgba(255,178,36,.26);
+      box-shadow:none;
     }
     .md-ledger-row.has-risk {
-      border-color:rgba(255,82,71,.42);
+      border-color:rgba(255,82,71,.3);
       background:rgba(255,82,71,.08);
-      box-shadow:inset 0 0 0 1px rgba(255,82,71,.12),0 0 24px rgba(255,82,71,.12);
+      box-shadow:none;
+    }
+    .md-ledger-row:target {
+      border-color:rgba(255,178,36,.72);
+      background:rgba(255,178,36,.08);
+      box-shadow:inset 0 0 0 1px rgba(255,178,36,.26),0 0 30px rgba(255,178,36,.24);
     }
     .md-ledger-row::before,
     .md-ledger-row::after,
@@ -912,7 +921,7 @@
         {% set truck_inspections_url = url_for('driver.list_pretrips', truck_number=audit.truck_number) if audit.truck_number else url_for('driver.list_pretrips') %}
         {% set route_pretrip_url = url_for('driver.pretrip_printable', pretrip_id=route_pretrip.id) if route_pretrip else truck_inspections_url %}
         {% set first_fuel_event = audit.fuel_events[0] if audit.fuel_events else none %}
-        {% set first_fuel_href = '#route-stop-' ~ first_fuel_event.log_id if first_fuel_event and first_fuel_event.log_id else '#route-stops' %}
+        {% set fuel_card_href = '#route-stop-' ~ first_fuel_event.log_id if first_fuel_event and first_fuel_event.log_id else route_pretrip_url %}
         <div class="md-route-audit-grid" aria-label="Route audit summary">
           <a class="md-route-audit-card" href="#route-stops" aria-label="View numbered stops">
             <span>Numbered Stops</span>
@@ -939,15 +948,10 @@
             <strong>{% if audit.truck_number or audit.trailer_number %}{{ audit.truck_number or 'Truck not set' }}{% if audit.trailer_number %} / {{ audit.trailer_number }}{% endif %}{% else %}Not recorded{% endif %}</strong>
             <small>From route PreTrip.</small>
           </a>
-          <a class="md-route-audit-card" href="{{ route_pretrip_url }}" aria-label="View start fuel inspection record">
-            <span>Start Fuel</span>
-            <strong>{{ audit.start_fuel_level or 'Not recorded' }}</strong>
-            <small>{{ audit.start_fuel_source or 'Capture on PreTrip or previous truck PostTrip.' }}</small>
-          </a>
-          <a class="md-route-audit-card" href="{{ first_fuel_href }}" aria-label="View fuel stop details">
-            <span>Fuel Stops</span>
-            <strong>{% if audit.fuel_events %}{{ audit.fuel_events|length }} recorded{% else %}None recorded{% endif %}</strong>
-            <small>{% if audit.fuel_events %}{% for fuel in audit.fuel_events %}{% if not loop.first %}; {% endif %}{% if fuel.sequence %}Stop {{ fuel.sequence }} · {% endif %}{{ fuel.plant }}{% if fuel.mileage is not none %} @ {{ "{:,}".format(fuel.mileage) }} mi{% endif %}{% endfor %}{% elif audit.end_fuel_level %}End fuel {{ audit.end_fuel_level }}{% else %}No fuel mileage saved for this route.{% endif %}</small>
+          <a class="md-route-audit-card" href="{{ fuel_card_href }}" aria-label="View fuel details">
+            <span>Fuel</span>
+            <strong>{{ audit.start_fuel_level or 'Start not recorded' }} · {% if audit.fuel_events %}{{ audit.fuel_events|length }} stop{{ 's' if audit.fuel_events|length != 1 else '' }}{% else %}No fuel stop{% endif %}</strong>
+            <small>Start: {{ audit.start_fuel_source or 'PreTrip or previous truck PostTrip needed.' }}{% if audit.fuel_events %} · Stops: {% for fuel in audit.fuel_events %}{% if not loop.first %}; {% endif %}{% if fuel.sequence %}Stop {{ fuel.sequence }} · {% endif %}{{ fuel.plant }}{% if fuel.mileage is not none %} @ {{ "{:,}".format(fuel.mileage) }} mi{% endif %}{% endfor %}{% elif audit.end_fuel_level %} · End fuel {{ audit.end_fuel_level }}{% endif %}</small>
           </a>
         </div>
 
@@ -960,7 +964,6 @@
 
 	          <div class="md-action-rail md-flow-top-actions" aria-label="Driver log actions">
 	            <a href="{{ url_for('driver.new_driving_log') }}" class="md-ledger-btn md-flow-action-tab primary"><span class="md-btn-icon" data-md-icon="record-stop" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="7"></circle><path d="M12 8v8"></path><path d="M8 12h8"></path></svg></span> Record Current Stop</a>
-	            <a href="{{ url_for('driver.add_stop') }}" class="md-ledger-btn md-flow-action-tab"><span class="md-btn-icon" data-md-icon="add-stop" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M5 7h8"></path><path d="M5 12h8"></path><path d="M5 17h6"></path><path d="M18 10v8"></path><path d="M14 14h8"></path></svg></span> Add Missed Stop</a>
 	            {% if logs %}
 	              <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d')) }}" class="md-ledger-btn md-flow-action-tab success"><span class="md-btn-icon" data-md-icon="print-route" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 9V4h10v5"></path><path d="M6 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-1"></path><path d="M7 14h10v6H7z"></path><path d="M8 12h.01"></path></svg></span> Print Route Record</a>
 	              <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d'), autoprint=1) }}" class="md-ledger-btn md-flow-action-tab success"><span class="md-btn-icon" data-md-icon="save-pdf" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 3h7l4 4v14H7z"></path><path d="M14 3v5h4"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg></span> Save Route PDF</a>

@@ -4547,10 +4547,14 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"<span>Route</span>" in logs_page.data
     assert b"Numbered Stops" in logs_page.data
     assert b"Route Miles" in logs_page.data
+    assert b"grid-template-columns:repeat(4,minmax(0,1fr))" in logs_page.data
+    assert b".md-ledger-row:target" in logs_page.data
+    assert b".md-ledger-list:target" in logs_page.data
+    assert b".md-ledger-row.has-warning {\n      border-color:rgba(255,178,36,.26);\n      box-shadow:none;" in logs_page.data
     assert b'href="#route-stops" aria-label="View numbered stops"' in logs_page.data
     assert f'href="/pretrip_printable/{current_pretrip_id}" aria-label="View route mileage inspection record"'.encode() in logs_page.data
     assert b'href="/list_pretrips?truck_number=BT-1" aria-label="View truck inspections"' in logs_page.data
-    assert f'href="#route-stop-{fuel_log_id}" aria-label="View fuel stop details"'.encode() in logs_page.data
+    assert f'href="#route-stop-{fuel_log_id}" aria-label="View fuel details"'.encode() in logs_page.data
     assert b'id="route-stops" class="md-ledger-list md-flow-window"' in logs_page.data
     assert f'id="route-stop-{fuel_log_id}"'.encode() in logs_page.data
     assert b"120 mi" in logs_page.data
@@ -4566,10 +4570,11 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"No prior day" not in logs_page.data
     assert b"Start 1,000" in logs_page.data
     assert b"End 1,120" in logs_page.data
-    assert b"Start Fuel" in logs_page.data
+    assert b"<span>Fuel</span>" in logs_page.data
     assert b"1/4" in logs_page.data
+    assert b"1 stop" in logs_page.data
+    assert b"Start:" in logs_page.data
     assert b"Previous PostTrip truck BT-1" in logs_page.data
-    assert b"Fuel Stops" in logs_page.data
     assert b"1,045 mi" in logs_page.data
     assert b"Stop <strong>1</strong>" in logs_page.data
     assert b"Stop #</span><strong>1 of 1" in logs_page.data
@@ -4588,9 +4593,10 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     action_end = logs_page.data.index(b"</div>", action_start)
     action_row = logs_page.data[action_start:action_end]
     assert b'data-md-icon="record-stop"' in action_row
-    assert b'data-md-icon="add-stop"' in action_row
+    assert b'data-md-icon="add-stop"' not in action_row
     assert b'data-md-icon="print-route"' in action_row
     assert b'data-md-icon="save-pdf"' in action_row
+    assert b"Add Missed Stop" not in action_row
     assert b'<span class="md-btn-icon">+</span>' not in action_row
     assert '<span class="md-btn-icon">↧</span>'.encode() not in action_row
     assert b'<span class="md-btn-icon">P</span>' not in action_row
