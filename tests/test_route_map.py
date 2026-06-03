@@ -800,7 +800,7 @@ def test_driver_dashboard_renders_route_narrative_cards(client, app):
     assert "flow-route-pair" in body
     assert '<span class="flow-arrow flow-route-arrow" aria-hidden="true">→</span>' in body
     assert "<em>Pickup</em><strong>Paint Central</strong>" in body
-    assert "<em>Deliver</em><strong>Raleigh East</strong>" in body
+    assert "<em>Delivered</em><strong>Raleigh East</strong>" in body
     assert "2 loads" in body
     assert "2 stops" in body
     assert "P-RE-8" in body
@@ -916,7 +916,7 @@ def test_completed_stop_states_reflect_cargo_action(client, app):
     assert "Picked up <strong>Parts</strong>" in body
     assert "Dropped <strong>Parts</strong>" in body
     assert "<em>Pickup</em><strong>Paint Central</strong>" in body
-    assert '<span class="flow-route-end flow-route-end--deliver"><span class="flow-arrow flow-route-arrow" aria-hidden="true">→</span><em>Deliver</em><strong>Raleigh East</strong></span>' in body
+    assert '<span class="flow-route-end flow-route-end--deliver"><span class="flow-arrow flow-route-arrow" aria-hidden="true">→</span><em>Delivered</em><strong>Raleigh East</strong></span>' in body
     assert '<span class="flow-arrow flow-route-arrow" aria-hidden="true">→</span>' in body
     assert "grid-template-columns: auto auto;" in body
     assert "grid-template-columns: auto auto minmax(0, 1fr);" in body
@@ -988,9 +988,9 @@ def test_unknown_route_pair_renders_single_line_fact(client, app):
     assert "Raleigh East &middot;" in body
     assert '<span class="flow-route-pair">' not in body
     assert "<em>Pickup</em><strong>Pickup source unknown</strong>" not in body
-    assert "<em>Deliver</em><strong>Destination needs confirmation</strong>" not in body
+    assert "<em>Delivered</em><strong>Destination needs confirmation</strong>" not in body
     assert "<em>Pickup</em><strong>--</strong>" not in body
-    assert "<em>Deliver</em><strong>--</strong>" not in body
+    assert "<em>Delivered</em><strong>--</strong>" not in body
 
 
 def test_partial_drop_is_recorded_not_route_review(client, app):
@@ -1021,6 +1021,6 @@ def test_partial_drop_is_recorded_not_route_review(client, app):
 
     assert "PPL &middot; Dropped <strong>1 load</strong> of <strong>Parts</strong>" in body
     assert "<em>Pickup</em><strong>Paint Central</strong>" in body
-    assert "<em>Deliver</em><strong>PPL</strong>" in body
+    assert "<em>Delivered</em><strong>PPL</strong>" in body
     assert "ROUTE?" not in body
     assert "Verify route" not in body
