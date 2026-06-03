@@ -483,18 +483,6 @@ def _active_route_date_for_driver(driver_id, today_local_date=None, open_shift=N
     return today_local_date
 
 
-def _route_date_has_driver_records(driver_id, route_date):
-    if not route_date:
-        return False
-    return any(
-        [
-            _active_driver_logs_query().filter_by(driver_id=driver_id, date=route_date).first(),
-            _active_pretrips_query().filter_by(user_id=driver_id, pretrip_date=route_date).first(),
-            _active_plant_transfers_query().filter_by(user_id=driver_id, transfer_date=route_date).first(),
-        ]
-    )
-
-
 def _latest_driver_route_date(driver_id):
     latest_log = (
         _active_driver_logs_query()
@@ -521,9 +509,7 @@ def _dashboard_route_date_for_driver(driver_id, today_local_date=None, open_shif
     active_route_date = _active_route_date_for_driver(driver_id, today_local_date, open_shift)
     if open_shift or active_route_date != today_local_date:
         return active_route_date
-    if _route_date_has_driver_records(driver_id, today_local_date):
-        return today_local_date
-    return _latest_driver_route_date(driver_id) or today_local_date
+    return today_local_date
 
 
 def _requested_mobile_route_date():

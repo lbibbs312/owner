@@ -4312,6 +4312,7 @@ def test_premature_finalized_event_does_not_lock_active_shift_new_logs(client, a
     body = mobile.get_data(as_text=True)
     assert b"Continue route" in mobile.data
     assert b"Add Stop" in mobile.data
+    assert b"md-flow-action-tab primary add-stop-action" in mobile.data
     assert body.count('data-flow-panel-title="Add Stop"') == 1
     assert b"Finalize Route" not in mobile.data
 
@@ -5673,7 +5674,7 @@ def test_completed_posttrip_route_shows_ended_across_driver_and_manager_surfaces
     assert b"Current Active Stop" not in manager_review.data
 
 
-def test_mobile_dashboard_route_panel_falls_back_to_latest_route_when_today_is_empty(client, app):
+def test_mobile_dashboard_defaults_to_today_when_today_is_empty(client, app):
     from datetime import date, datetime, timedelta
 
     with app.app_context():
@@ -5715,18 +5716,15 @@ def test_mobile_dashboard_route_panel_falls_back_to_latest_route_when_today_is_e
 
     assert page.status_code == 200
     assert b"Last Route" not in page.data
-    assert b"REPLAY MODE" in page.data
-    assert b"ACTIONS DISABLED" in page.data
+    assert b"REPLAY MODE" not in page.data
+    assert b"ACTIONS DISABLED" not in page.data
     assert b"Last Route Replay" not in page.data
     assert b"Last Route / Route Replay" not in page.data
     assert b"Live route actions are hidden" not in page.data
-    assert b'<div class="md-flow-top-actions"' not in page.data
-    assert b'data-flow-panel-title="Add Stop"' not in page.data
-    assert b"1 stop" in page.data
-    assert b"Raleigh East" in page.data
-    assert f"/driver_logs?date={route_date.isoformat()}".encode() in page.data
-    assert b"No stops logged yet today." not in page.data
-    assert b"Start shift with PreTrip" not in page.data
+    assert b"1 stop" not in page.data
+    assert b"Raleigh East" not in page.data
+    assert f"/driver_logs?date={route_date.isoformat()}".encode() not in page.data
+    assert b'data-flow-panel-title="Add Stop"' in page.data
 
 
 def test_mobile_dashboard_selected_date_renders_route_replay(client, app):
@@ -5945,6 +5943,10 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "content: none!important" in body
     assert ".md-flow-action-tab::before" in body
     assert "animation: actionDotPulse 1.9s ease-in-out infinite" in body
+    assert ".md-flow-action-tab.add-stop-action" in body
+    assert "animation: addStopBreath 2.45s ease-in-out infinite" in body
+    assert "@keyframes addStopBreath" in body
+    assert "background: rgba(43,213,118,.15)" in body
     assert "@keyframes actionDotPulse" in body
     assert "grid-template-columns: 9px max-content" in body
     assert "border: 1px solid rgba(91,157,255,.28)" not in body

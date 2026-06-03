@@ -270,7 +270,7 @@
       <span>Departure / proof</span>
     </a>
     {% elif add_stop_url %}
-    <a class="md-flow-action-tab primary {% if pulse_key == 'add_stop' %}is-next-required{% endif %}" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}" data-flow-panel-title="Add Stop">
+    <a class="md-flow-action-tab primary add-stop-action {% if pulse_key == 'add_stop' %}is-next-required{% endif %}" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}" data-flow-panel-title="Add Stop">
       <strong>Add Stop</strong>
       <span>Continue route</span>
     </a>
