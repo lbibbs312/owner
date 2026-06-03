@@ -4523,6 +4523,11 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     logs_page = client.get(f"/driver_logs?date={selected_date.isoformat()}")
     assert logs_page.status_code == 200
     assert b"driver-ledger-active" in logs_page.data
+    assert b"@media (min-width: 768px)" in logs_page.data
+    assert b"#pageContent > .navbar {" in logs_page.data
+    assert b"z-index: 2500;" in logs_page.data
+    assert b"#pageContent > .navbar .dropdown-menu {" in logs_page.data
+    assert b"z-index: 2510;" in logs_page.data
     assert b"AUDIT LEDGER" in logs_page.data
     assert b"PAST ROUTE" in logs_page.data
     assert b"REPLAY MODE" in logs_page.data

@@ -97,6 +97,22 @@
     .navbar {
       transition: background-color 0.3s ease;
     }
+    @media (min-width: 768px) {
+      #pageContent > .navbar {
+        position: relative;
+        z-index: 2500;
+        overflow: visible;
+      }
+      #pageContent > .navbar .container-fluid,
+      #pageContent > .navbar .navbar-collapse,
+      #pageContent > .navbar .navbar-nav,
+      #pageContent > .navbar .nav-item.dropdown {
+        overflow: visible;
+      }
+      #pageContent > .navbar .dropdown-menu {
+        z-index: 2510;
+      }
+    }
     .navbar-nav .nav-link {
       transition: color 0.2s ease;
     }
