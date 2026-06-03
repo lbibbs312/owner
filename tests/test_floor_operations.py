@@ -239,7 +239,8 @@ def test_driver_dashboard_survives_no_assigned_requests(client, app):
     assert "LIVE FLOW BOARD" in body
     assert "Today&#39;s Route" not in body
     assert "Today's Route" not in body
-    assert "No route stops logged for this date." in body
+    assert "START DAY" in body
+    assert "No stops logged yet today. Start day by recording the first stop." in body
     assert "Assigned Move Queue" not in body
     assert "No assigned moves" not in body
     assert "Next Action" not in body

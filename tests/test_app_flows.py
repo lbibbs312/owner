@@ -5721,10 +5721,20 @@ def test_mobile_dashboard_defaults_to_today_when_today_is_empty(client, app):
     assert b"Last Route Replay" not in page.data
     assert b"Last Route / Route Replay" not in page.data
     assert b"Live route actions are hidden" not in page.data
+    assert b"START DAY" in page.data
+    assert b"Today \xc2\xb7 0 stops" in page.data
+    assert b"Start Day" in page.data
+    assert b"No stops logged yet today. Start day by recording the first stop." in page.data
     assert b"1 stop" not in page.data
     assert b"Raleigh East" not in page.data
     assert f"/driver_logs?date={route_date.isoformat()}".encode() not in page.data
     assert b'data-flow-panel-title="Add Stop"' in page.data
+
+    fragment = client.get("/mobile/route-map-fragment")
+    assert fragment.status_code == 200
+    assert b"START DAY" in fragment.data
+    assert b"No stops logged yet today. Start day by recording the first stop." in fragment.data
+    assert b"Raleigh East" not in fragment.data
 
 
 def test_mobile_dashboard_selected_date_renders_route_replay(client, app):

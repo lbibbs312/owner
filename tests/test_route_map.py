@@ -842,7 +842,8 @@ def test_driver_dashboard_renders_with_no_assigned_requests(client, app):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "LIVE FLOW BOARD" in body
-    assert "No route stops logged for this date." in body
+    assert "START DAY" in body
+    assert "No stops logged yet today. Start day by recording the first stop." in body
     assert "Assigned Move Queue" not in body
     assert "Live Flow Map" not in body
     assert "Production Flow" not in body

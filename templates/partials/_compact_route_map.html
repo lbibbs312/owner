@@ -186,6 +186,8 @@
   {% endfor %}
 {% endif %}
 {% set board_count = (board_tasks|length) + (ops_board_items|length) + (1 if primary_stop else 0) + (completed_stops|length) + (1 if primary_event and not primary_stop else 0) + (recurring_events|length) %}
+{% set is_today_route = route_date is defined and today_local_date is defined and route_date and today_local_date and route_date == today_local_date %}
+{% set is_empty_today_route = is_today_route and board_count == 0 %}
 {% set route_sheet_url = urls.get('view_route') or urls.get('route_history') %}
 {% set depart_url = urls.get('record_departure') %}
 {% set damage_url = urls.get('add_damage') %}
@@ -213,7 +215,10 @@
 {% set dispatch_ticker_text = rm.dispatch_ticker_text if rm and rm.dispatch_ticker_text is defined else 'NO ALERTS FROM DISPATCH' %}
 {% set route_status_raw = (rm.route.next_action if rm and rm.route else cta.next_action if cta.next_action is defined else 'Ready')|default('Ready', true) %}
 {% set route_status_lower = route_status_raw|lower %}
-{% if 'no action' in route_status_lower %}
+{% if is_empty_today_route %}
+  {% set route_status_label = 'START DAY' %}
+  {% set route_status_tone = 'open' %}
+{% elif 'no action' in route_status_lower %}
   {% set route_status_label = 'COMPLETE' %}
   {% set route_status_tone = 'ready' %}
 {% elif 'finalize' in route_status_lower or 'ready' in route_status_lower or 'complete' in route_status_lower %}
@@ -254,6 +259,8 @@
 	      
 	      {% if rm and rm.stops %}
 	        <p class="md-flow-subline">{{ rm.stops|length }} stop{{ 's' if rm.stops|length != 1 else '' }}</p>
+	      {% elif is_empty_today_route %}
+	        <p class="md-flow-subline">Today · 0 stops</p>
 	      {% endif %}
 	    </div>
     <div class="md-flow-head-status">
@@ -817,9 +824,14 @@
       {% endfor %}
     </div>
   {% else %}
-    <p class="compact-empty">
-      {{ rm.map_empty_message if rm and rm.map_empty_message else 'No route stops logged for this date.' }}
-    </p>
+    <div class="compact-empty {% if is_empty_today_route %}start-day-empty{% endif %}" role="status">
+      {% if is_empty_today_route %}
+        <strong>Start Day</strong>
+        <span>{{ rm.map_empty_message if rm and rm.map_empty_message else 'No stops logged yet today. Start day by recording the first stop.' }}</span>
+      {% else %}
+        {{ rm.map_empty_message if rm and rm.map_empty_message else 'No route stops logged for this date.' }}
+      {% endif %}
+    </div>
 	    <div class="md-flow-ticker" aria-hidden="true">
 	      <div class="md-flow-ticker-track">
 	        <span>{{ dispatch_ticker_text }}</span>

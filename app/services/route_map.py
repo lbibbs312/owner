@@ -1895,8 +1895,8 @@ def build_driver_map_mode_context(route_context, route_map=None, production_flow
         empty = ""
     else:
         mode = "no_current_activity"
-        label = "No Current Activity"
-        empty = "No route stops logged for this date."
+        label = "Start Day" if is_today else "No Current Activity"
+        empty = "No stops logged yet today. Start day by recording the first stop." if is_today else "No route stops logged for this date."
 
     return {
         "map_mode": mode,
