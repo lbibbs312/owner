@@ -3464,19 +3464,23 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     login(client, "photo_driver")
     edit_page = client.get(f"/edit_driver_log/{log_id}")
     assert edit_page.status_code == 200
-    assert b"Add Picture To This Stop" in edit_page.data
-    assert b"Why are you adding this picture?" in edit_page.data
+    assert b"Add Paperwork / Proof Photo" in edit_page.data
+    assert b"Why are you adding this picture?" not in edit_page.data
+    assert b"BOL / Manifest" in edit_page.data
+    assert b"Optional note" in edit_page.data
     assert b"Upload From Gallery" in edit_page.data
     assert b'data-stop-photo-input="edit_gallery"' in edit_page.data
     assert b'capture="environment" data-stop-photo-input="edit_camera"' in edit_page.data
 
-    missing_note = client.post(
+    paperwork_upload = client.post(
         f"/driver_logs/{log_id}/photos",
-        data={"source": "edit_gallery", "photo": (BytesIO(b"edit-gallery-photo"), "edit-gallery.jpg")},
+        data={"source": "bol_manifest_edit_gallery", "photo": (BytesIO(b"edit-gallery-photo"), "edit-gallery.jpg")},
         headers={"Accept": "application/json"},
     )
-    assert missing_note.status_code == 400
-    assert "reason" in missing_note.get_json()["error"]
+    assert paperwork_upload.status_code == 200
+    paperwork_photo = paperwork_upload.get_json()["photo"]
+    assert paperwork_photo["source"] == "Bol Manifest Edit Gallery"
+    assert paperwork_photo["note"] == "BOL / manifest paperwork"
 
     first_upload = client.post(
         f"/driver_logs/{log_id}/photos",
@@ -3497,8 +3501,9 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
 
     depart_page = client.get(f"/driver_logs/{log_id}/depart")
     assert depart_page.status_code == 200
-    assert b"Add Picture To This Stop" in depart_page.data
-    assert b"Why are you adding this picture?" in depart_page.data
+    assert b"Add Paperwork / Proof Photo" in depart_page.data
+    assert b"Why are you adding this picture?" not in depart_page.data
+    assert b"BOL / Manifest" in depart_page.data
     assert b"Upload From Gallery" in depart_page.data
     assert b'data-stop-photo-input="departure_gallery"' in depart_page.data
     assert b"Upload Label Photo" not in depart_page.data
@@ -3521,12 +3526,14 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     driver_list = client.get("/driver_logs")
     assert driver_list.status_code == 200
     assert b"Photo proof 1" in driver_list.data
+    assert b"BOL / manifest paperwork" in driver_list.data
     assert b"Loaded seal photo from gallery" in driver_list.data
     assert b"Departing load proof from gallery" in driver_list.data
 
     driver_detail = client.get(f"/view_driver_log/{log_id}")
     assert driver_detail.status_code == 200
     assert b"Stop Photo Proof" in driver_detail.data
+    assert b"BOL / manifest paperwork" in driver_detail.data
     assert b"Loaded seal photo from gallery" in driver_detail.data
     assert b"Remove Photo" in driver_detail.data
 
@@ -3546,15 +3553,17 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
         from app.models import DriverLogPhoto
 
         photos = DriverLogPhoto.query.order_by(DriverLogPhoto.id.asc()).all()
-        assert len(photos) == 2
-        first_photo_id = photos[0].id
-        second_photo_id = photos[1].id
+        assert len(photos) == 3
+        paperwork_photo_id = photos[0].id
+        first_photo_id = photos[1].id
+        second_photo_id = photos[2].id
 
     client.get("/logout")
     login(client, "photo_manager")
     manager_list = client.get(f"/manager/driver-logs?date={date.today().isoformat()}")
     assert manager_list.status_code == 200
     assert b"Proof" in manager_list.data
+    assert b"BOL / manifest paperwork" in manager_list.data
     assert b"Loaded seal photo from gallery" in manager_list.data
     assert b"Departing load proof from gallery" in manager_list.data
 
@@ -3575,10 +3584,12 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert manager_page.status_code == 200
     assert b"Stop Photo Proof" in manager_page.data
     assert b"Cargo Photo Proof" in manager_page.data
-    assert b"Two stop photo proofs were attached" in manager_page.data
+    assert b"Three stop photo proofs were attached" in manager_page.data
     assert b"Latest proof from Paint Central says: Departing load proof from gallery" in manager_page.data
+    assert b"BOL / manifest paperwork" in manager_page.data
     assert b"Loaded seal photo from gallery" in manager_page.data
     assert b"Remove Photo" in manager_page.data
+    assert f"/manager/driver-log-photos/{paperwork_photo_id}".encode() in manager_page.data
     assert f"/manager/driver-log-photos/{first_photo_id}".encode() in manager_page.data
     assert f"/manager/driver-log-photos/{second_photo_id}".encode() in manager_page.data
     manager_photo = client.get(f"/manager/driver-log-photos/{second_photo_id}")
@@ -3592,6 +3603,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     )
     assert manager_delete.status_code == 302
     manager_page_after_delete = client.get(f"/manager/driver-logs/{log_id}")
+    assert b"BOL / manifest paperwork" in manager_page_after_delete.data
     assert b"Loaded seal photo from gallery" not in manager_page_after_delete.data
     assert b"Departing load proof from gallery" in manager_page_after_delete.data
     assert client.get(f"/manager/driver-log-photos/{first_photo_id}").status_code == 404
@@ -3633,6 +3645,13 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert driver_delete.status_code == 302
     assert client.get(first_photo["url"]).status_code == 404
     assert client.get(second_photo["url"]).status_code == 404
+    driver_paperwork_delete = client.post(
+        f"/driver_logs/photos/{paperwork_photo_id}/delete",
+        data={"next": "/driver_logs"},
+        follow_redirects=False,
+    )
+    assert driver_paperwork_delete.status_code == 302
+    assert client.get(f"/driver_logs/photos/{paperwork_photo_id}").status_code == 404
     with app.app_context():
         assert DriverLogPhoto.query.count() == 0
 
@@ -3667,7 +3686,7 @@ def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_rev
     assert b"Scan Loaded / Departing Cargo" in depart_page.data
     assert b"Scan Arriving Cargo" not in depart_page.data
     assert b"Scan Picked-Up Cargo" not in depart_page.data
-    assert b"Add Picture To This Stop" in depart_page.data
+    assert b"Add Paperwork / Proof Photo" in depart_page.data
     assert b"Upload From Gallery" in depart_page.data
     assert b'data-stop-photo-input="departure_gallery"' in depart_page.data
     assert b"Upload Label Photo" not in depart_page.data

@@ -14,7 +14,7 @@
     card.innerHTML = '<a class="stop-photo-image-link" href="' + photo.url + '" target="_blank" rel="noopener">' +
       '<img src="' + photo.url + '" alt="Stop proof photo">' +
       '<span>' + escapeHtml(photo.source) + ' - ' + escapeHtml(photo.original_filename) + '</span>' +
-      (photo.note ? '<small>Reason: ' + escapeHtml(photo.note) + '</small>' : '') +
+      (photo.note ? '<small>' + escapeHtml(photo.note) + '</small>' : '') +
       '</a>' +
       '<form method="POST" action="' + photo.delete_url + '" onsubmit="return confirm(\'Delete this stop photo proof?\');">' +
       '<input type="hidden" name="next" value="' + escapeHtml(next) + '">' +
@@ -29,19 +29,20 @@
     const list = panel.querySelector('[data-stop-photo-list]');
     const noteInput = panel.querySelector('[data-stop-photo-note]');
 
+    function selectedType() {
+      const checked = panel.querySelector('[data-stop-photo-type]:checked');
+      return checked ? checked.value : 'bol_manifest';
+    }
+
     async function uploadFile(file, source) {
       if (!file) return;
       const note = noteInput ? noteInput.value.trim() : '';
-      if (!note) {
-        status.textContent = 'Add a short reason before choosing a photo.';
-        if (noteInput) noteInput.focus();
-        return;
-      }
+      const docType = selectedType();
       const formData = new FormData();
       formData.append('photo', file);
-      formData.append('source', source || 'gallery');
+      formData.append('source', docType + '_' + (source || 'gallery'));
       formData.append('note', note);
-      status.textContent = 'Uploading photo...';
+      status.textContent = 'Uploading paperwork photo...';
       const response = await fetch(uploadUrl, {
         method: 'POST',
         headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'},
@@ -51,16 +52,16 @@
       if (!response.ok) throw new Error(payload.error || 'Photo upload failed.');
       addPhotoCard(list, payload.photo);
       if (noteInput) noteInput.value = '';
-      status.textContent = 'Photo saved to this stop.';
+      status.textContent = 'Photo attached to this stop.';
       if (window.MoveDefenseToast && typeof window.MoveDefenseToast.success === 'function') {
-        window.MoveDefenseToast.success('PHOTO ATTACHED', 'Stop proof saved');
+        window.MoveDefenseToast.success('PHOTO ATTACHED', 'Paperwork / proof saved');
       }
-      const routeUpdated = { title: 'PHOTO ATTACHED', detail: 'Stop proof saved', silent: true };
+      const routeUpdated = { title: 'PHOTO ATTACHED', detail: 'Paperwork / proof saved', silent: true };
       document.dispatchEvent(new CustomEvent('movedefense:route-updated', { detail: routeUpdated }));
       try {
         if (window.parent && window.parent !== window && window.parent.document) {
           window.parent.document.dispatchEvent(new CustomEvent('movedefense:route-updated', {
-            detail: { title: 'PHOTO ATTACHED', detail: 'Stop proof saved' }
+            detail: { title: 'PHOTO ATTACHED', detail: 'Paperwork / proof saved' }
           }));
         }
       } catch (err) {}
@@ -68,12 +69,6 @@
 
     panel.querySelectorAll('[data-stop-photo-trigger]').forEach(function (button) {
       button.addEventListener('click', function () {
-        const note = noteInput ? noteInput.value.trim() : '';
-        if (!note) {
-          status.textContent = 'Add a short reason before choosing a photo.';
-          if (noteInput) noteInput.focus();
-          return;
-        }
         const source = button.dataset.source || 'gallery';
         const input = panel.querySelector('[data-stop-photo-input="' + source + '"]');
         if (input) input.click();

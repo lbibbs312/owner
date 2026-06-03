@@ -1221,14 +1221,30 @@ def _driver_log_photo_upload_path():
     return upload_path
 
 
+def _driver_log_photo_default_note(source):
+    source_text = (source or "").replace("_", " ").strip().lower()
+    if any(term in source_text for term in ("bol", "manifest", "shipper")):
+        return "BOL / manifest paperwork"
+    if "transfer" in source_text:
+        return "Transfer sheet paperwork"
+    if "route" in source_text and ("paperwork" in source_text or "document" in source_text):
+        return "Route paperwork"
+    if "paperwork" in source_text or "document" in source_text:
+        return "Paperwork photo"
+    if "damage" in source_text:
+        return "Damage photo"
+    if "seal" in source_text:
+        return "Seal photo"
+    return "Stop photo proof"
+
+
 def _save_driver_log_photo(log, uploaded_file, *, source="gallery", note=None, uploaded_by_id=None):
     if not uploaded_file or not getattr(uploaded_file, "filename", ""):
         raise ValueError("Choose a photo from your gallery or camera before saving proof.")
     original = secure_filename(uploaded_file.filename) or "stop-photo"
     name, ext = os.path.splitext(original)
-    note_text = (note or "").strip()
-    if not note_text:
-        raise ValueError("Add a short reason for this stop photo before uploading.")
+    source_text = (source or "gallery").strip() or "gallery"
+    note_text = (note or "").strip() or _driver_log_photo_default_note(source_text)
     filename = f"driver-log-{log.id}-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}-{uuid4().hex}{ext or '.jpg'}"
     uploaded_file.save(os.path.join(_driver_log_photo_upload_path(), filename))
     photo = DriverLogPhoto(
@@ -1236,7 +1252,7 @@ def _save_driver_log_photo(log, uploaded_file, *, source="gallery", note=None, u
         filename=filename,
         original_filename=original,
         content_type=getattr(uploaded_file, "mimetype", None) or getattr(uploaded_file, "content_type", None),
-        source=(source or "gallery")[:40],
+        source=source_text[:40],
         note=note_text[:500],
         uploaded_by_id=uploaded_by_id,
         uploaded_at=datetime.utcnow(),
@@ -3559,8 +3575,8 @@ def record_driver_log_photo(log_id):
         user_id=current_user.id,
         category="log_photo",
         action="created",
-        title="Stop photo proof uploaded",
-        details=f"{_plant_label(log.plant_name)} stop photo: {photo.original_filename or photo.filename}. Reason: {photo.note}",
+        title="Stop paperwork / proof photo uploaded",
+        details=f"{_plant_label(log.plant_name)} stop photo: {photo.original_filename or photo.filename}. Type/note: {photo.note}",
         target_type="driver_log_photo",
         target_id=photo.id,
         commit=False,
@@ -3568,7 +3584,7 @@ def record_driver_log_photo(log_id):
     db.session.commit()
     if _photo_upload_wants_json():
         return jsonify({"photo": _driver_log_photo_payload(photo)})
-    flash("Stop photo proof saved.", "success")
+    flash("Stop paperwork / proof photo saved.", "success")
     return redirect(request.form.get("next") or url_for("driver.edit_driver_log", log_id=log.id))
 
 

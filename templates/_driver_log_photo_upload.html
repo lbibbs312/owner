@@ -3,6 +3,10 @@
   .stop-photo-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:10px 0; }
   .stop-photo-actions button { border:1px solid rgba(255,178,36,.44); background:rgba(255,178,36,.16); color:#f6f8fb; border-radius:8px; padding:12px 10px; font-weight:900; font-size:.95rem; }
   .stop-photo-actions button.secondary { border-color:rgba(91,157,255,.36); background:rgba(47,109,240,.16); color:#f6f8fb; }
+  .stop-photo-type-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:8px; margin:8px 0 10px; }
+  .stop-photo-type-grid input { position:absolute; opacity:0; pointer-events:none; }
+  .stop-photo-type-grid label { min-height:38px; display:flex; align-items:center; justify-content:center; margin:0; border:1px solid rgba(91,157,255,.25); border-radius:8px; background:rgba(6,10,18,.46); color:#dbeafe; font-size:.72rem; font-weight:900; letter-spacing:.04em; text-transform:uppercase; cursor:pointer; }
+  .stop-photo-type-grid input:checked + label { border-color:rgba(255,178,36,.58); background:rgba(255,178,36,.16); color:#fff3d2; box-shadow:0 0 18px rgba(255,178,36,.12); }
   .stop-photo-status { margin-top:4px; color:#8a99b3; font-size:.82rem; font-weight:800; min-height:1.2em; }
   .stop-photo-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,260px)); gap:12px; margin-top:10px; }
   .stop-photo-card { display:block; border:1px solid rgba(91,157,255,.24); border-radius:8px; overflow:hidden; background:rgba(6,10,18,.64); color:#f6f8fb; }
@@ -17,10 +21,22 @@
 </style>
 {% set photo_source_prefix = photo_source_prefix|default('stop') %}
 <section class="stop-photo-panel" data-stop-photo-panel data-upload-url="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}">
-  <h3 class="h6 mb-1">Add Picture To This Stop</h3>
-  <p class="text-muted small mb-2">Upload a saved gallery photo or take a new picture for this route stop.</p>
-  <label class="form-label fw-bold mb-1" for="stopPhotoNote-{{ photo_source_prefix }}">Why are you adding this picture?</label>
-  <textarea class="form-control mb-2" id="stopPhotoNote-{{ photo_source_prefix }}" rows="2" maxlength="500" data-stop-photo-note placeholder="Example: dock damage, load proof, seal photo, paperwork, blocked unload"></textarea>
+  <h3 class="h6 mb-1">Add Paperwork / Proof Photo</h3>
+  <p class="text-muted small mb-2">Take a picture or upload an image of the BOL, manifest, transfer sheet, route sheet, or stop proof.</p>
+  <div class="stop-photo-type-grid" role="radiogroup" aria-label="Photo document type">
+    <input id="stopPhotoTypeBol-{{ photo_source_prefix }}" type="radio" name="stop_photo_type_{{ photo_source_prefix }}" value="bol_manifest" data-stop-photo-type checked>
+    <label for="stopPhotoTypeBol-{{ photo_source_prefix }}">BOL / Manifest</label>
+    <input id="stopPhotoTypeTransfer-{{ photo_source_prefix }}" type="radio" name="stop_photo_type_{{ photo_source_prefix }}" value="transfer_sheet" data-stop-photo-type>
+    <label for="stopPhotoTypeTransfer-{{ photo_source_prefix }}">Transfer Sheet</label>
+    <input id="stopPhotoTypeRoute-{{ photo_source_prefix }}" type="radio" name="stop_photo_type_{{ photo_source_prefix }}" value="route_packet" data-stop-photo-type>
+    <label for="stopPhotoTypeRoute-{{ photo_source_prefix }}">Route Sheet</label>
+    <input id="stopPhotoTypeProof-{{ photo_source_prefix }}" type="radio" name="stop_photo_type_{{ photo_source_prefix }}" value="proof_photo" data-stop-photo-type>
+    <label for="stopPhotoTypeProof-{{ photo_source_prefix }}">Stop Proof</label>
+    <input id="stopPhotoTypeOther-{{ photo_source_prefix }}" type="radio" name="stop_photo_type_{{ photo_source_prefix }}" value="other_document" data-stop-photo-type>
+    <label for="stopPhotoTypeOther-{{ photo_source_prefix }}">Other Doc</label>
+  </div>
+  <label class="form-label fw-bold mb-1" for="stopPhotoNote-{{ photo_source_prefix }}">Optional note</label>
+  <textarea class="form-control mb-2" id="stopPhotoNote-{{ photo_source_prefix }}" rows="2" maxlength="500" data-stop-photo-note placeholder="Only add detail if something needs manager attention."></textarea>
   <div class="stop-photo-actions">
     <button type="button" data-stop-photo-trigger data-source="{{ photo_source_prefix }}_gallery">Upload From Gallery</button>
     <button class="secondary" type="button" data-stop-photo-trigger data-source="{{ photo_source_prefix }}_camera">Take New Photo</button>
@@ -36,13 +52,13 @@
         {% if photo.file_available %}
           <a class="stop-photo-image-link" href="{{ photo_url }}" target="_blank" rel="noopener">
             <img src="{{ photo_url }}" alt="Stop proof photo {{ loop.index }}">
-            <span>Photo Proof - {{ photo.original_filename or photo.filename }}</span>
-            {% if photo.note %}<small>Reason: {{ photo.note }}</small>{% endif %}
+            <span>{{ photo.source|replace('_', ' ')|title }} - {{ photo.original_filename or photo.filename }}</span>
+            {% if photo.note %}<small>{{ photo.note }}</small>{% endif %}
           </a>
         {% else %}
           <div class="stop-photo-image-link stop-photo-missing">
             <span>Photo file missing - Photo Proof</span>
-            {% if photo.note %}<small>Reason: {{ photo.note }}</small>{% endif %}
+            {% if photo.note %}<small>{{ photo.note }}</small>{% endif %}
             <small>Photo record exists but the file could not render. Manager review required.</small>
           </div>
         {% endif %}
