@@ -524,6 +524,14 @@
         .board-only-shell main > .ops-console { display:none; }
 	    }
     @media (max-width: 760px) {
+      body:not(.flow-first-body) .mobile-shell {
+        width: min(100%, 560px);
+        max-width: none;
+      }
+      body:not(.flow-first-body) main {
+        padding-left: clamp(8px, 2.8vw, 14px);
+        padding-right: clamp(8px, 2.8vw, 14px);
+      }
       body.flow-first-body { background: var(--bg); }
       body.flow-first-body .mobile-shell {
         width: 100%;
@@ -1877,6 +1885,14 @@
         rgba(0,0,0,.8) 0 40px 90px -30px,
         rgba(91,157,255,.05) 0 0 0 1px inset;
     }
+    @media (max-width: 760px) {
+      .move-defense-mobile .ops-console {
+        margin:4px calc(-1 * clamp(2px, 1vw, 6px)) 0;
+      }
+      .move-defense-mobile .compact-route-map.md-flow-board {
+        border-radius:12px;
+      }
+    }
     .md-flow-head {
       display: flex;
       justify-content: space-between;
@@ -2764,6 +2780,48 @@
 		      font-size: .6rem;
 		    }
 			    .md-flow-ticker-track span + span { display: inline-flex; }
+    @media (max-width: 760px) {
+      .md-flow-head {
+        padding:12px 14px;
+      }
+      .md-flow-top-actions {
+        gap:13px;
+        padding:8px 10px;
+      }
+      .md-flow-action-tab {
+        min-height:32px;
+        padding:5px 1px;
+      }
+      .md-flow-action-tab strong {
+        font-size:.63rem;
+      }
+      .md-flow-action-tab span {
+        font-size:.53rem;
+        max-width:84px;
+      }
+      .md-flow-window {
+        padding:8px;
+        max-height:min(72vh, 720px);
+      }
+      .md-flow-row {
+        padding:11px 12px;
+      }
+      .md-flow-row + .md-flow-row {
+        margin-top:4px;
+      }
+      .flow-detail,
+      .flow-line {
+        font-size:.76rem;
+        line-height:1.24;
+      }
+      .flow-status {
+        padding:3px 8px;
+        font-size:.64rem;
+      }
+      .md-flow-ticker {
+        padding:11px 0;
+      }
+    }
 	    .route-detail-actions form {
 	      min-width: 0;
 	      margin: 0;
