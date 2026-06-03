@@ -5737,6 +5737,67 @@ def test_mobile_dashboard_defaults_to_today_when_today_is_empty(client, app):
     assert b"Raleigh East" not in fragment.data
 
 
+def test_mobile_dashboard_ignores_stale_open_pretrip_when_off_duty(client, app):
+    from datetime import date, datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("stale_pretrip_driver", "stale-pretrip@example.com", "driver", first_name="Stale", last_name="PreTrip")
+        today = date.today()
+        old_route_date = today - timedelta(days=2)
+        pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="ST2",
+            pretrip_date=old_route_date,
+            start_mileage=379164,
+        )
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add(
+            ShiftRecord(
+                user_id=driver.id,
+                pretrip_id=pretrip.id,
+                start_time=datetime.combine(old_route_date, datetime.min.time()).replace(hour=7),
+                end_time=datetime.combine(old_route_date, datetime.min.time()).replace(hour=17),
+            )
+        )
+        db.session.add_all(
+            [
+                DriverLog(
+                    driver_id=driver.id,
+                    date=old_route_date,
+                    plant_name="RE",
+                    load_size="Empty",
+                    arrive_time=f"{old_route_date.isoformat()} 07:30:00",
+                    depart_time="08:00",
+                ),
+                DriverLog(
+                    driver_id=driver.id,
+                    date=old_route_date,
+                    plant_name="PPL",
+                    load_size="Parts",
+                    depart_load_size="Empty",
+                    arrive_time=f"{old_route_date.isoformat()} 09:15:00",
+                    depart_time="09:45",
+                ),
+            ]
+        )
+        db.session.commit()
+
+    login(client, "stale_pretrip_driver")
+    page = client.get("/mobile")
+
+    assert page.status_code == 200
+    assert b"START DAY" in page.data
+    assert b"Today \xc2\xb7 0 stops" in page.data
+    assert b"No stops logged yet today. Start day by recording the first stop." in page.data
+    assert b"COMPLETE" not in page.data
+    assert b"Raleigh East" not in page.data
+    assert b"PPL" not in page.data
+
+
 def test_mobile_dashboard_selected_date_renders_route_replay(client, app):
     from datetime import date, datetime
 

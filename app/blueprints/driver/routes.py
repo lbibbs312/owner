@@ -471,6 +471,18 @@ def _latest_open_pretrip(driver_id):
     return next((pretrip for pretrip in pretrips if not pretrip.posttrip), None)
 
 
+def _is_stale_open_pretrip(pretrip, today_local_date=None, open_shift=None):
+    if not pretrip or getattr(pretrip, "posttrip", None):
+        return False
+    today_local_date = today_local_date or _today_local_date()
+    pretrip_date = getattr(pretrip, "pretrip_date", None)
+    if not pretrip_date or pretrip_date >= today_local_date:
+        return False
+    if open_shift and getattr(open_shift, "pretrip_id", None) == getattr(pretrip, "id", None):
+        return _is_stale_open_shift(open_shift, today_local_date)
+    return True
+
+
 def _active_route_date_for_driver(driver_id, today_local_date=None, open_shift=None):
     today_local_date = today_local_date or _today_local_date()
     open_shift = open_shift if open_shift is not None else _open_shift_for_driver(driver_id)
@@ -478,7 +490,11 @@ def _active_route_date_for_driver(driver_id, today_local_date=None, open_shift=N
     if shift_date and not _is_stale_open_shift(open_shift, today_local_date):
         return shift_date
     open_pretrip = _latest_open_pretrip(driver_id)
-    if open_pretrip and open_pretrip.pretrip_date:
+    if open_pretrip and open_pretrip.pretrip_date and not _is_stale_open_pretrip(
+        open_pretrip,
+        today_local_date,
+        open_shift=open_shift,
+    ):
         return open_pretrip.pretrip_date
     return today_local_date
 
