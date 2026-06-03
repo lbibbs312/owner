@@ -1771,8 +1771,27 @@ def _dispatch_messages(stops, moves):
 
 
 def _cta_pulse(route_context, stops, *, proof_missing=False, pending_posttrip=False):
-    """Return the one primary workflow CTA that should pulse."""
-    risk_first = sorted(
+    """Return the one primary workflow CTA that should pulse.
+
+    CAMERA pulses ONLY for a genuine proof issue on a stop (missing_proof /
+    unconfirmed_drop / damage) -- never as a blanket "departed today without a
+    transfer" nudge, and never as a catch-all for unmapped issues. ``proof_missing``
+    is accepted for call-site compatibility but no longer forces a camera pulse.
+    """
+    # Map issue codes to the concrete next action. Codes not listed here
+    # (hot, review_requested, audit_risk, route_deviation, ...) do NOT force a
+    # CTA pulse -- they fall through to the route-state defaults below.
+    issue_action = {
+        "missing_proof": "camera",
+        "unconfirmed_drop": "camera",
+        "damage": "camera",
+        "destination_mismatch": "transfer",
+        "count_short": "transfer",
+        "hold": "transfer",
+        "needs_departure": "depart",
+        "open_wait": "depart",
+    }
+    issues_by_severity = sorted(
         (
             (stop, issue_item)
             for stop in stops
@@ -1780,28 +1799,19 @@ def _cta_pulse(route_context, stops, *, proof_missing=False, pending_posttrip=Fa
         ),
         key=lambda item: 0 if item[1].get("severity") == "risk" else 1,
     )
-    if risk_first:
-        stop, issue_item = risk_first[0]
-        code = issue_item.get("code")
-        if code in {"missing_proof", "unconfirmed_drop", "damage"}:
-            key = "camera"
-        elif code in {"destination_mismatch", "count_short", "hold"}:
-            key = "transfer"
-        elif code == "needs_departure":
-            key = "depart"
-        else:
-            key = "camera"
+    for stop, issue_item in issues_by_severity:
+        key = issue_action.get(issue_item.get("code"))
+        if not key:
+            continue
         return {
             "key": key,
             "reason": issue_item.get("label") or issue_item.get("reason") or "Issue requires action",
             "severity": issue_item.get("severity") or "attention",
-            "issue_code": code,
+            "issue_code": issue_item.get("code"),
             "stop_id": stop.get("stop_id"),
         }
 
     current = getattr(route_context, "current_stop", None)
-    if proof_missing:
-        return {"key": "camera", "reason": "Route proof is missing", "severity": "risk"}
     if current is not None and not getattr(current, "depart_time", None):
         return {"key": "depart", "reason": "Active stop needs departure/load closeout", "severity": "attention", "stop_id": current.id}
     if pending_posttrip:
