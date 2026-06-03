@@ -171,21 +171,34 @@
     {% for stop in rm.stops|default([]) if rm %}
       {% set log = route_logs_by_id.get(stop.stop_id) %}
       {% set forecast = (stop_forecasts or {}).get(stop.stop_id) %}
+      {% set stop_transfer = namespace(item=none) %}
+      {% for transfer in route_transfers %}
+        {% set from_text = (transfer.ship_from or '')|lower %}
+        {% set to_text = (transfer.ship_to or '')|lower %}
+        {% set plant_text = (stop.plant_name or '')|lower %}
+        {% if not stop_transfer.item and (route_transfers|length == 1 or from_text in plant_text or to_text in plant_text or plant_text in from_text or plant_text in to_text) %}
+          {% set stop_transfer.item = transfer %}
+        {% endif %}
+      {% endfor %}
+      {% set transfer = stop_transfer.item %}
+      {% set transfer_line = transfer.lines|first if transfer and transfer.lines else none %}
+      {% set transfer_remark_parts = (transfer_line.remarks or '').split('LP IDs:', 1) if transfer_line else [] %}
+      {% set transfer_remarks = transfer_remark_parts[0].rstrip(' |') if transfer_line else '' %}
+      {% set transfer_lp_ids = transfer_remark_parts[1].strip() if transfer_line and transfer_remark_parts|length > 1 else '' %}
       <template data-desktop-detail-template="desktop-stop-{{ stop.stop_id }}" data-title="Stop {{ stop.sequence }} / {{ stop.plant_name }}" data-kicker="Stop Detail">
         <div class="desk-detail-stack">
-          <section class="desk-detail-section">
-            <div class="desk-section-title"><span>Stop Detail</span><strong>{{ stop.board_code or ('STP-' ~ stop.sequence) }}</strong></div>
+          <section class="desk-detail-section desk-stop-summary">
+            <div class="desk-section-title"><span>Stop Summary</span><strong>{{ stop.board_code or ('STP-' ~ stop.sequence) }}</strong></div>
             <div class="desk-fact-grid">
               {{ fact('Sequence', 'Stop ' ~ stop.sequence) }}
               {{ fact('Plant', stop.plant_name) }}
               {{ fact('Arrival', stop.arrival_at|display_time if stop.arrival_at else none, 'ARRIVAL REQUIRED') }}
               {{ fact('Departure', stop.departure_at|to_12h_format if stop.departure_at else none, 'DEPARTURE REQUIRED') }}
-              {{ fact('Wait time', stop.wait_label) }}
               {{ fact('Arrived with', stop.arrived_with, 'SOURCE NOT CAPTURED') }}
               {{ fact('Departed with', ('No Pickup' if stop.no_pickup else stop.departed_with), 'DESTINATION REQUIRED') }}
-              {{ fact('Proof count', stop.evidence.proof_count if stop.evidence and stop.evidence.proof_count is defined else (log.photos|length if log else 0)) }}
-              {{ fact('Route issue', stop.badge.label if stop.badge else stop.next_action) }}
+              {{ fact('Wait', stop.wait_label) }}
               {{ fact('Last action', stop.next_action) }}
+              {{ fact('Next action / route issue', stop.badge.label if stop.badge else stop.next_action) }}
             </div>
             {% if log and log.downtime_reason %}
               <div class="desk-warning-strip"><strong>Driver note</strong><span>{{ log.downtime_reason }}</span></div>
@@ -200,25 +213,74 @@
           </section>
 
           {% if forecast %}
-            <section class="desk-detail-section">
-              <div class="desk-section-title"><span>Timing Comparison</span><strong>{{ forecast.status }}</strong></div>
-              <div class="desk-compare-grid">
-                {{ fact('Current stop wait', forecast.elapsed_label) }}
-                {{ fact('Today average', forecast.today_average_label) }}
-                {{ fact('30-day average', forecast.history_average_label) }}
-                {{ fact('Ready estimate', forecast.ready_at_label or forecast.estimate_label) }}
-                <div class="desk-fact"><span>Delta</span><strong>{% if forecast.delay_minutes is not none %}{{ delta_value(forecast.delay_minutes, 'm', 'desk-delta') }}{% else %}{{ forecast.confidence }}{% endif %}</strong></div>
-              </div>
-            </section>
+            <div class="desk-timing-strip" aria-label="Compact timing comparison">
+              <div><span>Current wait</span><strong>{{ forecast.elapsed_label or stop.wait_label }}</strong></div>
+              <div><span>Plant avg</span><strong>{{ forecast.today_average_label if forecast.today_average_label and forecast.today_average_label != 'No baseline' else 'Collecting baseline' }}</strong></div>
+              <div><span>30-day avg</span><strong>{{ forecast.history_average_label if forecast.history_average_label and forecast.history_average_label != 'No baseline' else 'Collecting baseline' }}</strong></div>
+              <div><span>Delta</span><strong>{% if forecast.delay_minutes is not none %}{{ delta_value(forecast.delay_minutes, 'm', 'desk-delta') }}{% else %}Collecting baseline{% endif %}</strong></div>
+            </div>
           {% endif %}
 
-          <section class="desk-detail-section">
-            <div class="desk-section-title"><span>Evidence</span><strong>{{ log.photos|length if log else 0 }} proof photo{{ 's' if log and log.photos|length != 1 else '' }}</strong></div>
+          <section class="desk-detail-section desk-load-paperwork">
+            <div class="desk-section-title"><span>Load / Transfer Detail</span><strong>{{ transfer.transfer_number if transfer else 'Transfer sheet needed' }}</strong></div>
+            <div class="desk-fact-grid">
+              {{ fact('Part number / item number', (transfer_line.part_number if transfer_line else log.part_number if log else none), 'ITEM NUMBER REQUIRED') }}
+              {{ fact('Part description', transfer_remarks, 'DESCRIPTION NOT CAPTURED') }}
+              {{ fact('JO / load reference', (log.depart_load_size if log and log.depart_load_size else stop.departed_with), 'LOAD REFERENCE REQUIRED') }}
+              {{ fact('LP IDs', transfer_lp_ids, 'LP IDS REQUIRED') }}
+              {{ fact('Lot', none, 'LOT NOT CAPTURED') }}
+              {{ fact('Quantity', transfer_line.quantity if transfer_line else none, 'COUNT REQUIRED') }}
+              {{ fact('Rack / pallet / container count', transfer_line.skids if transfer_line else none, 'COUNT REQUIRED') }}
+              {{ fact('From site', transfer.ship_from if transfer else none, 'SOURCE NOT CAPTURED') }}
+              {{ fact('To site', transfer.ship_to if transfer else stop.plant_name, 'DESTINATION REQUIRED') }}
+              {{ fact('Expected destination', stop.departed_with, 'DESTINATION REQUIRED') }}
+              {{ fact('Actual destination', stop.plant_name, 'DROP LOCATION REQUIRED') }}
+              {{ fact('Movement status', stop.badge.label if stop.badge else stop.next_action) }}
+            </div>
+            {% if transfer %}
+              <div class="desk-transfer-matrix" aria-label="Transfer sheet fields">
+                {% for line in transfer.lines[:4] %}
+                  {% set line_remark_parts = (line.remarks or '').split('LP IDs:', 1) %}
+                  {% set line_clean_remarks = line_remark_parts[0].rstrip(' |') %}
+                  {% set line_lp_ids = line_remark_parts[1].strip() if line_remark_parts|length > 1 else '' %}
+                  <div class="desk-transfer-mini-row">
+                    <span>LINE {{ line.line_number }}</span>
+                    <strong>{{ line.part_number or 'ITEM NUMBER REQUIRED' }}</strong>
+                    <small>From {{ transfer.ship_from }} / To {{ transfer.ship_to }} / Location {{ line.side|upper }} / LP {{ line_lp_ids or 'LP REQUIRED' }} / Lot {{ line_clean_remarks or 'LOT NOT CAPTURED' }} / Qty {{ line.quantity or 'COUNT REQUIRED' }}</small>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="desk-warning-strip tone-warn"><strong>TRANSFER SHEET NEEDED</strong><span>No transfer sheet is matched to this stop. Attach the inter-site inventory transfer sheet to populate item, LP, lot, and quantity fields.</span></div>
+            {% endif %}
+          </section>
+
+          <section class="desk-detail-section desk-paperwork-section">
+            <div class="desk-section-title"><span>Paperwork / Evidence</span><strong>{{ log.photos|length if log else 0 }} proof photo{{ 's' if log and log.photos|length != 1 else '' }}</strong></div>
+            <div class="desk-doc-grid">
+              <div class="desk-doc-row tone-missing">
+                <span>BOL Summary</span>
+                <strong>BOL MISSING</strong>
+                <small>BOL number, ship date, customer, carrier, pieces / pallets / weight, references, stop 1, and stop 2 will appear after a BOL is attached.</small>
+              </div>
+              <div class="desk-doc-row {{ 'tone-attached' if transfer else 'tone-missing' }}">
+                <span>Transfer Sheet</span>
+                <strong>{{ transfer.transfer_number if transfer else 'MISSING' }}</strong>
+                <small>{% if transfer %}{{ transfer.ship_from }} to {{ transfer.ship_to }} / {{ transfer.lines|length }} line{{ 's' if transfer.lines|length != 1 else '' }} / uploaded by {{ transfer.driver_name or current_user.display_name }}{% if transfer.created_at %} at {{ transfer.created_at|to_detroit_datetime }}{% endif %}{% else %}Attach transfer sheet to verify part movement.{% endif %}</small>
+              </div>
+              <div class="desk-doc-row tone-attached">
+                <span>Route Sheet</span>
+                <strong>{{ desk.completed }}/{{ todays_logs|length }} stops</strong>
+                <small>{{ desk.proof_items }} proof item{{ 's' if desk.proof_items != 1 else '' }} / {{ desk.proof_gaps }} proof gap{{ 's' if desk.proof_gaps != 1 else '' }} / {{ desk.scans }} scan{{ 's' if desk.scans != 1 else '' }}</small>
+              </div>
+            </div>
             {% if log and log.photos %}
-              <div class="desk-evidence-list">
+              <div class="desk-preview-strip" aria-label="Attached proof previews">
                 {% for photo in log.photos %}
-                  <a class="desk-evidence-row" href="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" target="_blank" rel="noopener">
-                    <span>PROOF</span><strong>{{ photo.source|replace('_', ' ')|title }}</strong><small>{{ photo.uploaded_at|to_detroit_datetime }}{% if photo.note %} / {{ photo.note }}{% endif %}</small>
+                  <a class="desk-proof-thumb" href="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" target="_blank" rel="noopener">
+                    <img src="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" alt="Proof photo {{ loop.index }}">
+                    <span>{{ photo.source|replace('_', ' ')|title }}</span>
+                    <small>{{ photo.uploaded_at|to_detroit_datetime }}{% if photo.uploaded_by %} / {{ photo.uploaded_by.display_name }}{% endif %}</small>
                   </a>
                 {% endfor %}
               </div>
@@ -228,21 +290,40 @@
           </section>
 
           {% if log %}
-            <section class="desk-detail-section">
+            <section class="desk-detail-section desk-actions-panel">
               <div class="desk-section-title"><span>Actions</span><strong>Workspace actions</strong></div>
-              <div class="desk-action-grid">
-                {% if not log.depart_time %}<a class="desk-action-link primary" href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}">Record departure</a>{% endif %}
-                <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}" enctype="multipart/form-data">
-                  <input type="hidden" name="source" value="proof">
-                  <input type="hidden" name="next" value="{{ request.full_path }}">
-                  <label class="desk-action-link">Add proof<input type="file" name="photo" accept="image/*" capture="environment" onchange="if(this.files.length){this.form.submit();}"></label>
-                </form>
-                <a class="desk-action-link" href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}">Scan cargo</a>
-                <a class="desk-action-link" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Edit / add note</a>
-                <a class="desk-action-link" href="{{ url_for('driver.new_damage_report') }}">Add damage</a>
-                <a class="desk-action-link" href="{{ url_for('driver.new_plant_transfer') }}">Attach paperwork</a>
-                <form class="desk-action-form" method="POST" action="{{ url_for('driver.request_manager_review', log_id=log.id) }}"><button class="desk-action-link" type="submit">Manager review</button></form>
-                {% if not route_context.route_finalized %}<form class="desk-action-form danger" method="POST" action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" onsubmit="return confirm('Delete this driver log?');"><button class="desk-action-link danger" type="submit">Delete if allowed</button></form>{% endif %}
+              <div class="desk-action-groups">
+                <div class="desk-action-group">
+                  <h4>Evidence</h4>
+                  <div class="desk-action-grid">
+                    <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}" enctype="multipart/form-data">
+                      <input type="hidden" name="source" value="proof">
+                      <input type="hidden" name="next" value="{{ request.full_path }}">
+                      <label class="desk-action-link">Add proof<input type="file" name="photo" accept="image/*" capture="environment" onchange="if(this.files.length){this.form.submit();}"></label>
+                    </form>
+                    <a class="desk-action-link" href="{{ url_for('driver.new_plant_transfer') }}">Attach paperwork</a>
+                    <a class="desk-action-link" href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}">Scan cargo</a>
+                    <a class="desk-action-link" href="{{ url_for('driver.new_plant_transfer') }}">Attach BOL / transfer sheet</a>
+                    <a class="desk-action-link" href="{{ url_for('driver.new_damage_report') }}">Add damage photo</a>
+                  </div>
+                </div>
+                <div class="desk-action-group">
+                  <h4>Route</h4>
+                  <div class="desk-action-grid">
+                    {% if not log.depart_time %}<a class="desk-action-link primary" href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}">Record departure</a>{% endif %}
+                    <a class="desk-action-link" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Edit stop</a>
+                    <a class="desk-action-link" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Add note</a>
+                    <a class="desk-action-link" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Confirm delivered</a>
+                  </div>
+                </div>
+                <div class="desk-action-group">
+                  <h4>Review</h4>
+                  <div class="desk-action-grid">
+                    <form class="desk-action-form" method="POST" action="{{ url_for('driver.request_manager_review', log_id=log.id) }}"><button class="desk-action-link" type="submit">Manager review</button></form>
+                    <form class="desk-action-form" method="POST" action="{{ url_for('driver.request_manager_review', log_id=log.id) }}"><button class="desk-action-link" type="submit">Resolve issue</button></form>
+                    {% if not route_context.route_finalized %}<form class="desk-action-form danger" method="POST" action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" onsubmit="return confirm('Delete this driver log?');"><button class="desk-action-link danger" type="submit">Delete if allowed</button></form>{% endif %}
+                  </div>
+                </div>
               </div>
             </section>
           {% endif %}

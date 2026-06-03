@@ -5252,7 +5252,14 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
             transfer_time="07:44",
         )
         transfer.lines.append(
-            PlantTransferLine(line_number=1, side="left", part_number="PART-900", skids="10", quantity="1600")
+            PlantTransferLine(
+                line_number=1,
+                side="left",
+                part_number="PART-900",
+                skids="10",
+                quantity="1600",
+                remarks="Lot A19 | LP IDs: LP-778 LP-779",
+            )
         )
         db.session.add_all([pretrip, log, transfer])
         db.session.flush()
@@ -5288,6 +5295,16 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert b"TRX-DESK" in workspace
     assert b"Document Discipline" in workspace
     assert b"Sensitive previews" in workspace
+    assert b"Stop Summary" in workspace
+    assert b"Load / Transfer Detail" in workspace
+    assert b"Paperwork / Evidence" in workspace
+    assert b"BOL Summary" in workspace
+    assert b"Transfer Sheet" in workspace
+    assert b"LP-778 LP-779" in workspace
+    assert b"Evidence</h4>" in workspace
+    assert b"Route</h4>" in workspace
+    assert b"Review</h4>" in workspace
+    assert b"desk-timing-strip" in workspace
     assert b"Truck inspections" in workspace
     assert b"Fuel at start" in workspace
     assert b"3/4" in workspace
