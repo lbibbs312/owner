@@ -957,6 +957,38 @@ def test_unknown_route_pair_labels_are_explicit_not_fake(app):
     assert "Next stop" not in combined
 
 
+def test_unknown_route_pair_renders_single_line_fact(client, app):
+    with app.app_context():
+        driver = _user("driver_unknown_pair_render", "driver")
+        _driver_log(
+            driver,
+            plant_name="PC",
+            arrive_time="2026-05-28 08:00:00",
+            depart_time="08:15",
+            load_size="Empty",
+            depart_load_size="Mystery Load",
+        )
+        _driver_log(
+            driver,
+            plant_name="RE",
+            arrive_time="2026-05-28 09:00:00",
+            depart_time="09:20",
+            load_size="Mystery Load",
+            depart_load_size="Empty",
+        )
+
+    _login(client, "driver_unknown_pair_render")
+    body = client.get("/mobile").get_data(as_text=True)
+
+    assert "Paint Central &middot; Picked up <strong>Parts</strong>" in body
+    assert "Raleigh East &middot;" in body
+    assert '<span class="flow-route-pair">' not in body
+    assert "<em>Pickup</em><strong>Pickup source unknown</strong>" not in body
+    assert "<em>Deliver</em><strong>Destination needs confirmation</strong>" not in body
+    assert "<em>Pickup</em><strong>--</strong>" not in body
+    assert "<em>Deliver</em><strong>--</strong>" not in body
+
+
 def test_partial_drop_is_recorded_not_route_review(client, app):
     with app.app_context():
         driver = _user("driver_partial_drop", "driver")

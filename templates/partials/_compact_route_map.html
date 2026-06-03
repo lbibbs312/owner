@@ -99,14 +99,18 @@
 {% macro bold_cargo(value) -%}
   {%- if value and value != '--' -%}<strong>{{ value }}</strong>{%- else -%}{{ value or '--' }}{%- endif -%}
 {%- endmacro %}
+{# Home Live Board route-pair contract: render a pair only when both ends are real.
+   Missing source/destination data stays in the row fact or issue detail, not in a stretched
+   half-empty Pickup -> Deliver grid. #}
+{% set ROUTE_PAIR_UNKNOWNS = ['', '--', '—', 'Pickup source unknown', 'Destination needs confirmation', 'Earlier stop', 'Next stop'] %}
 {% macro flow_route_pair(pickup, deliver) -%}
-  {%- set pk = '' if (not pickup or pickup == 'Pickup source unknown') else pickup -%}
-  {%- set dv = '' if (not deliver or deliver == 'Destination needs confirmation') else deliver -%}
-  {%- if pk or dv -%}
+  {%- set pk = pickup if (pickup and pickup not in ROUTE_PAIR_UNKNOWNS) else '' -%}
+  {%- set dv = deliver if (deliver and deliver not in ROUTE_PAIR_UNKNOWNS) else '' -%}
+  {%- if pk and dv -%}
     <span class="flow-route-pair">
-      <span class="flow-route-end"><em>Pickup</em><strong>{{ pk or '—' }}</strong></span>
+      <span class="flow-route-end"><em>Pickup</em><strong>{{ pk }}</strong></span>
       <span class="flow-arrow flow-route-arrow" aria-hidden="true">→</span>
-      <span class="flow-route-end"><em>Deliver</em><strong>{{ dv or '—' }}</strong></span>
+      <span class="flow-route-end"><em>Deliver</em><strong>{{ dv }}</strong></span>
     </span>
   {%- endif -%}
 {%- endmacro %}
