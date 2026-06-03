@@ -30,6 +30,7 @@
   <p><strong>Truck / Tractor #:</strong> {{ pretrip.truck_number or '' }}</p>
   <p><strong>Truck Type:</strong> {{ pretrip.truck_type or 'N/A' }}</p>
   <p><strong>Mileage:</strong> {{ pretrip.start_mileage or '' }}</p>
+  <p><strong>Starting Fuel:</strong> {{ pretrip.start_fuel_level or 'Not recorded' }}</p>
   <p><strong>Shift:</strong> {{ pretrip.shift or 'N/A' }}</p>
 
   <p>
@@ -124,6 +125,7 @@
       <div class="border rounded p-3 mb-3">
         <h3 class="h6 text-uppercase text-muted">PostTrip</h3>
         <p class="mb-1"><strong>End Mileage:</strong> {{ pretrip.posttrip.end_mileage or '' }}</p>
+        <p class="mb-1"><strong>Ending Fuel:</strong> {{ pretrip.posttrip.end_fuel_level or 'Not recorded' }}</p>
         <p class="mb-1"><strong>Miles Driven:</strong> {{ pretrip.posttrip.miles_driven or '' }}</p>
         <p class="mb-0"><strong>Remarks:</strong> {{ pretrip.posttrip.remarks or 'None' }}</p>
       </div>

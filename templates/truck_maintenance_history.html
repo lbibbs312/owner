@@ -41,7 +41,7 @@
     <header class="top">
       <a class="back" href="{{ url_for('driver.mobile_dashboard') }}">Back</a>
       <h1>Truck Maintenance</h1>
-      <p class="sub">Truck {{ truck_number or 'not set' }} - previous completed PostTrips, fuel stops, and truck issues.</p>
+      <p class="sub">Truck {{ truck_number or 'not set' }} - previous completed PostTrips, fuel levels, fuel stops, and truck issues.</p>
     </header>
 
     <div class="list">
@@ -60,6 +60,8 @@
               <div class="fact"><span>Closed</span><strong>{{ item.closed_at|to_detroit_datetime if item.closed_at else 'PostTrip saved' }}</strong></div>
               <div class="fact"><span>End Mileage</span><strong>{% if item.end_mileage is not none %}{{ "{:,}".format(item.end_mileage) }} mi{% else %}--{% endif %}</strong></div>
               <div class="fact"><span>Miles Driven</span><strong>{% if item.miles_driven is not none %}{{ "{:,}".format(item.miles_driven) }}{% else %}Not calculated{% endif %}</strong></div>
+              <div class="fact"><span>Start Fuel</span><strong>{{ item.start_fuel_level or 'Not recorded' }}</strong></div>
+              <div class="fact"><span>End Fuel</span><strong>{{ item.end_fuel_level or 'Not recorded' }}</strong></div>
               <div class="fact"><span>Fuel Stops</span><strong>{{ item.fuel_count }}</strong></div>
             </div>
 

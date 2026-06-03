@@ -7,6 +7,7 @@
   <p class="text-muted">Ending your shift clock and finalizing daily mileage.</p>
   <div class="alert alert-secondary py-2">
     <strong>Start Mileage:</strong> <span id="startMileage">{{ pretrip.start_mileage or 0 }}</span>
+    <span class="ms-3"><strong>Start Fuel:</strong> {{ pretrip.start_fuel_level or 'Not recorded' }}</span>
     {% if fuel_logs %}
       {% for fl in fuel_logs %}
         <span class="ms-3"><strong>Fuel Stop:</strong> {{ "{:,}".format(fl.fuel_mileage) }}
@@ -24,6 +25,11 @@
       {{ form.end_mileage.label }}
       {{ form.end_mileage(class="form-control", id="endMileageInput") }}
       <div id="mileageHelp" class="form-text">Total miles calculates as end mileage minus start mileage.</div>
+    </div>
+    <div class="mb-3">
+      {{ form.end_fuel_level.label }}
+      {{ form.end_fuel_level(class="form-select") }}
+      <div class="form-text">This becomes the next driver's fallback starting fuel if their PreTrip does not capture it.</div>
     </div>
     <div class="mb-3">
       {{ form.remarks.label }}

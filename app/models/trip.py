@@ -20,6 +20,7 @@ class PreTrip(db.Model):
     pretrip_date = db.Column(db.Date, default=date.today)
     shift = db.Column(db.String(10))
     start_mileage = db.Column(db.Integer)
+    start_fuel_level = db.Column(db.String(20), nullable=True)
     # Additional fields for the PreTrip inspection
     truck_type = db.Column(db.String(20))
     oil_system_status = db.Column(db.String(20))
@@ -101,6 +102,7 @@ class PostTrip(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     pretrip_id = db.Column(db.Integer, db.ForeignKey("pretrip.id"), nullable=False)
     end_mileage = db.Column(db.Integer, nullable=True)
+    end_fuel_level = db.Column(db.String(20), nullable=True)
     remarks = db.Column(db.Text, nullable=True)
     miles_driven = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

@@ -244,6 +244,50 @@
       border-bottom:1px solid var(--md-line-soft);
       background:rgba(5,10,18,.35);
     }
+    .md-route-audit-grid {
+      display:grid;
+      grid-template-columns:repeat(5,minmax(0,1fr));
+      gap:10px;
+      padding:14px 18px;
+      border-bottom:1px solid var(--md-line-soft);
+      background:rgba(8,19,34,.28);
+    }
+    .md-route-audit-card {
+      min-width:0;
+      border:1px solid rgba(91,157,255,.2);
+      border-radius:11px;
+      background:rgba(12,21,33,.78);
+      padding:10px;
+    }
+    .md-route-audit-card span {
+      display:block;
+      color:var(--md-amber);
+      font-family:var(--md-mono);
+      font-size:.58rem;
+      font-weight:900;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+    }
+    .md-route-audit-card strong {
+      display:block;
+      margin-top:4px;
+      color:var(--md-text);
+      font-family:var(--md-display);
+      font-size:.92rem;
+      font-weight:900;
+      line-height:1.15;
+      overflow-wrap:anywhere;
+    }
+    .md-route-audit-card small {
+      display:block;
+      margin-top:4px;
+      color:var(--md-muted);
+      font-family:var(--md-mono);
+      font-size:.66rem;
+      font-weight:750;
+      line-height:1.25;
+      overflow-wrap:anywhere;
+    }
     .md-ledger-filter {
       display:grid;
       grid-template-columns:auto minmax(0,160px) max-content;
@@ -370,7 +414,7 @@
       list-style:none;
       cursor:pointer;
       display:grid;
-      grid-template-columns:minmax(0,1fr);
+      grid-template-columns:auto minmax(0,1fr);
       gap:10px;
       align-items:center;
       min-height:68px;
@@ -405,6 +449,29 @@
       overflow:hidden;
       text-overflow:ellipsis;
       white-space:nowrap;
+    }
+    .md-stop-sequence {
+      width:42px;
+      min-height:42px;
+      display:grid;
+      place-items:center;
+      border:1px solid rgba(255,178,36,.38);
+      border-radius:10px;
+      background:rgba(255,178,36,.1);
+      color:var(--md-amber);
+      font-family:var(--md-mono);
+      font-size:.66rem;
+      font-weight:950;
+      line-height:1.1;
+      text-align:center;
+      text-transform:uppercase;
+    }
+    .md-stop-sequence strong {
+      display:block;
+      color:var(--md-text);
+      font-family:var(--md-display);
+      font-size:1rem;
+      line-height:1;
     }
     .md-row-state {
       justify-self:end;
@@ -727,7 +794,9 @@
       .md-ledger-head-side { justify-items:start; }
       .md-ledger-filter { grid-template-columns:1fr; max-width:none; }
       .md-action-rail { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .md-route-audit-grid { grid-template-columns:repeat(2,minmax(0,1fr)); padding:12px 10px; }
       .md-ledger-summary { grid-template-columns:minmax(0,1fr); gap:8px; padding:11px 10px; }
+      .md-stop-sequence { width:100%; min-height:30px; display:flex; justify-content:flex-start; gap:6px; padding:6px 8px; }
       .md-row-grid { grid-template-columns:1fr; }
       .md-ledger-btn, .md-row-action, .md-row-action-form button { font-size:.68rem; }
     }
@@ -742,16 +811,45 @@
 	    {% set dispatch_ticker_text = route_map.dispatch_ticker_text if route_map is defined and route_map and route_map.dispatch_ticker_text is defined else 'NO ALERTS FROM DISPATCH' %}
 	    <div class="md-ledger-shell">
 	      <section class="md-ledger-board compact-route-map md-flow-board" data-route-map-shell data-route-map-mode="driver-ledger" aria-label="Driver log ledger">
-	        <div class="md-ledger-head md-flow-head">
-	          <div>
-	            <span class="md-ledger-kicker md-flow-kicker">{% if is_current_route %}<i class="md-ledger-live-dot"></i>{% endif %} DRIVER LOGS</span>
-	            <h2>AUDIT LEDGER</h2>
-	            <p class="md-ledger-subline md-flow-subline">{{ search_date.strftime('%m/%d/%Y') }} · {{ log_count }} stop{{ 's' if log_count != 1 else '' }}</p>
+        <div class="md-ledger-head md-flow-head">
+          <div>
+            <span class="md-ledger-kicker md-flow-kicker">{% if is_current_route %}<i class="md-ledger-live-dot"></i>{% endif %} DRIVER LOGS</span>
+            <h2>AUDIT LEDGER</h2>
+            <p class="md-ledger-subline md-flow-subline">{{ search_date.strftime('%m/%d/%Y') }} · {{ log_count }} stop{{ 's' if log_count != 1 else '' }}</p>
 	          </div>
 	          <div class="md-ledger-head-side">
 	            <span class="md-ledger-mode">{{ route_mode_label }}</span>
-	            {% if is_replay_route %}<span class="md-ledger-state">REPLAY MODE</span>{% endif %}
+            {% if is_replay_route %}<span class="md-ledger-state">REPLAY MODE</span>{% endif %}
             <time class="md-ledger-meta">{{ search_date.strftime('%b %d') }}</time>
+          </div>
+        </div>
+
+        {% set audit = route_audit_summary if route_audit_summary is defined and route_audit_summary else {} %}
+        <div class="md-route-audit-grid" aria-label="Route audit summary">
+          <div class="md-route-audit-card">
+            <span>Numbered Stops</span>
+            <strong>{{ log_count }} stop{{ 's' if log_count != 1 else '' }}</strong>
+            <small>Rows show route-order stop numbers.</small>
+          </div>
+          <div class="md-route-audit-card">
+            <span>Route Miles</span>
+            <strong>{% if audit.total_miles is not none %}{{ "{:,}".format(audit.total_miles) }} mi{% elif logs %}Pending PostTrip{% else %}Not recorded{% endif %}</strong>
+            <small>{% if audit.start_mileage is not none %}Start {{ "{:,}".format(audit.start_mileage) }}{% endif %}{% if audit.end_mileage is not none %}{% if audit.start_mileage is not none %} → {% endif %}End {{ "{:,}".format(audit.end_mileage) }}{% endif %}{% if audit.pretrip_count %}{% if audit.start_mileage is not none or audit.end_mileage is not none %} · {% endif %}{{ audit.pretrip_count }} DVIR{% endif %}</small>
+          </div>
+          <div class="md-route-audit-card">
+            <span>Truck / Trailer</span>
+            <strong>{% if audit.truck_number or audit.trailer_number %}{{ audit.truck_number or 'Truck not set' }}{% if audit.trailer_number %} / {{ audit.trailer_number }}{% endif %}{% else %}Not recorded{% endif %}</strong>
+            <small>From route PreTrip.</small>
+          </div>
+          <div class="md-route-audit-card">
+            <span>Start Fuel</span>
+            <strong>{{ audit.start_fuel_level or 'Not recorded' }}</strong>
+            <small>{{ audit.start_fuel_source or 'Capture on PreTrip or previous truck PostTrip.' }}</small>
+          </div>
+          <div class="md-route-audit-card">
+            <span>Fuel Stops</span>
+            <strong>{% if audit.fuel_events %}{{ audit.fuel_events|length }} recorded{% else %}None recorded{% endif %}</strong>
+            <small>{% if audit.fuel_events %}{% for fuel in audit.fuel_events %}{% if not loop.first %}; {% endif %}{% if fuel.sequence %}Stop {{ fuel.sequence }} · {% endif %}{{ fuel.plant }}{% if fuel.mileage is not none %} @ {{ "{:,}".format(fuel.mileage) }} mi{% endif %}{% endfor %}{% elif audit.end_fuel_level %}End fuel {{ audit.end_fuel_level }}{% else %}No fuel mileage saved for this route.{% endif %}</small>
           </div>
         </div>
 
@@ -867,6 +965,7 @@
           {% set ledger_meta = stop_vm.ledger_meta if stop_vm and stop_vm.ledger_meta else (arrive_label ~ ' → ' ~ depart_label) %}
           {% set ledger_meta_lower = (ledger_meta or '')|lower %}
           {% set first_issue = stop_vm.issues[0] if stop_vm and stop_vm.issues else none %}
+          {% set stop_sequence = stop_vm.sequence if stop_vm and stop_vm.sequence else loop.revindex %}
           {% set route_line = '' %}
           {% if stop_vm and stop_vm.board_flow %}
             {% set flow = stop_vm.board_flow %}
@@ -883,21 +982,24 @@
           {% endif %}
           <details class="md-ledger-row md-flow-row tone-{{ row_tone }} {% if not log.depart_time %}is-open{% endif %} {% if route and route.warnings %}has-warning{% endif %} {% if row_has_risk %}has-risk{% endif %}" data-flow-row {% if not log.depart_time %}open{% endif %}>
             <summary class="md-ledger-summary">
+              <span class="md-stop-sequence">Stop <strong>{{ stop_sequence }}</strong></span>
               <span class="md-row-detail flow-detail">
                 <strong>{{ ledger_title }}</strong>
-                <small>{{ ledger_meta }}{% if wait_value and 'wait' not in ledger_meta_lower %} · Wait {{ wait_value }}{% endif %}</small>
+                <small>Stop {{ stop_sequence }} · {{ ledger_meta }}{% if wait_value and 'wait' not in ledger_meta_lower %} · Wait {{ wait_value }}{% endif %}</small>
               </span>
             </summary>
 
             <div class="md-row-panel">
               <div class="md-row-grid">
                 <div class="md-row-fact"><span>Driver</span><strong>{{ log.driver.display_name }}{% if log.driver.employee_id %} · ID {{ log.driver.employee_id }}{% endif %}{% if log.driver.department %} · {{ log.driver.department }}{% endif %}</strong></div>
+                <div class="md-row-fact"><span>Stop #</span><strong>{{ stop_sequence }} of {{ log_count }}</strong></div>
                 <div class="md-row-fact"><span>Route</span><strong>{{ route_line or 'Route not confirmed' }}</strong></div>
                 <div class="md-row-fact"><span>Move</span><strong>{% if first_issue and first_issue.code != 'needs_departure' %}{{ first_issue.label }} · {{ first_issue.reason }}{% elif not log.depart_time %}Open stop · record departure/load before continuing route{% elif stop_vm and stop_vm.movement_summary %}{{ stop_vm.movement_summary }}{% elif route %}{{ route.action }} · {{ route.state }}{% else %}Logged stop{% endif %}{% if route and route.next_stop %} · Following {{ route.next_stop }}{% endif %}</strong></div>
                 <div class="md-row-fact"><span>Arrive</span><strong>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</strong></div>
                 <div class="md-row-fact"><span>Depart</span><strong>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</strong></div>
                 <div class="md-row-fact"><span>In</span><strong>{{ arrive_label }}</strong></div>
                 <div class="md-row-fact"><span>Out</span><strong>{{ depart_label }}</strong></div>
+                <div class="md-row-fact"><span>Fuel / Odometer</span><strong>{% if log.fuel %}Fuel stop{% if log.fuel_mileage %} · {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}{% elif log.fuel_mileage %}{{ "{:,}".format(log.fuel_mileage) }} mi{% else %}No fuel logged{% endif %}</strong></div>
               </div>
 
               {% if log.plant_name in PLANT_ADDRESSES %}

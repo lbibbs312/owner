@@ -2248,6 +2248,7 @@ def test_pretrip_create_and_print_route(client, app):
             "pretrip_date": "2026-05-12",
             "shift": "1st",
             "start_mileage": "1000",
+            "start_fuel_level": "3/4",
             "truck_type": "Box Truck",
             "oil_system_status": "good",
             "tires_status": "good",
@@ -2264,6 +2265,7 @@ def test_pretrip_create_and_print_route(client, app):
 
         pretrip = PreTrip.query.filter_by(truck_number="BT-1").one()
         assert pretrip.truck_type == "Box Truck"
+        assert pretrip.start_fuel_level == "3/4"
         pretrip_id = pretrip.id
         shift = ShiftRecord.query.filter_by(pretrip_id=pretrip_id, end_time=None).one()
         assert shift.user_id == pretrip.user_id
@@ -2288,6 +2290,7 @@ def test_pretrip_create_and_print_route(client, app):
             "pretrip_date": "2026-05-12",
             "shift": "2nd",
             "start_mileage": "1005",
+            "start_fuel_level": "1/2",
             "truck_type": "Semi",
             "oil_system_status": "good",
             "tires_status": "good",
@@ -2308,6 +2311,7 @@ def test_pretrip_create_and_print_route(client, app):
         pretrip = PreTrip.query.get(pretrip_id)
         assert pretrip.truck_number == "BT-9"
         assert pretrip.shift == "2nd"
+        assert pretrip.start_fuel_level == "1/2"
         assert pretrip.gc_no_defects is True
         assert pretrip.towed_no_defects is True
         assert pretrip.damage_report == "updated ok"
@@ -2326,7 +2330,7 @@ def test_pretrip_create_and_print_route(client, app):
 
     posttrip = client.post(
         f"/do_posttrip/{pretrip_id}",
-        data={"end_mileage": "1125", "remarks": "ok"},
+        data={"end_mileage": "1125", "end_fuel_level": "1/4", "remarks": "ok"},
         follow_redirects=False,
     )
     assert posttrip.status_code == 302
@@ -2336,11 +2340,15 @@ def test_pretrip_create_and_print_route(client, app):
 
         saved_posttrip = PostTrip.query.filter_by(pretrip_id=pretrip_id).one()
         assert saved_posttrip.end_mileage == 1125
+        assert saved_posttrip.end_fuel_level == "1/4"
         assert saved_posttrip.miles_driven == 120
 
     printable = client.get(f"/pretrip_printable/{pretrip_id}")
     assert printable.status_code == 200
     assert b"Daily Vehicle Inspection Report" in printable.data
+    assert b"Fuel Level" in printable.data
+    assert b"Start 1/2" in printable.data
+    assert b"End 1/4" in printable.data
     assert b"Edit PreTrip Before Printing" in printable.data
     assert b"Document No:" in printable.data
     assert b"Generated:" in printable.data
@@ -4399,15 +4407,47 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
 
 
 def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, app):
-    from datetime import date
+    from datetime import date, datetime
 
     selected_date = date(2026, 5, 20)
     with app.app_context():
         from app.extensions import db
-        from app.models import DriverLog
+        from app.models import DriverLog, PostTrip, PreTrip
 
         driver = create_user("dated_print_driver", "dated-print@example.com", "driver")
-        db.session.add(
+        prior_driver = create_user("prior_truck_driver", "prior-truck@example.com", "driver")
+        prior_pretrip = PreTrip(
+            user_id=prior_driver.id,
+            truck_number="BT-1",
+            pretrip_date=selected_date,
+            start_mileage=900,
+            start_fuel_level="Full",
+            created_at=datetime(2026, 5, 20, 6, 0, 0),
+        )
+        current_pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="BT-1",
+            pretrip_date=selected_date,
+            start_mileage=1000,
+            created_at=datetime(2026, 5, 20, 14, 0, 0),
+        )
+        db.session.add_all([prior_pretrip, current_pretrip])
+        db.session.flush()
+        db.session.add_all([
+            PostTrip(
+                pretrip_id=prior_pretrip.id,
+                end_mileage=980,
+                end_fuel_level="1/4",
+                miles_driven=80,
+                created_at=datetime(2026, 5, 20, 13, 0, 0),
+            ),
+            PostTrip(
+                pretrip_id=current_pretrip.id,
+                end_mileage=1120,
+                end_fuel_level="3/4",
+                miles_driven=120,
+                created_at=datetime(2026, 5, 20, 22, 0, 0),
+            ),
             DriverLog(
                 driver_id=driver.id,
                 date=selected_date,
@@ -4417,8 +4457,10 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
                 no_pickup=True,
                 arrive_time="2026-05-20 21:12:00",
                 depart_time="22:00",
-            )
-        )
+                fuel=True,
+                fuel_mileage=1045,
+            ),
+        ])
         db.session.commit()
 
     login(client, "dated_print_driver")
@@ -4436,6 +4478,18 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b'<span class="md-row-state">' not in logs_page.data
     assert b"md-row-status flow-status empty status-empty" not in logs_page.data
     assert b"<span>Route</span>" in logs_page.data
+    assert b"Numbered Stops" in logs_page.data
+    assert b"Route Miles" in logs_page.data
+    assert b"120 mi" in logs_page.data
+    assert b"Start 1,000" in logs_page.data
+    assert b"End 1,120" in logs_page.data
+    assert b"Start Fuel" in logs_page.data
+    assert b"1/4" in logs_page.data
+    assert b"Previous PostTrip truck BT-1" in logs_page.data
+    assert b"Fuel Stops" in logs_page.data
+    assert b"1,045 mi" in logs_page.data
+    assert b"Stop <strong>1</strong>" in logs_page.data
+    assert b"Stop #</span><strong>1 of 1" in logs_page.data
     assert b"md-ledger-ticker md-flow-ticker" in logs_page.data
     assert b'content:"["' not in logs_page.data
     assert b"content:'['" not in logs_page.data
@@ -6009,6 +6063,7 @@ def test_mobile_dashboard_shows_truck_maintenance_history_from_previous_posttrip
             truck_number="ST4",
             pretrip_date=prior_date,
             start_mileage=12000,
+            start_fuel_level="Full",
         )
         other_pretrip = PreTrip(
             user_id=other_driver.id,
@@ -6023,6 +6078,7 @@ def test_mobile_dashboard_shows_truck_maintenance_history_from_previous_posttrip
                 PostTrip(
                     pretrip_id=prior_pretrip.id,
                     end_mileage=12160,
+                    end_fuel_level="1/4",
                     miles_driven=160,
                     remarks="Regen completed and cleared.",
                     created_at=datetime(2026, 5, 17, 21, 30, 0),
@@ -6075,6 +6131,8 @@ def test_mobile_dashboard_shows_truck_maintenance_history_from_previous_posttrip
     assert b"Truck ST4" in dashboard.data
     assert b"Prior Driver" in dashboard.data
     assert b"Truck regen: forced regen completed" in dashboard.data
+    assert b"Start Full" in dashboard.data
+    assert b"End 1/4" in dashboard.data
     assert b"12,080 mi" in dashboard.data
     assert b"12,050 mi" in dashboard.data
     assert b"Closed on PostTrip" in dashboard.data
@@ -6086,6 +6144,10 @@ def test_mobile_dashboard_shows_truck_maintenance_history_from_previous_posttrip
     assert b"Issues Opened / Closed" in detail.data
     assert b"Regen" in detail.data
     assert b"Fuel Stops" in detail.data
+    assert b"Start Fuel" in detail.data
+    assert b"Full" in detail.data
+    assert b"End Fuel" in detail.data
+    assert b"1/4" in detail.data
     assert b"Regen completed and cleared." in detail.data
     assert b"Other truck issue should not show" not in detail.data
 

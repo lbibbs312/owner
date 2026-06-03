@@ -515,6 +515,7 @@
                           <td><strong>{% if item.end_mileage is not none %}{{ "{:,}".format(item.end_mileage) }} mi{% else %}--{% endif %}</strong><span>{% if item.miles_driven is not none %}{{ "{:,}".format(item.miles_driven) }} driven{% elif item.start_mileage is not none %}Start {{ "{:,}".format(item.start_mileage) }}{% else %}Miles not calculated{% endif %}</span></td>
                           <td>
                             <div class="maintenance-list">
+                              <span><strong>Start {{ item.start_fuel_level or 'not recorded' }}</strong>End {{ item.end_fuel_level or 'not recorded' }}</span>
                               {% for fuel in item.fuel_logs[:2] %}
                                 <span><strong>{{ "{:,}".format(fuel.mileage) }} mi</strong>{{ fuel.time_label }} at {{ fuel.plant }}</span>
                               {% else %}

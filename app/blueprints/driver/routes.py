@@ -1387,6 +1387,110 @@ def _total_miles_for_pretrips(pretrips):
         has_mileage = True
     return total if has_mileage else None
 
+
+def _route_pretrip_sort_key(pretrip):
+    return (
+        pretrip.pretrip_date or date.min,
+        pretrip.created_at or datetime.min,
+        pretrip.id or 0,
+    )
+
+
+def _previous_posttrip_fuel_level(driver_id, before_date, truck_number=None, before_pretrip=None):
+    query = (
+        _active_pretrips_query()
+        .join(PostTrip, PostTrip.pretrip_id == PreTrip.id)
+    )
+    truck_number = _normalize_truck_number(truck_number)
+    if truck_number:
+        query = query.filter(func.lower(func.trim(PreTrip.truck_number)) == truck_number.lower())
+    else:
+        query = query.filter(PreTrip.user_id == driver_id)
+    if before_pretrip is not None:
+        query = query.filter(PreTrip.id != before_pretrip.id)
+        if before_pretrip.created_at:
+            query = query.filter(PostTrip.created_at < before_pretrip.created_at)
+        else:
+            query = query.filter(PreTrip.pretrip_date <= before_date)
+    else:
+        query = query.filter(PreTrip.pretrip_date < before_date)
+
+    previous_pretrips = (
+        query.order_by(PostTrip.created_at.desc(), PreTrip.pretrip_date.desc(), PreTrip.id.desc())
+        .limit(20)
+        .all()
+    )
+    for previous_pretrip in previous_pretrips:
+        previous_posttrip = previous_pretrip.posttrip
+        previous_fuel = (getattr(previous_posttrip, "end_fuel_level", None) or "").strip() if previous_posttrip else ""
+        if previous_fuel:
+            return previous_fuel, previous_pretrip
+    return "", None
+
+
+def _driver_route_audit_summary(driver_id, route_date, logs, route_map_ctx=None, pretrips=None):
+    pretrips = list(pretrips) if pretrips is not None else (
+        _active_pretrips_query()
+        .filter_by(user_id=driver_id, pretrip_date=route_date)
+        .order_by(PreTrip.created_at.asc(), PreTrip.id.asc())
+        .all()
+    )
+    pretrips = sorted(pretrips, key=_route_pretrip_sort_key)
+    route_stops_by_id = {
+        stop.get("stop_id"): stop
+        for stop in ((route_map_ctx or {}).get("stops") or [])
+        if stop.get("stop_id")
+    }
+    first_pretrip = pretrips[0] if pretrips else None
+    last_pretrip = pretrips[-1] if pretrips else None
+    last_posttrip = next((pretrip.posttrip for pretrip in reversed(pretrips) if pretrip.posttrip), None)
+    start_mileage = first_pretrip.start_mileage if first_pretrip else None
+    end_mileage = last_posttrip.end_mileage if last_posttrip else None
+    start_fuel_level = (getattr(last_pretrip, "start_fuel_level", None) or "").strip() if last_pretrip else ""
+    start_fuel_source = "PreTrip" if start_fuel_level else ""
+    if not start_fuel_level:
+        start_fuel_level, previous_fuel_pretrip = _previous_posttrip_fuel_level(
+            driver_id,
+            route_date,
+            truck_number=getattr(last_pretrip, "truck_number", None) if last_pretrip else None,
+            before_pretrip=last_pretrip,
+        )
+        if previous_fuel_pretrip:
+            start_fuel_source = (
+                f"Previous PostTrip truck {previous_fuel_pretrip.truck_number}"
+                if getattr(previous_fuel_pretrip, "truck_number", None)
+                else "Previous PostTrip"
+            )
+    fuel_events = []
+    for log in sorted([item for item in logs if item.fuel], key=_driver_log_sort_key):
+        stop_vm = route_stops_by_id.get(log.id) or {}
+        delta = None
+        if log.fuel_mileage is not None and start_mileage is not None:
+            delta = log.fuel_mileage - start_mileage
+        fuel_events.append(
+            {
+                "sequence": stop_vm.get("sequence"),
+                "plant": stop_vm.get("plant_name") or log.plant_name,
+                "mileage": log.fuel_mileage,
+                "delta_from_start": delta,
+            }
+        )
+    return {
+        "pretrip_count": len(pretrips),
+        "route_pretrip": last_pretrip,
+        "truck_number": last_pretrip.truck_number if last_pretrip else "",
+        "trailer_number": last_pretrip.trailer_number if last_pretrip else "",
+        "start_mileage": start_mileage,
+        "end_mileage": end_mileage,
+        "total_miles": _total_miles_for_pretrips(pretrips),
+        "posttrip_complete": bool(last_posttrip),
+        "start_fuel_level": start_fuel_level,
+        "start_fuel_source": start_fuel_source,
+        "end_fuel_level": (getattr(last_posttrip, "end_fuel_level", None) or "").strip() if last_posttrip else "",
+        "fuel_events": fuel_events,
+    }
+
+
 def _yes_no(value):
     return "Yes" if value else "No"
 
@@ -1731,6 +1835,8 @@ def _truck_maintenance_history(truck_number, *, current_pretrip_id=None, limit=8
                 "end_mileage": posttrip.end_mileage if posttrip else None,
                 "miles_driven": posttrip.miles_driven if posttrip else None,
                 "remarks": (posttrip.remarks or "").strip() if posttrip else "",
+                "start_fuel_level": pretrip.start_fuel_level or "",
+                "end_fuel_level": posttrip.end_fuel_level if posttrip else "",
                 "fuel_logs": fuel_logs,
                 "fuel_count": len(fuel_logs),
                 "issues": issues,
@@ -1817,6 +1923,11 @@ def _build_pretrip_pdf(pretrip):
         total = pretrip.posttrip.end_mileage - (pretrip.start_mileage or 0)
         mileage = f"{pretrip.start_mileage or 0} - {pretrip.posttrip.end_mileage} (Total {total})"
     pdf.text(360, y, f"Mileage: {mileage}", size=10)
+    y -= 18
+    fuel_level = f"Start: {pretrip.start_fuel_level or 'Not recorded'}"
+    if pretrip.posttrip:
+        fuel_level = f"{fuel_level} / End: {pretrip.posttrip.end_fuel_level or 'Not recorded'}"
+    pdf.text(36, y, f"Fuel Level: {fuel_level}", size=10)
     y -= 25
     pdf.text(36, y, "2. Power Unit Inspection / 3. In-Cab Inspection / 4. Engine Compartment / 5. Exterior", size=9, bold=True)
     y -= 12
@@ -2136,6 +2247,10 @@ def list_pretrips():
 @login_required
 def new_pretrip():
     form = PreTripForm()
+    if request.method == "GET":
+        previous_fuel, _ = _previous_posttrip_fuel_level(current_user.id, date.today())
+        if previous_fuel and not form.start_fuel_level.data:
+            form.start_fuel_level.data = previous_fuel
     if form.validate_on_submit():
         chosen_date = form.pretrip_date.data or date.today()
 
@@ -2146,6 +2261,7 @@ def new_pretrip():
             pretrip_date=chosen_date,
             shift=form.shift.data,
             start_mileage=form.start_mileage.data,
+            start_fuel_level=form.start_fuel_level.data,
             truck_type=form.truck_type.data,
             oil_system_status=form.oil_system_status.data,
             tires_ok=form.tires_ok.data,
@@ -2270,7 +2386,12 @@ def do_posttrip(pretrip_id):
         .all()
     )
 
-    form = PostTripForm()
+    posttrip = (
+        PostTrip.query.filter_by(pretrip_id=pretrip_id)
+        .order_by(PostTrip.created_at.asc(), PostTrip.id.asc())
+        .first()
+    )
+    form = PostTripForm(obj=posttrip)
     if form.validate_on_submit():
         end_mileage_val = form.end_mileage.data
         if pt.start_mileage is not None and end_mileage_val < pt.start_mileage:
@@ -2281,15 +2402,11 @@ def do_posttrip(pretrip_id):
         else:
             miles_val = None
 
-        posttrip = (
-            PostTrip.query.filter_by(pretrip_id=pretrip_id)
-            .order_by(PostTrip.created_at.asc(), PostTrip.id.asc())
-            .first()
-        )
         if posttrip is None:
             posttrip = PostTrip(pretrip_id=pretrip_id)
             db.session.add(posttrip)
         posttrip.end_mileage = end_mileage_val
+        posttrip.end_fuel_level = form.end_fuel_level.data
         posttrip.remarks = form.remarks.data
         posttrip.miles_driven = miles_val
 
@@ -2347,6 +2464,7 @@ def edit_pretrip_entry(pretrip_id):
         pt.truck_number = form.truck_number.data
         pt.trailer_number = form.trailer_number.data
         pt.start_mileage = form.start_mileage.data
+        pt.start_fuel_level = form.start_fuel_level.data
         pt.oil_system_status = form.oil_system_status.data
         pt.tires_ok = form.tires_ok.data
         pt.tires_status = form.tires_status.data
@@ -2789,13 +2907,31 @@ def driver_logs():
             .order_by(DriverLog.created_at.desc())
             .all()
         )
-        route_map_ctx = build_driver_route_map_context(driver=current_user, date=search_date)
+        pretrips = (
+            _active_pretrips_query()
+            .filter_by(user_id=current_user.id, pretrip_date=search_date)
+            .order_by(PreTrip.created_at.asc(), PreTrip.id.asc())
+            .all()
+        )
+        route_pretrip = sorted(pretrips, key=_route_pretrip_sort_key)[-1] if pretrips else None
+        route_map_ctx = build_driver_route_map_context(
+            driver=current_user,
+            date=search_date,
+            route_pretrip=route_pretrip,
+        )
         return render_template(
             "driver_logs.html",
             logs=logs,
             log_routes=_driver_log_route_context(logs),
             route_map=route_map_ctx,
             route_map_stops_by_id={stop["stop_id"]: stop for stop in route_map_ctx.get("stops", [])},
+            route_audit_summary=_driver_route_audit_summary(
+                current_user.id,
+                search_date,
+                logs,
+                route_map_ctx=route_map_ctx,
+                pretrips=pretrips,
+            ),
             route_task_events=_task_route_events_for_logs(logs),
             search_date=search_date,
             today_local_date=_today_local_date(),

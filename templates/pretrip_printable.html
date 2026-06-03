@@ -271,6 +271,13 @@
     {% endif %}
     <br>
 
+    <strong>Fuel Level:</strong>
+    Start {{ pretrip.start_fuel_level or "Not recorded" }}
+    {% if pretrip.posttrip %}
+      / End {{ pretrip.posttrip.end_fuel_level or "Not recorded" }}
+    {% endif %}
+    <br>
+
     <!-- Safely show date if it exists, calling strftime -->
     <strong>Date:</strong>
     {% if pretrip.pretrip_date %}

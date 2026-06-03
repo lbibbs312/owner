@@ -18,6 +18,16 @@ from wtforms import (
 from wtforms.validators import DataRequired
 
 
+FUEL_LEVEL_CHOICES = [
+    ("", "Select fuel level..."),
+    ("Full", "Full"),
+    ("3/4", "3/4"),
+    ("1/2", "1/2"),
+    ("1/4", "1/4"),
+    ("Empty", "Empty"),
+]
+
+
 class PreTripForm(FlaskForm):
     # Basic info
     truck_number = StringField("Truck / Tractor #", validators=[DataRequired()])
@@ -25,6 +35,7 @@ class PreTripForm(FlaskForm):
     pretrip_date = DateField("PreTrip Date", format="%Y-%m-%d")
     shift = SelectField("Shift", choices=[("1st", "1st"), ("2nd", "2nd"), ("3rd", "3rd")])
     start_mileage = IntegerField("Start Mileage")
+    start_fuel_level = SelectField("Starting Fuel Level", choices=FUEL_LEVEL_CHOICES, default="")
     # Additional info
     truck_type = SelectField(
         "Truck Type",
@@ -107,5 +118,6 @@ class PreTripForm(FlaskForm):
 
 class PostTripForm(FlaskForm):
     end_mileage = IntegerField("End Mileage", validators=[DataRequired()])
+    end_fuel_level = SelectField("Ending Fuel Level", choices=FUEL_LEVEL_CHOICES, default="")
     remarks = TextAreaField("PostTrip Remarks")
     submit = SubmitField("Complete PostTrip")
