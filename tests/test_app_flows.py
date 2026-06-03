@@ -6561,6 +6561,11 @@ def test_driver_inspections_page_is_scoped_to_current_truck(client, app):
     assert page.status_code == 200
     assert b"Truck Inspections" in page.data
     assert b"Truck ST4" in page.data
+    assert b"Inspection Sections" in page.data
+    assert b"PreTrips / PostTrips" in page.data
+    assert b"Fuel / Maintenance" in page.data
+    assert b'href="#inspection-prepost"' in page.data
+    assert b'href="#inspection-maintenance"' in page.data
     assert b"Current Driver" in page.data
     assert b"Prior Driver" in page.data
     assert b"PostTrip Complete" in page.data

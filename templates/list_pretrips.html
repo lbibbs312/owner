@@ -33,6 +33,80 @@
         grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
         gap:10px;
       }
+      .inspection-section-dropdown {
+        border:1px solid rgba(91,157,255,.28);
+        border-radius:14px;
+        background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(10,18,31,.96));
+        box-shadow:0 18px 40px rgba(0,0,0,.3), inset 0 1px 0 rgba(91,157,255,.1);
+        overflow:hidden;
+      }
+      .inspection-section-dropdown summary {
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        gap:12px;
+        align-items:center;
+        padding:12px 13px;
+        cursor:pointer;
+        list-style:none;
+      }
+      .inspection-section-dropdown summary::-webkit-details-marker {
+        display:none;
+      }
+      .inspection-section-dropdown summary::after {
+        content:"";
+        width:9px;
+        height:9px;
+        border-right:2px solid var(--md-blue);
+        border-bottom:2px solid var(--md-blue);
+        transform:rotate(45deg);
+        transition:transform .18s ease;
+      }
+      .inspection-section-dropdown[open] summary::after {
+        transform:rotate(225deg);
+      }
+      .inspection-section-dropdown summary strong,
+      .inspection-section-jump strong {
+        display:block;
+        color:var(--md-text);
+        font-family:var(--md-display);
+        font-size:.86rem;
+        font-weight:950;
+        letter-spacing:.04em;
+        text-transform:uppercase;
+      }
+      .inspection-section-copy,
+      .inspection-section-jump span {
+        display:block;
+        margin-top:3px;
+        color:var(--md-muted);
+        font-family:var(--md-mono);
+        font-size:.68rem;
+        font-weight:800;
+        line-height:1.35;
+      }
+      .inspection-section-menu {
+        display:grid;
+        gap:8px;
+        padding:0 12px 12px;
+      }
+      .inspection-section-jump {
+        display:grid;
+        gap:2px;
+        padding:10px;
+        border:1px solid rgba(148,163,184,.14);
+        border-radius:11px;
+        background:rgba(255,255,255,.035);
+        color:var(--md-text);
+        text-decoration:none;
+      }
+      .inspection-section-jump:focus-visible {
+        outline:2px solid rgba(91,157,255,.65);
+        outline-offset:2px;
+      }
+      #inspection-prepost,
+      #inspection-maintenance {
+        scroll-margin-top:92px;
+      }
       .inspection-truck-tab,
       .inspection-card,
       .inspection-history-card,
@@ -197,7 +271,33 @@
       {% endif %}
 
       {% if selected_truck_number %}
-        <p class="inspection-section-title">PreTrip / PostTrip Records</p>
+        {% set completed_posttrip_count = namespace(value=0) %}
+        {% for pt in pretrips %}
+          {% if pt.posttrip %}
+            {% set completed_posttrip_count.value = completed_posttrip_count.value + 1 %}
+          {% endif %}
+        {% endfor %}
+        {% set open_posttrip_count = pretrips|length - completed_posttrip_count.value %}
+        <details class="inspection-section-dropdown" open>
+          <summary>
+            <span class="inspection-section-summary">
+              <strong>Inspection Sections</strong>
+              <span class="inspection-section-copy">PreTrips, PostTrips, fuel, mileage, and maintenance for Truck {{ selected_truck_number }}.</span>
+            </span>
+          </summary>
+          <div class="inspection-section-menu">
+            <a class="inspection-section-jump" href="#inspection-prepost">
+              <strong>PreTrips / PostTrips</strong>
+              <span>{{ pretrips|length }} PreTrip record{{ 's' if pretrips|length != 1 else '' }} - {{ completed_posttrip_count.value }} PostTrip complete{% if open_posttrip_count %} - {{ open_posttrip_count }} open{% endif %}</span>
+            </a>
+            <a class="inspection-section-jump" href="#inspection-maintenance">
+              <strong>Fuel / Maintenance</strong>
+              <span>{{ truck_history|length }} closed truck histor{{ 'ies' if truck_history|length != 1 else 'y' }} with fuel, mileage, and maintenance notes.</span>
+            </a>
+          </div>
+        </details>
+
+        <p class="inspection-section-title" id="inspection-prepost">PreTrip / PostTrip Records</p>
         {% if pretrips %}
           <div class="inspection-card-list">
             {% for pt in pretrips %}
@@ -244,7 +344,7 @@
           <div class="inspection-empty">No inspection records found for truck {{ selected_truck_number }}.</div>
         {% endif %}
 
-        <p class="inspection-section-title">Fuel / Maintenance History</p>
+        <p class="inspection-section-title" id="inspection-maintenance">Fuel / Maintenance History</p>
         {% if truck_history %}
           <div class="inspection-history-list">
             {% for item in truck_history %}
