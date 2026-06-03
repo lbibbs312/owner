@@ -4501,7 +4501,7 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
             PostTrip(
                 pretrip_id=imported_odometer_pretrip.id,
                 end_mileage=999999,
-                miles_driven=None,
+                miles_driven=17465,
                 created_at=datetime(2026, 5, 17, 18, 0, 0),
             ),
             DriverLog(
@@ -4528,6 +4528,8 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"z-index: 2500;" in logs_page.data
     assert b"#pageContent > .navbar .dropdown-menu {" in logs_page.data
     assert b"z-index: 2510;" in logs_page.data
+    assert b'body.md-shell .navbar .nav-link[aria-label="Recent activity"].d-md-none' in logs_page.data
+    assert b"display:none !important;" in logs_page.data
     assert b"AUDIT LEDGER" in logs_page.data
     assert b"PAST ROUTE" in logs_page.data
     assert b"REPLAY MODE" in logs_page.data
@@ -4551,6 +4553,7 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"--status-red:oklch(0.65 0.22 25)" in logs_page.data
     assert b"Avg: 99 mi/day" in logs_page.data
     assert b"17,465 mi/day" not in logs_page.data
+    assert b"No prior day" not in logs_page.data
     assert b"Start 1,000" in logs_page.data
     assert b"End 1,120" in logs_page.data
     assert b"Start Fuel" in logs_page.data
@@ -4586,6 +4589,14 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
         f'href="/driver_logs_print?date={selected_date.isoformat()}" class="md-row-action"><span class="md-btn-icon">O</span> View'.encode()
         in logs_page.data
     )
+
+    first_history_page = client.get(f"/driver_logs?date={(selected_date - timedelta(days=2)).isoformat()}")
+    assert first_history_page.status_code == 200
+    assert b"90 mi" in first_history_page.data
+    assert b"No prior day" in first_history_page.data
+    assert "▲ +".encode() not in first_history_page.data
+    assert "▼ -".encode() not in first_history_page.data
+    assert b"17,465 mi/day" not in first_history_page.data
 
     print_page = client.get(f"/driver_logs_print?date={selected_date.isoformat()}")
     assert print_page.status_code == 200

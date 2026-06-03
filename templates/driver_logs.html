@@ -300,7 +300,8 @@
     .md-route-audit-card .md-mileage-average {
       color:rgba(138,153,179,.58);
     }
-    .md-route-mile-slot .md-mileage-delta {
+    .md-route-mile-slot .md-mileage-delta,
+    .md-route-mile-slot .md-mileage-note {
       position:absolute;
       top:-10px;
       right:8px;
@@ -310,6 +311,17 @@
       background:rgba(5,10,18,.9);
       font-size:.78rem;
       text-shadow:0 0 16px currentColor;
+    }
+    .md-route-mile-slot .md-mileage-note {
+      color:rgba(138,153,179,.72);
+      font-family:var(--md-mono);
+      font-size:.66rem;
+      font-weight:900;
+      letter-spacing:.04em;
+      line-height:1;
+      text-transform:uppercase;
+      text-shadow:none;
+      white-space:nowrap;
     }
     .md-route-mile-slot .md-mileage-delta.app-delta--up {
       color:var(--status-green);
@@ -897,6 +909,8 @@
             </div>
             {% if audit.mileage_variance is not none %}
               {{ delta_value(audit.mileage_variance, 'mi', 'md-mileage-delta') }}
+            {% elif audit.total_miles is not none and audit.previous_total_miles is none %}
+              <span class="md-mileage-note">No prior day</span>
             {% endif %}
           </div>
           <div class="md-route-audit-card">

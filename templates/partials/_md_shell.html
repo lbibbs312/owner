@@ -109,6 +109,11 @@
     box-shadow:0 0 0 2px rgba(8,13,22,.94);
     font-family:var(--md-mono);
   }
+  @media (min-width:768px) {
+    body.md-shell .navbar .nav-link[aria-label="Recent activity"].d-md-none {
+      display:none !important;
+    }
+  }
   /* Hamburger toggler */
   body.md-shell .navbar-toggler {
     border:1px solid var(--md-line) !important;

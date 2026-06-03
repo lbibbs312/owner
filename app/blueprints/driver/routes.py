@@ -103,6 +103,7 @@ PLANT_TRANSFER_LINE_COUNT = 20
 DRIVER_LOG_AUDIT_FIELDS = ["plant_name", "load_size", "depart_load_size", "secondary_load", "downtime_reason", "part_number", "hot_parts", "arrive_time", "depart_time", "dock_wait_minutes", "maintenance", "fuel", "fuel_mileage", "meeting"]
 PLANT_TRANSFER_AUDIT_FIELDS = ["transfer_number", "transfer_date", "ship_to", "ship_from", "trailer_number", "driver_name", "driver_initials", "transfer_time", "loaded_by"]
 RYDER_CLOSING_ACTIONS = {"fixed", "left", "rental"}
+MAX_REASONABLE_DAILY_ROUTE_MILES = 1000
 
 
 def _append_driver_log_flow_event(log, event_type, *, notes=None, payload=None, source="mobile"):
@@ -1377,19 +1378,31 @@ def _today_damage_reports(driver_id, report_date):
     return [report for report in reports if _damage_report_date(report) == report_date]
 
 
+def _is_reasonable_daily_route_miles(value):
+    return value is not None and 0 <= value <= MAX_REASONABLE_DAILY_ROUTE_MILES
+
+
+def _route_miles_from_values(start_mileage, end_mileage, miles_driven, *, allow_odometer_fallback=True):
+    if _is_reasonable_daily_route_miles(miles_driven):
+        return miles_driven
+    if not allow_odometer_fallback or start_mileage is None or end_mileage is None:
+        return None
+    odometer_delta = end_mileage - start_mileage
+    if _is_reasonable_daily_route_miles(odometer_delta):
+        return odometer_delta
+    return None
+
+
 def _tracked_miles_for_pretrip(pretrip, *, allow_odometer_fallback=True):
     posttrip = pretrip.posttrip if pretrip else None
     if not posttrip:
         return None
-    if posttrip.miles_driven is not None:
-        return posttrip.miles_driven
-    if (
-        allow_odometer_fallback
-        and pretrip.start_mileage is not None
-        and posttrip.end_mileage is not None
-    ):
-        return posttrip.end_mileage - pretrip.start_mileage
-    return None
+    return _route_miles_from_values(
+        pretrip.start_mileage,
+        posttrip.end_mileage,
+        posttrip.miles_driven,
+        allow_odometer_fallback=allow_odometer_fallback,
+    )
 
 
 def _total_miles_for_pretrips(pretrips):
@@ -1410,7 +1423,6 @@ def _driver_mileage_totals_by_date(driver_id, *, before_date=None, through_date=
         .join(PostTrip, PostTrip.pretrip_id == PreTrip.id)
         .filter(
             PreTrip.user_id == driver_id,
-            PostTrip.miles_driven.isnot(None),
         )
     )
     if before_date is not None:
@@ -1419,13 +1431,16 @@ def _driver_mileage_totals_by_date(driver_id, *, before_date=None, through_date=
         query = query.filter(PreTrip.pretrip_date <= through_date)
 
     totals = {}
-    for route_date, miles_driven in query.with_entities(
+    for route_date, start_mileage, end_mileage, miles_driven in query.with_entities(
         PreTrip.pretrip_date,
+        PreTrip.start_mileage,
+        PostTrip.end_mileage,
         PostTrip.miles_driven,
     ):
-        if route_date is None or miles_driven is None:
+        miles = _route_miles_from_values(start_mileage, end_mileage, miles_driven)
+        if route_date is None or miles is None:
             continue
-        totals[route_date] = totals.get(route_date, 0) + miles_driven
+        totals[route_date] = totals.get(route_date, 0) + miles
     return totals
 
 
