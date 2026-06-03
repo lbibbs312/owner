@@ -5206,6 +5206,97 @@ def test_mobile_dashboard_stop_clicks_open_audit_ledger_stop_anchor(client, app)
     assert f"/view_driver_log/{log_id}".encode() not in page.data
 
 
+def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DamageReport, DriverLog, PlantTransfer, PlantTransferLine, PreTrip
+
+        driver = create_user(
+            "desktop_ops_driver",
+            "desktop-ops@example.com",
+            "driver",
+            first_name="Desk",
+            last_name="Driver",
+            department="ST4",
+        )
+        route_date = date.today()
+        pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="123",
+            trailer_number="TR-Desk",
+            pretrip_date=route_date,
+            shift="1st",
+            start_mileage=120400,
+            start_fuel_level="3/4",
+        )
+        log = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="Trim DC",
+            load_size="Empty",
+            depart_load_size="PPL Parts",
+            arrive_time=f"{route_date.isoformat()} 07:10:00",
+            downtime_reason="Waiting on dock door 4.",
+        )
+        transfer = PlantTransfer(
+            user_id=driver.id,
+            transfer_number="TRX-DESK",
+            transfer_date=route_date,
+            ship_from="Trim DC",
+            ship_to="PPL",
+            trailer_number="TR-Desk",
+            driver_name="Desk Driver",
+            loaded_by="Dock Lead",
+            transfer_time="07:44",
+        )
+        transfer.lines.append(
+            PlantTransferLine(line_number=1, side="left", part_number="PART-900", skids="10", quantity="1600")
+        )
+        db.session.add_all([pretrip, log, transfer])
+        db.session.flush()
+        damage = DamageReport(
+            reported_by_id=driver.id,
+            driver_log_id=log.id,
+            truck_number="123",
+            trailer_number="TR-Desk",
+            plant_name="Trim DC",
+            stage="after",
+            move_reference="Stop 1 / dock 4",
+            description="Desk scratch on dock door.",
+            status="submitted",
+        )
+        db.session.add(damage)
+        db.session.commit()
+
+    login(client, "desktop_ops_driver")
+    page = client.get("/mobile")
+    assert page.status_code == 200
+    assert b"desktop-header-context" in page.data
+    assert b".md-driver-bottom-nav { display:none !important; }" in page.data
+    assert b".board-only-shell main > .ops-console { display:none; }" in page.data
+    assert b"setupDesktopOpsWorkspace" in page.data
+
+    workspace_start = page.data.index(b'<section class="desktop-ops-workspace"')
+    workspace = page.data[workspace_start: page.data.index(b"<script>", workspace_start)]
+    assert b"Live Ops Board" in workspace
+    assert b"Detail Workspace" in workspace
+    assert b'data-desktop-row' in workspace
+    assert b'data-desktop-detail-template="desktop-transfer-' in workspace
+    assert b"TRX-DESK" in workspace
+    assert b"Document Discipline" in workspace
+    assert b"Sensitive previews" in workspace
+    assert b"Truck inspections" in workspace
+    assert b"Fuel at start" in workspace
+    assert b"3/4" in workspace
+    assert b"Desk scratch on dock door." in workspace
+    assert b"Pickup source unknown" not in workspace
+    assert b"Destination needs confirmation" not in workspace
+    assert b"Earlier stop" not in workspace
+    assert b"Next stop" not in workspace
+
+
 def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     from datetime import date, timedelta
 

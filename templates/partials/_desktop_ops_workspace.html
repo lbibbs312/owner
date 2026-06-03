@@ -1,0 +1,460 @@
+{% from 'partials/_delta.html' import delta_value %}
+{% set rm = route_map if route_map is defined else none %}
+{% set cta_urls = route_cta_urls if route_cta_urls is defined else {} %}
+{% set route_logs_by_id = {} %}
+{% for dl in todays_logs|default([]) %}
+  {% set _ = route_logs_by_id.update({dl.id: dl}) %}
+{% endfor %}
+{% set desk = namespace(default_set=false, completed=0, open=0, proof_items=0, proof_gaps=0, issues=0, scans=0) %}
+{% for dl in todays_logs|default([]) %}
+  {% if dl.depart_time %}{% set desk.completed = desk.completed + 1 %}{% else %}{% set desk.open = desk.open + 1 %}{% endif %}
+  {% set desk.proof_items = desk.proof_items + (dl.photos|length) %}
+  {% set desk.scans = desk.scans + (dl.part_scan_events|length) + (dl.driver_log_part_scan_events|length) %}
+{% endfor %}
+{% for stop in rm.stops|default([]) if rm %}
+  {% for issue in stop.issues|default([]) %}
+    {% if issue.code == 'missing_proof' %}{% set desk.proof_gaps = desk.proof_gaps + 1 %}{% endif %}
+    {% if issue.code != 'needs_departure' %}{% set desk.issues = desk.issues + 1 %}{% endif %}
+  {% endfor %}
+{% endfor %}
+{% set route_transfers = route_transfers|default([]) %}
+{% set route_damage_reports = route_damage_reports|default([]) %}
+{% set current_stop_id = current_stop.id if current_stop else none %}
+
+{% macro clean_value(value, action='ACTION REQUIRED') -%}
+  {%- set text = (value|string).strip() if value is not none else '' -%}
+  {%- if not text or text in ['--', 'No current data', 'Not tracked yet', 'Truck not recorded', 'Pickup source unknown', 'Destination needs confirmation', 'Earlier stop', 'Next stop'] -%}
+    <span class="desk-action-needed">{{ action }}</span>
+  {%- else -%}
+    {{ text }}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro fact(label, value, action='ACTION REQUIRED') -%}
+  <div class="desk-fact"><span>{{ label }}</span><strong>{{ clean_value(value, action) }}</strong></div>
+{%- endmacro %}
+
+{% macro row_button(key, code, title, meta, tone='normal', default=false) -%}
+  <button class="desk-ops-row tone-{{ tone }}" type="button" data-desktop-row data-detail-template="{{ key }}" {% if default %}data-desktop-default="true"{% endif %}>
+    <span class="desk-row-code">{{ code }}</span>
+    <span class="desk-row-main"><strong>{{ title }}</strong><small>{{ clean_value(meta) }}</small></span>
+  </button>
+{%- endmacro %}
+
+<section class="desktop-ops-workspace" data-desktop-ops-workspace aria-label="MoveDefense widescreen operations workspace">
+  <div class="desk-route-strip">
+    <div>
+      <span class="desk-kicker">Operations Desk</span>
+      <strong>{{ clean_value(rm.route.current_location if rm and rm.route else none, 'ROUTE LOCATION REQUIRED') }}</strong>
+      <small>{{ current_user.display_name }}{% if current_user.department %} / {{ current_user.department }}{% endif %} / {{ route_date.strftime('%b %d, %Y') if route_date else today_local_date.strftime('%b %d, %Y') }}</small>
+    </div>
+    <div class="desk-current-action">
+      <span>Current Action</span>
+      <strong>{{ clean_value(route_cta.next_action if route_cta and route_cta.next_action else (rm.route.next_action if rm and rm.route else none), 'ACTION REQUIRED') }}</strong>
+      {% if current_stop and cta_urls.get('record_departure') %}
+        <a href="{{ cta_urls.get('record_departure') }}">Record departure</a>
+      {% elif cta_urls.get('add_stop') %}
+        <a href="{{ cta_urls.get('add_stop') }}">Add stop</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="desktop-metrics-strip" aria-label="Route health metrics">
+    <div><span>Stops</span><strong>{{ desk.completed }}/{{ todays_logs|length }}</strong><small>{{ desk.open }} open</small></div>
+    <div><span>Proof Coverage</span><strong>{{ desk.proof_items }} item{{ 's' if desk.proof_items != 1 else '' }}</strong><small>{{ desk.proof_gaps }} proof gap{{ 's' if desk.proof_gaps != 1 else '' }}</small></div>
+    <div><span>Documents</span><strong>{{ route_transfers|length }} transfer{{ 's' if route_transfers|length != 1 else '' }}</strong><small>{{ rm.route.document_summary if rm and rm.route else 'Route documents only' }}</small></div>
+    <div><span>Issues</span><strong>{{ desk.issues + route_damage_reports|length }}</strong><small>{{ route_damage_reports|length }} damage report{{ 's' if route_damage_reports|length != 1 else '' }}</small></div>
+    {% if current_stop_forecast %}
+      <div><span>Current Wait</span><strong>{{ current_stop_forecast.elapsed_label }}</strong><small>Today avg {{ current_stop_forecast.today_average_label }}</small></div>
+      <div><span>Plant Baseline</span><strong>{{ current_stop_forecast.history_average_label }}</strong><small>{% if current_stop_forecast.delay_minutes is not none %}Delta {{ delta_value(current_stop_forecast.delay_minutes, 'm', 'desk-delta') }}{% else %}{{ current_stop_forecast.confidence }}{% endif %}</small></div>
+    {% endif %}
+  </div>
+
+  <div class="desktop-ops-grid">
+    <aside class="desktop-ops-board" aria-label="Selectable live operations board">
+      <div class="desk-panel-head">
+        <span>Live Ops Board</span>
+        <strong>{{ (rm.stops|length if rm else 0) + (rm.delivery_narratives|length if rm else 0) + route_transfers|length }} objects</strong>
+      </div>
+      <div class="desk-row-group">
+        {% if rm and rm.stops %}
+          {% for stop in rm.stops %}
+            {% set log = route_logs_by_id.get(stop.stop_id) %}
+            {% set is_default = (not desk.default_set and (stop.stop_id == current_stop_id or loop.first)) %}
+            {% if is_default %}{% set desk.default_set = true %}{% endif %}
+            {% set row_tone = 'issue' if stop.badge and stop.badge.severity == 'risk' else ('warn' if stop.badge and stop.badge.severity == 'attention' else ('active' if stop.status == 'active' else 'normal')) %}
+            {% set row_code = 'ACTIVE' if stop.status == 'active' else ('START' if stop.movement_code in ['route_start', 'route_start_open'] else ('LOAD' if stop.movement_code == 'loaded' else ('DROP' if stop.movement_code == 'dropped' else (stop.board_code or 'STOP')))) %}
+            {{ row_button('desktop-stop-' ~ stop.stop_id, row_code, stop.plant_name, (stop.ledger_meta or stop.movement_summary or stop.next_action), row_tone, is_default) }}
+          {% endfor %}
+        {% else %}
+          {{ row_button('desktop-route-empty', 'ROUTE', 'No route stops recorded', 'Add the first stop to start route evidence.', 'warn', true) }}
+          {% set desk.default_set = true %}
+        {% endif %}
+      </div>
+
+      {% if rm and rm.delivery_narratives %}
+        <div class="desk-row-group">
+          <h3>Loads / Parts</h3>
+          {% for item in rm.delivery_narratives %}
+            {% set detail = item.details[0] if item.details else none %}
+            {% set is_default = not desk.default_set %}
+            {% if is_default %}{% set desk.default_set = true %}{% endif %}
+            {% set row_meta %}{{ clean_value(item.origin_label, 'SOURCE NOT CAPTURED') }} to {{ clean_value(item.destination_label, 'DESTINATION REQUIRED') }} / {{ item.load_count_label or item.route_line }}{% endset %}
+            {{ row_button('desktop-load-' ~ loop.index0, 'LOAD', item.title, row_meta, 'normal', is_default) }}
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if route_transfers %}
+        <div class="desk-row-group">
+          <h3>Transfers</h3>
+          {% for transfer in route_transfers %}
+            {% set line_count = transfer.lines|length %}
+            {% set is_default = not desk.default_set %}
+            {% if is_default %}{% set desk.default_set = true %}{% endif %}
+            {{ row_button('desktop-transfer-' ~ transfer.id, 'XFER', transfer.transfer_number or ('Transfer ' ~ transfer.id), (transfer.ship_from ~ ' to ' ~ transfer.ship_to ~ ' / ' ~ line_count ~ ' line' ~ ('s' if line_count != 1 else '')), 'normal', is_default) }}
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="desk-row-group">
+        <h3>Evidence / Paperwork</h3>
+        {% set evidence_default = not desk.default_set %}
+        {% if evidence_default %}{% set desk.default_set = true %}{% endif %}
+        {{ row_button('desktop-evidence-route', 'DOC', 'Route evidence and paperwork', (desk.proof_items ~ ' proof item' ~ ('s' if desk.proof_items != 1 else '') ~ ' / ' ~ route_transfers|length ~ ' transfer sheet' ~ ('s' if route_transfers|length != 1 else '')), 'warn' if desk.proof_gaps else 'normal', evidence_default) }}
+        {{ row_button('desktop-inspection-route', 'INSP', 'Truck inspections', ((current_truck_number or 'TRUCK REQUIRED') ~ ' / pretrip ' ~ ('recorded' if route_pretrip else 'needed') ~ ' / posttrip ' ~ ('complete' if route_pretrip and route_pretrip.posttrip else 'pending')), 'warn' if pending_posttrip else 'normal', false) }}
+      </div>
+
+      {% if rm and rm.stops %}
+        <div class="desk-row-group">
+          <h3>Issues</h3>
+          {% for stop in rm.stops %}
+            {% for issue in stop.issues|default([]) %}
+              {% if issue.code != 'needs_departure' %}
+                {{ row_button('desktop-issue-' ~ stop.stop_id ~ '-' ~ issue.code, 'ISSUE', issue.label, (stop.plant_name ~ ' / ' ~ issue.action), 'issue' if issue.severity == 'risk' else 'warn', false) }}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+          {% for report in route_damage_reports %}
+            {{ row_button('desktop-damage-' ~ report.id, 'DAMAGE', report.plant_name, report.description, 'issue', false) }}
+          {% endfor %}
+        </div>
+      {% endif %}
+    </aside>
+
+    <section class="desktop-detail-workspace" aria-label="Detail workspace">
+      <div class="desk-work-head">
+        <span data-desktop-work-kicker>Detail Workspace</span>
+        <strong data-desktop-work-title>Route object detail</strong>
+      </div>
+      <div class="desk-work-body" data-desktop-work-body>
+        <p class="desk-empty">Select an operation on the left to inspect evidence, paperwork, metrics, and actions.</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="desktop-issue-ticker" aria-label="Dispatch and issue ticker">
+    <span>{{ rm.dispatch_ticker_text if rm and rm.dispatch_ticker_text else 'NO ALERTS FROM DISPATCH' }}</span>
+  </div>
+
+  <div class="desktop-detail-templates" hidden>
+    <template data-desktop-detail-template="desktop-route-empty" data-title="Route setup" data-kicker="Route">
+      <div class="desk-detail-stack">
+        <section class="desk-detail-section">
+          <h3>Start route capture</h3>
+          <p class="desk-copy">No route stops are logged for this date. The route workspace will populate once the driver records the first stop.</p>
+          <div class="desk-action-grid"><a class="desk-action-link primary" href="{{ cta_urls.get('add_stop') or url_for('driver.new_driving_log') }}">Add first stop</a></div>
+        </section>
+      </div>
+    </template>
+
+    {% for stop in rm.stops|default([]) if rm %}
+      {% set log = route_logs_by_id.get(stop.stop_id) %}
+      {% set forecast = (stop_forecasts or {}).get(stop.stop_id) %}
+      <template data-desktop-detail-template="desktop-stop-{{ stop.stop_id }}" data-title="Stop {{ stop.sequence }} / {{ stop.plant_name }}" data-kicker="Stop Detail">
+        <div class="desk-detail-stack">
+          <section class="desk-detail-section">
+            <div class="desk-section-title"><span>Stop Detail</span><strong>{{ stop.board_code or ('STP-' ~ stop.sequence) }}</strong></div>
+            <div class="desk-fact-grid">
+              {{ fact('Sequence', 'Stop ' ~ stop.sequence) }}
+              {{ fact('Plant', stop.plant_name) }}
+              {{ fact('Arrival', stop.arrival_at|display_time if stop.arrival_at else none, 'ARRIVAL REQUIRED') }}
+              {{ fact('Departure', stop.departure_at|to_12h_format if stop.departure_at else none, 'DEPARTURE REQUIRED') }}
+              {{ fact('Wait time', stop.wait_label) }}
+              {{ fact('Arrived with', stop.arrived_with, 'SOURCE NOT CAPTURED') }}
+              {{ fact('Departed with', ('No Pickup' if stop.no_pickup else stop.departed_with), 'DESTINATION REQUIRED') }}
+              {{ fact('Proof count', stop.evidence.proof_count if stop.evidence and stop.evidence.proof_count is defined else (log.photos|length if log else 0)) }}
+              {{ fact('Route issue', stop.badge.label if stop.badge else stop.next_action) }}
+              {{ fact('Last action', stop.next_action) }}
+            </div>
+            {% if log and log.downtime_reason %}
+              <div class="desk-warning-strip"><strong>Driver note</strong><span>{{ log.downtime_reason }}</span></div>
+            {% endif %}
+            {% if stop.issues %}
+              <div class="desk-warning-list">
+                {% for issue in stop.issues %}
+                  <div class="desk-warning-strip tone-{{ 'issue' if issue.severity == 'risk' else 'warn' }}"><strong>{{ issue.label }}</strong><span>{{ issue.reason }} / {{ issue.action }}</span></div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </section>
+
+          {% if forecast %}
+            <section class="desk-detail-section">
+              <div class="desk-section-title"><span>Timing Comparison</span><strong>{{ forecast.status }}</strong></div>
+              <div class="desk-compare-grid">
+                {{ fact('Current stop wait', forecast.elapsed_label) }}
+                {{ fact('Today average', forecast.today_average_label) }}
+                {{ fact('30-day average', forecast.history_average_label) }}
+                {{ fact('Ready estimate', forecast.ready_at_label or forecast.estimate_label) }}
+                <div class="desk-fact"><span>Delta</span><strong>{% if forecast.delay_minutes is not none %}{{ delta_value(forecast.delay_minutes, 'm', 'desk-delta') }}{% else %}{{ forecast.confidence }}{% endif %}</strong></div>
+              </div>
+            </section>
+          {% endif %}
+
+          <section class="desk-detail-section">
+            <div class="desk-section-title"><span>Evidence</span><strong>{{ log.photos|length if log else 0 }} proof photo{{ 's' if log and log.photos|length != 1 else '' }}</strong></div>
+            {% if log and log.photos %}
+              <div class="desk-evidence-list">
+                {% for photo in log.photos %}
+                  <a class="desk-evidence-row" href="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" target="_blank" rel="noopener">
+                    <span>PROOF</span><strong>{{ photo.source|replace('_', ' ')|title }}</strong><small>{{ photo.uploaded_at|to_detroit_datetime }}{% if photo.note %} / {{ photo.note }}{% endif %}</small>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="desk-warning-strip tone-warn"><strong>PROOF NEEDED</strong><span>No proof photo is attached to this stop.</span></div>
+            {% endif %}
+          </section>
+
+          {% if log %}
+            <section class="desk-detail-section">
+              <div class="desk-section-title"><span>Actions</span><strong>Workspace actions</strong></div>
+              <div class="desk-action-grid">
+                {% if not log.depart_time %}<a class="desk-action-link primary" href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}">Record departure</a>{% endif %}
+                <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}" enctype="multipart/form-data">
+                  <input type="hidden" name="source" value="proof">
+                  <input type="hidden" name="next" value="{{ request.full_path }}">
+                  <label class="desk-action-link">Add proof<input type="file" name="photo" accept="image/*" capture="environment" onchange="if(this.files.length){this.form.submit();}"></label>
+                </form>
+                <a class="desk-action-link" href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}">Scan cargo</a>
+                <a class="desk-action-link" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Edit / add note</a>
+                <a class="desk-action-link" href="{{ url_for('driver.new_damage_report') }}">Add damage</a>
+                <a class="desk-action-link" href="{{ url_for('driver.new_plant_transfer') }}">Attach paperwork</a>
+                <form class="desk-action-form" method="POST" action="{{ url_for('driver.request_manager_review', log_id=log.id) }}"><button class="desk-action-link" type="submit">Manager review</button></form>
+                {% if not route_context.route_finalized %}<form class="desk-action-form danger" method="POST" action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" onsubmit="return confirm('Delete this driver log?');"><button class="desk-action-link danger" type="submit">Delete if allowed</button></form>{% endif %}
+              </div>
+            </section>
+          {% endif %}
+        </div>
+      </template>
+    {% endfor %}
+
+    {% for item in rm.delivery_narratives|default([]) if rm %}
+      {% set detail = item.details[0] if item.details else none %}
+      <template data-desktop-detail-template="desktop-load-{{ loop.index0 }}" data-title="{{ item.title }}" data-kicker="Load / Part Detail">
+        <div class="desk-detail-stack">
+          <section class="desk-detail-section">
+            <div class="desk-section-title"><span>Load / Part Detail</span><strong>{{ item.load_count_label or 'Route load' }}</strong></div>
+            <div class="desk-fact-grid">
+              {{ fact('Load name', item.route_line) }}
+              {{ fact('Pickup source', item.origin_label, 'SOURCE NOT CAPTURED') }}
+              {{ fact('Expected destination', item.destination_label, 'DESTINATION REQUIRED') }}
+              {{ fact('Actual drop location', detail.plant if detail else item.destination_label, 'DROP LOCATION REQUIRED') }}
+              {{ fact('Current state', item.board_badge.label if item.board_badge else 'Recorded') }}
+              {{ fact('Last seen stop', ('Stop ' ~ detail.sequence ~ ' / ' ~ detail.plant) if detail else none, 'LAST STOP REQUIRED') }}
+              {{ fact('Proof attached', detail.evidence.proof if detail and detail.evidence else none, 'PROOF NEEDED') }}
+              {{ fact('Scans attached', desk.scans ~ ' scan' ~ ('s' if desk.scans != 1 else '')) }}
+            </div>
+          </section>
+          <section class="desk-detail-section">
+            <div class="desk-section-title"><span>Actions</span><strong>Load controls</strong></div>
+            <div class="desk-action-grid">
+              <a class="desk-action-link" href="{{ url_for('driver.new_plant_transfer') }}">Attach transfer sheet</a>
+              {% if detail and detail.stop_id %}<a class="desk-action-link" href="{{ url_for('driver.depart_driver_log', log_id=detail.stop_id) }}">Scan cargo</a>{% endif %}
+              {% if detail and detail.stop_id %}<a class="desk-action-link" href="{{ url_for('driver.edit_driver_log', log_id=detail.stop_id) }}">Change destination</a>{% endif %}
+              {% if detail and detail.stop_id %}<form class="desk-action-form" method="POST" action="{{ url_for('driver.request_manager_review', log_id=detail.stop_id) }}"><button class="desk-action-link" type="submit">Send to manager review</button></form>{% endif %}
+            </div>
+          </section>
+        </div>
+      </template>
+    {% endfor %}
+
+    {% for transfer in route_transfers %}
+      <template data-desktop-detail-template="desktop-transfer-{{ transfer.id }}" data-title="{{ transfer.transfer_number or ('Transfer ' ~ transfer.id) }}" data-kicker="Transfer Detail">
+        <div class="desk-detail-stack">
+          <section class="desk-detail-section">
+            <div class="desk-section-title"><span>Transfer Detail</span><strong>{{ transfer.transfer_number or transfer.id }}</strong></div>
+            <div class="desk-fact-grid">
+              {{ fact('From site', transfer.ship_from) }}
+              {{ fact('To site', transfer.ship_to) }}
+              {{ fact('Trailer', transfer.trailer_number, 'TRAILER REQUIRED') }}
+              {{ fact('Printed time', transfer.transfer_time, 'PRINTED TIME REQUIRED') }}
+              {{ fact('Loaded by', transfer.loaded_by, 'LOADED BY REQUIRED') }}
+              {{ fact('Driver', transfer.driver_name or current_user.display_name) }}
+              {{ fact('Proof status', 'Transfer sheet recorded') }}
+              {{ fact('Matched route stop', transfer.ship_to, 'MATCHED STOP REQUIRED') }}
+            </div>
+            <div class="desk-transfer-lines">
+              {% for line in transfer.lines %}
+                <div class="desk-transfer-line"><span>{{ line.line_number }}</span><strong>{{ line.part_number or 'ITEM NUMBER REQUIRED' }}</strong><small>{{ line.skids or 'LP REQUIRED' }} LP / {{ line.quantity or 'COUNT REQUIRED' }} pcs{% if line.remarks %} / {{ line.remarks }}{% endif %}</small></div>
+              {% else %}
+                <div class="desk-warning-strip tone-warn"><strong>COUNT REQUIRED</strong><span>No transfer lines are recorded.</span></div>
+              {% endfor %}
+            </div>
+          </section>
+          <section class="desk-detail-section">
+            <div class="desk-section-title"><span>Actions</span><strong>Transfer controls</strong></div>
+            <div class="desk-action-grid">
+              <a class="desk-action-link primary" href="{{ url_for('driver.view_plant_transfer', transfer_id=transfer.id) }}">Open sheet</a>
+              <a class="desk-action-link" href="{{ url_for('driver.edit_plant_transfer', transfer_id=transfer.id) }}">Edit sheet</a>
+              <a class="desk-action-link" href="{{ url_for('driver.plant_transfer_printable', transfer_id=transfer.id) }}">Print</a>
+              <a class="desk-action-link" href="{{ url_for('driver.plant_transfer_attachment', transfer_id=transfer.id) }}">Save PDF</a>
+            </div>
+          </section>
+        </div>
+      </template>
+    {% endfor %}
+
+    <template data-desktop-detail-template="desktop-evidence-route" data-title="Route evidence and paperwork" data-kicker="Evidence / Paperwork">
+      <div class="desk-detail-stack">
+        <section class="desk-detail-section">
+          <div class="desk-section-title"><span>Evidence Coverage</span><strong>{{ desk.proof_items }} proof item{{ 's' if desk.proof_items != 1 else '' }}</strong></div>
+          <div class="desk-fact-grid">
+            {{ fact('Route stops', todays_logs|length) }}
+            {{ fact('Proof photos', desk.proof_items) }}
+            {{ fact('Transfer sheets', route_transfers|length) }}
+            {{ fact('Proof gaps', desk.proof_gaps) }}
+            {{ fact('Part scans', desk.scans) }}
+            {{ fact('Audit readiness', 'Needs review' if desk.proof_gaps or desk.issues else 'Ready') }}
+          </div>
+          {% if desk.proof_gaps %}
+            <div class="desk-warning-strip tone-warn"><strong>PROOF NEEDED</strong><span>{{ desk.proof_gaps }} stop{{ 's' if desk.proof_gaps != 1 else '' }} need proof before this route is audit-ready.</span></div>
+          {% endif %}
+        </section>
+        <section class="desk-detail-section">
+          <div class="desk-section-title"><span>Document Discipline</span><strong>Right workspace only</strong></div>
+          <div class="desk-policy-grid">
+            <div><span>Required</span><strong>Document type</strong><small>Transfer sheet, proof photo, damage photo, BOL, license, DOT card, insurance, registration, inspection, maintenance, override.</small></div>
+            <div><span>Required</span><strong>Related entity</strong><small>Driver, truck, stop, load, route, damage, or transfer must own the file.</small></div>
+            <div><span>Captured</span><strong>Uploaded by / at</strong><small>Existing proof and damage uploads preserve uploader and timestamp.</small></div>
+            <div><span>Restricted</span><strong>Sensitive previews</strong><small>License, DOT card, insurance, and registration stay out of the live board.</small></div>
+            <div><span>Controlled</span><strong>Expiration status</strong><small>Use inspection/document records for expiring driver or truck paperwork.</small></div>
+            <div><span>Audit</span><strong>Verify / replace trail</strong><small>Replace, delete, verify, and override actions must write an audit event.</small></div>
+          </div>
+        </section>
+        <section class="desk-detail-section">
+          <div class="desk-section-title"><span>Actions</span><strong>Evidence controls</strong></div>
+          <div class="desk-action-grid">
+            <a class="desk-action-link" href="{{ url_for('driver.new_plant_transfer') }}">Attach transfer sheet</a>
+            <a class="desk-action-link" href="{{ url_for('driver.new_damage_report') }}">Add damage photo</a>
+            <a class="desk-action-link" href="{{ url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) }}">Open route audit</a>
+            <a class="desk-action-link" href="{{ url_for('driver.list_pretrips', truck_number=current_truck_number) if current_truck_number else url_for('driver.list_pretrips') }}">Inspection records</a>
+          </div>
+        </section>
+      </div>
+    </template>
+
+    <template data-desktop-detail-template="desktop-inspection-route" data-title="Truck inspections" data-kicker="Inspection Detail">
+      <div class="desk-detail-stack">
+        <section class="desk-detail-section">
+          <div class="desk-section-title"><span>Vehicle / Shift Detail</span><strong>{{ clean_value(current_truck_number, 'TRUCK REQUIRED') }}</strong></div>
+          <div class="desk-fact-grid">
+            {{ fact('PreTrip', 'Recorded' if route_pretrip else none, 'PRETRIP REQUIRED') }}
+            {{ fact('PostTrip', 'Complete' if route_pretrip and route_pretrip.posttrip else none, 'POSTTRIP REQUIRED') }}
+            {{ fact('Truck', current_truck_number, 'TRUCK REQUIRED') }}
+            {{ fact('Trailer', active_pretrip.trailer_number if active_pretrip else none, 'TRAILER REQUIRED') }}
+            {{ fact('Start mileage', ('{:,}'.format(route_pretrip.start_mileage) ~ ' mi') if route_pretrip and route_pretrip.start_mileage else none, 'START MILEAGE REQUIRED') }}
+            {{ fact('Fuel at start', route_pretrip.start_fuel_level if route_pretrip and route_pretrip.start_fuel_level else none, 'START FUEL REQUIRED') }}
+          </div>
+        </section>
+        <section class="desk-detail-section">
+          <div class="desk-section-title"><span>Maintenance History</span><strong>{{ truck_maintenance_history|length }} records</strong></div>
+          <div class="desk-evidence-list">
+            {% for row in truck_maintenance_history %}
+              <div class="desk-evidence-row"><span>{{ row.kind|upper if row.kind is defined else 'TRUCK' }}</span><strong>{{ row.title if row.title is defined else row }}</strong><small>{{ row.detail if row.detail is defined else '' }}</small></div>
+            {% else %}
+              <div class="desk-warning-strip"><strong>No truck issues in recent history</strong><span>Inspection and maintenance notes will appear here when recorded.</span></div>
+            {% endfor %}
+          </div>
+        </section>
+        <section class="desk-detail-section">
+          <div class="desk-section-title"><span>Actions</span><strong>Inspection controls</strong></div>
+          <div class="desk-action-grid">
+            <a class="desk-action-link" href="{{ url_for('driver.list_pretrips', truck_number=current_truck_number) if current_truck_number else url_for('driver.list_pretrips') }}">Open inspections</a>
+            {% if route_pretrip and not route_pretrip.posttrip %}<a class="desk-action-link primary" href="{{ url_for('driver.do_posttrip', pretrip_id=route_pretrip.id) }}">Complete posttrip</a>{% endif %}
+            <a class="desk-action-link" href="{{ url_for('driver.truck_maintenance_history', truck_number=current_truck_number) if current_truck_number else url_for('driver.truck_maintenance_history') }}">Maintenance history</a>
+          </div>
+        </section>
+      </div>
+    </template>
+
+    {% for stop in rm.stops|default([]) if rm %}
+      {% set log = route_logs_by_id.get(stop.stop_id) %}
+      {% for issue in stop.issues|default([]) %}
+        {% if issue.code != 'needs_departure' %}
+          <template data-desktop-detail-template="desktop-issue-{{ stop.stop_id }}-{{ issue.code }}" data-title="{{ issue.label }}" data-kicker="Issue Review">
+            <div class="desk-detail-stack">
+              <section class="desk-detail-section">
+                <div class="desk-section-title"><span>Issue Review</span><strong>{{ issue.severity|upper }}</strong></div>
+                <div class="desk-fact-grid">
+                  {{ fact('Issue type', issue.label) }}
+                  {{ fact('Affected stop', 'Stop ' ~ stop.sequence ~ ' / ' ~ stop.plant_name) }}
+                  {{ fact('Why flagged', issue.reason) }}
+                  {{ fact('Evidence found', stop.evidence.proof if stop.evidence else none, 'EVIDENCE MISSING') }}
+                  {{ fact('Required action', issue.action) }}
+                  {{ fact('Review owner', 'Driver / manager review') }}
+                </div>
+                <div class="desk-warning-strip tone-{{ 'issue' if issue.severity == 'risk' else 'warn' }}"><strong>{{ issue.label }}</strong><span>{{ issue.action }}</span></div>
+              </section>
+              {% if log %}
+                <section class="desk-detail-section">
+                  <div class="desk-section-title"><span>Actions</span><strong>Issue controls</strong></div>
+                  <div class="desk-action-grid">
+                    {% if issue.code == 'destination_mismatch' %}<a class="desk-action-link primary" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Confirm destination</a>{% endif %}
+                    {% if issue.code in ['missing_proof', 'unconfirmed_drop'] %}
+                      <form class="desk-action-form" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}" enctype="multipart/form-data">
+                        <input type="hidden" name="source" value="proof">
+                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                        <label class="desk-action-link primary">Attach proof<input type="file" name="photo" accept="image/*" capture="environment" onchange="if(this.files.length){this.form.submit();}"></label>
+                      </form>
+                    {% endif %}
+                    <a class="desk-action-link" href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}">Scan cargo</a>
+                    <a class="desk-action-link" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Add note</a>
+                    <form class="desk-action-form" method="POST" action="{{ url_for('driver.request_manager_review', log_id=log.id) }}"><button class="desk-action-link" type="submit">Manager override / review</button></form>
+                  </div>
+                </section>
+              {% endif %}
+            </div>
+          </template>
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+
+    {% for report in route_damage_reports %}
+      <template data-desktop-detail-template="desktop-damage-{{ report.id }}" data-title="Damage report / {{ report.plant_name }}" data-kicker="Issue Review">
+        <div class="desk-detail-stack">
+          <section class="desk-detail-section">
+            <div class="desk-section-title"><span>Damage Report</span><strong>{{ report.status|upper }}</strong></div>
+            <div class="desk-fact-grid">
+              {{ fact('Plant', report.plant_name) }}
+              {{ fact('Truck', report.truck_number, 'TRUCK REQUIRED') }}
+              {{ fact('Trailer', report.trailer_number, 'TRAILER REQUIRED') }}
+              {{ fact('Stage', report.stage) }}
+              {{ fact('Description', report.description) }}
+              {{ fact('Photos', report.photos|length) }}
+            </div>
+          </section>
+          <section class="desk-detail-section">
+            <div class="desk-section-title"><span>Actions</span><strong>Damage controls</strong></div>
+            <div class="desk-action-grid">
+              <a class="desk-action-link primary" href="{{ url_for('driver.view_damage_report', report_id=report.id) }}">Open damage report</a>
+              <a class="desk-action-link" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Add note / photo</a>
+              <a class="desk-action-link" href="{{ url_for('driver.damage_evidence_packet', report_id=report.id) }}">Evidence packet</a>
+            </div>
+          </section>
+        </div>
+      </template>
+    {% endfor %}
+  </div>
+</section>

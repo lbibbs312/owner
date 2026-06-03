@@ -4764,6 +4764,12 @@ def mobile_dashboard():
         _active_driver_logs_query().filter_by(driver_id=current_user.id, date=route_date).all(),
         key=_driver_log_sort_key,
     )
+    route_transfers = (
+        _active_plant_transfers_query().filter_by(user_id=current_user.id, transfer_date=route_date)
+        .order_by(PlantTransfer.created_at.desc(), PlantTransfer.id.desc())
+        .all()
+    )
+    route_damage_reports = _today_damage_reports(current_user.id, route_date)
     route_context = build_route_context(driver_id=current_user.id, route_date=route_date, now=now_local)
     todays_log_routes = route_context.log_routes
     route_task_events = _task_route_events_for_logs(todays_logs, _driver_route_tasks(current_user.id, route_date))
@@ -4896,6 +4902,8 @@ def mobile_dashboard():
         current_stop_forecast=current_stop_forecast,
         next_load_eta=next_load_eta,
         next_load_prediction=next_load_prediction,
+        route_transfers=route_transfers,
+        route_damage_reports=route_damage_reports,
         current_truck_number=current_truck_number,
         truck_maintenance_history=truck_maintenance_history,
         truck_issue_choices=TRUCK_ISSUE_CHOICES,
