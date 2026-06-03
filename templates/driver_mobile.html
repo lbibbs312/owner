@@ -2807,12 +2807,14 @@
       background: rgba(217,192,140,.10);
       box-shadow: 0 0 20px rgba(217,192,140,.16), inset 0 0 10px rgba(217,192,140,.05);
     }
+    /* CURRENT ACTIVITY light — the active/open stop breathes BLUE so it is easy
+       to find on the board and reads as "live", distinct from the red alert. */
     .md-flow-board .md-flow-row.tone-active {
       border: 1px solid rgba(91,157,255,.30);
       border-radius: 11px;
       margin: 6px;
       background: rgba(91,157,255,.10);
-      box-shadow: 0 0 20px rgba(91,157,255,.15), inset 0 0 10px rgba(91,157,255,.05);
+      animation: activebreathe 4.6s ease-in-out infinite;
     }
     .md-flow-board .md-flow-row.tone-hot {
       border: 1px solid rgba(245,158,11,.30);
@@ -2840,6 +2842,19 @@
         border-color: rgba(255,82,71,.50);
         background-color: rgba(255,82,71,.12);
         box-shadow: 0 0 30px rgba(255,82,71,.22), inset 0 0 14px rgba(255,82,71,.09);
+      }
+    }
+    /* the current-activity light breathes blue — live "you are here" marker */
+    @keyframes activebreathe {
+      0%, 100% {
+        border-color: rgba(91,157,255,.26);
+        background-color: rgba(91,157,255,.07);
+        box-shadow: 0 0 14px rgba(91,157,255,.12), inset 0 0 10px rgba(91,157,255,.05);
+      }
+      50% {
+        border-color: rgba(91,157,255,.50);
+        background-color: rgba(91,157,255,.13);
+        box-shadow: 0 0 28px rgba(91,157,255,.24), inset 0 0 14px rgba(91,157,255,.09);
       }
     }
     @keyframes liveTicker {
