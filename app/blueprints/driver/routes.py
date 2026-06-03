@@ -5,7 +5,7 @@ inspections, driver logs, shift start/end, end-of-day. Currently only the
 pre-trip / post-trip family lives here; the rest will move in subsequent sub-
 PRs of PR-5c.
 """
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from functools import wraps
 import os
 from uuid import uuid4
@@ -1388,6 +1388,52 @@ def _total_miles_for_pretrips(pretrips):
     return total if has_mileage else None
 
 
+def _driver_mileage_totals_by_date(driver_id, *, before_date=None, through_date=None):
+    query = (
+        _active_pretrips_query()
+        .join(PostTrip, PostTrip.pretrip_id == PreTrip.id)
+        .filter(
+            PreTrip.user_id == driver_id,
+            PreTrip.start_mileage.isnot(None),
+            PostTrip.end_mileage.isnot(None),
+        )
+    )
+    if before_date is not None:
+        query = query.filter(PreTrip.pretrip_date < before_date)
+    if through_date is not None:
+        query = query.filter(PreTrip.pretrip_date <= through_date)
+
+    totals = {}
+    for route_date, start_mileage, end_mileage in query.with_entities(
+        PreTrip.pretrip_date,
+        PreTrip.start_mileage,
+        PostTrip.end_mileage,
+    ):
+        if route_date is None or start_mileage is None or end_mileage is None:
+            continue
+        totals[route_date] = totals.get(route_date, 0) + (end_mileage - start_mileage)
+    return totals
+
+
+def _driver_mileage_performance(driver_id, route_date, current_total):
+    previous_date = route_date - timedelta(days=1)
+    previous_total = _driver_mileage_totals_by_date(
+        driver_id,
+        through_date=previous_date,
+    ).get(previous_date)
+    history_totals = _driver_mileage_totals_by_date(driver_id, before_date=route_date)
+    historical_values = list(history_totals.values())
+    average_miles = round(sum(historical_values) / len(historical_values)) if historical_values else None
+    variance = current_total - previous_total if current_total is not None and previous_total is not None else None
+    return {
+        "previous_date": previous_date,
+        "previous_total_miles": previous_total,
+        "mileage_variance": variance,
+        "average_miles": average_miles,
+        "average_days": len(historical_values),
+    }
+
+
 def _route_pretrip_sort_key(pretrip):
     return (
         pretrip.pretrip_date or date.min,
@@ -1475,6 +1521,8 @@ def _driver_route_audit_summary(driver_id, route_date, logs, route_map_ctx=None,
                 "delta_from_start": delta,
             }
         )
+    total_miles = _total_miles_for_pretrips(pretrips)
+    mileage_performance = _driver_mileage_performance(driver_id, route_date, total_miles)
     return {
         "pretrip_count": len(pretrips),
         "route_pretrip": last_pretrip,
@@ -1482,7 +1530,8 @@ def _driver_route_audit_summary(driver_id, route_date, logs, route_map_ctx=None,
         "trailer_number": last_pretrip.trailer_number if last_pretrip else "",
         "start_mileage": start_mileage,
         "end_mileage": end_mileage,
-        "total_miles": _total_miles_for_pretrips(pretrips),
+        "total_miles": total_miles,
+        **mileage_performance,
         "posttrip_complete": bool(last_posttrip),
         "start_fuel_level": start_fuel_level,
         "start_fuel_source": start_fuel_source,

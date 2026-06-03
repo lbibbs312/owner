@@ -4406,8 +4406,19 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
     assert unread["unread_count"] >= unread["action_count"]
 
 
+def test_global_delta_component_formats_additions_and_subtractions(app):
+    with app.app_context():
+        delta_value = app.jinja_env.get_template("partials/_delta.html").module.delta_value
+        rendered = f"{delta_value(12, 'mi')} {delta_value(-8, 'mi')}"
+
+    assert "▲ +12 mi" in rendered
+    assert "▼ -8 mi" in rendered
+    assert "app-delta--up font-mono" in rendered
+    assert "app-delta--down font-mono" in rendered
+
+
 def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, app):
-    from datetime import date, datetime
+    from datetime import date, datetime, timedelta
 
     selected_date = date(2026, 5, 20)
     with app.app_context():
@@ -4431,7 +4442,21 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
             start_mileage=1000,
             created_at=datetime(2026, 5, 20, 14, 0, 0),
         )
-        db.session.add_all([prior_pretrip, current_pretrip])
+        previous_day_pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="BT-1",
+            pretrip_date=selected_date - timedelta(days=1),
+            start_mileage=800,
+            created_at=datetime(2026, 5, 19, 8, 0, 0),
+        )
+        older_pretrip = PreTrip(
+            user_id=driver.id,
+            truck_number="BT-1",
+            pretrip_date=selected_date - timedelta(days=2),
+            start_mileage=700,
+            created_at=datetime(2026, 5, 18, 8, 0, 0),
+        )
+        db.session.add_all([prior_pretrip, current_pretrip, previous_day_pretrip, older_pretrip])
         db.session.flush()
         db.session.add_all([
             PostTrip(
@@ -4447,6 +4472,18 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
                 end_fuel_level="3/4",
                 miles_driven=120,
                 created_at=datetime(2026, 5, 20, 22, 0, 0),
+            ),
+            PostTrip(
+                pretrip_id=previous_day_pretrip.id,
+                end_mileage=908,
+                miles_driven=108,
+                created_at=datetime(2026, 5, 19, 18, 0, 0),
+            ),
+            PostTrip(
+                pretrip_id=older_pretrip.id,
+                end_mileage=790,
+                miles_driven=90,
+                created_at=datetime(2026, 5, 18, 18, 0, 0),
             ),
             DriverLog(
                 driver_id=driver.id,
@@ -4481,6 +4518,11 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"Numbered Stops" in logs_page.data
     assert b"Route Miles" in logs_page.data
     assert b"120 mi" in logs_page.data
+    assert "▲ +12 mi".encode() in logs_page.data
+    assert b"app-delta app-delta--up font-mono md-mileage-delta" in logs_page.data
+    assert b"--status-green:oklch(0.72 0.17 150)" in logs_page.data
+    assert b"--status-red:oklch(0.65 0.22 25)" in logs_page.data
+    assert b"Avg: 99 mi/day" in logs_page.data
     assert b"Start 1,000" in logs_page.data
     assert b"End 1,120" in logs_page.data
     assert b"Start Fuel" in logs_page.data

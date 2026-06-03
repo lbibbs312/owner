@@ -1,0 +1,9 @@
+{% macro delta_value(value, unit='', class_name='') -%}
+  {%- if value is not none and value > 0 -%}
+    <span class="app-delta app-delta--up font-mono {{ class_name }}">▲ +{{ "{:,}".format(value) }}{% if unit %} {{ unit }}{% endif %}</span>
+  {%- elif value is not none and value < 0 -%}
+    <span class="app-delta app-delta--down font-mono {{ class_name }}">▼ -{{ "{:,}".format(value * -1) }}{% if unit %} {{ unit }}{% endif %}</span>
+  {%- elif value is not none -%}
+    <span class="app-delta app-delta--neutral font-mono {{ class_name }}">0{% if unit %} {{ unit }}{% endif %}</span>
+  {%- endif -%}
+{%- endmacro %}

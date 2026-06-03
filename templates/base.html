@@ -27,6 +27,37 @@
   >
 
   <style>
+    :root {
+      --status-green:oklch(0.72 0.17 150);
+      --status-red:oklch(0.65 0.22 25);
+      --font-mono:'IBM Plex Mono','JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    }
+
+    .font-mono {
+      font-family:var(--font-mono);
+    }
+
+    .app-delta {
+      display:inline-flex;
+      align-items:baseline;
+      gap:.25ch;
+      font-family:var(--font-mono);
+      font-variant-numeric:tabular-nums;
+      font-weight:900;
+      letter-spacing:0;
+      line-height:1;
+      white-space:nowrap;
+    }
+    .app-delta--up {
+      color:var(--status-green);
+    }
+    .app-delta--down {
+      color:var(--status-red);
+    }
+    .app-delta--neutral {
+      color:rgba(138,153,179,.72);
+    }
+
     body {
       font-family: 'Montserrat', sans-serif;
       background-color: #f9f9f9;

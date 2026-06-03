@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+{% from 'partials/_delta.html' import delta_value %}
 <div class="container-fluid driver-log-shell slide-in">
   {% set logs_endpoint = 'manager.driver_logs' if current_user.role == 'management' else 'driver.driver_logs' %}
   <script>document.body.classList.add({% if current_user.role == 'management' %}'manager-logs-active'{% else %}'md-shell','driver-ledger-active'{% endif %});</script>
@@ -271,12 +272,30 @@
     .md-route-audit-card strong {
       display:block;
       margin-top:4px;
-      color:var(--md-text);
+      color:#f2eadf;
       font-family:var(--md-display);
       font-size:.92rem;
       font-weight:900;
       line-height:1.15;
       overflow-wrap:anywhere;
+    }
+    .md-route-audit-card .md-metric-line {
+      display:flex;
+      align-items:baseline;
+      justify-content:space-between;
+      gap:10px;
+      margin-top:4px;
+    }
+    .md-route-audit-card .md-metric-line strong {
+      margin-top:0;
+      min-width:0;
+    }
+    .md-route-audit-card .md-mileage-average {
+      color:rgba(138,153,179,.58);
+    }
+    .md-route-audit-card .md-mileage-delta {
+      flex:0 0 auto;
+      font-size:.78rem;
     }
     .md-route-audit-card small {
       display:block;
@@ -833,8 +852,14 @@
           </div>
           <div class="md-route-audit-card">
             <span>Route Miles</span>
-            <strong>{% if audit.total_miles is not none %}{{ "{:,}".format(audit.total_miles) }} mi{% elif logs %}Pending PostTrip{% else %}Not recorded{% endif %}</strong>
+            <div class="md-metric-line">
+              <strong>{% if audit.total_miles is not none %}{{ "{:,}".format(audit.total_miles) }} mi{% elif logs %}Pending PostTrip{% else %}Not recorded{% endif %}</strong>
+              {% if audit.mileage_variance is not none %}
+                {{ delta_value(audit.mileage_variance, 'mi', 'md-mileage-delta') }}
+              {% endif %}
+            </div>
             <small>{% if audit.start_mileage is not none %}Start {{ "{:,}".format(audit.start_mileage) }}{% endif %}{% if audit.end_mileage is not none %}{% if audit.start_mileage is not none %} → {% endif %}End {{ "{:,}".format(audit.end_mileage) }}{% endif %}{% if audit.pretrip_count %}{% if audit.start_mileage is not none or audit.end_mileage is not none %} · {% endif %}{{ audit.pretrip_count }} DVIR{% endif %}</small>
+            <small class="md-mileage-average">Avg: {% if audit.average_miles is not none %}{{ "{:,}".format(audit.average_miles) }} mi/day{% else %}not enough history{% endif %}</small>
           </div>
           <div class="md-route-audit-card">
             <span>Truck / Trailer</span>
