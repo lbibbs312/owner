@@ -86,6 +86,28 @@ def _safe_url(endpoint, **values):
         return None
 
 
+def _date_param(value):
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date_cls):
+        return value.isoformat()
+    return str(value) if value else None
+
+
+def _stop_audit_url(log, *, role="driver"):
+    log_id = getattr(log, "id", None)
+    if not log_id:
+        return None
+    endpoint = "manager.driver_logs" if role == "manager" else "driver.driver_logs"
+    values = {"_anchor": f"route-stop-{log_id}"}
+    date_param = _date_param(getattr(log, "date", None))
+    if date_param:
+        values["date"] = date_param
+    if role == "manager" and getattr(log, "driver_id", None):
+        values["driver_id"] = log.driver_id
+    return _safe_url(endpoint, **values)
+
+
 def _location_label(value):
     text = _clean(value)
     if not text:
@@ -824,7 +846,11 @@ def _stop_actions(log, *, linked_move=None, role="driver"):
     actions = []
     view_endpoint = "manager.view_driver_log" if role == "manager" else "driver.view_driver_log"
     edit_endpoint = "driver.edit_driver_log"
-    actions.append({"label": "Open stop", "url": _safe_url(view_endpoint, log_id=log.id), "method": "get"})
+    actions.append({
+        "label": "Open stop",
+        "url": _stop_audit_url(log, role=role) or _safe_url(view_endpoint, log_id=log.id),
+        "method": "get",
+    })
     if role == "driver":
         actions.append({"label": "Record arrival", "url": None, "method": "disabled"})
         if not log.depart_time:
@@ -1163,7 +1189,8 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             "board_badge": board_status_badge,
             "notes": row.get("note") or "",
             "next_action": _stop_next_action(log, status=status, cargo=cargo, linked_move=linked_move, issues=stop_issues),
-            "view_url": _safe_url("manager.view_driver_log" if role == "manager" else "driver.view_driver_log", log_id=log.id),
+            "view_url": _stop_audit_url(log, role=role)
+            or _safe_url("manager.view_driver_log" if role == "manager" else "driver.view_driver_log", log_id=log.id),
             "actions": _stop_actions(log, linked_move=linked_move, role=role),
         })
         if dropped_loads or added_loads or (
@@ -1330,7 +1357,8 @@ def _base_stop_detail(log, row, route, *, cargo_label, pickup=None, has_prior_mo
         "wait_label": wait_label,
         "note": row.get("note") or "",
         "pickup_label": pickup_label,
-        "view_url": _safe_url("driver.view_driver_log", log_id=getattr(log, "id", None)),
+        "view_url": _stop_audit_url(log)
+        or _safe_url("driver.view_driver_log", log_id=getattr(log, "id", None)),
     }
 
 

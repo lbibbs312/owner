@@ -5177,6 +5177,35 @@ def test_plant_transfer_flow_and_eod_includes_transfer(client, app):
 
 
 
+def test_mobile_dashboard_stop_clicks_open_audit_ledger_stop_anchor(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("driver_stop_anchor", "driver-stop-anchor@example.com", "driver")
+        route_date = date.today()
+        log = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="RE",
+            load_size="Empty",
+            arrive_time=f"{route_date.isoformat()} 10:15:00",
+        )
+        db.session.add(log)
+        db.session.commit()
+        log_id = log.id
+
+    login(client, "driver_stop_anchor")
+    page = client.get("/mobile")
+
+    expected_href = f"/driver_logs?date={route_date.isoformat()}#route-stop-{log_id}".encode()
+    assert page.status_code == 200
+    assert expected_href in page.data
+    assert f"/view_driver_log/{log_id}".encode() not in page.data
+
+
 def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     from datetime import date, timedelta
 

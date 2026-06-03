@@ -146,6 +146,22 @@ def test_driver_route_map_with_driver_log_returns_stop_nodes(app):
     assert ctx["route"]["current_location"] == "Paint West"
 
 
+def test_driver_route_map_stop_links_open_audit_ledger_anchor(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user()
+    route_date = date(2026, 6, 2)
+    log = _driver_log(driver, date=route_date, plant_name="RE", depart_time="08:30")
+
+    with app.test_request_context("/mobile"):
+        ctx = build_driver_route_map_context(driver=driver, date=route_date)
+
+    expected_url = f"/driver_logs?date=2026-06-02#route-stop-{log.id}"
+    assert ctx["stops"][0]["view_url"] == expected_url
+    assert ctx["stops"][0]["actions"][0]["url"] == expected_url
+    assert "/view_driver_log/" not in ctx["stops"][0]["view_url"]
+
+
 def test_fuel_stop_uses_neutral_mileage_when_pretrip_delta_is_impossible(app):
     from app.extensions import db
     from app.models import PreTrip

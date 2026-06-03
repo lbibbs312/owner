@@ -3146,7 +3146,8 @@
         {% set r = (todays_log_routes or {}).get(dl.id) %}
         {% set is_done = dl.depart_time %}
         {% set is_current = current_stop and dl.id == current_stop.id %}
-        <a class="rp-stop {% if is_current %}is-current{% endif %}" href="{{ url_for('driver.view_driver_log', log_id=dl.id) }}" title="Open {{ r.plant if r else dl.plant_name }} stop">
+        {% set stop_audit_href = url_for('driver.driver_logs', date=dl.date.isoformat(), _anchor='route-stop-' ~ dl.id) %}
+        <a class="rp-stop {% if is_current %}is-current{% endif %}" href="{{ stop_audit_href }}" title="Open {{ r.plant if r else dl.plant_name }} stop">
           <div class="rp-indicator">
             <div class="rp-dot {% if is_current %}current{% elif is_done %}done{% else %}open{% endif %}">
               {% if is_done %}✓{% elif is_current %}●{% else %}○{% endif %}
