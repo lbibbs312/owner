@@ -2060,8 +2060,22 @@ def _build_pretrip_pdf(pretrip):
         )
 
     y = 210
-    remarks = (pretrip.damage_report or "").strip()
-    remarks_color = PDF_ALERT_RED if remarks else None
+    pretrip_remarks = (pretrip.damage_report or "").strip()
+    remarks_lines = []
+    if pretrip_remarks:
+        remarks_lines.append(pretrip_remarks)
+    if pretrip.posttrip:
+        posttrip_parts = [
+            f"PostTrip: End mileage {pretrip.posttrip.end_mileage if pretrip.posttrip.end_mileage is not None else 'not recorded'}",
+            f"miles driven {pretrip.posttrip.miles_driven if pretrip.posttrip.miles_driven is not None else 'not calculated'}",
+            f"ending fuel {pretrip.posttrip.end_fuel_level or 'not recorded'}",
+        ]
+        posttrip_remarks = (pretrip.posttrip.remarks or "").strip()
+        if posttrip_remarks:
+            posttrip_parts.append(f"remarks: {posttrip_remarks}")
+        remarks_lines.append("; ".join(posttrip_parts))
+    remarks = "\n".join(remarks_lines)
+    remarks_color = PDF_ALERT_RED if pretrip_remarks else None
     pdf.text(36, y, "6. Defects / Remarks", size=10, bold=True, color=remarks_color)
     pdf.rect(36, y - 70, 540, 60)
     pdf.multiline_text(
@@ -2070,8 +2084,8 @@ def _build_pretrip_pdf(pretrip):
         remarks,
         width_chars=95,
         size=9,
-        bold=bool(remarks),
-        max_lines=5,
+        bold=bool(pretrip_remarks),
+        max_lines=6,
         color=remarks_color,
     )
     pdf.text(36, 112, "7. Driver Signature", size=10, bold=True)
@@ -2519,13 +2533,15 @@ def do_posttrip(pretrip_id):
 @login_required
 def view_pretrip(pretrip_id):
     pt = _active_pretrips_query().filter_by(id=pretrip_id).first_or_404()
-    if current_user.role == "driver" and not _driver_can_view_inspection_pretrip(pt):
-        flash("Not authorized to view that PreTrip.", "danger")
-        return redirect(url_for("driver.list_pretrips"))
+    if current_user.role == "driver":
+        if not _driver_can_view_inspection_pretrip(pt):
+            flash("Not authorized to view that PreTrip.", "danger")
+            return redirect(url_for("driver.list_pretrips"))
+        return redirect(url_for("driver.pretrip_printable", pretrip_id=pt.id))
     return render_template(
         "view_pretrip.html",
         pretrip=pt,
-        readonly=(current_user.role == "management" or pt.user_id != current_user.id),
+        readonly=True,
         today_local_date=_today_local_date(),
         pretrip_damage_reports=_pretrip_damage_reports(pt),
         document_meta=_pretrip_document_meta(pt),
@@ -2693,8 +2709,8 @@ def pretrip_printable(pretrip_id):
 @login_required
 def pretrip_attachment(pretrip_id):
     pt = _active_pretrips_query().filter_by(id=pretrip_id).first_or_404()
-    if current_user.role == "driver" and pt.user_id != current_user.id:
-        flash("Not authorized to download another driver's PreTrip.", "danger")
+    if current_user.role == "driver" and not _driver_can_view_inspection_pretrip(pt):
+        flash("Not authorized to download that PreTrip.", "danger")
         return redirect(url_for("driver.list_pretrips"))
     return _document_attachment_response(
         pdf_bytes=_build_pretrip_pdf(pt),

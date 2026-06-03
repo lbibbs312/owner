@@ -112,7 +112,7 @@
               {% endif %}
             </div>
             <div class="actions" aria-label="Driver log actions">
-              <a class="mini-btn success" href="{{ url_for('driver.view_driver_log', log_id=log.id) }}">View</a>
+              <a class="mini-btn success" href="{{ url_for('driver.driver_logs_print', date=log.date.isoformat()) }}">View</a>
               {% if can_manage_log %}
                 <a class="mini-btn primary" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Edit</a>
                 {% if not log.depart_time %}

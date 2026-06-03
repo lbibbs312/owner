@@ -221,6 +221,9 @@
 {% set pretrip_view_endpoint = 'manager.view_pretrip' if current_user.role == 'management' else 'driver.view_pretrip' %}
 {% set pretrip_mark_endpoint = 'manager.mark_pretrip_printed' if current_user.role == 'management' else 'driver.mark_pretrip_printed' %}
 {% set pretrip_print_endpoint = 'manager.pretrip_printable' if current_user.role == 'management' else 'driver.pretrip_printable' %}
+{% set can_edit_pretrip = current_user.role == 'driver' and pretrip.user_id == current_user.id %}
+{% set can_mark_printed = current_user.role == 'management' or can_edit_pretrip %}
+{% set back_url = url_for(pretrip_view_endpoint, pretrip_id=pretrip.id) if current_user.role == 'management' else url_for('driver.list_pretrips', truck_number=pretrip.truck_number) %}
 {% macro defect_item(flag, label) -%}
   <div class="checkbox-line{% if flag %} defect-marked{% endif %}">
     [{{ "X" if flag else " " }}] {{ label }}
@@ -228,12 +231,12 @@
 {%- endmacro %}
 <div class="print-controls no-print">
   <div class="print-actions">
-    {% if current_user.role == 'driver' and pretrip.user_id == current_user.id %}
+    {% if can_edit_pretrip %}
       <a class="edit-btn" href="{{ url_for('driver.edit_pretrip_entry', pretrip_id=pretrip.id) }}">Edit PreTrip Before Printing</a>
     {% endif %}
-    <button class="print-btn" type="button" onclick="markPrintedAndPrint()">Print Document</button>
-    <a class="email-btn" href="{{ url_for(pretrip_print_endpoint, pretrip_id=pretrip.id, autoprint=1) }}">Save PDF</a>
-    <a class="back-btn" href="{{ url_for(pretrip_view_endpoint, pretrip_id=pretrip.id) }}">Back to PreTrip</a>
+    <button class="print-btn" type="button" onclick="{% if can_mark_printed %}markPrintedAndPrint(){% else %}window.print(){% endif %}">Print Document</button>
+    <a class="email-btn" href="{{ url_for(pretrip_attachment_endpoint, pretrip_id=pretrip.id) }}">Save PDF</a>
+    <a class="back-btn" href="{{ back_url }}">Back to Inspections</a>
   </div>
 </div>
 
@@ -388,6 +391,16 @@
     {{ pretrip.damage_report or "" }}
   </div>
 
+  {% if pretrip.posttrip %}
+    <div class="remarks-block">
+      <strong>PostTrip Closeout:</strong><br>
+      End Mileage: {{ pretrip.posttrip.end_mileage or "Not recorded" }}<br>
+      Miles Driven: {{ pretrip.posttrip.miles_driven if pretrip.posttrip.miles_driven is not none else "Not calculated" }}<br>
+      Ending Fuel: {{ pretrip.posttrip.end_fuel_level or "Not recorded" }}<br>
+      Remarks: {{ pretrip.posttrip.remarks or "None" }}
+    </div>
+  {% endif %}
+
 
   {% set damage_photo_endpoint = 'manager.damage_photo' if current_user.role == 'management' else 'driver.damage_photo' %}
   {% set evidence_reports = pretrip_damage_reports|default([]) %}
@@ -444,7 +457,7 @@
   {% if request.args.get('autoprint') %}
   window.addEventListener("load", function () {
     window.setTimeout(function () {
-      markPrintedAndPrint();
+      {% if can_mark_printed %}markPrintedAndPrint();{% else %}window.print();{% endif %}
     }, 150);
   });
   {% endif %}

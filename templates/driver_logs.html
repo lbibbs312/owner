@@ -1062,7 +1062,7 @@
               {% endif %}
 
               <div class="md-row-actions">
-                <a href="{{ url_for(log_view_endpoint, log_id=log.id) }}" class="md-row-action"><span class="md-btn-icon">O</span> View</a>
+                <a href="{{ url_for(log_view_endpoint, log_id=log.id) if current_user.role == 'management' else url_for('driver.driver_logs_print', date=log.date.isoformat()) }}" class="md-row-action"><span class="md-btn-icon">O</span> View</a>
                 {% if can_manage_log %}
                   <a href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}" class="md-row-action warn"><span class="md-btn-icon">E</span> Edit</a>
                   <a href="{{ url_for('driver.view_driver_log', log_id=log.id) }}" class="md-row-action"><span class="md-btn-icon">P</span> Add Proof</a>

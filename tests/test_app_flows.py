@@ -4501,6 +4501,10 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"Print Route Record" in logs_page.data
     assert f"/driver_logs_print?date={selected_date.isoformat()}".encode() in logs_page.data
     assert f"/driver_logs_print?date={selected_date.isoformat()}&amp;autoprint=1".encode() in logs_page.data
+    assert (
+        f'href="/driver_logs_print?date={selected_date.isoformat()}" class="md-row-action"><span class="md-btn-icon">O</span> View'.encode()
+        in logs_page.data
+    )
 
     print_page = client.get(f"/driver_logs_print?date={selected_date.isoformat()}")
     assert print_page.status_code == 200
@@ -6279,14 +6283,25 @@ def test_driver_inspections_page_is_scoped_to_current_truck(client, app):
     assert b"End Fuel" in page.data
     assert b"1/4" in page.data
     assert b"12,050 mi" in page.data
+    assert f"/pretrip_printable/{prior_same_truck_id}".encode() in page.data
     assert b"ST5" not in page.data
     assert b"Other truck issue should not show" not in page.data
 
-    same_truck_record = client.get(f"/view_pretrip/{prior_same_truck_id}")
+    same_truck_redirect = client.get(f"/view_pretrip/{prior_same_truck_id}")
+    assert same_truck_redirect.status_code == 302
+    assert same_truck_redirect.headers["Location"].endswith(f"/pretrip_printable/{prior_same_truck_id}")
+
+    same_truck_record = client.get(f"/view_pretrip/{prior_same_truck_id}", follow_redirects=True)
     assert same_truck_record.status_code == 200
-    assert b"Truck / Tractor #:</strong> ST4" in same_truck_record.data
-    assert b"Ending Fuel:</strong> 1/4" in same_truck_record.data
+    assert b"Daily Vehicle Inspection Report" in same_truck_record.data
+    assert b"Truck:</strong> ST4" in same_truck_record.data
+    assert b"End 1/4" in same_truck_record.data
     assert b"Same truck low fuel at handoff." in same_truck_record.data
+    assert b"Back to Inspections" in same_truck_record.data
+
+    same_truck_pdf = client.get(f"/pretrip_printable/{prior_same_truck_id}/attachment")
+    assert same_truck_pdf.status_code == 200
+    assert same_truck_pdf.headers["Content-Type"] == "application/pdf"
 
     blocked = client.get(f"/view_pretrip/{other_truck_id}", follow_redirects=True)
     assert blocked.status_code == 200
