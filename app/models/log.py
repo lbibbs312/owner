@@ -47,6 +47,9 @@ class DriverLogPhoto(db.Model):
     original_filename = db.Column(db.String(255), nullable=True)
     content_type = db.Column(db.String(100), nullable=True)
     source = db.Column(db.String(40), nullable=False, default="gallery")
+    document_type = db.Column(db.String(40), nullable=True)
+    owner_type = db.Column(db.String(30), nullable=True)
+    owner_id = db.Column(db.String(40), nullable=True)
     note = db.Column(db.Text, nullable=True)
     uploaded_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -61,6 +64,17 @@ class DriverLogPhoto(db.Model):
     )
     uploaded_by = db.relationship("User", backref="driver_log_photos")
 
+    DOCUMENT_TYPE_LABELS = {
+        "bol_manifest": "BOL",
+        "transfer_sheet": "Transfer Sheet",
+        "route_sheet": "Route Sheet",
+        "proof_photo": "Proof Photo",
+        "damage_photo": "Damage Photo",
+        "driver_credential": "Driver Credential",
+        "truck_document": "Truck Document",
+        "other_document": "Document",
+    }
+
     @property
     def file_available(self):
         try:
@@ -69,4 +83,22 @@ class DriverLogPhoto(db.Model):
         except RuntimeError:
             return False
         return os.path.isfile(upload_path)
+
+    @property
+    def resolved_document_type(self):
+        """Document type code, falling back to the legacy source-encoded value."""
+        if self.document_type:
+            return self.document_type
+        source = (self.source or "").strip()
+        for code in self.DOCUMENT_TYPE_LABELS:
+            if source == code or source.startswith(code + "_"):
+                return code
+        return None
+
+    @property
+    def document_type_label(self):
+        code = self.resolved_document_type
+        if code:
+            return self.DOCUMENT_TYPE_LABELS.get(code, code.replace("_", " ").title())
+        return (self.source or "Document").replace("_", " ").title()
 

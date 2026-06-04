@@ -468,20 +468,7 @@
       {% include "_driver_active_wait_banner.html" %}
     {% endif %}
 
-    {% if current_user.is_authenticated and current_user.role == "management" %}
-      {% with messages = get_flashed_messages(with_categories=True) %}
-        {% if messages %}
-          <div class="container mt-3 manager-flash-stack">
-            {% for category, message in messages %}
-              <div class="alert alert-{{ 'danger' if category == 'danger' else category }} alert-dismissible fade show" role="alert">
-                {{ message|safe }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-              </div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      {% endwith %}
-    {% endif %}
+    {# Flash messages render as MoveDefense toasts at the end of <body> (see _md_toasts emit). #}
 
     <!-- MAIN CONTENT with fade-in animation -->
     <div class="container mt-4 fade-in">
@@ -732,27 +719,27 @@
       });
     });
   </script>
-  {% if not (current_user.is_authenticated and current_user.role == "management") %}
-  <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
-
+  {% if current_user.is_authenticated %}
     {% with messages = get_flashed_messages(with_categories=True) %}
       {% if messages %}
         <script>
-          {% for category, message in messages %}
-            {% if category == 'success' %}
-              if (window.MoveDefenseToast) {
-                window.MoveDefenseToast.success("RECORDED", {{ message|striptags|tojson }});
-              } else {
-                swal({ title: "Success!", text: "{{ message|safe }}", icon: "success", button: "OK" });
-              }
-            {% elif category == 'danger' %}
-              swal({ title: "Error!", text: "{{ message|safe }}", icon: "error", button: "OK" });
-            {% elif category == 'warning' %}
-              swal({ title: "Warning", text: "{{ message|safe }}", icon: "warning", button: "OK" });
-            {% else %}
-              swal({ title: "Notice", text: "{{ message|safe }}", icon: "info", button: "OK" });
-            {% endif %}
-          {% endfor %}
+          (function () {
+            if (!window.MoveDefenseToast) return;
+            var items = {{ messages|tojson }};
+            var defaults = { success: 'DONE', error: 'ERROR', warning: 'HEADS UP', info: 'NOTICE' };
+            items.forEach(function (pair) {
+              var category = pair[0];
+              var message = String(pair[1] == null ? '' : pair[1]);
+              var type = category === 'danger' ? 'error'
+                : (category === 'warning' ? 'warning'
+                : (category === 'success' ? 'success' : 'info'));
+              var nl = message.indexOf('\n');
+              var title, detail;
+              if (nl >= 0) { title = message.slice(0, nl); detail = message.slice(nl + 1); }
+              else { title = defaults[type] || 'NOTICE'; detail = message; }
+              (window.MoveDefenseToast[type] || window.MoveDefenseToast.show)(title, detail, type);
+            });
+          })();
         </script>
       {% endif %}
     {% endwith %}

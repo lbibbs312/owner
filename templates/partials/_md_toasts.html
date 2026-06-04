@@ -1,0 +1,117 @@
+{# Shared MoveDefense toast system: dark glass, blue glow, auto-dismiss, success/error/warning states.
+   Defines window.MoveDefenseToast = { show(title, detail, type), success, warning, error, info }.
+   Safe to include once per page in any shell (driver workspace or manager base). #}
+<style>
+  .md-toast-stack {
+    position: fixed;
+    left: 14px;
+    right: 14px;
+    bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+    z-index: 4000;
+    display: grid;
+    gap: 10px;
+    pointer-events: none;
+  }
+  .md-toast {
+    justify-self: center;
+    width: min(420px, 100%);
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    border: 1px solid rgba(91, 157, 255, .42);
+    border-radius: 10px;
+    background: rgba(6, 10, 18, .92);
+    color: #f6f8fb;
+    padding: 11px 13px;
+    box-shadow: inset 0 0 26px rgba(91, 157, 255, .12), 0 0 28px rgba(91, 157, 255, .2), 0 20px 46px rgba(0, 0, 0, .36);
+    backdrop-filter: blur(14px);
+    transform: translateY(8px);
+    opacity: 0;
+    animation: mdToastIn .16s ease-out forwards;
+    pointer-events: auto;
+  }
+  .md-toast.is-leaving { animation: mdToastOut .16s ease-in forwards; }
+  .md-toast-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: #2bd576;
+    box-shadow: 0 0 0 4px rgba(43, 213, 118, .12), 0 0 16px rgba(43, 213, 118, .62);
+  }
+  .md-toast[data-type="error"] { border-color: rgba(255, 82, 71, .5); }
+  .md-toast[data-type="error"] .md-toast-dot { background: #ff5247; box-shadow: 0 0 0 4px rgba(255, 82, 71, .12), 0 0 16px rgba(255, 82, 71, .62); }
+  .md-toast[data-type="warning"] .md-toast-dot { background: #ffb224; box-shadow: 0 0 0 4px rgba(255, 178, 36, .12), 0 0 16px rgba(255, 178, 36, .62); }
+  .md-toast-title {
+    display: block;
+    color: #f6f8fb;
+    font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+    font-size: .74rem;
+    font-weight: 900;
+    letter-spacing: .12em;
+    line-height: 1.1;
+    text-transform: uppercase;
+  }
+  .md-toast-detail {
+    display: block;
+    margin-top: 3px;
+    color: #8a99b3;
+    font-size: .82rem;
+    line-height: 1.25;
+  }
+  .md-toast-close {
+    border: 0;
+    background: transparent;
+    color: #8a99b3;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px;
+    align-self: start;
+  }
+  .md-toast-close:hover { color: #f6f8fb; }
+  @keyframes mdToastIn { to { transform: translateY(0); opacity: 1; } }
+  @keyframes mdToastOut { to { transform: translateY(8px); opacity: 0; } }
+</style>
+<script>
+  window.MoveDefenseToast = window.MoveDefenseToast || (function () {
+    function stack() {
+      var existing = document.querySelector('[data-md-toast-stack]');
+      if (existing) return existing;
+      var node = document.createElement('div');
+      node.className = 'md-toast-stack';
+      node.setAttribute('data-md-toast-stack', 'true');
+      document.body.appendChild(node);
+      return node;
+    }
+    function dismiss(node) {
+      if (!node || node.dataset.dismissed === '1') return;
+      node.dataset.dismissed = '1';
+      node.classList.add('is-leaving');
+      window.setTimeout(function () { node.remove(); }, 180);
+    }
+    function show(title, detail, type) {
+      var node = document.createElement('div');
+      node.className = 'md-toast';
+      node.setAttribute('role', type === 'error' ? 'alert' : 'status');
+      node.setAttribute('data-type', type || 'success');
+      node.innerHTML = '<i class="md-toast-dot" aria-hidden="true"></i>' +
+        '<span><strong class="md-toast-title"></strong><small class="md-toast-detail"></small></span>' +
+        '<button type="button" class="md-toast-close" aria-label="Dismiss">&times;</button>';
+      node.querySelector('.md-toast-title').textContent = title || 'RECORDED';
+      node.querySelector('.md-toast-detail').textContent = detail || '';
+      node.querySelector('.md-toast-close').addEventListener('click', function () { dismiss(node); });
+      stack().appendChild(node);
+      var life = type === 'error' ? 5200 : (type === 'warning' ? 4400 : 3600);
+      window.setTimeout(function () { dismiss(node); }, life);
+      return node;
+    }
+    return {
+      show: show,
+      success: function (title, detail) { return show(title, detail, 'success'); },
+      warning: function (title, detail) { return show(title, detail, 'warning'); },
+      error: function (title, detail) { return show(title, detail, 'error'); },
+      info: function (title, detail) { return show(title, detail, 'success'); }
+    };
+  })();
+</script>

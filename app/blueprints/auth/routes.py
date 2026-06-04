@@ -145,7 +145,7 @@ def login():
         if user:
             login_user(user, remember=form.remember.data)
             remember_role_login(user)
-            flash("Logged in!", "success")
+            flash("SIGNED IN\nWelcome back to MoveDefense.", "success")
             if required_role and user.role != required_role:
                 flash(
                     f"{_role_label(required_role).title()} credentials are required for that area.",

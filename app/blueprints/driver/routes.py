@@ -1276,6 +1276,40 @@ def _save_driver_log_photo(log, uploaded_file, *, source="gallery", note=None, u
     return photo
 
 
+def _first_uploaded_file(files):
+    """Return the first FileStorage that actually carries a file.
+
+    The workspace attach-document control exposes two inputs named ``photo``
+    (Take Photo / Upload File). Browsers submit both, so ``request.files.get``
+    can return the empty one. Pick the first part that has a filename.
+    """
+    for candidate in files or []:
+        if candidate and getattr(candidate, "filename", ""):
+            return candidate
+    return None
+
+
+def _document_attached_toast(log, photo):
+    """Build (title, detail) lines for the document-attached toast.
+
+    No OCR/extraction pipeline exists, so BOL/transfer uploads land in a
+    review-needed state instead of promising auto-filled fields.
+    """
+    plant = _plant_label(log.plant_name) or "this stop"
+    day_logs = sorted(
+        _active_driver_logs_query().filter_by(driver_id=log.driver_id, date=log.date).all(),
+        key=_driver_log_sort_key,
+    )
+    sequence = next((index + 1 for index, item in enumerate(day_logs) if item.id == log.id), None)
+    context = f"Stop {sequence} · {plant}" if sequence else plant
+    code = photo.resolved_document_type
+    if code == "bol_manifest":
+        return ("BOL ATTACHED · REVIEW NEEDED", f"{context} · fields not extracted automatically")
+    if code == "transfer_sheet":
+        return ("TRANSFER SHEET ATTACHED · REVIEW NEEDED", f"{context} · awaiting review")
+    return ("DOCUMENT ATTACHED", f"{photo.document_type_label} · {context}")
+
+
 PHOTO_PROOF_CARGO_TERMS = ("cargo", "load", "skid", "pallet", "unbalanced", "un-balanced", "seal")
 
 
@@ -3564,36 +3598,45 @@ def delete_driver_log_photo(photo_id):
 @login_required
 def record_driver_log_photo(log_id):
     log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
+    next_url = request.form.get("next") or url_for("driver.edit_driver_log", log_id=log.id)
     if current_user.role == "driver" and log.driver_id != current_user.id:
         if _photo_upload_wants_json():
             return jsonify({"error": "Not authorized to upload this document for this stop."}), 403
-        flash("Not authorized to upload this document for this stop.", "danger")
-        return redirect(url_for("driver.driver_logs"))
+        flash("UPLOAD FAILED\nNot authorized to attach a document to this stop.", "danger")
+        return redirect(request.form.get("next") or url_for("driver.driver_logs"))
+
+    document_type = (request.form.get("document_type") or "").strip()
+    capture_source = (request.form.get("source") or "gallery").strip() or "gallery"
+    owner_type = (request.form.get("owner_type") or "").strip()
+    owner_id = (request.form.get("owner_id") or "").strip()
+    upload_source = f"{document_type}_{capture_source}" if document_type else capture_source
 
     try:
-        document_type = (request.form.get("document_type") or "").strip()
-        capture_source = (request.form.get("source") or "gallery").strip() or "gallery"
-        upload_source = f"{document_type}_{capture_source}" if document_type else capture_source
         photo = _save_driver_log_photo(
             log,
-            request.files.get("photo"),
+            _first_uploaded_file(request.files.getlist("photo")),
             source=upload_source,
             note=request.form.get("note"),
             uploaded_by_id=current_user.id,
         )
-    except ValueError as exc:
+    except ValueError:
         db.session.rollback()
         if _photo_upload_wants_json():
-            return jsonify({"error": str(exc)}), 400
-        flash(str(exc), "danger")
-        return redirect(request.form.get("next") or url_for("driver.edit_driver_log", log_id=log.id))
+            return jsonify({"error": "File was not saved. Try again."}), 400
+        flash("UPLOAD FAILED\nFile was not saved. Try again.", "danger")
+        return redirect(next_url)
+
+    if document_type:
+        photo.document_type = document_type[:40]
+    photo.owner_type = (owner_type or "stop")[:30]
+    photo.owner_id = (owner_id or str(log.id))[:40]
 
     record_activity(
         user_id=current_user.id,
         category="log_photo",
         action="created",
         title="Stop document uploaded",
-        details=f"{_plant_label(log.plant_name)} document: {photo.original_filename or photo.filename}. Type/note: {photo.note}",
+        details=f"{_plant_label(log.plant_name)} {photo.document_type_label}: {photo.original_filename or photo.filename}. Note: {photo.note}",
         target_type="driver_log_photo",
         target_id=photo.id,
         commit=False,
@@ -3601,8 +3644,9 @@ def record_driver_log_photo(log_id):
     db.session.commit()
     if _photo_upload_wants_json():
         return jsonify({"photo": _driver_log_photo_payload(photo)})
-    flash("Stop document saved.", "success")
-    return redirect(request.form.get("next") or url_for("driver.edit_driver_log", log_id=log.id))
+    toast_title, toast_detail = _document_attached_toast(log, photo)
+    flash(f"{toast_title}\n{toast_detail}", "success")
+    return redirect(next_url)
 
 
 @bp.route("/driver_logs/<int:log_id>/part-scans", methods=["POST"], strict_slashes=False)
