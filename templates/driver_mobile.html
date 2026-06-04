@@ -548,6 +548,27 @@
       }
       body.flow-first-body .wide-body { display: block; }
     }
+    body.flow-first-body .driver-ops-shell.flow-first-shell {
+      overflow: visible;
+    }
+    body.flow-first-body .driver-ops-shell.flow-first-shell .wide-body,
+    body.flow-first-body .driver-ops-shell.flow-first-shell main {
+      min-height: 0;
+      overflow: visible;
+    }
+    body.flow-first-body .driver-ops-shell.flow-first-shell main {
+      padding-bottom: calc(var(--nav-height) + 24px);
+    }
+    @media (max-width: 760px) {
+      body.flow-first-body .driver-ops-shell.flow-first-shell .compact-route-map.md-flow-board {
+        overflow: visible;
+      }
+      body.flow-first-body .driver-ops-shell.flow-first-shell .md-flow-window,
+      body.flow-first-body .driver-ops-shell.flow-first-shell .md-flow-track {
+        max-height: none;
+        overflow: visible;
+      }
+    }
 
     .rp-head {
       padding: 14px 16px 10px;

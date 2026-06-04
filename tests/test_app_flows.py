@@ -5362,6 +5362,9 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert b"nearestScrollableParent" in page.data
     assert b"scrollWorkAreaIntoView" in page.data
     assert b"desk-work-focus-pulse" in page.data
+    assert b"body.flow-first-body .driver-ops-shell.flow-first-shell" in page.data
+    assert b"body.flow-first-body .driver-ops-shell.flow-first-shell .md-flow-window" in page.data
+    assert b"max-height: none" in page.data
 
     workspace_start = page.data.index(b'<section class="desktop-ops-workspace"')
     workspace = page.data[workspace_start: page.data.index(b"<script>", workspace_start)]
