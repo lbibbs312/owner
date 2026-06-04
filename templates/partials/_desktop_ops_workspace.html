@@ -164,8 +164,9 @@
             {% set log = route_logs_by_id.get(stop.stop_id) %}
             {% set is_default = (not desk.default_set and stop.stop_id == route_focus.stop_id) %}
             {% if is_default %}{% set desk.default_set = true %}{% endif %}
-            {% set row_tone = 'issue' if stop.badge and stop.badge.severity == 'risk' else ('warn' if stop.badge and stop.badge.severity == 'attention' else ('active' if stop.status == 'active' else 'normal')) %}
-            {% set row_code = 'ACTIVE' if stop.status == 'active' else ('STARTED' if stop.movement_code in ['route_start', 'route_start_open'] else ('LOADED' if stop.movement_code == 'loaded' else ('DROPPED' if stop.movement_code == 'dropped' else (stop.board_code or 'STOP')))) %}
+            {% set stop_board = stop.board_badge if stop.board_badge is defined and stop.board_badge else stop.badge %}
+            {% set row_tone = 'issue' if stop_board and stop_board.severity == 'risk' else ('warn' if stop_board and stop_board.severity == 'attention' else ('active' if stop_board and stop_board.row_tone == 'active' else 'normal')) %}
+            {% set row_code = 'ACTIVE' if stop.status == 'active' else (stop_board.short if stop_board and stop_board.short else (stop.board_code or 'STOP')) %}
             {{ row_button('desktop-stop-' ~ stop.stop_id, row_code, stop.plant_name, (stop.ledger_meta or stop.movement_summary or stop.next_action), row_tone, is_default) }}
           {% endfor %}
         {% else %}
@@ -333,7 +334,8 @@
           {% if log and log.downtime_reason %}
             <div class="desk-overview-note"><span>Driver note</span><strong>{{ log.downtime_reason }}</strong></div>
           {% endif %}
-          <div class="desk-overview-next"><span>Next action</span><strong>{{ clean_value(stop.badge.label if stop.badge else stop.next_action) }}</strong></div>
+          {% set stop_state_badge = stop.board_badge if stop.board_badge is defined and stop.board_badge else stop.badge %}
+          <div class="desk-overview-next"><span>Next action</span><strong>{{ clean_value(stop_state_badge.label if stop_state_badge else stop.next_action) }}</strong></div>
           <section class="desk-route-packet-summary" aria-label="Compact route packet summary">
             <span>Route Packet:</span>
             <strong>{{ documents_attached }} attached &middot; {% if documents_needed %}{{ documents_needed }} required flagged{% else %}none required flagged{% endif %}</strong>

@@ -207,10 +207,8 @@ def _stop_board_badge(log, *, movement, issues=(), evidence=None, flags=(), note
         return _board_badge_display("OPEN", pill_tone="open", row_tone="active", severity="info")
 
     code = movement["code"]
-    proof_count = int(evidence.get("proof_count") or 0)
     valid_scan_count = int(evidence.get("valid_scan_count") or 0)
     transfer_count = int(evidence.get("transfer_count") or 0)
-    has_driver_confirmation = evidence.get("driver_confirmation") == "Drop confirmed"
 
     if code == "route_start":
         return _board_badge_display("START", pill_tone="open", row_tone="completed", severity="info")
@@ -221,9 +219,7 @@ def _stop_board_badge(log, *, movement, issues=(), evidence=None, flags=(), note
     if code == "in_transit":
         return _board_badge_display("IN TRANSIT", pill_tone="open", row_tone="completed", severity="info")
     if code == "dropped":
-        if proof_count or has_driver_confirmation:
-            return _board_badge_display("DELIVERED", pill_tone="delivery", row_tone="delivery", severity="ok")
-        return _board_badge_display("DROPPED", pill_tone="delivery", row_tone="delivery", severity="ok")
+        return _board_badge_display("DELIVERED", pill_tone="delivery", row_tone="delivery", severity="ok")
     if valid_scan_count:
         return _board_badge_display("SCANNED", pill_tone="recorded", row_tone="completed", severity="ok")
     if transfer_count:
@@ -398,6 +394,7 @@ def _board_flow_summary(
     sequence=None,
     has_prior_movement=False,
     wait_minutes=None,
+    dropped_loads=(),
 ):
     """Compact display copy for the live board.
 
@@ -438,6 +435,14 @@ def _board_flow_summary(
     if arrived != "Empty" and departed == "Empty":
         return _with_route_pair(
             {"mode": "action", "plant": label, "action": "Dropped", "cargo": arrived},
+            pickup=pickup_label or UNKNOWN_PICKUP_SOURCE_LABEL,
+            deliver=delivery_label or label,
+        )
+    if dropped_loads:
+        load_count = len([item for item in dropped_loads if not is_empty_load(item)])
+        cargo_label = "1 load of Parts" if load_count == 1 else f"{load_count} loads of Parts"
+        return _with_route_pair(
+            {"mode": "action", "plant": label, "action": "Dropped", "cargo": cargo_label},
             pickup=pickup_label or UNKNOWN_PICKUP_SOURCE_LABEL,
             deliver=delivery_label or label,
         )
@@ -968,6 +973,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
 
     stops = []
     prior_cargo_movement_seen = False
+    pending_pickup_by_cargo = {}
     current_stop_id = getattr(getattr(route_context, "current_stop", None), "id", None)
     route_rows = list(getattr(route_context, "rows", []) or [])
     future_removed_by_log_id = {}
@@ -999,6 +1005,11 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
         # --- Real drop / proof / destination evidence (not flag relabeling) ---
         dropped_loads = [load_display(it) for it in (row.get("cargo_removed") or ()) if not is_empty_load(it)]
         added_loads = [load_display(it) for it in (row.get("cargo_added") or ()) if not is_empty_load(it)]
+        drop_pickup_label = ""
+        for dropped in dropped_loads:
+            drop_pickup_label = pending_pickup_by_cargo.get(_norm_key(dropped)) or ""
+            if drop_pickup_label:
+                break
         movement = _stop_movement_state(
             log,
             label=label,
@@ -1153,6 +1164,9 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
                 sequence=sequence,
                 has_prior_movement=prior_cargo_movement_seen,
                 wait_minutes=wait_minutes,
+                pickup_label=drop_pickup_label,
+                delivery_label=label if dropped_loads else "",
+                dropped_loads=dropped_loads,
             ),
             "movement_code": movement["code"],
             "movement_label": movement["label"],
@@ -1193,6 +1207,8 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             or _safe_url("manager.view_driver_log" if role == "manager" else "driver.view_driver_log", log_id=log.id),
             "actions": _stop_actions(log, linked_move=linked_move, role=role),
         })
+        for added in added_loads:
+            pending_pickup_by_cargo[_norm_key(added)] = label
         if dropped_loads or added_loads or (
             departed and any(not is_empty_load(value) for value in (arrived_with, departed_with))
         ):

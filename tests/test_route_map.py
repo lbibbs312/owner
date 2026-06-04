@@ -741,11 +741,36 @@ def test_add_stop_action_copy_stays_route_specific(app):
             route_map={"map_mode": "live_current_work", "stops": [], "route": {"next_action": "Attach document"}},
             route_cta={"next_action": "Attach document"},
             route_cta_urls={"add_stop": "/new_driving_log", "attach_document": "/driver/transfers/new"},
-        )
+    )
 
     assert "<strong>Add Stop</strong>" in html
-    assert "<span>Continue route</span>" in html
+    assert "<small>Continue route</small>" in html
     assert "<strong>Add Stop</strong>\n      <span>Attach document</span>" not in html
+
+
+def test_mobile_live_flow_board_keeps_stop_sequence_and_active_glow(app):
+    from flask import render_template
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("driver_active_sequence", "driver")
+    completed = _driver_log(driver, plant_name="RE", depart_time="08:30")
+    active = _driver_log(driver, plant_name="PW", arrive_time="2026-05-28 13:00:00")
+
+    with app.test_request_context("/mobile"):
+        ctx = build_driver_route_map_context(driver=driver, date=date.today())
+        html = render_template(
+            "partials/_compact_route_map.html",
+            route_map=ctx,
+            route_cta={"next_action": "Record departure"},
+            route_cta_urls={},
+        )
+
+    completed_row = html.index(f'data-title="Stop 1 - {ctx["stops"][0]["plant_name"]}"')
+    active_row = html.index(f'data-title="Stop 2 - {ctx["stops"][1]["plant_name"]}"')
+    assert completed.id == ctx["stops"][0]["stop_id"]
+    assert active.id == ctx["stops"][1]["stop_id"]
+    assert completed_row < active_row
+    assert 'class="md-flow-row tone-active"' in html[active_row - 240:active_row]
 
 
 def test_driver_dashboard_shows_assigned_move_as_staged_board_row(client, app):
@@ -810,21 +835,24 @@ def test_driver_dashboard_renders_route_narrative_cards(client, app):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "Raleigh East delivery from Paint Central" in body
-    assert "Raleigh East Load delivered from Paint Central to Raleigh East" in body
-    assert "Dropped <strong>2 loads</strong> of <strong>Parts</strong>" in body
+    assert body.count('data-title="Stop ') == 5
+    assert 'data-detail-template="primary-event"' not in body
+    assert 'data-detail-template="event-' not in body
+    assert "Dropped <strong>2 loads</strong> of <strong>Parts</strong>" not in body
+    first_pickup = body.index('data-title="Stop 1 - Paint Central"')
+    first_drop = body.index('data-title="Stop 2 - Raleigh East"')
+    second_pickup = body.index('data-title="Stop 3 - Paint Central"')
+    second_drop = body.index('data-title="Stop 4 - Raleigh East"')
+    empty_return = body.index('data-title="Stop 5 - Paint Central"')
+    assert [first_pickup, first_drop, second_pickup, second_drop, empty_return] == sorted(
+        [first_pickup, first_drop, second_pickup, second_drop, empty_return]
+    )
     assert "flow-route-pair" in body
     assert '<span class="flow-arrow flow-route-arrow" aria-hidden="true">→</span>' in body
     assert "<em>Pickup</em><strong>Paint Central</strong>" in body
     assert "<em>Delivered</em><strong>Raleigh East</strong>" in body
-    assert "2 loads" in body
-    assert "2 stops" in body
-    assert "P-RE-8" in body
-    assert "HOT P-RE-10" in body
-    assert "Paint Central empty load" in body
-    assert "Arrived empty and departed empty at Paint Central" in body
     assert "LIVE FLOW BOARD" in body
-    assert 'data-flow-row' in body
+    assert 'data-detail-template="route-stop-' in body
     assert 'data-flow-open-url' in body
     assert 'data-md-flow-work-panel' in body
     assert body.count('class="route-focus-card') == 0
@@ -1036,7 +1064,7 @@ def test_partial_drop_is_recorded_not_route_review(client, app):
     _login(client, "driver_partial_drop")
     body = client.get("/mobile").get_data(as_text=True)
 
-    assert "PPL &middot; Dropped <strong>1 load</strong> of <strong>Parts</strong>" in body
+    assert "PPL &middot; Dropped <strong>1 load of Parts</strong>" in body
     assert "<em>Pickup</em><strong>Paint Central</strong>" in body
     assert "<em>Delivered</em><strong>PPL</strong>" in body
     assert "ROUTE?" not in body
