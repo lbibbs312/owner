@@ -2920,6 +2920,8 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     assert b'<div class="panel focus-panel" id="needsAttentionPanel">' in focused_dashboard.data
     assert b'<div class="panel focus-panel" id="liveRoutesPanel">' not in focused_dashboard.data
     assert b"const focusTarget = \"attention\";" in focused_dashboard.data
+    assert b"sameDashboardDataset" in focused_dashboard.data
+    assert b"scroller.scrollTo" in focused_dashboard.data
     detail_page = client.get(f"/manager/driver-logs/{log_id}")
     assert detail_page.status_code == 200
     assert b"Avg Dock Wait" not in detail_page.data
@@ -5357,6 +5359,9 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert b".board-only-shell main > .ops-console { display:none; }" in page.data
     assert b"setupDesktopOpsWorkspace" in page.data
     assert b"data-desktop-select-template" in page.data
+    assert b"nearestScrollableParent" in page.data
+    assert b"scrollWorkAreaIntoView" in page.data
+    assert b"desk-work-focus-pulse" in page.data
 
     workspace_start = page.data.index(b'<section class="desktop-ops-workspace"')
     workspace = page.data[workspace_start: page.data.index(b"<script>", workspace_start)]

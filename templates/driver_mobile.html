@@ -3283,6 +3283,33 @@
         background:linear-gradient(90deg, transparent, rgba(139,184,255,.72), transparent);
         pointer-events:none;
       }
+      .desktop-ops-workspace .desktop-detail-workspace {
+        scroll-margin-top:16px;
+      }
+      .desktop-ops-workspace .desktop-detail-workspace.desk-work-focus-pulse {
+        animation:desktopWorkFocusPulse 1.35s ease-out 1;
+      }
+      @keyframes desktopWorkFocusPulse {
+        0% {
+          box-shadow:
+            0 0 0 1px rgba(217,192,140,.24),
+            0 0 0 rgba(91,157,255,0),
+            0 24px 62px rgba(0,0,0,.34);
+        }
+        36% {
+          box-shadow:
+            0 0 0 1px rgba(217,192,140,.28),
+            0 0 34px rgba(91,157,255,.28),
+            0 0 58px rgba(255,178,36,.15),
+            0 24px 62px rgba(0,0,0,.34);
+        }
+        100% {
+          box-shadow:
+            0 0 0 1px rgba(91,157,255,.10),
+            0 0 44px rgba(47,109,240,.16),
+            0 24px 62px rgba(0,0,0,.34);
+        }
+      }
       .desk-route-strip {
         display:grid;
         grid-template-columns:minmax(0,1fr) minmax(260px,.34fr);
@@ -5983,12 +6010,55 @@
       if (!workspace || workspace.dataset.desktopOpsReady === '1') return;
       workspace.dataset.desktopOpsReady = '1';
       var body = workspace.querySelector('[data-desktop-work-body]');
+      var workArea = workspace.querySelector('.desktop-detail-workspace');
       var title = workspace.querySelector('[data-desktop-work-title]');
       var kicker = workspace.querySelector('[data-desktop-work-kicker]');
       var rows = Array.prototype.slice.call(workspace.querySelectorAll('[data-desktop-row]'));
       var modeButtons = Array.prototype.slice.call(workspace.querySelectorAll('[data-desktop-work-tabs] [data-desktop-mode]'));
       var activeMode = 'overview';
       var currentOverviewRow = null;
+
+      function nearestScrollableParent(node) {
+        var parent = node ? node.parentElement : null;
+        while (parent && parent !== document.body && parent !== document.documentElement) {
+          var style = window.getComputedStyle(parent);
+          var overflowY = style.overflowY || style.overflow || '';
+          if (/(auto|scroll|overlay)/.test(overflowY) && parent.scrollHeight > parent.clientHeight + 4) {
+            return parent;
+          }
+          parent = parent.parentElement;
+        }
+        return document.scrollingElement || document.documentElement;
+      }
+
+      function scrollWorkAreaIntoView() {
+        if (!workArea) return;
+        var scroller = nearestScrollableParent(workArea);
+        var offset = 14;
+        if (scroller && scroller !== document.scrollingElement && scroller !== document.documentElement && scroller !== document.body) {
+          var scrollerRect = scroller.getBoundingClientRect();
+          var targetRect = workArea.getBoundingClientRect();
+          scroller.scrollTo({ top: Math.max(0, scroller.scrollTop + targetRect.top - scrollerRect.top - offset), behavior: 'smooth' });
+        } else {
+          var pageTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+          var targetTop = pageTop + workArea.getBoundingClientRect().top - offset;
+          window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+        }
+        workArea.classList.remove('desk-work-focus-pulse');
+        void workArea.offsetWidth;
+        workArea.classList.add('desk-work-focus-pulse');
+        if (workArea.scrollHeight > workArea.clientHeight + 8) {
+          workArea.scrollTo({ top: 0, behavior: 'auto' });
+        }
+        if (!workArea.hasAttribute('tabindex')) workArea.setAttribute('tabindex', '-1');
+        window.setTimeout(function () {
+          try {
+            workArea.focus({ preventScroll: true });
+          } catch (error) {
+            workArea.focus();
+          }
+        }, 360);
+      }
 
       function rowTitle(row) {
         var strong = row ? row.querySelector('strong') : null;
@@ -6047,6 +6117,7 @@
         if (modeTrigger && workspace.contains(modeTrigger)) {
           event.preventDefault();
           setMode(modeTrigger.getAttribute('data-desktop-mode'));
+          scrollWorkAreaIntoView();
           return;
         }
 
@@ -6063,6 +6134,7 @@
             });
           }
           selectRow(targetRow);
+          scrollWorkAreaIntoView();
           return;
         }
 
@@ -6070,6 +6142,7 @@
         if (!row || !workspace.contains(row)) return;
         event.preventDefault();
         selectRow(row);
+        scrollWorkAreaIntoView();
       });
 
       selectRow(workspace.querySelector('[data-desktop-default="true"]') || rows[0]);
