@@ -630,7 +630,7 @@
           {% endfor %}
           {% for stop in board_route_stops %}
             {% set stop_badge = stop.board_badge if stop.board_badge is defined and stop.board_badge else stop.badge %}
-            <button class="md-flow-row tone-{{ stop_badge.row_tone }}" type="button"
+            <button class="md-flow-row tone-{{ stop_badge.row_tone }}{% if stop.status == 'completed' %} is-completed-stop{% endif %}" type="button"
                     data-flow-row
                     data-detail-template="route-stop-{{ stop.stop_id }}"
                     data-title="Stop {{ stop.sequence }} - {{ stop.plant_name }}"

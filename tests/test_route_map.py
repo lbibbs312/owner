@@ -770,7 +770,9 @@ def test_mobile_live_flow_board_keeps_stop_sequence_and_active_glow(app):
     assert completed.id == ctx["stops"][0]["stop_id"]
     assert active.id == ctx["stops"][1]["stop_id"]
     assert completed_row < active_row
+    assert 'is-completed-stop' in html[completed_row - 240:completed_row]
     assert 'class="md-flow-row tone-active"' in html[active_row - 240:active_row]
+    assert 'is-completed-stop' not in html[active_row - 240:active_row]
 
 
 def test_driver_dashboard_shows_assigned_move_as_staged_board_row(client, app):

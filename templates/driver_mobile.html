@@ -3165,6 +3165,34 @@
       background: linear-gradient(135deg, rgba(91,157,255,.13), rgba(45,212,191,.08));
       animation: activebreathe 4.6s ease-in-out infinite;
     }
+    .md-flow-board .md-flow-row.is-completed-stop {
+      border-color: transparent;
+      background: rgba(138,153,179,.025);
+      box-shadow: none;
+    }
+    .md-flow-board .md-flow-row.is-completed-stop .flow-detail,
+    .md-flow-board .md-flow-row.is-completed-stop .flow-main-line {
+      color: rgba(138,153,179,.72);
+    }
+    .md-flow-board .md-flow-row.is-completed-stop .flow-detail strong,
+    .md-flow-board .md-flow-row.is-completed-stop .flow-route-end strong {
+      color: rgba(234,240,248,.66);
+    }
+    .md-flow-board .md-flow-row.is-completed-stop .flow-route-end em,
+    .md-flow-board .md-flow-row.is-completed-stop .flow-arrow {
+      color: rgba(138,153,179,.70);
+      text-shadow: none;
+    }
+    .md-flow-board .md-flow-row.is-completed-stop .flow-status {
+      color: rgba(138,153,179,.84);
+      background: rgba(138,153,179,.08);
+      border-color: rgba(138,153,179,.22);
+      box-shadow: none;
+    }
+    .md-flow-board .md-flow-row.is-completed-stop:hover {
+      background: rgba(138,153,179,.045);
+      border-color: rgba(138,153,179,.18);
+    }
     .md-flow-board .md-flow-row.tone-hot {
       border: 1px solid rgba(245,158,11,.30);
       border-radius: 11px;
