@@ -494,12 +494,8 @@
             {{ fact('Route rule status', 'Needs review' if documents_needed or desk.issues else 'No required documents flagged') }}
             {{ fact('Packet basis', 'Ready based on current route rules' if not documents_needed and not desk.issues else 'Review flagged items') }}
           </div>
-          {% set route_transfer_total = route_transfers|length + route_doc.transfer_doc %}
           <div class="desk-doc-grid">
-            {{ document_row('Transfer Sheet', (route_transfer_total ~ ' attached') if route_transfer_total else ('Needed' if desktop.load_items else 'Not required'), (route_doc.transfer_doc ~ ' uploaded · fields not extracted · review optional') if route_doc.transfer_doc else ('Required for cargo moves.' if desktop.load_items else 'No cargo movement requiring a transfer sheet is flagged.'), 'attached' if route_transfer_total else ('missing' if desktop.load_items else 'normal'), url_for('driver.view_plant_transfer', transfer_id=route_transfers[0].id) if route_transfers else route_audit_url) }}
             {{ document_row('BOL', (route_doc.bol ~ ' attached · fields not extracted · review optional') if route_doc.bol else ('Not attached' if desktop.load_items else 'Not required'), 'Saved with the route for review; no fields are auto-extracted.' if route_doc.bol else ('Attach the BOL if one was issued; use Attach Document.' if desktop.load_items else 'No BOL requirement is flagged by the current route rules.'), 'attached' if route_doc.bol else 'normal', route_audit_url) }}
-            {{ document_row('Route Sheet', 'Route log active', desk.completed ~ '/' ~ todays_logs|length ~ ' stops captured', 'attached', route_audit_url) }}
-            {{ document_row('Photos', desk.proof_items ~ ' attached', (desk.proof_gaps ~ ' proof photo needed') if desk.proof_gaps else 'No photo requirement flagged', 'missing' if desk.proof_gaps else 'normal', route_audit_url) }}
           </div>
           {% if documents_needed %}
             <div class="desk-warning-strip tone-warn"><strong>DOCUMENT NEEDED</strong><span>{{ documents_needed }} route item{{ 's' if documents_needed != 1 else '' }} need a document before this route packet is ready for review.</span></div>
