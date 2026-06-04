@@ -175,14 +175,14 @@
       .inspection-facts {
         display:grid;
         grid-template-columns:repeat(4,minmax(0,1fr));
-        gap:8px;
+        gap:10px 16px;
+        padding:11px 13px;
+        border:1px solid rgba(148,163,184,.14);
+        border-radius:12px;
+        background:rgba(255,255,255,.025);
       }
       .inspection-fact {
         min-width:0;
-        border:1px solid rgba(148,163,184,.16);
-        border-radius:12px;
-        padding:9px;
-        background:rgba(255,255,255,.035);
       }
       .inspection-fact span {
         display:block;
@@ -285,7 +285,7 @@
         <a href="{{ url_for('driver.new_pretrip') }}" class="btn btn-sm btn-primary">New PreTrip</a>
       </div>
 
-      {% if inspection_trucks %}
+      {% if inspection_trucks|length > 1 %}
         <div class="inspection-truck-list" aria-label="Current truck inspection choices">
           {% for truck in inspection_trucks %}
             <a class="inspection-truck-tab {% if truck.truck_number == selected_truck_number %}active{% endif %}" href="{{ url_for('driver.list_pretrips', truck_number=truck.truck_number) }}">
