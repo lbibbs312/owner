@@ -762,7 +762,7 @@ def test_mobile_live_flow_board_keeps_stop_sequence_and_active_glow(app):
             "partials/_compact_route_map.html",
             route_map=ctx,
             route_cta={"next_action": "Record departure"},
-            route_cta_urls={},
+            route_cta_urls={"record_departure": "/driver_logs/2/depart"},
         )
 
     completed_row = html.index(f'data-title="Stop 1 - {ctx["stops"][0]["plant_name"]}"')
@@ -773,6 +773,9 @@ def test_mobile_live_flow_board_keeps_stop_sequence_and_active_glow(app):
     assert 'is-completed-stop' in html[completed_row - 240:completed_row]
     assert 'class="md-flow-row tone-active"' in html[active_row - 240:active_row]
     assert 'is-completed-stop' not in html[active_row - 240:active_row]
+    assert f'{ctx["stops"][1]["plant_name"]} &middot; record departure' in html
+    assert f'{ctx["stops"][1]["plant_name"]} &middot; {ctx["stops"][1]["wait_label"]} &middot; record departure' not in html
+    assert "<span>Wait</span>" not in html
 
 
 def test_driver_dashboard_shows_assigned_move_as_staged_board_row(client, app):

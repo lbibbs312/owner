@@ -113,13 +113,17 @@
     </span>
   {%- endif -%}
 {%- endmacro %}
-{% macro board_flow_text(flow, fallback) -%}
+{% macro board_flow_text(flow, fallback, wait_minutes=none) -%}
   {%- if flow and flow.mode == 'action' -%}
     <span class="flow-main-line">{{ flow.plant }} &middot; {{ flow.action }} {{ bold_cargo(flow.cargo) }}</span>{{ flow_route_pair(flow.pickup, flow.deliver) }}
   {%- elif flow and flow.mode == 'change' -%}
 	    <span class="flow-main-line">{{ flow.plant }} &middot; {{ bold_cargo(flow['from']) }} <span class="flow-arrow" aria-hidden="true">&rarr;</span> {{ bold_cargo(flow['to']) }}</span>{{ flow_route_pair(flow.pickup, flow.deliver) }}
   {%- elif flow and flow.mode == 'plain' -%}
-    <span class="flow-main-line">{{ flow.text }}</span>{{ flow_route_pair(flow.pickup, flow.deliver) }}
+    {%- set flow_text = flow.text -%}
+    {%- if wait_minutes is not none -%}
+      {%- set flow_text = flow_text|replace(' · wait ' ~ (wait_minutes|string) ~ 'm', '') -%}
+    {%- endif -%}
+    <span class="flow-main-line">{{ flow_text }}</span>{{ flow_route_pair(flow.pickup, flow.deliver) }}
   {%- else -%}
     <span class="flow-main-line">{{ fallback }}</span>
   {%- endif -%}
@@ -324,7 +328,7 @@
       <a class="md-flow-primary-cta" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow" data-flow-panel-kicker="DEPART QUICK FLOW">
         <span>Required driver action</span>
         <strong>Depart / Load</strong>
-        <small>{{ primary_stop.plant_name }} &middot; {{ primary_stop.wait_label }} &middot; record departure</small>
+        <small>{{ primary_stop.plant_name }} &middot; record departure</small>
       </a>
     </div>
   {% elif add_stop_url and (primary_action == 'add_stop' or not (rm and rm.stops)) %}
@@ -630,7 +634,7 @@
           {% endfor %}
           {% for stop in board_route_stops %}
             {% set stop_badge = stop.board_badge if stop.board_badge is defined and stop.board_badge else stop.badge %}
-            <button class="md-flow-row tone-{{ stop_badge.row_tone }}{% if stop.status == 'completed' %} is-completed-stop{% endif %}" type="button"
+            <button class="md-flow-row tone-{{ stop_badge.row_tone }}{% if stop.status == 'completed' and stop_badge.row_tone != 'active' %} is-completed-stop{% endif %}" type="button"
                     data-flow-row
                     data-detail-template="route-stop-{{ stop.stop_id }}"
                     data-title="Stop {{ stop.sequence }} - {{ stop.plant_name }}"
@@ -640,7 +644,7 @@
 	                    data-proof-url="{{ stop.view_url or route_sheet_url or '#' }}"
 	                    data-damage-url="{{ damage_url or '#' }}"
 	                    data-document-url="{{ document_url or '#' }}">
-	              <span class="flow-detail">{{ board_flow_text(stop.board_flow, stop.board_detail or (stop.plant_name ~ ' · ' ~ stop.arrived_with ~ ' → ' ~ stop.departed_with)) }}</span>
+	              <span class="flow-detail">{{ board_flow_text(stop.board_flow, stop.board_detail or (stop.plant_name ~ ' · ' ~ stop.arrived_with ~ ' → ' ~ stop.departed_with), stop.wait_minutes) }}</span>
 	              <span class="flow-status status-{{ stop_badge.pill_tone }}">{{ stop_badge.short }}</span>
 	            </button>
 	          {% endfor %}
@@ -713,7 +717,7 @@
             <div class="route-detail-grid">
               <div><span>Arrived with</span><strong>{{ stop.arrived_with }}</strong></div>
 	              <div><span>Departed with</span><strong>{{ 'No Pickup' if stop.no_pickup else stop.departed_with }}</strong></div>
-              <div><span>{{ 'Wait' if stop.status != 'completed' else 'Status' }}</span><strong>{{ stop.wait_label if stop.status != 'completed' else stop.status_label }}</strong></div>
+              {% if stop.status == 'completed' %}<div><span>Status</span><strong>{{ stop.status_label }}</strong></div>{% endif %}
               <div><span>Next</span><strong>{{ stop.next_action }}</strong></div>
             </div>
             {{ issue_panel(stop, stop.stop_id, depart_url if primary_stop and stop.stop_id == primary_stop.stop_id else none) }}
