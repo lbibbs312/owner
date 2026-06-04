@@ -5420,6 +5420,67 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert b"desk-detail-section" not in stop_template
 
 
+def test_mobile_dashboard_focuses_latest_stop_when_no_current_stop(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user(
+            "desktop_latest_stop_driver",
+            "desktop-latest-stop@example.com",
+            "driver",
+            first_name="Latest",
+            last_name="Stop",
+            department="ST4",
+        )
+        route_date = date.today()
+        raleigh_east = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="Raleigh East",
+            load_size="Empty",
+            depart_load_size="Empty",
+            no_pickup=True,
+            arrive_time=f"{route_date.isoformat()} 13:42:00",
+            depart_time="13:54",
+        )
+        ppl = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="PPL",
+            load_size="Empty",
+            depart_load_size="Barden Plant Load",
+            arrive_time=f"{route_date.isoformat()} 14:12:00",
+            depart_time="14:26",
+        )
+        db.session.add_all([raleigh_east, ppl])
+        db.session.commit()
+        raleigh_east_id = raleigh_east.id
+        ppl_id = ppl.id
+
+    login(client, "desktop_latest_stop_driver")
+    page = client.get("/mobile")
+    assert page.status_code == 200
+
+    workspace_start = page.data.index(b'<section class="desktop-ops-workspace"')
+    workspace = page.data[workspace_start: page.data.index(b"<script>", workspace_start)]
+    active_card_start = workspace.index(b"desk-active-stop-card")
+    active_card = workspace[active_card_start: workspace.index(b"desktop-metrics-strip", active_card_start)]
+    assert b"<strong>PPL</strong>" in active_card
+    assert b"<strong>Stop 2</strong>" in active_card
+    assert b"<strong>Raleigh East</strong>" not in active_card
+    assert (
+        f'data-detail-template="desktop-stop-{ppl_id}" data-desktop-default="true"'.encode()
+        in workspace
+    )
+    assert (
+        f'data-detail-template="desktop-stop-{raleigh_east_id}" data-desktop-default="true"'.encode()
+        not in workspace
+    )
+
+
 def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     from datetime import date, timedelta
 

@@ -21,9 +21,15 @@
 {% set route_transfers = route_transfers|default([]) %}
 {% set route_damage_reports = route_damage_reports|default([]) %}
 {% set current_stop_id = current_stop.id if current_stop else none %}
+{% set route_focus = namespace(stop_id=current_stop_id) %}
+{% if rm and rm.stops and not route_focus.stop_id %}
+  {% for stop in rm.stops %}
+    {% if loop.last %}{% set route_focus.stop_id = stop.stop_id %}{% endif %}
+  {% endfor %}
+{% endif %}
 {% set current_stop_header = namespace(plant='Route Workspace', stop_label='Route') %}
 {% for stop in rm.stops|default([]) if rm %}
-  {% if current_stop_header.plant == 'Route Workspace' and (stop.stop_id == current_stop_id or (not current_stop_id and loop.first)) %}
+  {% if current_stop_header.plant == 'Route Workspace' and stop.stop_id == route_focus.stop_id %}
     {% set current_stop_header.plant = stop.plant_name %}
     {% set current_stop_header.stop_label = 'Stop ' ~ stop.sequence %}
   {% endif %}
@@ -139,7 +145,7 @@
         {% if rm and rm.stops %}
           {% for stop in rm.stops %}
             {% set log = route_logs_by_id.get(stop.stop_id) %}
-            {% set is_default = (not desk.default_set and (stop.stop_id == current_stop_id or loop.first)) %}
+            {% set is_default = (not desk.default_set and stop.stop_id == route_focus.stop_id) %}
             {% if is_default %}{% set desk.default_set = true %}{% endif %}
             {% set row_tone = 'issue' if stop.badge and stop.badge.severity == 'risk' else ('warn' if stop.badge and stop.badge.severity == 'attention' else ('active' if stop.status == 'active' else 'normal')) %}
             {% set row_code = 'ACTIVE' if stop.status == 'active' else ('START' if stop.movement_code in ['route_start', 'route_start_open'] else ('LOAD' if stop.movement_code == 'loaded' else ('DROP' if stop.movement_code == 'dropped' else (stop.board_code or 'STOP')))) %}
