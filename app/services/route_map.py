@@ -1733,6 +1733,8 @@ def _dispatch_messages(stops, moves):
     messages = []
     for stop in stops:
         for issue_item in stop.get("issues") or []:
+            if issue_item.get("code") == "needs_departure":
+                continue
             messages.append(_dispatch_issue_message(stop, issue_item))
         if "Hot" in (stop.get("flags") or ()):
             messages.append({
@@ -1849,7 +1851,7 @@ def _cta_pulse(route_context, stops, *, proof_missing=False, pending_posttrip=Fa
     route_status = getattr(route_context, "route_status", None)
     if "attach document" in next_action:
         return {"key": "transfer", "reason": "Transfer sheet or document is needed", "severity": "attention"}
-    if route_status == "completed":
+    if route_status == "completed" and getattr(route_context, "posttrip_status", None) == "complete":
         return {"key": "finalize", "reason": "Route is ready to finalize", "severity": "attention"}
     if route_status == "active" and getattr(route_context, "rows", None) and current is None and not getattr(route_context, "all_departed", False):
         return {"key": "add_stop", "reason": "Route needs the next stop", "severity": "attention"}

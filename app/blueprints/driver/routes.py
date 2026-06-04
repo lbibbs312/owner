@@ -570,7 +570,7 @@ def _mobile_route_date_options(driver_id, route_date, today_local_date):
     return options
 
 
-def _route_cta_urls(route_date, current_stop=None):
+def _route_cta_urls(route_date, current_stop=None, active_pretrip=None, pending_posttrip=False):
     date_value = route_date.isoformat() if route_date else _today_local_date().isoformat()
     urls = {
         "add_damage": url_for("driver.new_damage_report"),
@@ -586,6 +586,8 @@ def _route_cta_urls(route_date, current_stop=None):
     if current_stop:
         urls["confirm_cargo"] = url_for("driver.pickup_driver_log", log_id=current_stop.id)
         urls["record_departure"] = url_for("driver.depart_driver_log", log_id=current_stop.id)
+    if pending_posttrip and active_pretrip:
+        urls["posttrip"] = url_for("driver.do_posttrip", pretrip_id=active_pretrip.id)
     return urls
 
 
@@ -4752,7 +4754,12 @@ def _mobile_route_map_fragment_context(route_date=None):
         route_is_active=route_is_active,
     )
     route_map.update(route_map_mode)
-    route_cta_urls = _route_cta_urls(route_date, current_stop=current_stop)
+    route_cta_urls = _route_cta_urls(
+        route_date,
+        current_stop=current_stop,
+        active_pretrip=active_pretrip,
+        pending_posttrip=pending_posttrip,
+    )
 
     truck_source_pretrip = active_pretrip or route_pretrip or latest_pretrip
     current_truck_number = _normalize_truck_number(
@@ -4962,7 +4969,12 @@ def mobile_dashboard():
     )
     route_map.update(route_map_mode)
     route_date_options = _mobile_route_date_options(current_user.id, route_date, today_local_date)
-    route_cta_urls = _route_cta_urls(route_date, current_stop=current_stop)
+    route_cta_urls = _route_cta_urls(
+        route_date,
+        current_stop=current_stop,
+        active_pretrip=active_pretrip,
+        pending_posttrip=pending_posttrip,
+    )
 
     return render_template(
         "driver_mobile.html",

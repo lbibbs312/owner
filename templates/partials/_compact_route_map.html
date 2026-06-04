@@ -137,9 +137,10 @@
 {% set urls = route_cta_urls if route_cta_urls is defined else {} %}
 {% set primary_cta = cta.primary_cta if cta.primary_cta is defined else none %}
 {% set secondary_cta = cta.secondary_cta if cta.secondary_cta is defined else none %}
+{% set primary_action = primary_cta.action if primary_cta else '' %}
 {% set board_ctas = [] %}
 {% for route_action in [primary_cta, secondary_cta] %}
-  {% if route_action and route_action.action not in ['record_departure', 'add_stop', 'add_damage', 'view_route', 'route_history'] and urls.get(route_action.action) %}
+  {% if route_action and route_action.action not in ['record_departure', 'posttrip', 'add_stop', 'add_damage', 'view_route', 'route_history'] and urls.get(route_action.action) %}
     {% set _ = board_ctas.append(route_action) %}
   {% endif %}
 {% endfor %}
@@ -210,9 +211,10 @@
 {% set pulse_key = cta_pulse.key|default('none') %}
 {% set dispatch_messages = rm.dispatch_messages if rm and rm.dispatch_messages is defined else [] %}
 {% if not dispatch_messages %}
-  {% set dispatch_messages = [{'text': 'NO ALERTS FROM DISPATCH'}] %}
+  {% set dispatch_messages = [{'text': 'NO ALERTS FROM DISPATCH', 'code': 'none'}] %}
 {% endif %}
 {% set dispatch_ticker_text = rm.dispatch_ticker_text if rm and rm.dispatch_ticker_text is defined else 'NO ALERTS FROM DISPATCH' %}
+{% set show_dispatch_ticker = dispatch_messages and not (dispatch_messages|length == 1 and dispatch_messages[0].code|default('none') == 'none') %}
 {% set route_status_raw = (rm.route.next_action if rm and rm.route else cta.next_action if cta.next_action is defined else 'Ready')|default('Ready', true) %}
 {% set route_status_lower = route_status_raw|lower %}
 {% if is_empty_today_route %}
@@ -243,8 +245,9 @@
 {% set _rev = namespace(open=0, risk=0, first='') %}
 {% if rm and rm.stops %}
   {% for _st in rm.stops %}
-    {% if _st.badge and _st.badge.severity == 'risk' %}{% set _rev.open = _rev.open + 1 %}{% set _rev.risk = _rev.risk + 1 %}{% if not _rev.first %}{% set _rev.first = _st.badge.label %}{% endif %}
-    {% elif _st.badge and _st.badge.severity == 'attention' %}{% set _rev.open = _rev.open + 1 %}{% if not _rev.first %}{% set _rev.first = _st.badge.label %}{% endif %}{% endif %}
+    {% set _departure_only = (_st.issues|length == 1 and _st.issues[0].code == 'needs_departure') %}
+    {% if not _departure_only and _st.badge and _st.badge.severity == 'risk' %}{% set _rev.open = _rev.open + 1 %}{% set _rev.risk = _rev.risk + 1 %}{% if not _rev.first %}{% set _rev.first = _st.badge.label %}{% endif %}
+    {% elif not _departure_only and _st.badge and _st.badge.severity == 'attention' %}{% set _rev.open = _rev.open + 1 %}{% if not _rev.first %}{% set _rev.first = _st.badge.label %}{% endif %}{% endif %}
   {% endfor %}
 {% endif %}
 {% if _rev.open > 0 %}
@@ -272,14 +275,9 @@
   {% if map_mode != 'route_replay' %}
   <div class="md-flow-top-actions" aria-label="Live flow workflow actions">
     {% if depart_url and primary_stop %}
-    <a class="md-flow-action-tab primary {% if pulse_key == 'depart' %}is-next-required{% endif %}" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow" data-flow-panel-kicker="DEPART QUICK FLOW">
+    <a class="md-flow-action-tab primary" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow" data-flow-panel-kicker="DEPART QUICK FLOW">
       <strong>Depart / Load</strong>
       <span>Departure / proof</span>
-    </a>
-    {% elif add_stop_url %}
-    <a class="md-flow-action-tab primary add-stop-action {% if pulse_key == 'add_stop' %}is-next-required{% endif %}" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}" data-flow-panel-title="Add Stop">
-      <strong>Add Stop</strong>
-      <span>Continue route</span>
     </a>
     {% endif %}
     {% for route_action in board_ctas %}
@@ -297,10 +295,12 @@
       <strong>Transfer</strong>
       <span>{{ transfer_note }}</span>
     </a>
-    <a class="md-flow-action-tab {% if pulse_key == 'posttrip' %}is-next-required{% endif %}" href="{{ shift_url }}" data-flow-open-url="{{ shift_url }}" data-flow-panel-title="{{ 'PostTrip Work' if posttrip_url else 'PreTrip / Shift' }}">
-      <strong>{{ shift_label }}</strong>
-      <span>{{ shift_note }}</span>
-    </a>
+    {% if not (posttrip_url and primary_action == 'posttrip') %}
+      <a class="md-flow-action-tab {% if pulse_key == 'posttrip' %}is-next-required{% endif %}" href="{{ shift_url }}" data-flow-open-url="{{ shift_url }}" data-flow-panel-title="{{ 'PostTrip Work' if posttrip_url else 'PreTrip / Shift' }}">
+        <strong>{{ shift_label }}</strong>
+        <span>{{ shift_note }}</span>
+      </a>
+    {% endif %}
     <a class="md-flow-action-tab" href="{{ history_url }}" data-flow-open-url="{{ history_url }}" data-flow-panel-title="TRUCK DETAIL">
       <strong>Maintenance</strong>
       <span>Ryder / truck</span>
@@ -310,7 +310,15 @@
       <span>Full details</span>
     </a>
   </div>
-  {% if depart_url and primary_stop %}
+  {% if posttrip_url and primary_action == 'posttrip' %}
+    <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
+      <a class="md-flow-primary-cta" href="{{ posttrip_url }}" data-flow-open-url="{{ posttrip_url }}">
+        <span>Required driver action</span>
+        <strong>PostTrip Due</strong>
+        <small>Finish inspection and end shift</small>
+      </a>
+    </div>
+  {% elif depart_url and primary_stop %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow" data-flow-panel-kicker="DEPART QUICK FLOW">
         <span>Required driver action</span>
@@ -318,7 +326,7 @@
         <small>{{ primary_stop.plant_name }} &middot; {{ primary_stop.wait_label }} &middot; record departure</small>
       </a>
     </div>
-  {% elif add_stop_url %}
+  {% elif add_stop_url and primary_action == 'add_stop' %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta add-stop-action" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}">
         <span>Required driver action</span>
@@ -701,12 +709,14 @@
       </div>
     </div>
 
+	    {% if show_dispatch_ticker %}
 	    <div class="md-flow-ticker" aria-hidden="true">
 	      <div class="md-flow-ticker-track">
 	        <span>{{ dispatch_ticker_text }}</span>
 	        <span>{{ dispatch_ticker_text }}</span>
 	      </div>
 	    </div>
+	    {% endif %}
 
     <div class="md-flow-templates" hidden>
       {% for task in board_tasks %}
@@ -849,11 +859,13 @@
         {{ rm.map_empty_message if rm and rm.map_empty_message else 'No route stops logged for this date.' }}
       {% endif %}
     </div>
+	    {% if show_dispatch_ticker %}
 	    <div class="md-flow-ticker" aria-hidden="true">
 	      <div class="md-flow-ticker-track">
 	        <span>{{ dispatch_ticker_text }}</span>
 	        <span>{{ dispatch_ticker_text }}</span>
 	      </div>
 	    </div>
+	    {% endif %}
   {% endif %}
 </section>

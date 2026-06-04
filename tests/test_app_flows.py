@@ -4310,14 +4310,14 @@ def test_premature_finalized_event_does_not_lock_active_shift_new_logs(client, a
     mobile = client.get("/mobile")
     assert mobile.status_code == 200
     body = mobile.get_data(as_text=True)
-    assert b"Continue route" in mobile.data
-    assert b"Add Stop" in mobile.data
-    assert b"md-flow-action-tab primary add-stop-action" in mobile.data
-    assert b"md-flow-primary-cta add-stop-action" in mobile.data
-    assert b"Continue route capture" in mobile.data
-    assert b"animation: primaryFlowActionBreath 2.6s ease-in-out infinite" in mobile.data
-    assert body.count('data-flow-panel-title="Add Stop"') == 1
+    assert b"PostTrip Due" in mobile.data
+    assert b"Finish inspection and end shift" in mobile.data
+    assert b"md-flow-primary-cta" in mobile.data
+    assert b"md-flow-action-tab primary add-stop-action" not in mobile.data
+    assert b'<a class="md-flow-primary-cta add-stop-action"' in mobile.data
     assert b"Finalize Route" not in mobile.data
+    assert b"animation: primaryFlowActionBreath 2.6s ease-in-out infinite" in mobile.data
+    assert body.count('data-flow-panel-title="Add Stop"') <= 1
 
     new_log = client.get("/new_driving_log")
     assert new_log.status_code == 200
@@ -6160,6 +6160,10 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "md-flow-primary-cta" in body
     assert "Required driver action" in body
     assert "record departure" in body
+    assert 'class="md-flow-action-tab primary" href' in body
+    assert 'class="md-flow-action-tab primary is-next-required"' not in body
+    assert 'flow-status status-attention">NEEDS DEPARTURE' not in body
+    assert '<div class="md-flow-ticker" aria-hidden="true">' not in body
     assert ".md-flow-board .md-flow-row.tone-active" in body
     assert "animation: activebreathe 4.6s ease-in-out infinite" in body
     assert "@keyframes activebreathe" in body
@@ -6200,7 +6204,6 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert ".md-flow-track::-webkit-scrollbar { display: none; width: 0; height: 0; }" in body
     assert "scrollbar-color: rgba(91,157,255,.34)" not in body
     assert "ROUTE LOGS &nbsp; PLANT TRANSFERS" not in body
-    assert "NEEDS DEPARTURE" in body
     assert "&diams;" not in body
     assert ".md-flow-work-card::before" in body
     assert ".flow-status::after" in body
@@ -6237,8 +6240,47 @@ def test_mobile_dashboard_shows_posttrip_due_after_route_close_not_as_board_row(
 
     assert page.status_code == 200
     assert b"PostTrip Due" in page.data
+    assert b"Finish inspection and end shift" in page.data
+    assert b"Finalize Route" not in page.data
+    assert b"Ready To Finalize" not in page.data
     assert "POSTTRIP NEEDED" not in body
     assert "<strong>TRUCK</strong>" not in body
+
+
+def test_mobile_dashboard_allows_finalize_after_posttrip_complete(client, app):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PostTrip, PreTrip
+
+        driver = create_user("posttrip_complete_driver", "posttrip-complete@example.com", "driver")
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=379000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add(PostTrip(pretrip_id=pretrip.id, end_mileage=379025, miles_driven=25))
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="RE",
+                load_size="Empty",
+                depart_load_size="Empty",
+                no_pickup=True,
+                arrive_time=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                depart_time="08:20",
+            )
+        )
+        db.session.commit()
+
+    login(client, "posttrip_complete_driver")
+    page = client.get("/mobile")
+
+    assert page.status_code == 200
+    assert b"Finalize Route" in page.data
+    assert b"PostTrip Due" not in page.data
+    assert b"Ready To Finalize" in page.data
 
 
 def test_mobile_route_map_fragment_refresh_uses_route_state(client, app):
@@ -6268,7 +6310,8 @@ def test_mobile_route_map_fragment_refresh_uses_route_state(client, app):
     body = fragment.get_data(as_text=True)
     assert "compact-route-map md-flow-board" in body
     assert "data-route-refresh-url=" in body
-    assert "NEEDS DEPARTURE" in body
+    assert 'flow-status status-attention">NEEDS DEPARTURE' not in body
+    assert '<div class="md-flow-ticker" aria-hidden="true">' not in body
     assert "ROUTE LOGS &nbsp; PLANT TRANSFERS" not in body
     assert "<html" not in body.lower()
 

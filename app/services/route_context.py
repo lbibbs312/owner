@@ -189,6 +189,7 @@ def build_route_cta_context(
     route_status = getattr(route_context, "route_status", None)
     route_finalized = bool(getattr(route_context, "route_finalized", False) or route_status == "finalized")
     all_departed = bool(getattr(route_context, "all_departed", False))
+    posttrip_complete = getattr(route_context, "posttrip_status", None) == "complete"
     has_route_history = bool(rows)
     is_today = bool(route_date and today_local_date and route_date == today_local_date)
 
@@ -246,12 +247,23 @@ def build_route_cta_context(
     elif all_departed and has_route_history and not route_finalized:
         if is_today and not selected_date_forced:
             display_mode = "completed_route"
-            next_action = "Finalize route"
-            primary = _route_cta("Finalize Route", "finalize_route")
             secondary = _route_cta("Print Draft", "print_route", "ghost")
-            show_finalize = True
-            allowed_actions = ["finalize_route", "print_route", "view_route"]
-            route_message = "All recorded stops are closed."
+            if pending_posttrip:
+                next_action = "PostTrip Due"
+                primary = _route_cta("PostTrip Due", "posttrip")
+                allowed_actions = ["posttrip", "print_route", "view_route"]
+                route_message = "All recorded stops are closed. Complete PostTrip before finalizing."
+            elif posttrip_complete:
+                next_action = "Finalize route"
+                primary = _route_cta("Finalize Route", "finalize_route")
+                show_finalize = True
+                allowed_actions = ["finalize_route", "print_route", "view_route"]
+                route_message = "All recorded stops and PostTrip are complete."
+            else:
+                next_action = "PostTrip required"
+                primary = _route_cta("Print Draft", "print_route")
+                allowed_actions = ["print_route", "view_route"]
+                route_message = "All recorded stops are closed. PostTrip is required before finalizing."
         else:
             display_mode = "read_only_history" if selected_date_forced else "last_route"
             next_action = "Start new shift or View last route"
