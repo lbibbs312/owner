@@ -5783,10 +5783,14 @@
             var response = await fetch(form.action, {
               method: 'POST',
               credentials: 'same-origin',
-              headers: { 'X-Requested-With': 'fetch' },
+              headers: { 'X-Requested-With': 'fetch', 'Accept': 'application/json' },
               body: new FormData(form)
             });
-            if (!response.ok) throw new Error('Departure was not saved.');
+            var contentType = response.headers.get('content-type') || '';
+            var payload = contentType.indexOf('application/json') !== -1 ? await response.json() : null;
+            if (!response.ok || (payload && payload.ok === false)) {
+              throw new Error((payload && payload.error) || 'Departure was not saved.');
+            }
             if (panel) panel.hidden = true;
             // Reload the whole page, not just the board fragment: the active-stop
             // wait banner ("DEPART / LOAD", elapsed timer) is rendered OUTSIDE the
@@ -5795,7 +5799,7 @@
             // any server-side validation flash surfaces on reload.
             var nextUrl = new URL(window.location.href);
             nextUrl.searchParams.delete('flow');
-            window.location.assign(nextUrl.toString());
+            window.location.assign((payload && payload.redirect) || nextUrl.toString());
             return;
           } catch (error) {
             routeToast('SAVE FAILED', error.message || 'Open the stop and try again.', 'error');

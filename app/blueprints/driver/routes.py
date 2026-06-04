@@ -3727,14 +3727,33 @@ def depart_driver_log(log_id):
         or request.args.get("next") == "mobile"
         or request.form.get("source") == "live_flow"
     )
+    quick_fetch = quick_depart and request.headers.get("X-Requested-With") == "fetch"
 
     def depart_redirect():
         return redirect(url_for("driver.mobile_dashboard" if quick_depart else "driver.driver_logs"))
 
+    def quick_depart_error(message, status=400):
+        if quick_fetch:
+            return jsonify({"ok": False, "error": message}), status
+        flash(message, "danger")
+        if quick_depart:
+            return depart_redirect()
+        return render_depart_page()
+
+    def quick_depart_success(message):
+        if quick_fetch:
+            return jsonify({"ok": True, "message": message, "redirect": url_for("driver.mobile_dashboard")})
+        flash(message, "success")
+        return depart_redirect()
+
     if current_user.role == "driver" and log.driver_id != current_user.id:
+        if quick_fetch:
+            return jsonify({"ok": False, "error": "Not authorized to depart someone else's log!"}), 403
         flash("Not authorized to depart someone else's log!", "danger")
         return depart_redirect()
     if log.depart_time:
+        if quick_fetch:
+            return jsonify({"ok": False, "error": "That log already has a departure time."}), 409
         flash("That log already has a departure time.", "warning")
         return depart_redirect()
 
@@ -3745,6 +3764,18 @@ def depart_driver_log(log_id):
 
     def render_depart_page():
         if quick_depart:
+            if quick_fetch:
+                error = next(
+                    (
+                        f"{field.label.text}: {messages[0]}"
+                        for field in form
+                        if getattr(field, "errors", None)
+                        for messages in [field.errors]
+                        if messages
+                    ),
+                    "Departure could not be saved. Check the required answers and try again.",
+                )
+                return jsonify({"ok": False, "error": error, "errors": form.errors}), 400
             return redirect(url_for("driver.mobile_dashboard"))
         now_local = datetime.now(pytz.timezone("America/Detroit"))
         auto_wait_seconds = elapsed_wait_seconds(log, now=now_local)
@@ -3773,26 +3804,22 @@ def depart_driver_log(log_id):
         if not service_stop and route.get("arrived_at_primary_destination"):
             primary_unloaded = form.unloaded_on_departure.data
             if primary_unloaded not in {"yes", "no"}:
-                flash("Please answer whether you got unloaded.", "danger")
-                return render_depart_page()
+                return quick_depart_error("Please answer whether you got unloaded.")
             if primary_unloaded == "no":
                 primary_unload_reason = (form.unload_reason.data or "").strip()
                 if not primary_unload_reason:
-                    flash("Please enter why the load was not unloaded.", "danger")
-                    return render_depart_page()
+                    return quick_depart_error("Please enter why the load was not unloaded.")
 
         secondary_dropped = None
         secondary_drop_reason = None
         if not service_stop and route.get("arrived_at_secondary_destination"):
             secondary_dropped = form.secondary_dropped_on_departure.data
             if secondary_dropped not in {"yes", "no"}:
-                flash("Please answer whether you dropped off the second-stop cargo.", "danger")
-                return render_depart_page()
+                return quick_depart_error("Please answer whether you dropped off the second-stop cargo.")
             if secondary_dropped == "no":
                 secondary_drop_reason = (form.secondary_unload_reason.data or "").strip()
                 if not secondary_drop_reason:
-                    flash("Please enter why the second-stop cargo was not dropped off.", "danger")
-                    return render_depart_page()
+                    return quick_depart_error("Please enter why the second-stop cargo was not dropped off.")
 
         after_unload_primary = route.get("after_arrival_primary") or "Empty"
         if primary_unloaded == "yes":
@@ -3802,14 +3829,12 @@ def depart_driver_log(log_id):
             departure_load = route.get("after_arrival_primary") or load_display(log.load_size) or "Empty"
         elif form.got_loaded.data == "yes":
             if not form.destination.data:
-                flash("Please select where the primary load is going.", "danger")
-                return render_depart_page()
+                return quick_depart_error("Please select where the primary load is going.")
             departure_load = destination_load_value(form.destination.data)
         elif form.got_loaded.data == "no":
             departure_load = after_unload_primary
         else:
-            flash("Please answer whether you got loaded.", "danger")
-            return render_depart_page()
+            return quick_depart_error("Please answer whether you got loaded.")
 
         secondary_load = route.get("after_arrival_secondary") or None
         if not service_stop:
@@ -3855,8 +3880,7 @@ def depart_driver_log(log_id):
         depart_time = now_local.strftime("%H:%M")
         timing_errors = _route_timing_errors(log.driver_id, log.date, log.plant_name, _arrival_hhmm_for_log(log), depart_time, exclude_log_id=log.id, check_previous=False)
         if timing_errors:
-            flash(timing_errors[0], "danger")
-            return render_depart_page()
+            return quick_depart_error(timing_errors[0])
         log.depart_time = depart_time
         log.dock_wait_minutes = _auto_wait_minutes_for_departure(log, now_local)
         log.depart_load_size = departure_load
@@ -3882,8 +3906,7 @@ def depart_driver_log(log_id):
         )
         ingest_driver_log(log, commit=True)
         _emit_driver_log_updated(log, "departed")
-        flash(f"Departed {log.plant_name} with {cargo_display(log.depart_load_size, log.secondary_load)}.", "success")
-        return depart_redirect()
+        return quick_depart_success(f"Departed {log.plant_name} with {cargo_display(log.depart_load_size, log.secondary_load)}.")
 
     return render_depart_page()
 

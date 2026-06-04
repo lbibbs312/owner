@@ -6474,6 +6474,96 @@ def test_mobile_quick_depart_returns_to_live_board_without_full_depart_form(clie
         assert DriverLog.query.get(invalid_id).depart_time is None
 
 
+def test_mobile_quick_depart_handles_secondary_drop_required(client, app):
+    from datetime import date
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("secondary_quick_depart", "secondary-quick@example.com", "driver")
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="KP",
+                load_size="Empty",
+                depart_load_size="Trim DC Load",
+                secondary_load="Helios Hot Part",
+                arrive_time="08:00",
+                depart_time="08:15",
+            )
+        )
+        active = DriverLog(
+            driver_id=driver.id,
+            date=today,
+            plant_name="Helios",
+            load_size="Trim DC Load + Helios Hot Part",
+            arrive_time="08:45",
+        )
+        db.session.add(active)
+        db.session.commit()
+        active_id = active.id
+
+    login(client, "secondary_quick_depart")
+    page = client.get("/mobile")
+    body = page.get_data(as_text=True)
+
+    assert page.status_code == 200
+    assert 'data-depart-start-step="0"' in body
+    assert "Did you drop off this cargo?" in body
+    assert 'data-depart-field="secondary_dropped_on_departure" value=""' in body
+
+    missing_secondary = client.post(
+        f"/driver_logs/{active_id}/depart",
+        data={
+            "next": "mobile",
+            "source": "live_flow",
+            "unloaded_on_departure": "yes",
+            "secondary_dropped_on_departure": "",
+            "got_loaded": "no",
+            "destination": "",
+            "secondary_destination": "",
+            "secondary_load_type": "load",
+        },
+        headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+    )
+
+    assert missing_secondary.status_code == 400
+    assert missing_secondary.get_json()["error"] == "Please answer whether you dropped off the second-stop cargo."
+    with app.app_context():
+        from app.models import DriverLog
+
+        assert DriverLog.query.get(active_id).depart_time is None
+
+    saved = client.post(
+        f"/driver_logs/{active_id}/depart",
+        data={
+            "next": "mobile",
+            "source": "live_flow",
+            "unloaded_on_departure": "yes",
+            "secondary_dropped_on_departure": "yes",
+            "got_loaded": "no",
+            "destination": "",
+            "secondary_destination": "",
+            "secondary_load_type": "load",
+        },
+        headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+    )
+
+    assert saved.status_code == 200
+    assert saved.get_json()["ok"] is True
+    assert saved.get_json()["redirect"].endswith("/mobile")
+    with app.app_context():
+        from app.models import DriverLog
+
+        active = DriverLog.query.get(active_id)
+        assert active.depart_time
+        assert active.depart_load_size == "Trim DC Load"
+        assert active.secondary_load is None
+
+
 def test_new_driver_log_uses_today_when_open_shift_route_date_is_stale(client, app):
     from datetime import date, datetime, timedelta
 

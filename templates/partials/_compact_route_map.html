@@ -366,14 +366,16 @@
           {% set depart_code = primary_stop.board_code or 'STP-' ~ primary_stop.sequence %}
           {% set is_service_depart = depart_code in ['FUEL', 'RYDR', 'MTN', 'MTG', 'SRVC'] %}
           {% set requires_unload_check = primary_stop.requires_unload_check if primary_stop.requires_unload_check is defined else false %}
-          {% set start_depart_step = 0 if is_service_depart or requires_unload_check else 1 %}
+          {% set requires_secondary_drop_check = primary_stop.requires_secondary_drop_check if primary_stop.requires_secondary_drop_check is defined else false %}
+          {% set requires_drop_check = requires_unload_check or requires_secondary_drop_check %}
+          {% set start_depart_step = 0 if is_service_depart or requires_drop_check else 1 %}
           <form class="depart-wizard" method="POST" action="{{ depart_url }}" data-depart-wizard data-depart-start-step="{{ start_depart_step }}">
             {% if depart_form is defined and depart_form %}{{ depart_form.hidden_tag() }}{% endif %}
             <input type="hidden" name="next" value="mobile">
             <input type="hidden" name="source" value="live_flow">
             <input type="hidden" name="unloaded_on_departure" data-depart-field="unloaded_on_departure" value="{{ 'yes' if is_service_depart or not requires_unload_check else '' }}">
             <input type="hidden" name="unload_reason" data-depart-field="unload_reason" value="">
-            <input type="hidden" name="secondary_dropped_on_departure" data-depart-field="secondary_dropped_on_departure" value="{{ 'yes' if is_service_depart else '' }}">
+            <input type="hidden" name="secondary_dropped_on_departure" data-depart-field="secondary_dropped_on_departure" value="{{ 'yes' if is_service_depart or not requires_secondary_drop_check else '' }}">
             <input type="hidden" name="secondary_unload_reason" data-depart-field="secondary_unload_reason" value="">
             <input type="hidden" name="got_loaded" data-depart-field="got_loaded" value="{{ 'no' if is_service_depart else '' }}">
             <input type="hidden" name="destination" data-depart-field="destination" value="">
@@ -389,7 +391,7 @@
             </div>
             <section class="depart-step {% if start_depart_step == 0 %}is-active{% endif %}" data-depart-step="0">
               <span class="depart-step-kicker">{{ depart_code }} &middot; depart</span>
-              <h4>{% if is_service_depart %}Close this service stop?{% else %}Did you get unloaded?{% endif %}</h4>
+              <h4>{% if is_service_depart %}Close this service stop?{% elif requires_unload_check and requires_secondary_drop_check %}Did you unload and drop off cargo?{% elif requires_secondary_drop_check %}Did you drop off this cargo?{% else %}Did you get unloaded?{% endif %}</h4>
               <div class="depart-choice-grid">
                 <button type="button" data-depart-choice data-field="unloaded_on_departure" data-value="yes" data-mirror-secondary="true" data-next-step="{{ 1 if not is_service_depart else 4 }}">Yes</button>
                 {% if not is_service_depart %}
