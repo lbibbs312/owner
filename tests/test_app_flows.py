@@ -2920,6 +2920,8 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     assert b'<div class="panel focus-panel" id="needsAttentionPanel">' in focused_dashboard.data
     assert b'<div class="panel focus-panel" id="liveRoutesPanel">' not in focused_dashboard.data
     assert b"const focusTarget = \"attention\";" in focused_dashboard.data
+    assert b"#needsAttentionPanel.focus-panel" in focused_dashboard.data
+    assert b"rgba(245,158,11,.24)" in focused_dashboard.data
     assert b"sameDashboardDataset" in focused_dashboard.data
     assert b"scroller.scrollTo" in focused_dashboard.data
     detail_page = client.get(f"/manager/driver-logs/{log_id}")
@@ -5362,6 +5364,9 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert b"nearestScrollableParent" in page.data
     assert b"scrollWorkAreaIntoView" in page.data
     assert b"desk-work-focus-pulse" in page.data
+    assert b"desk-work-focus-pulse--alert" in page.data
+    assert b"desktopAlertFocusPulse" in page.data
+    assert b"isAlertDesktopTarget" in page.data
     assert b".driver-ops-shell.board-only-shell" in page.data
     assert b"body .driver-ops-shell.board-only-shell .md-flow-window" in page.data
     assert b"max-height:none !important" in page.data

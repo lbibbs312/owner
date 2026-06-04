@@ -3311,6 +3311,9 @@
       .desktop-ops-workspace .desktop-detail-workspace.desk-work-focus-pulse {
         animation:desktopWorkFocusPulse 1.35s ease-out 1;
       }
+      .desktop-ops-workspace .desktop-detail-workspace.desk-work-focus-pulse--alert {
+        animation:desktopAlertFocusPulse 1.45s ease-out 1;
+      }
       @keyframes desktopWorkFocusPulse {
         0% {
           box-shadow:
@@ -3329,6 +3332,30 @@
           box-shadow:
             0 0 0 1px rgba(91,157,255,.10),
             0 0 44px rgba(47,109,240,.16),
+            0 24px 62px rgba(0,0,0,.34);
+        }
+      }
+      @keyframes desktopAlertFocusPulse {
+        0% {
+          border-color:rgba(245,158,11,.34);
+          box-shadow:
+            0 0 0 1px rgba(245,158,11,.20),
+            0 0 0 rgba(245,158,11,0),
+            0 24px 62px rgba(0,0,0,.34);
+        }
+        38% {
+          border-color:rgba(245,158,11,.62);
+          box-shadow:
+            0 0 0 1px rgba(245,158,11,.30),
+            0 0 36px rgba(245,158,11,.30),
+            0 0 62px rgba(217,119,6,.16),
+            0 24px 62px rgba(0,0,0,.34);
+        }
+        100% {
+          border-color:rgba(245,158,11,.30);
+          box-shadow:
+            0 0 0 1px rgba(245,158,11,.12),
+            0 0 32px rgba(245,158,11,.16),
             0 24px 62px rgba(0,0,0,.34);
         }
       }
@@ -6065,7 +6092,16 @@
         return document.scrollingElement || document.documentElement;
       }
 
-      function scrollWorkAreaIntoView() {
+      function isAlertDesktopTarget(trigger, mode, row) {
+        if (mode === 'issues') return true;
+        if (trigger && trigger.classList && trigger.classList.contains('has-alert')) return true;
+        if (!row || !row.classList) return false;
+        return row.classList.contains('tone-warn')
+          || row.classList.contains('tone-issue')
+          || row.classList.contains('tone-hot');
+      }
+
+      function scrollWorkAreaIntoView(alertFocus) {
         if (!workArea) return;
         var scroller = nearestScrollableParent(workArea);
         var offset = 14;
@@ -6079,8 +6115,9 @@
           window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
         }
         workArea.classList.remove('desk-work-focus-pulse');
+        workArea.classList.remove('desk-work-focus-pulse--alert');
         void workArea.offsetWidth;
-        workArea.classList.add('desk-work-focus-pulse');
+        workArea.classList.add(alertFocus ? 'desk-work-focus-pulse--alert' : 'desk-work-focus-pulse');
         if (workArea.scrollHeight > workArea.clientHeight + 8) {
           workArea.scrollTo({ top: 0, behavior: 'auto' });
         }
@@ -6150,8 +6187,9 @@
         var modeTrigger = event.target.closest('[data-desktop-mode]');
         if (modeTrigger && workspace.contains(modeTrigger)) {
           event.preventDefault();
-          setMode(modeTrigger.getAttribute('data-desktop-mode'));
-          scrollWorkAreaIntoView();
+          var requestedMode = modeTrigger.getAttribute('data-desktop-mode');
+          setMode(requestedMode);
+          scrollWorkAreaIntoView(isAlertDesktopTarget(modeTrigger, requestedMode, null));
           return;
         }
 
@@ -6168,7 +6206,7 @@
             });
           }
           selectRow(targetRow);
-          scrollWorkAreaIntoView();
+          scrollWorkAreaIntoView(isAlertDesktopTarget(templateTrigger, '', targetRow));
           return;
         }
 
@@ -6176,7 +6214,7 @@
         if (!row || !workspace.contains(row)) return;
         event.preventDefault();
         selectRow(row);
-        scrollWorkAreaIntoView();
+        scrollWorkAreaIntoView(isAlertDesktopTarget(row, '', row));
       });
 
       selectRow(workspace.querySelector('[data-desktop-default="true"]') || rows[0]);
