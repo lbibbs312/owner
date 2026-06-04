@@ -191,6 +191,20 @@ def _jpeg_dimensions(jpeg_bytes):
     return None
 
 
+def _image_dimensions(image_bytes):
+    """Return (width, height) in pixels for a PNG or baseline JPEG, else None."""
+    if image_bytes[:8] == b"\x89PNG\r\n\x1a\n":
+        if len(image_bytes) >= 24:
+            width, height = struct.unpack(">II", image_bytes[16:24])
+            if width and height:
+                return width, height
+        return None
+    jpeg = _jpeg_dimensions(image_bytes)
+    if jpeg:
+        return jpeg[0], jpeg[1]
+    return None
+
+
 class SimplePdf:
     def __init__(self, title="MoveDefense Document", pagesize=LETTER):
         self.title = title
@@ -278,6 +292,32 @@ class SimplePdf:
         )
         self.current.append(f"q {w:.2f} 0 0 {h:.2f} {x:.2f} {y:.2f} cm /{name} Do Q")
         return True
+
+    def image_file_fit(self, path, x, top_y, max_w, max_h):
+        """Embed an image scaled to fit within max_w x max_h while preserving aspect ratio.
+
+        (x, top_y) is the top-left anchor; the image is drawn downward from top_y.
+        JPEG bytes are embedded without recompression and PNG losslessly, so the
+        result keeps the uploaded document's full resolution. Returns the drawn
+        height in points, or 0.0 if the file is missing or not a supported image.
+        """
+        try:
+            with open(path, "rb") as fh:
+                image_bytes = fh.read()
+        except OSError:
+            return 0.0
+        dimensions = _image_dimensions(image_bytes)
+        if not dimensions:
+            return 0.0
+        intrinsic_w, intrinsic_h = dimensions
+        if intrinsic_w <= 0 or intrinsic_h <= 0:
+            return 0.0
+        scale = min(max_w / intrinsic_w, max_h / intrinsic_h)
+        draw_w = intrinsic_w * scale
+        draw_h = intrinsic_h * scale
+        if self.image_file(path, x, top_y - draw_h, draw_w, draw_h):
+            return draw_h
+        return 0.0
 
     def table(self, x, y, col_widths, row_height, headers, rows, font_size=8, header_gray=0.9):
         total_width = sum(col_widths)

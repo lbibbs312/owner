@@ -41,6 +41,7 @@ from app.services.document_numbers import (
 )
 from app.services.driver_wait import elapsed_wait_minutes, elapsed_wait_seconds, wait_label_for_log
 from app.services.simple_pdf import LANDSCAPE_LETTER, LETTER, SimplePdf
+from app.services.route_documents import collect_route_documents, render_document_appendix
 from app.services.load_state import (
     MIN_PLANT_TRANSFER_MINUTES,
     SECONDARY_NOT_DROPPED_PREFIX,
@@ -1292,8 +1293,8 @@ def _first_uploaded_file(files):
 def _document_attached_toast(log, photo):
     """Build (title, detail) lines for the document-attached toast.
 
-    No OCR/extraction pipeline exists, so BOL/transfer uploads land in a
-    review-needed state instead of promising auto-filled fields.
+    Capture-and-attach is the core workflow; no extraction runs, so the detail
+    line states fields were not extracted and review is optional (never blocking).
     """
     plant = _plant_label(log.plant_name) or "this stop"
     day_logs = sorted(
@@ -1304,9 +1305,9 @@ def _document_attached_toast(log, photo):
     context = f"Stop {sequence} · {plant}" if sequence else plant
     code = photo.resolved_document_type
     if code == "bol_manifest":
-        return ("BOL ATTACHED · REVIEW NEEDED", f"{context} · fields not extracted automatically")
+        return ("BOL ATTACHED", f"{context} · fields not extracted · review optional")
     if code == "transfer_sheet":
-        return ("TRANSFER SHEET ATTACHED · REVIEW NEEDED", f"{context} · awaiting review")
+        return ("TRANSFER SHEET ATTACHED", f"{context} · fields not extracted · review optional")
     return ("DOCUMENT ATTACHED", f"{photo.document_type_label} · {context}")
 
 
@@ -2351,6 +2352,26 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
     y -= 18
     pdf.text(36, y, "3. Signatures", size=11, bold=True)
     _draw_signature_pdf_block(pdf, driver_signature, signature_timestamp)
+
+    def _start_document_page():
+        pdf.add_page()
+        _draw_pdf_header(
+            pdf,
+            "DRIVER ROUTE SHEET",
+            meta["document_no"],
+            meta["generated_at"],
+            "Documents",
+            driver=driver.display_name if driver else None,
+            truck=truck,
+            date_value=the_date,
+        )
+        return 704
+
+    render_document_appendix(
+        pdf,
+        collect_route_documents(logs, plant_label=_plant_label),
+        start_new_page=_start_document_page,
+    )
     return pdf.build()
 
 

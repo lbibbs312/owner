@@ -309,39 +309,33 @@
 
           <section class="desk-detail-section desk-load-paperwork">
             <div class="desk-section-title"><span>Load / Transfer Detail</span><strong>{% if transfer %}{{ transfer.transfer_number }}{% elif cargo_expected %}Document needed{% else %}Empty movement{% endif %}</strong></div>
-            {% if cargo_expected %}
-              <div class="desk-fact-grid">
-                {{ fact('Part number / item number', (transfer_line.part_number if transfer_line else log.part_number if log else none), 'DOCUMENT NEEDED') }}
-                {{ fact('Part description', transfer_remarks, 'DOCUMENT NEEDED') }}
-                {{ fact('JO / load reference', (log.depart_load_size if log and log.depart_load_size else stop.departed_with), 'LOAD REFERENCE NEEDED') }}
-                {{ fact('LP IDs', transfer_lp_ids, 'DOCUMENT NEEDED') }}
-                {{ fact('Lot', none, 'DOCUMENT NEEDED') }}
-                {{ fact('Quantity', transfer_line.quantity if transfer_line else none, 'DOCUMENT NEEDED') }}
-                {{ fact('Rack / pallet / container count', transfer_line.skids if transfer_line else none, 'DOCUMENT NEEDED') }}
-                {{ fact('From site', transfer.ship_from if transfer else none, 'DOCUMENT NEEDED') }}
-                {{ fact('To site', transfer.ship_to if transfer else stop.plant_name, 'DESTINATION REQUIRED') }}
-                {{ fact('Expected destination', stop.departed_with, 'DESTINATION REQUIRED') }}
-                {{ fact('Actual destination', stop.plant_name, 'DROP LOCATION REQUIRED') }}
-                {{ fact('Movement status', stop.badge.label if stop.badge else stop.next_action) }}
-              </div>
+            {% if not cargo_expected %}
+              <div class="desk-warning-strip"><strong>No load captured</strong><span>This stop is an empty or no-pickup movement. No cargo documents are required.</span></div>
             {% else %}
-              <div class="desk-warning-strip"><strong>No load captured</strong><span>This stop is an empty or no-pickup movement. Cargo document fields are not required by the current route data.</span></div>
-            {% endif %}
-            {% if transfer %}
-              <div class="desk-transfer-matrix" aria-label="Transfer sheet fields">
-                {% for line in transfer.lines[:4] %}
-                  {% set line_remark_parts = (line.remarks or '').split('LP IDs:', 1) %}
-                  {% set line_clean_remarks = line_remark_parts[0].rstrip(' |') %}
-                  {% set line_lp_ids = line_remark_parts[1].strip() if line_remark_parts|length > 1 else '' %}
-                  <div class="desk-transfer-mini-row">
-                    <span>LINE {{ line.line_number }}</span>
-                    <strong>{{ line.part_number or 'ITEM NUMBER NOT CAPTURED' }}</strong>
-                    <small>From {{ transfer.ship_from }} / To {{ transfer.ship_to }} / Location {{ line.side|upper }} / LP {{ line_lp_ids or 'NOT CAPTURED' }} / Lot {{ line_clean_remarks or 'NOT CAPTURED' }} / Qty {{ line.quantity or 'NOT CAPTURED' }}</small>
-                  </div>
-                {% endfor %}
+              {# Only fields backed by real route data. Parts/LP/lot/qty/weight are never shown blank and never typed here — they live on the attached document for review. #}
+              <div class="desk-fact-grid">
+                {% if (log.depart_load_size if log else none) or stop.departed_with %}{{ fact('Load / JO reference', (log.depart_load_size if log and log.depart_load_size else stop.departed_with)) }}{% endif %}
+                {% if stop.departed_with %}{{ fact('Expected destination', stop.departed_with) }}{% endif %}
+                {{ fact('Actual destination', stop.plant_name) }}
+                {{ fact('Movement status', stop.badge.label if stop.badge else stop.next_action) }}
+                {% if transfer %}{{ fact('From site', transfer.ship_from) }}{{ fact('To site', transfer.ship_to) }}{% endif %}
               </div>
-            {% elif cargo_expected %}
-              <div class="desk-warning-strip tone-warn"><strong>DOCUMENT NEEDED</strong><span>Attach a BOL, transfer sheet, route sheet, or document photo. The app or manager can extract part, LP, lot, and quantity fields later.</span></div>
+              {% if transfer %}
+                <div class="desk-transfer-matrix" aria-label="Transfer sheet fields">
+                  {% for line in transfer.lines[:4] %}
+                    {% set line_remark_parts = (line.remarks or '').split('LP IDs:', 1) %}
+                    {% set line_clean_remarks = line_remark_parts[0].rstrip(' |') %}
+                    {% set line_lp_ids = line_remark_parts[1].strip() if line_remark_parts|length > 1 else '' %}
+                    <div class="desk-transfer-mini-row">
+                      <span>LINE {{ line.line_number }}</span>
+                      <strong>{{ line.part_number or '—' }}</strong>
+                      <small>From {{ transfer.ship_from }} / To {{ transfer.ship_to }} / Location {{ line.side|upper }} / LP {{ line_lp_ids or '—' }} / Lot {{ line_clean_remarks or '—' }} / Qty {{ line.quantity or '—' }}</small>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="desk-warning-strip"><strong>Load details not entered digitally</strong><span>Part, LP, lot, weight, and quantity aren't typed here. Attach the transfer sheet or BOL below — it is saved with this stop for review (no typing, no auto-extraction).</span></div>
+              {% endif %}
             {% endif %}
           </section>
 
@@ -351,12 +345,12 @@
               {% if transfer %}
                 {{ document_row('Transfer Sheet', 'Attached', (transfer.ship_from ~ ' to ' ~ transfer.ship_to ~ ' / ' ~ transfer.lines|length ~ ' line' ~ ('s' if transfer.lines|length != 1 else '')), 'attached') }}
               {% elif stop_docs.transfer_doc %}
-                {{ document_row('Transfer Sheet', stop_docs.transfer_doc|length ~ ' attached · awaiting review', 'Transfer sheet uploaded. Fields are reviewed manually (no auto-extraction).', 'attached') }}
+                {{ document_row('Transfer Sheet', stop_docs.transfer_doc|length ~ ' attached · fields not extracted · review optional', 'Latest ' ~ ((stop_docs.transfer_doc|last).original_filename or 'document') ~ ' · ' ~ (stop_docs.transfer_doc|last).uploaded_at|to_detroit_datetime, 'attached') }}
               {% else %}
                 {{ document_row('Transfer Sheet', 'Not attached' if cargo_expected else 'Not required', 'Required for cargo moves.' if cargo_expected else 'Empty / no-pickup stop.', 'missing' if cargo_expected else 'normal') }}
               {% endif %}
               {% if stop_docs.bol %}
-                {{ document_row('BOL', stop_docs.bol|length ~ ' attached · review needed', 'Latest ' ~ ((stop_docs.bol|last).original_filename or 'document') ~ ' · ' ~ (stop_docs.bol|last).uploaded_at|to_detroit_datetime ~ ' · fields not extracted automatically.', 'attached') }}
+                {{ document_row('BOL', stop_docs.bol|length ~ ' attached · fields not extracted · review optional', 'Latest ' ~ ((stop_docs.bol|last).original_filename or 'document') ~ ' · ' ~ (stop_docs.bol|last).uploaded_at|to_detroit_datetime, 'attached') }}
               {% else %}
                 {{ document_row('BOL', 'Not attached' if cargo_expected else 'Not required', 'Attach the BOL if one was issued; fields are reviewed manually.' if cargo_expected else 'No BOL requirement is flagged by the current route rules.', 'normal') }}
               {% endif %}
@@ -424,7 +418,7 @@
               {{ fact('Current state', item.board_badge.label if item.board_badge else 'Recorded') }}
               {{ fact('Last seen stop', ('Stop ' ~ detail.sequence ~ ' / ' ~ detail.plant) if detail else none, 'LAST STOP REQUIRED') }}
               {{ fact('Documents', documents_attached ~ ' attached') }}
-              {{ fact('Transfer Sheet', 'Attached' if route_transfers else none, 'DOCUMENT NEEDED') }}
+              {{ fact('Transfer Sheet', 'Attached' if route_transfers else 'Not attached') }}
             </div>
           </section>
           <section class="desk-detail-section">
@@ -491,8 +485,8 @@
           </div>
           {% set route_transfer_total = route_transfers|length + route_doc.transfer_doc %}
           <div class="desk-doc-grid">
-            {{ document_row('Transfer Sheet', (route_transfer_total ~ ' attached') if route_transfer_total else ('Needed' if desktop.load_items else 'Not required'), (route_doc.transfer_doc ~ ' uploaded · awaiting review') if route_doc.transfer_doc else ('Required for cargo moves.' if desktop.load_items else 'No cargo movement requiring a transfer sheet is flagged.'), 'attached' if route_transfer_total else ('missing' if desktop.load_items else 'normal')) }}
-            {{ document_row('BOL', (route_doc.bol ~ ' attached · review needed') if route_doc.bol else ('Not attached' if desktop.load_items else 'Not required'), 'Uploaded BOLs are reviewed manually; no fields are auto-extracted.' if route_doc.bol else ('Attach the BOL if one was issued; use Attach Document.' if desktop.load_items else 'No BOL requirement is flagged by the current route rules.'), 'attached' if route_doc.bol else 'normal') }}
+            {{ document_row('Transfer Sheet', (route_transfer_total ~ ' attached') if route_transfer_total else ('Needed' if desktop.load_items else 'Not required'), (route_doc.transfer_doc ~ ' uploaded · fields not extracted · review optional') if route_doc.transfer_doc else ('Required for cargo moves.' if desktop.load_items else 'No cargo movement requiring a transfer sheet is flagged.'), 'attached' if route_transfer_total else ('missing' if desktop.load_items else 'normal')) }}
+            {{ document_row('BOL', (route_doc.bol ~ ' attached · fields not extracted · review optional') if route_doc.bol else ('Not attached' if desktop.load_items else 'Not required'), 'Saved with the route for review; no fields are auto-extracted.' if route_doc.bol else ('Attach the BOL if one was issued; use Attach Document.' if desktop.load_items else 'No BOL requirement is flagged by the current route rules.'), 'attached' if route_doc.bol else 'normal') }}
             {{ document_row('Route Sheet', 'Route log active', desk.completed ~ '/' ~ todays_logs|length ~ ' stops captured', 'attached') }}
             {{ document_row('Photos', desk.proof_items ~ ' attached', (desk.proof_gaps ~ ' proof photo needed') if desk.proof_gaps else 'No photo requirement flagged', 'missing' if desk.proof_gaps else 'normal') }}
           </div>
@@ -511,6 +505,7 @@
             <div><span>Controlled</span><strong>Expiration date</strong><small>Use credential and truck-document records for expiring driver or truck documents.</small></div>
             <div><span>Verified</span><strong>Status / audit trail</strong><small>Replace, delete, verify, and manager-review actions must write an audit event.</small></div>
           </div>
+          {{ attach_document_control(route_document_upload_log.id if route_document_upload_log else none, 'driver', current_user.id, false, not route_finalized) }}
         </section>
         <section class="desk-detail-section">
           <div class="desk-section-title"><span>Actions</span><strong>Route controls</strong></div>
@@ -563,6 +558,7 @@
             <a class="desk-action-link" href="{{ url_for('driver.list_pretrips', truck_number=current_truck_number) if current_truck_number else url_for('driver.list_pretrips') }}">Open inspections</a>
             {% if route_pretrip and not route_pretrip.posttrip %}<a class="desk-action-link primary" href="{{ url_for('driver.do_posttrip', pretrip_id=route_pretrip.id) }}">Complete posttrip</a>{% endif %}
             <a class="desk-action-link" href="{{ url_for('driver.truck_maintenance_history', truck_number=current_truck_number) if current_truck_number else url_for('driver.truck_maintenance_history') }}">Maintenance history</a>
+            {{ attach_document_control(route_document_upload_log.id if route_document_upload_log else none, 'truck', current_truck_number or '', false, not route_finalized) }}
           </div>
         </section>
       </div>

@@ -58,6 +58,7 @@ from app.services.report_summary import damage_report_count_label, damage_report
 from app.services.role_session import restore_role_user
 from app.services.search_corpus import suggest_terms
 from app.services.simple_pdf import LETTER, SimplePdf
+from app.services.route_documents import collect_route_documents, render_document_appendix
 from app.blueprints.driver.routes import (
     _build_plant_transfer_pdf,
     _build_pretrip_pdf,
@@ -1634,11 +1635,11 @@ def _build_manager_route_review_pdf(review):
             photo_id = f"Photo ID #{row['photo_id']}" if row.get("photo_id") else "Photo ID unavailable"
             pdf.text(36, y, f"{row['plant']} - {row['review_type']} ({photo_id})", size=9, bold=True)
             y -= 12
-            image_y = y - 78
-            image_drawn = bool(row.get("photo_path")) and pdf.image_file(row["photo_path"], 36, image_y, 96, 72)
+            image_top = y - 2
+            image_drawn = bool(row.get("photo_path")) and pdf.image_file_fit(row["photo_path"], 36, image_top, 100, 116)
             if not image_drawn:
-                pdf.rect(36, image_y, 96, 72)
-                pdf.multiline_text(42, image_y + 46, "Photo record exists but file failed to render. Review in system before approval.", width_chars=22, size=6, leading=8, max_lines=4, bold=True)
+                pdf.rect(36, image_top - 72, 100, 72)
+                pdf.multiline_text(42, image_top - 28, "Photo record exists but file failed to render. Review in system before approval.", width_chars=22, size=6, leading=8, max_lines=4, bold=True)
             pdf.text(146, y, f"Uploaded: {row['uploaded_label']}", size=8, bold=True)
             pdf.multiline_text(146, y - 12, f"Driver note: {row['display_note'] or 'No driver note recorded.'}", width_chars=68, size=7, leading=9, max_lines=3)
             checks = "[ ] No issue   [ ] Cargo loading issue   [ ] Damage event   [ ] Safety concern"
@@ -1703,6 +1704,27 @@ def _build_manager_route_review_pdf(review):
     pdf.line(330, y - 18, 576, y - 18)
     if review.get("driver_signature"):
         pdf.text(36, 42, "Driver e-signature captured", size=8)
+
+    def _start_document_page():
+        pdf.add_page()
+        doc_meta = _manager_review_document_meta(review, page="Documents")
+        _draw_pdf_header(
+            pdf,
+            "Manager Route Review",
+            doc_meta["document_no"],
+            doc_meta["generated_at"],
+            doc_meta["page"],
+            driver=review["driver"].display_name,
+            truck=review["truck_label"],
+            date_value=review["the_date"],
+        )
+        return 704
+
+    render_document_appendix(
+        pdf,
+        collect_route_documents(review.get("logs") or [], plant_label=_plant_label),
+        start_new_page=_start_document_page,
+    )
     return pdf.build()
 
 def _requested_url():
