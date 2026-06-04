@@ -2260,6 +2260,9 @@ def manager_dashboard():
     focus_panel = request.args.get("focus", "jobs")
     if focus_panel not in {"jobs", "routes"}:
         focus_panel = "jobs"
+    focus_target = request.args.get("target", "")
+    if focus_target not in {"attention", "capture", "jobs", "routes", "reviews", "cases"}:
+        focus_target = ""
 
     day_start = datetime.combine(today, datetime.min.time())
     uncompleted_tasks = (
@@ -2319,6 +2322,7 @@ def manager_dashboard():
         live_stop_rows=live_stop_rows,
         selected_driver_id=selected_driver_id,
         focus_panel=focus_panel,
+        focus_target=focus_target,
         drivers=drivers,
         division_filter=division_filter,
         total_active_moves=len(uncompleted_tasks) + len(todays_transfers),

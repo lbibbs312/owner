@@ -95,8 +95,20 @@
 
   /* ── Panel ── */
   .panel { background:#fff; border:1px solid #e2e8f0; border-radius:18px;
+           scroll-margin-top:22px;
            box-shadow:0 1px 2px rgba(15,23,42,.04); overflow:hidden; }
-  .panel.focus-panel { border-color:#93c5fd; box-shadow:0 0 0 3px rgba(147,197,253,.24), 0 1px 2px rgba(15,23,42,.04); }
+  .panel.focus-panel,
+  .capture-panel.focus-panel {
+    border-color:#38bdf8;
+    box-shadow:0 0 0 3px rgba(56,189,248,.2), 0 18px 42px rgba(15,23,42,.12);
+  }
+  .panel.dashboard-focus-pulse,
+  .capture-panel.dashboard-focus-pulse { animation:dashboard-focus-pulse 1.4s ease-out 1; }
+  @keyframes dashboard-focus-pulse {
+    0% { transform:translateY(-2px); box-shadow:0 0 0 0 rgba(245,158,11,.55), 0 18px 42px rgba(15,23,42,.12); }
+    58% { box-shadow:0 0 0 11px rgba(245,158,11,0), 0 18px 42px rgba(15,23,42,.12); }
+    100% { transform:none; }
+  }
   .panel-top { padding:14px 20px; border-bottom:1px solid #e2e8f0; background:#f8fafc;
                display:flex; align-items:center; justify-content:space-between;
                gap:12px; flex-wrap:wrap; }
@@ -215,7 +227,7 @@
   .plant-timing-card strong { display:block; font-size:.86rem; }
   .plant-timing-card span { display:block; color:#64748b; font-size:.72rem; margin-top:2px; }
 
-  .capture-panel { background:#0f172a; color:#e2e8f0; border:1px solid #1e293b; border-radius:16px; overflow:hidden; box-shadow:0 18px 42px rgba(15,23,42,.16); }
+  .capture-panel { background:#0f172a; color:#e2e8f0; border:1px solid #1e293b; border-radius:16px; overflow:hidden; scroll-margin-top:22px; box-shadow:0 18px 42px rgba(15,23,42,.16); }
   .capture-head { padding:14px 16px; display:flex; justify-content:space-between; gap:12px; align-items:center; border-bottom:1px solid rgba(148,163,184,.16); }
   .capture-head h3 { margin:0; font-size:1rem; font-weight:900; color:#fff; }
   .capture-head span { font-size:.72rem; font-weight:800; color:#93c5fd; }
@@ -684,7 +696,7 @@
 
     <div class="mc-body">
 
-      <section class="capture-panel" id="dispatchCaptureInbox">
+      <section class="capture-panel {% if focus_target == 'capture' %}focus-panel{% endif %}" id="dispatchCaptureInbox">
         <div class="capture-head">
           <div>
             <h3>Universal Dispatch Capture Inbox</h3>
@@ -752,21 +764,21 @@
       {# Compact live summary - division counts stay in the detailed table filters below #}
       {% set kpi_count = 3 + (1 if live_problem_count else 0) + (1 if pending_review_count else 0) %}
       <div class="kpi-row" style="grid-template-columns:repeat({{ kpi_count }},minmax(0,1fr));">
-        <a class="kpi {% if division_filter == 'All' and focus_panel == 'jobs' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division='All', focus='jobs') }}" aria-label="Show all active moves">
+        <a class="kpi {% if division_filter == 'All' and focus_panel == 'jobs' and focus_target in ['', 'jobs'] %}active{% endif %}" data-dashboard-target="dispatchJobsPanel" href="{{ url_for('manager.manager_dashboard', division='All', focus='jobs', target='jobs') }}#dispatchJobsPanel" aria-label="Show all active moves">
           <p class="kpi-lbl">Active Moves</p>
           <div class="kpi-val">
             <span class="kpi-num">{{ total_active_moves }}</span>
             <span class="kpi-tag">Open jobs</span>
           </div>
         </a>
-        <a class="kpi green {% if focus_panel == 'jobs' %}active{% endif %}" href="#dispatchCaptureInbox" aria-label="Show captured dispatch requests">
+        <a class="kpi green {% if focus_target == 'capture' %}active{% endif %}" data-dashboard-target="dispatchCaptureInbox" href="{{ url_for('manager.manager_dashboard', division=division_filter, focus='jobs', target='capture') }}#dispatchCaptureInbox" aria-label="Show captured dispatch requests">
           <p class="kpi-lbl">Captured Requests</p>
           <div class="kpi-val">
             <span class="kpi-num">{{ dispatch_capture_count or 0 }}</span>
             <span class="kpi-tag">Needs triage</span>
           </div>
         </a>
-        <a class="kpi blue {% if focus_panel == 'routes' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division=division_filter, focus='routes') }}" aria-label="Show live driver routes">
+        <a class="kpi blue {% if focus_panel == 'routes' and focus_target in ['', 'routes'] %}active{% endif %}" data-dashboard-target="liveRoutesPanel" href="{{ url_for('manager.manager_dashboard', division=division_filter, focus='routes', target='routes') }}#liveRoutesPanel" aria-label="Show live driver routes">
           <p class="kpi-lbl">Drivers Moving</p>
           <div class="kpi-val">
             <span class="kpi-num">{{ active_driver_count }}</span>
@@ -774,7 +786,7 @@
           </div>
         </a>
         {% if live_problem_count %}
-        <a class="kpi danger {% if focus_panel == 'routes' %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division=division_filter, focus='routes') }}" aria-label="Show live route problems">
+        <a class="kpi danger {% if focus_target == 'attention' %}active{% endif %}" data-dashboard-target="needsAttentionPanel" href="{{ url_for('manager.manager_dashboard', division=division_filter, focus='routes', target='attention') }}#needsAttentionPanel" aria-label="Show live route problems">
           <p class="kpi-lbl">Needs Attention</p>
           <div class="kpi-val">
             <span class="kpi-num">{{ live_problem_count }}</span>
@@ -805,7 +817,7 @@
         {% include "partials/_floor_operations_snapshot.html" %}
       {% endif %}
 
-      <div class="panel {% if focus_panel == 'routes' %}focus-panel{% endif %}" id="needsAttentionPanel">
+      <div class="panel {% if focus_target == 'attention' %}focus-panel{% endif %}" id="needsAttentionPanel">
         <div class="panel-top">
           <h3>
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -831,7 +843,7 @@
 
 
       {% if review_rows %}
-      <div class="panel {% if focus_panel == 'routes' %}focus-panel{% endif %}" id="reviewQueuePanel">
+      <div class="panel {% if focus_target == 'reviews' %}focus-panel{% endif %}" id="reviewQueuePanel">
         <div class="panel-top">
           <h3>
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -875,7 +887,7 @@
       {% endif %}
 
       {% if followup_cases %}
-      <div class="panel {% if focus_panel == 'routes' %}focus-panel{% endif %}">
+      <div class="panel {% if focus_target == 'cases' %}focus-panel{% endif %}" id="followupCasesPanel">
         <div class="panel-top">
           <h3>Grouped Management Cases</h3>
           <span class="text-sm text-muted">Related history only, not route evidence</span>
@@ -893,7 +905,7 @@
       {% endif %}
 
       {# Live route/stop panel #}
-      <div class="panel {% if focus_panel == 'routes' %}focus-panel{% endif %}" id="liveRoutesPanel">
+      <div class="panel {% if focus_panel == 'routes' and focus_target in ['', 'routes'] %}focus-panel{% endif %}" id="liveRoutesPanel">
         <div class="panel-top">
           <h3>
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -996,7 +1008,7 @@
       </div>
 
       {# Dispatch queue panel #}
-      <div class="panel {% if focus_panel == 'jobs' %}focus-panel{% endif %}" id="dispatchJobsPanel">
+      <div class="panel {% if focus_panel == 'jobs' and focus_target in ['', 'jobs'] %}focus-panel{% endif %}" id="dispatchJobsPanel">
         <div class="panel-top">
           <h3>
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -1287,10 +1299,48 @@ function closeCreate() {
   document.body.style.overflow = '';
 }
 
-const focusPanel = {{ focus_panel|tojson }};
+const focusTarget = {{ focus_target|tojson }};
+const dashboardFocusTargets = {
+  attention: 'needsAttentionPanel',
+  capture: 'dispatchCaptureInbox',
+  jobs: 'dispatchJobsPanel',
+  routes: 'liveRoutesPanel',
+  reviews: 'reviewQueuePanel',
+  cases: 'followupCasesPanel',
+};
+
+function pulseDashboardTarget(target) {
+  if (!target) return;
+  target.classList.remove('dashboard-focus-pulse');
+  void target.offsetWidth;
+  target.classList.add('dashboard-focus-pulse');
+  target.setAttribute('tabindex', '-1');
+  target.focus({ preventScroll: true });
+}
+
+function focusDashboardTarget(targetId, behavior = 'smooth') {
+  const target = document.getElementById(targetId);
+  if (!target) return;
+  target.scrollIntoView({ behavior, block: 'start' });
+  window.setTimeout(() => pulseDashboardTarget(target), behavior === 'smooth' ? 360 : 0);
+}
+
 window.addEventListener('load', () => {
-  const target = focusPanel === 'routes' ? document.getElementById('liveRoutesPanel') : document.getElementById('dispatchJobsPanel');
-  if (target && focusPanel !== 'jobs') target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const hashTarget = window.location.hash ? window.location.hash.slice(1) : '';
+  const targetId = hashTarget || dashboardFocusTargets[focusTarget] || '';
+  if (targetId) focusDashboardTarget(targetId);
+});
+
+document.querySelectorAll('[data-dashboard-target]').forEach(link => {
+  link.addEventListener('click', event => {
+    const targetId = link.dataset.dashboardTarget;
+    if (!targetId) return;
+    const targetUrl = new URL(link.href, window.location.href);
+    if (targetUrl.pathname !== window.location.pathname || targetUrl.search !== window.location.search) return;
+    event.preventDefault();
+    window.history.pushState(null, '', targetUrl);
+    focusDashboardTarget(targetId);
+  });
 });
 
 {% if config.ENABLE_SOCKETIO %}
