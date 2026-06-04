@@ -72,12 +72,20 @@
   </button>
 {%- endmacro %}
 
-{% macro document_row(label, status, detail='', tone='normal') -%}
+{% macro document_row(label, status, detail='', tone='normal', href=none) -%}
+  {%- if href -%}
+  <a class="desk-doc-row tone-{{ tone }} is-link" href="{{ href }}">
+    <span>{{ label }}</span>
+    <strong>{{ status }}</strong>
+    <small>{{ detail }}</small>
+  </a>
+  {%- else -%}
   <div class="desk-doc-row tone-{{ tone }}">
     <span>{{ label }}</span>
     <strong>{{ status }}</strong>
     <small>{{ detail }}</small>
   </div>
+  {%- endif -%}
 {%- endmacro %}
 
 {% macro attach_document_control(log_id, owner_type='stop', owner_id='', primary=true, allowed=true) -%}
@@ -233,7 +241,7 @@
         <section class="desk-detail-section">
           <h3>Start route capture</h3>
           <p class="desk-copy">No route stops are logged for this date. The route workspace will populate once the driver records the first stop.</p>
-          <div class="desk-action-grid"><a class="desk-action-link primary" href="{{ cta_urls.get('add_stop') or url_for('driver.new_driving_log') }}">Add first stop</a></div>
+          <div class="desk-action-grid"><a class="desk-action-link add-stop-cta" href="{{ cta_urls.get('add_stop') or url_for('driver.new_driving_log') }}">Add first stop</a></div>
         </section>
       </div>
     </template>
@@ -341,21 +349,23 @@
 
           <section class="desk-detail-section desk-paperwork-section">
             <div class="desk-section-title"><span>Documents</span><strong>{{ log.photos|length if log else 0 }} attached</strong></div>
+            {% set stop_doc_url = url_for('driver.edit_driver_log', log_id=log.id) if log else none %}
+            {% set stop_route_audit_url = url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) %}
             <div class="desk-doc-grid">
               {% if transfer %}
-                {{ document_row('Transfer Sheet', 'Attached', (transfer.ship_from ~ ' to ' ~ transfer.ship_to ~ ' / ' ~ transfer.lines|length ~ ' line' ~ ('s' if transfer.lines|length != 1 else '')), 'attached') }}
+                {{ document_row('Transfer Sheet', 'Attached', (transfer.ship_from ~ ' to ' ~ transfer.ship_to ~ ' / ' ~ transfer.lines|length ~ ' line' ~ ('s' if transfer.lines|length != 1 else '')), 'attached', url_for('driver.view_plant_transfer', transfer_id=transfer.id)) }}
               {% elif stop_docs.transfer_doc %}
-                {{ document_row('Transfer Sheet', stop_docs.transfer_doc|length ~ ' attached · fields not extracted · review optional', 'Latest ' ~ ((stop_docs.transfer_doc|last).original_filename or 'document') ~ ' · ' ~ (stop_docs.transfer_doc|last).uploaded_at|to_detroit_datetime, 'attached') }}
+                {{ document_row('Transfer Sheet', stop_docs.transfer_doc|length ~ ' attached · fields not extracted · review optional', 'Latest ' ~ ((stop_docs.transfer_doc|last).original_filename or 'document') ~ ' · ' ~ (stop_docs.transfer_doc|last).uploaded_at|to_detroit_datetime, 'attached', stop_doc_url) }}
               {% else %}
-                {{ document_row('Transfer Sheet', 'Not attached' if cargo_expected else 'Not required', 'Required for cargo moves.' if cargo_expected else 'Empty / no-pickup stop.', 'missing' if cargo_expected else 'normal') }}
+                {{ document_row('Transfer Sheet', 'Not attached' if cargo_expected else 'Not required', 'Required for cargo moves.' if cargo_expected else 'Empty / no-pickup stop.', 'missing' if cargo_expected else 'normal', stop_doc_url) }}
               {% endif %}
               {% if stop_docs.bol %}
-                {{ document_row('BOL', stop_docs.bol|length ~ ' attached · fields not extracted · review optional', 'Latest ' ~ ((stop_docs.bol|last).original_filename or 'document') ~ ' · ' ~ (stop_docs.bol|last).uploaded_at|to_detroit_datetime, 'attached') }}
+                {{ document_row('BOL', stop_docs.bol|length ~ ' attached · fields not extracted · review optional', 'Latest ' ~ ((stop_docs.bol|last).original_filename or 'document') ~ ' · ' ~ (stop_docs.bol|last).uploaded_at|to_detroit_datetime, 'attached', stop_doc_url) }}
               {% else %}
-                {{ document_row('BOL', 'Not attached' if cargo_expected else 'Not required', 'Attach the BOL if one was issued; fields are reviewed manually.' if cargo_expected else 'No BOL requirement is flagged by the current route rules.', 'normal') }}
+                {{ document_row('BOL', 'Not attached' if cargo_expected else 'Not required', 'Attach the BOL if one was issued; fields are reviewed manually.' if cargo_expected else 'No BOL requirement is flagged by the current route rules.', 'normal', stop_doc_url) }}
               {% endif %}
-              {{ document_row('Route Sheet', 'Route log active', (desk.completed ~ '/' ~ todays_logs|length ~ ' stops captured'), 'attached') }}
-              {{ document_row('Proof Photo', (stop_docs.proof|length ~ ' attached') if stop_docs.proof else ('Needed' if stop_docs.photo_required else 'Optional'), 'Required only when the selected stop or route rule asks for a proof photo.', 'attached' if stop_docs.proof else ('missing' if stop_docs.photo_required else 'normal')) }}
+              {{ document_row('Route Sheet', 'Route log active', (desk.completed ~ '/' ~ todays_logs|length ~ ' stops captured'), 'attached', stop_route_audit_url) }}
+              {{ document_row('Proof Photo', (stop_docs.proof|length ~ ' attached') if stop_docs.proof else ('Needed' if stop_docs.photo_required else 'Optional'), 'Required only when the selected stop or route rule asks for a proof photo.', 'attached' if stop_docs.proof else ('missing' if stop_docs.photo_required else 'normal'), stop_doc_url) }}
             </div>
             {% if log and log.photos %}
               <div class="desk-preview-strip" aria-label="Attached document previews">
@@ -472,6 +482,7 @@
     {% endfor %}
 
     <template data-desktop-detail-template="desktop-documents-route" data-title="Route documents" data-kicker="DOCUMENT DETAIL">
+      {% set route_audit_url = url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) %}
       <div class="desk-detail-stack">
         <section class="desk-detail-section">
           <div class="desk-section-title"><span>Documents</span><strong>{{ documents_attached }} attached</strong></div>
@@ -485,10 +496,10 @@
           </div>
           {% set route_transfer_total = route_transfers|length + route_doc.transfer_doc %}
           <div class="desk-doc-grid">
-            {{ document_row('Transfer Sheet', (route_transfer_total ~ ' attached') if route_transfer_total else ('Needed' if desktop.load_items else 'Not required'), (route_doc.transfer_doc ~ ' uploaded · fields not extracted · review optional') if route_doc.transfer_doc else ('Required for cargo moves.' if desktop.load_items else 'No cargo movement requiring a transfer sheet is flagged.'), 'attached' if route_transfer_total else ('missing' if desktop.load_items else 'normal')) }}
-            {{ document_row('BOL', (route_doc.bol ~ ' attached · fields not extracted · review optional') if route_doc.bol else ('Not attached' if desktop.load_items else 'Not required'), 'Saved with the route for review; no fields are auto-extracted.' if route_doc.bol else ('Attach the BOL if one was issued; use Attach Document.' if desktop.load_items else 'No BOL requirement is flagged by the current route rules.'), 'attached' if route_doc.bol else 'normal') }}
-            {{ document_row('Route Sheet', 'Route log active', desk.completed ~ '/' ~ todays_logs|length ~ ' stops captured', 'attached') }}
-            {{ document_row('Photos', desk.proof_items ~ ' attached', (desk.proof_gaps ~ ' proof photo needed') if desk.proof_gaps else 'No photo requirement flagged', 'missing' if desk.proof_gaps else 'normal') }}
+            {{ document_row('Transfer Sheet', (route_transfer_total ~ ' attached') if route_transfer_total else ('Needed' if desktop.load_items else 'Not required'), (route_doc.transfer_doc ~ ' uploaded · fields not extracted · review optional') if route_doc.transfer_doc else ('Required for cargo moves.' if desktop.load_items else 'No cargo movement requiring a transfer sheet is flagged.'), 'attached' if route_transfer_total else ('missing' if desktop.load_items else 'normal'), url_for('driver.view_plant_transfer', transfer_id=route_transfers[0].id) if route_transfers else route_audit_url) }}
+            {{ document_row('BOL', (route_doc.bol ~ ' attached · fields not extracted · review optional') if route_doc.bol else ('Not attached' if desktop.load_items else 'Not required'), 'Saved with the route for review; no fields are auto-extracted.' if route_doc.bol else ('Attach the BOL if one was issued; use Attach Document.' if desktop.load_items else 'No BOL requirement is flagged by the current route rules.'), 'attached' if route_doc.bol else 'normal', route_audit_url) }}
+            {{ document_row('Route Sheet', 'Route log active', desk.completed ~ '/' ~ todays_logs|length ~ ' stops captured', 'attached', route_audit_url) }}
+            {{ document_row('Photos', desk.proof_items ~ ' attached', (desk.proof_gaps ~ ' proof photo needed') if desk.proof_gaps else 'No photo requirement flagged', 'missing' if desk.proof_gaps else 'normal', route_audit_url) }}
           </div>
           {% if documents_needed %}
             <div class="desk-warning-strip tone-warn"><strong>DOCUMENT NEEDED</strong><span>{{ documents_needed }} route item{{ 's' if documents_needed != 1 else '' }} need a document before this route packet is ready for review.</span></div>
@@ -525,28 +536,38 @@
         {% set insp_issue_count = (desk.issues if (rm and rm.stops) else 0) + route_damage_reports|length %}
         <section class="desk-detail-section">
           <div class="desk-section-title"><span>Inspection Record</span><strong>{{ clean_value(current_truck_number, 'TRUCK REQUIRED') }}</strong></div>
+          {% if route_pretrip %}
           <div class="desk-fact-grid">
             {{ fact('Truck', current_truck_number, 'TRUCK REQUIRED') }}
-            {{ fact('PreTrip', 'Recorded' if route_pretrip else none, 'PRETRIP REQUIRED') }}
-            {{ fact('PostTrip', 'Complete' if posttrip else ('Pending' if route_pretrip else none), 'POSTTRIP REQUIRED') }}
-            {{ fact('Start mileage', ('{:,}'.format(route_pretrip.start_mileage) ~ ' mi') if route_pretrip and route_pretrip.start_mileage else none, 'START MILEAGE REQUIRED') }}
-            {{ fact('Fuel at start', route_pretrip.start_fuel_level if route_pretrip and route_pretrip.start_fuel_level else none, 'START FUEL REQUIRED') }}
-            {{ fact('End mileage', ('{:,}'.format(posttrip.end_mileage) ~ ' mi') if posttrip and posttrip.end_mileage else none, 'POSTTRIP REQUIRED') }}
-            {{ fact('Miles driven', ('{:,}'.format(posttrip.miles_driven) ~ ' mi') if posttrip and posttrip.miles_driven is not none else none, 'POSTTRIP REQUIRED') }}
+            {{ fact('PreTrip', 'Recorded') }}
+            {{ fact('Start mileage', ('{:,}'.format(route_pretrip.start_mileage) ~ ' mi') if route_pretrip.start_mileage else none, 'Not recorded') }}
+            {{ fact('Fuel at start', route_pretrip.start_fuel_level if route_pretrip.start_fuel_level else none, 'Not recorded') }}
             {{ fact('Fuel logs', insp.fuel ~ ' today') }}
             {{ fact('Defects / issues', insp_issue_count) }}
-            {{ fact('Completed', posttrip.created_at|to_detroit_datetime if posttrip else none, 'POSTTRIP REQUIRED') }}
+            {% if posttrip %}
+            {{ fact('PostTrip', 'Complete') }}
+            {{ fact('End mileage', ('{:,}'.format(posttrip.end_mileage) ~ ' mi') if posttrip.end_mileage else none, 'Not recorded') }}
+            {{ fact('Miles driven', ('{:,}'.format(posttrip.miles_driven) ~ ' mi') if posttrip.miles_driven is not none else none, 'Not recorded') }}
+            {{ fact('Completed', posttrip.created_at|to_detroit_datetime) }}
+            {% endif %}
           </div>
+          {% if not posttrip %}
+            <div class="desk-warning-strip tone-warn"><strong>PostTrip pending</strong><span>Close the route with a PostTrip to capture end mileage, fuel, and miles driven.</span></div>
+          {% endif %}
+          {% else %}
+          <div class="desk-warning-strip tone-warn"><strong>No PreTrip recorded for {{ current_truck_number or 'this truck' }}</strong><span>Start a PreTrip to begin the inspection record for this route.</span></div>
+          <div class="desk-action-grid"><a class="desk-action-link primary" href="{{ url_for('driver.new_pretrip') }}">Start PreTrip</a></div>
+          {% endif %}
         </section>
         <section class="desk-detail-section">
           <div class="desk-section-title"><span>Recent Truck History</span><strong>{{ truck_maintenance_history|length }} record{{ 's' if truck_maintenance_history|length != 1 else '' }}</strong></div>
           <div class="desk-evidence-list">
             {% for row in truck_maintenance_history %}
-              <div class="desk-evidence-row">
+              <a class="desk-evidence-row is-link" href="{{ url_for('driver.view_pretrip', pretrip_id=row.pretrip.id) }}">
                 <span>{{ row.date.strftime('%b %d') if row.date else 'NO DATE' }}</span>
                 <strong>{{ row.status_label }}{% if row.miles_driven is not none %} &middot; {{ '{:,}'.format(row.miles_driven) }} mi{% endif %}</strong>
                 <small>Start {{ '{:,}'.format(row.start_mileage) if row.start_mileage else '--' }} &middot; End {{ '{:,}'.format(row.end_mileage) if row.end_mileage else '--' }} &middot; {{ row.fuel_count }} fuel log{{ 's' if row.fuel_count != 1 else '' }} &middot; {{ row.issue_count }} issue{{ 's' if row.issue_count != 1 else '' }}{% if row.closed_at %} &middot; closed {{ row.closed_at|to_detroit_datetime }}{% endif %}</small>
-              </div>
+              </a>
             {% else %}
               <div class="desk-warning-strip"><strong>No recent truck history</strong><span>Completed PreTrip / PostTrip cycles for this truck will appear here.</span></div>
             {% endfor %}
@@ -618,7 +639,7 @@
           <section class="desk-detail-section">
             <div class="desk-section-title"><span>Documents</span><strong>{{ report.photos|length }} attached</strong></div>
             <div class="desk-doc-grid">
-              {{ document_row('Damage Photo', (report.photos|length ~ ' attached') if report.photos else 'Needed', 'Damage reports require a photo or manager review note.', 'attached' if report.photos else 'missing') }}
+              {{ document_row('Damage Photo', (report.photos|length ~ ' attached') if report.photos else 'Needed', 'Damage reports require a photo or manager review note.', 'attached' if report.photos else 'missing', url_for('driver.view_damage_report', report_id=report.id)) }}
               {{ document_row('Manager Note', 'Review if needed', 'Manager-only classification happens inside the damage report workflow.', 'normal') }}
             </div>
           </section>

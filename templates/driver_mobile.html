@@ -3482,6 +3482,16 @@
       }
       .desk-doc-row.tone-attached { border-left-color:#2bd576; background:rgba(43,213,118,.06); }
       .desk-doc-row.tone-missing { border-left-color:#ffb224; background:rgba(255,178,36,.07); }
+      a.desk-doc-row,
+      a.desk-evidence-row { text-decoration:none; cursor:pointer; position:relative; padding-right:22px; transition:background .15s ease, border-color .15s ease; }
+      a.desk-doc-row::after,
+      a.desk-evidence-row::after { content:"\203A"; position:absolute; right:9px; top:50%; transform:translateY(-50%); color:#8a99b3; font-size:1rem; font-weight:900; }
+      a.desk-doc-row:hover { background:rgba(91,157,255,.16); }
+      a.desk-doc-row.tone-attached:hover { background:rgba(43,213,118,.14); }
+      a.desk-doc-row.tone-missing:hover { background:rgba(255,178,36,.16); }
+      a.desk-evidence-row:hover { background:rgba(91,157,255,.14); border-color:rgba(91,157,255,.45); }
+      a.desk-doc-row:hover::after,
+      a.desk-evidence-row:hover::after { color:#dbeafe; }
       .desk-doc-row strong {
         color:#e7edf6;
         font-size:.78rem;
@@ -3693,6 +3703,16 @@
         border-color:rgba(91,157,255,.55);
         background:rgba(47,109,240,.24);
         color:#eef5ff;
+      }
+      .desk-action-link.add-stop-cta {
+        min-height:48px;
+        border:1px solid rgba(43,213,118,.5);
+        background:rgba(43,213,118,.16);
+        color:#d9ffe7;
+        font-size:.78rem;
+        text-shadow:0 0 12px rgba(43,213,118,.3);
+        box-shadow:inset 0 0 0 1px rgba(43,213,118,.1), 0 0 18px rgba(43,213,118,.2);
+        animation:addStopBreath 2.45s ease-in-out infinite;
       }
       .desk-action-link.danger,
       .desk-action-form.danger .desk-action-link {
