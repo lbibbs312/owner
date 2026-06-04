@@ -128,11 +128,11 @@
       <span>Current Action</span>
       <strong>{{ clean_value(current_action_text, 'ACTION REQUIRED') }}</strong>
       {% if current_action_is_document and not route_finalized %}
-        <button type="button" data-desktop-select-template="{{ 'desktop-stop-' ~ current_stop.id if current_stop else 'desktop-documents-route' }}">Attach Document</button>
+        <button class="desk-current-cta" type="button" data-desktop-select-template="{{ 'desktop-stop-' ~ current_stop.id if current_stop else 'desktop-documents-route' }}">Attach Document</button>
       {% elif action_is_depart %}
-        {% if current_stop and cta_urls.get('record_departure') %}<a href="{{ cta_urls.get('record_departure') }}">Record Departure</a>{% endif %}
+        {% if current_stop and cta_urls.get('record_departure') %}<a class="desk-current-cta is-go" href="{{ cta_urls.get('record_departure') }}">Record Departure</a>{% endif %}
       {% elif action_is_add_stop %}
-        {% if cta_urls.get('add_stop') %}<a href="{{ cta_urls.get('add_stop') }}">Add Stop</a>{% endif %}
+        {% if cta_urls.get('add_stop') %}<a class="desk-current-cta is-go" href="{{ cta_urls.get('add_stop') }}">Add Stop</a>{% endif %}
       {% endif %}
     </div>
   </div>

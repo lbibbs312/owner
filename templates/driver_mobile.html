@@ -3185,6 +3185,31 @@
         text-transform:uppercase;
         cursor:pointer;
       }
+      .desk-current-action .desk-current-cta {
+        justify-self:stretch;
+        width:100%;
+        min-height:50px;
+        justify-content:center;
+        padding:0 14px;
+        border-radius:9px;
+        font-size:.82rem;
+        letter-spacing:.05em;
+        border-color:rgba(91,157,255,.55);
+        background:rgba(47,109,240,.26);
+        color:#eef5ff;
+      }
+      .desk-current-action .desk-current-cta.is-go {
+        border-color:rgba(255,178,36,.66);
+        background:linear-gradient(180deg, rgba(255,178,36,.22), rgba(245,158,11,.16));
+        color:#ffe9bf;
+        text-shadow:0 0 12px rgba(255,178,36,.3);
+        box-shadow:inset 0 0 0 1px rgba(255,178,36,.14), 0 0 24px rgba(255,178,36,.3);
+        animation:currentCtaPulse 2s ease-in-out infinite;
+      }
+      @keyframes currentCtaPulse {
+        0%,100% { box-shadow:inset 0 0 0 1px rgba(255,178,36,.12), 0 0 16px rgba(255,178,36,.22); }
+        50% { box-shadow:inset 0 0 0 1px rgba(255,178,36,.24), 0 0 30px rgba(255,178,36,.44); }
+      }
       .desktop-metrics-strip {
         display:grid;
         grid-template-columns:repeat(6,minmax(0,1fr));
