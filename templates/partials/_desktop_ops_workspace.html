@@ -44,16 +44,6 @@
     {% set _ = desktop.load_items.append(item) %}
   {% endif %}
 {% endfor %}
-{% set documents_attached = desk.proof_items + route_transfers|length %}
-{% set documents_needed = desk.proof_gaps + (1 if desktop.load_items and not route_transfers else 0) %}
-{% set attention_count = documents_needed + desk.issues + route_damage_reports|length + (1 if pending_posttrip else 0) %}
-{% set route_document_upload_log = current_stop or (todays_logs|last if todays_logs else none) %}
-{% set current_action_text = route_cta.next_action if route_cta and route_cta.next_action else (rm.route.next_action if rm and rm.route else none) %}
-{% set current_action_lower = (current_action_text|string)|lower if current_action_text is not none else '' %}
-{% set current_action_is_document = 'document' in current_action_lower or 'paperwork' in current_action_lower or 'proof' in current_action_lower %}
-{% set action_is_depart = 'depart' in current_action_lower %}
-{% set action_is_add_stop = ('add' in current_action_lower and 'stop' in current_action_lower) or not (rm and rm.stops) %}
-{% set route_finalized = route_context.route_finalized if route_context else false %}
 {# Route-wide tally of uploaded documents by resolved type (no OCR pipeline; review-only). #}
 {% set route_doc = namespace(bol=0, transfer_doc=0, latest_bol=none, latest_transfer=none) %}
 {% for dl in todays_logs|default([]) %}
@@ -62,11 +52,26 @@
     {% elif photo.resolved_document_type == 'transfer_sheet' %}{% set route_doc.transfer_doc = route_doc.transfer_doc + 1 %}{% set route_doc.latest_transfer = photo %}{% endif %}
   {% endfor %}
 {% endfor %}
+{% set packet_transfer_load = desktop.load_items|first if desktop.load_items else none %}
+{% set route_packet_missing_transfer = (desktop.load_items|length > 0 and route_transfers|length == 0 and route_doc.transfer_doc == 0) %}
+{% set route_packet_flag_count = 1 if route_packet_missing_transfer else 0 %}
+{% set documents_attached = desk.proof_items + route_transfers|length %}
+{% set documents_needed = desk.proof_gaps + route_packet_flag_count %}
+{% set attention_count = documents_needed + desk.issues + route_damage_reports|length + (1 if pending_posttrip else 0) %}
+{% set attention_template = 'desktop-route-packet-transfer-sheet' if route_packet_missing_transfer else none %}
+{% set attention_mode = 'issues' if desk.issues or route_damage_reports else ('inspections' if pending_posttrip else ('route-packet' if documents_needed else 'log')) %}
+{% set route_document_upload_log = current_stop or (todays_logs|last if todays_logs else none) %}
+{% set current_action_text = route_cta.next_action if route_cta and route_cta.next_action else (rm.route.next_action if rm and rm.route else none) %}
+{% set current_action_lower = (current_action_text|string)|lower if current_action_text is not none else '' %}
+{% set current_action_is_document = 'document' in current_action_lower or 'paperwork' in current_action_lower or 'proof' in current_action_lower %}
+{% set action_is_depart = 'depart' in current_action_lower %}
+{% set action_is_add_stop = ('add' in current_action_lower and 'stop' in current_action_lower) or not (rm and rm.stops) %}
+{% set route_finalized = route_context.route_finalized if route_context else false %}
 {# Accurate count of every selectable row rendered on the board. #}
 {% set obj = namespace(count=0) %}
 {% set obj.count = obj.count + ((rm.stops|length) if (rm and rm.stops) else 1) %}
 {% set obj.count = obj.count + desktop.load_items|length + route_transfers|length %}
-{% if rm and rm.stops %}{% set obj.count = obj.count + desk.issues + route_damage_reports|length %}{% endif %}
+{% if rm and rm.stops %}{% set obj.count = obj.count + desk.issues + route_damage_reports|length + route_packet_flag_count %}{% endif %}
 
 {% macro clean_value(value, action='ACTION REQUIRED') -%}
   {%- set text = (value|string).strip() if value is not none else '' -%}
@@ -79,6 +84,18 @@
 
 {% macro fact(label, value, action='ACTION REQUIRED') -%}
   <div class="desk-fact"><span>{{ label }}</span><strong>{{ clean_value(value, action) }}</strong></div>
+{%- endmacro %}
+
+{% macro metric_tile(label, value, detail, mode=none, template=none, alert=false) -%}
+  {%- if mode or template -%}
+    <button class="desk-metric-tile{% if alert %} has-alert{% endif %}" type="button" {% if template %}data-desktop-select-template="{{ template }}"{% else %}data-desktop-mode="{{ mode }}"{% endif %} aria-label="{{ label }}: {{ value }} {{ detail }}">
+      <span>{{ label }}</span><strong>{{ value }}</strong><small>{{ detail }}</small>
+    </button>
+  {%- else -%}
+    <div class="desk-metric-tile{% if alert %} has-alert{% endif %}">
+      <span>{{ label }}</span><strong>{{ value }}</strong><small>{{ detail }}</small>
+    </div>
+  {%- endif -%}
 {%- endmacro %}
 
 {% macro row_button(key, code, title, meta, tone='normal', default=false) -%}
@@ -148,7 +165,7 @@
             {% set is_default = (not desk.default_set and stop.stop_id == route_focus.stop_id) %}
             {% if is_default %}{% set desk.default_set = true %}{% endif %}
             {% set row_tone = 'issue' if stop.badge and stop.badge.severity == 'risk' else ('warn' if stop.badge and stop.badge.severity == 'attention' else ('active' if stop.status == 'active' else 'normal')) %}
-            {% set row_code = 'ACTIVE' if stop.status == 'active' else ('START' if stop.movement_code in ['route_start', 'route_start_open'] else ('LOAD' if stop.movement_code == 'loaded' else ('DROP' if stop.movement_code == 'dropped' else (stop.board_code or 'STOP')))) %}
+            {% set row_code = 'ACTIVE' if stop.status == 'active' else ('STARTED' if stop.movement_code in ['route_start', 'route_start_open'] else ('LOADED' if stop.movement_code == 'loaded' else ('DROPPED' if stop.movement_code == 'dropped' else (stop.board_code or 'STOP')))) %}
             {{ row_button('desktop-stop-' ~ stop.stop_id, row_code, stop.plant_name, (stop.ledger_meta or stop.movement_summary or stop.next_action), row_tone, is_default) }}
           {% endfor %}
         {% else %}
@@ -165,7 +182,7 @@
             {% set is_default = not desk.default_set %}
             {% if is_default %}{% set desk.default_set = true %}{% endif %}
             {% set row_meta %}{{ clean_value(item.origin_label, 'SOURCE NOT CAPTURED') }} to {{ clean_value(item.destination_label, 'DESTINATION REQUIRED') }} / {{ item.load_count_label or item.route_line }}{% endset %}
-            {{ row_button('desktop-load-' ~ loop.index0, 'LOAD', item.title, row_meta, 'normal', is_default) }}
+            {{ row_button('desktop-load-' ~ loop.index0, 'LOADED', item.title, row_meta, 'normal', is_default) }}
           {% endfor %}
           {% for transfer in route_transfers %}
             {% set line_count = transfer.lines|length %}
@@ -179,6 +196,9 @@
       {% if rm and rm.stops %}
         <div class="desk-row-group">
           <h3>Issues</h3>
+          {% if route_packet_missing_transfer %}
+            {{ row_button('desktop-route-packet-transfer-sheet', 'DOC', 'Transfer sheet needed', ((packet_transfer_load.title if packet_transfer_load else 'Route packet') ~ ' / missing transfer sheet'), 'warn', false) }}
+          {% endif %}
           {% for stop in rm.stops %}
             {% for issue in stop.issues|default([]) %}
               {% if issue.code != 'needs_departure' %}
@@ -218,12 +238,12 @@
       </div>
 
       <div class="desktop-metrics-strip" aria-label="Route health metrics">
-        <div><span>Stops</span><strong>{{ desk.completed }}/{{ todays_logs|length }}</strong><small>{{ desk.open }} open</small></div>
-        <div><span>Documents</span><strong>{{ documents_attached }} attached</strong><small>{% if documents_needed %}{{ documents_needed }} needed{% else %}none required flagged{% endif %}</small></div>
-        <div><span>Attention</span><strong>{{ attention_count }}</strong><small>{{ 'item' if attention_count == 1 else 'items' }} need review</small></div>
-        <div><span>Issues</span><strong>{{ route_damage_reports|length }} damage</strong><small>{{ desk.mismatches }} mismatch</small></div>
+        {{ metric_tile('Stops', desk.completed ~ '/' ~ todays_logs|length, desk.open ~ ' open', 'log') }}
+        {{ metric_tile('Documents', documents_attached ~ ' attached', (documents_needed ~ ' needed') if documents_needed else 'none required flagged', 'route-packet' if documents_needed else 'documents', none, documents_needed > 0) }}
+        {{ metric_tile('Attention', attention_count, ('item' if attention_count == 1 else 'items') ~ ' need review', attention_mode if not attention_template else none, attention_template, attention_count > 0) }}
+        {{ metric_tile('Issues', route_damage_reports|length ~ ' damage', desk.mismatches ~ ' mismatch', 'issues', none, desk.issues > 0 or route_damage_reports|length > 0 or desk.mismatches > 0) }}
         {% if current_stop_forecast %}
-          <div><span>Current Wait</span><strong>{{ current_stop_forecast.elapsed_label }}</strong><small>Today avg {{ current_stop_forecast.today_average_label }}</small></div>
+          {{ metric_tile('Current Wait', current_stop_forecast.elapsed_label, 'Today avg ' ~ current_stop_forecast.today_average_label, none, 'desktop-stop-' ~ current_stop.id if current_stop else none) }}
         {% endif %}
       </div>
 
@@ -413,6 +433,26 @@
           </section>
           {% if documents_needed %}
             <div class="desk-warning-strip tone-warn"><strong>Packet not ready</strong><span>{{ documents_needed }} route item{{ 's' if documents_needed != 1 else '' }} need document review before export.</span></div>
+            <div class="desk-evidence-list" aria-label="Required route packet flags">
+              {% if route_packet_missing_transfer %}
+                <button class="desk-evidence-row desk-mode-row" type="button" data-desktop-select-template="desktop-route-packet-transfer-sheet">
+                  <span>DOC</span>
+                  <strong>Transfer sheet needed</strong>
+                  <small>{{ packet_transfer_load.title if packet_transfer_load else 'Recorded route load' }} has no transfer sheet or route transfer record attached.</small>
+                </button>
+              {% endif %}
+              {% for stop in rm.stops|default([]) if rm %}
+                {% for issue in stop.issues|default([]) %}
+                  {% if issue.code == 'missing_proof' %}
+                    <button class="desk-evidence-row desk-mode-row" type="button" data-desktop-select-template="desktop-issue-{{ stop.stop_id }}-{{ issue.code }}">
+                      <span>DOC</span>
+                      <strong>{{ issue.label }}</strong>
+                      <small>{{ stop.plant_name }} &middot; {{ issue.action }}</small>
+                    </button>
+                  {% endif %}
+                {% endfor %}
+              {% endfor %}
+            </div>
           {% endif %}
         </section>
         <section class="desk-detail-section">
@@ -542,6 +582,13 @@
         <section class="desk-detail-section">
           <div class="desk-section-title"><span>Current Issues</span><strong>{{ attention_count }} attention</strong></div>
           <div class="desk-evidence-list">
+            {% if route_packet_missing_transfer %}
+              <button class="desk-evidence-row desk-mode-row" type="button" data-desktop-select-template="desktop-route-packet-transfer-sheet">
+                <span>DOC</span>
+                <strong>Transfer sheet needed</strong>
+                <small>{{ packet_transfer_load.title if packet_transfer_load else 'Recorded route load' }} &middot; Add the missing route packet document.</small>
+              </button>
+            {% endif %}
             {% for stop in rm.stops|default([]) if rm %}
               {% for issue in stop.issues|default([]) %}
                 {% if issue.code != 'needs_departure' %}
@@ -560,7 +607,14 @@
                 <small>{{ report.description }}</small>
               </button>
             {% endfor %}
-            {% if not desk.issues and not route_damage_reports %}
+            {% if pending_posttrip %}
+              <button class="desk-evidence-row desk-mode-row" type="button" data-desktop-mode="inspections">
+                <span>INSP</span>
+                <strong>PostTrip pending</strong>
+                <small>Close the route with a PostTrip to capture end mileage, fuel, and miles driven.</small>
+              </button>
+            {% endif %}
+            {% if not route_packet_missing_transfer and not desk.issues and not route_damage_reports and not pending_posttrip %}
               <div class="desk-warning-strip"><strong>No open issues</strong><span>No actionable route issues are currently flagged.</span></div>
             {% endif %}
           </div>
@@ -628,6 +682,33 @@
         {% endif %}
       {% endfor %}
     {% endfor %}
+
+    {% if route_packet_missing_transfer %}
+      <template data-desktop-detail-template="desktop-route-packet-transfer-sheet" data-title="Transfer sheet needed" data-kicker="ROUTE PACKET FLAG">
+        <div class="desk-detail-stack">
+          <section class="desk-detail-section">
+            <div class="desk-section-title"><span>Packet Flag</span><strong>DOCUMENT REQUIRED</strong></div>
+            <div class="desk-fact-grid">
+              {{ fact('Flag', 'Transfer sheet needed') }}
+              {{ fact('Affected load', packet_transfer_load.title if packet_transfer_load else 'Recorded route load') }}
+              {{ fact('Why flagged', 'A load is recorded on this route, but no transfer sheet or route transfer record is attached.') }}
+              {{ fact('Evidence found', route_transfers|length ~ ' transfer records attached') }}
+              {{ fact('Required action', 'Attach the transfer sheet to the Route Packet or open Documents to add it.') }}
+              {{ fact('Review owner', 'Driver / manager review') }}
+            </div>
+            <div class="desk-warning-strip tone-warn"><strong>Missing transfer sheet</strong><span>{{ packet_transfer_load.title if packet_transfer_load else 'A recorded route load' }} needs a transfer sheet before the route packet is ready.</span></div>
+          </section>
+          <section class="desk-detail-section">
+            <div class="desk-section-title"><span>Actions</span><strong>Packet controls</strong></div>
+            <div class="desk-action-grid">
+              <button class="desk-action-link primary" type="button" data-desktop-mode="documents">Open Documents</button>
+              <button class="desk-action-link" type="button" data-desktop-mode="route-packet">Back to Route Packet</button>
+              <a class="desk-action-link" href="{{ url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) }}">Open route audit</a>
+            </div>
+          </section>
+        </div>
+      </template>
+    {% endif %}
 
     {% for report in route_damage_reports %}
       <template data-desktop-detail-template="desktop-damage-{{ report.id }}" data-title="Damage report / {{ report.plant_name }}" data-kicker="Issue Review">

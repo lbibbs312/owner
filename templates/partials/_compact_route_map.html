@@ -310,6 +310,23 @@
       <span>Full details</span>
     </a>
   </div>
+  {% if depart_url and primary_stop %}
+    <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
+      <a class="md-flow-primary-cta" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow" data-flow-panel-kicker="DEPART QUICK FLOW">
+        <span>Required driver action</span>
+        <strong>Depart / Load</strong>
+        <small>{{ primary_stop.plant_name }} &middot; {{ primary_stop.wait_label }} &middot; record departure</small>
+      </a>
+    </div>
+  {% elif add_stop_url %}
+    <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
+      <a class="md-flow-primary-cta add-stop-action" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}">
+        <span>Required driver action</span>
+        <strong>Add Stop</strong>
+        <small>Continue route capture</small>
+      </a>
+    </div>
+  {% endif %}
   {% endif %}
 
   {% if pending_ryder %}

@@ -4313,6 +4313,9 @@ def test_premature_finalized_event_does_not_lock_active_shift_new_logs(client, a
     assert b"Continue route" in mobile.data
     assert b"Add Stop" in mobile.data
     assert b"md-flow-action-tab primary add-stop-action" in mobile.data
+    assert b"md-flow-primary-cta add-stop-action" in mobile.data
+    assert b"Continue route capture" in mobile.data
+    assert b"animation: primaryFlowActionBreath 2.6s ease-in-out infinite" in mobile.data
     assert body.count('data-flow-panel-title="Add Stop"') == 1
     assert b"Finalize Route" not in mobile.data
 
@@ -5329,8 +5332,12 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert b"desktopActiveStopHalo" not in page.data
     assert b".board-only-shell .desk-ops-row.tone-active" in page.data
     assert b".board-only-shell .desk-ops-row.tone-active::after" in page.data
+    assert b"animation:boardOpsRowGlowBreath 4.6s ease-in-out infinite" in page.data
+    assert b"@keyframes boardOpsRowGlowBreath" in page.data
     assert b"0 0 26px rgba(43,213,118,.08)" in page.data
     assert b".board-only-shell .desk-staged-actions .desk-current-cta.is-go" in page.data
+    assert b"animation:boardActionGlowBreath 2.8s ease-in-out infinite" in page.data
+    assert b"@keyframes boardActionGlowBreath" in page.data
     assert b"min-width:176px" in page.data
     assert b"min-height:44px" in page.data
     assert b"border-color:rgba(43,213,118,.58)" in page.data
@@ -5455,10 +5462,21 @@ def test_mobile_dashboard_focuses_latest_stop_when_no_current_stop(client, app):
             arrive_time=f"{route_date.isoformat()} 14:12:00",
             depart_time="14:26",
         )
-        db.session.add_all([raleigh_east, ppl])
+        barden = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="Barden Plant",
+            load_size="Barden Plant Load",
+            depart_load_size="Empty",
+            no_pickup=True,
+            arrive_time=f"{route_date.isoformat()} 15:02:00",
+            depart_time="15:14",
+        )
+        db.session.add_all([raleigh_east, ppl, barden])
         db.session.commit()
         raleigh_east_id = raleigh_east.id
         ppl_id = ppl.id
+        barden_id = barden.id
 
     login(client, "desktop_latest_stop_driver")
     page = client.get("/mobile")
@@ -5468,17 +5486,32 @@ def test_mobile_dashboard_focuses_latest_stop_when_no_current_stop(client, app):
     workspace = page.data[workspace_start: page.data.index(b"<script>", workspace_start)]
     active_card_start = workspace.index(b"desk-active-stop-card")
     active_card = workspace[active_card_start: workspace.index(b"desktop-metrics-strip", active_card_start)]
-    assert b"<strong>PPL</strong>" in active_card
-    assert b"<strong>Stop 2</strong>" in active_card
+    assert b"<strong>Barden Plant</strong>" in active_card
+    assert b"<strong>Stop 3</strong>" in active_card
     assert b"<strong>Raleigh East</strong>" not in active_card
     assert (
-        f'data-detail-template="desktop-stop-{ppl_id}" data-desktop-default="true"'.encode()
+        f'data-detail-template="desktop-stop-{barden_id}" data-desktop-default="true"'.encode()
         in workspace
     )
     assert (
         f'data-detail-template="desktop-stop-{raleigh_east_id}" data-desktop-default="true"'.encode()
         not in workspace
     )
+    assert (
+        f'data-detail-template="desktop-stop-{ppl_id}" data-desktop-default="true"'.encode()
+        not in workspace
+    )
+    assert b"Transfer sheet needed" in workspace
+    assert b"STARTED" in workspace
+    assert b"LOADED" in workspace
+    assert b"DROPPED" in workspace
+    assert b'data-detail-template="desktop-route-packet-transfer-sheet"' in workspace
+    assert b'data-desktop-detail-template="desktop-route-packet-transfer-sheet"' in workspace
+    assert b'data-desktop-select-template="desktop-route-packet-transfer-sheet"' in workspace
+    assert b"1 required flagged" in workspace
+    assert b"has no transfer sheet or route transfer record attached" in workspace
+    assert b"Missing transfer sheet" in workspace
+    assert b"No open issues" not in workspace
 
 
 def test_driver_mobile_dashboard_renders_real_workflow(client, app):
@@ -6121,7 +6154,15 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "md-flow-work-scrim" in body
     assert "Did you get unloaded?" in body
     assert "driver-active-wait-action" in body
+    assert "animation:activeStopWaitBreath 4.6s ease-in-out infinite" in body
+    assert "@keyframes activeStopWaitBreath" in body
     assert "Depart / Load" in body
+    assert "md-flow-primary-cta" in body
+    assert "Required driver action" in body
+    assert "record departure" in body
+    assert ".md-flow-board .md-flow-row.tone-active" in body
+    assert "animation: activebreathe 4.6s ease-in-out infinite" in body
+    assert "@keyframes activebreathe" in body
     assert "→" in body
     assert "&middot;" in body
     assert "flow-arrow" in body
@@ -6142,9 +6183,14 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "content: none!important" in body
     assert ".md-flow-action-tab::before" in body
     assert "animation: actionDotPulse 1.9s ease-in-out infinite" in body
+    assert ".md-flow-action-tab.is-next-required:not(.add-stop-action)" in body
+    assert "animation: actionButtonBreath 2.6s ease-in-out infinite" in body
+    assert "@keyframes actionButtonBreath" in body
     assert ".md-flow-action-tab.add-stop-action" in body
     assert "animation: addStopBreath 2.45s ease-in-out infinite" in body
     assert "@keyframes addStopBreath" in body
+    assert "animation: primaryFlowActionBreath 2.6s ease-in-out infinite" in body
+    assert "@keyframes primaryFlowActionBreath" in body
     assert "background: rgba(43,213,118,.15)" in body
     assert "@keyframes actionDotPulse" in body
     assert "grid-template-columns: 9px max-content" in body
