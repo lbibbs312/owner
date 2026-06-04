@@ -548,25 +548,26 @@
       }
       body.flow-first-body .wide-body { display: block; }
     }
-    body.flow-first-body .driver-ops-shell.flow-first-shell {
+    .driver-ops-shell.board-only-shell {
       overflow: visible;
     }
-    body.flow-first-body .driver-ops-shell.flow-first-shell .wide-body,
-    body.flow-first-body .driver-ops-shell.flow-first-shell main {
+    .driver-ops-shell.board-only-shell .wide-body,
+    .driver-ops-shell.board-only-shell main {
       min-height: 0;
       overflow: visible;
     }
-    body.flow-first-body .driver-ops-shell.flow-first-shell main {
-      padding-bottom: calc(var(--nav-height) + 24px);
-    }
     @media (max-width: 760px) {
-      body.flow-first-body .driver-ops-shell.flow-first-shell .compact-route-map.md-flow-board {
+      body .driver-ops-shell.board-only-shell {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        min-height: 100svh;
+        border: 0;
+        border-radius: 0;
         overflow: visible;
       }
-      body.flow-first-body .driver-ops-shell.flow-first-shell .md-flow-window,
-      body.flow-first-body .driver-ops-shell.flow-first-shell .md-flow-track {
-        max-height: none;
-        overflow: visible;
+      body .driver-ops-shell.board-only-shell main {
+        padding-bottom: calc(var(--nav-height) + 24px);
       }
     }
 
@@ -5106,6 +5107,18 @@
       .board-only-shell .desktop-detail-workspace .desk-actions-panel {
         grid-column:auto;
         grid-row:auto;
+      }
+    }
+
+    @media (max-width: 760px) {
+      body .driver-ops-shell.board-only-shell .compact-route-map.md-flow-board,
+      body .driver-ops-shell.board-only-shell .md-flow-window,
+      body .driver-ops-shell.board-only-shell .md-flow-track {
+        max-height:none !important;
+        overflow:visible !important;
+      }
+      body .driver-ops-shell.board-only-shell .md-flow-track {
+        overscroll-behavior:auto;
       }
     }
   </style>
