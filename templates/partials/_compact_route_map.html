@@ -220,6 +220,8 @@
 {% endif %}
 {% set dispatch_ticker_text = rm.dispatch_ticker_text if rm and rm.dispatch_ticker_text is defined else 'NO ALERTS FROM DISPATCH' %}
 {% set show_dispatch_ticker = dispatch_messages and not (dispatch_messages|length == 1 and dispatch_messages[0].code|default('none') == 'none') %}
+{% set route_finalized_for_cta = cta.route_finalized if cta.route_finalized is defined else false %}
+{% set show_between_loads_add_stop = add_stop_url and not primary_stop and is_today_route and not route_finalized_for_cta and primary_action not in ['posttrip', 'finalize_route'] %}
 {% set route_status_raw = (rm.route.next_action if rm and rm.route else cta.next_action if cta.next_action is defined else 'Ready')|default('Ready', true) %}
 {% set route_status_lower = route_status_raw|lower %}
 {% if is_empty_today_route %}
@@ -331,7 +333,7 @@
         <small>{{ primary_stop.plant_name }} &middot; record departure</small>
       </a>
     </div>
-  {% elif add_stop_url and (primary_action == 'add_stop' or not (rm and rm.stops)) %}
+  {% elif add_stop_url and (primary_action == 'add_stop' or not (rm and rm.stops) or show_between_loads_add_stop) %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta add-stop-action" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}">
         <span>Required driver action</span>

@@ -748,6 +748,50 @@ def test_add_stop_action_copy_stays_route_specific(app):
     assert "<strong>Add Stop</strong>\n      <span>Attach document</span>" not in html
 
 
+def test_mobile_between_loads_route_keeps_add_stop_cta(app):
+    from flask import render_template
+
+    today = date.today()
+    with app.test_request_context("/mobile"):
+        html = render_template(
+            "partials/_compact_route_map.html",
+            route_map={
+                "map_mode": "live_current_work",
+                "stops": [
+                    {
+                        "stop_id": 1,
+                        "sequence": 1,
+                        "status": "completed",
+                        "plant_name": "Raleigh East",
+                        "board_badge": {"row_tone": "delivery", "pill_tone": "delivery", "short": "DELIVERED"},
+                        "badge": {"severity": "ok"},
+                        "board_flow": {"mode": "plain", "text": "Raleigh East · dropped Parts"},
+                        "board_detail": "Raleigh East · dropped Parts",
+                        "arrived_with": "Paint Central Load",
+                        "departed_with": "Empty",
+                        "wait_minutes": 0,
+                        "no_pickup": False,
+                        "status_label": "Completed",
+                        "next_action": "No action needed",
+                    }
+                ],
+                "route": {"next_action": "Attach document"},
+            },
+            route_cta={
+                "next_action": "Attach document",
+                "primary_cta": {"label": "Attach Document", "action": "attach_document", "style": "primary"},
+                "route_finalized": False,
+            },
+            route_cta_urls={"add_stop": "/new_driving_log", "attach_document": "/driver/transfers/new"},
+            route_date=today,
+            today_local_date=today,
+        )
+
+    assert '<a class="md-flow-primary-cta add-stop-action" href="/new_driving_log"' in html
+    assert "<strong>Add Stop</strong>" in html
+    assert "<small>Continue route</small>" in html
+
+
 def test_mobile_live_flow_board_keeps_stop_sequence_and_active_glow(app):
     from flask import render_template
     from app.services.route_map import build_driver_route_map_context
