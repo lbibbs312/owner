@@ -31,6 +31,13 @@ def _now():
     return datetime.utcnow()
 
 
+def _hot_part_photo_upload_path():
+    upload_root = current_app.config.get("HOT_PART_UPLOAD_FOLDER", "uploads/hot_part_photos")
+    upload_path = os.path.abspath(os.path.join(current_app.root_path, os.pardir, upload_root))
+    os.makedirs(upload_path, exist_ok=True)
+    return upload_path
+
+
 def _task_status(task):
     if getattr(task, "status", None) == "completed":
         return "completed"
@@ -334,12 +341,10 @@ def record_hot_part_event(
 def save_hot_part_photo(hot_move, uploaded_file, *, uploaded_by_id=None, stop_id=None, plant_id=None):
     if not uploaded_file or not getattr(uploaded_file, "filename", ""):
         raise ValueError("Take or choose a photo before saving proof.")
-    upload_root = current_app.config.get("HOT_PART_UPLOAD_FOLDER", "uploads/hot_part_photos")
-    os.makedirs(upload_root, exist_ok=True)
     original = secure_filename(uploaded_file.filename) or "hot-part-photo"
     name, ext = os.path.splitext(original)
     filename = f"hot-part-{hot_move.id}-{_now().strftime('%Y%m%d%H%M%S%f')}-{uuid4().hex}{ext or '.jpg'}"
-    uploaded_file.save(os.path.join(upload_root, filename))
+    uploaded_file.save(os.path.join(_hot_part_photo_upload_path(), filename))
 
     photo = HotPartPhoto(
         filename=filename,

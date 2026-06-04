@@ -1,10 +1,11 @@
 services:
   - type: web
-    name: lacksdrivers-com
+    name: movedefense
     env: python
-    plan: free
-    branch: main
-    autoDeploy: true
+    plan: standard
+    repo: https://github.com/lbibbs312/owner
+    branch: claude/review-lacksdrivers-flask-kAOQQ
+    autoDeploy: false
 
     buildCommand: pip install -e .
     preDeployCommand: flask --app lacksdrivers.py deploy-db
@@ -33,3 +34,14 @@ services:
         sync: false
       - key: SQLALCHEMY_DATABASE_URI
         sync: false
+      - key: DRIVER_LOG_PHOTO_UPLOAD_FOLDER
+        value: /var/data/movedefense_uploads/driver_log_photos
+      - key: DAMAGE_UPLOAD_FOLDER
+        value: /var/data/movedefense_uploads/damage_photos
+      - key: HOT_PART_UPLOAD_FOLDER
+        value: /var/data/movedefense_uploads/hot_part_photos
+
+    disk:
+      name: movedefense-uploads
+      mountPath: /var/data/movedefense_uploads
+      sizeGB: 5

@@ -42,6 +42,10 @@ def _env_csv(name):
     )
 
 
+def _env_upload_folder(name, default):
+    return os.environ.get(name, default)
+
+
 def _public_url():
     return (
         os.environ.get("APP_URL")
@@ -108,6 +112,18 @@ class BaseConfig:
     PUBLIC_URL = os.environ.get("PUBLIC_URL", APP_URL).rstrip("/")
     CANONICAL_HOST = _canonical_host()
     REDIRECT_HOSTS = _env_csv("REDIRECT_HOSTS")
+    DRIVER_LOG_PHOTO_UPLOAD_FOLDER = _env_upload_folder(
+        "DRIVER_LOG_PHOTO_UPLOAD_FOLDER",
+        "uploads/driver_log_photos",
+    )
+    DAMAGE_UPLOAD_FOLDER = _env_upload_folder(
+        "DAMAGE_UPLOAD_FOLDER",
+        "uploads/damage_photos",
+    )
+    HOT_PART_UPLOAD_FOLDER = _env_upload_folder(
+        "HOT_PART_UPLOAD_FOLDER",
+        "uploads/hot_part_photos",
+    )
 
 
 class DevConfig(BaseConfig):

@@ -23,6 +23,9 @@ def _reload_config(monkeypatch, **values):
         "PUBLIC_URL",
         "CANONICAL_HOST",
         "REDIRECT_HOSTS",
+        "DRIVER_LOG_PHOTO_UPLOAD_FOLDER",
+        "DAMAGE_UPLOAD_FOLDER",
+        "HOT_PART_UPLOAD_FOLDER",
     ]:
         monkeypatch.delenv(key, raising=False)
     for key, value in values.items():
@@ -67,6 +70,24 @@ def test_render_runtime_uses_prod_config_with_postgres(monkeypatch):
     assert selected.SOCKETIO_ASYNC_MODE == "threading"
     assert selected.SOCKETIO_PATH == "_socketio_disabled"
     assert selected.SQLALCHEMY_DATABASE_URI.startswith("postgresql://")
+
+
+def test_upload_folders_can_be_configured_from_environment(monkeypatch):
+    config = _reload_config(
+        monkeypatch,
+        FLASK_ENV="production",
+        SECRET_KEY="secret",
+        SQLALCHEMY_DATABASE_URI="postgresql://user:pass@example.com/db",
+        DRIVER_LOG_PHOTO_UPLOAD_FOLDER="/var/data/movedefense_uploads/driver_log_photos",
+        DAMAGE_UPLOAD_FOLDER="/var/data/movedefense_uploads/damage_photos",
+        HOT_PART_UPLOAD_FOLDER="/var/data/movedefense_uploads/hot_part_photos",
+    )
+
+    selected = config.get_config()
+
+    assert selected.DRIVER_LOG_PHOTO_UPLOAD_FOLDER == "/var/data/movedefense_uploads/driver_log_photos"
+    assert selected.DAMAGE_UPLOAD_FOLDER == "/var/data/movedefense_uploads/damage_photos"
+    assert selected.HOT_PART_UPLOAD_FOLDER == "/var/data/movedefense_uploads/hot_part_photos"
 
 
 def test_socketio_can_be_explicitly_enabled(monkeypatch):
