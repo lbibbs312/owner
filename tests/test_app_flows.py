@@ -4558,6 +4558,9 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"z-index: 2510;" in logs_page.data
     assert b'body.md-shell .navbar .nav-link[aria-label="Recent activity"].d-md-none' in logs_page.data
     assert b"display:none !important;" in logs_page.data
+    assert b"body.driver-ledger-active .driver-active-wait-action" in logs_page.data
+    assert b"background:rgba(91,157,255,.08)" in logs_page.data
+    assert b"body.driver-ledger-active .md-driver-bottom-nav {\n        display:none !important;" in logs_page.data
     assert b"AUDIT LEDGER" in logs_page.data
     assert b"PAST ROUTE" in logs_page.data
     assert b"REPLAY MODE" in logs_page.data
@@ -4620,6 +4623,9 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b'data-md-icon="add-stop"' not in action_row
     assert b'data-md-icon="print-route"' in action_row
     assert b'data-md-icon="save-pdf"' in action_row
+    assert b"md-flow-action-tab" not in action_row
+    assert b"md-ledger-primary" in action_row
+    assert b"md-ledger-utility" in action_row
     assert b"Add Missed Stop" not in action_row
     assert b'<span class="md-btn-icon">+</span>' not in action_row
     assert '<span class="md-btn-icon">↧</span>'.encode() not in action_row
@@ -4629,6 +4635,8 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
         f'href="/driver_logs_print?date={selected_date.isoformat()}" class="md-row-action"><span class="md-btn-icon">O</span> View'.encode()
         in logs_page.data
     )
+    assert b'<details class="md-row-more-actions">' in logs_page.data
+    assert b"Stop actions" in logs_page.data
 
     first_history_page = client.get(f"/driver_logs?date={(selected_date - timedelta(days=2)).isoformat()}")
     assert first_history_page.status_code == 200
@@ -5306,6 +5314,29 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert page.status_code == 200
     assert b"desktop-header-context" in page.data
     assert b"@media (min-width: 640px) and (min-height: 560px)" in page.data
+    assert b"@media (min-width: 1280px) and (min-height: 560px)" in page.data
+    assert b"--lov-bg: oklch(0.16 0.018 250)" in page.data
+    assert b"--lov-accent: oklch(0.72 0.08 190)" in page.data
+    assert b".board-only-shell .desk-detail-stack" in page.data
+    assert b".board-only-shell .desktop-ops-grid" in page.data
+    assert b"flex-direction:column" in page.data
+    assert b"display:contents" in page.data
+    assert b"grid-template-columns:minmax(0, 1fr)" in page.data
+    assert b".board-only-shell .desk-staged-actions" in page.data
+    assert b".board-only-shell .desk-stop-marker" in page.data
+    assert b".board-only-shell .desk-active-stop-card" in page.data
+    assert b"desktopActiveStopBreathe" not in page.data
+    assert b"desktopActiveStopHalo" not in page.data
+    assert b".board-only-shell .desk-ops-row.tone-active" in page.data
+    assert b".board-only-shell .desk-ops-row.tone-active::after" in page.data
+    assert b"0 0 26px rgba(43,213,118,.08)" in page.data
+    assert b".board-only-shell .desk-staged-actions .desk-current-cta.is-go" in page.data
+    assert b"min-width:176px" in page.data
+    assert b"min-height:44px" in page.data
+    assert b"border-color:rgba(43,213,118,.58)" in page.data
+    assert b"justify-content:center" in page.data
+    assert b"font-feature-settings:\"ss01\", \"cv11\"" in page.data
+    assert b"--md-mono: 'JetBrains Mono', 'IBM Plex Mono'" in page.data
     assert b".md-driver-bottom-nav { display:none !important; }" in page.data
     assert b".board-only-shell main > .ops-console { display:none; }" in page.data
     assert b"setupDesktopOpsWorkspace" in page.data
@@ -5314,16 +5345,34 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     workspace_start = page.data.index(b'<section class="desktop-ops-workspace"')
     workspace = page.data[workspace_start: page.data.index(b"<script>", workspace_start)]
     assert b"Live Ops Board" in workspace
-    assert b"Route Workspace" in workspace
-    assert b"ROUTE WORKSPACE" in workspace
+    assert b"Current Stop" in workspace
+    assert b"<strong>Trim DC</strong>" in workspace
+    assert b"<span>Stop</span>" in workspace
+    assert b"<strong>Stop 1</strong>" in workspace
+    assert b"desk-active-stop-card" in workspace
+    assert b"desk-staged-actions" in workspace
+    assert b"Record Departure" in workspace
+    assert b"desk-work-tabs" in workspace
+    assert b"Route Packet" in workspace
+    assert b"data-desktop-mode-template=\"route-packet\"" in workspace
+    assert b"data-desktop-mode-template=\"documents\"" in workspace
+    assert b"data-desktop-mode-template=\"issues\"" in workspace
+    assert b"data-desktop-mode-template=\"inspections\"" in workspace
+    assert b"data-desktop-mode-template=\"log\"" in workspace
+    assert b"Stop 1 / Trim DC" not in workspace
+    assert b"<span>Transfer Sheets</span>" not in workspace
+    assert b"<span>Plant Baseline</span>" not in workspace
+    assert b"desktop-main-column" in workspace
+    assert workspace.index(b"desktop-ops-board") < workspace.index(b"desktop-main-column")
+    assert workspace.index(b"desktop-main-column") < workspace.index(b"desktop-metrics-strip")
     assert b'data-desktop-row' in workspace
     assert b'data-desktop-detail-template="desktop-transfer-' in workspace
     assert b'data-desktop-detail-template="desktop-documents-route"' in workspace
     assert b"TRX-DESK" in workspace
-    assert b"Driver Credentials / Truck Documents" in workspace
-    assert b"Visibility" in workspace
-    assert b"Stop Summary" in workspace
-    assert b"Load / Transfer Detail" in workspace
+    assert b"desk-overview-card" in workspace
+    assert b"Stop Summary" not in workspace
+    assert b"Packet Readiness" in workspace
+    assert b"Document Types" in workspace
     assert b"Documents" in workspace
     assert b"Attach Document" in workspace
     assert b"Take Photo" in workspace
@@ -5336,13 +5385,14 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert b"Take proof photo" not in workspace
     assert b"Upload document image" not in workspace
     assert b"Add damage photo" not in workspace
-    assert b"Route</h4>" in workspace
-    assert b"Review</h4>" in workspace
+    assert b"desk-overview-primary-action" in workspace
+    assert b"Route</h4>" not in workspace
+    assert b"Review</h4>" not in workspace
     assert b"Scan cargo" not in workspace
     assert b"Operations Desk" not in workspace
     assert b"Audit readiness" not in workspace
     assert b"Evidence Coverage" not in workspace
-    assert b"desk-timing-strip" in workspace
+    assert b"desk-overview-timing" in workspace
     assert b"Truck inspections" in workspace
     assert b"Fuel at start" in workspace
     assert b"3/4" in workspace
@@ -5351,6 +5401,23 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert b"Destination needs confirmation" not in workspace
     assert b"Earlier stop" not in workspace
     assert b"Next stop" not in workspace
+    assert b"<h3>Documents</h3>" not in workspace
+    assert b"<h3>Inspections</h3>" not in workspace
+
+    stop_template_start = workspace.index(b'data-desktop-detail-template="desktop-stop-')
+    stop_template = workspace[stop_template_start: workspace.index(b"</template>", stop_template_start)]
+    assert b"desk-overview-card" in stop_template
+    assert b"Arrive" in stop_template
+    assert b"Depart" in stop_template
+    assert b"Wait" in stop_template
+    assert b"Route Packet:" in stop_template
+    assert b"Attach to Route Packet" in stop_template
+    assert b"desk-paperwork-section" not in stop_template
+    assert b"desk-preview-strip" not in stop_template
+    assert b"Transfer Sheet" not in stop_template
+    assert b"Proof Photo" not in stop_template
+    assert b"Load / Transfer Detail" not in stop_template
+    assert b"desk-detail-section" not in stop_template
 
 
 def test_driver_mobile_dashboard_renders_real_workflow(client, app):

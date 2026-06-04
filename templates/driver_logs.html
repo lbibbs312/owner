@@ -38,6 +38,17 @@
       box-shadow:0 12px 34px rgba(0,0,0,.28);
       margin-bottom:14px;
     }
+    body.driver-ledger-active .driver-active-wait-action {
+      background:rgba(91,157,255,.08);
+      border-color:rgba(91,157,255,.24);
+      color:var(--md-text);
+      box-shadow:none;
+    }
+    body.driver-ledger-active .driver-active-wait-action:hover {
+      background:rgba(91,157,255,.12);
+      border-color:rgba(91,157,255,.34);
+      color:var(--md-text);
+    }
     body.driver-ledger-active #pageContent > .container.mt-4.fade-in {
       width:100%;
       max-width:none;
@@ -48,6 +59,14 @@
       min-height:100vh;
       padding:0 0 108px;
       background:transparent;
+    }
+    @media (min-width:768px) {
+      body.driver-ledger-active .md-driver-bottom-nav {
+        display:none !important;
+      }
+      body.driver-ledger-active .driver-log-shell {
+        padding-bottom:36px;
+      }
     }
     .md-ledger-shell {
       width:min(1040px,100%);
@@ -391,45 +410,52 @@
       box-shadow:0 0 0 2px rgba(255,178,36,.16),0 0 22px rgba(91,157,255,.1);
     }
     .md-action-rail {
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-      gap:10px;
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+      gap:8px;
     }
     .md-ledger-btn,
     .md-row-action,
     .md-row-action-form button {
-      min-height:42px;
+      min-height:34px;
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      gap:8px;
-      border-radius:10px;
-      border:1px solid rgba(91,157,255,.34);
-      background:rgba(47,109,240,.14);
+      gap:6px;
+      border-radius:7px;
+      border:1px solid rgba(91,157,255,.22);
+      background:rgba(91,157,255,.045);
       color:var(--md-text);
       font-family:var(--md-mono);
-      font-size:.74rem;
+      font-size:.68rem;
       font-weight:900;
       letter-spacing:.08em;
       text-transform:uppercase;
       text-decoration:none;
       text-align:center;
-      box-shadow:inset 0 0 18px rgba(91,157,255,.08);
+      box-shadow:none;
+      padding:0 10px;
     }
     .md-ledger-btn:hover,
     .md-row-action:hover,
     .md-row-action-form button:hover {
       color:var(--md-text);
-      border-color:rgba(255,178,36,.58);
-      box-shadow:inset 0 0 22px rgba(91,157,255,.16),0 0 18px rgba(255,178,36,.12);
+      border-color:rgba(91,157,255,.38);
+      background:rgba(91,157,255,.08);
+      box-shadow:none;
     }
-    .md-ledger-btn.primary {
-      border-color:rgba(255,178,36,.45);
-      background:rgba(255,178,36,.12);
-    }
-    .md-ledger-btn.success {
+    .md-ledger-btn.primary,
+    .md-ledger-btn.md-ledger-primary {
       border-color:rgba(43,213,118,.34);
-      background:rgba(43,213,118,.1);
+      background:rgba(43,213,118,.08);
+      color:#d8ffe9;
+    }
+    .md-ledger-btn.success,
+    .md-ledger-btn.md-ledger-utility {
+      border-color:rgba(91,157,255,.18);
+      background:transparent;
+      color:var(--md-muted);
     }
     .md-ledger-btn .md-btn-icon,
     .md-row-action .md-btn-icon,
@@ -440,9 +466,9 @@
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      border-radius:5px;
-      border:1px solid rgba(255,178,36,.34);
-      color:var(--md-amber);
+      border-radius:0;
+      border:0;
+      color:currentColor;
       line-height:1;
     }
     .md-ledger-btn .md-btn-icon svg,
@@ -691,6 +717,34 @@
       gap:7px;
       align-items:center;
     }
+    .md-row-actions {
+      justify-content:flex-end;
+      padding-top:10px;
+      border-top:1px solid rgba(91,157,255,.10);
+    }
+    .md-row-more-actions {
+      flex:0 1 auto;
+      min-width:0;
+      margin:0;
+    }
+    .md-row-more-actions > summary {
+      list-style:none;
+      cursor:pointer;
+    }
+    .md-row-more-actions > summary::-webkit-details-marker {
+      display:none;
+    }
+    .md-row-actions-menu {
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+      gap:7px;
+      margin-top:7px;
+      padding:8px;
+      border:1px solid rgba(91,157,255,.12);
+      border-radius:9px;
+      background:rgba(5,10,18,.82);
+    }
     .md-ledger-notes {
       display:grid;
       gap:5px;
@@ -760,15 +814,15 @@
     .route-photo-note { display:block; color:var(--md-muted); font-size:.66rem; font-weight:800; margin-top:1px; }
     .route-photo-delete-form { display:flex; margin:0; }
     .route-photo-delete { border:0; border-left:1px solid rgba(91,157,255,.24); background:rgba(255,82,71,.12); color:#ff8b84; padding:0 8px; font-family:var(--md-mono); font-size:.66rem; font-weight:900; }
-    .md-row-action-form { margin:0; min-width:0; flex:1 1 120px; }
-    .md-row-action { flex:1 1 120px; }
+    .md-row-action-form { margin:0; min-width:0; flex:0 1 auto; }
+    .md-row-action { flex:0 1 auto; }
     .md-row-action.danger,
     .md-row-action-form.danger button {
       border-color:rgba(255,82,71,.38);
-      background:rgba(255,82,71,.1);
+      background:rgba(255,82,71,.045);
       color:#ffbbb7;
     }
-    .md-row-action.warn { border-color:rgba(255,178,36,.42); background:rgba(255,178,36,.12); }
+    .md-row-action.warn { border-color:rgba(255,178,36,.26); background:rgba(255,178,36,.045); }
     .md-ledger-ticker {
       display:flex;
       overflow:hidden;
@@ -885,7 +939,8 @@
       .md-ledger-head { grid-template-columns:1fr; }
       .md-ledger-head-side { justify-items:start; }
       .md-ledger-filter { grid-template-columns:1fr; max-width:none; }
-      .md-action-rail { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .md-action-rail { justify-content:stretch; }
+      .md-action-rail .md-ledger-btn { flex:1 1 140px; }
       .md-route-audit-grid { grid-template-columns:repeat(2,minmax(0,1fr)); padding:12px 10px; }
       .md-ledger-summary { grid-template-columns:minmax(0,1fr); gap:8px; padding:11px 10px; }
       .md-stop-sequence { width:100%; min-height:30px; display:flex; justify-content:flex-start; gap:6px; padding:6px 8px; }
@@ -962,11 +1017,11 @@
             <button type="submit" class="md-ledger-btn"><span class="md-btn-icon" data-md-icon="search" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg></span> Search</button>
           </form>
 
-	          <div class="md-action-rail md-flow-top-actions" aria-label="Driver log actions">
-	            <a href="{{ url_for('driver.new_driving_log') }}" class="md-ledger-btn md-flow-action-tab primary"><span class="md-btn-icon" data-md-icon="record-stop" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="7"></circle><path d="M12 8v8"></path><path d="M8 12h8"></path></svg></span> Record Current Stop</a>
+	          <div class="md-action-rail" aria-label="Driver log actions">
+	            <a href="{{ url_for('driver.new_driving_log') }}" class="md-ledger-btn md-ledger-primary"><span class="md-btn-icon" data-md-icon="record-stop" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="7"></circle><path d="M12 8v8"></path><path d="M8 12h8"></path></svg></span> Record Current Stop</a>
 	            {% if logs %}
-	              <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d')) }}" class="md-ledger-btn md-flow-action-tab success"><span class="md-btn-icon" data-md-icon="print-route" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 9V4h10v5"></path><path d="M6 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-1"></path><path d="M7 14h10v6H7z"></path><path d="M8 12h.01"></path></svg></span> Print Route Record</a>
-	              <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d'), autoprint=1) }}" class="md-ledger-btn md-flow-action-tab success"><span class="md-btn-icon" data-md-icon="save-pdf" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 3h7l4 4v14H7z"></path><path d="M14 3v5h4"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg></span> Save Route PDF</a>
+	              <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d')) }}" class="md-ledger-btn md-ledger-utility"><span class="md-btn-icon" data-md-icon="print-route" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 9V4h10v5"></path><path d="M6 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-1"></path><path d="M7 14h10v6H7z"></path><path d="M8 12h.01"></path></svg></span> Print Route Record</a>
+	              <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d'), autoprint=1) }}" class="md-ledger-btn md-ledger-utility"><span class="md-btn-icon" data-md-icon="save-pdf" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 3h7l4 4v14H7z"></path><path d="M14 3v5h4"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg></span> Save Route PDF</a>
 	            {% endif %}
 	          </div>
 	        </div>
@@ -1165,18 +1220,23 @@
               <div class="md-row-actions">
                 <a href="{{ url_for(log_view_endpoint, log_id=log.id) if current_user.role == 'management' else url_for('driver.driver_logs_print', date=log.date.isoformat()) }}" class="md-row-action"><span class="md-btn-icon">O</span> View</a>
                 {% if can_manage_log %}
-                  <a href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}" class="md-row-action warn"><span class="md-btn-icon">E</span> Edit</a>
-                  <a href="{{ url_for('driver.view_driver_log', log_id=log.id) }}" class="md-row-action"><span class="md-btn-icon">P</span> Add Proof</a>
-                  {% if can_delete_log %}
-                    {% if log.hot_parts or log.part_number %}
-                      <form action="{{ url_for('driver.clear_driver_log_hot_part', log_id=log.id) }}" method="POST" class="md-row-action-form" onsubmit="return confirm('Clear the hot-part flag and part number from this stop?');">
-                        <button type="submit"><span class="md-btn-icon">×</span> Clear Hot</button>
-                      </form>
-                    {% endif %}
-                    <form action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" method="POST" class="md-row-action-form danger" onsubmit="return confirm('Delete this driver log?');">
-                      <button type="submit"><span class="md-btn-icon">!</span> Delete</button>
-                    </form>
-                  {% endif %}
+                  <details class="md-row-more-actions">
+                    <summary class="md-row-action"><span class="md-btn-icon">+</span> Stop actions</summary>
+                    <div class="md-row-actions-menu">
+                      <a href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}" class="md-row-action warn"><span class="md-btn-icon">E</span> Edit</a>
+                      <a href="{{ url_for('driver.view_driver_log', log_id=log.id) }}" class="md-row-action"><span class="md-btn-icon">P</span> Add Proof</a>
+                      {% if can_delete_log %}
+                        {% if log.hot_parts or log.part_number %}
+                          <form action="{{ url_for('driver.clear_driver_log_hot_part', log_id=log.id) }}" method="POST" class="md-row-action-form" onsubmit="return confirm('Clear the hot-part flag and part number from this stop?');">
+                            <button type="submit"><span class="md-btn-icon">×</span> Clear Hot</button>
+                          </form>
+                        {% endif %}
+                        <form action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" method="POST" class="md-row-action-form danger" onsubmit="return confirm('Delete this driver log?');">
+                          <button type="submit"><span class="md-btn-icon">!</span> Delete</button>
+                        </form>
+                      {% endif %}
+                    </div>
+                  </details>
                 {% endif %}
               </div>
             </div>
