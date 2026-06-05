@@ -1,7 +1,8 @@
+import logging
 import os
 from urllib.parse import urlsplit
 
-from flask import flash, redirect, render_template, request, url_for
+from flask import current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.blueprints.auth import bp
@@ -72,6 +73,39 @@ def _role_label(role):
     return "manager" if role == "management" else "driver"
 
 
+def _safe_form_value(form, field_name):
+    field = getattr(form, field_name, None)
+    if not field:
+        return ""
+    return (field.data or "").strip()
+
+
+def _log_auth_event(level, event_name, **details):
+    safe_details = {
+        key: value
+        for key, value in details.items()
+        if value not in (None, "", [], ())
+    }
+    safe_details["path"] = request.path
+    current_app.logger.log(
+        level,
+        "%s %s",
+        event_name,
+        " ".join(f"{key}={value}" for key, value in sorted(safe_details.items())),
+    )
+
+
+def _flash_form_errors(form, event_name):
+    if form.errors:
+        _log_auth_event(
+            logging.WARNING,
+            event_name,
+            fields=",".join(sorted(form.errors.keys())),
+            role=_safe_form_value(form, "role"),
+        )
+        flash("CHECK REQUIRED FIELDS\nReview the highlighted fields and try again.", "danger")
+
+
 @bp.route("/register", methods=["GET", "POST"])
 def register():
     if current_user.is_authenticated:
@@ -81,9 +115,21 @@ def register():
         if form.role.data == "management":
             expected_pin = (os.environ.get("MANAGER_REGISTRATION_PIN") or "").strip()
             if not expected_pin:
+                _log_auth_event(
+                    logging.ERROR,
+                    "auth.register.manager_pin_unconfigured",
+                    role=form.role.data,
+                    username=form.username.data,
+                )
                 flash("Manager self-registration is not enabled.", "danger")
                 return redirect(url_for("auth.register"))
             if form.manager_pin.data != expected_pin:
+                _log_auth_event(
+                    logging.WARNING,
+                    "auth.register.invalid_manager_pin",
+                    role=form.role.data,
+                    username=form.username.data,
+                )
                 flash("Invalid Manager PIN!", "danger")
                 return redirect(url_for("auth.register"))
         existing = User.query.filter(
@@ -93,6 +139,12 @@ def register():
             | (User.username == form.email.data)
         ).first()
         if existing:
+            _log_auth_event(
+                logging.WARNING,
+                "auth.register.duplicate_identity",
+                role=form.role.data,
+                username=form.username.data,
+            )
             flash("User already exists with that email or username.", "danger")
         else:
             user = User(
@@ -107,8 +159,17 @@ def register():
             user.set_password(form.password.data)
             db.session.add(user)
             db.session.commit()
+            _log_auth_event(
+                logging.INFO,
+                "auth.register.success",
+                role=user.role,
+                user_id=user.id,
+                username=user.username,
+            )
             flash("Registration successful! Please log in.", "success")
             return redirect(url_for("auth.login"))
+    elif request.method == "POST":
+        _flash_form_errors(form, "auth.register.validation_failed")
     return render_template("register.html", form=form)
 
 
@@ -148,8 +209,22 @@ def login():
         if user:
             login_user(user, remember=form.remember.data)
             remember_role_login(user)
+            _log_auth_event(
+                logging.INFO,
+                "auth.login.success",
+                role=user.role,
+                user_id=user.id,
+                username=user.username,
+            )
             flash("SIGNED IN\nWelcome back to MoveDefense.", "success")
             if required_role and user.role != required_role:
+                _log_auth_event(
+                    logging.WARNING,
+                    "auth.login.role_mismatch",
+                    actual_role=user.role,
+                    required_role=required_role,
+                    user_id=user.id,
+                )
                 flash(
                     f"{_role_label(required_role).title()} credentials are required for that area.",
                     "warning",
@@ -159,7 +234,15 @@ def login():
                 return redirect(next_url)
             return _redirect_user_home(user)
         else:
+            _log_auth_event(
+                logging.WARNING,
+                "auth.login.invalid_credentials",
+                login_name_present=bool(name_or_email),
+                required_role=required_role,
+            )
             flash("Invalid credentials.", "danger")
+    elif request.method == "POST":
+        _flash_form_errors(form, "auth.login.validation_failed")
     return render_template("login.html", form=form)
 
 

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/_auth_form_errors.html" import form_error_summary, field_errors %}
 {% block content %}
 <script>document.body.classList.add('md-shell');</script>
 {% include 'partials/_md_shell.html' %}
@@ -111,13 +112,16 @@
   <form class="md-auth-card" method="POST" action="">
     {{ form.hidden_tag() }}
     <h2>Sign In</h2>
+    {{ form_error_summary(form) }}
     <div class="mb-3">
       {{ form.login_name.label }}
-      {{ form.login_name(class="form-control", autocomplete="username") }}
+      {{ form.login_name(class="form-control" ~ (" is-invalid" if form.login_name.errors else ""), autocomplete="username") }}
+      {{ field_errors(form.login_name) }}
     </div>
     <div class="mb-3">
       {{ form.password.label }}
-      {{ form.password(class="form-control", autocomplete="current-password") }}
+      {{ form.password(class="form-control" ~ (" is-invalid" if form.password.errors else ""), autocomplete="current-password") }}
+      {{ field_errors(form.password) }}
     </div>
     <div class="mb-3 form-check">
       {{ form.remember(class="form-check-input") }}

@@ -322,6 +322,81 @@
     .report-description {
       white-space: pre-wrap;
     }
+    .md-flash-list {
+      width: min(1120px, calc(100% - 24px));
+      margin: 14px auto 0;
+      display: grid;
+      gap: 8px;
+    }
+    .md-flash {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+      padding: 11px 13px;
+      border: 1px solid rgba(91,157,255,.28);
+      border-radius: 10px;
+      background: rgba(15,23,42,.94);
+      color: #e5eefb;
+      box-shadow: 0 12px 28px rgba(0,0,0,.24);
+      font-size: .92rem;
+      line-height: 1.35;
+    }
+    .md-flash strong {
+      color: #f8fafc;
+      font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: .68rem;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .md-flash--error,
+    .md-flash--danger {
+      border-color: rgba(248,113,113,.62);
+      background: rgba(69,10,10,.94);
+    }
+    .md-flash--warning {
+      border-color: rgba(251,191,36,.66);
+      background: rgba(69,46,5,.94);
+    }
+    .md-flash--success {
+      border-color: rgba(34,197,94,.58);
+      background: rgba(5,46,22,.94);
+    }
+    .md-form-alert {
+      margin: 0 0 16px;
+      padding: 12px 14px;
+      border: 1px solid rgba(248,113,113,.62);
+      border-radius: 10px;
+      background: rgba(69,10,10,.72);
+      color: #fee2e2;
+    }
+    .md-form-alert strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #fff7f7;
+      font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: .72rem;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .md-form-alert ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+    .md-field-errors {
+      margin-top: 6px;
+      color: #fecaca;
+      font-size: .82rem;
+      font-weight: 800;
+      line-height: 1.3;
+    }
+    .form-control.is-invalid,
+    .form-select.is-invalid {
+      border-color: #f87171 !important;
+      box-shadow: 0 0 0 .18rem rgba(248,113,113,.18) !important;
+    }
     @media (max-width: 575.98px) {
       .driver-active-wait {
         grid-template-columns: minmax(0, 1fr) auto;
@@ -345,6 +420,7 @@
 </head>
 
 <body>
+  {% set flash_messages = get_flashed_messages(with_categories=True) %}
   <div id="pageContent">
     <nav class="navbar navbar-expand-md navbar-dark bg-primary py-2">
       <div class="container-fluid">
@@ -468,7 +544,17 @@
       {% include "_driver_active_wait_banner.html" %}
     {% endif %}
 
-    {# Flash messages render as MoveDefense toasts at the end of <body> (see _md_toasts emit). #}
+    {% if flash_messages %}
+      <div class="md-flash-list" aria-live="polite">
+        {% for category, message in flash_messages %}
+          {% set flash_type = 'error' if category == 'danger' else category %}
+          <div class="md-flash md-flash--{{ flash_type }}" role="{% if category in ['danger', 'warning'] %}alert{% else %}status{% endif %}">
+            <strong>{{ 'Error' if category == 'danger' else category|title }}</strong>
+            <span>{{ message|replace('\n', ' ') }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
 
     <!-- MAIN CONTENT with fade-in animation -->
     <div class="container mt-4 fade-in">
@@ -719,28 +805,5 @@
       });
     });
   </script>
-  {% with messages = get_flashed_messages(with_categories=True) %}
-    {% if messages %}
-      <script>
-        (function () {
-          if (!window.MoveDefenseToast) return;
-          var items = {{ messages|tojson }};
-          var defaults = { success: 'DONE', error: 'ERROR', warning: 'HEADS UP', info: 'NOTICE' };
-          items.forEach(function (pair) {
-            var category = pair[0];
-            var message = String(pair[1] == null ? '' : pair[1]);
-            var type = category === 'danger' ? 'error'
-              : (category === 'warning' ? 'warning'
-              : (category === 'success' ? 'success' : 'info'));
-            var nl = message.indexOf('\n');
-            var title, detail;
-            if (nl >= 0) { title = message.slice(0, nl); detail = message.slice(nl + 1); }
-            else { title = defaults[type] || 'NOTICE'; detail = message; }
-            (window.MoveDefenseToast[type] || window.MoveDefenseToast.show)(title, detail, type);
-          });
-        })();
-      </script>
-    {% endif %}
-  {% endwith %}
 </body>
 </html>

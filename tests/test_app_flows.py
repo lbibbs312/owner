@@ -326,7 +326,7 @@ def test_unauthenticated_auth_errors_render_flash_messages(client, monkeypatch):
     )
     assert disabled_response.status_code == 200
     assert b"Manager self-registration is not enabled." in disabled_response.data
-    assert b"MoveDefenseToast" in disabled_response.data
+    assert disabled_response.data.count(b"Manager self-registration is not enabled.") == 1
 
     monkeypatch.setenv("MANAGER_REGISTRATION_PIN", "2468")
     wrong_pin_response = client.post(
@@ -343,6 +343,7 @@ def test_unauthenticated_auth_errors_render_flash_messages(client, monkeypatch):
     )
     assert wrong_pin_response.status_code == 200
     assert b"Invalid Manager PIN!" in wrong_pin_response.data
+    assert wrong_pin_response.data.count(b"Invalid Manager PIN!") == 1
 
     login_response = client.post(
         "/login",
@@ -351,6 +352,50 @@ def test_unauthenticated_auth_errors_render_flash_messages(client, monkeypatch):
     )
     assert login_response.status_code == 200
     assert b"Invalid credentials." in login_response.data
+    assert login_response.data.count(b"Invalid credentials.") == 1
+
+
+def test_registration_validation_errors_render_inline_feedback(client, monkeypatch):
+    monkeypatch.setenv("MANAGER_REGISTRATION_PIN", "2468")
+
+    response = client.post(
+        "/register",
+        data={
+            "username": "mgr_bad_form",
+            "email": "not-an-email",
+            "password": "short",
+            "confirm_password": "different",
+            "role": "management",
+            "manager_pin": "2468",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"CHECK REQUIRED FIELDS" in response.data
+    assert b"Review the highlighted fields and try again." in response.data
+    assert b"Check Required Fields" in response.data
+    assert b"Email:" in response.data
+    assert b"Invalid email address." in response.data
+    assert b"Confirm Password:" in response.data
+    assert b"Field must be equal to password." in response.data
+    assert b'id="email-errors"' in response.data
+    assert b"is-invalid" in response.data
+
+
+def test_login_validation_errors_render_inline_feedback(client):
+    response = client.post(
+        "/login",
+        data={"login_name": "", "password": ""},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"CHECK REQUIRED FIELDS" in response.data
+    assert b"Username or Email:" in response.data
+    assert b"Password:" in response.data
+    assert b"This field is required." in response.data
+    assert b'id="login_name-errors"' in response.data
 
 
 def test_login_checks_password_against_all_matching_usernames_and_emails(client, app):

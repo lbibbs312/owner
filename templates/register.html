@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/_auth_form_errors.html" import form_error_summary, field_errors %}
 {% block content %}
 <script>document.body.classList.add('md-shell');</script>
 {% include 'partials/_md_shell.html' %}
@@ -101,51 +102,62 @@
   <form class="md-register-card" method="POST" action="">
     {{ form.hidden_tag() }}
     <h2>Account Details</h2>
+    {{ form_error_summary(form) }}
     <div class="mb-3">
       {{ form.username.label }}
-      {{ form.username(class="form-control", autocomplete="username") }}
+      {{ form.username(class="form-control" ~ (" is-invalid" if form.username.errors else ""), autocomplete="username") }}
+      {{ field_errors(form.username) }}
     </div>
     <div class="row">
       <div class="col-md-6 mb-3">
         {{ form.first_name.label }}
-        {{ form.first_name(class="form-control", autocomplete="given-name") }}
+        {{ form.first_name(class="form-control" ~ (" is-invalid" if form.first_name.errors else ""), autocomplete="given-name") }}
+        {{ field_errors(form.first_name) }}
       </div>
       <div class="col-md-6 mb-3">
         {{ form.last_name.label }}
-        {{ form.last_name(class="form-control", autocomplete="family-name") }}
+        {{ form.last_name(class="form-control" ~ (" is-invalid" if form.last_name.errors else ""), autocomplete="family-name") }}
+        {{ field_errors(form.last_name) }}
       </div>
     </div>
     <div class="row">
       <div class="col-md-6 mb-3">
         {{ form.employee_id.label }}
-        {{ form.employee_id(class="form-control") }}
+        {{ form.employee_id(class="form-control" ~ (" is-invalid" if form.employee_id.errors else "")) }}
+        {{ field_errors(form.employee_id) }}
       </div>
       <div class="col-md-6 mb-3">
         {{ form.department.label }}
-        {{ form.department(class="form-control") }}
+        {{ form.department(class="form-control" ~ (" is-invalid" if form.department.errors else "")) }}
+        {{ field_errors(form.department) }}
       </div>
     </div>
     <div class="mb-3">
       {{ form.email.label }}
-      {{ form.email(class="form-control", autocomplete="email") }}
+      {{ form.email(class="form-control" ~ (" is-invalid" if form.email.errors else ""), autocomplete="email") }}
+      {{ field_errors(form.email) }}
     </div>
     <div class="row">
       <div class="col-md-6 mb-3">
         {{ form.password.label }}
-        {{ form.password(class="form-control", autocomplete="new-password") }}
+        {{ form.password(class="form-control" ~ (" is-invalid" if form.password.errors else ""), autocomplete="new-password") }}
+        {{ field_errors(form.password) }}
       </div>
       <div class="col-md-6 mb-3">
         {{ form.confirm_password.label }}
-        {{ form.confirm_password(class="form-control", autocomplete="new-password") }}
+        {{ form.confirm_password(class="form-control" ~ (" is-invalid" if form.confirm_password.errors else ""), autocomplete="new-password") }}
+        {{ field_errors(form.confirm_password) }}
       </div>
     </div>
     <div class="mb-3">
       {{ form.role.label }}
-      {{ form.role(class="form-select") }}
+      {{ form.role(class="form-select" ~ (" is-invalid" if form.role.errors else "")) }}
+      {{ field_errors(form.role) }}
     </div>
     <div class="mb-3">
       {{ form.manager_pin.label }}
-      {{ form.manager_pin(class="form-control", autocomplete="off") }}
+      {{ form.manager_pin(class="form-control" ~ (" is-invalid" if form.manager_pin.errors else ""), autocomplete="off") }}
+      {{ field_errors(form.manager_pin) }}
       <div class="md-pin-note">Required only for manager accounts.</div>
     </div>
     {{ form.submit(class="btn btn-primary w-100") }}
