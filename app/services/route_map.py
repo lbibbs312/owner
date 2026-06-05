@@ -212,8 +212,10 @@ def _stop_board_badge(log, *, movement, issues=(), evidence=None, flags=(), note
 
     if code == "route_start":
         return _board_badge_display("STARTED", pill_tone="open", row_tone="completed", severity="info")
-    if code in {"empty_return", "no_pickup"}:
-        return _board_badge_display("NO PICKUP" if code == "no_pickup" else "CLOSED", pill_tone="recorded")
+    if code == "no_pickup":
+        return _board_badge_display("LEFT EMPTY", pill_tone="recorded")
+    if code == "empty_return":
+        return _board_badge_display("CLOSED", pill_tone="recorded")
     if code == "loaded":
         return _board_badge_display("IN TRANSIT", pill_tone="open", row_tone="completed", severity="info")
     if code == "in_transit":
@@ -392,7 +394,7 @@ def _board_flow_summary(
     delivery_label=None,
     *,
     sequence=None,
-    has_prior_movement=False,
+    is_empty_return=False,
     wait_minutes=None,
     dropped_loads=(),
 ):
@@ -420,9 +422,9 @@ def _board_flow_summary(
     if closed and no_pickup and arrived == "Empty" and departed == "Empty":
         if sequence == 1:
             return {"mode": "plain", "text": f"{label} · route start · arrived empty"}
-        if has_prior_movement:
+        if is_empty_return:
             return {"mode": "plain", "text": f"{label} · empty return"}
-        return {"mode": "plain", "text": f"{label} · no pickup"}
+        return {"mode": "plain", "text": f"{label} · left empty"}
     if not closed:
         cargo_text = f" · arrived with {arrived}" if arrived != "Empty" else ""
         return {"mode": "plain", "text": f"{label}{cargo_text}{wait_suffix} · needs departure"}
@@ -499,7 +501,7 @@ def _board_stop_detail(
     route_pretrip=None,
     *,
     sequence=None,
-    has_prior_movement=False,
+    is_empty_return=False,
 ):
     if is_service_stop(log):
         return _service_board_detail(log, label, route_pretrip=route_pretrip)
@@ -513,9 +515,9 @@ def _board_stop_detail(
     if closed and no_pickup and arrived == "Empty" and departed == "Empty":
         if sequence == 1:
             return f"{label} · route start · arrived empty"
-        if has_prior_movement:
+        if is_empty_return:
             return f"{label} · empty return"
-        return f"{label} · no pickup"
+        return f"{label} · left empty"
 
     return f"{label} · {arrived} → {departed}"
 
@@ -530,14 +532,14 @@ def _stop_movement_state(
     added_loads=(),
     departed=False,
     sequence=None,
-    has_prior_movement=False,
+    is_empty_return=False,
     route_pretrip=None,
 ):
     """Return the source-derived semantic state for one route stop.
 
     This intentionally separates "route start", "no pickup", and "empty
     return". Empty return is not a synonym for arriving empty; it requires
-    prior cargo movement context.
+    an empty return to the route origin after a completed delivery.
     """
     if is_service_stop(log):
         if getattr(log, "fuel", False):
@@ -623,7 +625,7 @@ def _stop_movement_state(
                 "ledger_title": f"{label} · Route start",
                 "ledger_meta": "Arrived empty · Departed no pickup",
             }
-        if has_prior_movement:
+        if is_empty_return:
             return {
                 "code": "empty_return",
                 "label": "EMPTY RETURN",
@@ -636,13 +638,13 @@ def _stop_movement_state(
             }
         return {
             "code": "no_pickup",
-            "label": "NO PICKUP",
+            "label": "LEFT EMPTY",
             "pill_tone": "empty",
             "row_tone": "completed",
             "severity": "ok",
-            "summary": f"{label} · No pickup",
-            "ledger_title": f"{label} · No pickup",
-            "ledger_meta": "Arrived empty · Departed no pickup",
+            "summary": f"{label} · Left empty",
+            "ledger_title": f"{label} · No load picked up",
+            "ledger_meta": "Arrived empty · Departed with no load picked up",
         }
     if not arrived_empty and departed_label == arrived:
         return {
@@ -791,6 +793,28 @@ def _plant_alias_keys(value):
     if label:
         keys.add(_norm_key(label))
     return {key for key in keys if key}
+
+
+def _location_key_set(*values):
+    keys = set()
+    for value in values:
+        keys.update(_plant_alias_keys(value))
+    return {key for key in keys if key}
+
+
+def _route_origin_keys(route_rows):
+    for row in route_rows or []:
+        log = row.get("log")
+        if not log or is_service_stop(log):
+            continue
+        keys = _location_key_set(row.get("plant"), getattr(log, "plant_name", None))
+        if keys:
+            return keys
+    return set()
+
+
+def _matches_location_keys(keys, *values):
+    return bool(keys and keys & _location_key_set(*values))
 
 
 def _transfer_line_text_keys(transfer):
@@ -1020,11 +1044,12 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             issue_stop_ids.add(item["stop_id"])
             true_exception_by_stop.setdefault(item["stop_id"], []).append(item)
 
+    route_rows = list(getattr(route_context, "rows", []) or [])
     stops = []
-    prior_cargo_movement_seen = False
+    route_origin_keys = _route_origin_keys(route_rows)
+    prior_drop_seen = False
     pending_pickup_by_cargo = {}
     current_stop_id = getattr(getattr(route_context, "current_stop", None), "id", None)
-    route_rows = list(getattr(route_context, "rows", []) or [])
     future_removed_by_log_id = {}
     future_removed_keys = set()
     for future_row in reversed(route_rows):
@@ -1054,6 +1079,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
         # --- Real drop / proof / destination evidence (not flag relabeling) ---
         dropped_loads = [load_display(it) for it in (row.get("cargo_removed") or ()) if not is_empty_load(it)]
         added_loads = [load_display(it) for it in (row.get("cargo_added") or ()) if not is_empty_load(it)]
+        is_empty_return = bool(prior_drop_seen and _matches_location_keys(route_origin_keys, label, log.plant_name))
         drop_pickup_label = ""
         for dropped in dropped_loads:
             drop_pickup_label = pending_pickup_by_cargo.get(_norm_key(dropped)) or ""
@@ -1068,7 +1094,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             added_loads=added_loads,
             departed=departed,
             sequence=sequence,
-            has_prior_movement=prior_cargo_movement_seen,
+            is_empty_return=is_empty_return,
             route_pretrip=route_pretrip,
         )
         scan_events_for_stop = scan_events_by_log.get(log.id, [])
@@ -1227,7 +1253,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
                 wait_label=wait_label,
                 route_pretrip=route_pretrip,
                 sequence=sequence,
-                has_prior_movement=prior_cargo_movement_seen,
+                is_empty_return=is_empty_return,
             ),
             "board_flow": _board_flow_summary(
                 log,
@@ -1236,7 +1262,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
                 departed_with,
                 route_pretrip=route_pretrip,
                 sequence=sequence,
-                has_prior_movement=prior_cargo_movement_seen,
+                is_empty_return=is_empty_return,
                 wait_minutes=wait_minutes,
                 pickup_label=drop_pickup_label,
                 delivery_label=label if dropped_loads else "",
@@ -1283,10 +1309,8 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
         })
         for added in added_loads:
             pending_pickup_by_cargo[_norm_key(added)] = label
-        if dropped_loads or added_loads or (
-            departed and any(not is_empty_load(value) for value in (arrived_with, departed_with))
-        ):
-            prior_cargo_movement_seen = True
+        if dropped_loads:
+            prior_drop_seen = True
     return stops
 
 
@@ -1399,7 +1423,7 @@ def _add_narrative_detail(groups, key, group, detail):
     target["details"].append(detail)
 
 
-def _base_stop_detail(log, row, route, *, cargo_label, pickup=None, has_prior_movement=False):
+def _base_stop_detail(log, row, route, *, cargo_label, pickup=None, is_empty_return=False):
     flags = list(_detail_flags(log, row, route))
     parts = _part_labels(log, *((pickup or {}).get("parts") or ()))
     wait_minutes = wait_minutes_for_log(log, now=None) if not getattr(log, "depart_time", None) else (getattr(log, "dock_wait_minutes", None) or 0)
@@ -1423,7 +1447,7 @@ def _base_stop_detail(log, row, route, *, cargo_label, pickup=None, has_prior_mo
             row.get("cargo_out") or route.get("depart_cargo_desc") or load_display(getattr(log, "depart_load_size", "")),
             wait_label=wait_label.replace("Wait ", "", 1) if wait_label else "",
             sequence=row.get("index"),
-            has_prior_movement=has_prior_movement,
+            is_empty_return=is_empty_return,
         ),
         "board_flow": _board_flow_summary(
             log,
@@ -1432,7 +1456,7 @@ def _base_stop_detail(log, row, route, *, cargo_label, pickup=None, has_prior_mo
             row.get("cargo_out") or route.get("depart_cargo_desc") or load_display(getattr(log, "depart_load_size", "")),
             pickup_label=(pickup or {}).get("plant_label"),
             sequence=row.get("index"),
-            has_prior_movement=has_prior_movement,
+            is_empty_return=is_empty_return,
             wait_minutes=wait_minutes,
         ),
         "plant": row.get("plant") or plant_label(getattr(log, "plant_name", None)) or SAFE_EMPTY,
@@ -1469,9 +1493,11 @@ def _build_delivery_narratives(route_context):
     groups = {}
     pending_by_cargo = {}
     pending_by_destination = {}
-    prior_cargo_movement_seen = False
+    route_rows = list(getattr(route_context, "rows", []) or [])
+    route_origin_keys = _route_origin_keys(route_rows)
+    prior_drop_seen = False
 
-    for row in getattr(route_context, "rows", []) or []:
+    for row in route_rows:
         log = row.get("log")
         route = row.get("route") or {}
         if not log or not getattr(log, "depart_time", None):
@@ -1480,6 +1506,10 @@ def _build_delivery_narratives(route_context):
         plant_label_text = row.get("plant") or plant_label(getattr(log, "plant_name", None)) or SAFE_EMPTY
         removed = [load_display(item) for item in row.get("cargo_removed") or () if not is_empty_load(item)]
         added = [load_display(item) for item in row.get("cargo_added") or () if not is_empty_load(item)]
+        is_empty_return = bool(
+            prior_drop_seen
+            and _matches_location_keys(route_origin_keys, plant_label_text, getattr(log, "plant_name", None))
+        )
 
         for cargo_label in removed:
             cargo_key = _norm_key(cargo_label)
@@ -1499,12 +1529,12 @@ def _build_delivery_narratives(route_context):
                 origin_label=origin_label,
                 destination_label=destination_label,
             )
-            detail = _base_stop_detail(log, row, route, cargo_label=cargo_label, pickup=pickup, has_prior_movement=prior_cargo_movement_seen)
+            detail = _base_stop_detail(log, row, route, cargo_label=cargo_label, pickup=pickup)
             _add_narrative_detail(groups, key, group, detail)
 
         arrived_empty = is_empty_load(row.get("cargo_in")) or is_empty_load(route.get("arrive_cargo_desc")) or is_empty_load(getattr(log, "load_size", None))
         departed_empty = is_empty_load(row.get("cargo_out")) or is_empty_load(route.get("depart_cargo_desc")) or is_empty_load(getattr(log, "depart_load_size", None))
-        if not removed and not added and arrived_empty and departed_empty and prior_cargo_movement_seen:
+        if not removed and not added and arrived_empty and departed_empty and is_empty_return:
             key = _norm_key(f"empty:{plant_label_text}")
             group = _new_narrative_group(
                 "empty",
@@ -1513,7 +1543,7 @@ def _build_delivery_narratives(route_context):
                 board_detail=f"{plant_label_text} · empty return",
                 destination_label=plant_label_text,
             )
-            detail = _base_stop_detail(log, row, route, cargo_label="Empty load", has_prior_movement=True)
+            detail = _base_stop_detail(log, row, route, cargo_label="Empty load", is_empty_return=True)
             _add_narrative_detail(groups, key, group, detail)
 
         for cargo_label in added:
@@ -1522,8 +1552,8 @@ def _build_delivery_narratives(route_context):
             pending_by_cargo[_norm_key(cargo_label)] = info
             pending_by_destination[destination_key] = info
 
-        if removed or added or any(not is_empty_load(value) for value in (row.get("cargo_in"), row.get("cargo_out"))):
-            prior_cargo_movement_seen = True
+        if removed:
+            prior_drop_seen = True
 
     for group in groups.values():
         narrative_issues = [

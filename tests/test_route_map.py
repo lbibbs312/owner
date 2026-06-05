@@ -224,6 +224,57 @@ def test_later_empty_movement_is_empty_return(app):
     assert stop["issues"] == []
 
 
+def test_no_load_non_origin_stop_is_left_empty_not_empty_return(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("pc_no_load_driver")
+    _driver_log(driver, plant_name="RE", arrive_time="2026-05-28 08:00:00", depart_time="08:20", load_size="Empty", depart_load_size="PPL Load")
+    _driver_log(driver, plant_name="PPL", arrive_time="2026-05-28 09:00:00", depart_time="09:20", load_size="PPL Load", depart_load_size="Empty")
+    _driver_log(driver, plant_name="PC", arrive_time="2026-05-28 10:00:00", depart_time="10:10", load_size="Empty", depart_load_size="Empty", no_pickup=True)
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][2]
+
+    assert stop["movement_code"] == "no_pickup"
+    assert stop["movement_label"] == "LEFT EMPTY"
+    assert stop["board_badge"]["label"] == "LEFT EMPTY"
+    assert stop["board_detail"] == "Paint Central · left empty"
+    assert stop["board_flow"]["text"] == "Paint Central · left empty"
+    assert stop["ledger_title"] == "Paint Central · No load picked up"
+    assert "empty return" not in f"{stop['board_detail']} {stop['movement_summary']} {stop['ledger_title']}".lower()
+    assert [item for item in ctx["delivery_narratives"] if item["kind"] == "empty"] == []
+
+
+def test_actual_return_to_origin_empty_leg_stays_empty_return(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("actual_empty_return_driver")
+    _driver_log(driver, plant_name="PC", arrive_time="2026-05-28 08:00:00", depart_time="08:20", load_size="Empty", depart_load_size="Raleigh East Load")
+    _driver_log(driver, plant_name="RE", arrive_time="2026-05-28 09:00:00", depart_time="09:20", load_size="Raleigh East Load", depart_load_size="Empty")
+    _driver_log(driver, plant_name="PC", arrive_time="2026-05-28 10:00:00", depart_time="10:10", load_size="Empty", depart_load_size="Empty", no_pickup=True)
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][2]
+
+    assert stop["movement_code"] == "empty_return"
+    assert stop["board_detail"] == "Paint Central · empty return"
+    assert stop["board_flow"]["text"] == "Paint Central · empty return"
+
+
+def test_first_raleigh_east_empty_stop_is_route_start_not_empty_return(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("re_route_start_driver")
+    _driver_log(driver, plant_name="RE", depart_time="08:20", load_size="Empty", depart_load_size="Empty", no_pickup=True)
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    assert stop["movement_code"] == "route_start"
+    assert stop["board_detail"] == "Raleigh East · route start · arrived empty"
+    assert "empty return" not in stop["board_detail"].lower()
+
+
 def test_picked_up_load_shows_loaded_info(app):
     from app.services.route_map import build_driver_route_map_context
 
@@ -250,6 +301,9 @@ def test_valid_drop_at_expected_destination_shows_dropped(app):
 
     assert stop["badge"]["label"] == "DROPPED"
     assert stop["badge"]["severity"] == "ok"
+    assert stop["movement_code"] == "dropped"
+    assert "dropped" in stop["movement_summary"].lower()
+    assert "empty return" not in stop["board_detail"].lower()
     assert stop["issues"] == []
 
 
