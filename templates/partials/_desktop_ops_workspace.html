@@ -98,9 +98,10 @@
   {%- endif -%}
 {%- endmacro %}
 
-{% macro row_button(key, code, title, meta, tone='normal', default=false) -%}
-  <button class="desk-ops-row tone-{{ tone }}" type="button" data-desktop-row data-detail-template="{{ key }}" {% if default %}data-desktop-default="true"{% endif %}>
+{% macro row_button(key, code, title, meta, tone='normal', default=false, stop_label=none) -%}
+  <button class="desk-ops-row tone-{{ tone }}{% if stop_label %} has-stop-number{% endif %}" type="button" data-desktop-row data-detail-template="{{ key }}" {% if default %}data-desktop-default="true"{% endif %}>
     <span class="desk-row-code">{{ code }}</span>
+    {% if stop_label %}<span class="desk-row-stop-number">{{ stop_label }}</span>{% endif %}
     <span class="desk-row-main"><strong>{{ title }}</strong><small>{{ clean_value(meta) }}</small></span>
   </button>
 {%- endmacro %}
@@ -166,8 +167,8 @@
             {% if is_default %}{% set desk.default_set = true %}{% endif %}
             {% set stop_board = stop.board_badge if stop.board_badge is defined and stop.board_badge else stop.badge %}
             {% set row_tone = 'issue' if stop_board and stop_board.severity == 'risk' else ('warn' if stop_board and stop_board.severity == 'attention' else ('active' if stop_board and stop_board.row_tone == 'active' else 'normal')) %}
-            {% set row_code = 'ACTIVE' if stop.status == 'active' else (stop_board.short if stop_board and stop_board.short else (stop.board_code or 'STOP')) %}
-            {{ row_button('desktop-stop-' ~ stop.stop_id, row_code, stop.plant_name, (stop.ledger_meta or stop.movement_summary or stop.next_action), row_tone, is_default) }}
+            {% set row_code = 'ACTIVE' if stop.status == 'active' else (stop_board.short if stop_board and stop_board.short else 'STOP') %}
+            {{ row_button('desktop-stop-' ~ stop.stop_id, row_code, stop.plant_name, (stop.ledger_meta or stop.movement_summary or stop.next_action), row_tone, is_default, 'Stop ' ~ stop.sequence) }}
           {% endfor %}
         {% else %}
           {{ row_button('desktop-route-empty', 'ROUTE', 'No route stops recorded', 'Add the first stop to start route documents.', 'warn', true) }}

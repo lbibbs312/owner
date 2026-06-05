@@ -16,7 +16,7 @@
         <p>{{ pi.reason }}</p>
       </div>
       <div class="flow-issue-evidence">
-        <div><span>Stop</span><strong>{{ obj.board_code or ('STP-' ~ obj.sequence) }} · {{ obj.plant_name }}</strong></div>
+        <div><span>Stop</span><strong>{{ obj.board_code or ('Stop ' ~ obj.sequence) }} · {{ obj.plant_name }}</strong></div>
         {% if ev.load or ev.dropped %}<div><span>Load</span><strong>{{ ev.load or ev.dropped|join(', ') }}</strong></div>{% endif %}
         {% if ev.expected_destination %}<div><span>Expected destination</span><strong>{{ ev.expected_destination }}</strong></div>{% endif %}
         {% if ev.actual_stop %}<div><span>Actual stop</span><strong>{{ ev.actual_stop }}</strong></div>{% endif %}
@@ -382,7 +382,7 @@
       <div class="md-flow-context" data-md-flow-context></div>
       <div class="md-flow-inline-panel depart-quick-flow" data-flow-inline-panel="depart" hidden>
         {% if depart_url and primary_stop and primary_action != 'end_route' %}
-          {% set depart_code = primary_stop.board_code or 'STP-' ~ primary_stop.sequence %}
+          {% set depart_code = primary_stop.board_code or 'Stop ' ~ primary_stop.sequence %}
           {% set is_service_depart = depart_code in ['FUEL', 'RYDR', 'MTN', 'MTG', 'SRVC'] %}
           {% set requires_unload_check = primary_stop.requires_unload_check if primary_stop.requires_unload_check is defined else false %}
           {% set requires_secondary_drop_check = primary_stop.requires_secondary_drop_check if primary_stop.requires_secondary_drop_check is defined else false %}

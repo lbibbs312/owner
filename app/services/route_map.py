@@ -475,7 +475,7 @@ def _service_board_code(log):
 def _board_stop_code(log, sequence):
     if is_service_stop(log):
         return _service_board_code(log)
-    return f"STP-{sequence or '?'}"
+    return f"Stop {sequence or '?'}"
 
 
 def _service_board_detail(log, label, route_pretrip=None):
