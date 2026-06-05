@@ -6387,6 +6387,79 @@ def test_mobile_dashboard_allows_finalize_after_posttrip_complete(client, app):
     assert b"Ready To Finalize" in page.data
 
 
+def test_mobile_dashboard_registers_completed_posttrip_with_duplicate_open_pretrip(client, app):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ActivityEvent, DriverLog, PlantTransfer, PostTrip, PreTrip
+
+        driver = create_user("duplicate_posttrip_driver", "duplicate-posttrip@example.com", "driver")
+        completed_pretrip = PreTrip(
+            user_id=driver.id,
+            pretrip_date=today,
+            truck_number="ST4",
+            start_mileage=379000,
+            created_at=datetime(2026, 6, 4, 12, 0),
+        )
+        duplicate_open_pretrip = PreTrip(
+            user_id=driver.id,
+            pretrip_date=today,
+            truck_number="ST4",
+            start_mileage=379000,
+            created_at=datetime(2026, 6, 4, 12, 30),
+        )
+        db.session.add_all([completed_pretrip, duplicate_open_pretrip])
+        db.session.flush()
+        db.session.add_all([
+            PostTrip(
+                pretrip_id=completed_pretrip.id,
+                end_mileage=379050,
+                miles_driven=50,
+                created_at=datetime(2026, 6, 4, 20, 30),
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="RE",
+                load_size="Empty",
+                depart_load_size="Empty",
+                no_pickup=True,
+                arrive_time="08:00",
+                depart_time="08:20",
+                created_at=datetime(2026, 6, 4, 8, 0),
+            ),
+            PlantTransfer(
+                user_id=driver.id,
+                transfer_date=today,
+                ship_from="RE",
+                ship_to="RE",
+                driver_name="Duplicate PostTrip",
+            ),
+            ActivityEvent(
+                user_id=driver.id,
+                category="eod",
+                action="finalized",
+                title="Route finalized",
+                details=f"Route finalized for {today}",
+                target_type="end_of_day",
+            ),
+        ])
+        db.session.commit()
+
+    login(client, "duplicate_posttrip_driver")
+    page = client.get("/mobile")
+    body = page.get_data(as_text=True)
+
+    assert page.status_code == 200
+    assert "PostTrip Due" not in body
+    assert "Complete posttrip" not in body
+    assert "No action needed" in body
+    assert "Print Route" in body
+    assert "379,050" in body
+
+
 def test_mobile_route_map_fragment_refresh_uses_route_state(client, app):
     from datetime import date
 

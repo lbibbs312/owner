@@ -593,9 +593,48 @@ def _route_cta_urls(route_date, current_stop=None, active_pretrip=None, pending_
 
 
 def _posttrip_due_for_route(active_pretrip, route_context):
+    if getattr(route_context, "posttrip_status", None) == "complete":
+        return False
     if not active_pretrip or active_pretrip.posttrip:
         return False
     return getattr(route_context, "route_status", None) != "active"
+
+
+def _route_pretrips_for_driver_date(driver_id, route_date):
+    if not driver_id or not route_date:
+        return []
+    return (
+        _active_pretrips_query()
+        .filter_by(user_id=driver_id, pretrip_date=route_date)
+        .order_by(PreTrip.created_at.desc(), PreTrip.id.desc())
+        .all()
+    )
+
+
+def _select_route_pretrip(pretrips, *, route_context=None, open_shift=None):
+    pretrips = list(pretrips or [])
+    if not pretrips:
+        return None
+    posttrip_complete = getattr(route_context, "posttrip_status", None) == "complete"
+    route_status = getattr(route_context, "route_status", None)
+    open_shift_pretrip_id = getattr(open_shift, "pretrip_id", None)
+
+    if route_status == "active" and open_shift_pretrip_id:
+        for pretrip in pretrips:
+            if pretrip.id == open_shift_pretrip_id:
+                return pretrip
+
+    if posttrip_complete:
+        completed = [pretrip for pretrip in pretrips if pretrip.posttrip]
+        if completed:
+            return completed[0]
+
+    if route_status in {"completed", "finalized"}:
+        open_pretrip = next((pretrip for pretrip in pretrips if not pretrip.posttrip), None)
+        if open_pretrip:
+            return open_pretrip
+
+    return pretrips[0]
 
 
 def _soft_delete_record(record):
@@ -4785,18 +4824,24 @@ def _mobile_route_map_fragment_context(route_date=None):
         .order_by(PreTrip.created_at.desc())
         .first()
     )
-    todays_pretrip = (
-        _active_pretrips_query().filter_by(user_id=current_user.id, pretrip_date=today_local_date)
-        .order_by(PreTrip.created_at.desc())
-        .first()
-    )
-    route_pretrip = (
-        _active_pretrips_query().filter_by(user_id=current_user.id, pretrip_date=route_date)
-        .order_by(PreTrip.created_at.desc())
-        .first()
-    )
+    today_pretrips = _route_pretrips_for_driver_date(current_user.id, today_local_date)
+    route_pretrips = _route_pretrips_for_driver_date(current_user.id, route_date)
     open_shift_route_date = _shift_route_date(open_shift)
-    route_is_active = bool((open_shift and (not open_shift_route_date or open_shift_route_date == route_date)) or (route_pretrip and not route_pretrip.posttrip))
+    route_context = build_route_context(driver_id=current_user.id, route_date=route_date, now=now_local)
+    todays_pretrip = _select_route_pretrip(
+        today_pretrips,
+        route_context=route_context if route_date == today_local_date else None,
+        open_shift=open_shift,
+    )
+    route_pretrip = _select_route_pretrip(
+        route_pretrips,
+        route_context=route_context,
+        open_shift=open_shift,
+    )
+    route_is_active = bool(
+        (open_shift and (not open_shift_route_date or open_shift_route_date == route_date))
+        or route_context.route_status == "active"
+    )
     active_pretrip = todays_pretrip or (route_pretrip if route_is_active else None)
     pending_posttrip = False
     latest_transfer = (
@@ -4818,7 +4863,6 @@ def _mobile_route_map_fragment_context(route_date=None):
         _active_driver_logs_query().filter_by(driver_id=current_user.id, date=route_date).all(),
         key=_driver_log_sort_key,
     )
-    route_context = build_route_context(driver_id=current_user.id, route_date=route_date, now=now_local)
     current_stop = route_context.current_stop
     pending_posttrip = _posttrip_due_for_route(active_pretrip, route_context)
     departed_today = any(getattr(log, "depart_time", None) for log in todays_logs)
@@ -4941,18 +4985,24 @@ def mobile_dashboard():
         .order_by(PreTrip.created_at.desc())
         .first()
     )
-    todays_pretrip = (
-        _active_pretrips_query().filter_by(user_id=current_user.id, pretrip_date=today_local_date)
-        .order_by(PreTrip.created_at.desc())
-        .first()
-    )
-    route_pretrip = (
-        _active_pretrips_query().filter_by(user_id=current_user.id, pretrip_date=route_date)
-        .order_by(PreTrip.created_at.desc())
-        .first()
-    )
+    today_pretrips = _route_pretrips_for_driver_date(current_user.id, today_local_date)
+    route_pretrips = _route_pretrips_for_driver_date(current_user.id, route_date)
     open_shift_route_date = _shift_route_date(open_shift)
-    route_is_active = bool((open_shift and (not open_shift_route_date or open_shift_route_date == route_date)) or (route_pretrip and not route_pretrip.posttrip))
+    route_context = build_route_context(driver_id=current_user.id, route_date=route_date, now=now_local)
+    todays_pretrip = _select_route_pretrip(
+        today_pretrips,
+        route_context=route_context if route_date == today_local_date else None,
+        open_shift=open_shift,
+    )
+    route_pretrip = _select_route_pretrip(
+        route_pretrips,
+        route_context=route_context,
+        open_shift=open_shift,
+    )
+    route_is_active = bool(
+        (open_shift and (not open_shift_route_date or open_shift_route_date == route_date))
+        or route_context.route_status == "active"
+    )
     active_pretrip = todays_pretrip or (route_pretrip if route_is_active else None)
     pending_posttrip = False
     latest_transfer = (
@@ -4981,7 +5031,6 @@ def mobile_dashboard():
         .all()
     )
     route_damage_reports = _today_damage_reports(current_user.id, route_date)
-    route_context = build_route_context(driver_id=current_user.id, route_date=route_date, now=now_local)
     todays_log_routes = route_context.log_routes
     route_task_events = _task_route_events_for_logs(todays_logs, _driver_route_tasks(current_user.id, route_date))
     current_stop = route_context.current_stop
