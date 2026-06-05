@@ -14,6 +14,7 @@ def build_route_state(logs, log_routes=None, stop_forecasts=None, route_finalize
     rows = []
     open_logs = [log for log in logs if not getattr(log, "depart_time", None)]
     current_open_log = open_logs[-1] if open_logs and logs and open_logs[-1].id == logs[-1].id else None
+    route_end_log = current_open_log if route_finalized else None
 
     for index, log in enumerate(logs, start=1):
         route = log_routes.get(log.id, {})
@@ -21,9 +22,13 @@ def build_route_state(logs, log_routes=None, stop_forecasts=None, route_finalize
         plant = _plant(log, route)
         is_open = not bool(getattr(log, "depart_time", None))
         is_current = bool(current_open_log and current_open_log.id == log.id and not route_finalized)
+        is_route_end = bool(route_end_log and route_end_log.id == log.id)
         if is_current:
             status = "Current"
             note = "Awaiting load-out/departure"
+        elif is_route_end:
+            status = "Finalized"
+            note = "Route finalized at final stop"
         elif is_open:
             status = "Open"
             note = "Missing departure"

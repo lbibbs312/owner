@@ -68,6 +68,34 @@ def _route_finalized(driver_id, route_date):
     ).filter(ActivityEvent.details.contains(str(route_date))).first() is not None
 
 
+def route_end_arrival_log(logs, *, route_finalized=False):
+    """Return the arrival-only route terminus when a finalized route ends there."""
+    if not route_finalized or not logs:
+        return None
+    last_log = logs[-1]
+    if getattr(last_log, "depart_time", None):
+        return None
+    return last_log
+
+
+def unresolved_departure_logs(logs, *, route_finalized=False):
+    """Open stops that still need correction because the route moved past them."""
+    if not logs:
+        return []
+    route_end_log = route_end_arrival_log(logs, route_finalized=route_finalized)
+    unresolved = []
+    for index, log in enumerate(logs):
+        if getattr(log, "depart_time", None):
+            continue
+        later_stop_exists = index < len(logs) - 1
+        if later_stop_exists:
+            unresolved.append(log)
+            continue
+        if route_finalized and (not route_end_log or route_end_log.id != log.id):
+            unresolved.append(log)
+    return unresolved
+
+
 def _signature_shift(driver_id, route_date):
     by_pretrip = (
         ShiftRecord.query.join(PreTrip, ShiftRecord.pretrip_id == PreTrip.id)
@@ -207,7 +235,18 @@ def build_route_cta_context(
     show_start_shift = False
     show_posttrip = bool(pending_posttrip)
 
-    if route_finalized and route_is_active:
+    if route_finalized and pending_posttrip:
+        display_mode = "completed_route"
+        next_action = "PostTrip Due"
+        primary = _route_cta("PostTrip Due", "posttrip")
+        secondary = _route_cta("Print Route", "print_route", "ghost") if has_route_history else None
+        route_message = "Route is closed. Complete PostTrip mileage."
+        proof_message = "Document proof is missing." if proof_missing else proof_message
+        show_attach = bool(proof_missing)
+        allowed_actions = ["posttrip", "print_route", "view_route"]
+        if proof_missing:
+            allowed_actions.append("attach_document")
+    elif route_finalized and route_is_active:
         display_mode = "active_route"
         next_action = "Continue route"
         primary = _route_cta("Add Stop", "add_stop")
@@ -445,6 +484,10 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
     all_departed = bool(logs) and all(getattr(log, "depart_time", None) for log in logs)
     open_logs = [log for log in logs if not getattr(log, "depart_time", None)]
     current_open = open_logs[-1] if open_logs and open_logs[-1].id == logs[-1].id and not route_finalized else None
+    route_end_log = route_end_arrival_log(logs, route_finalized=route_finalized)
+    unresolved_departure_ids = {
+        log.id for log in unresolved_departure_logs(logs, route_finalized=route_finalized)
+    }
 
     for index, log in enumerate(logs):
         route = log_routes.get(log.id)
@@ -465,8 +508,9 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
         route = log_routes.get(log.id, {})
         is_current = bool(current_open and current_open.id == log.id)
         later_stop_exists = index < len(logs)
-        is_missing_departure = bool(not log.depart_time and (route_finalized or later_stop_exists))
-        is_final = bool(route_finalized and index == len(logs) and not is_current)
+        is_route_end_arrival = bool(route_end_log and route_end_log.id == log.id)
+        is_missing_departure = bool(not log.depart_time and (log.id in unresolved_departure_ids or later_stop_exists))
+        is_final = bool(route_finalized and index == len(logs) and not is_current and not is_missing_departure)
         role = stop_role_details(log, route, is_current_open=is_current, is_final_stop=is_final)
         timing_row = timing.get(log.id, {})
         if is_current:
@@ -480,7 +524,7 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
         elif is_final:
             status = "Finalized"
             status_key = "finalized"
-            note = "Route finalized"
+            note = "Route finalized at final stop." if is_route_end_arrival else "Route finalized"
         else:
             status = "Completed" if log.depart_time else "Open"
             status_key = "complete" if log.depart_time else "open"
@@ -540,7 +584,7 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
         truck_id = pretrips[-1].truck_number
     shift_id = _route_shift_id(driver_id, route_date, truck_id=truck_id, pretrips=pretrips, shift_id=scope.get("shift_id")) if driver_id and route_date else None
     route_id_value = _canonical_route_id(route_id, logs, driver_id, route_date, truck_id=truck_id, shift_id=shift_id)
-    active_route = bool(current_open or (logs and not all_departed)) and not route_finalized
+    active_route = bool(current_open or (logs and unresolved_departure_ids)) and not route_finalized
     if route_finalized:
         route_status = "finalized"
     elif active_route:

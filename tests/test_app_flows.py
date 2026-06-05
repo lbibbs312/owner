@@ -2385,6 +2385,87 @@ def test_pretrip_create_and_print_route(client, app):
     assert b"PreTrip printed" in activity.data
 
 
+def test_new_pretrip_blank_date_uses_local_route_date(client, app, monkeypatch):
+    from datetime import date
+
+    from app.blueprints.driver import routes as driver_routes
+
+    local_route_date = date(2026, 6, 4)
+    monkeypatch.setattr(driver_routes, "_today_local_date", lambda: local_route_date)
+
+    with app.app_context():
+        create_user("local_pretrip_driver", "local-pretrip@example.com", "driver")
+
+    login(client, "local_pretrip_driver")
+    page = client.get("/new_pretrip")
+    body = page.get_data(as_text=True)
+
+    assert page.status_code == 200
+    assert 'name="pretrip_date" type="date" value="2026-06-04"' in body
+
+    response = client.post(
+        "/new_pretrip",
+        data={
+            "truck_number": "ST4",
+            "trailer_number": "",
+            "pretrip_date": "",
+            "shift": "1st",
+            "start_mileage": "379000",
+            "start_fuel_level": "3/4",
+            "truck_type": "Box Truck",
+            "oil_system_status": "good",
+            "tires_status": "good",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        from app.models import PreTrip
+
+        pretrip = PreTrip.query.filter_by(truck_number="ST4").one()
+        assert pretrip.pretrip_date == local_route_date
+
+
+def test_mobile_dashboard_repairs_pretrip_saved_under_utc_tomorrow(client, app, monkeypatch):
+    from datetime import date, datetime
+
+    import pytz
+
+    from app.blueprints.driver import routes as driver_routes
+
+    local_tz = pytz.timezone("America/Detroit")
+    local_now = local_tz.localize(datetime(2026, 6, 4, 21, 15))
+    utc_now = local_now.astimezone(pytz.utc).replace(tzinfo=None)
+    monkeypatch.setattr(driver_routes, "_now_local_and_utc", lambda: (local_now, utc_now))
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import PreTrip
+
+        driver = create_user("utc_pretrip_driver", "utc-pretrip@example.com", "driver")
+        pretrip = PreTrip(
+            user_id=driver.id,
+            pretrip_date=date(2026, 6, 5),
+            truck_number="ST4",
+            start_mileage=379000,
+            created_at=utc_now,
+        )
+        db.session.add(pretrip)
+        db.session.commit()
+        pretrip_id = pretrip.id
+
+    login(client, "utc_pretrip_driver")
+    page = client.get("/mobile")
+
+    assert page.status_code == 200
+    with app.app_context():
+        from app.models import PreTrip
+
+        repaired = PreTrip.query.get(pretrip_id)
+        assert repaired.pretrip_date == date(2026, 6, 4)
+
+
 def test_posttrip_ends_unlinked_manual_shift_timer(client, app):
     from datetime import date, datetime, timedelta
 
@@ -7101,21 +7182,22 @@ def test_active_stop_is_current_not_missing_departure(client, app):
     assert b"Pickup estimate:" in route_review.data
 
 
-def test_finalized_route_with_missing_departure_requires_correction(client, app):
+def test_finalized_route_can_end_at_arrival_only_final_stop(client, app):
     from datetime import date, datetime
 
     with app.app_context():
         from app.extensions import db
         from app.models import ActivityEvent, DriverLog
+        from app.services.route_context import build_route_context
 
-        driver = create_user("final_missing", "final-missing@example.com", "driver")
-        create_user("manager_final_missing", "manager-final-missing@example.com", "management")
+        driver = create_user("final_arrival", "final-arrival@example.com", "driver")
+        create_user("manager_final_arrival", "manager-final-arrival@example.com", "management")
         route_date = date.today()
         db.session.add_all([
             DriverLog(
                 driver_id=driver.id,
                 date=route_date,
-                plant_name="PC",
+                plant_name="RE",
                 load_size="Empty",
                 arrive_time="08:00",
                 created_at=datetime(2026, 5, 20, 8, 0),
@@ -7131,8 +7213,77 @@ def test_finalized_route_with_missing_departure_requires_correction(client, app)
         ])
         db.session.commit()
         driver_id = driver.id
+        snapshot = build_route_context(driver_id=driver_id, route_date=route_date)
+        assert snapshot.route_status == "finalized"
+        assert snapshot.current_stop is None
+        assert snapshot.rows[-1]["status"] == "Finalized"
+        assert snapshot.rows[-1]["note"] == "Route finalized at final stop."
+        assert "Missing Departure" not in {row["status"] for row in snapshot.rows}
 
-    login(client, "manager_final_missing")
+    login(client, "manager_final_arrival")
+    route_review = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert route_review.status_code == 200
+    assert b"Missing Departure" not in route_review.data
+    assert b"Correction required" not in route_review.data
+
+    client.get("/logout")
+    login(client, "final_arrival")
+    route_sheet = client.get(f"/driver_logs_print?date={date.today().isoformat()}")
+    assert route_sheet.status_code == 200
+    assert b"Route End: Raleigh East" in route_sheet.data
+    assert b"Finalized Stop: Raleigh East" not in route_sheet.data
+    assert b"Missing Departure" not in route_sheet.data
+
+
+def test_finalized_route_with_prior_missing_departure_requires_correction(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ActivityEvent, DriverLog
+        from app.services.route_context import build_route_context
+
+        driver = create_user("final_prior_missing", "final-prior-missing@example.com", "driver")
+        create_user("manager_prior_missing", "manager-prior-missing@example.com", "management")
+        route_date = date.today()
+        first = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="PC",
+            load_size="Empty",
+            arrive_time="08:00",
+            created_at=datetime(2026, 5, 20, 8, 0),
+        )
+        second = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="RE",
+            load_size="Empty",
+            depart_load_size="Empty",
+            no_pickup=True,
+            arrive_time="08:30",
+            depart_time="08:45",
+            created_at=datetime(2026, 5, 20, 8, 30),
+        )
+        db.session.add_all([
+            first,
+            second,
+            ActivityEvent(
+                user_id=driver.id,
+                category="eod",
+                action="finalized",
+                title="Route finalized",
+                details=f"Route finalized for {route_date}",
+                target_type="end_of_day",
+            ),
+        ])
+        db.session.commit()
+        driver_id = driver.id
+        snapshot = build_route_context(driver_id=driver_id, route_date=route_date)
+        assert snapshot.rows[0]["status"] == "Missing Departure"
+        assert snapshot.true_exceptions[0]["label"] == "Missing Departure"
+
+    login(client, "manager_prior_missing")
     route_review = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
     assert route_review.status_code == 200
     assert b"Missing Departure" in route_review.data

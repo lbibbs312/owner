@@ -20,6 +20,11 @@
   <form method="POST" action="" enctype="multipart/form-data" class="md-glass md-glow p-3 pretrip-checklist" data-autosave="true" data-autosave-key="pretrip-new">
     <!-- CRITICAL: ensures CSRF token is included -->
     {{ form.hidden_tag() }}
+    {% if form.errors %}
+      <div class="alert alert-danger">
+        <strong>PreTrip was not saved.</strong> Check the highlighted fields and try again.
+      </div>
+    {% endif %}
 
     <!-- 1) BASIC INFO -->
     <div class="row mb-3">
@@ -39,11 +44,7 @@
       </div>
       <div class="col-md-4">
         {{ form.pretrip_date.label }} 
-        <!-- By default, DateField requires YYYY-MM-DD. If you want a date picker, 
-             you can do type="date" with something like:
-             {{ form.pretrip_date(class="form-control", type="date") }} 
-        -->
-        {{ form.pretrip_date(class="form-control") }}
+        {{ form.pretrip_date(class="form-control", type="date") }}
         {% for err in form.pretrip_date.errors %}
           <div class="text-danger">{{ err }}</div>
         {% endfor %}

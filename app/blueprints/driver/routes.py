@@ -14,6 +14,7 @@ import pytz
 from flask import abort, current_app, flash, jsonify, make_response, redirect, render_template, request, send_from_directory, session, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import and_, func, or_
+from werkzeug.datastructures import CombinedMultiDict, MultiDict
 from werkzeug.utils import secure_filename
 
 from app.blueprints.driver import bp
@@ -64,7 +65,7 @@ from app.services.load_state import (
 )
 from app.services.parts import record_part_scan as save_part_scan, scan_event_payload
 from app.services.next_load_prediction import build_next_load_prediction
-from app.services.route_context import build_route_context, build_route_cta_context
+from app.services.route_context import build_route_context, build_route_cta_context, unresolved_departure_logs
 from app.services.flow_events import FlowEventService
 from app.services.production_flow import build_production_flow_context
 from app.services.route_map import build_driver_route_map_context, build_driver_map_mode_context
@@ -875,6 +876,42 @@ def _repair_today_driver_log_dates(driver_id, today_local_date):
     return changed
 
 
+def _repair_today_pretrip_dates(driver_id, today_local_date):
+    """Recover PreTrips saved under tomorrow's UTC date during today's local shift."""
+    if not driver_id or not today_local_date:
+        return 0
+    existing_today = (
+        _active_pretrips_query()
+        .filter_by(user_id=driver_id, pretrip_date=today_local_date)
+        .order_by(PreTrip.created_at.desc(), PreTrip.id.desc())
+        .limit(20)
+        .all()
+    )
+    if any(not pretrip.posttrip for pretrip in existing_today):
+        return 0
+
+    day_start, day_end = _local_route_date_utc_bounds(today_local_date)
+    future_date = today_local_date + timedelta(days=1)
+    candidates = (
+        _active_pretrips_query()
+        .filter(
+            PreTrip.user_id == driver_id,
+            PreTrip.pretrip_date == future_date,
+            PreTrip.created_at >= day_start,
+            PreTrip.created_at <= day_end,
+        )
+        .order_by(PreTrip.created_at.asc(), PreTrip.id.asc())
+        .all()
+    )
+    changed = 0
+    for pretrip in candidates:
+        pretrip.pretrip_date = today_local_date
+        changed += 1
+    if changed:
+        db.session.commit()
+    return changed
+
+
 def _depart_local_dt_for_log(log):
     return _local_dt_for_hhmm(getattr(log, "date", None), _normalize_hhmm_time(getattr(log, "depart_time", "")))
 
@@ -1016,6 +1053,7 @@ def _replace_plant_transfer_lines(transfer):
 def _get_today_eod_records():
     local_tz = pytz.timezone("America/Detroit")
     today_local_date = datetime.now(local_tz).date()
+    _repair_today_pretrip_dates(current_user.id, today_local_date)
     logs = _active_driver_logs_query().filter_by(
         driver_id=current_user.id, date=today_local_date
     ).all()
@@ -2513,13 +2551,21 @@ def list_pretrips():
 @bp.route("/new_pretrip", methods=["GET", "POST"])
 @login_required
 def new_pretrip():
-    form = PreTripForm()
+    today_local_date = _today_local_date()
+    formdata = None
+    if request.method == "POST" and not (request.form.get("pretrip_date") or "").strip():
+        posted = MultiDict(request.form)
+        posted["pretrip_date"] = today_local_date.isoformat()
+        formdata = CombinedMultiDict((posted, request.files))
+    form = PreTripForm(formdata=formdata) if formdata is not None else PreTripForm()
     if request.method == "GET":
-        previous_fuel, _ = _previous_posttrip_fuel_level(current_user.id, date.today())
+        if not form.pretrip_date.data:
+            form.pretrip_date.data = today_local_date
+        previous_fuel, _ = _previous_posttrip_fuel_level(current_user.id, today_local_date)
         if previous_fuel and not form.start_fuel_level.data:
             form.start_fuel_level.data = previous_fuel
     if form.validate_on_submit():
-        chosen_date = form.pretrip_date.data or date.today()
+        chosen_date = form.pretrip_date.data or today_local_date
 
         new_pt = PreTrip(
             user_id=current_user.id,
@@ -2631,8 +2677,15 @@ def new_pretrip():
 
         flash("PreTrip saved successfully!", "success")
         return redirect(url_for("driver.list_pretrips"))
+    elif request.method == "POST":
+        current_app.logger.warning(
+            "PreTrip validation failed for user_id=%s: %s",
+            current_user.id,
+            form.errors,
+        )
+        flash("PreTrip was not saved. Check the highlighted fields and try again.", "danger")
 
-    return render_template("new_pretrip.html", form=form)
+    return render_template("new_pretrip.html", form=form, today_local_date=today_local_date)
 
 
 @bp.route("/do_posttrip/<int:pretrip_id>", methods=["GET", "POST"])
@@ -4054,6 +4107,9 @@ def driver_logs_print():
     local_tz = pytz.timezone("America/Detroit")
     now_local = datetime.now(local_tz)
     selected_date = _selected_log_date_from_request()
+    today_local_date = _today_local_date()
+    if selected_date == today_local_date:
+        _repair_today_pretrip_dates(current_user.id, today_local_date)
     logs = sorted(
         _active_driver_logs_query().filter_by(driver_id=current_user.id, date=selected_date).all(),
         key=_driver_log_sort_key,
@@ -4219,6 +4275,15 @@ def end_of_day_summary():
     form = EndOfDayForm()
     today_local_date, logs, pretrips_today, plant_transfers_today = _get_today_eod_records()
     if form.validate_on_submit():
+        unresolved_departures = unresolved_departure_logs(
+            sorted(logs, key=_driver_log_sort_key),
+            route_finalized=True,
+        )
+        if unresolved_departures:
+            stop = unresolved_departures[0]
+            flash(f"Correct departure for {_plant_label(stop.plant_name)} before ending the route.", "warning")
+            return redirect(url_for("driver.view_driver_log", log_id=stop.id))
+
         signature_shift = None
         sig_data = _valid_signature_data(form.driver_signature.data) or _end_of_day_draft_signature()
         if not sig_data:
@@ -4271,6 +4336,7 @@ def end_of_day_summary():
 def end_of_day_print():
     local_tz = pytz.timezone("America/Detroit")
     today_local_date = datetime.now(local_tz).date()
+    _repair_today_pretrip_dates(current_user.id, today_local_date)
     logs = _active_driver_logs_query().filter_by(
         driver_id=current_user.id, date=today_local_date
     ).all()
@@ -4310,6 +4376,7 @@ def end_of_day_print():
 def end_of_day_attachment():
     local_tz = pytz.timezone("America/Detroit")
     today_local_date = datetime.now(local_tz).date()
+    _repair_today_pretrip_dates(current_user.id, today_local_date)
     logs = _active_driver_logs_query().filter_by(
         driver_id=current_user.id, date=today_local_date
     ).all()
@@ -4336,6 +4403,15 @@ def end_of_day_attachment():
 @login_required
 def submit_end_of_day():
     today_local_date, logs, pretrips_today, plant_transfers_today = _get_today_eod_records()
+    unresolved_departures = unresolved_departure_logs(
+        sorted(logs, key=_driver_log_sort_key),
+        route_finalized=True,
+    )
+    if unresolved_departures:
+        stop = unresolved_departures[0]
+        flash(f"Correct departure for {_plant_label(stop.plant_name)} before ending the route.", "warning")
+        return redirect(url_for("driver.view_driver_log", log_id=stop.id))
+
     _end_open_shifts_for_driver(current_user.id)
     db.session.commit()
     _record_eod_finalized(today_local_date, logs, pretrips_today, plant_transfers_today)
@@ -4647,6 +4723,10 @@ def mobile_day_report(report_date):
     if parsed_date is None:
         return redirect(url_for("driver.mobile_history"))
 
+    today_local_date = _today_local_date()
+    if parsed_date == today_local_date:
+        _repair_today_pretrip_dates(current_user.id, today_local_date)
+
     logs = (
         _active_driver_logs_query().filter_by(driver_id=current_user.id, date=parsed_date)
         .order_by(DriverLog.created_at.desc())
@@ -4669,7 +4749,6 @@ def mobile_day_report(report_date):
         for log in logs
     ]
     transfer_reports = [_transfer_summary(transfer) for transfer in transfers]
-    today_local_date = _today_local_date()
     return render_template(
         "mobile_day_report.html",
         report_date=parsed_date,
@@ -4687,6 +4766,7 @@ def mobile_day_report(report_date):
 def _mobile_route_map_fragment_context(route_date=None):
     now_local, _ = _now_local_and_utc()
     today_local_date = now_local.date()
+    _repair_today_pretrip_dates(current_user.id, today_local_date)
     open_shift = _open_shift_for_driver(current_user.id)
     route_date = route_date or _requested_mobile_route_date() or _dashboard_route_date_for_driver(
         current_user.id,
@@ -4695,6 +4775,7 @@ def _mobile_route_map_fragment_context(route_date=None):
     )
     if route_date == today_local_date:
         _repair_today_driver_log_dates(current_user.id, today_local_date)
+        _repair_today_pretrip_dates(current_user.id, today_local_date)
 
     tasks = _driver_task_queue(current_user.id)
     active_task = tasks[0] if tasks else None
@@ -4838,11 +4919,13 @@ def mobile_dashboard():
 
     now_local, _ = _now_local_and_utc()
     today_local_date = now_local.date()
+    _repair_today_pretrip_dates(current_user.id, today_local_date)
     open_shift = _open_shift_for_driver(current_user.id)
     requested_route_date = _requested_mobile_route_date()
     route_date = requested_route_date or _dashboard_route_date_for_driver(current_user.id, today_local_date, open_shift=open_shift)
     if route_date == today_local_date:
         _repair_today_driver_log_dates(current_user.id, today_local_date)
+        _repair_today_pretrip_dates(current_user.id, today_local_date)
     shift_elapsed = None
     if open_shift:
         shift_elapsed = _format_duration((datetime.utcnow() - open_shift.start_time).total_seconds())
@@ -5064,6 +5147,7 @@ def mobile_production_flow_fragment():
 
     now_local, _ = _now_local_and_utc()
     today_local_date = now_local.date()
+    _repair_today_pretrip_dates(current_user.id, today_local_date)
     route_date = _requested_mobile_route_date() or _dashboard_route_date_for_driver(
         current_user.id,
         today_local_date,
@@ -5071,6 +5155,7 @@ def mobile_production_flow_fragment():
     )
     if route_date == today_local_date:
         _repair_today_driver_log_dates(current_user.id, today_local_date)
+        _repair_today_pretrip_dates(current_user.id, today_local_date)
     selected_stop_id = request.args.get("selected_stop_id", type=int)
     production_flow = build_production_flow_context(
         date=route_date,

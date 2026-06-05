@@ -46,7 +46,7 @@ from app.services.cargo_reconciliation_service import reconcile_cargo
 from app.services.media_attachment_service import upload_file_path
 from app.services.mileage_service import calculate_mileage_record
 from app.services.next_load_prediction import build_next_load_prediction
-from app.services.route_context import build_route_context
+from app.services.route_context import build_route_context, unresolved_departure_logs
 from app.services.route_state_service import build_route_state
 from app.services.scan_scope_service import route_scope_id, route_stop_ids
 from app.services.case_grouping import build_followup_cases, same_plant_intelligence, same_vehicle_intelligence
@@ -1223,12 +1223,15 @@ def _manager_delay_review(logs, log_routes, stop_forecasts):
 def _manager_data_quality(logs, log_routes, mileage_quality_item, driver_signature, route_finalized):
     items = [mileage_quality_item]
     all_departed = bool(logs) and all(log.depart_time for log in logs)
+    unresolved_departure_ids = {
+        log.id for log in unresolved_departure_logs(logs, route_finalized=route_finalized)
+    }
     if all_departed and not route_finalized:
         items.append({"label": "Route status", "status": "Ready for final review", "detail": "All recorded stops are closed. Route is awaiting final review."})
     for index, log in enumerate(logs):
         route = log_routes.get(log.id, {})
         plant = route.get("plant") or _plant_label(log.plant_name)
-        if not log.depart_time and (route_finalized or index < len(logs) - 1):
+        if not log.depart_time and log.id in unresolved_departure_ids:
             reason = "the route is being finalized" if route_finalized else "a later stop exists"
             items.append({"label": "Missing Departure", "status": "Correction required", "detail": f"{plant} is missing departure because {reason}."})
         if log.arrive_time and log.depart_time:
@@ -1276,7 +1279,8 @@ def _manager_required_actions(data_quality_items, photo_reviews, cargo_review, r
         if row.get("requires_reason"):
             actions.append(row.get("action") or f"Add delay reason for {row['plant']} before final approval.")
             break
-    if next_load_prediction and next_load_prediction.get("required_driver_action") and not all(log.depart_time for log in logs):
+    route_still_active = bool(logs) and not route_finalized and not all(log.depart_time for log in logs)
+    if next_load_prediction and next_load_prediction.get("required_driver_action") and route_still_active:
         actions.append(next_load_prediction["required_driver_action"])
     all_departed = bool(logs) and all(log.depart_time for log in logs)
     if all_departed and not route_finalized:
@@ -1292,11 +1296,15 @@ def _manager_approval_blockers(data_quality_items, photo_reviews, cargo_review, 
     blockers = []
     mileage_item = next((item for item in data_quality_items if item["label"] == "Mileage"), None)
     all_departed = bool(logs) and all(log.depart_time for log in logs)
-    active_open_stop = bool(logs) and not all_departed
+    unresolved_departures = unresolved_departure_logs(logs, route_finalized=route_finalized)
+    active_open_stop = bool(logs) and not all_departed and (not route_finalized or bool(unresolved_departures))
 
     if active_open_stop:
-        open_stop = next((log for log in reversed(logs) if not log.depart_time), logs[-1])
-        blockers.append({"label": "Active stop still open", "detail": f"{_plant_label(open_stop.plant_name)} is awaiting departure/load-out."})
+        open_stop = unresolved_departures[0] if unresolved_departures else next((log for log in reversed(logs) if not log.depart_time), logs[-1])
+        if route_finalized and unresolved_departures:
+            blockers.append({"label": "Missing departure", "detail": f"{_plant_label(open_stop.plant_name)} needs correction before approval."})
+        else:
+            blockers.append({"label": "Active stop still open", "detail": f"{_plant_label(open_stop.plant_name)} is awaiting departure/load-out."})
         if mileage_item and mileage_item.get("blocks_approval"):
             blockers.append({"label": "PostTrip mileage not yet due", "detail": "PostTrip mileage is pending until the route is closed."})
     elif mileage_item and mileage_item.get("blocks_approval"):

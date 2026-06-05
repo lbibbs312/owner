@@ -190,6 +190,7 @@
         {% set issue = (log_issue_details or {}).get(log.id, {}) %}
         {% set stop_forecast = (stop_forecasts or {}).get(log.id) %}
         {% set purpose = route.stop_purpose if route else none %}
+        {% set row_state = route_context.rows[loop.index0] if route_context and route_context.rows and loop.index0 < (route_context.rows|length) else none %}
         <tr class="{% if not next_log %}final-row{% endif %}">
           <td>{{ loop.index }}</td>
           <td>
@@ -199,7 +200,7 @@
                 <div class="route-sub">Timing status: <span class="timing-status {{ stop_forecast.severity }}">{{ stop_forecast.status }}</span></div>
               {% endif %}
             {% else %}
-              <div class="route-leg">{% if route_finalized %}Finalized Stop: {{ plant_name }}{% elif not log.depart_time %}Current Stop: {{ plant_name }}{% elif purpose == 'shift_end' %}Shift End: {{ plant_name }}{% else %}Route End: {{ plant_name }}{% endif %}</div>
+              <div class="route-leg">{% if purpose == 'shift_end' %}Shift End: {{ plant_name }}{% elif row_state and row_state.status == 'Finalized' and not log.depart_time %}Route End: {{ plant_name }}{% elif route_finalized %}Finalized Stop: {{ plant_name }}{% elif not log.depart_time %}Current Stop: {{ plant_name }}{% else %}Route End: {{ plant_name }}{% endif %}</div>
               <div class="route-sub">{% if route_finalized %}Route finalized{% elif not log.depart_time %}Awaiting departure / load intent{% elif route_completed %}Route completed / awaiting final review{% else %}Route completed / not finalized{% endif %}</div>
             {% endif %}
           </td>

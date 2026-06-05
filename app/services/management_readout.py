@@ -279,7 +279,7 @@ def is_open_stop_exception(open_log, day_logs, routes=None, route_finalized=Fals
     if not open_log:
         return False
     if route_finalized:
-        return True
+        return not is_current_active_stop(open_log, day_logs)
     if not is_current_active_stop(open_log, day_logs):
         return True
 
