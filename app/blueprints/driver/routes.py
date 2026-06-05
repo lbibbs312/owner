@@ -259,6 +259,7 @@ DRIVER_ONLY_ENDPOINTS = {
     "end_of_day_print",
     "end_of_day_attachment",
     "submit_end_of_day",
+    "mobile_end_route",
     "profile",
     "list_tasks",
     "view_task",
@@ -331,18 +332,24 @@ def _driver_log_route_context(logs):
     return build_driver_log_route_context(logs)
 
 
+def _route_finalized_for_driver_date(driver_id, route_date):
+    if not driver_id or not route_date:
+        return False
+    return ActivityEvent.query.filter_by(
+        user_id=driver_id,
+        category="eod",
+        action="finalized",
+        target_type="end_of_day",
+    ).filter(ActivityEvent.details.contains(str(route_date))).first() is not None
+
+
 def _active_driver_logs_query():
     return DriverLog.query.filter(DriverLog.deleted_at.is_(None))
 
 
 def _current_driver_load(driver_id, route_date=None):
     route_date = route_date or _today_local_date()
-    route_finalized = ActivityEvent.query.filter_by(
-        user_id=driver_id,
-        category="eod",
-        action="finalized",
-        target_type="end_of_day",
-    ).filter(ActivityEvent.details.contains(str(route_date))).first()
+    route_finalized = _route_finalized_for_driver_date(driver_id, route_date)
     open_shift = _open_shift_for_driver(driver_id)
     open_shift_route_date = _shift_route_date(open_shift)
     route_still_active = bool(open_shift and (not open_shift_route_date or open_shift_route_date == route_date))
@@ -577,6 +584,7 @@ def _route_cta_urls(route_date, current_stop=None, active_pretrip=None, pending_
         "add_damage": url_for("driver.new_damage_report"),
         "add_note": url_for("driver.new_damage_report"),
         "add_stop": url_for("driver.new_driving_log"),
+        "end_route": url_for("driver.mobile_end_route"),
         "attach_document": url_for("driver.new_plant_transfer"),
         "finalize_route": url_for("driver.end_of_day_summary"),
         "print_route": url_for("driver.driver_logs_print", date=date_value),
@@ -590,6 +598,41 @@ def _route_cta_urls(route_date, current_stop=None, active_pretrip=None, pending_
     if pending_posttrip and active_pretrip:
         urls["posttrip"] = url_for("driver.do_posttrip", pretrip_id=active_pretrip.id)
     return urls
+
+
+def _route_can_end_at_current_stop(route_context, active_pretrip, route_date, today_local_date):
+    current_stop = getattr(route_context, "current_stop", None)
+    if not current_stop or getattr(current_stop, "depart_time", None):
+        return False
+    if not route_date or not today_local_date or route_date != today_local_date:
+        return False
+    if getattr(route_context, "route_finalized", False):
+        return False
+    if not active_pretrip or not active_pretrip.posttrip:
+        return False
+    logs = [row.get("log") for row in (getattr(route_context, "rows", None) or []) if row.get("log")]
+    if not logs or logs[-1].id != current_stop.id:
+        return False
+    return not unresolved_departure_logs(logs, route_finalized=True)
+
+
+def _apply_route_end_cta(route_cta, route_context, active_pretrip, route_date, today_local_date):
+    if not _route_can_end_at_current_stop(route_context, active_pretrip, route_date, today_local_date):
+        return route_cta
+    patched = dict(route_cta or {})
+    patched.update(
+        {
+            "route_display_mode": "route_end_ready",
+            "next_action": "End route",
+            "primary_cta": {"label": "End Route", "action": "end_route", "style": "primary"},
+            "secondary_cta": {"label": "Print Route", "action": "print_route", "style": "ghost"},
+            "allowed_actions": ["end_route", "print_route", "view_route"],
+            "route_state_message": "PostTrip is complete. End the route here without recording a departure.",
+            "show_finalize_button": False,
+            "show_posttrip_button": False,
+        }
+    )
+    return patched
 
 
 def _posttrip_due_for_route(active_pretrip, route_context):
@@ -1166,6 +1209,8 @@ def _end_of_day_draft_signature():
 
 
 def _record_eod_finalized(today_local_date, logs, pretrips, plant_transfers):
+    if _route_finalized_for_driver_date(current_user.id, today_local_date):
+        return None
     record_activity(
         user_id=current_user.id,
         category="eod",
@@ -2416,6 +2461,7 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
         route = routes.get(log.id, {})
         snapshot = snapshot_rows.get(log.id, {})
         status = snapshot.get("note") or route.get("action") or ("Open" if not log.depart_time else "Complete")
+        wait_label = "" if snapshot.get("status") == "Finalized" and not log.depart_time else wait_label_for_log(log)
         rows.append([
             str(idx),
             snapshot.get("plant") or route.get("plant") or log.plant_name,
@@ -2423,7 +2469,7 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
             _format_hhmm_12h(log.depart_time) or "--",
             snapshot.get("cargo_in") or route.get("arrive_cargo_desc") or route.get("arrive_desc") or load_display(log.load_size),
             snapshot.get("cargo_out") or (route.get("depart_cargo_desc") if route.get("depart_cargo_desc") is not None else "--"),
-            wait_label_for_log(log) or "--",
+            wait_label or "--",
             ("No Pickup " if log.no_pickup else "") + (("HOT " if log.hot_parts else "") + (log.part_number or "")).strip(),
             f"{snapshot.get('status', '')}: {status}" if snapshot else status,
         ])
@@ -2732,6 +2778,8 @@ def new_pretrip():
 def do_posttrip(pretrip_id):
     pt = _active_pretrips_query().filter_by(id=pretrip_id).first_or_404()
     if current_user.role == "driver" and pt.user_id != current_user.id:
+        if request.method == "GET" and pt.posttrip and _driver_can_view_inspection_pretrip(pt):
+            return redirect(url_for("driver.pretrip_printable", pretrip_id=pt.id, _anchor="posttrip-closeout"))
         flash("Not authorized to complete a PostTrip for someone else's PreTrip.", "danger")
         return redirect(url_for("driver.list_pretrips"))
 
@@ -2755,7 +2803,7 @@ def do_posttrip(pretrip_id):
         end_mileage_val = form.end_mileage.data
         if pt.start_mileage is not None and end_mileage_val < pt.start_mileage:
             flash("End mileage cannot be lower than start mileage.", "danger")
-            return render_template("posttrip.html", form=form, pretrip=pt, fuel_logs=fuel_logs)
+            return render_template("posttrip.html", form=form, pretrip=pt, posttrip=posttrip, fuel_logs=fuel_logs)
         if pt.start_mileage is not None:
             miles_val = end_mileage_val - pt.start_mileage
         else:
@@ -2784,7 +2832,7 @@ def do_posttrip(pretrip_id):
 
         flash("PostTrip completed successfully and shift clock ended!", "success")
         return redirect(url_for("driver.view_pretrip", pretrip_id=pretrip_id))
-    return render_template("posttrip.html", form=form, pretrip=pt, fuel_logs=fuel_logs)
+    return render_template("posttrip.html", form=form, pretrip=pt, posttrip=posttrip, fuel_logs=fuel_logs)
 
 
 @bp.route("/view_pretrip/<int:pretrip_id>", methods=["GET", "POST"])
@@ -4308,6 +4356,44 @@ def end_shift():
     return _shift_redirect()
 
 
+@bp.route("/mobile/end-route", methods=["GET", "POST"])
+@login_required
+def mobile_end_route():
+    if current_user.role == "management":
+        return redirect(url_for("manager.manager_dashboard"))
+
+    now_local, _ = _now_local_and_utc()
+    today_local_date, logs, pretrips_today, plant_transfers_today = _get_today_eod_records()
+    logs = sorted(logs, key=_driver_log_sort_key)
+    open_shift = _open_shift_for_driver(current_user.id)
+    route_context = build_route_context(driver_id=current_user.id, route_date=today_local_date, now=now_local)
+    active_pretrip = _select_route_pretrip(pretrips_today, route_context=route_context, open_shift=open_shift)
+
+    if not _route_can_end_at_current_stop(route_context, active_pretrip, today_local_date, today_local_date):
+        flash("Complete PostTrip first, or record departure if this stop continues the route.", "warning")
+        return redirect(url_for("driver.mobile_dashboard"))
+
+    unresolved_departures = unresolved_departure_logs(logs, route_finalized=True)
+    if unresolved_departures:
+        stop = unresolved_departures[0]
+        flash(f"Correct departure for {_plant_label(stop.plant_name)} before ending the route.", "warning")
+        return redirect(url_for("driver.view_driver_log", log_id=stop.id))
+
+    current_stop = route_context.current_stop
+    _append_driver_log_flow_event(
+        current_stop,
+        "ROUTE_ENDED_AT_STOP",
+        notes=f"Route ended at {_plant_label(current_stop.plant_name)} without recording a departure after PostTrip.",
+        payload={"driver_action": "end_route_at_current_stop", "posttrip_id": active_pretrip.posttrip.id},
+    )
+    _end_open_shifts_for_driver(current_user.id)
+    db.session.commit()
+    _record_eod_finalized(today_local_date, logs, pretrips_today, plant_transfers_today)
+    _emit_driver_log_updated(current_stop, "route_ended")
+    flash(f"Route ended at {_plant_label(current_stop.plant_name)}. PostTrip is complete; no departure was recorded.", "success")
+    return redirect(url_for("driver.mobile_dashboard"))
+
+
 @bp.route("/end_of_day_summary", methods=["GET", "POST"])
 @login_required
 def end_of_day_summary():
@@ -4893,6 +4979,7 @@ def _mobile_route_map_fragment_context(route_date=None):
         selected_date_forced=bool(request.args.get("date")),
         pending_posttrip=pending_posttrip,
     )
+    route_cta = _apply_route_end_cta(route_cta, route_context, active_pretrip, route_date, today_local_date)
     route_map_mode = build_driver_map_mode_context(
         route_context,
         route_map,
@@ -5113,6 +5200,7 @@ def mobile_dashboard():
         selected_date_forced=bool(requested_route_date),
         pending_posttrip=pending_posttrip,
     )
+    route_cta = _apply_route_end_cta(route_cta, route_context, active_pretrip, route_date, today_local_date)
     driver_next_action = route_cta["next_action"]
     route_map_mode = build_driver_map_mode_context(
         route_context,

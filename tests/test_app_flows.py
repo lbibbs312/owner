@@ -6377,14 +6377,91 @@ def test_mobile_dashboard_allows_finalize_after_posttrip_complete(client, app):
             )
         )
         db.session.commit()
+        pretrip_id = pretrip.id
 
     login(client, "posttrip_complete_driver")
+    posttrip_record = client.get(f"/do_posttrip/{pretrip_id}")
+    assert posttrip_record.status_code == 200
+    assert b"PostTrip Record" in posttrip_record.data
+
     page = client.get("/mobile")
 
     assert page.status_code == 200
     assert b"Finalize Route" in page.data
     assert b"PostTrip Due" not in page.data
     assert b"Ready To Finalize" in page.data
+
+
+def test_mobile_dashboard_can_end_route_at_final_arrival_after_posttrip(client, app):
+    from datetime import date, datetime, timedelta
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ActivityEvent, DriverLog, PostTrip, PreTrip, ShiftRecord
+
+        driver = create_user("final_stop_closeout_driver", "final-stop-closeout@example.com", "driver")
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=379000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            PostTrip(pretrip_id=pretrip.id, end_mileage=379025, miles_driven=25),
+            ShiftRecord(
+                user_id=driver.id,
+                pretrip_id=pretrip.id,
+                start_time=datetime.utcnow() - timedelta(hours=8),
+                week_ending=None,
+            ),
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="RE",
+                load_size="Empty",
+                arrive_time=(datetime.utcnow() - timedelta(minutes=45)).strftime("%Y-%m-%d %H:%M:%S"),
+                created_at=datetime.utcnow() - timedelta(minutes=45),
+            ),
+        ])
+        db.session.commit()
+        driver_id = driver.id
+        log_id = DriverLog.query.filter_by(driver_id=driver.id).first().id
+
+    login(client, "final_stop_closeout_driver")
+    page = client.get("/mobile")
+    assert page.status_code == 200
+    assert b"End Route" in page.data
+    assert b"PostTrip Due" not in page.data
+    assert b"Depart Quick Flow" not in page.data
+
+    response = client.get("/mobile/end-route", follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/mobile")
+
+    with app.app_context():
+        from app.models import ActivityEvent, DriverLog, ShiftRecord
+        from app.services.driver_wait import active_driver_wait_status
+        from app.services.route_context import build_route_context
+
+        saved_log = DriverLog.query.get(log_id)
+        assert saved_log.depart_time is None
+        assert saved_log.dock_wait_minutes is None
+        assert ShiftRecord.query.filter_by(user_id=driver_id, end_time=None).count() == 0
+        assert ActivityEvent.query.filter_by(
+            user_id=driver_id,
+            category="eod",
+            action="finalized",
+            target_type="end_of_day",
+        ).count() == 1
+        assert active_driver_wait_status(driver_id, now=datetime.now()) is None
+        snapshot = build_route_context(driver_id=driver_id, route_date=today)
+        assert snapshot.route_status == "finalized"
+        assert snapshot.current_stop is None
+        assert snapshot.rows[-1]["status"] == "Finalized"
+
+    route_sheet = client.get(f"/driver_logs_print?date={today.isoformat()}")
+    assert route_sheet.status_code == 200
+    assert b"25 miles" in route_sheet.data
+    assert b"Active wait" not in route_sheet.data
+    assert b"Route End: Raleigh East" in route_sheet.data
 
 
 def test_mobile_dashboard_registers_completed_posttrip_with_duplicate_open_pretrip(client, app):
@@ -7135,8 +7212,14 @@ def test_driver_inspections_page_is_scoped_to_current_truck(client, app):
     assert b"1/4" in page.data
     assert b"12,050 mi" in page.data
     assert f"/pretrip_printable/{prior_same_truck_id}".encode() in page.data
+    assert b"Open PostTrip" in page.data
+    assert f"/pretrip_printable/{prior_same_truck_id}#posttrip-closeout".encode() in page.data
     assert b"ST5" not in page.data
     assert b"Other truck issue should not show" not in page.data
+
+    same_truck_posttrip = client.get(f"/do_posttrip/{prior_same_truck_id}")
+    assert same_truck_posttrip.status_code == 302
+    assert same_truck_posttrip.headers["Location"].endswith(f"/pretrip_printable/{prior_same_truck_id}#posttrip-closeout")
 
     same_truck_redirect = client.get(f"/view_pretrip/{prior_same_truck_id}")
     assert same_truck_redirect.status_code == 302

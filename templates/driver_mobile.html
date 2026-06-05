@@ -5234,7 +5234,7 @@
 	      </nav>
       {% endif %}
 	      {% if not board_only_home and (active_task or not flow_first_current) %}
-		      <section class="card hero {% if not active_task and cta.route_display_mode in ['completed_route', 'finalized_route', 'proof_needed'] %}route-complete-panel {% if cta.route_display_mode == 'proof_needed' %}proof-needed{% endif %}{% endif %}">
+		      <section class="card hero {% if not active_task and cta.route_display_mode in ['completed_route', 'finalized_route', 'proof_needed', 'route_end_ready'] %}route-complete-panel {% if cta.route_display_mode == 'proof_needed' %}proof-needed{% endif %}{% endif %}">
         {% if active_task %}
           <div class="eyebrow"><span class="bolt"></span>{% if active_task.is_hot %}Active Hot Move{% else %}Active Task{% endif %}</div>
           <h1>{{ active_task.title }}</h1>
@@ -5264,8 +5264,8 @@
             {% endif %}
           </div>
 	        {% else %}
-	          {% if cta.route_display_mode in ['completed_route', 'finalized_route', 'proof_needed', 'last_route', 'read_only_history'] and todays_logs %}
-	            <div class="eyebrow"><span class="bolt"></span>{% if cta.route_display_mode == 'finalized_route' %}Route Finalized{% elif cta.route_display_mode == 'completed_route' %}Route Complete{% elif cta.route_display_mode == 'proof_needed' %}Proof Needed{% elif cta.route_display_mode == 'read_only_history' %}Route History{% else %}Last Route{% endif %}</div>
+	          {% if cta.route_display_mode in ['completed_route', 'finalized_route', 'proof_needed', 'route_end_ready', 'last_route', 'read_only_history'] and todays_logs %}
+	            <div class="eyebrow"><span class="bolt"></span>{% if cta.route_display_mode == 'finalized_route' %}Route Finalized{% elif cta.route_display_mode == 'route_end_ready' %}Route Closeout{% elif cta.route_display_mode == 'completed_route' %}Route Complete{% elif cta.route_display_mode == 'proof_needed' %}Proof Needed{% elif cta.route_display_mode == 'read_only_history' %}Route History{% else %}Last Route{% endif %}</div>
 	            <h1>{% if cta.route_display_mode == 'completed_route' %}Ready To Finalize{% else %}{{ cta.next_action or 'No action needed' }}{% endif %}</h1>
 	            <p>{{ cta.proof_state_message if cta.route_display_mode == 'proof_needed' else cta.route_state_message }}</p>
 	          {% elif next_load_prediction %}

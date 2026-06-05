@@ -494,12 +494,13 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
         if route is None:
             continue
         route.update(stop_role_details(log, route))
+        final_arrival_wait_label = bool(route_end_log and route_end_log.id == log.id and not getattr(log, "depart_time", None))
         route.update(build_stop_summary(
             route, log,
             is_first=(index == 0),
             is_last=(index == len(logs) - 1),
             route_finalized=route_finalized,
-            wait_label=wait_label_for_log(log),
+            wait_label="" if final_arrival_wait_label else wait_label_for_log(log),
             current_open=bool(current_open and current_open.id == log.id),
         ))
 

@@ -117,17 +117,18 @@
     </div>
   </div>
 
+  {% set finalized_arrival_stop_id = logs[-1].id if route_context and route_context.route_status == 'finalized' and logs and logs[-1].depart_time is none else none %}
   <div class="qa-grid">
     <div class="qa-box">
       <span class="qa-label">Total Mileage</span>
-      <div class="qa-value">{% if logs and logs[-1].depart_time is none %}Pending posttrip mileage{% elif total_miles is not none %}{{ total_miles }} miles{% elif logs %}Pending posttrip mileage{% else %}Not recorded{% endif %}</div>
+      <div class="qa-value">{% if total_miles is not none and (not logs or logs[-1].depart_time is not none or finalized_arrival_stop_id) %}{{ total_miles }} miles{% elif logs %}Pending posttrip mileage{% else %}Not recorded{% endif %}</div>
     </div>
     <div class="qa-box">
       <span class="qa-label">Wait Time</span>
       <div class="qa-value">
         {% set wait_count = namespace(value=0) %}
         {% for wait_log in logs %}
-          {% if wait_label_for_log(wait_log) %}
+          {% if wait_log.id != finalized_arrival_stop_id and wait_label_for_log(wait_log) %}
             {% set wait_count.value = wait_count.value + 1 %}
           {% endif %}
         {% endfor %}
@@ -137,7 +138,7 @@
         <div class="qa-note">
           {% set printed_wait = namespace(value=0) %}
           {% for wait_log in logs -%}
-            {% set wait_label = wait_label_for_log(wait_log) -%}
+            {% set wait_label = '' if wait_log.id == finalized_arrival_stop_id else wait_label_for_log(wait_log) -%}
             {% if wait_label -%}
               {%- if printed_wait.value %}; {% endif -%}
               {{ ((log_routes or {}).get(wait_log.id) or {}).get('plant') or wait_log.plant_name }}: {{ wait_label }}

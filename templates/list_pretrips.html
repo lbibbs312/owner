@@ -345,7 +345,13 @@
 
                 <div class="inspection-card-actions">
                   <a href="{{ url_for('driver.pretrip_printable', pretrip_id=pt.id) }}" class="btn btn-info">View Inspection</a>
-                  {% if not pt.posttrip and can_manage_pretrip %}
+                  {% if pt.posttrip %}
+                    {% if can_manage_pretrip %}
+                      <a href="{{ url_for('driver.do_posttrip', pretrip_id=pt.id) }}" class="btn btn-success">Open PostTrip</a>
+                    {% else %}
+                      <a href="{{ url_for('driver.pretrip_printable', pretrip_id=pt.id, _anchor='posttrip-closeout') }}" class="btn btn-success">Open PostTrip</a>
+                    {% endif %}
+                  {% elif can_manage_pretrip %}
                     <a href="{{ url_for('driver.do_posttrip', pretrip_id=pt.id) }}" class="btn btn-warning">Complete PostTrip</a>
                   {% endif %}
                   {% if can_manage_pretrip %}
@@ -454,7 +460,7 @@
               <div class="d-flex flex-wrap gap-1">
                 <a href="{{ url_for(pretrip_view_endpoint, pretrip_id=pt.id) }}" class="btn btn-sm btn-info">View</a>
                 {% if pt.posttrip %}
-                  <strong class="text-success align-self-center">PostTrip done</strong>
+                  <a href="{{ url_for('driver.do_posttrip', pretrip_id=pt.id) }}" class="btn btn-sm btn-success">Open PostTrip</a>
                 {% else %}
                   <strong class="text-danger align-self-center">PostTrip needed</strong>
                 {% endif %}

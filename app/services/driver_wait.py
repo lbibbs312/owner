@@ -4,7 +4,7 @@ import pytz
 from flask_login import current_user
 from sqlalchemy import or_
 
-from app.models import DriverLog, PreTrip, ShiftRecord
+from app.models import ActivityEvent, DriverLog, PreTrip, ShiftRecord
 from app.services.plant_addresses import plant_label
 
 
@@ -98,6 +98,17 @@ def _active_route_date_for_driver(driver_id, today_local_date):
     return open_pretrip.pretrip_date if open_pretrip and open_pretrip.pretrip_date else today_local_date
 
 
+def _route_finalized(driver_id, route_date):
+    if not driver_id or not route_date:
+        return False
+    return ActivityEvent.query.filter_by(
+        user_id=driver_id,
+        category="eod",
+        action="finalized",
+        target_type="end_of_day",
+    ).filter(ActivityEvent.details.contains(str(route_date))).first() is not None
+
+
 def active_driver_wait_status(driver_id, now=None):
     now = now or datetime.now(DETROIT_TZ)
     if now.tzinfo is None:
@@ -105,6 +116,8 @@ def active_driver_wait_status(driver_id, now=None):
     else:
         now = now.astimezone(DETROIT_TZ)
     route_date = _active_route_date_for_driver(driver_id, now.date())
+    if _route_finalized(driver_id, route_date):
+        return None
     log = (
         DriverLog.query
         .filter_by(driver_id=driver_id, date=route_date, deleted_at=None)

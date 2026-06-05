@@ -392,7 +392,7 @@
   </div>
 
   {% if pretrip.posttrip %}
-    <div class="remarks-block">
+    <div class="remarks-block" id="posttrip-closeout">
       <strong>PostTrip Closeout:</strong><br>
       End Mileage: {{ pretrip.posttrip.end_mileage or "Not recorded" }}<br>
       Miles Driven: {{ pretrip.posttrip.miles_driven if pretrip.posttrip.miles_driven is not none else "Not calculated" }}<br>

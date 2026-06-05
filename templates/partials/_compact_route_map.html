@@ -144,7 +144,7 @@
 {% set primary_action = primary_cta.action if primary_cta else '' %}
 {% set board_ctas = [] %}
 {% for route_action in [primary_cta, secondary_cta] %}
-  {% if route_action and route_action.action not in ['record_departure', 'posttrip', 'add_stop', 'add_damage', 'view_route', 'route_history'] and urls.get(route_action.action) %}
+  {% if route_action and route_action.action not in ['record_departure', 'posttrip', 'add_stop', 'add_damage', 'end_route', 'view_route', 'route_history'] and urls.get(route_action.action) %}
     {% set _ = board_ctas.append(route_action) %}
   {% endif %}
 {% endfor %}
@@ -196,6 +196,7 @@
 {% set is_empty_today_route = is_today_route and board_count == 0 %}
 {% set route_sheet_url = urls.get('view_route') or urls.get('route_history') %}
 {% set depart_url = urls.get('record_departure') %}
+{% set end_route_url = urls.get('end_route') %}
 {% set damage_url = urls.get('add_damage') %}
 {% set document_url = urls.get('attach_document') %}
 {% set add_stop_url = urls.get('add_stop') %}
@@ -221,7 +222,7 @@
 {% set dispatch_ticker_text = rm.dispatch_ticker_text if rm and rm.dispatch_ticker_text is defined else 'NO ALERTS FROM DISPATCH' %}
 {% set show_dispatch_ticker = dispatch_messages and not (dispatch_messages|length == 1 and dispatch_messages[0].code|default('none') == 'none') %}
 {% set route_finalized_for_cta = cta.route_finalized if cta.route_finalized is defined else false %}
-{% set show_between_loads_add_stop = add_stop_url and not primary_stop and is_today_route and not route_finalized_for_cta and primary_action not in ['posttrip', 'finalize_route'] %}
+{% set show_between_loads_add_stop = add_stop_url and not primary_stop and is_today_route and not route_finalized_for_cta and primary_action not in ['posttrip', 'finalize_route', 'end_route'] %}
 {% set route_status_raw = (rm.route.next_action if rm and rm.route else cta.next_action if cta.next_action is defined else 'Ready')|default('Ready', true) %}
 {% set route_status_lower = route_status_raw|lower %}
 {% if is_empty_today_route %}
@@ -281,7 +282,7 @@
 
   {% if map_mode != 'route_replay' %}
   <div class="md-flow-top-actions" aria-label="Live flow workflow actions">
-    {% if depart_url and primary_stop %}
+    {% if depart_url and primary_stop and primary_action != 'end_route' %}
     <a class="md-flow-action-tab primary" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow" data-flow-panel-kicker="DEPART QUICK FLOW">
       <strong>Depart / Load</strong>
       <span>Departure / proof</span>
@@ -317,7 +318,15 @@
       <span>Full details</span>
     </a>
   </div>
-  {% if posttrip_url and primary_action == 'posttrip' %}
+  {% if end_route_url and primary_action == 'end_route' %}
+    <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
+      <a class="md-flow-primary-cta" href="{{ end_route_url }}" data-flow-open-url="{{ end_route_url }}">
+        <span>Required driver action</span>
+        <strong>End Route</strong>
+        <small>{{ primary_stop.plant_name if primary_stop else 'Current stop' }} &middot; close shift here</small>
+      </a>
+    </div>
+  {% elif posttrip_url and primary_action == 'posttrip' %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta" href="{{ posttrip_url }}" data-flow-open-url="{{ posttrip_url }}">
         <span>Required driver action</span>
@@ -369,7 +378,7 @@
       </div>
       <div class="md-flow-context" data-md-flow-context></div>
       <div class="md-flow-inline-panel depart-quick-flow" data-flow-inline-panel="depart" hidden>
-        {% if depart_url and primary_stop %}
+        {% if depart_url and primary_stop and primary_action != 'end_route' %}
           {% set depart_code = primary_stop.board_code or 'STP-' ~ primary_stop.sequence %}
           {% set is_service_depart = depart_code in ['FUEL', 'RYDR', 'MTN', 'MTG', 'SRVC'] %}
           {% set requires_unload_check = primary_stop.requires_unload_check if primary_stop.requires_unload_check is defined else false %}
