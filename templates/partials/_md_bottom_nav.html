@@ -19,14 +19,20 @@
     {% set md_nav_active = 'home' %}
   {% endif %}
 {% endif %}
+<script>document.body.classList.add('md-has-bottom-nav');</script>
 <style>
+  body.md-has-bottom-nav #pageContent,
+  body.md-shell.md-has-bottom-nav #pageContent {
+    padding-bottom:calc(var(--md-bottom-nav-space, 116px) + 24px) !important;
+  }
   .md-driver-bottom-nav {
     position:fixed;
     left:50%;
     bottom:0;
     transform:translateX(-50%);
     width:min(760px, 100vw);
-    height:var(--md-nav-height, 74px);
+    height:var(--md-nav-height, 78px);
+    box-sizing:border-box;
     background:rgba(8,13,22,.96);
     backdrop-filter:blur(16px);
     border-top:1px solid var(--md-line, #22324a);
@@ -66,6 +72,15 @@
     background:rgba(47,109,240,.2);
     border-color:rgba(91,157,255,.5);
     box-shadow:0 0 14px rgba(47,109,240,.4), 0 0 22px rgba(255,178,36,.12);
+  }
+  @media (min-width:768px) {
+    body.md-has-bottom-nav #pageContent,
+    body.md-shell.md-has-bottom-nav #pageContent {
+      padding-bottom:32px !important;
+    }
+    .md-driver-bottom-nav {
+      display:none !important;
+    }
   }
   @media print {
     .md-driver-bottom-nav { display:none !important; }
