@@ -5041,7 +5041,8 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"body.driver-ledger-active .driver-active-wait-action" in logs_page.data
     assert b"background:rgba(91,157,255,.08)" in logs_page.data
     assert b"body.driver-ledger-active .md-driver-bottom-nav {\n        display:none !important;" in logs_page.data
-    assert b"AUDIT LEDGER" in logs_page.data
+    assert b"DRIVER LOG" in logs_page.data
+    assert b"AUDIT LEDGER" not in logs_page.data
     assert b"PAST ROUTE" in logs_page.data
     assert b"REPLAY MODE" in logs_page.data
     assert b"LIVE FLOW BOARD" not in logs_page.data

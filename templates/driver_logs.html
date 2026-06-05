@@ -957,11 +957,11 @@
 	    {% set route_mode_label = 'CURRENT ROUTE' if is_current_route else ('PAST ROUTE' if log_count > 0 else 'NO LOGS') %}
 	    {% set dispatch_ticker_text = route_map.dispatch_ticker_text if route_map is defined and route_map and route_map.dispatch_ticker_text is defined else 'NO ALERTS FROM DISPATCH' %}
 	    <div class="md-ledger-shell">
-	      <section class="md-ledger-board compact-route-map md-flow-board" data-route-map-shell data-route-map-mode="driver-ledger" aria-label="Driver log ledger">
+	      <section class="md-ledger-board compact-route-map md-flow-board" data-route-map-shell data-route-map-mode="driver-ledger" aria-label="Driver logs">
         <div class="md-ledger-head md-flow-head">
           <div>
             <span class="md-ledger-kicker md-flow-kicker">{% if is_current_route %}<i class="md-ledger-live-dot"></i>{% endif %} DRIVER LOGS</span>
-            <h2>AUDIT LEDGER</h2>
+            <h2>DRIVER LOG</h2>
             <p class="md-ledger-subline md-flow-subline">{{ search_date.strftime('%m/%d/%Y') }} · {{ log_count }} stop{{ 's' if log_count != 1 else '' }}</p>
 	          </div>
 	          <div class="md-ledger-head-side">
