@@ -2495,7 +2495,7 @@ def test_damage_evidence_packet_includes_timeline_hashes_related_records_and_war
     report_page = client.get(f"/manager/damage-reports/{report_id}")
     assert report_page.status_code == 200
     assert b"Print Document" in report_page.data
-    assert b"Evidence Packet" in report_page.data
+    assert b"Proof Record" in report_page.data
 
     packet = client.get(f"/manager/damage-reports/{report_id}/evidence-packet")
     assert packet.status_code == 200
@@ -4786,11 +4786,11 @@ def test_new_log_load_state_ignores_previous_days_and_finalized_route(client, ap
         db.session.commit()
 
     finalized_page = client.get("/new_driving_log")
-    assert b"Empty" in finalized_page.data
-    assert b"Raleigh East Load + PPL Hot Part" not in finalized_page.data
+    assert finalized_page.status_code == 302
+    assert finalized_page.headers["Location"].endswith(f"/driver_logs?date={today.isoformat()}")
 
 
-def test_premature_finalized_event_does_not_lock_active_shift_new_logs(client, app):
+def test_finalized_event_locks_active_shift_new_logs(client, app):
     from datetime import datetime
 
     with app.app_context():
@@ -4832,19 +4832,290 @@ def test_premature_finalized_event_does_not_lock_active_shift_new_logs(client, a
     mobile = client.get("/mobile")
     assert mobile.status_code == 200
     body = mobile.get_data(as_text=True)
-    assert b"PostTrip Due" not in mobile.data
-    assert b"PostTrip Available" in mobile.data
-    assert b"Optional until route close" in mobile.data
-    assert b"md-flow-primary-cta" in mobile.data
+    assert "Add Stop" not in body
     assert b"md-flow-action-tab primary add-stop-action" not in mobile.data
-    assert b'<a class="md-flow-primary-cta add-stop-action"' in mobile.data
-    assert b"Finalize Route" not in mobile.data
-    assert b"animation: primaryFlowActionBreath 2.6s ease-in-out infinite" in mobile.data
-    assert body.count('data-flow-panel-title="Add Stop"') <= 1
+    assert b'<a class="md-flow-primary-cta add-stop-action"' not in mobile.data
 
-    new_log = client.get("/new_driving_log")
+    new_log = client.get("/new_driving_log", follow_redirects=True)
     assert new_log.status_code == 200
-    assert b"Raleigh West Load" in new_log.data
+    assert b"That route is finalized. Driver Log entries cannot be changed." in new_log.data
+    assert b"Save Changes" not in new_log.data
+
+
+def test_finalized_route_blocks_driver_mutating_urls_and_controls(client, app):
+    from datetime import datetime
+
+    with app.app_context():
+        from app.blueprints.driver.routes import _today_local_date
+        from app.extensions import db
+        from app.models import ActivityEvent, DriverLog, DriverLogPhoto, PreTrip, ShiftRecord
+
+        driver = create_user("finalized_lock_driver", "finalized-lock@example.com", "driver")
+        create_user("finalized_lock_manager", "finalized-lock-manager@example.com", "management")
+        today = _today_local_date()
+        pretrip = PreTrip(
+            user_id=driver.id,
+            pretrip_date=today,
+            truck_number="H-12",
+            start_mileage=1200,
+        )
+        db.session.add(pretrip)
+        db.session.flush()
+        shift = ShiftRecord(
+            user_id=driver.id,
+            pretrip_id=pretrip.id,
+            start_time=datetime.utcnow(),
+        )
+        db.session.add(shift)
+        log = DriverLog(
+            driver_id=driver.id,
+            date=today,
+            plant_name="H",
+            load_size="Empty",
+            arrive_time="2026-06-05 12:00:00",
+            created_at=datetime.utcnow(),
+        )
+        db.session.add(log)
+        db.session.flush()
+        photo = DriverLogPhoto(
+            driver_log_id=log.id,
+            filename="locked-proof.jpg",
+            original_filename="locked-proof.jpg",
+            source="proof",
+            note="Loaded seal photo",
+            uploaded_by_id=driver.id,
+        )
+        db.session.add(photo)
+        db.session.add(
+            ActivityEvent(
+                user_id=driver.id,
+                category="eod",
+                action="finalized",
+                title="Route finalized",
+                details=f"Route finalized for {today}",
+                target_type="end_of_day",
+            )
+        )
+        db.session.commit()
+        log_id = log.id
+        photo_id = photo.id
+        pretrip_id = pretrip.id
+        shift_id = shift.id
+        today_value = today.isoformat()
+
+    login(client, "finalized_lock_driver")
+
+    edit_page = client.get(f"/edit_driver_log/{log_id}", follow_redirects=True)
+    assert edit_page.status_code == 200
+    assert b"That route is finalized. Driver Log entries cannot be changed." in edit_page.data
+    assert b"Save Changes" not in edit_page.data
+    assert b"Upload From Gallery" not in edit_page.data
+    assert b"Take New Photo" not in edit_page.data
+
+    edit_post = client.post(
+        f"/edit_driver_log/{log_id}",
+        data={
+            "plant_name": "RE",
+            "load_size": "Raleigh East Load",
+            "arrive_time": "8:00am",
+            "depart_time": "8:15am",
+            "departure_destination": "KP",
+            "secondary_departure_dest": "",
+            "secondary_departure_type": "load",
+        },
+        follow_redirects=True,
+    )
+    assert b"That route is finalized. Driver Log entries cannot be changed." in edit_post.data
+
+    quick_depart = client.post(
+        f"/driver_logs/{log_id}/depart",
+        data={
+            "next": "mobile",
+            "source": "live_flow",
+            "unloaded_on_departure": "yes",
+            "secondary_dropped_on_departure": "yes",
+            "got_loaded": "yes",
+            "destination": "RE",
+            "secondary_destination": "",
+            "secondary_load_type": "load",
+        },
+        headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+    )
+    assert quick_depart.status_code == 403
+    assert "That route is finalized" in quick_depart.get_json()["error"]
+
+    proof_upload = client.post(
+        f"/driver_logs/{log_id}/photos",
+        data={"source": "proof", "photo": (BytesIO(b"proof"), "proof.jpg")},
+        headers={"Accept": "application/json"},
+    )
+    assert proof_upload.status_code == 403
+    assert "That route is finalized" in proof_upload.get_json()["error"]
+
+    proof_delete = client.post(
+        f"/driver_logs/photos/{photo_id}/delete",
+        data={"next": "/driver_logs"},
+        follow_redirects=True,
+    )
+    assert b"That route is finalized. Driver Log entries cannot be changed." in proof_delete.data
+
+    add_stop = client.post(
+        "/add_stop",
+        data={"plant_name": "RE", "load_size": "Empty", "arrive_time": "8:30am"},
+        follow_redirects=True,
+    )
+    assert b"That route is finalized. Driver Log entries cannot be changed." in add_stop.data
+
+    transfer = client.post(
+        "/plant_transfers/new",
+        data={
+            "transfer_number": "LOCK-1",
+            "transfer_date": today_value,
+            "ship_to": "RE",
+            "ship_from": "H",
+            "driver_name": "finalized_lock_driver",
+            "part_number_0": "LOCKED",
+            "quantity_0": "1",
+        },
+        follow_redirects=True,
+    )
+    assert b"That route is finalized. Plant Transfer entries cannot be changed." in transfer.data
+
+    damage = client.get("/damage_reports/new", follow_redirects=True)
+    assert b"That route is finalized. Damage Report entries cannot be changed." in damage.data
+
+    pickup_page = client.get(f"/driver_logs/{log_id}/pickup", follow_redirects=True)
+    assert b"That route is finalized. Driver Log entries cannot be changed." in pickup_page.data
+    assert b"Record Load" not in pickup_page.data
+
+    posttrip_page = client.get(f"/do_posttrip/{pretrip_id}", follow_redirects=True)
+    assert b"That route is finalized. PostTrip entries cannot be changed." in posttrip_page.data
+    assert b"Complete PostTrip" not in posttrip_page.data
+
+    posttrip_submit = client.post(
+        f"/do_posttrip/{pretrip_id}",
+        data={"end_mileage": "1225", "end_fuel_level": "1/2", "remarks": "locked route"},
+        follow_redirects=True,
+    )
+    assert b"That route is finalized. PostTrip entries cannot be changed." in posttrip_submit.data
+
+    eod_submit = client.post(
+        "/end_of_day_summary",
+        data={"driver_signature": "data:image/png;base64,lockedroute"},
+        follow_redirects=False,
+    )
+    assert eod_submit.status_code == 302
+    assert "/driver_logs_print" in eod_submit.headers["Location"]
+
+    legacy_eod_submit = client.post("/submit_end_of_day", follow_redirects=True)
+    assert b"That route is finalized. Route closeout cannot be changed." in legacy_eod_submit.data
+
+    view_page = client.get(f"/view_driver_log/{log_id}")
+    assert view_page.status_code == 200
+    assert b"Remove Photo" not in view_page.data
+    assert f"/edit_driver_log/{log_id}".encode() not in view_page.data
+
+    list_page = client.get("/driver_logs")
+    assert list_page.status_code == 200
+    assert b"Remove Photo" not in list_page.data
+    assert b"Record Current Stop" not in list_page.data
+    assert f"/edit_driver_log/{log_id}".encode() not in list_page.data
+    assert f"/driver_logs/photos/{photo_id}/delete".encode() not in list_page.data
+
+    mobile_page = client.get("/mobile")
+    assert mobile_page.status_code == 200
+    assert b'<a href="/new_driving_log">Add Stop</a>' not in mobile_page.data
+    assert b'<a href="/damage_reports/new">Damage</a>' not in mobile_page.data
+    assert b'<a class="md-flow-primary-cta add-stop-action"' not in mobile_page.data
+
+    client.get("/logout")
+    login(client, "finalized_lock_manager")
+    manager_view = client.get(f"/manager/driver-logs/{log_id}")
+    assert manager_view.status_code == 200
+    assert b"Remove Photo" not in manager_view.data
+
+    manager_delete = client.post(
+        f"/manager/driver-log-photos/{photo_id}/delete",
+        data={"next": f"/manager/driver-logs/{log_id}"},
+        follow_redirects=True,
+    )
+    assert b"That route is finalized. Stop photo proof cannot be changed." in manager_delete.data
+
+    with app.app_context():
+        from app.models import DamageReport, DriverLog, DriverLogPhoto, PlantTransfer, PostTrip, ShiftRecord
+
+        saved = DriverLog.query.get(log_id)
+        assert saved.plant_name == "H"
+        assert saved.load_size == "Empty"
+        assert saved.depart_time is None
+        assert DriverLog.query.filter_by(driver_id=saved.driver_id, date=saved.date).count() == 1
+        assert DriverLogPhoto.query.get(photo_id) is not None
+        assert DriverLogPhoto.query.count() == 1
+        assert PostTrip.query.filter_by(pretrip_id=pretrip_id).count() == 0
+        saved_shift = ShiftRecord.query.get(shift_id)
+        assert saved_shift.driver_signature is None
+        assert saved_shift.end_time is None
+        assert ActivityEvent.query.filter_by(user_id=saved.driver_id, category="eod", action="finalized").count() == 1
+        assert PlantTransfer.query.count() == 0
+        assert DamageReport.query.count() == 0
+
+
+def test_plant_transfer_edit_cannot_move_record_to_locked_date(client, app):
+    from datetime import date, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ActivityEvent, PlantTransfer, PlantTransferLine
+
+        driver = create_user("transfer_target_lock_driver", "transfer-target-lock@example.com", "driver")
+        today = date.today()
+        locked_date = today - timedelta(days=1)
+        transfer = PlantTransfer(
+            user_id=driver.id,
+            transfer_number="MOVE-DATE",
+            transfer_date=today,
+            ship_from="KP",
+            ship_to="RE",
+            driver_name="transfer_target_lock_driver",
+        )
+        transfer.lines.append(PlantTransferLine(line_number=1, side="left", part_number="OK-1", quantity="1"))
+        db.session.add_all([
+            transfer,
+            ActivityEvent(
+                user_id=driver.id,
+                category="eod",
+                action="finalized",
+                title="Route finalized",
+                details=f"Route finalized for {locked_date}",
+                target_type="end_of_day",
+            ),
+        ])
+        db.session.commit()
+        transfer_id = transfer.id
+
+    login(client, "transfer_target_lock_driver")
+    response = client.post(
+        f"/plant_transfers/{transfer_id}/edit",
+        data={
+            "transfer_number": "MOVE-DATE",
+            "transfer_date": locked_date.isoformat(),
+            "ship_to": "RE",
+            "ship_from": "KP",
+            "driver_name": "transfer_target_lock_driver",
+            "part_number_0": "MOVED",
+            "quantity_0": "9",
+            "edit_reason": "move date",
+        },
+        follow_redirects=True,
+    )
+    assert b"Only same-day Plant Transfer entries can be changed." in response.data
+
+    with app.app_context():
+        from app.models import PlantTransfer
+
+        saved = PlantTransfer.query.get(transfer_id)
+        assert saved.transfer_date == today
+        assert saved.lines[0].part_number == "OK-1"
 
 
 def test_driver_logs_flags_impossible_plant_transfer_timing(client, app):
@@ -5401,7 +5672,7 @@ def test_end_of_day_signature_submit_ends_open_shift_timer(client, app):
     signature = "data:image/png;base64,endshift"
     with app.app_context():
         from app.extensions import db
-        from app.models import DriverLog, PreTrip, ShiftRecord
+        from app.models import DriverLog, PostTrip, PreTrip, ShiftRecord
 
         driver = create_user("shift_sign_driver", "shift-sign@example.com", "driver")
         route_date = date.today()
@@ -5415,6 +5686,7 @@ def test_end_of_day_signature_submit_ends_open_shift_timer(client, app):
         )
         db.session.add_all([
             shift,
+            PostTrip(pretrip_id=pretrip.id, end_mileage=1100, miles_driven=100),
             DriverLog(
                 driver_id=driver.id,
                 date=route_date,
@@ -7528,7 +7800,7 @@ def test_mobile_quick_depart_optional_second_stop_defaults_to_none(client, app):
         active = DriverLog(
             driver_id=driver.id,
             date=date.today(),
-            plant_name="KP",
+            plant_name="H",
             load_size="Empty",
             arrive_time="00:01",
         )
@@ -7553,14 +7825,30 @@ def test_mobile_quick_depart_optional_second_stop_defaults_to_none(client, app):
     )
 
     assert response.status_code == 200
-    assert response.get_json()["ok"] is True
+    payload = response.get_json()
+    assert payload["ok"] is True
+    assert payload["redirect"].endswith("/mobile")
+    assert "Next stop opened: Raleigh East." in payload["message"]
+    assert "No second stop selected." in payload["message"]
     with app.app_context():
-        from app.models import DriverLog
+        from app.models import DriverLog, FlowEvent
 
         saved = DriverLog.query.get(active_id)
         assert saved.depart_time
         assert saved.depart_load_size == "Raleigh East Load"
         assert saved.secondary_load is None
+        route_logs = DriverLog.query.filter_by(driver_id=saved.driver_id, date=saved.date).order_by(DriverLog.created_at.asc()).all()
+        assert len(route_logs) == 2
+        assert route_logs[1].plant_name == "RE"
+        assert route_logs[1].load_size == "Raleigh East Load"
+        assert route_logs[1].depart_time is None
+        assert FlowEvent.query.filter_by(stop_id=saved.id, event_type="DEPARTED_ORIGIN").count() == 1
+        assert FlowEvent.query.filter_by(stop_id=route_logs[1].id, event_type="ARRIVED_DESTINATION").count() == 1
+
+    mobile = client.get("/mobile")
+    assert mobile.status_code == 200
+    assert b"Raleigh East" in mobile.data
+    assert b"Depart / Load" in mobile.data
 
 
 def test_mobile_quick_depart_returns_to_live_board_without_full_depart_form(client, app):

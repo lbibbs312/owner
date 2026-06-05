@@ -97,7 +97,7 @@
 
 <!-- NAVBAR -->
 <nav class="navbar navbar-expand-lg navbar-primary bg-primary">
-  <a class="navbar-brand text-white" href="#">
+  <a class="navbar-brand text-white" href="{{ url_for('public.welcome') }}">
     <strong>MoveDefense</strong>
   </a>
   <button class="navbar-toggler" type="button" data-toggle="collapse"
@@ -109,7 +109,7 @@
     <!-- Left side -->
     <ul class="navbar-nav mr-auto">
       <li class="nav-item">
-        <a class="nav-link text-white" href="#">About</a>
+        <a class="nav-link text-white" href="{{ url_for('public.welcome') }}">About</a>
       </li>
     </ul>
 
@@ -123,23 +123,23 @@
         </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link text-white" href="#">Dashboard</a>
+        <a class="nav-link text-white" href="{{ url_for('manager.manager_dashboard') if is_management else url_for('driver.dashboard') }}">Dashboard</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link text-white" href="#">Chat</a>
+        <a class="nav-link text-white" href="{{ url_for('messaging.chat_page') }}">Chat</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link text-white" href="#">Announcements</a>
+        <a class="nav-link text-white" href="{{ url_for('messaging.announcements') }}">Announcements</a>
       </li>
       <li class="nav-item">
         <a class="nav-link text-white" href="{{ url_for('auth.logout') }}">Logout</a>
       </li>
       {% else %}
       <li class="nav-item">
-        <a class="nav-link text-white" href="#">Login</a>
+        <a class="nav-link text-white" href="{{ url_for('auth.login') }}">Login</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link text-white" href="#">Register</a>
+        <a class="nav-link text-white" href="{{ url_for('auth.register') }}">Register</a>
       </li>
       {% endif %}
     </ul>

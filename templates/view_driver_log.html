@@ -6,6 +6,7 @@
 {% endif %}
 <div class="container">
   {% set logs_endpoint = 'manager.driver_logs' if current_user.role == 'management' else 'driver.driver_logs' %}
+  {% set route_locked = route_finalized|default(false) %}
   <style>
     .stop-help { display:block; width:100%; border-left:3px solid #93c5fd; padding-left:10px; writing-mode:horizontal-tb; white-space:normal; word-break:normal; overflow-wrap:normal; }
     .print-title { display:none; }
@@ -293,13 +294,15 @@
                   <strong>Photo file missing</strong>
                   <small>Stop #{{ day_log_positions.get(photo.driver_log_id, '?') if day_log_positions is defined else loop.index }} - {{ photo_stop.plant_name if photo_stop else 'Route stop' }} - Photo Proof</small>
                   {% if photo.note %}<small>Reason: {{ photo.note }}</small>{% endif %}
-                  <small>Delete this missing proof record and upload the photo again.</small>
+                  {% if not route_locked %}<small>Delete this missing proof record and upload the photo again.</small>{% endif %}
                 </div>
               {% endif %}
-              <form method="POST" action="{{ url_for(photo_delete_endpoint, photo_id=photo.id) }}" onsubmit="return confirm('Delete this stop photo proof?');">
-                <input type="hidden" name="next" value="{{ request.full_path }}">
-                <button class="proof-photo-delete" type="submit">Remove Photo</button>
-              </form>
+              {% if not route_locked %}
+                <form method="POST" action="{{ url_for(photo_delete_endpoint, photo_id=photo.id) }}" onsubmit="return confirm('Delete this stop photo proof?');">
+                  <input type="hidden" name="next" value="{{ request.full_path }}">
+                  <button class="proof-photo-delete" type="submit">Remove Photo</button>
+                </form>
+              {% endif %}
             </div>
           {% endfor %}
         </div>
@@ -460,6 +463,7 @@
             <p class="detail-pair"><span>Proof found</span><strong>{{ ev.proof or 'None on file' }}</strong></p>
             <p class="detail-pair"><span>Action needed</span><strong>{{ ev.action_needed or primary_issue.action }}</strong></p>
           </div>
+          {% if not route_locked %}
           <div class="driver-issue-actions">
             <form class="driver-issue-closeout" action="{{ url_for('driver.close_driver_log_issue', log_id=log.id) }}" method="POST">
               <input type="hidden" name="issue_type" value="{{ primary_issue.code }}">
@@ -488,6 +492,7 @@
               <button class="btn btn-outline-danger" type="submit">Send to manager review</button>
             </form>
           </div>
+          {% endif %}
         </div>
       </div>
     {% elif issue_closeout %}
@@ -515,13 +520,15 @@
                     <strong>Photo file missing</strong>
                     <small>Photo Proof</small>
                     {% if photo.note %}<small>Reason: {{ photo.note }}</small>{% endif %}
-                    <small>Delete this missing proof record and upload the photo again.</small>
+                    {% if not route_locked %}<small>Delete this missing proof record and upload the photo again.</small>{% endif %}
                   </div>
                 {% endif %}
-                <form method="POST" action="{{ url_for('driver.delete_driver_log_photo', photo_id=photo.id) }}" onsubmit="return confirm('Delete this stop photo proof?');">
-                  <input type="hidden" name="next" value="{{ request.full_path }}">
-                  <button class="proof-photo-delete" type="submit">Remove Photo</button>
-                </form>
+                {% if not route_locked %}
+                  <form method="POST" action="{{ url_for('driver.delete_driver_log_photo', photo_id=photo.id) }}" onsubmit="return confirm('Delete this stop photo proof?');">
+                    <input type="hidden" name="next" value="{{ request.full_path }}">
+                    <button class="proof-photo-delete" type="submit">Remove Photo</button>
+                  </form>
+                {% endif %}
               </div>
             {% endfor %}
           </div>
@@ -530,7 +537,7 @@
     {% endif %}
   {% endif %}
 
-  {% set can_manage_log = current_user.role == 'driver' and log.driver_id == current_user.id %}
+  {% set can_manage_log = current_user.role == 'driver' and log.driver_id == current_user.id and not route_locked %}
   {% set can_delete_log = can_manage_log and log.date == today_local_date %}
   <div class="d-flex flex-wrap gap-2 mt-3">
     <a href="{{ url_for(logs_endpoint) }}" class="btn btn-secondary">Back to Driver Logs</a>

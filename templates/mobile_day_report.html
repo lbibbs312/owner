@@ -94,7 +94,7 @@
       {% if log_reports %}
         {% for report in log_reports %}
           {% set log = report.log %}
-          {% set can_manage_log = report_date == today_local_date %}
+          {% set can_manage_log = report_date == today_local_date and not route_finalized|default(false) %}
           <div class="row">
             <div>
               {% set route = report.route %}

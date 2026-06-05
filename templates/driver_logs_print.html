@@ -123,6 +123,7 @@
       <div><span>Open Stops:</span><strong>{{ summary.open_stops }}</strong></div>
       <div><span>Mileage:</span><strong>{% if summary.total_miles is not none %}{{ summary.total_miles }} miles{% elif logs %}Pending posttrip{% else %}Not started{% endif %}</strong></div>
       <div><span>Total Wait:</span><strong>{{ summary.total_wait_minutes }} min</strong></div>
+      <div><span>Route Status:</span><strong>{% if route_context and route_context.route_status == 'completed' %}Route completed / awaiting final review{% elif route_context and route_context.route_status == 'finalized' %}Route finalized{% elif logs %}Route open / not finalized{% else %}No route recorded{% endif %}</strong></div>
     </div>
 
     {% if logs %}
@@ -167,7 +168,7 @@
                     <li>Stop complete</li>
                   {% endif %}
                   {% if route and route.summary_lines %}
-                    {% for line in route.summary_lines[:2] %}
+                    {% for line in route.summary_lines %}
                       <li>{{ line }}</li>
                     {% endfor %}
                   {% endif %}
@@ -237,6 +238,8 @@
             Signed {{ signature_timestamp|to_detroit_datetime }}
           {% elif driver_signature %}
             Timestamp unavailable
+          {% else %}
+            Not yet signed
           {% endif %}
         </div>
       </div>

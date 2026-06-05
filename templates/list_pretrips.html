@@ -222,7 +222,7 @@
       }
       .inspection-card-actions .btn:active,
       .inspection-card-actions button:active { filter:brightness(1.08); }
-      /* Primary: the urgent action. Complete PostTrip when open, else View. */
+      /* Primary: the urgent inspection action, else View. */
       .inspection-card-actions .btn-warning {
         background:linear-gradient(180deg, #f6b73c, #e0890f);
         border-color:rgba(245,158,11,.65);
@@ -235,7 +235,7 @@
         color:#fff;
         box-shadow:0 10px 24px rgba(47,109,240,.34);
       }
-      /* When Complete PostTrip is present it owns primary, so View steps down. */
+      /* When an urgent inspection action is present it owns primary, so View steps down. */
       .inspection-card-actions:has(.btn-warning) .btn-info {
         background:transparent;
         border-color:rgba(91,157,255,.5);
@@ -321,7 +321,8 @@
         {% if pretrips %}
           <div class="inspection-card-list">
             {% for pt in pretrips %}
-              {% set can_manage_pretrip = pt.user_id == current_user.id %}
+              {% set route_locked = (route_finalized_by_pretrip_id or {}).get(pt.id, false) %}
+              {% set can_manage_pretrip = pt.user_id == current_user.id and not route_locked %}
               {% set can_delete_pretrip = can_manage_pretrip and pt.pretrip_date == today_local_date %}
               <article class="inspection-card">
                 <div class="inspection-card-top">
@@ -351,6 +352,8 @@
                     {% else %}
                       <a href="{{ url_for('driver.pretrip_printable', pretrip_id=pt.id, _anchor='posttrip-closeout') }}" class="btn btn-success">Open PostTrip</a>
                     {% endif %}
+                  {% elif route_locked %}
+                    <span class="btn btn-secondary disabled" aria-disabled="true">PostTrip Pending</span>
                   {% elif can_manage_pretrip %}
                     <a href="{{ url_for('driver.do_posttrip', pretrip_id=pt.id) }}" class="btn btn-warning">Complete PostTrip</a>
                   {% endif %}
@@ -451,6 +454,7 @@
         </thead>
         <tbody>
           {% for pt in pretrips %}
+          {% set route_locked = (route_finalized_by_pretrip_id or {}).get(pt.id, false) %}
           <tr class="{% if not pt.posttrip %}table-danger{% endif %}">
             <td>{{ pt.id }}</td>
             <td>{{ pt.truck_number }}</td>
@@ -459,8 +463,10 @@
             <td>
               <div class="d-flex flex-wrap gap-1">
                 <a href="{{ url_for(pretrip_view_endpoint, pretrip_id=pt.id) }}" class="btn btn-sm btn-info">View</a>
-                {% if pt.posttrip %}
+                {% if pt.posttrip and not route_locked %}
                   <a href="{{ url_for('driver.do_posttrip', pretrip_id=pt.id) }}" class="btn btn-sm btn-success">Open PostTrip</a>
+                {% elif pt.posttrip %}
+                  <a href="{{ url_for(pretrip_view_endpoint, pretrip_id=pt.id) }}" class="btn btn-sm btn-success">Open PostTrip</a>
                 {% else %}
                   <strong class="text-danger align-self-center">PostTrip needed</strong>
                 {% endif %}

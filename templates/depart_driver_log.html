@@ -231,7 +231,9 @@
           detail: { title: 'SCAN SAVED', detail: payload.scan.validation_message || 'Cargo scan recorded' }
         }));
       }
-    } catch (err) {}
+    } catch (err) {
+      if (window.console && console.warn) console.warn('Parent scan update event failed', err);
+    }
   }
 
   async function stopScanner() {

@@ -96,6 +96,7 @@ class BaseConfig:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-do-not-deploy")
     SQLALCHEMY_DATABASE_URI = configured_database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    MAX_CONTENT_LENGTH = int(os.environ.get("MAX_UPLOAD_BYTES", str(5 * 1024 * 1024)))
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", False)

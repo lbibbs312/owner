@@ -5559,10 +5559,13 @@
       {% endif %}
       <div class="rp-footer">
         <a href="{{ url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) }}">View full log</a>
-        <div class="rp-footer-grid">
-          <a href="{{ url_for('driver.new_driving_log') }}">Add Stop</a>
-          <a href="{{ url_for('driver.new_damage_report') }}">Damage</a>
-        </div>
+        {% set route_locked = route_context.route_finalized if route_context else false %}
+        {% if not route_locked %}
+          <div class="rp-footer-grid">
+            <a href="{{ url_for('driver.new_driving_log') }}">Add Stop</a>
+            <a href="{{ url_for('driver.new_damage_report') }}">Damage</a>
+          </div>
+        {% endif %}
       </div>
 	    </aside>
 	    {% endif %}
@@ -6091,7 +6094,9 @@
             ].join('');
             doc.head.appendChild(style);
             frame.classList.add('is-ready');
-          } catch (error) {}
+          } catch (error) {
+            if (window.console && console.warn) console.warn('Route sheet embed styling failed', error);
+          }
         });
       }
     }
@@ -6106,7 +6111,9 @@
           currentUrl.searchParams.delete('flow');
           window.history.replaceState(null, '', currentUrl.pathname + currentUrl.search + currentUrl.hash);
         }
-      } catch (error) {}
+      } catch (error) {
+        if (window.console && console.warn) console.warn('Route quick-action request parse failed', error);
+      }
       if (requested !== 'depart') return;
       var board = document.querySelector('[data-route-map-shell].md-flow-board');
       var trigger = board ? board.querySelector('[data-flow-open-panel="depart"]') : null;

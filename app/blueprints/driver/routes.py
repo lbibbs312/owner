@@ -183,7 +183,7 @@ def _transfer_document_meta(transfer, page="1 of 1"):
 
 
 def _evidence_document_meta(report, page="1 of 1"):
-    return document_meta("DAMAGE EVIDENCE PACKET", evidence_document_number(report), page=page)
+    return document_meta("DAMAGE PROOF RECORD", evidence_document_number(report), page=page)
 
 
 def _draw_pdf_header(pdf, title, document_no, generated_at, page_label, *, driver=None, truck=None, date_value=None):
@@ -336,7 +336,7 @@ def _selected_log_date_from_request():
         try:
             return datetime.strptime(date_str, "%Y-%m-%d").date()
         except ValueError:
-            pass
+            current_app.logger.warning("Invalid driver log date query: %s", date_str)
     return _today_local_date()
 
 
@@ -357,23 +357,34 @@ def _can_driver_change_same_day(record_user_id, record_date, record_label, actio
 
 
 def _driver_route_record_finalized(driver_id, route_date):
-    if not _route_finalized_for_driver_date(driver_id, route_date):
-        return False
-    open_shift = _open_shift_for_driver(driver_id)
-    open_shift_route_date = _shift_route_date(open_shift)
-    return not (open_shift and (not open_shift_route_date or open_shift_route_date == route_date))
+    return _route_finalized_for_driver_date(driver_id, route_date)
 
 
 def _can_driver_mutate_route_record(record_user_id, record_date, record_label, action):
     return _can_driver_change_same_day(record_user_id, record_date, record_label, action)
 
 
-def _guard_driver_log_mutation(log, action, *, wants_json=False, next_url=None):
-    if _can_driver_mutate_route_record(log.driver_id, log.date, "driver log", action):
+def _guard_route_record_mutation(record_user_id, record_date, record_label, action, *, wants_json=False, next_url=None):
+    if _can_driver_mutate_route_record(record_user_id, record_date, record_label, action):
         return None
     if wants_json:
-        return jsonify({"error": f"Not authorized to {action} this stop."}), 403
-    return redirect(next_url or _driver_logs_url_for_date(getattr(log, "date", None)))
+        if _driver_route_record_finalized(record_user_id, record_date):
+            message = f"That route is finalized. {record_label.title()} entries cannot be changed."
+        else:
+            message = f"Not authorized to {action} this {record_label}."
+        return jsonify({"ok": False, "error": message}), 403
+    return redirect(next_url or _driver_logs_url_for_date(record_date))
+
+
+def _guard_driver_log_mutation(log, action, *, wants_json=False, next_url=None):
+    return _guard_route_record_mutation(
+        log.driver_id,
+        log.date,
+        "driver log",
+        action,
+        wants_json=wants_json,
+        next_url=next_url,
+    )
 
 
 def _driver_log_sort_key(log):
@@ -435,6 +446,40 @@ def _sync_next_open_stop_arrival_cargo(log):
         next_log.secondary_load = expected_secondary
         changed.append(next_log)
     return changed[-1] if changed else None
+
+
+def _create_quick_depart_next_stop(log, destination_code, arrival_load, secondary_load):
+    if not log or not destination_code or not arrival_load:
+        return None
+    if _driver_route_record_finalized(log.driver_id, log.date):
+        return None
+    logs = sorted(
+        _active_driver_logs_query().filter_by(driver_id=log.driver_id, date=log.date).all(),
+        key=_driver_log_sort_key,
+    )
+    current_index = next((index for index, item in enumerate(logs) if item.id == log.id), None)
+    if current_index is None or current_index + 1 < len(logs):
+        return None
+
+    now_utc = datetime.utcnow()
+    next_log = DriverLog(
+        driver_id=log.driver_id,
+        date=log.date,
+        plant_name=destination_code,
+        load_size=arrival_load or "Empty",
+        secondary_load=secondary_load or None,
+        arrive_time=now_utc.strftime("%Y-%m-%d %H:%M:%S"),
+        created_at=now_utc,
+    )
+    db.session.add(next_log)
+    db.session.flush()
+    _append_driver_log_flow_event(
+        next_log,
+        "ARRIVED_DESTINATION",
+        notes=f"Quick depart created next stop at {_plant_label(next_log.plant_name)}.",
+        payload={"driver_action": "quick_depart_next_stop", "source_log_id": log.id},
+    )
+    return next_log
 
 
 def _driver_log_context_for(log):
@@ -689,6 +734,8 @@ def _apply_route_end_cta(route_cta, route_context, active_pretrip, route_date, t
 
 def _posttrip_due_for_route(active_pretrip, route_context, *, route_is_active=False, finalizing=False):
     if getattr(route_context, "posttrip_status", None) == "complete":
+        return False
+    if getattr(route_context, "route_finalized", False):
         return False
     if not active_pretrip or active_pretrip.posttrip:
         return False
@@ -2767,6 +2814,10 @@ def list_pretrips():
         inspection_trucks=inspection_trucks,
         truck_history=truck_history,
         today_local_date=_today_local_date(),
+        route_finalized_by_pretrip_id={
+            pretrip.id: _route_finalized_for_driver_date(pretrip.user_id, pretrip.pretrip_date)
+            for pretrip in pretrips
+        },
     )
 
 
@@ -2918,6 +2969,11 @@ def do_posttrip(pretrip_id):
         if request.method == "GET" and pt.posttrip and _driver_can_view_inspection_pretrip(pt):
             return redirect(url_for("driver.pretrip_printable", pretrip_id=pt.id, _anchor="posttrip-closeout"))
         flash("Not authorized to complete a PostTrip for someone else's PreTrip.", "danger")
+        return redirect(url_for("driver.list_pretrips"))
+    if _driver_route_record_finalized(pt.user_id, pt.pretrip_date):
+        if request.method == "GET" and pt.posttrip and _driver_can_view_inspection_pretrip(pt):
+            return redirect(url_for("driver.pretrip_printable", pretrip_id=pt.id, _anchor="posttrip-closeout"))
+        flash("That route is finalized. PostTrip entries cannot be changed.", "warning")
         return redirect(url_for("driver.list_pretrips"))
 
     local_tz = pytz.timezone("America/Detroit")
@@ -3208,6 +3264,26 @@ def new_plant_transfer():
     if request.method == "GET" and not form.driver_name.data:
         form.driver_name.data = current_user.display_name
     lines = _plant_transfer_form_lines()
+    if request.method == "GET":
+        guard = _guard_route_record_mutation(
+            current_user.id,
+            _today_local_date(),
+            "Plant Transfer",
+            "create",
+            next_url=url_for("driver.plant_transfers"),
+        )
+        if guard:
+            return guard
+    elif request.method == "POST":
+        guard = _guard_route_record_mutation(
+            current_user.id,
+            form.transfer_date.data or _today_local_date(),
+            "Plant Transfer",
+            "create",
+            next_url=url_for("driver.plant_transfers"),
+        )
+        if guard:
+            return guard
     if form.validate_on_submit():
         if not any(_plant_transfer_line_from_request(i) for i in range(PLANT_TRANSFER_LINE_COUNT)):
             flash("Add at least one part line before saving the Plant Transfer.", "danger")
@@ -3266,12 +3342,23 @@ def edit_plant_transfer(transfer_id):
         flash("Managers have read-only access to driver Plant Transfers.", "warning")
         return redirect(url_for("driver.view_plant_transfer", transfer_id=transfer.id))
     form = PlantTransferForm(obj=transfer)
+    guard = _guard_route_record_mutation(
+        transfer.user_id,
+        transfer.transfer_date,
+        "Plant Transfer",
+        "update",
+        next_url=url_for("driver.view_plant_transfer", transfer_id=transfer.id),
+    )
+    if guard:
+        return guard
     if request.method == "GET":
         form.transfer_time.data = _format_display_time(transfer.transfer_time)
     lines = _plant_transfer_form_lines(transfer)
     if form.validate_on_submit():
         if not _can_driver_mutate_route_record(transfer.user_id, transfer.transfer_date, "Plant Transfer", "update"):
             return redirect(url_for("driver.plant_transfers"))
+        if not _can_driver_mutate_route_record(transfer.user_id, form.transfer_date.data, "Plant Transfer", "move"):
+            return redirect(url_for("driver.view_plant_transfer", transfer_id=transfer.id))
         if not any(_plant_transfer_line_from_request(i) for i in range(PLANT_TRANSFER_LINE_COUNT)):
             flash("Add at least one part line before saving the Plant Transfer.", "danger")
             return render_template(
@@ -3483,6 +3570,7 @@ def driver_logs():
                 pretrips=pretrips,
             ),
             route_task_events=_task_route_events_for_logs(logs),
+            route_finalized=_driver_route_record_finalized(current_user.id, search_date),
             search_date=search_date,
             today_local_date=_today_local_date(),
         )
@@ -3501,6 +3589,15 @@ def new_driving_log():
     current_load = _current_driver_load(current_user.id, route_date=local_date)
     current_load_value = current_load["value"] or "Empty"
     current_secondary_value = current_load.get("secondary_value") or ""
+    guard = _guard_route_record_mutation(
+        current_user.id,
+        local_date,
+        "driver log",
+        "create",
+        next_url=_driver_logs_url_for_date(local_date),
+    )
+    if guard:
+        return guard
 
     if form.validate_on_submit():
         if pending_ryder_event:
@@ -3590,6 +3687,12 @@ def add_stop():
     log_date = source_log.date if source_log else active_log_date
 
     form = DriverLogForm()
+    if current_user.role != "driver":
+        flash("Driver credentials required.", "warning")
+        return redirect(url_for("driver.dashboard"))
+    if _driver_route_record_finalized(current_user.id, log_date):
+        flash("That route is finalized. Driver Log entries cannot be changed.", "warning")
+        return redirect(_driver_logs_url_for_date(log_date))
 
     if form.validate_on_submit():
         if not form.plant_name.data:
@@ -3673,6 +3776,9 @@ def edit_driver_log(log_id):
     if current_user.role == "driver" and log.driver_id != current_user.id:
         flash("Not authorized to edit someone else's log!", "danger")
         return redirect(url_for("driver.driver_logs"))
+    guard = _guard_driver_log_mutation(log, "edit", next_url=_driver_logs_url_for_date(log.date))
+    if guard:
+        return guard
 
     form = DriverLogForm(obj=log)
     ensure_legacy_plant_choice(form.plant_name, log.plant_name)
@@ -4193,6 +4299,14 @@ def depart_driver_log(log_id):
         _set_departure_unload_reasons(log, primary_unload_reason, secondary_drop_reason)
         log.no_pickup = False if service_stop else departure_load == "Empty" and not log.secondary_load
         _sync_next_open_stop_arrival_cargo(log)
+        quick_next_stop = None
+        if quick_depart and not service_stop and form.got_loaded.data == "yes":
+            quick_next_stop = _create_quick_depart_next_stop(
+                log,
+                form.destination.data,
+                departure_load,
+                log.secondary_load,
+            )
         _append_driver_log_flow_event(
             log,
             "DEPARTED_ORIGIN",
@@ -4211,7 +4325,12 @@ def depart_driver_log(log_id):
         )
         ingest_driver_log(log, commit=True)
         _emit_driver_log_updated(log, "departed")
-        return quick_depart_success(f"Departed {log.plant_name} with {cargo_display(log.depart_load_size, log.secondary_load)}.")
+        success_message = f"Departed {log.plant_name} with {cargo_display(log.depart_load_size, log.secondary_load)}."
+        if quick_next_stop:
+            success_message = f"{success_message} Next stop opened: {_plant_label(quick_next_stop.plant_name)}."
+        if quick_depart and form.got_loaded.data == "yes" and not form.secondary_destination.data:
+            success_message = f"{success_message} No second stop selected."
+        return quick_depart_success(success_message)
 
     return render_depart_page()
 
@@ -4270,10 +4389,9 @@ def pickup_driver_log(log_id):
     if current_user.role == "driver" and log.driver_id != current_user.id:
         flash("Not authorized to pick up from someone else's log!", "danger")
         return redirect(url_for("driver.driver_logs"))
-    if request.method == "POST":
-        guard = _guard_driver_log_mutation(log, "pick up from")
-        if guard:
-            return guard
+    guard = _guard_driver_log_mutation(log, "pick up from")
+    if guard:
+        return guard
     if log.depart_time:
         flash("That log already has a departure time.", "warning")
         return redirect(url_for("driver.driver_logs"))
@@ -4354,6 +4472,7 @@ def view_driver_log(log_id):
         driver_log_photos=list(log.photos),
         issue_review=issue_review,
         issue_closeout=issue_closeout,
+        route_finalized=_driver_route_record_finalized(log.driver_id, log.date),
     )
 
 
@@ -4561,6 +4680,12 @@ def end_of_day_summary():
     active_pretrip = _select_route_pretrip(pretrips_today, route_context=route_context, open_shift=open_shift)
     pending_posttrip = _posttrip_due_for_route(active_pretrip, route_context, finalizing=True)
     if form.validate_on_submit():
+        if _driver_route_record_finalized(current_user.id, today_local_date):
+            flash("That route is finalized. Route closeout cannot be changed.", "warning")
+            return redirect(url_for("driver.driver_logs_print"))
+        if pending_posttrip:
+            flash("Complete PostTrip before final route closeout.", "warning")
+            return redirect(url_for("driver.do_posttrip", pretrip_id=active_pretrip.id))
         unresolved_departures = unresolved_departure_logs(
             sorted(logs, key=_driver_log_sort_key),
             route_finalized=True,
@@ -4691,6 +4816,16 @@ def end_of_day_attachment():
 @login_required
 def submit_end_of_day():
     today_local_date, logs, pretrips_today, plant_transfers_today = _get_today_eod_records()
+    if _driver_route_record_finalized(current_user.id, today_local_date):
+        flash("That route is finalized. Route closeout cannot be changed.", "warning")
+        return redirect(url_for("driver.dashboard"))
+    now_local, _ = _now_local_and_utc()
+    open_shift = _open_shift_for_driver(current_user.id)
+    route_context = build_route_context(driver_id=current_user.id, route_date=today_local_date, now=now_local)
+    active_pretrip = _select_route_pretrip(pretrips_today, route_context=route_context, open_shift=open_shift)
+    if _posttrip_due_for_route(active_pretrip, route_context, finalizing=True):
+        flash("Complete PostTrip before final route closeout.", "warning")
+        return redirect(url_for("driver.do_posttrip", pretrip_id=active_pretrip.id))
     unresolved_departures = unresolved_departure_logs(
         sorted(logs, key=_driver_log_sort_key),
         route_finalized=True,
@@ -4803,6 +4938,15 @@ def close_driver_log_issue(log_id):
 @login_required
 def new_damage_report():
     form = DamageReportForm()
+    guard = _guard_route_record_mutation(
+        current_user.id,
+        _today_local_date(),
+        "damage report",
+        "create",
+        next_url=url_for("driver.damage_reports"),
+    )
+    if guard:
+        return guard
     if form.validate_on_submit():
         report = DamageReport(
             reported_by_id=current_user.id,
@@ -4869,8 +5013,8 @@ def damage_evidence_packet(report_id):
         user_id=current_user.id,
         category="damage",
         action="evidence_packet_generated",
-        title="Evidence packet generated",
-        details=f"Generated damage evidence packet #{report.id}.",
+        title="Damage proof record generated",
+        details=f"Generated damage proof record #{report.id}.",
         target_type="damage_report",
         target_id=report.id,
     )
@@ -5077,6 +5221,7 @@ def mobile_day_report(report_date):
         log_reports=log_reports,
         log_routes=log_routes,
         route_task_events=route_task_events,
+        route_finalized=_driver_route_record_finalized(current_user.id, parsed_date),
         pretrips=pretrips,
         transfers=transfers,
         transfer_reports=transfer_reports,

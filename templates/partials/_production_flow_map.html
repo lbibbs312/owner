@@ -1285,7 +1285,9 @@
       function writePositionStore(value) {
         try {
           window.localStorage.setItem(positionStoreKey, JSON.stringify(value || {}));
-        } catch (err) {}
+        } catch (err) {
+          if (window.console && console.warn) console.warn('Flow card position save failed', err);
+        }
       }
 
       function nodePositionKey(node) {
@@ -1380,7 +1382,9 @@
           drag.node.classList.add('is-dragging');
           drag.node.classList.remove('flow-node--hot-centered');
           if (drag.node.setPointerCapture) {
-            try { drag.node.setPointerCapture(drag.pointerId); } catch (err) {}
+            try { drag.node.setPointerCapture(drag.pointerId); } catch (err) {
+              if (window.console && console.warn) console.warn('Flow drag pointer capture failed', err);
+            }
           }
         }
         root.addEventListener('pointerdown', function(e) {

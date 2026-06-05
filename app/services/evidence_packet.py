@@ -326,7 +326,7 @@ def build_damage_evidence_packet(report, *, generated_by):
     return {
         "report": report,
         "report_date": report_date,
-        "packet_title": f"Damage Evidence Packet #{report.id}",
+        "packet_title": f"Damage Proof Record #{report.id}",
         "packet_version": f"1.{audit_count}",
         "generated_by": generated_by.display_name,
         "generated_at": _label_dt(generated_at),

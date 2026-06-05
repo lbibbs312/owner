@@ -231,6 +231,8 @@ def build_stop_summary(
         lines.append("Departed empty.")
 
     reason = deviation_reason(route)
+    if reason:
+        lines.append(f"Deviation: {reason}.")
 
     if wait_label:
         lines.append(f"{wait_label}.")

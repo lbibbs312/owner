@@ -1018,7 +1018,9 @@
           </form>
 
 	          <div class="md-action-rail" aria-label="Driver log actions">
-	            <a href="{{ url_for('driver.new_driving_log') }}" class="md-ledger-btn md-ledger-primary"><span class="md-btn-icon" data-md-icon="record-stop" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="7"></circle><path d="M12 8v8"></path><path d="M8 12h8"></path></svg></span> Record Current Stop</a>
+	            {% if not route_finalized|default(false) %}
+	              <a href="{{ url_for('driver.new_driving_log') }}" class="md-ledger-btn md-ledger-primary"><span class="md-btn-icon" data-md-icon="record-stop" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="7"></circle><path d="M12 8v8"></path><path d="M8 12h8"></path></svg></span> Record Current Stop</a>
+	            {% endif %}
 	            {% if logs %}
 	              <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d')) }}" class="md-ledger-btn md-ledger-utility"><span class="md-btn-icon" data-md-icon="print-route" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 9V4h10v5"></path><path d="M6 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-1"></path><path d="M7 14h10v6H7z"></path><path d="M8 12h.01"></path></svg></span> Print Route Record</a>
 	              <a href="{{ url_for('driver.driver_logs_print', date=search_date.strftime('%Y-%m-%d'), autoprint=1) }}" class="md-ledger-btn md-ledger-utility"><span class="md-btn-icon" data-md-icon="save-pdf" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 3h7l4 4v14H7z"></path><path d="M14 3v5h4"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg></span> Save Route PDF</a>
@@ -1090,7 +1092,8 @@
         {% for log in logs %}
           {% set route = (log_routes or {}).get(log.id) %}
           {% set stop_vm = (route_map_stops_by_id or {}).get(log.id) %}
-          {% set can_manage_log = log.driver_id == current_user.id %}
+          {% set route_locked = route_finalized|default(false) %}
+          {% set can_manage_log = log.driver_id == current_user.id and not route_locked %}
           {% set can_delete_log = can_manage_log and log.date == today_local_date %}
           {% set wait_label = wait_label_for_log(log) %}
           {% set wait_value = wait_label|replace('Active wait ', '', 1)|replace('Wait ', '', 1) if wait_label else '' %}
@@ -1208,17 +1211,19 @@
                           <span>Photo file missing<small class="route-photo-note">{{ photo.note or ((photo.source or 'photo')|replace('_', ' ')|title) }}</small></span>
                         </div>
                       {% endif %}
-                      <form class="route-photo-delete-form" method="POST" action="{{ photo_delete_url }}" onsubmit="return confirm('Delete this stop photo proof?');">
-                        <input type="hidden" name="next" value="{{ request.full_path }}">
-                        <button class="route-photo-delete" type="submit">Delete</button>
-                      </form>
+                      {% if not route_locked %}
+                        <form class="route-photo-delete-form" method="POST" action="{{ photo_delete_url }}" onsubmit="return confirm('Delete this stop photo proof?');">
+                          <input type="hidden" name="next" value="{{ request.full_path }}">
+                          <button class="route-photo-delete" type="submit">Delete</button>
+                        </form>
+                      {% endif %}
                     </div>
                   {% endfor %}
                 </div>
               {% endif %}
 
               <div class="md-row-actions">
-                <a href="{{ url_for(log_view_endpoint, log_id=log.id) if current_user.role == 'management' else url_for('driver.driver_logs_print', date=log.date.isoformat()) }}" class="md-row-action">View</a>
+                <a href="{{ url_for(log_view_endpoint, log_id=log.id) if current_user.role == 'management' else url_for('driver.driver_logs_print', date=log.date.isoformat()) }}" class="md-row-action"><span class="md-btn-icon">O</span> View</a>
                 {% if can_manage_log %}
                   <details class="md-row-more-actions">
                     <summary class="md-row-action">Stop actions</summary>

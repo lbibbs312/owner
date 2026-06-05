@@ -99,7 +99,7 @@ def _transfer_document_meta(transfer, page="1 of 1"):
 
 
 def _evidence_document_meta(report, page="1 of 1"):
-    return document_meta("DAMAGE EVIDENCE PACKET", evidence_document_number(report), page=page)
+    return document_meta("DAMAGE PROOF RECORD", evidence_document_number(report), page=page)
 
 
 def _draw_pdf_header(pdf, title, document_no, generated_at, page_label, *, driver=None, truck=None, date_value=None):
@@ -2165,6 +2165,9 @@ def _delete_driver_log_photo_file(photo):
 def delete_driver_log_photo(photo_id):
     photo = DriverLogPhoto.query.get_or_404(photo_id)
     log = photo.log
+    if log and _route_finalized_for_driver_date(log.driver_id, log.date):
+        flash("That route is finalized. Stop photo proof cannot be changed.", "warning")
+        return redirect(request.form.get("next") or url_for("manager.view_driver_log", log_id=log.id))
     photo_label = photo.original_filename or photo.filename
     note = photo.note
     _delete_driver_log_photo_file(photo)
@@ -2255,8 +2258,8 @@ def damage_evidence_packet(report_id):
         user_id=current_user.id,
         category="damage",
         action="evidence_packet_generated",
-        title="Evidence packet generated",
-        details=f"Generated damage evidence packet #{report.id}.",
+        title="Damage proof record generated",
+        details=f"Generated damage proof record #{report.id}.",
         target_type="damage_report",
         target_id=report.id,
     )
@@ -2627,6 +2630,7 @@ def view_driver_log(log_id):
         hot_part_proof=hot_part_proof,
         driver_log_photos=driver_log_photos,
         issue_closeout=issue_closeout,
+        route_finalized=route_finalized,
     )
 
 

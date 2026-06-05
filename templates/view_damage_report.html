@@ -78,13 +78,13 @@
       {% endif %}
       <button class="btn btn-outline-primary" type="button" onclick="window.print()">Print Document</button>
       {% if manager_view|default(false) %}
-        <a class="btn btn-primary" href="{{ url_for('manager.damage_evidence_packet', report_id=report.id) }}">Evidence Packet</a>
+        <a class="btn btn-primary" href="{{ url_for('manager.damage_evidence_packet', report_id=report.id) }}">Proof Record</a>
         <form method="POST" action="{{ url_for('manager.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report from active review? Evidence will remain attached.');">
           <input type="hidden" name="next" value="{{ url_for('manager.review_dashboard') }}">
           <button class="btn btn-outline-danger" type="submit">Archive Report</button>
         </form>
       {% else %}
-        <a class="btn btn-primary" href="{{ url_for('driver.damage_evidence_packet', report_id=report.id) }}">Evidence Packet</a>
+        <a class="btn btn-primary" href="{{ url_for('driver.damage_evidence_packet', report_id=report.id) }}">Proof Record</a>
       {% endif %}
       {% if can_modify|default(false) %}
         <a class="btn btn-primary" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Edit</a>

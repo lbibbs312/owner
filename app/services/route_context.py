@@ -233,28 +233,16 @@ def build_route_cta_context(
     show_attach = False
     show_print = has_route_history
     show_start_shift = False
-    show_posttrip = bool(pending_posttrip)
+    show_posttrip = bool(pending_posttrip and not route_finalized)
 
-    if route_finalized and route_is_active:
-        display_mode = "active_route"
-        next_action = "Continue route"
-        primary = _route_cta("Add Stop", "add_stop")
-        secondary = _route_cta("Attach Document", "attach_document", "ghost") if proof_missing else _route_cta("Print Route", "print_route", "ghost")
-        route_message = "Shift is still active. Continue the route or attach proof."
-        proof_message = "Document proof is missing." if proof_missing else proof_message
-        show_attach = bool(proof_missing)
-        allowed_actions = ["add_stop", "attach_document", "print_route", "view_route", "route_history"]
-    elif route_finalized and pending_posttrip:
-        display_mode = "completed_route"
-        next_action = "PostTrip Due"
-        primary = _route_cta("PostTrip Due", "posttrip")
+    if route_finalized and pending_posttrip:
+        display_mode = "finalized_route"
+        next_action = "No driver action"
+        primary = _route_cta("Print Route", "print_route")
         secondary = _route_cta("Print Route", "print_route", "ghost") if has_route_history else None
-        route_message = "Route is closed. Complete PostTrip mileage."
+        route_message = "Route is finalized. PostTrip is pending for manager review."
         proof_message = "Document proof is missing." if proof_missing else proof_message
-        show_attach = bool(proof_missing)
-        allowed_actions = ["posttrip", "print_route", "view_route"]
-        if proof_missing:
-            allowed_actions.append("attach_document")
+        allowed_actions = ["print_route", "view_route", "route_history"]
     elif route_finalized and not proof_missing:
         display_mode = "finalized_route"
         next_action = "No action needed"
@@ -263,7 +251,7 @@ def build_route_cta_context(
         route_message = "Route is finalized."
         allowed_actions = ["print_route", "route_history", "view_route"]
     elif route_finalized and proof_missing:
-        display_mode = "proof_needed"
+        display_mode = "finalized_route"
         next_action = "Attach document"
         primary = _route_cta("Attach Document", "attach_document")
         secondary = _route_cta("Print Route", "print_route", "ghost")

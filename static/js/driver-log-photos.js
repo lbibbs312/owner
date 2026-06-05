@@ -64,7 +64,9 @@
             detail: { title: 'PHOTO ATTACHED', detail: 'Paperwork / proof saved' }
           }));
         }
-      } catch (err) {}
+      } catch (err) {
+        if (window.console && console.warn) console.warn('Parent route update event failed', err);
+      }
     }
 
     panel.querySelectorAll('[data-stop-photo-trigger]').forEach(function (button) {

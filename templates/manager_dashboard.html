@@ -65,7 +65,7 @@
   .btn-create:hover { background:#1d4ed8; }
   .btn-create svg { width:15px; height:15px; }
 
-  .db-alert { margin:0 28px; border:1px solid #fecaca; background:#fef2f2; color:#7f1d1d;
+  .db-alert { margin:0 28px; border:1px solid #fecaca; background:#fef2f2; color:#991b1b;
               padding:10px 12px; border-radius:0 0 12px 12px; font-size:.82rem;
               font-weight:800; display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .db-alert strong { color:#991b1b; }
@@ -198,15 +198,15 @@
   .status-dot.problem { background:#dc2626; animation:pulse-red 1.15s infinite; box-shadow:0 0 0 0 rgba(220,38,38,.55); }
   .status-dot.open { background:#f59e0b; animation:pulse-yellow 1.35s infinite; box-shadow:0 0 0 0 rgba(245,158,11,.55); }
   .status-dot.complete { background:#16a34a; }
-  .problem-line { display:flex; align-items:center; gap:8px; margin-top:6px; max-width:100%; color:#7f1d1d; font-size:.72rem; line-height:1.25; font-weight:800; overflow-wrap:anywhere; }
+  .problem-line { display:flex; align-items:center; gap:8px; margin-top:6px; max-width:100%; color:#991b1b; font-size:.72rem; line-height:1.25; font-weight:800; overflow-wrap:anywhere; }
   .problem-thumb { width:42px; height:32px; object-fit:cover; border-radius:6px; border:1px solid #fecaca; background:#fff; flex:0 0 42px; }
   .problem-label { color:#be123c; text-transform:uppercase; letter-spacing:.04em; font-size:.62rem; display:block; }
   .critical-list { display:grid; gap:8px; padding:12px 16px; max-height:min(72vh,720px); overflow-y:auto; overscroll-behavior:contain; }
-  .critical-row { display:grid; grid-template-columns:minmax(120px,.8fr) minmax(150px,1fr) minmax(0,2fr) auto; gap:10px; align-items:flex-start; border:1px solid #fee2e2; background:#fff7f7; border-radius:10px; padding:10px; color:#7f1d1d; text-decoration:none; min-height:max-content; }
-  .critical-row:hover { background:#fff1f2; color:#7f1d1d; }
+  .critical-row { display:grid; grid-template-columns:minmax(120px,.8fr) minmax(150px,1fr) minmax(0,2fr) auto; gap:10px; align-items:flex-start; border:1px solid #fee2e2; background:#fff7f7; border-radius:10px; padding:10px; color:#991b1b; text-decoration:none; min-height:max-content; }
+  .critical-row:hover { background:#fff1f2; color:#991b1b; }
   .critical-type { font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; color:#be123c; }
   .critical-stop { font-size:.82rem; font-weight:900; color:#0f172a; overflow-wrap:anywhere; }
-  .critical-issue { font-size:.78rem; font-weight:800; color:#7f1d1d; overflow-wrap:anywhere; line-height:1.35; }
+  .critical-issue { font-size:.78rem; font-weight:800; color:#991b1b; overflow-wrap:anywhere; line-height:1.35; }
   .exception-chip-list { display:flex; flex-wrap:wrap; gap:5px; max-width:100%; }
   .exception-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 7px; border-radius:999px; font-size:.64rem; font-weight:900; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; white-space:normal; line-height:1.2; }
   .exception-chip.damage { background:#fff1f2; color:#be123c; border-color:#fecdd3; }
@@ -244,7 +244,7 @@
   .capture-actions { display:flex; flex-wrap:wrap; gap:8px; }
   .capture-actions button { border:1px solid #334155; background:#1e293b; color:#e2e8f0; border-radius:999px; padding:7px 11px; font-size:.74rem; font-weight:900; cursor:pointer; white-space:normal; line-height:1.2; }
   .capture-actions button:hover { border-color:#93c5fd; color:#fff; }
-  .capture-actions .hot { background:#7f1d1d; border-color:#b91c1c; }
+  .capture-actions .hot { background:#991b1b; border-color:#b91c1c; }
   .capture-inbox { display:grid; gap:8px; padding:12px 16px 16px; }
   .capture-card { background:#020617; border:1px solid #1e293b; border-radius:12px; padding:11px 12px; display:grid; gap:8px; }
   .capture-card-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
@@ -499,7 +499,7 @@
           This is a logged plant transfer.
           Use the transfer detail page to review or edit.
         </p>
-        <a id="mgXferLink" href="#"
+        <a id="mgXferLink" href="{{ url_for('manager.plant_transfers') }}"
           style="display:inline-flex;align-items:center;gap:7px;margin-top:10px;
                  text-decoration:none;background:#2563eb;color:#fff;
                  padding:9px 18px;border-radius:10px;font-size:.875rem;font-weight:800;">
@@ -1219,7 +1219,11 @@ srch?.addEventListener('input', () => {
       const data = await res.json();
       renderSuggestions(data.results || []);
     } catch (err) {
-      renderSuggestions([]);
+      if (window.console && console.warn) console.warn('Dispatch search suggestions failed', err);
+      if (suggestions) {
+        suggestions.innerHTML = '<div class="suggestion-item" role="status"><span class="suggestion-term">Suggestions unavailable</span><span class="suggestion-meta">Search still filtered</span></div>';
+        suggestions.classList.add('open');
+      }
     }
   }, 200);
 });
