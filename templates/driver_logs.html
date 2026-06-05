@@ -1218,21 +1218,21 @@
               {% endif %}
 
               <div class="md-row-actions">
-                <a href="{{ url_for(log_view_endpoint, log_id=log.id) if current_user.role == 'management' else url_for('driver.driver_logs_print', date=log.date.isoformat()) }}" class="md-row-action"><span class="md-btn-icon">O</span> View</a>
+                <a href="{{ url_for(log_view_endpoint, log_id=log.id) if current_user.role == 'management' else url_for('driver.driver_logs_print', date=log.date.isoformat()) }}" class="md-row-action">View</a>
                 {% if can_manage_log %}
                   <details class="md-row-more-actions">
-                    <summary class="md-row-action"><span class="md-btn-icon">+</span> Stop actions</summary>
+                    <summary class="md-row-action">Stop actions</summary>
                     <div class="md-row-actions-menu">
-                      <a href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}" class="md-row-action warn"><span class="md-btn-icon">E</span> Edit</a>
-                      <a href="{{ url_for('driver.view_driver_log', log_id=log.id) }}" class="md-row-action"><span class="md-btn-icon">P</span> Add Proof</a>
+                      <a href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}" class="md-row-action warn">Edit</a>
+                      <a href="{{ url_for('driver.view_driver_log', log_id=log.id) }}" class="md-row-action">Add Proof</a>
                       {% if can_delete_log %}
                         {% if log.hot_parts or log.part_number %}
                           <form action="{{ url_for('driver.clear_driver_log_hot_part', log_id=log.id) }}" method="POST" class="md-row-action-form" onsubmit="return confirm('Clear the hot-part flag and part number from this stop?');">
-                            <button type="submit"><span class="md-btn-icon">×</span> Clear Hot</button>
+                            <button type="submit">Clear Hot</button>
                           </form>
                         {% endif %}
                         <form action="{{ url_for('driver.delete_driver_log', log_id=log.id) }}" method="POST" class="md-row-action-form danger" onsubmit="return confirm('Delete this driver log?');">
-                          <button type="submit"><span class="md-btn-icon">!</span> Delete</button>
+                          <button type="submit">Delete</button>
                         </form>
                       {% endif %}
                     </div>

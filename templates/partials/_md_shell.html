@@ -68,16 +68,6 @@
     text-transform:uppercase;
     color:var(--md-text) !important;
   }
-  body.md-shell .navbar-brand::before {
-    content:"";
-    display:inline-block;
-    width:.55rem;
-    height:1.5rem;
-    margin-right:.1rem;
-    background:linear-gradient(180deg, var(--md-blue-bright), var(--md-blue));
-    border-radius:2px;
-    box-shadow:0 0 12px rgba(91,157,255,.6);
-  }
   /* Shared dark icon buttons for mobile header actions */
   body.md-shell .md-icon-button,
   body.md-shell .navbar .nav-link[aria-label="Recent activity"] {
@@ -182,8 +172,7 @@
   body.md-shell .container > h2:first-child,
   body.md-shell .container-fluid > h1:first-child,
   body.md-shell .container-fluid > h2:first-child {
-    border-left:4px solid var(--md-blue-bright);
-    padding-left:.8rem;
+    padding-left:0;
   }
   body.md-shell .md-section-label {
     color:var(--md-amber);

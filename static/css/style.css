@@ -61,14 +61,6 @@ body {
   color: #fff !important;
 }
 
-.navbar-brand::before {
-  content: "";
-  display: inline-block;
-  width: 0.7rem;
-  height: 1.65rem;
-  background: var(--ld-maroon);
-}
-
 .glow-text,
 .glow-text span {
   color: #fff !important;
@@ -120,8 +112,6 @@ body {
 .container > h3 {
   color: var(--ld-ink);
   font-weight: 800;
-  border-left: 5px solid var(--ld-maroon);
-  padding-left: 0.85rem;
 }
 
 .card {
@@ -148,7 +138,6 @@ body {
 .card-header.bg-danger {
   background: var(--ld-panel) !important;
   color: #fff !important;
-  border-left: 5px solid var(--ld-maroon);
 }
 
 .card-body {
