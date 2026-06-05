@@ -235,8 +235,7 @@ class SimplePdf:
     def brand_signature(self, x=None, y=None):
         x = self.width - 158 if x is None else x
         y = self.height - 28 if y is None else y
-        self.text(x, y, "MoveDefense", size=18, font="signature", color=(31, 78, 163))
-        self.text(x + 10, y - 10, "AUDIT DEFENSE", size=6, bold=True, color=(71, 85, 105))
+        self.text(x, y, "MOVEDEFENSE", size=12, bold=True, color=(31, 78, 163))
 
     def multiline_text(
         self, x, y, value, width_chars=40, size=9, leading=11, bold=False, max_lines=3, color=None

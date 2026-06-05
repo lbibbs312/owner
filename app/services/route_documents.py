@@ -71,6 +71,13 @@ def _owner_label(photo, log_index_by_id, plant_by_log_id):
     return owner_type.title() + (f" {owner_id}" if owner_id else "") if owner_type else "Route"
 
 
+def _paper_document_label(photo):
+    code = photo.resolved_document_type
+    if code:
+        return photo.document_type_label
+    return "Route Photo"
+
+
 def collect_route_documents(logs, *, plant_label=None):
     """Return one entry per uploaded document across the route's logs.
 
@@ -94,7 +101,7 @@ def collect_route_documents(logs, *, plant_label=None):
                 {
                     "photo": photo,
                     "path": _photo_path(photo),
-                    "doc_label": photo.document_type_label,
+                    "doc_label": _paper_document_label(photo),
                     "owner_label": _owner_label(photo, log_index_by_id, plant_by_log_id),
                     "uploaded_by": uploader,
                     "uploaded_label": _uploaded_label(photo.uploaded_at),
@@ -156,7 +163,7 @@ def render_document_appendix(pdf, entries, *, start_new_page, title="Route Docum
             pdf.multiline_text(
                 42,
                 image_top - 42,
-                "Document image is missing from upload storage. Open the record in MoveDefense to review the original.",
+                "Document image is missing from upload storage. Open the route record to review the original.",
                 width_chars=62,
                 size=8,
                 leading=10,

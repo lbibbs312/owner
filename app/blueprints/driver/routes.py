@@ -39,7 +39,7 @@ from app.services.document_numbers import (
     route_document_number,
     transfer_document_number,
 )
-from app.services.driver_wait import elapsed_wait_minutes, elapsed_wait_seconds, wait_label_for_log
+from app.services.driver_wait import elapsed_wait_minutes, elapsed_wait_seconds, wait_label_for_log, wait_minutes_for_log
 from app.services.simple_pdf import LANDSCAPE_LETTER, LETTER, SimplePdf
 from app.services.route_documents import collect_route_documents, render_document_appendix
 from app.services.load_state import (
@@ -202,6 +202,19 @@ def _draw_pdf_header(pdf, title, document_no, generated_at, page_label, *, drive
     if meta:
         pdf.text(36, 734, " | ".join(meta), size=8)
     pdf.line(36, 726, 576, 726, width=0.8)
+
+
+def _draw_route_sheet_pdf_header(pdf, meta, *, driver=None, truck=None, date_value=None, page_label=None):
+    date_label = date_value.strftime("%b %d, %Y") if hasattr(date_value, "strftime") else str(date_value or "")
+    truck_date = f"{truck or 'Truck not set'} \xb7 {date_label}"
+    pdf.text(36, 764, "DRIVER", size=8, bold=True)
+    pdf.text(36, 748, (driver or "").upper(), size=15, bold=True)
+    pdf.text(36, 732, truck_date, size=8, bold=True)
+    pdf.text(420, 748, f"Route Sheet No: {meta['document_no']}", size=8, bold=True)
+    pdf.text(420, 734, f"Generated: {meta['generated_at']}", size=8)
+    pdf.text(420, 720, f"Page: {page_label or meta['page']}", size=8)
+    pdf.line(36, 712, 576, 712, width=1.0)
+    pdf.text(36, 694, "DRIVER ROUTE SHEET", size=12, bold=True)
 
 RYDER_OUTCOME_LABELS = {
     "headed": "Headed to Ryder",
@@ -1649,6 +1662,61 @@ def _total_miles_for_pretrips(pretrips):
     return total if has_mileage else None
 
 
+def _route_sheet_wait_minutes(logs, *, now=None):
+    total = 0
+    has_wait = False
+    for log in logs or []:
+        minutes = wait_minutes_for_log(log, now=now)
+        if minutes is None:
+            continue
+        total += minutes
+        has_wait = True
+    return total if has_wait else 0
+
+
+def _route_sheet_supporting_data(driver_id, route_date, logs, log_routes, route_context, *, now=None):
+    damage_reports = _today_damage_reports(driver_id, route_date) if driver_id else []
+    exception_notes = []
+    log_issue_details = {}
+    for log in logs or []:
+        route = (log_routes or {}).get(log.id, {})
+        plant_name = route.get("plant") or _plant_label(log.plant_name)
+        truck_issue = truck_issue_reason(log)
+        route_problem = route_problem_reason(log)
+        log_issue_details[log.id] = {"truck": truck_issue, "route": route_problem}
+        if log.maintenance or truck_issue:
+            exception_notes.append(f"Truck issue at {plant_name}: {truck_issue or 'Maintenance marked'}")
+        if route.get("unload_blocked"):
+            exception_notes.append(f"Unload issue at {plant_name}: {route.get('unload_reason')}")
+        elif route.get("secondary_drop_blocked"):
+            exception_notes.append(f"Second-stop cargo issue at {plant_name}: {route.get('secondary_drop_reason')}")
+        elif route_problem:
+            exception_notes.append(f"Route issue at {plant_name}: {route_problem}")
+    for issue in (getattr(route_context, "true_exceptions", None) or []):
+        label = issue.get("label") or "Route review item"
+        detail = issue.get("detail") or ""
+        note = f"{label}: {detail}" if detail else label
+        if note not in exception_notes:
+            exception_notes.append(note)
+    total_miles = _total_miles_for_pretrips(
+        _active_pretrips_query().filter_by(user_id=driver_id, pretrip_date=route_date).all()
+    ) if driver_id and route_date else None
+    return {
+        "damage_reports": damage_reports,
+        "damage_report_details": [damage_report_detail_label(report) for report in damage_reports],
+        "parts_carried": sorted({log.part_number for log in logs or [] if log.part_number}),
+        "exception_notes": exception_notes,
+        "log_issue_details": log_issue_details,
+        "route_documents": collect_route_documents(logs, plant_label=_plant_label),
+        "summary": {
+            "total_stops": len(logs or []),
+            "open_stops": sum(1 for log in logs or [] if not getattr(log, "depart_time", None)),
+            "total_miles": total_miles,
+            "total_wait_minutes": _route_sheet_wait_minutes(logs, now=now),
+        },
+    }
+
+
 def _driver_mileage_totals_by_date(driver_id, *, before_date=None, through_date=None):
     query = (
         _active_pretrips_query()
@@ -2452,7 +2520,7 @@ def _draw_signature_pdf_block(pdf, driver_signature=None, signature_timestamp=No
     pdf.fill_rect(36, 34, 540, 94, gray=1)
     pdf.rect(36, 34, 540, 94)
     pdf.text(44, 112, "Driver Signature", size=9, bold=True)
-    pdf.text(330, 112, "Manager / Auditor Signature", size=9, bold=True)
+    pdf.text(330, 112, "Manager / Reviewer Signature", size=9, bold=True)
 
     if driver_signature:
         image_drawn = pdf.image_png_data_url(driver_signature, 44, 62, 190, 38)
@@ -2474,29 +2542,24 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
     pretrips = _active_pretrips_query().filter_by(user_id=getattr(driver, "id", None), pretrip_date=the_date).all() if driver else []
     truck = _truck_from_pretrips(pretrips)
     meta = _route_document_meta(the_date, driver, logs, pretrips)
+    support = _route_sheet_supporting_data(getattr(driver, "id", None), the_date, logs, routes, route_context)
+    summary = support["summary"]
     pdf = SimplePdf("Driver Route Sheet", LETTER)
-    _draw_pdf_header(
+    _draw_route_sheet_pdf_header(
         pdf,
-        "DRIVER ROUTE SHEET",
-        meta["document_no"],
-        meta["generated_at"],
-        meta["page"],
+        meta,
         driver=driver.display_name if driver else None,
         truck=truck,
         date_value=the_date,
     )
-    y = 710
-    pdf.text(36, y, "1. Route Summary", size=11, bold=True)
+    y = 674
+    pdf.text(36, y, "ROUTE SUMMARY", size=11, bold=True)
     y -= 14
-    if driver:
-        info_parts = [driver.display_name]
-        if driver.shift:
-            info_parts.append(f"Shift: {driver.shift}")
-        if driver.employee_id:
-            info_parts.append(f"Badge: {driver.employee_id}")
-        pdf.text(44, y, " | ".join(info_parts), size=8)
-        y -= 14
-    pdf.text(36, y, "2. Stop Timeline", size=11, bold=True)
+    mileage = f"{summary['total_miles']} miles" if summary["total_miles"] is not None else ("Pending posttrip" if logs else "Not started")
+    pdf.text(44, y, f"Total Stops: {summary['total_stops']}    Open Stops: {summary['open_stops']}", size=8)
+    pdf.text(320, y, f"Mileage: {mileage}    Total Wait: {summary['total_wait_minutes']} min", size=8)
+    y -= 20
+    pdf.text(36, y, "1. STOP TIMELINE", size=11, bold=True)
     y -= 12
     snapshot_rows = {row.get("log_id"): row for row in (route_context.rows if route_context else [])}
     rows = []
@@ -2505,40 +2568,70 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
         snapshot = snapshot_rows.get(log.id, {})
         status = snapshot.get("note") or route.get("action") or ("Open" if not log.depart_time else "Complete")
         wait_label = "" if snapshot.get("status") == "Finalized" and not log.depart_time else wait_label_for_log(log)
+        plant_label = snapshot.get("plant") or route.get("plant") or log.plant_name
+        if not log.depart_time and getattr(route_context, "route_status", None) == "finalized":
+            notes = f"Route End: {plant_label}"
+        elif not log.depart_time:
+            notes = "Current stop; departure pending"
+        else:
+            notes = "Shift start" if idx == 1 else "Stop complete"
+        part_note = (("Hot part " if log.hot_parts else "") + (log.part_number or "")).strip()
+        if part_note:
+            notes = f"{notes}; {part_note}"
         rows.append([
             str(idx),
-            snapshot.get("plant") or route.get("plant") or log.plant_name,
+            plant_label,
             _arrival_utc_to_local_hhmm(log.arrive_time) or "--",
             _format_hhmm_12h(log.depart_time) or "--",
+            (wait_label or "--").replace("Active wait ", "").replace("Wait ", ""),
             snapshot.get("cargo_in") or route.get("arrive_cargo_desc") or route.get("arrive_desc") or load_display(log.load_size),
-            snapshot.get("cargo_out") or (route.get("depart_cargo_desc") if route.get("depart_cargo_desc") is not None else "--"),
-            wait_label or "--",
-            ("No Pickup " if log.no_pickup else "") + (("HOT " if log.hot_parts else "") + (log.part_number or "")).strip(),
-            f"{snapshot.get('status', '')}: {status}" if snapshot else status,
+            "Pending" if not log.depart_time else (snapshot.get("cargo_out") or route.get("depart_cargo_desc") or "--"),
+            notes if not snapshot else f"{notes}; {status}",
         ])
-    y = pdf.table(36, y, [28, 56, 44, 44, 78, 78, 54, 78, 72], 24, ["Stop #", "Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Wait", "Parts", "Status"], rows or [["--", "No logs", "", "", "", "", "", "", ""]], font_size=6)
-    y -= 18
-    pdf.text(36, y, "3. Signatures", size=11, bold=True)
+    if rows:
+        y = pdf.table(36, y, [22, 82, 42, 42, 36, 88, 88, 124], 24, ["#", "Location", "Arrive", "Depart", "Wait", "In Truck", "Out Truck", "Notes"], rows, font_size=6)
+    else:
+        pdf.text(44, y, "No stops for selected date.", size=8)
+        y -= 18
+    if support["parts_carried"] and y > 170:
+        y -= 14
+        pdf.text(36, y, "LOAD / PART REFERENCES", size=10, bold=True)
+        y -= 12
+        pdf.multiline_text(44, y, ", ".join(support["parts_carried"]), width_chars=96, size=8, leading=10, max_lines=3)
+        y -= 22
+    if support["damage_report_details"] and y > 170:
+        y -= 8
+        pdf.text(36, y, "DAMAGE / INCIDENTS", size=10, bold=True)
+        y -= 12
+        pdf.multiline_text(44, y, "; ".join(support["damage_report_details"]), width_chars=96, size=8, leading=10, max_lines=3)
+        y -= 22
+    if support["exception_notes"] and y > 170:
+        y -= 8
+        pdf.text(36, y, "EXCEPTIONS", size=10, bold=True)
+        y -= 12
+        pdf.multiline_text(44, y, "; ".join(support["exception_notes"]), width_chars=96, size=8, leading=10, max_lines=3)
+        y -= 22
+    y = max(y - 18, 136)
+    pdf.text(36, y, "SIGNATURES", size=11, bold=True)
     _draw_signature_pdf_block(pdf, driver_signature, signature_timestamp)
 
     def _start_document_page():
         pdf.add_page()
-        _draw_pdf_header(
+        _draw_route_sheet_pdf_header(
             pdf,
-            "DRIVER ROUTE SHEET",
-            meta["document_no"],
-            meta["generated_at"],
-            "Documents",
+            meta,
             driver=driver.display_name if driver else None,
             truck=truck,
             date_value=the_date,
+            page_label="Documents",
         )
-        return 704
+        return 674
 
     render_document_appendix(
         pdf,
-        collect_route_documents(logs, plant_label=_plant_label),
+        support["route_documents"],
         start_new_page=_start_document_page,
+        title="Documents Attached",
     )
     return pdf.build()
 
@@ -4282,33 +4375,7 @@ def driver_logs_print():
     ).all()
     route_context = build_route_context(driver_id=current_user.id, route_date=selected_date, now=now_local)
     log_routes = route_context.log_routes if route_context else _driver_log_route_context(logs)
-    damage_reports_today = _today_damage_reports(current_user.id, selected_date)
-    parts_carried = sorted({log.part_number for log in logs if log.part_number})
-    exception_notes = []
-    log_issue_details = {}
-    for log in logs:
-        route = log_routes.get(log.id, {})
-        plant_name = route.get("plant") or _plant_label(log.plant_name)
-        truck_issue = truck_issue_reason(log)
-        route_problem = route_problem_reason(log)
-        log_issue_details[log.id] = {"truck": truck_issue, "route": route_problem}
-        if log.maintenance or truck_issue:
-            exception_notes.append(f"Truck issue at {plant_name}: {truck_issue or 'Maintenance marked'}")
-        if route.get("unload_blocked"):
-            exception_notes.append(f"Unload issue at {plant_name}: {route.get('unload_reason')}")
-        elif route.get("secondary_drop_blocked"):
-            exception_notes.append(f"Second-stop cargo issue at {plant_name}: {route.get('secondary_drop_reason')}")
-        elif route_problem:
-            exception_notes.append(f"Route issue at {plant_name}: {route_problem}")
-        photo_review = _stop_photo_review_summary(log, plant_name)
-        if photo_review:
-            exception_notes.append(f"{photo_review['label']}: {photo_review['detail']}")
-    for issue in route_context.true_exceptions or []:
-        label = issue.get("label") or "Route review item"
-        detail = issue.get("detail") or ""
-        note = f"{label}: {detail}" if detail else label
-        if note not in exception_notes:
-            exception_notes.append(note)
+    route_sheet_data = _route_sheet_supporting_data(current_user.id, selected_date, logs, log_routes, route_context, now=now_local)
     route_finalized = ActivityEvent.query.filter_by(
         user_id=current_user.id,
         category="eod",
@@ -4330,13 +4397,15 @@ def driver_logs_print():
         log_routes=log_routes,
         the_date=selected_date,
         pretrips=pretrips,
-        damage_reports=damage_reports_today,
-        damage_report_summary=damage_report_count_label(damage_reports_today),
-        damage_report_details=[damage_report_detail_label(report) for report in damage_reports_today],
+        damage_reports=route_sheet_data["damage_reports"],
+        damage_report_summary=damage_report_count_label(route_sheet_data["damage_reports"]),
+        damage_report_details=route_sheet_data["damage_report_details"],
         total_miles=_total_miles_for_pretrips(pretrips),
-        parts_carried=parts_carried,
-        exception_notes=exception_notes,
-        log_issue_details=log_issue_details,
+        parts_carried=route_sheet_data["parts_carried"],
+        exception_notes=route_sheet_data["exception_notes"],
+        log_issue_details=route_sheet_data["log_issue_details"],
+        route_documents=route_sheet_data["route_documents"],
+        route_sheet_summary=route_sheet_data["summary"],
         route_task_events=_task_route_events_for_logs(logs),
         stop_forecasts=route_context.stop_timing,
         route_state=route_context.route_state,

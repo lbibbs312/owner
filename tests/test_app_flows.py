@@ -64,11 +64,22 @@ BANNED_PRINT_PHRASES = (
 
 
 def assert_official_record_output(data):
-    assert b"MoveDefense" in data
-    assert b"Document No:" in data
+    assert b"Document No:" in data or b"Route Sheet No:" in data
     assert b"Generated:" in data
     for phrase in BANNED_PRINT_PHRASES:
         assert phrase not in data
+
+
+def assert_driver_route_sheet_output(data):
+    assert_official_record_output(data)
+    lowered = data.lower()
+    assert b"audit" not in lowered
+    assert b"movedefense" not in lowered
+    assert b"Transit Cargo" not in data
+    assert b"In Truck" in data
+    assert b"Out Truck" in data
+    assert b"Manager / Reviewer Signature" in data
+    assert b"Manager / Auditor" not in data
 
 
 def test_autosave_draft_round_trip_is_user_scoped(client, app):
@@ -1453,29 +1464,28 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
     login(client, "print_driver")
     page = client.get("/driver_logs_print")
     assert page.status_code == 200
-    assert b"Pending posttrip mileage" in page.data
-    assert b"1 incident report, 1 damage report filed" in page.data
+    assert b"Mileage:" in page.data
+    assert b"Pending posttrip" in page.data
+    assert b"DAMAGE / INCIDENTS" in page.data
     assert b"Incident - Other" in page.data
     assert b"Damage - RE" in page.data
     assert b"Timing status pending" not in page.data
-    assert b"Wait Time" in page.data
-    assert b"Raleigh East: Wait 15 min" in page.data
-    assert b"<strong>Raleigh East:</strong> Pickup." in page.data
-    assert b"Loaded Kraft Plater Load." in page.data
-    assert b"Wait 15 min." in page.data
+    assert b"Total Wait:" in page.data
+    assert b"15 min" in page.data
+    assert b"Raleigh East" in page.data
+    assert b"Kraft Plater Load" in page.data
+    assert b"In Truck" in page.data
+    assert b"Out Truck" in page.data
     assert b"Wait time:</strong> Wait 15 min" not in page.data
     assert b"Movement segment" not in page.data
-    assert_official_record_output(page.data)
-    assert b"Plant Legend" in page.data
-    assert b"PPL = PPL" in page.data
-    assert b"RE = Raleigh East" in page.data
-    assert b"DC = 52nd Street DC" in page.data
-    assert b"KP = Kraft Plater" in page.data
-    assert b"PC = Paint Central" in page.data
+    assert_driver_route_sheet_output(page.data)
+    assert b"Plant Legend" not in page.data
+    assert b"PPL = PPL" not in page.data
 
     attachment = client.get("/driver_logs_print/attachment")
     assert attachment.status_code == 200
-    assert b"Wait 15 min" in attachment.data
+    assert b"15 min" in attachment.data
+    assert_driver_route_sheet_output(attachment.data)
 
 
 def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
@@ -4010,15 +4020,15 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
 
     driver_print = client.get("/driver_logs_print")
     assert driver_print.status_code == 200
-    assert b"3. Photo Proof" in driver_print.data
-    assert b"4. Plant Legend" in driver_print.data
-    assert b"5. Signatures" in driver_print.data
+    assert b"DOCUMENTS ATTACHED" in driver_print.data
+    assert b"Plant Legend" not in driver_print.data
+    assert b"SIGNATURES" in driver_print.data
     assert b"Loaded seal photo from gallery" in driver_print.data
     assert b"Departing load proof from gallery" in driver_print.data
-    assert b"Photo proof review" in driver_print.data
-    assert b"Uploaded " in driver_print.data
+    assert b"Photo proof review" not in driver_print.data
     assert b" UTC" not in driver_print.data
     assert b"Timing status pending" not in driver_print.data
+    assert_driver_route_sheet_output(driver_print.data)
 
     with app.app_context():
         from app.models import DriverLogPhoto
@@ -4859,19 +4869,18 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
 
     print_response = client.get("/driver_logs_print")
     assert print_response.status_code == 200
-    assert b"Driver Route Sheet" in print_response.data
-    assert b"Driver Route Audit Sheet" not in print_response.data
+    assert b"DRIVER ROUTE SHEET" in print_response.data
     assert b"5:45pm" in print_response.data
     assert b"Wait 12 min" in print_response.data
     assert b"17:45" not in print_response.data
-    assert b"2. Stop Timeline" in print_response.data
-    assert b"Stop #" in print_response.data
-    assert b"Stop / Movement" in print_response.data
-    assert b"3. Plant Legend" in print_response.data
-    assert b"4. Signatures" in print_response.data
+    assert b"1. STOP TIMELINE" in print_response.data
+    assert b"Location" in print_response.data
+    assert b"Stop / Movement" not in print_response.data
+    assert b"Plant Legend" not in print_response.data
+    assert b"SIGNATURES" in print_response.data
     assert b"Leg #" not in print_response.data
     assert b"9. Signatures" not in print_response.data
-    assert_official_record_output(print_response.data)
+    assert_driver_route_sheet_output(print_response.data)
 
     eod_print = client.get("/end_of_day_print")
     assert eod_print.status_code == 200
@@ -5126,9 +5135,9 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert pdf_response.status_code == 200
     assert pdf_response.headers["Content-Type"] == "application/pdf"
     assert b"DRIVER ROUTE SHEET" in pdf_response.data
-    assert b"DRIVER ROUTE AUDIT SHEET" not in pdf_response.data
-    assert b"2. Stop Timeline" in pdf_response.data
-    assert b"Stop #" in pdf_response.data
+    assert_driver_route_sheet_output(pdf_response.data)
+    assert b"1. STOP TIMELINE" in pdf_response.data
+    assert b"Location" in pdf_response.data
     assert b"Leg #" not in pdf_response.data
 
 

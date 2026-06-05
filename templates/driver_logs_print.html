@@ -8,319 +8,245 @@
     @page { size: Letter portrait; margin: 0.35in; }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; width: 100%; min-height: 100%; }
-    body { font-family: Arial, sans-serif; font-size: 9pt; color: #000; background: #fff; }
-    .print-page { width: 100%; margin: 0; padding: 0; }
-    .no-print, .screen-only { }
-    .print-controls { margin-bottom:0.12in; }
-    .official-print-document { width:100%; }
-    .document-header { display:flex; justify-content:space-between; gap:0.18in; border-bottom:2px solid #111; padding-bottom:0.08in; margin-bottom:0.12in; }
-    .document-header h1 { margin:0; font-size:15pt; }
-    .document-meta { text-align:right; font-size:8pt; line-height:1.35; }
-    .document-number { font-weight:900; }
-    .print-guidance { margin: 0 0 0.12in; color: #444; font-size: 9pt; }
-    .email-btn { display: inline-block; margin-bottom: 0.12in; padding: 8px 16px; background: #198754; color: #fff; text-decoration: none; font-size: 10pt; line-height: 1.1; }
-    .print-btn { margin: 0 0 0.12in; padding: 8px 16px; background: #007bff; color: #fff; border: none; cursor: pointer; }
-    .sheet-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 0.2in; border-bottom: 2px solid #111; padding-bottom: 0.08in; margin-bottom: 0.14in; }
-    h2 { margin: 0; font-size: 15pt; letter-spacing: 0; }
-    .sheet-meta { text-align: right; font-size: 8.5pt; color: #333; line-height: 1.35; }
-    .qa-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.08in; margin: 0 0 0.12in; }
-    .qa-box { border: 1px solid #111; padding: 0.06in; min-height: 0.43in; }
-    .qa-label { display: block; font-size: 6.8pt; color: #444; text-transform: uppercase; font-weight: 900; letter-spacing: 0.04em; margin-bottom: 2px; }
-    .qa-value { font-size: 8.4pt; font-weight: 900; line-height: 1.25; }
-    .qa-note { font-size: 7.4pt; font-weight: 400; color: #333; }
-    table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 0.08in; }
-    th, td { border: 1px solid #000; padding: 5px 6px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
-    th { text-align: center; font-weight: bold; background: #f1f5f9; }
-    th:nth-child(1), td:nth-child(1) { width: 8%; text-align: center; }
-    th:nth-child(2), td:nth-child(2) { width: 25%; }
-    th:nth-child(3), td:nth-child(3), th:nth-child(4), td:nth-child(4) { width: 11%; text-align: center; white-space: nowrap; }
-    th:nth-child(5), td:nth-child(5) { width: 20%; }
-    th:nth-child(6), td:nth-child(6) { width: 25%; }
-    .route-leg { font-weight: 900; font-size: 9.5pt; }
-    .route-sub { margin-top: 2px; color: #555; font-size: 8pt; }
-    .timing-status { font-weight: 900; }
-    .timing-status.ok { color: #166534; }
-    .timing-status.warning { color: #92400e; }
-    .timing-status.high { color: #991b1b; }
-    .timing-status.muted { color: #555; }
-    .cargo { font-weight: 900; }
-    .badge { display: inline-block; border: 1px solid #111; padding: 1px 5px; font-size: 7pt; font-weight: 900; text-transform: uppercase; margin-bottom: 3px; }
-    .badge.deviation { background: #111; color: #fff; }
-    .detail-line { margin: 0 0 2px; }
-    .issue { color: #7f1d1d; font-weight: 900; }
-    .muted { color: #555; font-size: 8pt; }
-    .task-note { border-left: 4px solid #2563eb; background: #eff6ff; color: #111; padding: 3px 5px; margin-top: 3px; font-size: 8pt; }
-    .task-note.hot { border-left-color: #dc2626; background: #fee2e2; }
-    .task-note.done { border-left-color: #16a34a; background: #dcfce7; }
-    .section-title { margin: 0.12in 0 0.04in; font-size: 10pt; }
-    .photo-proof-section { margin-top: 0.14in; break-inside: avoid; }
-    .photo-proof-section h3 { margin: 0 0 0.06in; font-size: 10pt; }
-    .photo-proof-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.1in; }
-    .photo-proof-card { border: 1px solid #111; padding: 0.06in; min-height: 3in; break-inside: avoid; }
-    .photo-proof-card img { width: 100%; height: 2.4in; object-fit: contain; border: 1px solid #999; display: block; margin-bottom: 4px; background:#f8fafc; }
-    .photo-proof-meta { font-size: 7.2pt; line-height: 1.25; }
-    .photo-proof-meta strong { display: block; font-size: 7.6pt; }
-    .photo-proof-missing { min-height: 1.65in; border: 1px solid #b45309; background: #fff7ed; color: #92400e; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; font-size: 8pt; margin-bottom: 4px; padding: 4px; }
-    .plant-legend { margin-top: 0.14in; border: 1px solid #111; padding: 0.06in 0.08in; font-size: 7.6pt; break-inside: avoid; }
-    .plant-legend strong { display:block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: .04em; font-size: 7pt; }
-    .plant-legend span { display:inline-block; margin-right: 0.12in; white-space: nowrap; }
-    .final-row td { background: #f8fafc; }
-    .sig-block { display: flex; gap: 0.4in; margin-top: 0.25in; align-items: flex-end; }
-    .sig-col { flex: 1; }
-    .sig-label { font-size: 7.5pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; color: #444; margin-bottom: 2px; }
-    .sig-line { border-bottom: 1.5px solid #000; min-height: 0.45in; display: flex; align-items: flex-end; padding-bottom: 3px; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #111; background: #fff; }
+    .print-page, .official-print-document { width: 100%; margin: 0; padding: 0; }
+    .print-controls { margin-bottom: 0.12in; }
+    .print-btn, .email-btn {
+      display: inline-block;
+      margin: 0 0.05in 0.12in 0;
+      padding: 8px 14px;
+      border: 0;
+      color: #fff;
+      text-decoration: none;
+      font-size: 10pt;
+      line-height: 1.1;
+      cursor: pointer;
+    }
+    .print-btn { background: #0d6efd; }
+    .email-btn { background: #198754; }
+    .document-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 2.7in;
+      gap: 0.2in;
+      border-bottom: 2px solid #111;
+      padding-bottom: 0.09in;
+      margin-bottom: 0.08in;
+    }
+    .driver-kicker { font-size: 8pt; font-weight: 900; text-transform: uppercase; }
+    .driver-name { margin: 1px 0; font-size: 15pt; font-weight: 900; text-transform: uppercase; line-height: 1; }
+    .driver-route-meta { font-size: 8.2pt; font-weight: 700; color: #333; }
+    .document-title { margin: 0 0 0.1in; font-size: 15pt; font-weight: 900; text-transform: uppercase; line-height: 1; }
+    .header-detail, .document-meta { font-size: 8pt; line-height: 1.35; }
+    .document-meta { text-align: right; }
+    .document-number { font-weight: 900; }
+    .section-title {
+      margin: 0.14in 0 0.05in;
+      padding-bottom: 0.03in;
+      border-bottom: 1.5px solid #111;
+      font-size: 10pt;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .route-summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.03in 0.22in;
+      margin: 0 0 0.1in;
+      font-size: 8.6pt;
+    }
+    .route-summary div { display: flex; gap: 0.06in; }
+    .route-summary span { min-width: 0.82in; font-weight: 900; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 0.06in; }
+    th, td { border: 1px solid #222; padding: 4px 5px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+    th { background: #f1f1f1; font-weight: 900; text-transform: uppercase; font-size: 7.2pt; }
+    .timeline th:nth-child(1), .timeline td:nth-child(1) { width: 5%; text-align: center; }
+    .timeline th:nth-child(2), .timeline td:nth-child(2) { width: 19%; }
+    .timeline th:nth-child(3), .timeline td:nth-child(3), .timeline th:nth-child(4), .timeline td:nth-child(4) { width: 10%; white-space: nowrap; }
+    .timeline th:nth-child(5), .timeline td:nth-child(5) { width: 9%; white-space: nowrap; }
+    .timeline th:nth-child(6), .timeline td:nth-child(6), .timeline th:nth-child(7), .timeline td:nth-child(7) { width: 17%; }
+    .timeline th:nth-child(8), .timeline td:nth-child(8) { width: 22%; }
+    .notes-list, .simple-list { margin: 0; padding-left: 0.16in; }
+    .notes-list li, .simple-list li { margin: 0 0 2px; }
+    .optional-grid { display: grid; gap: 0.04in; }
+    .signature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.45in;
+      margin-top: 0.22in;
+    }
+    .sig-label { font-size: 7.5pt; font-weight: 900; text-transform: uppercase; color: #333; }
+    .sig-line { border-bottom: 1.5px solid #111; min-height: 0.46in; display: flex; align-items: flex-end; padding-bottom: 3px; }
     .sig-line img { max-height: 0.4in; max-width: 100%; }
-    .sig-ts { font-size: 7pt; color: #555; margin-top: 3px; }
+    .sig-ts { min-height: 0.14in; margin-top: 3px; font-size: 7pt; color: #555; }
     @media screen { body { padding: 1rem; } }
     @media print {
       body { padding: 0; }
-      .no-print, .screen-only, .print-controls, .helper-text, .form-hint, .button-row, nav, header.app-nav, .print-btn, .email-btn, .print-guidance { display: none !important; }
+      .no-print, .screen-only, .print-controls, .helper-text, .form-hint, .button-row, nav, header.app-nav, .print-btn, .email-btn { display: none !important; }
       th { background: #eee !important; }
-      .final-row td { background: #f5f5f5 !important; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
-    {% include 'partials/_md_print_signature_styles.html' %}
   </style>
 </head>
 <body>
 <div class="print-page">
   {% set document_meta = document_meta|default({'title': 'DRIVER ROUTE SHEET', 'document_no': 'ROUTE-' ~ the_date, 'generated_at': '', 'page': '1 of 1'}) %}
+  {% set print_driver_name = print_driver.display_name if print_driver is defined and print_driver else current_user.display_name %}
+  {% set route_truck = pretrips[0].truck_number if pretrips else '' %}
+  {% set route_date_label = the_date.strftime('%b %d, %Y') if the_date else '' %}
+  {% set summary = route_sheet_summary|default({'total_stops': logs|length if logs else 0, 'open_stops': 0, 'total_miles': none, 'total_wait_minutes': 0}) %}
   <div class="print-controls no-print">
-  <button class="print-btn" onclick="window.print()">Print Document</button>
-  <a class="email-btn" href="{{ url_for('driver.driver_logs_print', date=the_date.isoformat(), autoprint=1) }}">Save PDF</a>
-  {% if csv_url is defined %}<a class="email-btn" href="{{ csv_url }}">CSV Export</a>{% endif %}
-  {% if sheets_url is defined %}<a class="email-btn" href="{{ sheets_url }}">Sheets Export</a>{% endif %}
+    <button class="print-btn" onclick="window.print()">Print Document</button>
+    <a class="email-btn" href="{{ url_for('driver.driver_logs_print', date=the_date.isoformat(), autoprint=1) }}">Save PDF</a>
+    {% if csv_url is defined %}<a class="email-btn" href="{{ csv_url }}">CSV Export</a>{% endif %}
+    {% if sheets_url is defined %}<a class="email-btn" href="{{ sheets_url }}">Sheets Export</a>{% endif %}
   </div>
 
   <main class="official-print-document">
-  <header class="document-header print-only">
-    <div>
-      {% include 'partials/_md_print_signature.html' %}
-      <h1>{{ document_meta.title }}</h1>
-      <div><strong>Date:</strong> {{ the_date }}</div>
-      <div><strong>Driver:</strong> {{ print_driver.display_name if print_driver is defined and print_driver else current_user.display_name }}</div>
-    </div>
-    <div class="document-meta">
-      <div class="document-number">Document No: {{ document_meta.document_no }}</div>
-      <div class="generated-at">Generated: {{ document_meta.generated_at }}</div>
-      <div class="page-number">Page {{ document_meta.page }}</div>
-    </div>
-  </header>
-
-  <div class="sheet-head">
-    <div>
-      <h2>1. Driver Route Sheet</h2>
-      <div class="muted">Chronological route record with cargo, stop actions, exceptions, and verification totals.</div>
-    </div>
-    <div class="sheet-meta">
-      <strong>Date:</strong> {{ the_date }}<br>
-      <strong>Total Stops:</strong> {{ logs|length if logs else 0 }}<br>
-      <strong>Driver:</strong> {{ print_driver.display_name if print_driver is defined and print_driver else current_user.display_name }}
-    </div>
-  </div>
-
-  {% set finalized_arrival_stop_id = logs[-1].id if route_context and route_context.route_status == 'finalized' and logs and logs[-1].depart_time is none else none %}
-  <div class="qa-grid">
-    <div class="qa-box">
-      <span class="qa-label">Total Mileage</span>
-      <div class="qa-value">{% if total_miles is not none and (not logs or logs[-1].depart_time is not none or finalized_arrival_stop_id) %}{{ total_miles }} miles{% elif logs %}Pending posttrip mileage{% else %}Not recorded{% endif %}</div>
-    </div>
-    <div class="qa-box">
-      <span class="qa-label">Wait Time</span>
-      <div class="qa-value">
-        {% set wait_count = namespace(value=0) %}
-        {% for wait_log in logs %}
-          {% if wait_log.id != finalized_arrival_stop_id and wait_label_for_log(wait_log) %}
-            {% set wait_count.value = wait_count.value + 1 %}
-          {% endif %}
-        {% endfor %}
-        {% if wait_count.value %}{{ wait_count.value }} stop{{ 's' if wait_count.value != 1 else '' }} with wait time{% else %}No wait time recorded{% endif %}
+    <header class="document-header">
+      <div>
+        <div class="driver-kicker">DRIVER</div>
+        <div class="driver-name">{{ print_driver_name|upper }}</div>
+        <div class="driver-route-meta">{{ route_truck or 'Truck not set' }} &middot; {{ route_date_label }}</div>
       </div>
-      {% if logs %}
-        <div class="qa-note">
-          {% set printed_wait = namespace(value=0) %}
-          {% for wait_log in logs -%}
-            {% set wait_label = '' if wait_log.id == finalized_arrival_stop_id else wait_label_for_log(wait_log) -%}
-            {% if wait_label -%}
-              {%- if printed_wait.value %}; {% endif -%}
-              {{ ((log_routes or {}).get(wait_log.id) or {}).get('plant') or wait_log.plant_name }}: {{ wait_label }}
-              {%- set printed_wait.value = printed_wait.value + 1 -%}
-            {% endif -%}
-          {% endfor %}
-        </div>
-      {% endif %}
-    </div>
-    <div class="qa-box">
-      <span class="qa-label">Incidents / Damage</span>
-      <div class="qa-value">{{ damage_report_summary if damage_report_summary is defined else (damage_reports|length ~ ' report' ~ ('s' if damage_reports|length != 1 else '') ~ ' filed' if damage_reports else 'No in-route damage/incidents reported') }}</div>
-      {% if damage_report_details is defined and damage_report_details %}<div class="qa-note">{{ damage_report_details|join('; ') }}</div>{% elif damage_reports %}<div class="qa-note">{% for report in damage_reports %}#{{ report.id }} {{ report.plant_name }}{% if not loop.last %}; {% endif %}{% endfor %}</div>{% endif %}
-    </div>
-    <div class="qa-box">
-      <span class="qa-label">Part References</span>
-      <div class="qa-value">{% if parts_carried %}{{ parts_carried|join(', ') }}{% else %}No part references recorded{% endif %}</div>
-    </div>
-    <div class="qa-box">
-      <span class="qa-label">Exceptions</span>
-      <div class="qa-value">{% if exception_notes %}{{ exception_notes|length }} exception{{ 's' if exception_notes|length != 1 else '' }}{% else %}No route exceptions recorded{% endif %}</div>
-      {% if exception_notes %}<div class="qa-note">{% for note in exception_notes %}{{ note }}{% if not loop.last %}; {% endif %}{% endfor %}</div>{% endif %}
-    </div>
-  </div>
+      <div class="document-meta">
+        <div class="document-number">Route Sheet No: {{ document_meta.document_no }}</div>
+        <div class="generated-at">Generated: {{ document_meta.generated_at }}</div>
+        <div class="page-number">Page: {{ document_meta.page }}</div>
+      </div>
+    </header>
 
-  {% set section_no = namespace(value=2) %}
-  {% set route_completed = route_context and route_context.route_status == 'completed' %}
-  {% if logs %}
-    <h3 class="section-title">{{ section_no.value }}. Stop Timeline</h3>
-    {% set section_no.value = section_no.value + 1 %}
-    <table>
-      <thead>
-        <tr>
-          <th>Stop #</th>
-          <th>Stop / Movement</th>
-          <th>Depart</th>
-          <th>Arrive</th>
-          <th>Transit Cargo</th>
-          <th>Stop Details</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for log in logs %}
-        {% set route = (log_routes or {}).get(log.id) %}
-        {% set next_log = logs[loop.index0 + 1] if loop.index0 + 1 < logs|length else none %}
-        {% set next_route = (log_routes or {}).get(next_log.id) if next_log else none %}
-        {% set plant_name = route.plant if route else log.plant_name %}
-        {% set next_plant_name = next_route.plant if next_route else (next_log.plant_name if next_log else none) %}
-        {% set transit_cargo = route.depart_cargo_desc if route and route.depart_cargo_desc is not none else (log.depart_load_size or '--') %}
-        {% set issue = (log_issue_details or {}).get(log.id, {}) %}
-        {% set stop_forecast = (stop_forecasts or {}).get(log.id) %}
-        {% set purpose = route.stop_purpose if route else none %}
-        {% set row_state = route_context.rows[loop.index0] if route_context and route_context.rows and loop.index0 < (route_context.rows|length) else none %}
-        <tr class="{% if not next_log %}final-row{% endif %}">
-          <td>{{ loop.index }}</td>
-          <td>
-            {% if next_log %}
-              <div class="route-leg">{{ plant_name }} &#8594; {{ next_plant_name }}</div>
-              {% if stop_forecast and stop_forecast.estimate_minutes is not none %}
-                <div class="route-sub">Timing status: <span class="timing-status {{ stop_forecast.severity }}">{{ stop_forecast.status }}</span></div>
-              {% endif %}
-            {% else %}
-              <div class="route-leg">{% if purpose == 'shift_end' %}Shift End: {{ plant_name }}{% elif row_state and row_state.status == 'Finalized' and not log.depart_time %}Route End: {{ plant_name }}{% elif route_finalized %}Finalized Stop: {{ plant_name }}{% elif not log.depart_time %}Current Stop: {{ plant_name }}{% else %}Route End: {{ plant_name }}{% endif %}</div>
-              <div class="route-sub">{% if route_finalized %}Route finalized{% elif not log.depart_time %}Awaiting departure / load intent{% elif route_completed %}Route completed / awaiting final review{% else %}Route completed / not finalized{% endif %}</div>
-            {% endif %}
-          </td>
-          <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
-          <td>
-            {% if next_log %}
-              {{ next_log.arrive_time|to_local_time if next_log.arrive_time else '--' }}
-            {% else %}
-              {{ log.arrive_time|to_local_time if log.arrive_time else '--' }}
-            {% endif %}
-          </td>
-          <td>
-            {% if next_log %}
-              <span class="cargo">{{ transit_cargo }}</span>
-            {% else %}
-              <span class="cargo">{{ route.arrive_cargo_desc if route else log.load_size }}</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if route and route.deviation %}
-              <span class="badge deviation">Deviation</span>
-              {% if route.deviation_reason %}<div class="muted">{{ route.deviation_reason }}.</div>{% endif %}
-            {% endif %}
-            {% if route and route.summary_lines %}
-              {% for line in route.summary_lines %}
-                {% if loop.first %}
-                  <p class="detail-line"><strong>{{ plant_name }}:</strong>{{ line[(plant_name|length + 1):] }}</p>
-                {% else %}
-                  <p class="detail-line">{{ line }}</p>
-                {% endif %}
-              {% endfor %}
-            {% else %}
-              <p class="detail-line"><strong>{{ plant_name }}:</strong> {% if not log.depart_time %}Awaiting departure / load intent.{% else %}Stop recorded.{% endif %}</p>
-            {% endif %}
-            {% if log.maintenance or issue.truck %}<p class="detail-line issue">Truck issue: {{ issue.truck or 'Maintenance marked' }}{% if log.fuel_mileage %}; odometer {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</p>{% endif %}
-            {% if issue.route %}<p class="detail-line issue">Route issue: {{ issue.route }}</p>{% endif %}
-            {% if log.hot_parts or log.part_number %}<p class="detail-line muted">{% if log.hot_parts %}HOT {% endif %}{{ log.part_number or '' }}</p>{% endif %}
-            {% if log.photos %}<p class="detail-line issue">Photo proof review: {{ log.photos|length }} attached.</p>{% endif %}
-            {% for event in (route_task_events or {}).get(log.id, []) %}
-              <p class="detail-line task-note {% if event.is_hot %}hot{% elif event.completed_at %}done{% endif %}">{{ event.kind_label }} {{ event.label }}: {{ event.status }}{% if event.accepted_at %}; accepted {{ event.accepted_at|to_detroit_datetime }}{% endif %}{% if event.completed_at %}; unloaded {{ event.completed_at|to_detroit_datetime }}{% endif %}</p>
-            {% endfor %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% set photo_proof_count = namespace(value=0) %}
-    {% for proof_log in logs %}
-      {% set photo_proof_count.value = photo_proof_count.value + (proof_log.photos|length) %}
-    {% endfor %}
-    {% if photo_proof_count.value %}
-      <div class="photo-proof-section">
-        <h3>{{ section_no.value }}. Photo Proof</h3>
-        {% set section_no.value = section_no.value + 1 %}
-        <div class="photo-proof-grid">
-          {% for proof_log in logs %}
-            {% set proof_route = (log_routes or {}).get(proof_log.id) %}
-            {% set proof_plant = proof_route.plant if proof_route else proof_log.plant_name %}
-            {% for photo in proof_log.photos %}
-              {% set photo_endpoint = 'manager.driver_log_photo' if current_user.role == 'management' else 'driver.driver_log_photo' %}
-              <div class="photo-proof-card">
-                {% if photo.file_available %}
-                  <img src="{{ url_for(photo_endpoint, photo_id=photo.id) }}" alt="Stop photo proof {{ loop.index }}">
-                {% else %}
-                  <div class="photo-proof-missing">Photo file missing</div>
-                {% endif %}
-                <div class="photo-proof-meta">
-                  <strong>{{ photo.document_type_label }} &middot; {{ proof_plant }}</strong>
-                  {% if photo.note %}Reason: {{ photo.note }}<br>{% endif %}
-                  Uploaded {{ photo.uploaded_at|to_detroit_datetime if photo.uploaded_at else '--' }}{% if photo.uploaded_by %} by {{ photo.uploaded_by.display_name }}{% endif %}<br>
-                  {% if photo.review_status == 'review_needed' %}Review needed{% else %}Fields not extracted &middot; review optional{% endif %}
-                </div>
-              </div>
-            {% endfor %}
+    <h1 class="document-title">DRIVER ROUTE SHEET</h1>
+
+    <h2 class="section-title">ROUTE SUMMARY</h2>
+    <div class="route-summary">
+      <div><span>Total Stops:</span><strong>{{ summary.total_stops }}</strong></div>
+      <div><span>Open Stops:</span><strong>{{ summary.open_stops }}</strong></div>
+      <div><span>Mileage:</span><strong>{% if summary.total_miles is not none %}{{ summary.total_miles }} miles{% elif logs %}Pending posttrip{% else %}Not started{% endif %}</strong></div>
+      <div><span>Total Wait:</span><strong>{{ summary.total_wait_minutes }} min</strong></div>
+    </div>
+
+    {% if logs %}
+      <h2 class="section-title">1. STOP TIMELINE</h2>
+      <table class="timeline">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Location</th>
+            <th>Arrive</th>
+            <th>Depart</th>
+            <th>Wait</th>
+            <th>In Truck</th>
+            <th>Out Truck</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+            {% set route = (log_routes or {}).get(log.id) %}
+            {% set row_state = route_context.rows[loop.index0] if route_context and route_context.rows and loop.index0 < (route_context.rows|length) else none %}
+            {% set plant_name = route.plant if route else log.plant_name %}
+            {% set wait_label = wait_label_for_log(log)|replace('Active wait ', '')|replace('Wait ', '') %}
+            {% set inbound = row_state.cargo_in if row_state else (route.arrive_cargo_desc if route else log.load_size) %}
+            {% set outbound = row_state.cargo_out if row_state else (route.depart_cargo_desc if route and route.depart_cargo_desc is not none else '') %}
+            {% set issue = (log_issue_details or {}).get(log.id, {}) %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td><strong>{{ plant_name }}</strong></td>
+              <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
+              <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
+              <td>{{ wait_label or '--' }}</td>
+              <td>{{ inbound or '--' }}</td>
+              <td>{% if log.depart_time %}{{ outbound or '--' }}{% else %}Pending{% endif %}</td>
+              <td>
+                <ul class="notes-list">
+                  {% if not log.depart_time %}
+                    <li>{% if route_context and route_context.route_status == 'finalized' %}Route End: {{ plant_name }}{% else %}Current stop; departure pending{% endif %}</li>
+                  {% elif loop.first %}
+                    <li>Shift start</li>
+                  {% else %}
+                    <li>Stop complete</li>
+                  {% endif %}
+                  {% if route and route.summary_lines %}
+                    {% for line in route.summary_lines[:2] %}
+                      <li>{{ line }}</li>
+                    {% endfor %}
+                  {% endif %}
+                  {% if log.no_pickup %}<li>No pickup</li>{% endif %}
+                  {% if log.hot_parts or log.part_number %}<li>{% if log.hot_parts %}Hot part {% endif %}{{ log.part_number or '' }}</li>{% endif %}
+                  {% if log.maintenance or issue.truck %}<li>Truck issue: {{ issue.truck or 'Maintenance marked' }}</li>{% endif %}
+                  {% if issue.route %}<li>Route issue: {{ issue.route }}</li>{% endif %}
+                  {% for event in (route_task_events or {}).get(log.id, []) %}
+                    <li>{{ event.kind_label }} {{ event.label }}: {{ event.status }}</li>
+                  {% endfor %}
+                </ul>
+              </td>
+            </tr>
           {% endfor %}
-        </div>
+        </tbody>
+      </table>
+    {% else %}
+      <p>No stops for selected date.</p>
+    {% endif %}
+
+    {% set section_no = namespace(value=2) %}
+    {% if parts_carried %}
+      <h2 class="section-title">{{ section_no.value }}. LOAD / PART REFERENCES</h2>
+      {% set section_no.value = section_no.value + 1 %}
+      <ul class="simple-list">
+        {% for part in parts_carried %}<li>{{ part }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+
+    {% if route_documents %}
+      <h2 class="section-title">{{ section_no.value }}. DOCUMENTS ATTACHED</h2>
+      {% set section_no.value = section_no.value + 1 %}
+      <div class="optional-grid">
+        {% for doc in route_documents %}
+          <div><strong>{{ doc.doc_label }}</strong> - {{ doc.owner_label }} - {{ doc.uploaded_label }}{% if doc.note %} - {{ doc.note }}{% endif %}</div>
+        {% endfor %}
       </div>
     {% endif %}
-    <div class="plant-legend">
-      <strong>{{ section_no.value }}. Plant Legend</strong>
-      <span>PPL = PPL</span>
-      <span>RE = Raleigh East</span>
-      <span>DC = 52nd Street DC</span>
-      <span>KP = Kraft Plater</span>
-      <span>PC = Paint Central</span>
-    </div>
-    {% set section_no.value = section_no.value + 1 %}
-  {% else %}
-    <p>No logs found for selected date.</p>
-  {% endif %}
 
-  <h3>{{ section_no.value }}. Signatures</h3>
-    <div class="sig-block">
-    <div class="sig-col">
-      <div class="sig-label">Driver Signature</div>
-      <div class="sig-line">
-        {% if driver_signature %}
-          <img src="{{ driver_signature }}" alt="Driver signature">
-        {% endif %}
+    {% if damage_report_details %}
+      <h2 class="section-title">{{ section_no.value }}. DAMAGE / INCIDENTS</h2>
+      {% set section_no.value = section_no.value + 1 %}
+      <ul class="simple-list">
+        {% for detail in damage_report_details %}<li>{{ detail }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+
+    {% if exception_notes %}
+      <h2 class="section-title">{{ section_no.value }}. EXCEPTIONS</h2>
+      {% set section_no.value = section_no.value + 1 %}
+      <ul class="simple-list">
+        {% for note in exception_notes %}<li>{{ note }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+
+    <h2 class="section-title">{{ section_no.value }}. SIGNATURES</h2>
+    <div class="signature-grid">
+      <div>
+        <div class="sig-label">Driver Signature</div>
+        <div class="sig-line">
+          {% if driver_signature %}
+            <img src="{{ driver_signature }}" alt="Driver signature">
+          {% endif %}
+        </div>
+        <div class="sig-ts">
+          {% if signature_timestamp %}
+            Signed {{ signature_timestamp|to_detroit_datetime }}
+          {% elif driver_signature %}
+            Timestamp unavailable
+          {% endif %}
+        </div>
       </div>
-      <div class="sig-ts">
-        {% if signature_timestamp %}
-          Signed {{ signature_timestamp|to_detroit_datetime }}
-        {% elif driver_signature %}
-          Timestamp unavailable
-        {% else %}
-          Not yet signed
-        {% endif %}
+      <div>
+        <div class="sig-label">Manager / Reviewer Signature</div>
+        <div class="sig-line"></div>
+        <div class="sig-ts">&nbsp;</div>
       </div>
     </div>
-    <div class="sig-col">
-      <div class="sig-label">Manager / Auditor Signature</div>
-      <div class="sig-line"></div>
-      <div class="sig-ts">&nbsp;</div>
-    </div>
-  </div>
-</main>
+  </main>
 </div>
 {% if request.args.get('autoprint') %}
 <script>
