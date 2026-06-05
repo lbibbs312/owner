@@ -159,6 +159,7 @@
       }
     }
 
+    {% include 'partials/_md_print_signature_styles.html' %}
   </style>
 </head>
 <body>
@@ -171,7 +172,7 @@
 
 <main class="print-container official-print-document">
   <header class="document-header print-only">
-    <div><h1>{{ document_meta.title }}</h1><div><strong>Date:</strong> {{ the_date }}</div><div><strong>Driver:</strong> {{ current_user.display_name }}</div></div>
+    <div>{% include 'partials/_md_print_signature.html' %}<h1>{{ document_meta.title }}</h1><div><strong>Date:</strong> {{ the_date }}</div><div><strong>Driver:</strong> {{ current_user.display_name }}</div></div>
     <div class="document-meta"><div class="document-number">Document No: {{ document_meta.document_no }}</div><div class="generated-at">Generated: {{ document_meta.generated_at }}</div><div class="page-number">Page {{ document_meta.page }}</div></div>
   </header>
 

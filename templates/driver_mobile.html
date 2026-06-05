@@ -5780,20 +5780,24 @@
           if (node) node.value = value || '';
         }
 
-        function selectedDestinationLabel() {
-          var select = form.querySelector('[data-depart-select="destination"]');
+        function selectedSelectLabel(name) {
+          var select = form.querySelector('[data-depart-select="' + name + '"]');
           if (!select || !select.value) return '';
           return select.options[select.selectedIndex].textContent || select.value;
         }
 
         function syncSummary() {
+          var secondaryType = form.querySelector('[data-depart-secondary-type]');
+          if (secondaryType) secondaryType.hidden = !fieldValue('secondary_destination');
           form.querySelectorAll('[data-depart-summary]').forEach(function (node) {
             var key = node.getAttribute('data-depart-summary');
             var value = fieldValue(key);
             if (key === 'destination') {
-              value = fieldValue('got_loaded') === 'yes' ? selectedDestinationLabel() : 'No pickup / empty';
+              value = fieldValue('got_loaded') === 'yes' ? selectedSelectLabel('destination') : 'No pickup / empty';
+            } else if (key === 'secondary_destination') {
+              value = fieldValue('got_loaded') === 'yes' ? selectedSelectLabel('secondary_destination') : '';
             }
-            node.textContent = value ? value.toUpperCase() : '--';
+            node.textContent = value ? value.toUpperCase() : (key === 'secondary_destination' ? 'NONE' : '--');
           });
         }
 
@@ -5837,8 +5841,14 @@
             if (key) setField(key, value);
             if (key === 'got_loaded' && value === 'no') {
               setField('destination', '');
+              setField('secondary_destination', '');
+              setField('secondary_load_type', 'load');
               var select = form.querySelector('[data-depart-select="destination"]');
               if (select) select.value = '';
+              var secondarySelect = form.querySelector('[data-depart-select="secondary_destination"]');
+              if (secondarySelect) secondarySelect.value = '';
+              var typeSelect = form.querySelector('[data-depart-select="secondary_load_type"]');
+              if (typeSelect) typeSelect.value = 'load';
             }
             if (button.hasAttribute('data-mirror-secondary')) {
               setField('secondary_dropped_on_departure', value);

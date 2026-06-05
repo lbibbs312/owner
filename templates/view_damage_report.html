@@ -56,6 +56,7 @@
   body.md-shell .history-item { color:var(--md-muted); }
   @media (max-width:800px) { .damage-grid { grid-template-columns:1fr 1fr; } .photo-grid { grid-template-columns:1fr; } }
   @media (max-width:520px) { .damage-grid { grid-template-columns:1fr; } }
+  {% include 'partials/_md_print_signature_styles.html' %}
 </style>
 
 <div class="container-fluid py-4 responsive-workspace damage-shell">
@@ -105,7 +106,7 @@
   {% endif %}
 
   <header class="document-header print-only">
-    <div><h1>Damage Report</h1><div><strong>Driver:</strong> {{ report.reported_by.display_name }}</div><div><strong>Date:</strong> {{ report.damage_time|to_detroit_datetime if report.damage_time else report.created_at|to_detroit_datetime }}</div></div>
+    <div>{% include 'partials/_md_print_signature.html' %}<h1>Damage Report</h1><div><strong>Driver:</strong> {{ report.reported_by.display_name }}</div><div><strong>Date:</strong> {{ report.damage_time|to_detroit_datetime if report.damage_time else report.created_at|to_detroit_datetime }}</div></div>
     <div><strong>Document No:</strong> EVIDENCE-REPORT-{{ "%03d"|format(report.id) }}<br><strong>Generated:</strong> {{ report.created_at|to_detroit_datetime if report.created_at else '' }}<br><strong>Page</strong> 1 of 1</div>
   </header>
 

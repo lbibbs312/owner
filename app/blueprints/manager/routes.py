@@ -103,6 +103,7 @@ def _evidence_document_meta(report, page="1 of 1"):
 
 
 def _draw_pdf_header(pdf, title, document_no, generated_at, page_label, *, driver=None, truck=None, date_value=None):
+    pdf.brand_signature()
     pdf.text(36, 764, title, size=12, bold=True)
     pdf.text(36, 748, f"Document No: {document_no}", size=8, bold=True)
     pdf.text(260, 748, f"Generated: {generated_at}", size=8)

@@ -444,6 +444,20 @@
                   <option value="{{ code }}">{{ label }}</option>
                 {% endfor %}
               </select>
+              <label for="departSecondaryDestination">Optional second stop</label>
+              <select id="departSecondaryDestination" data-depart-select="secondary_destination">
+                <option value="">None / not applicable</option>
+                {% for code, label in PLANT_LABELS.items() %}
+                  <option value="{{ code }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+              <div class="depart-secondary-type" data-depart-secondary-type hidden>
+                <label for="departSecondaryLoadType">Second stop load type</label>
+                <select id="departSecondaryLoadType" data-depart-select="secondary_load_type">
+                  <option value="load">Regular load</option>
+                  <option value="hot">Hot part</option>
+                </select>
+              </div>
               <p class="depart-error" data-depart-error hidden>Select a destination before confirming a loaded departure.</p>
               <div class="depart-step-actions">
                 <button type="button" data-depart-prev="1">Back</button>
@@ -471,6 +485,7 @@
                 <div><span>Unloaded</span><strong data-depart-summary="unloaded_on_departure">--</strong></div>
                 <div><span>Loaded</span><strong data-depart-summary="got_loaded">--</strong></div>
                 <div><span>Next</span><strong data-depart-summary="destination">--</strong></div>
+                <div><span>Second</span><strong data-depart-summary="secondary_destination">NONE</strong></div>
               </div>
               <div class="depart-step-actions">
                 <button type="button" data-depart-prev="3">Back</button>

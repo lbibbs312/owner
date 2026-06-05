@@ -212,6 +212,7 @@
       }
     }
 
+    {% include 'partials/_md_print_signature_styles.html' %}
   </style>
 </head>
 <body>
@@ -243,6 +244,7 @@
 <main class="print-container official-print-document">
   <header class="document-header print-only">
     <div>
+      {% include 'partials/_md_print_signature.html' %}
       <h1>{{ document_meta.title }}</h1>
       <div><strong>Driver:</strong> {{ pretrip.driver.display_name if pretrip.driver else current_user.display_name }}</div>
       <div><strong>Truck:</strong> {{ pretrip.truck_number or '' }}{% if pretrip.trailer_number %} / Trailer {{ pretrip.trailer_number }}{% endif %}</div>

@@ -64,6 +64,7 @@ BANNED_PRINT_PHRASES = (
 
 
 def assert_official_record_output(data):
+    assert b"MoveDefense" in data
     assert b"Document No:" in data
     assert b"Generated:" in data
     for phrase in BANNED_PRINT_PHRASES:
@@ -7454,6 +7455,55 @@ def test_empty_active_stop_quick_depart_starts_at_load_check(client, app):
     assert 'data-depart-start-step="1"' in body
     assert '<section class="depart-step " data-depart-step="0">' in body
     assert '<section class="depart-step is-active" data-depart-step="1">' in body
+    assert 'name="secondary_destination" data-depart-field="secondary_destination" value=""' in body
+    assert '<label for="departSecondaryDestination">Optional second stop</label>' in body
+    assert '<option value="">None / not applicable</option>' in body
+
+
+def test_mobile_quick_depart_optional_second_stop_defaults_to_none(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("quick_second_none", "quick-second-none@example.com", "driver")
+        active = DriverLog(
+            driver_id=driver.id,
+            date=date.today(),
+            plant_name="KP",
+            load_size="Empty",
+            arrive_time="00:01",
+        )
+        db.session.add(active)
+        db.session.commit()
+        active_id = active.id
+
+    login(client, "quick_second_none")
+    response = client.post(
+        f"/driver_logs/{active_id}/depart",
+        data={
+            "next": "mobile",
+            "source": "live_flow",
+            "unloaded_on_departure": "yes",
+            "secondary_dropped_on_departure": "yes",
+            "got_loaded": "yes",
+            "destination": "RE",
+            "secondary_destination": "",
+            "secondary_load_type": "load",
+        },
+        headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
+    with app.app_context():
+        from app.models import DriverLog
+
+        saved = DriverLog.query.get(active_id)
+        assert saved.depart_time
+        assert saved.depart_load_size == "Raleigh East Load"
+        assert saved.secondary_load is None
 
 
 def test_mobile_quick_depart_returns_to_live_board_without_full_depart_form(client, app):

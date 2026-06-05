@@ -79,6 +79,7 @@
       .final-row td { background: #f5f5f5 !important; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
+    {% include 'partials/_md_print_signature_styles.html' %}
   </style>
 </head>
 <body>
@@ -94,6 +95,7 @@
   <main class="official-print-document">
   <header class="document-header print-only">
     <div>
+      {% include 'partials/_md_print_signature.html' %}
       <h1>{{ document_meta.title }}</h1>
       <div><strong>Date:</strong> {{ the_date }}</div>
       <div><strong>Driver:</strong> {{ print_driver.display_name if print_driver is defined and print_driver else current_user.display_name }}</div>

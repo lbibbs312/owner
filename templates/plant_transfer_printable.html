@@ -50,6 +50,7 @@
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
 
+    {% include 'partials/_md_print_signature_styles.html' %}
   </style>
 </head>
 <body>
@@ -84,6 +85,7 @@
       <div class="document-meta-row"><span class="document-number">Document No: {{ document_meta.document_no }}</span><span class="generated-at">Generated: {{ document_meta.generated_at }}</span><span class="page-number">Page {{ loop.index }} of {{ copy_sets|length }}</span></div>
       <div class="copy-label">{{ copy.label }}</div>
       <div class="title">
+        {% include 'partials/_md_print_signature.html' %}
         <div class="company">LACKS INDUSTRIES INC.</div>
         <h1>PLANT TRANSFER</h1>
         <div>No. {{ transfer.transfer_number or transfer.id }}</div>

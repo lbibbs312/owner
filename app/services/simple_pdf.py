@@ -221,13 +221,22 @@ class SimplePdf:
         self.current = []
         self.pages.append((self.width, self.height, self.current))
 
-    def text(self, x, y, value, size=10, bold=False, color=None):
-        font = "F2" if bold else "F1"
-        command = f"BT /{font} {size} Tf {x:.2f} {y:.2f} Td ({_escape_pdf_text(value)}) Tj ET"
+    def text(self, x, y, value, size=10, bold=False, color=None, font=None):
+        if font == "signature":
+            font_ref = "F3"
+        else:
+            font_ref = "F2" if bold else "F1"
+        command = f"BT /{font_ref} {size} Tf {x:.2f} {y:.2f} Td ({_escape_pdf_text(value)}) Tj ET"
         rgb = _normalize_rgb(color)
         if rgb:
             command = f"q {rgb} rg {command} Q"
         self.current.append(command)
+
+    def brand_signature(self, x=None, y=None):
+        x = self.width - 158 if x is None else x
+        y = self.height - 28 if y is None else y
+        self.text(x, y, "MoveDefense", size=18, font="signature", color=(31, 78, 163))
+        self.text(x + 10, y - 10, "AUDIT DEFENSE", size=6, bold=True, color=(71, 85, 105))
 
     def multiline_text(
         self, x, y, value, width_chars=40, size=9, leading=11, bold=False, max_lines=3, color=None
@@ -345,12 +354,13 @@ class SimplePdf:
     def build(self):
         objects = []
         objects.append("<< /Type /Catalog /Pages 2 0 R >>")
-        first_page_obj = 5 + len(self.images)
+        first_page_obj = 6 + len(self.images)
         page_refs = " ".join(f"{first_page_obj + i * 2} 0 R" for i in range(len(self.pages)))
         objects.append(f"<< /Type /Pages /Kids [{page_refs}] /Count {len(self.pages)} >>")
         objects.append("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
         objects.append("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>")
-        for idx, image in enumerate(self.images, start=5):
+        objects.append("<< /Type /Font /Subtype /Type1 /BaseFont /ZapfChancery-MediumItalic >>")
+        for idx, image in enumerate(self.images, start=6):
             image["object_id"] = idx
             stream = image["stream"].decode("latin-1")
             objects.append(
@@ -371,7 +381,7 @@ class SimplePdf:
             stream = "\n".join(commands)
             page = (
                 f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width:.2f} {height:.2f}] "
-                f"/Resources << /Font << /F1 3 0 R /F2 4 0 R >>{xobject_resources} >> "
+                f"/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >>{xobject_resources} >> "
                 f"/Contents {content_obj} 0 R >>"
             )
             objects.append(page)

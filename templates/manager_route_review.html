@@ -76,6 +76,7 @@
     .sig-line img { max-height:0.38in; max-width:100%; }
     .muted { color:#555; }
     @media print { body { padding:0; } .no-print, .screen-only, .print-controls, .helper-text, .form-hint, .button-row, nav, header.app-nav, .print-btn, .email-btn, .print-guidance { display:none !important; } * { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+    {% include 'partials/_md_print_signature_styles.html' %}
   </style>
 </head>
 <body>
@@ -90,6 +91,7 @@
   <main class="official-print-document">
   <header class="document-header print-only">
     <div>
+      {% include 'partials/_md_print_signature.html' %}
       <h1>{{ document_meta.title }}</h1>
       <div><strong>Date:</strong> {{ the_date }}</div>
       <div><strong>Driver:</strong> {{ driver.display_name }}</div>
