@@ -7,6 +7,16 @@
 <div class="container fade-in">
   <h2 class="mt-4 mb-3">End of Day Summary (Interactive)</h2>
 
+  {% if pending_posttrip and pending_posttrip_pretrip %}
+    <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2" role="alert">
+      <div>
+        <strong>POSTTRIP DUE</strong>
+        <div class="small">Complete PostTrip before final route closeout.</div>
+      </div>
+      <a class="btn btn-sm btn-warning" href="{{ url_for('driver.do_posttrip', pretrip_id=pending_posttrip_pretrip.id) }}">Complete PostTrip</a>
+    </div>
+  {% endif %}
+
   <form method="POST" action="{{ url_for('driver.end_of_day_summary') }}" data-autosave="true" data-autosave-key="end-of-day-{{ current_user.id }}">
     {{ form.hidden_tag() }}
 

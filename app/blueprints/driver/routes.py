@@ -102,6 +102,22 @@ from app.models import (
 PLANT_TRANSFER_LINE_COUNT = 20
 DRIVER_LOG_AUDIT_FIELDS = ["plant_name", "load_size", "depart_load_size", "secondary_load", "downtime_reason", "part_number", "hot_parts", "arrive_time", "depart_time", "dock_wait_minutes", "maintenance", "fuel", "fuel_mileage", "meeting"]
 PLANT_TRANSFER_AUDIT_FIELDS = ["transfer_number", "transfer_date", "ship_to", "ship_from", "trailer_number", "driver_name", "driver_initials", "transfer_time", "loaded_by"]
+DAMAGE_REPORT_AUDIT_FIELDS = [
+    "reported_by_id",
+    "task_id",
+    "driver_log_id",
+    "plant_transfer_id",
+    "truck_number",
+    "trailer_number",
+    "plant_name",
+    "damage_time",
+    "stage",
+    "move_reference",
+    "description",
+    "status",
+    "created_at",
+    "resolved_at",
+]
 RYDER_CLOSING_ACTIONS = {"fixed", "left", "rental"}
 MAX_REASONABLE_DAILY_ROUTE_MILES = 1000
 
@@ -657,12 +673,16 @@ def _apply_route_end_cta(route_cta, route_context, active_pretrip, route_date, t
     return patched
 
 
-def _posttrip_due_for_route(active_pretrip, route_context):
+def _posttrip_due_for_route(active_pretrip, route_context, *, route_is_active=False, finalizing=False):
     if getattr(route_context, "posttrip_status", None) == "complete":
         return False
     if not active_pretrip or active_pretrip.posttrip:
         return False
-    return getattr(route_context, "route_status", None) != "active"
+    if finalizing:
+        return True
+    if route_is_active:
+        return False
+    return getattr(route_context, "route_status", None) in {"completed", "finalized"}
 
 
 def _route_pretrips_for_driver_date(driver_id, route_date):
@@ -4463,7 +4483,12 @@ def mobile_end_route():
 @login_required
 def end_of_day_summary():
     form = EndOfDayForm()
+    now_local, _ = _now_local_and_utc()
     today_local_date, logs, pretrips_today, plant_transfers_today = _get_today_eod_records()
+    open_shift = _open_shift_for_driver(current_user.id)
+    route_context = build_route_context(driver_id=current_user.id, route_date=today_local_date, now=now_local)
+    active_pretrip = _select_route_pretrip(pretrips_today, route_context=route_context, open_shift=open_shift)
+    pending_posttrip = _posttrip_due_for_route(active_pretrip, route_context, finalizing=True)
     if form.validate_on_submit():
         unresolved_departures = unresolved_departure_logs(
             sorted(logs, key=_driver_log_sort_key),
@@ -4518,6 +4543,8 @@ def end_of_day_summary():
         drivers_pretrips=drivers_pretrips,
         drivers_plant_transfers=drivers_plant_transfers,
         log_routes=_driver_log_route_context(logs),
+        pending_posttrip=pending_posttrip,
+        pending_posttrip_pretrip=active_pretrip if pending_posttrip else None,
     )
 
 
@@ -4728,7 +4755,7 @@ def new_damage_report():
             target_type="damage_report",
             target_id=report.id,
         )
-        flash("Damage report saved. You can edit or delete it until the route is finalized or you submit it.", "success")
+        flash("Damage report saved. You can edit or archive it until the route is finalized or you submit it.", "success")
         return redirect(url_for("driver.view_damage_report", report_id=report.id))
     return render_template("damage_report_form.html", form=form, report=None, is_edit=False)
 
@@ -4868,19 +4895,34 @@ def delete_damage_report(report_id):
         flash("This damage report is locked because it was submitted or the route was finalized.", "warning")
         return redirect(url_for("driver.view_damage_report", report_id=report.id))
 
-    details = f"Damage report #{report.id} deleted for {report.plant_name}."
+    before = model_snapshot(report, DAMAGE_REPORT_AUDIT_FIELDS)
+    before["photos"] = [photo.filename for photo in report.photos]
+    report.status = "closed"
+    report.resolved_at = datetime.utcnow()
+    after = model_snapshot(report, ["status", "resolved_at"])
+    after["photos_preserved"] = [photo.filename for photo in report.photos]
+    record_audit_event(
+        user_id=current_user.id,
+        target_type="damage_report",
+        target_id=report.id,
+        action="driver_archived",
+        reason="Driver archived open damage report before route finalization.",
+        before_values=before,
+        after_values=after,
+        commit=False,
+    )
     record_activity(
         user_id=current_user.id,
         category="damage",
-        action="deleted",
-        title="Damage report deleted",
-        details=details,
+        action="archived",
+        title="Damage report archived",
+        details=f"Damage report #{report.id} archived for {report.plant_name}; evidence remains attached.",
         target_type="damage_report",
         target_id=report.id,
+        commit=False,
     )
-    db.session.delete(report)
     db.session.commit()
-    flash("Damage report deleted.", "success")
+    flash("Damage report archived.", "success")
     return redirect(url_for("driver.damage_reports"))
 
 
@@ -5032,7 +5074,11 @@ def _mobile_route_map_fragment_context(route_date=None):
         key=_driver_log_sort_key,
     )
     current_stop = route_context.current_stop
-    pending_posttrip = _posttrip_due_for_route(active_pretrip, route_context)
+    pending_posttrip = _posttrip_due_for_route(
+        active_pretrip,
+        route_context,
+        route_is_active=route_is_active,
+    )
     departed_today = any(getattr(log, "depart_time", None) for log in todays_logs)
     has_transfer_today = bool(
         _active_plant_transfers_query()
@@ -5261,7 +5307,11 @@ def mobile_dashboard():
     )
     production_flow = None
     proof_missing = bool(departed_today and not has_transfer_today)
-    pending_posttrip = _posttrip_due_for_route(active_pretrip, route_context)
+    pending_posttrip = _posttrip_due_for_route(
+        active_pretrip,
+        route_context,
+        route_is_active=route_is_active,
+    )
     route_map = build_driver_route_map_context(
         driver=current_user,
         date=route_date,

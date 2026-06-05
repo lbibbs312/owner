@@ -719,30 +719,28 @@
       });
     });
   </script>
-  {% if current_user.is_authenticated %}
-    {% with messages = get_flashed_messages(with_categories=True) %}
-      {% if messages %}
-        <script>
-          (function () {
-            if (!window.MoveDefenseToast) return;
-            var items = {{ messages|tojson }};
-            var defaults = { success: 'DONE', error: 'ERROR', warning: 'HEADS UP', info: 'NOTICE' };
-            items.forEach(function (pair) {
-              var category = pair[0];
-              var message = String(pair[1] == null ? '' : pair[1]);
-              var type = category === 'danger' ? 'error'
-                : (category === 'warning' ? 'warning'
-                : (category === 'success' ? 'success' : 'info'));
-              var nl = message.indexOf('\n');
-              var title, detail;
-              if (nl >= 0) { title = message.slice(0, nl); detail = message.slice(nl + 1); }
-              else { title = defaults[type] || 'NOTICE'; detail = message; }
-              (window.MoveDefenseToast[type] || window.MoveDefenseToast.show)(title, detail, type);
-            });
-          })();
-        </script>
-      {% endif %}
-    {% endwith %}
-  {% endif %}
+  {% with messages = get_flashed_messages(with_categories=True) %}
+    {% if messages %}
+      <script>
+        (function () {
+          if (!window.MoveDefenseToast) return;
+          var items = {{ messages|tojson }};
+          var defaults = { success: 'DONE', error: 'ERROR', warning: 'HEADS UP', info: 'NOTICE' };
+          items.forEach(function (pair) {
+            var category = pair[0];
+            var message = String(pair[1] == null ? '' : pair[1]);
+            var type = category === 'danger' ? 'error'
+              : (category === 'warning' ? 'warning'
+              : (category === 'success' ? 'success' : 'info'));
+            var nl = message.indexOf('\n');
+            var title, detail;
+            if (nl >= 0) { title = message.slice(0, nl); detail = message.slice(nl + 1); }
+            else { title = defaults[type] || 'NOTICE'; detail = message; }
+            (window.MoveDefenseToast[type] || window.MoveDefenseToast.show)(title, detail, type);
+          });
+        })();
+      </script>
+    {% endif %}
+  {% endwith %}
 </body>
 </html>

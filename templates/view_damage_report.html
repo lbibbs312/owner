@@ -92,8 +92,8 @@
         </form>
         <details class="more-actions">
           <summary class="btn btn-outline-secondary">More Actions</summary>
-          <form class="mt-2" method="POST" action="{{ url_for('driver.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Delete this damage report?');">
-            <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
+          <form class="mt-2" method="POST" action="{{ url_for('driver.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report? Evidence will remain attached.');">
+            <button class="btn btn-outline-danger btn-sm" type="submit">Archive Report</button>
           </form>
         </details>
       {% endif %}

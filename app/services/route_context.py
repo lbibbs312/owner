@@ -283,7 +283,7 @@ def build_route_cta_context(
             allowed_actions = ["record_departure", "add_damage", "add_note"]
         secondary = _route_cta("Add Damage", "add_damage", "ghost")
         route_message = "Current stop is open."
-    elif all_departed and has_route_history and not route_finalized:
+    elif all_departed and has_route_history and not route_finalized and not route_is_active:
         if is_today and not selected_date_forced:
             display_mode = "completed_route"
             secondary = _route_cta("Print Draft", "print_route", "ghost")
@@ -321,13 +321,22 @@ def build_route_cta_context(
         route_message = "Showing route history." if not route_is_active else "Route is active."
     else:
         display_mode = "no_active_shift" if not has_active_shift else "active_route"
-        next_action = "Start shift"
-        primary = _route_cta("Start Shift", "start_shift")
-        secondary = _route_cta("View Last Route", "route_history", "ghost")
-        show_start_shift = True
-        show_print = False
-        allowed_actions = ["start_shift", "route_history"]
-        route_message = "No active route for this date."
+        if has_active_shift or route_is_active:
+            next_action = "Add Stop"
+            primary = _route_cta("Add Stop", "add_stop")
+            secondary = _route_cta("View Last Route", "route_history", "ghost")
+            show_start_shift = False
+            show_print = False
+            allowed_actions = ["add_stop", "route_history"]
+            route_message = "Shift is active. Add the next stop."
+        else:
+            next_action = "Start shift"
+            primary = _route_cta("Start Shift", "start_shift")
+            secondary = _route_cta("View Last Route", "route_history", "ghost")
+            show_start_shift = True
+            show_print = False
+            allowed_actions = ["start_shift", "route_history"]
+            route_message = "No active route for this date."
 
     if proof_missing and not route_finalized and next_action not in {"Confirm cargo", "Record departure", "Finalize route"}:
         display_mode = "proof_needed"

@@ -1,21 +1,118 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container">
-  <h2 class="mt-3">Register</h2>
-  <form method="POST" action="">
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+<style>
+  body.md-shell #pageContent {
+    padding:28px 14px;
+  }
+  .md-register-wrap {
+    width:min(1040px, 100%);
+    margin:0 auto;
+    display:grid;
+    grid-template-columns:minmax(0, 360px) minmax(0, 1fr);
+    gap:18px;
+    align-items:start;
+  }
+  .md-register-panel,
+  .md-register-card {
+    border:1px solid var(--md-line);
+    border-radius:16px;
+    background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(12,21,33,.96));
+    box-shadow:0 22px 60px rgba(0,0,0,.42), inset 0 1px 0 rgba(91,157,255,.08);
+  }
+  .md-register-panel {
+    padding:24px;
+    position:sticky;
+    top:90px;
+  }
+  .md-register-panel h1 {
+    margin:8px 0 10px;
+    color:var(--md-text);
+    font-family:var(--md-display);
+    font-size:2.2rem;
+    font-weight:900;
+    line-height:1;
+    text-transform:uppercase;
+  }
+  .md-register-panel p {
+    margin:0;
+    color:var(--md-muted);
+    font-weight:700;
+    line-height:1.5;
+  }
+  .md-register-card {
+    padding:22px;
+  }
+  .md-register-card h2 {
+    margin:0 0 18px;
+    color:var(--md-text);
+    font-family:var(--md-display);
+    font-size:1.35rem;
+    font-weight:900;
+    text-transform:uppercase;
+  }
+  .md-register-card label {
+    color:var(--md-muted);
+    font-family:var(--md-mono);
+    font-size:.72rem;
+    font-weight:900;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+  .md-register-card .form-control,
+  .md-register-card .form-select {
+    min-height:46px;
+    border:1px solid rgba(91,157,255,.28);
+    background:rgba(6,10,18,.72);
+    color:var(--md-text);
+    font-weight:700;
+  }
+  .md-register-card .form-control:focus,
+  .md-register-card .form-select:focus {
+    border-color:var(--md-blue-bright);
+    box-shadow:0 0 0 .2rem rgba(47,109,240,.28);
+  }
+  .md-pin-note {
+    margin-top:6px;
+    color:var(--md-muted);
+    font-size:.78rem;
+    font-weight:700;
+  }
+  .md-auth-link {
+    color:var(--md-blue-bright);
+    font-weight:900;
+    text-decoration:none;
+  }
+  .md-auth-link:hover { color:var(--md-text); }
+  @media (max-width:820px) {
+    .md-register-wrap { grid-template-columns:1fr; }
+    .md-register-panel { position:static; }
+  }
+</style>
+
+<section class="md-register-wrap" aria-label="MoveDefense account setup">
+  <aside class="md-register-panel">
+    <p class="md-section-label mb-1">MOVEDEFENSE SETUP</p>
+    <h1>Create Access</h1>
+    <p>Use the role that matches the workflow. Drivers record route proof and damage evidence. Managers require the configured manager PIN.</p>
+  </aside>
+
+  <form class="md-register-card" method="POST" action="">
     {{ form.hidden_tag() }}
+    <h2>Account Details</h2>
     <div class="mb-3">
       {{ form.username.label }}
-      {{ form.username(class="form-control") }}
+      {{ form.username(class="form-control", autocomplete="username") }}
     </div>
     <div class="row">
       <div class="col-md-6 mb-3">
         {{ form.first_name.label }}
-        {{ form.first_name(class="form-control") }}
+        {{ form.first_name(class="form-control", autocomplete="given-name") }}
       </div>
       <div class="col-md-6 mb-3">
         {{ form.last_name.label }}
-        {{ form.last_name(class="form-control") }}
+        {{ form.last_name(class="form-control", autocomplete="family-name") }}
       </div>
     </div>
     <div class="row">
@@ -30,15 +127,17 @@
     </div>
     <div class="mb-3">
       {{ form.email.label }}
-      {{ form.email(class="form-control") }}
+      {{ form.email(class="form-control", autocomplete="email") }}
     </div>
-    <div class="mb-3">
-      {{ form.password.label }}
-      {{ form.password(class="form-control") }}
-    </div>
-    <div class="mb-3">
-      {{ form.confirm_password.label }}
-      {{ form.confirm_password(class="form-control") }}
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        {{ form.password.label }}
+        {{ form.password(class="form-control", autocomplete="new-password") }}
+      </div>
+      <div class="col-md-6 mb-3">
+        {{ form.confirm_password.label }}
+        {{ form.confirm_password(class="form-control", autocomplete="new-password") }}
+      </div>
     </div>
     <div class="mb-3">
       {{ form.role.label }}
@@ -46,13 +145,14 @@
     </div>
     <div class="mb-3">
       {{ form.manager_pin.label }}
-      {{ form.manager_pin(class="form-control") }}
+      {{ form.manager_pin(class="form-control", autocomplete="off") }}
+      <div class="md-pin-note">Required only for manager accounts.</div>
     </div>
-    {{ form.submit(class="btn btn-primary") }}
+    {{ form.submit(class="btn btn-primary w-100") }}
+    <p class="mt-3 mb-0 text-muted small">
+      Already have access?
+      <a class="md-auth-link" href="{{ url_for('auth.login') }}">Sign in</a>
+    </p>
   </form>
-  <p class="mt-3">
-    Already have an account?
-    <a href="{{ url_for('auth.login') }}">Login</a>
-  </p>
-</div>
+</section>
 {% endblock %}

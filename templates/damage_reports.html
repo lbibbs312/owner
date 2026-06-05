@@ -128,8 +128,8 @@
               <form method="POST" action="{{ url_for('driver.submit_damage_report', report_id=report.id) }}">
                 <button class="btn btn-success" type="submit">Submit</button>
               </form>
-              <form method="POST" action="{{ url_for('driver.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Delete this damage report?');">
-                <button class="btn btn-outline-danger" type="submit">Delete</button>
+              <form method="POST" action="{{ url_for('driver.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report? Evidence will remain attached.');">
+                <button class="btn btn-outline-danger" type="submit">Archive</button>
               </form>
             {% endif %}
           </div>
@@ -169,17 +169,17 @@
               <div class="d-flex flex-wrap gap-1 justify-content-end damage-actions">
                 <a class="btn btn-sm btn-outline-primary" href="{{ url_for('manager.view_damage_report' if is_manager_history else 'driver.view_damage_report', report_id=report.id) }}">Open</a>
                 {% if is_manager_history %}
-                  <form method="POST" action="{{ url_for('manager.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Delete this damage report?');">
+                  <form method="POST" action="{{ url_for('manager.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report from active review? Evidence will remain attached.');">
                     <input type="hidden" name="next" value="{{ url_for('driver.damage_reports') }}">
-                    <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Archive</button>
                   </form>
                 {% elif can_modify %}
                   <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Edit</a>
                   <form method="POST" action="{{ url_for('driver.submit_damage_report', report_id=report.id) }}">
                     <button class="btn btn-sm btn-success" type="submit">Submit</button>
                   </form>
-                  <form method="POST" action="{{ url_for('driver.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Delete this damage report?');">
-                    <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                  <form method="POST" action="{{ url_for('driver.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report? Evidence will remain attached.');">
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Archive</button>
                   </form>
                 {% endif %}
               </div>

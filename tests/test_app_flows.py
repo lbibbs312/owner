@@ -281,6 +281,66 @@ def test_login_redirects_by_role(client, app):
     assert manager_response.headers["Location"].endswith("/manager/dashboard")
 
 
+def test_auth_pages_use_movedefense_shell(client):
+    login_page = client.get("/login")
+    assert login_page.status_code == 200
+    assert b"md-shell" in login_page.data
+    assert b"MOVEDEFENSE ACCESS" in login_page.data
+    assert b"Operations Sign In" in login_page.data
+    assert b"Driver logs, route timing, cargo proof" in login_page.data
+
+    register_page = client.get("/register")
+    assert register_page.status_code == 200
+    assert b"md-shell" in register_page.data
+    assert b"MOVEDEFENSE SETUP" in register_page.data
+    assert b"Create Access" in register_page.data
+    assert b"Required only for manager accounts." in register_page.data
+
+
+def test_unauthenticated_auth_errors_render_flash_messages(client, monkeypatch):
+    monkeypatch.delenv("MANAGER_REGISTRATION_PIN", raising=False)
+
+    disabled_response = client.post(
+        "/register",
+        data={
+            "username": "manager_unset_visible",
+            "email": "manager-unset-visible@example.com",
+            "password": "password1",
+            "confirm_password": "password1",
+            "role": "management",
+            "manager_pin": "0000",
+        },
+        follow_redirects=True,
+    )
+    assert disabled_response.status_code == 200
+    assert b"Manager self-registration is not enabled." in disabled_response.data
+    assert b"MoveDefenseToast" in disabled_response.data
+
+    monkeypatch.setenv("MANAGER_REGISTRATION_PIN", "2468")
+    wrong_pin_response = client.post(
+        "/register",
+        data={
+            "username": "manager_wrong_visible",
+            "email": "manager-wrong-visible@example.com",
+            "password": "password1",
+            "confirm_password": "password1",
+            "role": "management",
+            "manager_pin": "0000",
+        },
+        follow_redirects=True,
+    )
+    assert wrong_pin_response.status_code == 200
+    assert b"Invalid Manager PIN!" in wrong_pin_response.data
+
+    login_response = client.post(
+        "/login",
+        data={"login_name": "missing-user", "password": "bad-password"},
+        follow_redirects=True,
+    )
+    assert login_response.status_code == 200
+    assert b"Invalid credentials." in login_response.data
+
+
 def test_login_checks_password_against_all_matching_usernames_and_emails(client, app):
     with app.app_context():
         create_user("driver1", "shared@example.com", "driver", password="firstpass")
@@ -4716,8 +4776,9 @@ def test_premature_finalized_event_does_not_lock_active_shift_new_logs(client, a
     mobile = client.get("/mobile")
     assert mobile.status_code == 200
     body = mobile.get_data(as_text=True)
-    assert b"PostTrip Due" in mobile.data
-    assert b"Finish inspection and end shift" in mobile.data
+    assert b"PostTrip Due" not in mobile.data
+    assert b"PostTrip Available" in mobile.data
+    assert b"Optional until route close" in mobile.data
     assert b"md-flow-primary-cta" in mobile.data
     assert b"md-flow-action-tab primary add-stop-action" not in mobile.data
     assert b'<a class="md-flow-primary-cta add-stop-action"' in mobile.data
@@ -5507,6 +5568,54 @@ def test_damage_report_edit_delete_submit_and_eod_lock(client, app):
         report = DamageReport.query.get(report_id)
         assert report.truck_number == "T2"
         assert report.description == "Scuffed bumper updated"
+
+    archive_create_response = client.post(
+        "/damage_reports/new",
+        data={
+            "truck_number": "T4",
+            "trailer_number": "TR4",
+            "plant_name": "KP",
+            "stage": "before",
+            "move_reference": "Dock 8",
+            "description": "Mirror crack",
+            "photo": (BytesIO(b"archive damage image"), "archive-damage.jpg"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+    assert archive_create_response.status_code == 302
+
+    with app.app_context():
+        from app.models import DamageReport
+
+        archived_report = DamageReport.query.filter_by(description="Mirror crack").one()
+        archive_report_id = archived_report.id
+        assert len(archived_report.photos) == 1
+
+    archive_detail = client.get(f"/damage_reports/{archive_report_id}")
+    assert archive_detail.status_code == 200
+    assert b"Archive Report" in archive_detail.data
+    assert b"Delete this damage report" not in archive_detail.data
+
+    archive_response = client.post(f"/damage_reports/{archive_report_id}/delete", follow_redirects=False)
+    assert archive_response.status_code == 302
+
+    with app.app_context():
+        from app.models import ActivityEvent, AuditEvent, DamageReport
+
+        archived_report = DamageReport.query.get(archive_report_id)
+        assert archived_report is not None
+        assert archived_report.status == "closed"
+        assert archived_report.resolved_at is not None
+        assert len(archived_report.photos) == 1
+        audit = AuditEvent.query.filter_by(
+            target_type="damage_report", target_id=archive_report_id, action="driver_archived"
+        ).one()
+        assert "archive-damage.jpg" in audit.after_values
+        activity = ActivityEvent.query.filter_by(
+            target_type="damage_report", target_id=archive_report_id, action="archived"
+        ).one()
+        assert activity.title == "Damage report archived"
 
     submit_response = client.post(f"/damage_reports/{report_id}/submit", follow_redirects=False)
     assert submit_response.status_code == 302
@@ -6681,6 +6790,145 @@ def test_mobile_dashboard_shows_posttrip_due_after_route_close_not_as_board_row(
     assert b"Ready To Finalize" not in page.data
     assert "POSTTRIP NEEDED" not in body
     assert "<strong>TRUCK</strong>" not in body
+
+
+def test_mobile_dashboard_active_shift_without_stops_keeps_add_stop_primary(client, app):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import PreTrip, ShiftRecord
+
+        driver = create_user("route_started_driver", "route-started@example.com", "driver")
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=379000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add(ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime.utcnow()))
+        db.session.commit()
+
+    login(client, "route_started_driver")
+    page = client.get("/mobile")
+
+    assert page.status_code == 200
+    assert b"PostTrip Due" not in page.data
+    assert b"PostTrip Available" in page.data
+    assert b"Optional until route close" in page.data
+    assert b'<a class="md-flow-primary-cta add-stop-action"' in page.data
+    assert b"<strong>Add Stop</strong>" in page.data
+
+
+def test_mobile_dashboard_active_between_stops_prioritizes_add_stop_over_posttrip(client, app):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("between_stops_driver", "between-stops@example.com", "driver")
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=379000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime.utcnow()),
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="RE",
+                load_size="Empty",
+                depart_load_size="Raleigh West Load",
+                arrive_time="08:00",
+                depart_time="08:15",
+                created_at=datetime.utcnow(),
+            ),
+        ])
+        db.session.commit()
+
+    login(client, "between_stops_driver")
+    page = client.get("/mobile")
+
+    assert page.status_code == 200
+    assert b"PostTrip Due" not in page.data
+    assert b"PostTrip Available" in page.data
+    assert b'<a class="md-flow-primary-cta add-stop-action"' in page.data
+    assert b"<strong>Add Stop</strong>" in page.data
+    assert b"Finalize Route" not in page.data
+
+
+def test_end_of_day_summary_shows_posttrip_due_when_finalizing_without_posttrip(client, app):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("eod_missing_posttrip_driver", "eod-missing-posttrip@example.com", "driver")
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=379000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime.utcnow()),
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="RE",
+                load_size="Empty",
+                depart_load_size="Empty",
+                no_pickup=True,
+                arrive_time="08:00",
+                depart_time="08:15",
+                created_at=datetime.utcnow(),
+            ),
+        ])
+        db.session.commit()
+        pretrip_id = pretrip.id
+
+    login(client, "eod_missing_posttrip_driver")
+    page = client.get("/end_of_day_summary")
+
+    assert page.status_code == 200
+    assert b"POSTTRIP DUE" in page.data
+    assert b"Complete PostTrip before final route closeout." in page.data
+    assert f"/do_posttrip/{pretrip_id}".encode() in page.data
+
+
+def test_end_of_day_summary_hides_posttrip_due_after_posttrip_complete(client, app):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PostTrip, PreTrip, ShiftRecord
+
+        driver = create_user("eod_posttrip_complete_driver", "eod-posttrip-complete@example.com", "driver")
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=379000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            PostTrip(pretrip_id=pretrip.id, end_mileage=379025, miles_driven=25),
+            ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime.utcnow()),
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="RE",
+                load_size="Empty",
+                depart_load_size="Empty",
+                no_pickup=True,
+                arrive_time="08:00",
+                depart_time="08:15",
+                created_at=datetime.utcnow(),
+            ),
+        ])
+        db.session.commit()
+
+    login(client, "eod_posttrip_complete_driver")
+    page = client.get("/end_of_day_summary")
+
+    assert page.status_code == 200
+    assert b"POSTTRIP DUE" not in page.data
+    assert b"Complete PostTrip before final route closeout." not in page.data
 
 
 def test_mobile_dashboard_allows_finalize_after_posttrip_complete(client, app):

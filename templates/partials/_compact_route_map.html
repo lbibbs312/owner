@@ -201,10 +201,11 @@
 {% set document_url = urls.get('attach_document') %}
 {% set add_stop_url = urls.get('add_stop') %}
 {% set pretrip_url = urls.get('start_shift') or url_for('driver.new_pretrip') %}
-{% set posttrip_url = url_for('driver.do_posttrip', pretrip_id=active_pt.id) if pending_pt and active_pt else none %}
+{% set posttrip_available = active_pt and not active_pt.posttrip %}
+{% set posttrip_url = url_for('driver.do_posttrip', pretrip_id=active_pt.id) if posttrip_available else none %}
 {% set shift_url = posttrip_url or pretrip_url %}
-{% set shift_label = 'PostTrip Due' if posttrip_url else 'PreTrip / Shift' %}
-{% set shift_note = 'Finish inspection and end shift' if posttrip_url else ('Shift started from PreTrip' if active_pt else 'Start shift with PreTrip') %}
+{% set shift_label = 'PostTrip Due' if pending_pt and posttrip_url else ('PostTrip Available' if posttrip_url else 'PreTrip / Shift') %}
+{% set shift_note = 'Finish inspection and end shift' if pending_pt and posttrip_url else ('Optional until route close' if posttrip_url else ('Shift started from PreTrip' if active_pt else 'Start shift with PreTrip')) %}
 {% set transfer_url = document_url or url_for('driver.new_plant_transfer') %}
 {% set transfer_note = latest_transfer.ship_from ~ ' to ' ~ latest_transfer.ship_to if latest_transfer is defined and latest_transfer else 'Create a transfer sheet' %}
 {% set history_url = truck_history_url if truck_history_url is defined and truck_history_url else url_for('driver.truck_maintenance_history') %}
@@ -304,7 +305,7 @@
       <span>{{ transfer_note }}</span>
     </a>
     {% if not (posttrip_url and primary_action == 'posttrip') %}
-      <a class="md-flow-action-tab {% if pulse_key == 'posttrip' %}is-next-required{% endif %}" href="{{ shift_url }}" data-flow-open-url="{{ shift_url }}" data-flow-panel-title="{{ 'PostTrip Work' if posttrip_url else 'PreTrip / Shift' }}">
+      <a class="md-flow-action-tab {% if pending_pt and pulse_key == 'posttrip' %}is-next-required{% endif %}" href="{{ shift_url }}" data-flow-open-url="{{ shift_url }}" data-flow-panel-title="{{ 'PostTrip Work' if posttrip_url else 'PreTrip / Shift' }}">
         <strong>{{ shift_label }}</strong>
         <span>{{ shift_note }}</span>
       </a>
