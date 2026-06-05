@@ -97,7 +97,7 @@
         <div><dt>Linked transfers</dt><dd>{% if lane.linked_transfer_ids %}{{ lane.linked_transfer_ids|join(', ') }}{% else %}No current data{% endif %}</dd></div>
       </dl>
       <div class="drawer-actions">
-        {% if can_open_records and lane.view_url %}<a href="{{ lane.view_url }}">Open related Move Queue</a>{% else %}<button type="button" disabled>Open related Move Queue <span>{% if can_open_records %}Not wired yet.{% else %}Requires authorized identity.{% endif %}</span></button>{% endif %}
+        {% if can_open_records and lane.view_url %}<a href="{{ lane.view_url }}">Open related Move Queue</a>{% elif not can_open_records %}<button type="button" disabled>Open related Move Queue <span>Requires authorized identity.</span></button>{% endif %}
       </div>
     </div>
   {% endfor %}
@@ -159,7 +159,7 @@
       {% endif %}
       <div class="drawer-section-title">Available Actions</div>
       <div class="drawer-actions">
-        {% if can_open_records and item.view_url %}<a href="{{ item.view_url }}">Open related record</a>{% else %}<button type="button" disabled>Open related record <span>{% if can_open_records %}Not wired yet.{% else %}Requires authorized identity.{% endif %}</span></button>{% endif %}
+        {% if can_open_records and item.view_url %}<a href="{{ item.view_url }}">Open related record</a>{% elif not can_open_records %}<button type="button" disabled>Open related record <span>Requires authorized identity.</span></button>{% endif %}
       </div>
     </div>
   {% endfor %}

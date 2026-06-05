@@ -160,7 +160,7 @@ def test_deploy_db_bootstraps_empty_database_and_stamps_head(monkeypatch):
         tables = set(inspect(db.engine).get_table_names())
         assert "user" in tables
         assert "driver_log" in tables
-        assert db.session.execute(text("SELECT version_num FROM alembic_version")).scalar() == "3d4e5f607182"
+        assert db.session.execute(text("SELECT version_num FROM alembic_version")).scalar() == "4e5f60718293"
 
     response = app.test_client().get("/readyz")
     assert response.status_code == 200

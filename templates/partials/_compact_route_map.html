@@ -320,11 +320,13 @@
   </div>
   {% if end_route_url and primary_action == 'end_route' %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
-      <a class="md-flow-primary-cta" href="{{ end_route_url }}" data-flow-open-url="{{ end_route_url }}">
+      <form action="{{ end_route_url }}" method="POST" style="margin:0">
+      <button class="md-flow-primary-cta" type="submit" style="width:100%; cursor:pointer">
         <span>Required driver action</span>
         <strong>End Route</strong>
         <small>{{ primary_stop.plant_name if primary_stop else 'Current stop' }} &middot; close shift here</small>
-      </a>
+      </button>
+      </form>
     </div>
   {% elif posttrip_url and primary_action == 'posttrip' %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
@@ -344,7 +346,7 @@
     </div>
   {% elif add_stop_url and (primary_action == 'add_stop' or not (rm and rm.stops) or show_between_loads_add_stop) %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
-      <a class="md-flow-primary-cta add-stop-action" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}">
+      <a class="md-flow-primary-cta add-stop-action" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}" data-flow-panel-title="Add Stop">
         <span>Required driver action</span>
         <strong>Add Stop</strong>
         <small>Continue route</small>
@@ -727,7 +729,7 @@
             <h4>Stop {{ stop.sequence }} route details</h4>
             <div class="route-detail-grid">
               <div><span>Arrived with</span><strong>{{ stop.arrived_with }}</strong></div>
-	              <div><span>Departed with</span><strong>{{ 'No Pickup' if stop.no_pickup else stop.departed_with }}</strong></div>
+		              <div><span>Departed with</span><strong>{% if stop.no_pickup %}Out: No Pickup{% else %}{{ stop.departed_with }}{% endif %}</strong></div>
               {% if stop.status == 'completed' %}<div><span>Status</span><strong>{{ stop.status_label }}</strong></div>{% endif %}
               <div><span>Next</span><strong>{{ stop.next_action }}</strong></div>
             </div>

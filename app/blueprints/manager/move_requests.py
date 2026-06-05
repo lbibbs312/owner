@@ -49,6 +49,67 @@ MOVE_REQUEST_AUDIT_FIELDS = [
     "parse_warnings",
 ]
 
+CLOSED_MOVE_REQUEST_STATUSES = {"completed", "cancelled"}
+MOVE_REQUEST_LIFECYCLE_TRANSITIONS = {
+    "assign": {
+        "open": "assigned",
+        "assigned": "assigned",
+        "blocked": "assigned",
+        "acknowledged": "acknowledged",
+        "in_progress": "in_progress",
+        "waiting": "waiting",
+        "active": "active",
+        "needs_review": "needs_review",
+    },
+    "acknowledge": {
+        "open": "open",
+        "assigned": "assigned",
+        "blocked": "blocked",
+        "acknowledged": "acknowledged",
+        "in_progress": "in_progress",
+        "waiting": "waiting",
+        "active": "active",
+        "needs_review": "needs_review",
+    },
+    "block": {
+        "open": "blocked",
+        "assigned": "blocked",
+        "blocked": "blocked",
+        "acknowledged": "blocked",
+        "in_progress": "blocked",
+        "waiting": "blocked",
+        "active": "blocked",
+        "needs_review": "blocked",
+    },
+    "complete": {
+        "open": "completed",
+        "assigned": "completed",
+        "blocked": "completed",
+        "acknowledged": "completed",
+        "in_progress": "completed",
+        "waiting": "completed",
+        "active": "completed",
+        "needs_review": "completed",
+    },
+    "cancel": {
+        "open": "cancelled",
+        "assigned": "cancelled",
+        "blocked": "cancelled",
+        "acknowledged": "cancelled",
+        "in_progress": "cancelled",
+        "waiting": "cancelled",
+        "active": "cancelled",
+        "needs_review": "cancelled",
+    },
+}
+MOVE_REQUEST_LIFECYCLE_LABELS = {
+    "assign": "assign this request",
+    "acknowledge": "acknowledge this request",
+    "block": "mark this request blocked",
+    "complete": "mark this request completed",
+    "cancel": "cancel this request",
+}
+
 
 def _clean_text(value):
     text = (value or "").strip()
@@ -57,6 +118,36 @@ def _clean_text(value):
 
 def _zero_to_none(value):
     return value or None
+
+
+def _normalized_status(value):
+    return (value or "open").strip().lower()
+
+
+def _move_request_lifecycle_target(move_request, action):
+    status = _normalized_status(move_request.status)
+    if status in CLOSED_MOVE_REQUEST_STATUSES:
+        label = MOVE_REQUEST_LIFECYCLE_LABELS.get(action, "change this request")
+        flash(
+            f"{move_request.display_number} is {status.replace('_', ' ')} and cannot {label} without a correction/reopen action.",
+            "danger",
+        )
+        return None
+    target_status = MOVE_REQUEST_LIFECYCLE_TRANSITIONS.get(action, {}).get(status)
+    if target_status is None:
+        label = MOVE_REQUEST_LIFECYCLE_LABELS.get(action, "change this request")
+        flash(f"{move_request.display_number} cannot {label} from {status.replace('_', ' ')}.", "danger")
+        return None
+    return target_status
+
+
+def _require_lifecycle_reason(field_name, value):
+    reason = _clean_text(value)
+    if reason:
+        return reason
+    label = "Blocked reason" if field_name == "blocked_reason" else "Closed / cancel reason"
+    flash(f"{label} is required for this move-request action.", "danger")
+    return None
 
 
 def _driver_choices():
@@ -360,14 +451,16 @@ def edit_move_request(request_id):
 @bp.route("/move-requests/<int:request_id>/assign", methods=["POST"])
 def assign_move_request(request_id):
     move_request = _request_or_404(request_id)
+    target_status = _move_request_lifecycle_target(move_request, "assign")
+    if target_status is None:
+        return redirect(url_for("manager.move_requests"))
     before_values = model_snapshot(move_request, MOVE_REQUEST_AUDIT_FIELDS)
     driver_id = request.form.get("assigned_driver_id", type=int) or None
     move_request.assigned_driver_id = driver_id
     move_request.assigned_driver_text = _clean_text(request.form.get("assigned_driver_text"))
     move_request.equipment_id = _clean_text(request.form.get("equipment_id"))
     move_request.equipment_text = _clean_text(request.form.get("equipment_text"))
-    if move_request.status in {"open", "blocked"}:
-        move_request.status = "assigned"
+    move_request.status = target_status
     move_request.updated_by_id = current_user.id
     _record_move_request_activity(
         move_request,
@@ -390,8 +483,12 @@ def assign_move_request(request_id):
 @bp.route("/move-requests/<int:request_id>/acknowledge", methods=["POST"])
 def acknowledge_move_request(request_id):
     move_request = _request_or_404(request_id)
+    target_status = _move_request_lifecycle_target(move_request, "acknowledge")
+    if target_status is None:
+        return redirect(url_for("manager.move_requests"))
     before_values = model_snapshot(move_request, MOVE_REQUEST_AUDIT_FIELDS)
     acknowledged_by_text = _clean_text(request.form.get("acknowledged_by_text")) or current_user.display_name
+    move_request.status = target_status
     move_request.updated_by_id = current_user.id
     _record_move_request_activity(
         move_request,
@@ -471,9 +568,15 @@ def link_move_request_evidence(request_id):
 @bp.route("/move-requests/<int:request_id>/mark-blocked", methods=["POST"])
 def mark_move_request_blocked(request_id):
     move_request = _request_or_404(request_id)
+    target_status = _move_request_lifecycle_target(move_request, "block")
+    if target_status is None:
+        return redirect(url_for("manager.move_requests"))
+    blocked_reason = _require_lifecycle_reason("blocked_reason", request.form.get("blocked_reason"))
+    if blocked_reason is None:
+        return redirect(url_for("manager.move_requests"))
     before_values = model_snapshot(move_request, MOVE_REQUEST_AUDIT_FIELDS)
-    move_request.status = "blocked"
-    move_request.blocked_reason = _clean_text(request.form.get("blocked_reason")) or move_request.blocked_reason or "Marked blocked from queue."
+    move_request.status = target_status
+    move_request.blocked_reason = blocked_reason
     move_request.updated_by_id = current_user.id
     _record_move_request_activity(
         move_request,
@@ -496,9 +599,15 @@ def mark_move_request_blocked(request_id):
 @bp.route("/move-requests/<int:request_id>/mark-completed", methods=["POST"])
 def mark_move_request_completed(request_id):
     move_request = _request_or_404(request_id)
+    target_status = _move_request_lifecycle_target(move_request, "complete")
+    if target_status is None:
+        return redirect(url_for("manager.move_requests"))
+    closed_reason = _require_lifecycle_reason("closed_reason", request.form.get("closed_reason"))
+    if closed_reason is None:
+        return redirect(url_for("manager.move_requests"))
     before_values = model_snapshot(move_request, MOVE_REQUEST_AUDIT_FIELDS)
-    move_request.status = "completed"
-    move_request.closed_reason = _clean_text(request.form.get("closed_reason")) or move_request.closed_reason or "Marked completed from queue."
+    move_request.status = target_status
+    move_request.closed_reason = closed_reason
     move_request.updated_by_id = current_user.id
     _record_move_request_activity(
         move_request,
@@ -521,9 +630,15 @@ def mark_move_request_completed(request_id):
 @bp.route("/move-requests/<int:request_id>/cancel", methods=["POST"])
 def cancel_move_request(request_id):
     move_request = _request_or_404(request_id)
+    target_status = _move_request_lifecycle_target(move_request, "cancel")
+    if target_status is None:
+        return redirect(url_for("manager.move_requests"))
+    closed_reason = _require_lifecycle_reason("closed_reason", request.form.get("closed_reason"))
+    if closed_reason is None:
+        return redirect(url_for("manager.move_requests"))
     before_values = model_snapshot(move_request, MOVE_REQUEST_AUDIT_FIELDS)
-    move_request.status = "cancelled"
-    move_request.closed_reason = _clean_text(request.form.get("closed_reason")) or move_request.closed_reason or "Cancelled from queue."
+    move_request.status = target_status
+    move_request.closed_reason = closed_reason
     move_request.updated_by_id = current_user.id
     _record_move_request_activity(
         move_request,

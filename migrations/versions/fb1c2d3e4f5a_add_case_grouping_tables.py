@@ -28,12 +28,24 @@ def _column_names(table_name):
 
 def _add_column_if_missing(table_name, column):
     if column.name not in _column_names(table_name):
-        op.add_column(table_name, column)
+        if op.get_bind().dialect.name == "sqlite" and column.foreign_keys:
+            with op.batch_alter_table(table_name, schema=None, recreate="always") as batch_op:
+                batch_op.add_column(column)
+        else:
+            op.add_column(table_name, column)
 
 
 def upgrade():
     _add_column_if_missing("part_scan_event", sa.Column("route_id", sa.String(length=80), nullable=True))
-    _add_column_if_missing("part_scan_event", sa.Column("driver_log_id", sa.Integer(), sa.ForeignKey("driver_log.id"), nullable=True))
+    _add_column_if_missing(
+        "part_scan_event",
+        sa.Column(
+            "driver_log_id",
+            sa.Integer(),
+            sa.ForeignKey("driver_log.id", name="fk_part_scan_event_driver_log_id_driver_log"),
+            nullable=True,
+        ),
+    )
 
     if not _has_table("exception_events"):
         op.create_table(

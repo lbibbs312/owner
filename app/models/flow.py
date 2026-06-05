@@ -46,6 +46,15 @@ class FlowEvent(db.Model):
             "device_id",
             "offline_event_id",
         ),
+        db.Index(
+            "uq_flow_event_offline_idempotency_present",
+            "tenant_id",
+            "device_id",
+            "offline_event_id",
+            unique=True,
+            sqlite_where=db.text("device_id IS NOT NULL AND offline_event_id IS NOT NULL"),
+            postgresql_where=db.text("device_id IS NOT NULL AND offline_event_id IS NOT NULL"),
+        ),
     )
 
 
@@ -152,6 +161,10 @@ class ContainerItem(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    __table_args__ = (
+        db.CheckConstraint("quantity >= 0", name="ck_container_item_quantity_nonnegative"),
+    )
+
 
 class ContainerTreeSnapshot(db.Model):
     __tablename__ = "container_tree_snapshot"
@@ -171,6 +184,7 @@ class ContainerTreeSnapshot(db.Model):
     container = db.relationship("FlowContainer", foreign_keys=[container_id])
 
     __table_args__ = (
+        db.CheckConstraint("current_quantity >= 0", name="ck_container_tree_snapshot_quantity_nonnegative"),
         db.UniqueConstraint("tenant_id", "container_id", name="uq_container_tree_snapshot_container"),
     )
 
@@ -217,3 +231,12 @@ class ManifestLine(db.Model):
     metadata_json = db.Column(db.JSON, nullable=False, default=dict)
 
     container = db.relationship("FlowContainer", backref="manifest_lines")
+
+    __table_args__ = (
+        db.CheckConstraint("quantity_expected >= 0", name="ck_manifest_line_expected_nonnegative"),
+        db.CheckConstraint("quantity_scanned >= 0", name="ck_manifest_line_scanned_nonnegative"),
+        db.CheckConstraint(
+            "quantity_scanned <= quantity_expected",
+            name="ck_manifest_line_scanned_not_over_expected",
+        ),
+    )

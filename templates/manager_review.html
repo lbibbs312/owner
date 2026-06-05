@@ -159,7 +159,7 @@
                           <input type="hidden" name="category" value="{{ item.category }}">
                           <input type="hidden" name="label" value="{{ item.label }}">
                           <input type="hidden" name="review_action" value="deleted">
-                          <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                          <button class="btn btn-sm btn-outline-danger" type="submit">Acknowledge</button>
                         </form>
                       </details>
                     </div>
@@ -191,7 +191,7 @@
         <div class="foldout-body list-group list-group-flush">
           {% for event in exception_history %}
             <div class="list-group-item px-0">
-              <div class="d-flex justify-content-between gap-2"><strong>{{ event.title }}</strong><span class="badge text-bg-{{ 'danger' if event.action == 'deleted' else 'success' }}">{{ event.action|title }}</span></div>
+              <div class="d-flex justify-content-between gap-2"><strong>{{ event.title }}</strong><span class="badge text-bg-{{ 'danger' if event.action == 'deleted' else 'success' }}">{{ 'Acknowledged' if event.action == 'deleted' else event.action|title }}</span></div>
               <div class="small text-muted">{{ event.created_at|to_detroit_datetime if event.created_at else '' }}</div>
               <div class="small">{{ event.details }}</div>
             </div>
@@ -210,9 +210,9 @@
                 <span><strong>{{ report.plant_name }}</strong> {{ report.stage|title }} move</span>
                 <span class="text-muted small">{{ report.truck_number or 'Truck not set' }} / {{ report.trailer_number or 'Trailer not set' }}</span>
               </a>
-              <form method="POST" action="{{ url_for('manager.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Delete this damage report?');">
+              <form method="POST" action="{{ url_for('manager.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report from active review? Evidence will remain attached.');">
                 <input type="hidden" name="next" value="{{ url_for('manager.review_dashboard') }}">
-                <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                <button class="btn btn-sm btn-outline-danger" type="submit">Archive</button>
               </form>
             </div>
           {% else %}

@@ -9,34 +9,55 @@ init_extensions), so handlers are wired up against a fully bound app.
 from flask_login import current_user
 from flask_socketio import emit, join_room, leave_room
 
+from app.blueprints.messaging import bp
 from app.extensions import db, socketio
 from app.models import ChatMessage
 
+ALLOWED_CHAT_ROOMS = frozenset({"global"})
 
-@socketio.on("connect")
+
+def _allowed_room(data):
+    room = (data or {}).get("room", "global")
+    if room not in ALLOWED_CHAT_ROOMS:
+        emit("chat_error", {"msg": "Room is not available."})
+        return None
+    return room
+
+
 def on_connect():
+    if not current_user.is_authenticated:
+        return False
     join_room("global")
     emit("status", {"msg": f"{current_user.username} joined global chat."}, to="global")
 
 
-@socketio.on("join")
 def handle_join(data):
-    room = data.get("room", "global")
+    if not current_user.is_authenticated:
+        return False
+    room = _allowed_room(data)
+    if not room:
+        return False
     join_room(room)
     emit("status", {"msg": f"{current_user.username} joined {room}."}, to=room)
 
 
-@socketio.on("leave")
 def handle_leave(data):
-    room = data.get("room", "global")
+    if not current_user.is_authenticated:
+        return False
+    room = _allowed_room(data)
+    if not room:
+        return False
     leave_room(room)
     emit("status", {"msg": f"{current_user.username} left {room}."}, to=room)
 
 
-@socketio.on("chat_message")
 def handle_chat_message(data):
-    room = data.get("room", "global")
-    content = data.get("content", "").strip()
+    if not current_user.is_authenticated:
+        return False
+    room = _allowed_room(data)
+    if not room:
+        return False
+    content = (data or {}).get("content", "").strip()
     if content:
         msg = ChatMessage(user_id=current_user.id, content=content, room=room)
         db.session.add(msg)
@@ -46,3 +67,11 @@ def handle_chat_message(data):
             {"username": current_user.username, "content": content},
             to=room,
         )
+
+
+@bp.record
+def register_socketio_handlers(state):
+    socketio.on_event("connect", on_connect)
+    socketio.on_event("join", handle_join)
+    socketio.on_event("leave", handle_leave)
+    socketio.on_event("chat_message", handle_chat_message)

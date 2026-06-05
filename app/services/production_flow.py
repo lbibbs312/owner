@@ -323,6 +323,17 @@ def _day_bounds(target):
     return utc_start, utc_start + timedelta(days=1)
 
 
+def _record_matches_date(record, target, attrs):
+    for attr in attrs:
+        value = getattr(record, attr, None)
+        if not value:
+            continue
+        value_date = value.date() if isinstance(value, datetime) else value
+        if value_date == target:
+            return True
+    return False
+
+
 def _safe_url(endpoint, **values):
     if not has_request_context():
         return None
@@ -1022,7 +1033,11 @@ def _move_requests(target, *, driver_id=None, selected_move_request_id=None):
         )
         active_query = active_query.filter(driver_scope)
         completed_query = completed_query.filter(driver_scope)
-    active = active_query.all()
+    active = [
+        req for req in active_query.all()
+        if _record_matches_date(req, target, ("due_at", "requested_at", "created_at", "updated_at"))
+        or (getattr(req, "linked_driver_log", None) is not None and req.linked_driver_log.date == target)
+    ]
     completed = completed_query.all()
     by_id = {req.id: req for req in active + completed}
     if selected_move_request_id and selected_move_request_id not in by_id:
@@ -1077,6 +1092,14 @@ def _damage_reports(target, *, driver_id=None):
     return query.order_by(DamageReport.created_at.desc(), DamageReport.id.desc()).all()
 
 
+RESOLVED_EXCEPTION_EVENT_TYPES = {
+    "manager_review_resolved",
+    "exception_resolved",
+    "issue_resolved",
+    "resolved",
+}
+
+
 def _issue_events(target, *, driver_id=None):
     start, end = _day_bounds(target)
     query = ExceptionEvent.query.filter(
@@ -1087,20 +1110,63 @@ def _issue_events(target, *, driver_id=None):
     )
     if driver_id:
         query = query.filter_by(driver_id=driver_id)
-    return query.order_by(ExceptionEvent.created_at.desc(), ExceptionEvent.id.desc()).all()
+    events = query.order_by(ExceptionEvent.created_at.desc(), ExceptionEvent.id.desc()).all()
+    resolved_at_by_stop = {}
+    for event in events:
+        event_type = (event.event_type or "").lower()
+        if event_type not in RESOLVED_EXCEPTION_EVENT_TYPES:
+            continue
+        for stop_id in (event.stop_id, event.driver_log_id):
+            if not stop_id:
+                continue
+            previous = resolved_at_by_stop.get(stop_id)
+            if previous is None or event.created_at > previous:
+                resolved_at_by_stop[stop_id] = event.created_at
+
+    active = []
+    for event in events:
+        event_type = (event.event_type or "").lower()
+        if event_type in RESOLVED_EXCEPTION_EVENT_TYPES:
+            continue
+        stop_ids = [stop_id for stop_id in (event.stop_id, event.driver_log_id) if stop_id]
+        if any(resolved_at_by_stop.get(stop_id) and resolved_at_by_stop[stop_id] >= event.created_at for stop_id in stop_ids):
+            continue
+        active.append(event)
+    return active
 
 
-def _flow_ledger_counts(target):
+def _scoped_flow_event_query(target, *, driver_id=None, scoped_log_ids=frozenset()):
     start, end = _day_bounds(target)
+    query = FlowEvent.query.filter(FlowEvent.occurred_at >= start, FlowEvent.occurred_at < end)
+    if driver_id:
+        log_ids = [log_id for log_id in scoped_log_ids if log_id]
+        entity_ids = [str(log_id) for log_id in log_ids]
+        scope_filters = [FlowEvent.actor_user_id == driver_id]
+        if log_ids:
+            scope_filters.append(FlowEvent.stop_id.in_(log_ids))
+        if entity_ids:
+            scope_filters.append(
+                FlowEvent.entity_type.in_(("route_stop", "driver_log")) & FlowEvent.entity_id.in_(entity_ids)
+            )
+        query = query.filter(or_(*scope_filters))
+    return query
+
+
+def _flow_ledger_counts(target, *, driver_id=None, scoped_log_ids=frozenset()):
     try:
-        event_count = FlowEvent.query.filter(FlowEvent.occurred_at >= start, FlowEvent.occurred_at < end).count()
-        active_exceptions = FlowEvent.query.filter(
+        flow_query = _scoped_flow_event_query(target, driver_id=driver_id, scoped_log_ids=scoped_log_ids)
+        event_count = flow_query.count()
+        active_exceptions = flow_query.filter(
             FlowEvent.event_type == "MISMATCH_DETECTED",
-            FlowEvent.occurred_at >= start,
-            FlowEvent.occurred_at < end,
         ).count()
-        open_manifests = FlowManifest.query.filter(FlowManifest.current_status.notin_(["reconciled", "approved", "closed"])).count()
-        manifest_line_count = ManifestLine.query.count()
+        manifest_query = FlowManifest.query.filter(FlowManifest.current_status.notin_(["reconciled", "approved", "closed"]))
+        if driver_id:
+            manifest_query = manifest_query.filter_by(driver_id=driver_id)
+        open_manifests = manifest_query.count()
+        manifest_line_query = ManifestLine.query
+        if driver_id:
+            manifest_line_query = manifest_line_query.join(FlowManifest, ManifestLine.manifest_id == FlowManifest.id).filter(FlowManifest.driver_id == driver_id)
+        manifest_line_count = manifest_line_query.count()
     except SQLAlchemyError:
         db.session.rollback()
         return {"event_count": 0, "active_exceptions": 0, "open_manifests": 0, "manifest_line_count": 0, "ledger_ready": False}
@@ -1243,12 +1309,11 @@ def _event_entity_key(event):
     return None
 
 
-def _flow_map_edges(target):
+def _flow_map_edges(target, *, driver_id=None, scoped_log_ids=frozenset()):
     """Return FlowMapEdge projection rows derived only from FlowEvent ledger rows."""
-    start, end = _day_bounds(target)
     try:
         events = (
-            FlowEvent.query.filter(FlowEvent.occurred_at >= start, FlowEvent.occurred_at < end)
+            _scoped_flow_event_query(target, driver_id=driver_id, scoped_log_ids=scoped_log_ids)
             .order_by(FlowEvent.occurred_at.asc(), FlowEvent.id.asc())
             .all()
         )
@@ -1473,7 +1538,7 @@ def _transfer_item(transfer):
         "related_path_key": f"{_location_key(origin)}--{_location_key(destination)}",
         "related_node_key": _location_key(destination),
         "source_label": FRIENDLY_SOURCE["PlantTransfer"],
-        "view_url": None,
+        "view_url": _safe_url("manager.view_plant_transfer", transfer_id=transfer.id),
     }
 
 
@@ -1504,8 +1569,19 @@ def _damage_item(report, *, now):
         "linked_document_id": None,
         "linked_transfer_id": report.plant_transfer_id,
         "source_label": FRIENDLY_SOURCE["DamageReport"],
-        "view_url": _safe_url("driver.view_damage_report", report_id=report.id),
+        "view_url": _safe_url("manager.view_damage_report", report_id=report.id),
     }
+
+
+def _exception_view_url(event):
+    if event.target_type == "plant_transfer" and event.target_id:
+        return _safe_url("manager.view_plant_transfer", transfer_id=event.target_id)
+    if event.target_type == "move_request" and event.target_id:
+        return _safe_url("manager.edit_move_request", request_id=event.target_id)
+    stop_id = event.stop_id or event.driver_log_id
+    if stop_id:
+        return _safe_url("manager.view_driver_log", log_id=stop_id)
+    return None
 
 
 def _exception_item(event, *, now):
@@ -1535,8 +1611,73 @@ def _exception_item(event, *, now):
         "linked_document_id": None,
         "linked_transfer_id": event.target_id if event.target_type == "plant_transfer" else None,
         "source_label": FRIENDLY_SOURCE["IssueEvent"],
-        "view_url": None,
+        "view_url": _exception_view_url(event),
     }
+
+
+def _redact_read_only_context(*, flow_nodes, flow_lanes, flow_items, route_overlay, transport_token, proof_markers, issue_markers):
+    for item in flow_items:
+        item_type = item.get("item_type")
+        if item_type == "move_request":
+            item.update({
+                "label": "Move request",
+                "description": "Dispatch details hidden",
+                "cargo_text": SAFE_EMPTY,
+                "part_number": "",
+                "quantity_text": "",
+                "assigned_driver": "Restricted",
+                "document_summary": DOCUMENT_MISSING,
+            })
+        elif item_type == "route_stop":
+            item.update({
+                "arrived_with": NOT_TRACKED,
+                "departed_with": NOT_TRACKED,
+                "part_number": "",
+            })
+        item.update({
+            "linked_request_id": None,
+            "linked_route_stop_id": None,
+            "linked_document_id": None,
+            "linked_transfer_id": None,
+            "view_url": None,
+        })
+
+    for lane in flow_lanes:
+        lane["linked_request_ids"] = []
+        lane["linked_driver_log_ids"] = []
+        lane["linked_transfer_ids"] = []
+        lane["view_url"] = None
+
+    for node in flow_nodes:
+        node["view_url"] = None
+        node["active_moves_url"] = None
+        profile = node.get("production_profile") or {}
+        profile["material_lines"] = []
+        if profile.get("console_left"):
+            profile["console_left"][0]["value"] = "Restricted"
+        for row_key in ("console_left", "console_right"):
+            rows = profile.get(row_key) or []
+            for row in rows:
+                if "driver" in str(row.get("label", "")).lower() or "material" in str(row.get("label", "")).lower():
+                    row["value"] = "Restricted"
+
+    if route_overlay:
+        route_overlay.update({
+            "driver_name": None,
+            "driver_id": None,
+            "route_label": "Route proof overlay",
+        })
+        for marker in route_overlay.get("stop_markers") or []:
+            marker.pop("internal_stop_id", None)
+            marker["arrived_with"] = NOT_TRACKED
+            marker["departed_with"] = NOT_TRACKED
+    if transport_token:
+        transport_token["label"] = "Route shuttle"
+        transport_token["cargo"] = NOT_TRACKED
+    for marker in proof_markers:
+        marker["label"] = "Proof attached"
+    for marker in issue_markers:
+        marker["label"] = "Issue"
 
 
 def build_production_flow_context(
@@ -1561,11 +1702,13 @@ def build_production_flow_context(
     now = datetime.utcnow()
     requests = _move_requests(target, driver_id=driver_id, selected_move_request_id=selected_move_request_id)
     logs = _driver_logs(target, driver_id=driver_id, selected_stop_id=selected_stop_id)
+    scoped_log_ids = frozenset(log.id for log in logs if getattr(log, "id", None))
     transfers = _plant_transfers(target, driver_id=driver_id)
     damage_reports = _damage_reports(target, driver_id=driver_id)
     issue_events = _issue_events(target, driver_id=driver_id)
     timing_by_node = _timing_by_node(target)
-    ledger_counts = _flow_ledger_counts(target)
+    ledger_counts = _flow_ledger_counts(target, driver_id=driver_id, scoped_log_ids=scoped_log_ids)
+    redact_read_only = bool(mode == "plant_floor" and not any((can_edit, can_assign, can_review, can_export)))
 
     nodes = {}
     lanes = {}
@@ -1918,6 +2061,17 @@ def build_production_flow_context(
         }
         route_overlay["transport_token"] = transport_token
 
+    if redact_read_only:
+        _redact_read_only_context(
+            flow_nodes=flow_nodes,
+            flow_lanes=flow_lanes,
+            flow_items=items,
+            route_overlay=route_overlay,
+            transport_token=transport_token,
+            proof_markers=proof_markers,
+            issue_markers=issue_markers,
+        )
+
     console_node = None
     if flow_nodes:
         console_node = next((node for node in flow_nodes if node.get("issue_count") or node.get("blocked_count")), None)
@@ -1940,7 +2094,7 @@ def build_production_flow_context(
         "data_scope_note": DATA_SCOPE_EMPTY,
     }
     no_flow_signals = not bool(flow_nodes or flow_lanes or items)
-    flow_edges = _flow_map_edges(target)
+    flow_edges = _flow_map_edges(target, driver_id=driver_id, scoped_log_ids=scoped_log_ids)
 
     return {
         "mode": mode,

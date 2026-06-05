@@ -25,9 +25,7 @@
             <li>
               <strong>From:</strong> {{ msg.sender.username }} <br>
               {{ msg.content }} <br>
-              <small class="text-muted">Sent: {{ msg.timestamp }}</small> <br>
-              <!-- REPLY LINK -->
-              <a href="{{ url_for('reply_dm', dm_id=msg.id) }}" class="btn btn-sm btn-outline-primary mt-1">Reply</a>
+              <small class="text-muted">Sent: {{ msg.timestamp }}</small>
             </li>
           {% endfor %}
         </ul>

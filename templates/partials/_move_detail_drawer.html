@@ -28,8 +28,6 @@
             <form method="POST" action="{{ action.url }}"><button type="submit">{{ action.label }}</button></form>
           {% elif action.url %}
             <a href="{{ action.url }}">{{ action.label }}</a>
-          {% else %}
-            <button type="button" disabled>{{ action.label }} <span>Not wired yet.</span></button>
           {% endif %}
         {% else %}
           {% if move.view_url %}<a href="{{ move.view_url }}">Open move request</a>{% endif %}

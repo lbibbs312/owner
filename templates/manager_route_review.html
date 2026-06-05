@@ -82,7 +82,7 @@
   {% set document_meta = document_meta|default({'title': 'MANAGER ROUTE REVIEW', 'document_no': 'MGR-REVIEW-' ~ the_date, 'generated_at': '', 'page': '1 of 1'}) %}
   <div class="print-controls no-print">
   <button class="print-btn" onclick="window.print()">Print Document</button>
-  <a class="email-btn" href="{{ url_for('manager.driver_route_print', driver_id=driver.id, date=the_date.isoformat(), autoprint=1) }}">Save PDF</a>
+  <a class="email-btn" href="{{ attachment_url }}">Save PDF</a>
   {% if csv_url is defined %}<a class="email-btn" href="{{ csv_url }}">CSV Export</a>{% endif %}
   {% if sheets_url is defined %}<a class="email-btn" href="{{ sheets_url }}">Sheets Export</a>{% endif %}
   </div>

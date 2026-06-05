@@ -336,6 +336,9 @@
           {% endif %}
           {% set stop_state_badge = stop.board_badge if stop.board_badge is defined and stop.board_badge else stop.badge %}
           <div class="desk-overview-next"><span>Next action</span><strong>{{ clean_value(stop_state_badge.label if stop_state_badge else stop.next_action) }}</strong></div>
+          {% if stop.movement_label and stop_state_badge and stop_state_badge.label != stop.movement_label %}
+            <div class="desk-overview-next"><span>Movement</span><strong>Source movement: {{ stop.movement_label }}</strong></div>
+          {% endif %}
           <section class="desk-route-packet-summary" aria-label="Compact route packet summary">
             <span>Route Packet:</span>
             <strong>{{ documents_attached }} attached &middot; {% if documents_needed %}{{ documents_needed }} required flagged{% else %}none required flagged{% endif %}</strong>

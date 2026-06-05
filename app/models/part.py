@@ -27,6 +27,10 @@ class PartMaster(db.Model):
         order_by="PartAlias.last_seen_at.desc()",
     )
 
+    __table_args__ = (
+        db.UniqueConstraint("tenant_id", "canonical_part_number", name="uq_part_master_tenant_canonical"),
+    )
+
 
 class PartAlias(db.Model):
     __tablename__ = "part_alias"
@@ -42,6 +46,10 @@ class PartAlias(db.Model):
     label_source = db.Column(db.String(80), nullable=True)
     first_seen_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     last_seen_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("tenant_id", "normalized_value", name="uq_part_alias_tenant_normalized"),
+    )
 
 
 class PartScanEvent(db.Model):
@@ -99,6 +107,20 @@ class MovePart(db.Model):
     part = db.relationship("PartMaster", backref="move_parts")
     expected_drop_stop = db.relationship("DriverLog", foreign_keys=[expected_drop_stop_id])
     actual_drop_stop = db.relationship("DriverLog", foreign_keys=[actual_drop_stop_id])
+
+    __table_args__ = (
+        db.CheckConstraint("expected_quantity >= 0", name="ck_move_part_expected_quantity_nonnegative"),
+        db.CheckConstraint("picked_quantity >= 0", name="ck_move_part_picked_quantity_nonnegative"),
+        db.CheckConstraint("dropped_quantity >= 0", name="ck_move_part_dropped_quantity_nonnegative"),
+        db.CheckConstraint(
+            "picked_quantity <= expected_quantity",
+            name="ck_move_part_picked_not_over_expected",
+        ),
+        db.CheckConstraint(
+            "dropped_quantity <= expected_quantity",
+            name="ck_move_part_dropped_not_over_expected",
+        ),
+    )
 
 
 class PartLocationHistory(db.Model):

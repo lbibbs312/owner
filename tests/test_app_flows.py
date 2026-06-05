@@ -173,7 +173,57 @@ def test_new_driver_log_ignores_stale_hidden_cargo(client, app):
         assert log.secondary_load is None
 
 
-def test_registration_uses_manager_pin(client, app):
+def test_manager_registration_fails_closed_without_configured_pin(client, app, monkeypatch):
+    monkeypatch.delenv("MANAGER_REGISTRATION_PIN", raising=False)
+
+    response = client.post(
+        "/register",
+        data={
+            "username": "manager_unset",
+            "email": "manager-unset@example.com",
+            "password": "password1",
+            "confirm_password": "password1",
+            "role": "management",
+            "manager_pin": "0000",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/register")
+    with app.app_context():
+        from app.models import User
+
+        assert User.query.filter_by(username="manager_unset").first() is None
+
+
+def test_manager_registration_rejects_wrong_configured_pin(client, app, monkeypatch):
+    monkeypatch.setenv("MANAGER_REGISTRATION_PIN", "2468")
+
+    response = client.post(
+        "/register",
+        data={
+            "username": "manager_wrong_pin",
+            "email": "manager-wrong-pin@example.com",
+            "password": "password1",
+            "confirm_password": "password1",
+            "role": "management",
+            "manager_pin": "0000",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/register")
+    with app.app_context():
+        from app.models import User
+
+        assert User.query.filter_by(username="manager_wrong_pin").first() is None
+
+
+def test_registration_uses_manager_pin(client, app, monkeypatch):
+    monkeypatch.setenv("MANAGER_REGISTRATION_PIN", "2468")
+
     response = client.post(
         "/register",
         data={
@@ -182,7 +232,7 @@ def test_registration_uses_manager_pin(client, app):
             "password": "password1",
             "confirm_password": "password1",
             "role": "management",
-            "manager_pin": "0000",
+            "manager_pin": "2468",
         },
         follow_redirects=False,
     )
@@ -271,6 +321,14 @@ def test_registration_rejects_username_email_cross_collision(client, app):
         assert User.query.filter_by(email="new@example.com").first() is None
 
 
+def test_onesignal_worker_serves_nested_static_asset(client):
+    response = client.get("/OneSignalSDKWorker.js")
+
+    assert response.status_code == 200
+    assert response.mimetype == "application/javascript"
+    assert b"OneSignalSDK.sw.js" in response.data
+
+
 def test_authenticated_user_cannot_view_login_or_register(client, app):
     with app.app_context():
         create_user("driver1", "driver1@example.com", "driver")
@@ -329,6 +387,68 @@ def test_cross_role_access_requires_matching_credentials(client, app):
     )
     assert wrong_role_login.status_code == 302
     assert wrong_role_login.headers["Location"].endswith("/manager/dashboard")
+
+
+def test_direct_messages_with_inbox_render_without_dead_reply_endpoint(client, app):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DirectMessage
+
+        sender = create_user("dm_sender", "dm-sender@example.com", "driver")
+        receiver = create_user("dm_receiver", "dm-receiver@example.com", "driver")
+        db.session.add(
+            DirectMessage(
+                sender_id=sender.id,
+                receiver_id=receiver.id,
+                content="Bring packet to dispatch.",
+            )
+        )
+        db.session.commit()
+
+    login(client, "dm_receiver")
+    response = client.get("/direct_messages")
+
+    assert response.status_code == 200
+    assert b"Bring packet to dispatch." in response.data
+    assert b"reply_dm" not in response.data
+
+
+def test_socketio_rejects_anonymous_clients(client, app):
+    from app.extensions import socketio
+
+    socket_client = socketio.test_client(app, flask_test_client=client)
+
+    assert not socket_client.is_connected()
+
+
+def test_socketio_accepts_authenticated_global_room_only(client, app):
+    with app.app_context():
+        user = create_user("socket_driver", "socket-driver@example.com", "driver")
+        user_id = user.id
+
+    login(client, "socket_driver")
+
+    from app.extensions import socketio
+
+    socket_client = socketio.test_client(app, flask_test_client=client)
+    assert socket_client.is_connected()
+
+    socket_client.emit("chat_message", {"content": "Global check", "room": "global"})
+    socket_client.emit("join", {"room": "dispatch"})
+    socket_client.emit("chat_message", {"content": "Dispatch leak", "room": "dispatch"})
+
+    received_events = socket_client.get_received()
+    assert any(event["name"] == "chat_error" for event in received_events)
+    with app.app_context():
+        from app.models import ChatMessage
+
+        global_message = ChatMessage.query.filter_by(
+            user_id=user_id,
+            room="global",
+            content="Global check",
+        ).one()
+        assert global_message.content == "Global check"
+        assert ChatMessage.query.filter_by(room="dispatch").count() == 0
 
 
 def test_detroit_time_display_uses_12_hour_local_time(client, app):
@@ -672,11 +792,96 @@ def test_manager_move_request_queue_create_edit_and_actions(client, app):
         assert req.assigned_driver_id == driver_id
         assert req.equipment_text == "ST4"
         assert req.blocked_reason == "Waiting on trailer."
-        assert req.status == "cancelled"
-        assert req.closed_reason == "Cancelled after completion for correction test."
-        for action in ["updated", "assigned", "blocked", "completed", "cancelled"]:
+        assert req.status == "completed"
+        assert req.closed_reason == "Moved by driver."
+        for action in ["updated", "assigned", "blocked", "completed"]:
             assert ActivityEvent.query.filter_by(target_type="move_request", target_id=request_id, action=action).count() == 1
             assert AuditEvent.query.filter_by(target_type="move_request", target_id=request_id, action=action).count() == 1
+        assert ActivityEvent.query.filter_by(target_type="move_request", target_id=request_id, action="cancelled").count() == 0
+        assert AuditEvent.query.filter_by(target_type="move_request", target_id=request_id, action="cancelled").count() == 0
+
+
+def test_manager_move_request_lifecycle_blocks_closed_requests_and_requires_reasons(client, app):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ActivityEvent, AuditEvent, MoveRequest
+
+        manager = create_user("queue_guard_manager", "queue-guard-manager@example.com", "management")
+        driver = create_user("queue_guard_driver", "queue-guard-driver@example.com", "driver")
+        open_request = MoveRequest(
+            created_by_id=manager.id,
+            request_number="MOVE-REQ-GUARD-OPEN",
+            raw_text="Open request for guard test.",
+            status="open",
+        )
+        completed_request = MoveRequest(
+            created_by_id=manager.id,
+            request_number="MOVE-REQ-GUARD-COMPLETE",
+            raw_text="Completed request for guard test.",
+            status="completed",
+            closed_reason="Already moved.",
+        )
+        cancelled_request = MoveRequest(
+            created_by_id=manager.id,
+            request_number="MOVE-REQ-GUARD-CANCEL",
+            raw_text="Cancelled request for guard test.",
+            status="cancelled",
+            closed_reason="Plant cancelled.",
+        )
+        db.session.add_all([open_request, completed_request, cancelled_request])
+        db.session.commit()
+        open_request_id = open_request.id
+        completed_request_id = completed_request.id
+        cancelled_request_id = cancelled_request.id
+        driver_id = driver.id
+
+    login(client, "queue_guard_manager")
+
+    for endpoint, data in [
+        ("mark-blocked", {"blocked_reason": ""}),
+        ("mark-completed", {"closed_reason": ""}),
+        ("cancel", {"closed_reason": ""}),
+    ]:
+        response = client.post(
+            f"/manager/move-requests/{open_request_id}/{endpoint}",
+            data=data,
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+
+    closed_actions = [
+        ("assign", {"assigned_driver_id": str(driver_id), "equipment_text": "ST9"}),
+        ("acknowledge", {"acknowledged_by_text": "Dispatch"}),
+        ("mark-blocked", {"blocked_reason": "Trailer unavailable."}),
+        ("mark-completed", {"closed_reason": "Duplicate completion."}),
+        ("cancel", {"closed_reason": "Duplicate cancel."}),
+    ]
+    for request_id in [completed_request_id, cancelled_request_id]:
+        for endpoint, data in closed_actions:
+            response = client.post(
+                f"/manager/move-requests/{request_id}/{endpoint}",
+                data=data,
+                follow_redirects=False,
+            )
+            assert response.status_code == 302
+
+    with app.app_context():
+        open_request = MoveRequest.query.get(open_request_id)
+        completed_request = MoveRequest.query.get(completed_request_id)
+        cancelled_request = MoveRequest.query.get(cancelled_request_id)
+        assert open_request.status == "open"
+        assert open_request.blocked_reason is None
+        assert open_request.closed_reason is None
+        assert completed_request.status == "completed"
+        assert completed_request.closed_reason == "Already moved."
+        assert completed_request.assigned_driver_id is None
+        assert cancelled_request.status == "cancelled"
+        assert cancelled_request.closed_reason == "Plant cancelled."
+        assert cancelled_request.assigned_driver_id is None
+        for request_id in [open_request_id, completed_request_id, cancelled_request_id]:
+            for action in ["assigned", "acknowledged", "blocked", "completed", "cancelled"]:
+                assert ActivityEvent.query.filter_by(target_type="move_request", target_id=request_id, action=action).count() == 0
+                assert AuditEvent.query.filter_by(target_type="move_request", target_id=request_id, action=action).count() == 0
 
 
 def test_phase1a_group_chat_request_acknowledgement_and_transfer_link(client, app):
@@ -2225,6 +2430,9 @@ def test_driver_profile_cannot_change_role(client, app):
 
 
 def test_pretrip_create_and_print_route(client, app):
+    from datetime import date
+
+    today_value = date.today().isoformat()
     with app.app_context():
         create_user(
             "driver1",
@@ -2245,7 +2453,7 @@ def test_pretrip_create_and_print_route(client, app):
         data={
             "truck_number": "BT-1",
             "trailer_number": "TR-2",
-            "pretrip_date": "2026-05-12",
+            "pretrip_date": today_value,
             "shift": "1st",
             "start_mileage": "1000",
             "start_fuel_level": "3/4",
@@ -2287,7 +2495,7 @@ def test_pretrip_create_and_print_route(client, app):
         data={
             "truck_number": "BT-9",
             "trailer_number": "TR-9",
-            "pretrip_date": "2026-05-12",
+            "pretrip_date": today_value,
             "shift": "2nd",
             "start_mileage": "1005",
             "start_fuel_level": "1/2",
@@ -2764,20 +2972,20 @@ def test_edit_driver_log_rejects_impossible_depart_to_next_arrival(client, app):
         from app.models import DriverLog
 
         driver = create_user("driver1", "driver1@example.com", "driver")
-        route_date = date(2026, 5, 16)
+        route_date = date.today()
         first = DriverLog(
             driver_id=driver.id,
             date=route_date,
             plant_name="PE",
             load_size="Empty",
-            arrive_time="2026-05-16 21:28:00",
+            arrive_time=f"{route_date.isoformat()} 21:28:00",
         )
         second = DriverLog(
             driver_id=driver.id,
             date=route_date,
             plant_name="RW",
             load_size="Empty",
-            arrive_time="2026-05-16 21:32:00",
+            arrive_time=f"{route_date.isoformat()} 21:32:00",
         )
         db.session.add_all([first, second])
         db.session.commit()
@@ -2941,6 +3149,7 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
         )
         db.session.add_all([completed_log, log, problem_log])
         db.session.commit()
+        first_log_id = completed_log.id
         log_id = log.id
         driver_id = driver.id
 
@@ -2969,6 +3178,8 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     assert b"Driver Route Audit Sheet" not in route_print.data
     assert b"CSV Export" in route_print.data
     assert b"Sheets Export" in route_print.data
+    assert f"/manager/driver-logs/route-attachment?driver_id={driver_id}&amp;date={date.today().isoformat()}".encode() in route_print.data
+    assert f"/manager/driver-logs/route-print?driver_id={driver_id}&amp;date={date.today().isoformat()}&amp;autoprint=1".encode() not in route_print.data
 
     route_csv = client.get(f"/manager/driver-logs/route-export?driver_id={driver_id}&date={date.today().isoformat()}&type=csv")
     assert route_csv.status_code == 200
@@ -2979,6 +3190,28 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     assert route_sheets.status_code == 200
     assert route_sheets.headers["Content-Type"].startswith("text/tab-separated-values")
     assert b"Stop	Date	Driver" in route_sheets.data
+
+    route_pdf = client.get(f"/manager/driver-logs/route-attachment?driver_id={driver_id}&date={date.today().isoformat()}")
+    assert route_pdf.status_code == 200
+    assert route_pdf.headers["Content-Type"] == "application/pdf"
+
+    with app.app_context():
+        from app.models import ActivityEvent
+
+        pdf_activity = ActivityEvent.query.filter_by(
+            category="download",
+            action="manager_pdf_attachment",
+            target_type="driver_log",
+            target_id=first_log_id,
+        ).one()
+        assert "manager-route-review" in pdf_activity.details
+        csv_activity = ActivityEvent.query.filter_by(
+            category="download",
+            action="manager_route_export",
+            target_type="driver_log",
+            target_id=first_log_id,
+        ).first()
+        assert csv_activity is not None
 
     dashboard = client.get(f"/manager/dashboard?driver_id={driver_id}")
     assert dashboard.status_code == 200
@@ -3349,7 +3582,7 @@ def test_manager_search_suggest_learns_from_driver_logs(client, app):
     assert any(item["category"] == "driver" and "Driver One" in item["term"] for item in driver_suggestions.get_json()["results"])
 
 
-def test_manager_exception_complete_and_delete_are_history(client, app):
+def test_manager_exception_complete_and_acknowledge_are_history_without_hiding_source(client, app):
     from datetime import date
 
     with app.app_context():
@@ -3395,7 +3628,7 @@ def test_manager_exception_complete_and_delete_are_history(client, app):
     )
     assert b"Exception reviewed" in complete.data
 
-    delete = client.post(
+    acknowledge = client.post(
         "/manager/exceptions/reviewed",
         data={
             "review_key": f"driver_log:{log_id}:No pre-trip",
@@ -3407,8 +3640,8 @@ def test_manager_exception_complete_and_delete_are_history(client, app):
         },
         follow_redirects=True,
     )
-    assert b"Exception deleted" in delete.data
-    assert b"Deleted" in delete.data
+    assert b"Exception acknowledged" in acknowledge.data
+    assert b"No pre-trip" in acknowledge.data
 
     with app.app_context():
         from app.models import ActivityEvent, OperationalFollowUp
@@ -3416,6 +3649,85 @@ def test_manager_exception_complete_and_delete_are_history(client, app):
         assert OperationalFollowUp.query.get(followup_id).status == "closed"
         assert ActivityEvent.query.filter_by(category="exception", action="reviewed").count() == 1
         assert ActivityEvent.query.filter_by(category="exception", action="deleted").count() == 1
+
+
+def test_manager_task_reassignment_requires_driver_or_unassigned(client, app):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import Task
+
+        create_user("task_manager", "task-manager@example.com", "management")
+        driver = create_user("task_driver", "task-driver@example.com", "driver")
+        other_driver = create_user("other_task_driver", "other-task-driver@example.com", "driver")
+        manager_assignee = create_user("manager_assignee", "manager-assignee@example.com", "management")
+        task = Task(title="Move RE to KP", details="Initial note", assigned_to=driver.id, status="pending")
+        db.session.add(task)
+        db.session.commit()
+        task_id = task.id
+        other_driver_id = other_driver.id
+        manager_assignee_id = manager_assignee.id
+
+    login(client, "task_manager")
+
+    valid = client.post(
+        f"/manager/tasks/{task_id}",
+        data={"assigned_to": str(other_driver_id), "status": "pending", "shift": "1st", "details": "Assigned"},
+        follow_redirects=False,
+    )
+    assert valid.status_code == 302
+    with app.app_context():
+        from app.models import Task
+
+        assert Task.query.get(task_id).assigned_to == other_driver_id
+
+    unassigned = client.post(
+        f"/manager/tasks/{task_id}",
+        data={"assigned_to": "0", "status": "pending", "shift": "1st", "details": "Open"},
+        follow_redirects=False,
+    )
+    assert unassigned.status_code == 302
+    with app.app_context():
+        from app.models import Task
+
+        assert Task.query.get(task_id).assigned_to is None
+
+    invalid_manager = client.post(
+        f"/manager/tasks/{task_id}",
+        data={"assigned_to": str(manager_assignee_id), "status": "pending", "shift": "1st", "details": "Bad"},
+        follow_redirects=False,
+    )
+    assert invalid_manager.status_code == 302
+    with app.app_context():
+        from app.models import Task
+
+        assert Task.query.get(task_id).assigned_to is None
+
+    missing_user = client.post(
+        f"/manager/tasks/{task_id}",
+        data={"assigned_to": "999999", "status": "pending", "shift": "1st", "details": "Bad"},
+        follow_redirects=False,
+    )
+    assert missing_user.status_code == 302
+    with app.app_context():
+        from app.models import Task
+
+        assert Task.query.get(task_id).assigned_to is None
+
+
+def test_manager_dashboard_does_not_offer_fake_print_audit_log_action(client, app):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import Task
+
+        manager = create_user("audit_button_manager", "audit-button-manager@example.com", "management")
+        db.session.add(Task(title="Move PC to RE", details="Dashboard row", status="pending", assigned_to=None))
+        db.session.commit()
+
+    login(client, "audit_button_manager")
+    dashboard = client.get("/manager/dashboard")
+    assert dashboard.status_code == 200
+    assert b"Print Audit Log" not in dashboard.data
+    assert b"openAuditPrintView" not in dashboard.data
 
 
 def test_drivers_can_delete_only_same_day_records(client, app):
@@ -5061,12 +5373,12 @@ def test_pretrip_printout_highlights_defects_and_written_remarks(client, app):
     assert b"0.690 0.000 0.125 rg" in pdf.data
 
 
-def test_manager_can_delete_old_damage_report_test_records(client, app):
+def test_manager_archives_damage_report_without_deleting_evidence(client, app):
     from datetime import datetime, timedelta
 
     with app.app_context():
         from app.extensions import db
-        from app.models import DamageReport
+        from app.models import DamagePhoto, DamageReport
 
         driver = create_user("driver1", "driver1@example.com", "driver")
         create_user("manager1", "manager1@example.com", "management")
@@ -5084,6 +5396,14 @@ def test_manager_can_delete_old_damage_report_test_records(client, app):
             status="submitted",
         )
         db.session.add(report)
+        db.session.flush()
+        db.session.add(DamagePhoto(
+            damage_report_id=report.id,
+            stage="before",
+            filename="old-proof.jpg",
+            original_filename="old-proof.jpg",
+            content_type="image/jpeg",
+        ))
         db.session.commit()
         report_id = report.id
 
@@ -5094,28 +5414,40 @@ def test_manager_can_delete_old_damage_report_test_records(client, app):
 
     detail = client.get(f"/manager/damage-reports/{report_id}")
     assert detail.status_code == 200
-    assert b"Delete Report" in detail.data
+    assert b"Archive Report" in detail.data
 
-    deleted = client.post(
+    archived = client.post(
         f"/manager/damage-reports/{report_id}/delete",
         data={"next": "/manager/review"},
         follow_redirects=False,
     )
-    assert deleted.status_code == 302
-    assert deleted.headers["Location"].endswith("/manager/review")
+    assert archived.status_code == 302
+    assert archived.headers["Location"].endswith("/manager/review")
 
     with app.app_context():
         from app.models import ActivityEvent, AuditEvent, DamageReport
 
-        assert DamageReport.query.get(report_id) is None
+        saved = DamageReport.query.get(report_id)
+        assert saved is not None
+        assert saved.status == "closed"
+        assert saved.resolved_at is not None
+        assert len(saved.photos) == 1
+        assert saved.photos[0].filename == "old-proof.jpg"
         audit = AuditEvent.query.filter_by(
-            target_type="damage_report", target_id=report_id, action="manager_deleted"
+            target_type="damage_report", target_id=report_id, action="manager_archived"
         ).one()
         assert "Old damage report test" in audit.before_values
+        assert "old-proof.jpg" in audit.after_values
         activity = ActivityEvent.query.filter_by(
-            target_type="damage_report", target_id=report_id, action="deleted"
+            target_type="damage_report", target_id=report_id, action="archived"
         ).one()
-        assert activity.title == "Damage report deleted by manager"
+        assert activity.title == "Damage report archived by manager"
+
+    review_after = client.get("/manager/review")
+    assert review_after.status_code == 200
+    assert f"/manager/damage-reports/{report_id}/delete".encode() not in review_after.data
+    detail_after = client.get(f"/manager/damage-reports/{report_id}")
+    assert detail_after.status_code == 200
 
 
 def test_damage_report_edit_delete_submit_and_eod_lock(client, app):
@@ -6429,10 +6761,29 @@ def test_mobile_dashboard_can_end_route_at_final_arrival_after_posttrip(client, 
     page = client.get("/mobile")
     assert page.status_code == 200
     assert b"End Route" in page.data
+    assert b'action="/mobile/end-route" method="POST"' in page.data
     assert b"PostTrip Due" not in page.data
     assert b"Depart Quick Flow" not in page.data
 
-    response = client.get("/mobile/end-route", follow_redirects=False)
+    get_response = client.get("/mobile/end-route", follow_redirects=False)
+    assert get_response.status_code == 302
+    assert get_response.headers["Location"].endswith("/mobile")
+
+    with app.app_context():
+        from app.models import ActivityEvent, DriverLog, ShiftRecord
+
+        saved_log = DriverLog.query.get(log_id)
+        assert saved_log.depart_time is None
+        assert saved_log.dock_wait_minutes is None
+        assert ShiftRecord.query.filter_by(user_id=driver_id, end_time=None).count() == 1
+        assert ActivityEvent.query.filter_by(
+            user_id=driver_id,
+            category="eod",
+            action="finalized",
+            target_type="end_of_day",
+        ).count() == 0
+
+    response = client.post("/mobile/end-route", follow_redirects=False)
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/mobile")
 
@@ -6462,6 +6813,204 @@ def test_mobile_dashboard_can_end_route_at_final_arrival_after_posttrip(client, 
     assert b"25 miles" in route_sheet.data
     assert b"Active wait" not in route_sheet.data
     assert b"Route End: Raleigh East" in route_sheet.data
+
+
+def test_shift_get_routes_do_not_mutate_shift_state(client, app):
+    from datetime import datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ActivityEvent, ShiftRecord
+
+        driver = create_user("shift_get_driver", "shift-get@example.com", "driver")
+        open_shift = ShiftRecord(
+            user_id=driver.id,
+            start_time=datetime.utcnow() - timedelta(hours=1),
+        )
+        db.session.add(open_shift)
+        db.session.commit()
+        driver_id = driver.id
+        shift_id = open_shift.id
+
+    login(client, "shift_get_driver")
+
+    start_get = client.get("/start_shift", follow_redirects=False)
+    assert start_get.status_code == 302
+    end_get = client.get("/end_shift?next=mobile", follow_redirects=False)
+    assert end_get.status_code == 302
+    assert end_get.headers["Location"].endswith("/mobile")
+
+    with app.app_context():
+        from app.models import ActivityEvent, ShiftRecord
+
+        saved_shift = ShiftRecord.query.get(shift_id)
+        assert saved_shift.end_time is None
+        assert ShiftRecord.query.filter_by(user_id=driver_id, end_time=None).count() == 1
+        assert ActivityEvent.query.filter_by(user_id=driver_id, category="shift").count() == 0
+
+
+def test_request_manager_review_is_driver_owned_and_active_log_only(client, app):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        owner = create_user("review_owner", "review-owner@example.com", "driver")
+        create_user("review_other", "review-other@example.com", "driver")
+        create_user("review_manager", "review-manager@example.com", "management")
+        owned_log = DriverLog(
+            driver_id=owner.id,
+            date=today,
+            plant_name="RE",
+            load_size="Empty",
+            arrive_time="08:00",
+        )
+        deleted_log = DriverLog(
+            driver_id=owner.id,
+            date=today,
+            plant_name="KP",
+            load_size="Empty",
+            arrive_time="09:00",
+            deleted_at=datetime.utcnow(),
+        )
+        db.session.add_all([owned_log, deleted_log])
+        db.session.commit()
+        owner_log_id = owned_log.id
+        deleted_log_id = deleted_log.id
+        owner_id = owner.id
+
+    login(client, "review_other")
+    other_response = client.post(f"/driver_logs/{owner_log_id}/request_review", follow_redirects=False)
+    assert other_response.status_code == 302
+
+    with app.app_context():
+        from app.models import ExceptionEvent
+
+        assert ExceptionEvent.query.filter_by(driver_log_id=owner_log_id).count() == 0
+
+    client.get("/logout")
+    login(client, "review_manager")
+    manager_response = client.post(f"/driver_logs/{owner_log_id}/request_review", follow_redirects=False)
+    assert manager_response.status_code == 302
+
+    with app.app_context():
+        from app.models import ExceptionEvent
+
+        assert ExceptionEvent.query.filter_by(driver_log_id=owner_log_id).count() == 0
+
+    client.get("/logout")
+    login(client, "review_owner")
+    missing_response = client.post(f"/driver_logs/{deleted_log_id}/request_review", follow_redirects=False)
+    assert missing_response.status_code == 404
+
+    success_response = client.post(f"/driver_logs/{owner_log_id}/request_review", follow_redirects=False)
+    assert success_response.status_code == 302
+    assert success_response.headers["Location"].endswith("/mobile")
+
+    with app.app_context():
+        from app.models import ExceptionEvent
+
+        event = ExceptionEvent.query.filter_by(driver_log_id=owner_log_id).one()
+        assert event.event_type == "manager_review_requested"
+        assert event.driver_id == owner_id
+
+
+def test_driver_log_mutations_block_past_and_finalized_routes(client, app):
+    from datetime import date, timedelta
+
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ActivityEvent, DriverLog
+
+        driver = create_user("guarded_driver", "guarded-driver@example.com", "driver")
+        past_log = DriverLog(
+            driver_id=driver.id,
+            date=yesterday,
+            plant_name="RE",
+            load_size="Empty",
+            arrive_time="08:00",
+        )
+        finalized_log = DriverLog(
+            driver_id=driver.id,
+            date=today,
+            plant_name="KP",
+            load_size="Empty",
+            arrive_time="09:00",
+        )
+        active_log = DriverLog(
+            driver_id=driver.id,
+            date=today,
+            plant_name="PW",
+            load_size="Empty",
+            arrive_time="00:01",
+        )
+        db.session.add_all([past_log, finalized_log, active_log])
+        db.session.flush()
+        db.session.add(
+            ActivityEvent(
+                user_id=driver.id,
+                category="eod",
+                action="finalized",
+                title="Route finalized",
+                details=f"Route finalized for {today}",
+                target_type="end_of_day",
+            )
+        )
+        db.session.commit()
+        past_log_id = past_log.id
+        finalized_log_id = finalized_log.id
+        active_log_id = active_log.id
+
+    login(client, "guarded_driver")
+
+    past_response = client.post(f"/driver_logs/{past_log_id}/no_pickup", follow_redirects=False)
+    assert past_response.status_code == 302
+    finalized_response = client.post(
+        f"/driver_logs/{finalized_log_id}/part-scans",
+        json={"raw_value": "ABC123", "scan_context": "pickup"},
+    )
+    assert finalized_response.status_code == 403
+
+    with app.app_context():
+        from app.models import ActivityEvent, DriverLog, PartScanEvent
+
+        assert DriverLog.query.get(past_log_id).depart_time is None
+        assert PartScanEvent.query.filter_by(stop_id=finalized_log_id).count() == 0
+
+        ActivityEvent.query.filter_by(
+            category="eod",
+            action="finalized",
+            target_type="end_of_day",
+        ).delete()
+        db.session.commit()
+
+    active_response = client.post(f"/driver_logs/{active_log_id}/no_pickup", follow_redirects=False)
+    assert active_response.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        assert DriverLog.query.get(active_log_id).depart_time is not None
+
+
+def test_dashboard_and_map_are_redirect_only(client, app):
+    with app.app_context():
+        create_user("redirect_driver", "redirect-driver@example.com", "driver")
+
+    login(client, "redirect_driver")
+
+    dashboard_get = client.get("/dashboard", follow_redirects=False)
+    assert dashboard_get.status_code == 302
+    assert dashboard_get.headers["Location"].endswith("/mobile")
+    assert client.post("/dashboard", follow_redirects=False).status_code == 405
+
+    map_get = client.get("/map", follow_redirects=False)
+    assert map_get.status_code == 302
+    assert map_get.headers["Location"].endswith("/mobile")
 
 
 def test_mobile_dashboard_registers_completed_posttrip_with_duplicate_open_pretrip(client, app):
@@ -6745,8 +7294,8 @@ def test_mobile_quick_depart_handles_secondary_drop_required(client, app):
                 load_size="Empty",
                 depart_load_size="Trim DC Load",
                 secondary_load="Helios Hot Part",
-                arrive_time="08:00",
-                depart_time="08:15",
+                arrive_time="00:05",
+                depart_time="00:15",
             )
         )
         active = DriverLog(
@@ -6754,7 +7303,7 @@ def test_mobile_quick_depart_handles_secondary_drop_required(client, app):
             date=today,
             plant_name="Helios",
             load_size="Trim DC Load + Helios Hot Part",
-            arrive_time="08:45",
+            arrive_time="00:45",
         )
         db.session.add(active)
         db.session.commit()
@@ -7934,3 +8483,114 @@ def test_manager_review_resolve_requires_management_role(client, app):
         assert ExceptionEvent.query.filter_by(
             event_type="manager_review_resolved", stop_id=log_id,
         ).count() == 0
+
+
+def test_manager_review_resolve_requires_pending_request_newer_than_latest_resolve(client, app):
+    from datetime import date, datetime
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, ExceptionEvent
+
+        manager = create_user("stale_review_manager", "stale-review-manager@example.com", role="management")
+        driver = create_user("stale_review_driver", "stale-review-driver@example.com")
+        route_date = date.today()
+        no_request_log = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="KP",
+            load_size="Empty",
+            depart_load_size="Empty",
+        )
+        stale_log = DriverLog(
+            driver_id=driver.id,
+            date=route_date,
+            plant_name="RE",
+            load_size="Empty",
+            depart_load_size="Empty",
+        )
+        db.session.add_all([no_request_log, stale_log])
+        db.session.flush()
+        db.session.add_all([
+            ExceptionEvent(
+                event_type="manager_review_requested",
+                severity="medium",
+                stop_id=stale_log.id,
+                driver_log_id=stale_log.id,
+                driver_id=driver.id,
+                plant_name="RE",
+                event_date=route_date,
+                summary="Driver requested manager review",
+                created_at=datetime(2026, 6, 5, 8, 0),
+            ),
+            ExceptionEvent(
+                event_type="manager_review_resolved",
+                severity="medium",
+                stop_id=stale_log.id,
+                driver_log_id=stale_log.id,
+                driver_id=manager.id,
+                plant_name="RE",
+                event_date=route_date,
+                summary="Manager resolved review",
+                created_at=datetime(2026, 6, 5, 9, 0),
+            ),
+        ])
+        db.session.commit()
+        no_request_log_id = no_request_log.id
+        stale_log_id = stale_log.id
+        driver_id = driver.id
+
+    login(client, "stale_review_manager")
+
+    no_request = client.post(f"/manager/reviews/{no_request_log_id}/resolve", follow_redirects=True)
+    assert no_request.status_code == 200
+    assert b"No pending manager review request exists" in no_request.data
+
+    stale = client.post(f"/manager/reviews/{stale_log_id}/resolve", follow_redirects=True)
+    assert stale.status_code == 200
+    assert b"No pending manager review request exists" in stale.data
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ExceptionEvent
+
+        assert ExceptionEvent.query.filter_by(
+            event_type="manager_review_resolved",
+            stop_id=no_request_log_id,
+        ).count() == 0
+        assert ExceptionEvent.query.filter_by(
+            event_type="manager_review_resolved",
+            stop_id=stale_log_id,
+        ).count() == 1
+        db.session.add(ExceptionEvent(
+            event_type="manager_review_requested",
+            severity="medium",
+            stop_id=stale_log_id,
+            driver_log_id=stale_log_id,
+            driver_id=driver_id,
+            plant_name="RE",
+            event_date=date.today(),
+            summary="Driver requested manager review again",
+            details="New request after the old resolve.",
+            created_at=datetime(2026, 6, 5, 10, 0),
+        ))
+        db.session.commit()
+
+    queue = client.get("/manager/reviews")
+    assert queue.status_code == 200
+    assert b"New request after the old resolve." in queue.data
+
+    resolved = client.post(
+        f"/manager/reviews/{stale_log_id}/resolve",
+        data={"note": "Resolved current request."},
+        follow_redirects=True,
+    )
+    assert resolved.status_code == 200
+
+    with app.app_context():
+        from app.models import ExceptionEvent
+
+        assert ExceptionEvent.query.filter_by(
+            event_type="manager_review_resolved",
+            stop_id=stale_log_id,
+        ).count() == 2

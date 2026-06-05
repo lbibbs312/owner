@@ -45,3 +45,25 @@ class PlantTransferLine(db.Model):
     quantity = db.Column(db.String(30), nullable=True)
     skids = db.Column(db.String(30), nullable=True)
     remarks = db.Column(db.String(200), nullable=True)
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "plant_transfer_id",
+            "line_number",
+            "side",
+            name="uq_plant_transfer_line_slot",
+        ),
+        db.CheckConstraint("line_number > 0", name="ck_plant_transfer_line_number_positive"),
+        db.CheckConstraint(
+            "COALESCE(NULLIF(TRIM(part_number), ''), NULLIF(TRIM(quantity), ''), NULLIF(TRIM(skids), '')) IS NOT NULL",
+            name="ck_plant_transfer_line_has_cargo_detail",
+        ),
+        db.CheckConstraint(
+            "quantity IS NULL OR TRIM(quantity) = '' OR TRIM(quantity) NOT LIKE '-%'",
+            name="ck_plant_transfer_line_quantity_nonnegative",
+        ),
+        db.CheckConstraint(
+            "skids IS NULL OR TRIM(skids) = '' OR TRIM(skids) NOT LIKE '-%'",
+            name="ck_plant_transfer_line_skids_nonnegative",
+        ),
+    )

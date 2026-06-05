@@ -199,7 +199,7 @@ def test_first_empty_stop_is_route_start_without_issue(app):
 
     assert stop["movement_code"] == "route_start"
     assert stop["badge"]["label"] == "ROUTE START"
-    assert stop["board_badge"]["label"] == "START"
+    assert stop["board_badge"]["label"] == "STARTED"
     assert stop["board_detail"] == "Paint Central · route start · arrived empty"
     assert "empty return" not in stop["board_detail"].lower()
     assert stop["issues"] == []
@@ -309,6 +309,35 @@ def test_missing_proof_is_specific_issue(app):
     assert stop["evidence"]["proof"] == "None on file"
     assert ctx["dispatch_messages"][0]["text"].startswith("MISSING PROOF")
     assert ctx["cta_pulse"]["key"] == "camera"
+
+
+def test_unrelated_same_plant_transfer_does_not_satisfy_drop_proof(app):
+    from app.services.load_state import UNLOAD_NOT_COMPLETED_PREFIX
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("unrelated_transfer_driver")
+    _driver_log(
+        driver,
+        plant_name="PPL",
+        depart_time="09:20",
+        load_size="PPL Load",
+        depart_load_size="Empty",
+        downtime_reason=f"{UNLOAD_NOT_COMPLETED_PREFIX} delivery proof not attached",
+    )
+    _plant_transfer(
+        driver,
+        ship_from="PC",
+        ship_to="PPL",
+        transfer_number="PT-UNRELATED",
+    )
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    assert stop["badge"]["label"] == "MISSING PROOF"
+    assert stop["issues"][0]["code"] == "missing_proof"
+    assert stop["evidence"]["transfer_count"] == 0
+    assert stop["evidence"]["proof_count"] == 0
 
 
 def test_destination_mismatch_is_specific_issue(app):
@@ -440,6 +469,24 @@ def test_open_stop_without_departure_is_actionable_needs_departure(app):
     assert stop["badge"]["severity"] == "attention"
     assert stop["next_action"] == "Record departure"
     assert ctx["cta_pulse"]["key"] == "depart"
+
+
+def test_earlier_open_stop_gets_actionable_missing_departure_issue(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("missing_departure_sequence_driver")
+    first = _driver_log(driver, plant_name="RE", arrive_time="2026-05-28 08:00:00")
+    second = _driver_log(driver, plant_name="PW", arrive_time="2026-05-28 09:00:00")
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    first_stop, second_stop = ctx["stops"]
+
+    assert first_stop["stop_id"] == first.id
+    assert first_stop["badge"]["label"] == "MISSING DEPARTURE"
+    assert first_stop["issues"][0]["code"] == "missing_departure_sequence"
+    assert first_stop["issues"][0]["action"] == "Record departure or send to manager review"
+    assert second_stop["stop_id"] == second.id
+    assert second_stop["issues"][0]["code"] == "needs_departure"
 
 
 def test_pending_posttrip_pulses_posttrip_after_clean_route(app):
@@ -650,6 +697,29 @@ def test_completed_request_and_linked_stop_statuses(app):
     assert ctx["stops"][0]["status"] == "completed"
     assert ctx["moves"][0]["status"] == "completed"
     assert ctx["moves"][0]["linked_stop_id"] == stop.id
+
+
+def test_active_move_requests_do_not_pollute_historical_route_map_date(app):
+    from app.services.route_map import build_driver_route_map_context
+
+    manager = _user("historical_mgr", "management")
+    driver = _user("historical_driver", "driver")
+    historical_date = date.today() - timedelta(days=7)
+    _driver_log(driver, date=historical_date, plant_name="RE", depart_time="09:00")
+    _move_request(
+        manager.id,
+        status="assigned",
+        assigned_driver_id=driver.id,
+        requested_at=datetime.utcnow(),
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+
+    ctx = build_driver_route_map_context(driver=driver, date=historical_date)
+
+    assert ctx["stops"]
+    assert ctx["moves"] == []
+    assert all(item["code"] != "LOAD" for item in ctx["ops_board_items"])
 
 
 def test_assigned_move_request_adds_staged_ops_board_row(app):

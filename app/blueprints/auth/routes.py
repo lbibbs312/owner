@@ -79,7 +79,10 @@ def register():
     form = RegistrationForm()
     if form.validate_on_submit():
         if form.role.data == "management":
-            expected_pin = os.environ.get("MANAGER_REGISTRATION_PIN", "0000")
+            expected_pin = (os.environ.get("MANAGER_REGISTRATION_PIN") or "").strip()
+            if not expected_pin:
+                flash("Manager self-registration is not enabled.", "danger")
+                return redirect(url_for("auth.register"))
             if form.manager_pin.data != expected_pin:
                 flash("Invalid Manager PIN!", "danger")
                 return redirect(url_for("auth.register"))

@@ -131,21 +131,6 @@
           <td>
             <div class="row-actions">
               <a class="btn btn-sm btn-outline-primary" href="{{ url_for('manager.edit_move_request', request_id=req.id) }}">Edit Request</a>
-              <form method="POST" action="{{ url_for('manager.assign_move_request', request_id=req.id) }}" class="assign-row">
-                <select class="form-select" name="assigned_driver_id" aria-label="Assigned driver">
-                  <option value="0">Unassigned</option>
-                  {% for driver in drivers %}
-                    <option value="{{ driver.id }}" {% if req.assigned_driver_id == driver.id %}selected{% endif %}>{{ driver.manager_label }}</option>
-                  {% endfor %}
-                </select>
-                <input class="form-control" name="assigned_driver_text" value="{{ req.assigned_driver_text or '' }}" placeholder="Manual driver">
-                <input class="form-control" name="equipment_text" value="{{ req.equipment_text or req.equipment_id or '' }}" placeholder="Equipment">
-                <button class="btn btn-sm btn-secondary" type="submit">Assign Request</button>
-              </form>
-              <form method="POST" action="{{ url_for('manager.acknowledge_move_request', request_id=req.id) }}" class="assign-row">
-                <input class="form-control" name="acknowledged_by_text" placeholder="Ack by (optional)">
-                <button class="btn btn-sm btn-outline-secondary" type="submit">Acknowledge Request</button>
-              </form>
               <form method="POST" action="{{ url_for('manager.link_move_request_evidence', request_id=req.id) }}" class="assign-row">
                 <select class="form-select" name="linked_plant_transfer_id" aria-label="Linked plant transfer">
                   {% for value, label in plant_transfer_choices %}
@@ -155,17 +140,39 @@
                 <input class="form-control" name="linked_document_id" value="{{ req.linked_document_id or '' }}" placeholder="Document ID">
                 <button class="btn btn-sm btn-outline-secondary" type="submit">Link Evidence</button>
               </form>
-              <div class="button-row">
-                <form method="POST" action="{{ url_for('manager.mark_move_request_blocked', request_id=req.id) }}">
-                  <button class="btn btn-sm btn-warning" type="submit">Mark Blocked</button>
+              {% if req.status in ['completed', 'cancelled'] %}
+                <span class="text-muted small">Closed. Correction/reopen required for lifecycle actions.</span>
+              {% else %}
+                <form method="POST" action="{{ url_for('manager.assign_move_request', request_id=req.id) }}" class="assign-row">
+                  <select class="form-select" name="assigned_driver_id" aria-label="Assigned driver">
+                    <option value="0">Unassigned</option>
+                    {% for driver in drivers %}
+                      <option value="{{ driver.id }}" {% if req.assigned_driver_id == driver.id %}selected{% endif %}>{{ driver.manager_label }}</option>
+                    {% endfor %}
+                  </select>
+                  <input class="form-control" name="assigned_driver_text" value="{{ req.assigned_driver_text or '' }}" placeholder="Manual driver">
+                  <input class="form-control" name="equipment_text" value="{{ req.equipment_text or req.equipment_id or '' }}" placeholder="Equipment">
+                  <button class="btn btn-sm btn-secondary" type="submit">Assign Request</button>
                 </form>
-                <form method="POST" action="{{ url_for('manager.mark_move_request_completed', request_id=req.id) }}">
-                  <button class="btn btn-sm btn-success" type="submit">Mark Completed</button>
+                <form method="POST" action="{{ url_for('manager.acknowledge_move_request', request_id=req.id) }}" class="assign-row">
+                  <input class="form-control" name="acknowledged_by_text" placeholder="Ack by (optional)">
+                  <button class="btn btn-sm btn-outline-secondary" type="submit">Acknowledge Request</button>
                 </form>
-                <form method="POST" action="{{ url_for('manager.cancel_move_request', request_id=req.id) }}">
-                  <button class="btn btn-sm btn-outline-danger" type="submit">Cancel Request</button>
-                </form>
-              </div>
+                <div class="button-row">
+                  <form method="POST" action="{{ url_for('manager.mark_move_request_blocked', request_id=req.id) }}" class="assign-row">
+                    <input class="form-control" name="blocked_reason" placeholder="Blocked reason" required>
+                    <button class="btn btn-sm btn-warning" type="submit">Mark Blocked</button>
+                  </form>
+                  <form method="POST" action="{{ url_for('manager.mark_move_request_completed', request_id=req.id) }}" class="assign-row">
+                    <input class="form-control" name="closed_reason" placeholder="Completion reason" required>
+                    <button class="btn btn-sm btn-success" type="submit">Mark Completed</button>
+                  </form>
+                  <form method="POST" action="{{ url_for('manager.cancel_move_request', request_id=req.id) }}" class="assign-row">
+                    <input class="form-control" name="closed_reason" placeholder="Cancel reason" required>
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Cancel Request</button>
+                  </form>
+                </div>
+              {% endif %}
             </div>
           </td>
         </tr>

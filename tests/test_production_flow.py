@@ -75,6 +75,24 @@ def _driver_log(driver, **kw):
     return log
 
 
+def _plant_transfer(driver, **kw):
+    from app.extensions import db
+    from app.models import PlantTransfer
+
+    base = dict(
+        user_id=driver.id,
+        transfer_date=date.today(),
+        ship_from="RE",
+        ship_to="PW",
+        transfer_number="PT-PF-1",
+    )
+    base.update(kw)
+    transfer = PlantTransfer(**base)
+    db.session.add(transfer)
+    db.session.commit()
+    return transfer
+
+
 def _login(client, username):
     return client.post(
         "/login",
@@ -524,6 +542,85 @@ def test_flow_map_edges_are_ledger_backed_and_animated(client, app):
     assert "System Summary" not in body
 
 
+def test_driver_scoped_production_flow_filters_edges_and_ledger_counts(app):
+    from app.extensions import db
+    from app.models import FlowEvent
+    from app.services.production_flow import build_production_flow_context
+
+    driver = _user("scoped-flow-driver", "driver")
+    other_driver = _user("other-flow-driver", "driver")
+    log = _driver_log(driver, plant_name="RE")
+    other_log = _driver_log(other_driver, plant_name="PW")
+    db.session.add_all([
+        FlowEvent(
+            event_type="DEPARTED_ORIGIN",
+            entity_type="route_stop",
+            entity_id=str(log.id),
+            stop_id=log.id,
+            occurred_at=datetime.utcnow() - timedelta(minutes=3),
+            source="mobile",
+        ),
+        FlowEvent(
+            event_type="MISMATCH_DETECTED",
+            entity_type="route_stop",
+            entity_id=str(other_log.id),
+            stop_id=other_log.id,
+            occurred_at=datetime.utcnow() - timedelta(minutes=2),
+            source="mobile",
+        ),
+    ])
+    db.session.commit()
+
+    ctx = build_production_flow_context(date=date.today(), driver_id=driver.id)
+
+    assert [edge["stop_id"] for edge in ctx["flow_edges"]] == [log.id]
+    assert ctx["ledger_summary"]["event_count"] == 1
+    assert ctx["queue_summary"]["ledger_exception_count"] == 0
+
+
+def test_resolved_exception_events_do_not_keep_production_nodes_blocked(app):
+    from app.extensions import db
+    from app.models.case import ExceptionEvent
+    from app.services.production_flow import build_production_flow_context
+
+    driver = _user("resolved-node-driver", "driver")
+    log = _driver_log(driver, plant_name="RE")
+    opened_at = datetime.utcnow() - timedelta(minutes=10)
+    resolved_at = datetime.utcnow() - timedelta(minutes=1)
+    db.session.add_all([
+        ExceptionEvent(
+            event_type="damage_reported",
+            severity="critical",
+            stop_id=log.id,
+            driver_log_id=log.id,
+            driver_id=driver.id,
+            plant_name="RE",
+            event_date=date.today(),
+            summary="Damage reported",
+            created_at=opened_at,
+        ),
+        ExceptionEvent(
+            event_type="manager_review_resolved",
+            severity="medium",
+            stop_id=log.id,
+            driver_log_id=log.id,
+            driver_id=driver.id,
+            plant_name="RE",
+            event_date=date.today(),
+            summary="Resolved",
+            created_at=resolved_at,
+        ),
+    ])
+    db.session.commit()
+
+    ctx = build_production_flow_context(date=date.today(), driver_id=driver.id)
+    node = next(node for node in ctx["flow_nodes"] if node["label"] == "Raleigh East")
+
+    assert [item for item in ctx["flow_items"] if item["item_type"] == "issue"] == []
+    assert node["blocked_count"] == 0
+    assert ctx["floor_summary"]["issue_count"] == 0
+
+
 def test_mobile_dashboard_uses_compact_shared_production_flow(client, app):
     with app.app_context():
         driver = _user("mobile-pf-driver", "driver")
@@ -553,16 +650,89 @@ def test_mobile_dashboard_uses_compact_shared_production_flow(client, app):
 def test_operations_board_is_shared_read_only_plant_floor_board(client, app):
     with app.app_context():
         manager = _user()
-        _move_request(manager.id, request_number="MR-FLOOR-1")
+        _move_request(
+            manager.id,
+            request_number="MR-FLOOR-1",
+            raw_text="Secret dispatch detail for driver 12",
+            cargo_text="Sensitive cargo",
+            part_number="SECRET-PART",
+            assigned_driver_text="Named Driver",
+        )
 
+    _login(client, "mgr")
     resp = client.get("/operations-board")
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "Plant Floor Board" in body
     assert 'data-production-flow-mode="plant_floor"' in body
-    assert "MR-FLOOR-1" in body
+    assert "mgr / management" in body
+    assert "MR-FLOOR-1" not in body
+    assert "Secret dispatch detail" not in body
+    assert "Sensitive cargo" not in body
+    assert "SECRET-PART" not in body
+    assert "Named Driver" not in body
     assert "Requires authorized identity." in body
+
+
+def test_active_move_requests_do_not_pollute_historical_production_flow_date(app):
+    from app.services.production_flow import build_production_flow_context
+
+    manager = _user("pf-historical-mgr", "management")
+    driver = _user("pf-historical-driver", "driver")
+    historical_date = date.today() - timedelta(days=4)
+    _driver_log(driver, date=historical_date, plant_name="RE")
+    _move_request(
+        manager.id,
+        status="assigned",
+        assigned_driver_id=driver.id,
+        request_number="MR-CURRENT-ONLY",
+        requested_at=datetime.utcnow(),
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+
+    ctx = build_production_flow_context(date=historical_date, driver_id=driver.id)
+
+    assert all(item.get("label") != "MR-CURRENT-ONLY" for item in ctx["flow_items"])
+    assert ctx["queue_summary"]["active_count"] == 0
+
+
+def test_production_flow_manager_items_have_record_urls(app):
+    from app.extensions import db
+    from app.models.case import ExceptionEvent
+    from app.services.production_flow import build_production_flow_context
+
+    driver = _user("url-driver", "driver")
+    transfer = _plant_transfer(driver)
+    log = _driver_log(driver, plant_name="RE")
+    db.session.add(ExceptionEvent(
+        event_type="manager_review_requested",
+        severity="medium",
+        stop_id=log.id,
+        driver_log_id=log.id,
+        driver_id=driver.id,
+        plant_name="RE",
+        event_date=date.today(),
+        summary="Review stop",
+    ))
+    db.session.commit()
+
+    with app.test_request_context("/manager/dashboard"):
+        ctx = build_production_flow_context(date=date.today(), can_review=True)
+
+    transfer_item = next(item for item in ctx["flow_items"] if item["item_type"] == "plant_transfer")
+    issue_item = next(item for item in ctx["flow_items"] if item["item_type"] == "issue")
+
+    assert transfer_item["view_url"] == f"/manager/plant-transfers/{transfer.id}"
+    assert issue_item["view_url"] == f"/manager/driver-logs/{log.id}"
+
+
+def test_operations_board_requires_authentication(client, app):
+    resp = client.get("/operations-board", follow_redirects=False)
+
+    assert resp.status_code == 302
+    assert "/login" in resp.headers["Location"]
 
 
 def test_board_uses_production_flow_wording_not_audit_defense(client, app):

@@ -211,7 +211,7 @@ def _stop_board_badge(log, *, movement, issues=(), evidence=None, flags=(), note
     transfer_count = int(evidence.get("transfer_count") or 0)
 
     if code == "route_start":
-        return _board_badge_display("START", pill_tone="open", row_tone="completed", severity="info")
+        return _board_badge_display("STARTED", pill_tone="open", row_tone="completed", severity="info")
     if code in {"empty_return", "no_pickup"}:
         return _board_badge_display("NO PICKUP" if code == "no_pickup" else "CLOSED", pill_tone="recorded")
     if code == "loaded":
@@ -715,10 +715,27 @@ def _open_issue_request_ids(requests):
     return ids
 
 
+def _request_matches_date(req, target):
+    linked_log = getattr(req, "linked_driver_log", None)
+    if linked_log is not None and getattr(linked_log, "date", None) == target:
+        return True
+    for attr in ("due_at", "requested_at", "created_at", "updated_at"):
+        value = getattr(req, attr, None)
+        if not value:
+            continue
+        value_date = value.date() if isinstance(value, datetime) else value
+        if value_date == target:
+            return True
+    return False
+
+
 def _requests_for_view(*, driver_id=None, target=None, selected_move_request_id=None):
     target = target or date_cls.today()
     start, end = _day_bounds(target)
-    requests = MoveRequest.query.filter(MoveRequest.status.in_(ACTIVE_STATUSES)).all()
+    requests = [
+        req for req in MoveRequest.query.filter(MoveRequest.status.in_(ACTIVE_STATUSES)).all()
+        if _request_matches_date(req, target)
+    ]
     completed_today = MoveRequest.query.filter(
         MoveRequest.status == "completed",
         MoveRequest.updated_at >= start,
@@ -760,6 +777,53 @@ def _transfers_for_view(*, driver_id=None, target=None):
     if driver_id:
         query = query.filter_by(user_id=driver_id)
     return query.order_by(PlantTransfer.created_at.desc()).all()
+
+
+def _plant_alias_keys(value):
+    if not _clean(value):
+        return set()
+    keys = {_norm_key(value)}
+    code = _plant_code(value)
+    if code:
+        keys.add(_norm_key(code))
+        keys.add(_norm_key(plant_label(code) or code))
+    label = _location_label(value)
+    if label:
+        keys.add(_norm_key(label))
+    return {key for key in keys if key}
+
+
+def _transfer_line_text_keys(transfer):
+    keys = set()
+    for line in getattr(transfer, "lines", []) or []:
+        for value in (getattr(line, "part_number", None), getattr(line, "remarks", None)):
+            if not _clean(value):
+                continue
+            key = _norm_key(value)
+            if key:
+                keys.add(key)
+    return keys
+
+
+def _transfer_proves_stop(transfer, log, *, label, dropped_loads, pickup_label="", linked_move=None):
+    if linked_move is not None and getattr(linked_move, "linked_plant_transfer_id", None) == getattr(transfer, "id", None):
+        return True
+    if transfer.user_id != log.driver_id or transfer.transfer_date != log.date:
+        return False
+    if not dropped_loads:
+        return False
+    destination_keys = _plant_alias_keys(label) | _plant_alias_keys(log.plant_name)
+    if _norm_key(transfer.ship_to) not in destination_keys and not (_plant_alias_keys(transfer.ship_to) & destination_keys):
+        return False
+    origin_keys = _plant_alias_keys(pickup_label)
+    if origin_keys and (_plant_alias_keys(transfer.ship_from) & origin_keys):
+        return True
+    line_keys = _transfer_line_text_keys(transfer)
+    log_part = _norm_key(getattr(log, "part_number", None)) if _clean(getattr(log, "part_number", None)) else ""
+    if log_part and log_part in line_keys:
+        return True
+    dropped_keys = {_norm_key(load) for load in dropped_loads if _norm_key(load)}
+    return bool(line_keys and dropped_keys and line_keys & dropped_keys)
 
 
 def _move_view_model(req, *, damaged_log_ids=frozenset(), issue_request_ids=frozenset(), role="driver"):
@@ -843,7 +907,7 @@ def _move_actions(req, *, role, edit_url=None):
             "method": "post",
         })
     actions.append({"label": "Attach document", "url": edit_url, "method": "get"})
-    actions.append({"label": "View audit/proof", "url": None, "method": "disabled"})
+    actions.append({"label": "View audit/proof", "url": edit_url, "method": "get"})
     return actions
 
 
@@ -857,11 +921,9 @@ def _stop_actions(log, *, linked_move=None, role="driver"):
         "method": "get",
     })
     if role == "driver":
-        actions.append({"label": "Record arrival", "url": None, "method": "disabled"})
         if not log.depart_time:
             actions.append({"label": "Record departure", "url": _safe_url("driver.depart_driver_log", log_id=log.id), "method": "get"})
             actions.append({"label": "Confirm cargo", "url": _safe_url("driver.pickup_driver_log", log_id=log.id), "method": "get"})
-        actions.append({"label": "Add note", "url": None, "method": "disabled"})
         actions.append({"label": "Add damage", "url": _safe_url("driver.new_damage_report"), "method": "get"})
         actions.append({"label": "Attach document", "url": _safe_url("driver.new_plant_transfer"), "method": "get"})
     if linked_move and role == "manager":
@@ -922,7 +984,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
     log_ids = [row["log"].id for row in getattr(route_context, "rows", []) if row.get("log")]
     damaged_log_ids = _damage_log_ids(log_ids)
     scan_events_by_log = {}
-    transfer_proof_by_log = {}
+    proof_transfers = []
     if log_ids:
         _review_req = {e.stop_id for e in ExceptionEvent.query.filter(
             ExceptionEvent.event_type == "manager_review_requested",
@@ -951,25 +1013,12 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             PlantTransfer.user_id.in_(driver_ids),
             PlantTransfer.transfer_date.in_(route_dates),
         ).all()
-        for row in getattr(route_context, "rows", []) or []:
-            log = row.get("log")
-            if not log:
-                continue
-            plant = _plant_code(log.plant_name) or _plant_code(row.get("plant"))
-            plant_texts = {_norm_key(log.plant_name), _norm_key(row.get("plant"))}
-            if plant:
-                plant_texts.add(_norm_key(plant_label(plant) or plant))
-                plant_texts.add(_norm_key(plant))
-            for transfer in proof_transfers:
-                if transfer.user_id != log.driver_id or transfer.transfer_date != log.date:
-                    continue
-                transfer_plants = {_norm_key(transfer.ship_from), _norm_key(transfer.ship_to)}
-                if plant_texts & transfer_plants:
-                    transfer_proof_by_log.setdefault(log.id, []).append(transfer)
+    true_exception_by_stop = {}
     issue_stop_ids = set()
     for item in (getattr(route_context, "true_exceptions", None) or []) + (getattr(route_context, "review_items", None) or []):
         if item.get("stop_id"):
             issue_stop_ids.add(item["stop_id"])
+            true_exception_by_stop.setdefault(item["stop_id"], []).append(item)
 
     stops = []
     prior_cargo_movement_seen = False
@@ -1033,7 +1082,17 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             if (event.validation_status or "").lower() in {"missing", "missed_drop"}
             or "short" in _clean(event.validation_message).lower()
         ])
-        transfer_matches = transfer_proof_by_log.get(log.id, [])
+        transfer_matches = [
+            transfer for transfer in proof_transfers
+            if _transfer_proves_stop(
+                transfer,
+                log,
+                label=label,
+                dropped_loads=dropped_loads,
+                pickup_label=drop_pickup_label,
+                linked_move=linked_move,
+            )
+        ]
         proof_count = (
             len(getattr(log, "photos", []) or [])
             + valid_scan_count
@@ -1092,11 +1151,26 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             unconfirmed_drop=unconfirmed_only,
             destination_mismatch=mismatch,
             missing_proof=missing_proof,
-            needs_departure=not departed,
+            needs_departure=not departed and log.id == current_stop_id,
             review_requested=log.id in review_requested_ids,
             evidence=stop_evidence,
             extra_codes=("count_short",) if short_scan_count else (),
         )
+        missing_departure_items = [
+            item for item in true_exception_by_stop.get(log.id, [])
+            if _clean(item.get("label")).lower() == "missing departure"
+        ]
+        if missing_departure_items and log.id != current_stop_id:
+            detail = _clean(missing_departure_items[0].get("detail"))
+            stop_issues.insert(0, {
+                "code": "missing_departure_sequence",
+                "label": "MISSING DEPARTURE",
+                "severity": "risk",
+                "reason": detail or "This stop is still open even though a later stop exists.",
+                "action": "Record departure or send to manager review",
+                "evidence": dict(stop_evidence, route_context_exception=detail or None),
+                "resolved": False,
+            })
         is_review_closed = log.id in _review_done
         if is_review_closed:
             stop_issues = []

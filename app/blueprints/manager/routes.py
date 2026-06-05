@@ -269,13 +269,15 @@ def _route_export_response(ctx, *, filename, delimiter, content_type, title):
     response = make_response(output.getvalue())
     response.headers["Content-Type"] = content_type
     response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    target_id = _first_record_id(ctx.get("logs") or [])
     record_activity(
         user_id=current_user.id,
         category="download",
         action="manager_route_export",
         title=title,
-        details=f"Prepared {filename} route export.",
+        details=f"Prepared {filename} route export for driver #{ctx['driver'].id} on {ctx['the_date']}.",
         target_type="driver_log",
+        target_id=target_id,
     )
     return response
 
@@ -662,10 +664,35 @@ def _reviewed_exception_keys():
 
 def _active_exception_items():
     reviewed = _reviewed_exception_keys()
-    return [
-        item for item in build_exception_items(dock_delay_minutes=_dock_delay_minutes())
-        if _exception_key(item) not in reviewed
-    ]
+    items = []
+    for item in build_exception_items(dock_delay_minutes=_dock_delay_minutes()):
+        if _exception_key(item) in reviewed and _exception_source_resolved(item):
+            continue
+        items.append(item)
+    return items
+
+
+def _exception_source_resolved(item):
+    target_type = item.get("target_type")
+    target_id = item.get("target_id")
+    if not target_id:
+        return False
+    if target_type == "followup":
+        followup = OperationalFollowUp.query.get(target_id)
+        return followup is None or followup.status != "open"
+    if target_type == "damage_report":
+        report = DamageReport.query.get(target_id)
+        return report is None or report.status == "closed"
+    if target_type == "task":
+        task = Task.query.get(target_id)
+        return task is None or task.status in {"completed", "declined"}
+    if target_type == "driver_log":
+        log = DriverLog.query.get(target_id)
+        return log is None or log.deleted_at is not None
+    if target_type == "plant_transfer":
+        transfer = PlantTransfer.query.get(target_id)
+        return transfer is None or transfer.deleted_at is not None
+    return False
 
 
 def _live_stop_rows(logs):
@@ -1828,7 +1855,13 @@ def review_dashboard():
         "unassigned_issue_count": len([item for item in exceptions if item["severity"] != "followup" and item.get("category") in {"Truck issue", "Damage flag"}]),
     }
     followups = OperationalFollowUp.query.order_by(OperationalFollowUp.created_at.desc()).limit(20).all()
-    damage_reports = DamageReport.query.order_by(DamageReport.created_at.desc()).limit(10).all()
+    damage_reports = (
+        DamageReport.query
+        .filter(DamageReport.status != "closed")
+        .order_by(DamageReport.created_at.desc())
+        .limit(10)
+        .all()
+    )
     plant_forecasts = plant_forecast_rows(date.today())[:8]
     followup_cases = build_followup_cases(anchor=date.today())
     exception_history = (
@@ -1879,13 +1912,13 @@ def mark_exception_reviewed():
         user_id=current_user.id,
         category="exception",
         action=review_action,
-        title="Exception deleted" if review_action == "deleted" else "Exception reviewed",
+        title="Exception acknowledged" if review_action == "deleted" else "Exception reviewed",
         details=f"key:{review_key}; {category}: {label}",
         target_type=target_type,
         target_id=target_id,
     )
     db.session.commit()
-    flash("Exception deleted from active review." if review_action == "deleted" else "Exception marked completed.", "success")
+    flash("Exception acknowledged; unresolved source issues stay active until corrected." if review_action == "deleted" else "Exception marked completed.", "success")
     return redirect(url_for("manager.review_dashboard"))
 
 
@@ -1913,30 +1946,58 @@ def _pending_review_stop_ids():
     been resolved.
 
     Mirrors the IN REVIEW contract in app/services/route_map.py: a stop is in
-    review when it has a ``manager_review_requested`` ExceptionEvent and no
-    matching ``manager_review_resolved`` ExceptionEvent for the same stop_id.
+    review when its latest ``manager_review_requested`` ExceptionEvent is newer
+    than the latest ``manager_review_resolved`` ExceptionEvent for that stop_id.
     """
-    requested = {
-        stop_id
-        for (stop_id,) in ExceptionEvent.query.with_entities(ExceptionEvent.stop_id)
+    latest_requested = {}
+    latest_resolved = {}
+    events = (
+        ExceptionEvent.query
         .filter(
-            ExceptionEvent.event_type == "manager_review_requested",
+            ExceptionEvent.event_type.in_(["manager_review_requested", "manager_review_resolved"]),
             ExceptionEvent.stop_id.isnot(None),
         )
+        .order_by(ExceptionEvent.created_at.desc(), ExceptionEvent.id.desc())
         .all()
+    )
+    for event in events:
+        if event.event_type == "manager_review_requested":
+            latest_requested.setdefault(event.stop_id, event)
+        elif event.event_type == "manager_review_resolved":
+            latest_resolved.setdefault(event.stop_id, event)
+    return {
+        stop_id for stop_id, request_event in latest_requested.items()
+        if _event_is_newer(request_event, latest_resolved.get(stop_id))
     }
-    if not requested:
-        return set()
-    resolved = {
-        stop_id
-        for (stop_id,) in ExceptionEvent.query.with_entities(ExceptionEvent.stop_id)
+
+
+def _event_is_newer(event, previous):
+    if event is None:
+        return False
+    if previous is None:
+        return True
+    event_key = (event.created_at or datetime.min, event.id or 0)
+    previous_key = (previous.created_at or datetime.min, previous.id or 0)
+    return event_key > previous_key
+
+
+def _latest_review_event(log_id, event_type):
+    return (
+        ExceptionEvent.query
         .filter(
-            ExceptionEvent.event_type == "manager_review_resolved",
-            ExceptionEvent.stop_id.in_(requested),
+            ExceptionEvent.event_type == event_type,
+            ExceptionEvent.stop_id == log_id,
         )
-        .all()
-    }
-    return requested - resolved
+        .order_by(ExceptionEvent.created_at.desc(), ExceptionEvent.id.desc())
+        .first()
+    )
+
+
+def _has_pending_review_request(log_id):
+    return _event_is_newer(
+        _latest_review_event(log_id, "manager_review_requested"),
+        _latest_review_event(log_id, "manager_review_resolved"),
+    )
 
 
 def _pending_review_rows():
@@ -2036,7 +2097,10 @@ def resolve_review(log_id):
     if current_user.role != "management":
         flash("Manager credentials required.", "warning")
         return redirect(url_for("manager.review_queue"))
-    log = DriverLog.query.get_or_404(log_id)
+    log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
+    if not _has_pending_review_request(log_id):
+        flash("No pending manager review request exists for that stop.", "warning")
+        return redirect(url_for("manager.review_queue"))
     db.session.add(ExceptionEvent(
         event_type="manager_review_resolved",
         severity="medium",
@@ -2148,29 +2212,38 @@ def delete_damage_report(report_id):
         ],
     )
     before["photos"] = [photo.filename for photo in report.photos]
+    report.status = "closed"
+    report.resolved_at = datetime.utcnow()
+    after = model_snapshot(
+        report,
+        [
+            "status",
+            "resolved_at",
+        ],
+    )
+    after["photos_preserved"] = [photo.filename for photo in report.photos]
     record_audit_event(
         user_id=current_user.id,
         target_type="damage_report",
         target_id=report.id,
-        action="manager_deleted",
-        reason="Manager deleted damage report from review cleanup.",
+        action="manager_archived",
+        reason="Manager archived damage report from active review cleanup.",
         before_values=before,
-        after_values={"deleted": True},
+        after_values=after,
         commit=False,
     )
     record_activity(
         user_id=current_user.id,
         category="damage",
-        action="deleted",
-        title="Damage report deleted by manager",
-        details=f"Damage report #{report.id} deleted for {report.plant_name}.",
+        action="archived",
+        title="Damage report archived by manager",
+        details=f"Damage report #{report.id} archived for {report.plant_name}; evidence remains attached.",
         target_type="damage_report",
         target_id=report.id,
         commit=False,
     )
-    db.session.delete(report)
     db.session.commit()
-    flash("Damage report deleted.", "success")
+    flash("Damage report archived.", "success")
     return redirect(_safe_manager_next())
 
 
@@ -2424,6 +2497,7 @@ def driver_route_attachment():
         pdf_bytes=_build_manager_route_review_pdf(ctx),
         filename=f"manager-route-review-{driver_id}-{route_date}.pdf",
         target_type="driver_log",
+        target_id=_first_record_id(ctx.get("logs") or []),
         title="Manager Route Review PDF downloaded",
     )
 
@@ -2698,11 +2772,20 @@ def manage_task(task_id):
     shifts = ["1st", "2nd", "3rd"]
 
     if request.method == "POST":
-        assigned_to = request.form.get("assigned_to", "0")
-        try:
-            assigned_id = int(assigned_to)
-        except ValueError:
+        assigned_to = (request.form.get("assigned_to", "0") or "0").strip()
+        assigned_driver = None
+        if assigned_to in {"", "0"}:
             assigned_id = 0
+        else:
+            try:
+                assigned_id = int(assigned_to)
+            except ValueError:
+                flash("Select a valid driver for this move or choose Unassigned.", "danger")
+                return redirect(url_for("manager.manage_task", task_id=task.id))
+            assigned_driver = User.query.filter_by(id=assigned_id, role="driver").first()
+            if not assigned_driver:
+                flash("Select a valid driver for this move or choose Unassigned.", "danger")
+                return redirect(url_for("manager.manage_task", task_id=task.id))
         task.assigned_to = assigned_id or None
 
         status = request.form.get("status", task.status)
@@ -2729,7 +2812,6 @@ def manage_task(task_id):
             ensure_hot_move_for_task(task, driver_id=task.assigned_to, created_by_id=current_user.id, source="dispatch")
         db.session.commit()
 
-        assigned_driver = User.query.get(task.assigned_to) if task.assigned_to else None
         assigned_label = assigned_driver.manager_label if assigned_driver else "Unassigned"
         record_activity(
             user_id=current_user.id,

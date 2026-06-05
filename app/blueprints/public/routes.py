@@ -1,3 +1,4 @@
+import os
 from datetime import date as date_cls, datetime
 
 from flask import abort, current_app, jsonify, render_template, request, send_from_directory
@@ -19,7 +20,11 @@ def welcome():
 
 @bp.route("/OneSignalSDKWorker.js")
 def onesignal_sw():
-    return send_from_directory("static", "OneSignalSDKWorker.js")
+    return send_from_directory(
+        os.path.join(current_app.static_folder, "OneSignalSDK.sw.js"),
+        "onesignal.js",
+        mimetype="application/javascript",
+    )
 
 
 @bp.route("/plant_directory")
@@ -30,6 +35,7 @@ def plant_directory():
 
 @bp.route("/operations-board")
 @bp.route("/production-flow-board")
+@login_required
 def production_flow_board():
     selected_plant = (request.args.get("plant") or "").strip() or None
     target_date = date_cls.today()
