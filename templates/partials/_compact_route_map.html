@@ -103,27 +103,28 @@
    Missing source/destination data stays in the row fact or issue detail, not in a stretched
    half-empty Pickup -> Deliver grid. #}
 {% set ROUTE_PAIR_UNKNOWNS = ['', '--', '—', 'Pickup source unknown', 'Destination needs confirmation', 'Earlier stop', 'Next stop'] %}
-{% macro flow_route_pair(pickup, deliver) -%}
+{% macro flow_route_pair(pickup, deliver, deliver_state='delivered') -%}
   {%- set pk = pickup if (pickup and pickup not in ROUTE_PAIR_UNKNOWNS) else '' -%}
   {%- set dv = deliver if (deliver and deliver not in ROUTE_PAIR_UNKNOWNS) else '' -%}
+  {%- set deliver_word = 'Delivered' if deliver_state == 'delivered' else 'Destination' -%}
   {%- if pk and dv -%}
     <span class="flow-route-pair">
       <span class="flow-route-end"><em>Pickup</em><strong>{{ pk }}</strong></span>
-      <span class="flow-route-end flow-route-end--deliver"><span class="flow-arrow flow-route-arrow" aria-hidden="true">→</span><em>Delivered</em><strong>{{ dv }}</strong></span>
+      <span class="flow-route-end flow-route-end--deliver"><span class="flow-arrow flow-route-arrow" aria-hidden="true">→</span><em>{{ deliver_word }}</em><strong>{{ dv }}</strong></span>
     </span>
   {%- endif -%}
 {%- endmacro %}
 {% macro board_flow_text(flow, fallback, wait_minutes=none) -%}
   {%- if flow and flow.mode == 'action' -%}
-    <span class="flow-main-line">{{ flow.plant }} &middot; {{ flow.action }} {{ bold_cargo(flow.cargo) }}</span>{{ flow_route_pair(flow.pickup, flow.deliver) }}
+    <span class="flow-main-line">{{ flow.plant }} &middot; {{ flow.action }} {{ bold_cargo(flow.cargo) }}</span>{{ flow_route_pair(flow.pickup, flow.deliver, flow.deliver_state|default('delivered')) }}
   {%- elif flow and flow.mode == 'change' -%}
-	    <span class="flow-main-line">{{ flow.plant }} &middot; {{ bold_cargo(flow['from']) }} <span class="flow-arrow" aria-hidden="true">&rarr;</span> {{ bold_cargo(flow['to']) }}</span>{{ flow_route_pair(flow.pickup, flow.deliver) }}
+	    <span class="flow-main-line">{{ flow.plant }} &middot; {{ bold_cargo(flow['from']) }} <span class="flow-arrow" aria-hidden="true">&rarr;</span> {{ bold_cargo(flow['to']) }}</span>{{ flow_route_pair(flow.pickup, flow.deliver, flow.deliver_state|default('delivered')) }}
   {%- elif flow and flow.mode == 'plain' -%}
     {%- set flow_text = flow.text -%}
     {%- if wait_minutes is not none -%}
       {%- set flow_text = flow_text|replace(' · wait ' ~ (wait_minutes|string) ~ 'm', '') -%}
     {%- endif -%}
-    <span class="flow-main-line">{{ flow_text }}</span>{{ flow_route_pair(flow.pickup, flow.deliver) }}
+    <span class="flow-main-line">{{ flow_text }}</span>{{ flow_route_pair(flow.pickup, flow.deliver, flow.deliver_state|default('delivered')) }}
   {%- else -%}
     <span class="flow-main-line">{{ fallback }}</span>
   {%- endif -%}

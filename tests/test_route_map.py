@@ -1242,3 +1242,169 @@ def test_partial_drop_is_recorded_not_route_review(client, app):
     assert "<em>Delivered</em><strong>PPL</strong>" in body
     assert "ROUTE?" not in body
     assert "Verify route" not in body
+
+
+# --- Regression: in-transit cargo wording + next-action CTA (mobile flow board) ---
+
+
+def test_in_transit_pickup_reads_destination_not_delivered(app):
+    """Picked up at Paint Central, headed to Raleigh East, not yet dropped.
+
+    The inline board label must NOT claim the load was delivered while the
+    status pill still says IN TRANSIT. The destination still displays.
+    """
+    from flask import render_template
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("in_transit_pickup_driver")
+    _driver_log(
+        driver,
+        plant_name="PC",
+        depart_time="08:20",
+        load_size="Empty",
+        depart_load_size="Raleigh East Load",
+    )
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][0]
+
+    # Status pill stays IN TRANSIT while the load is moving.
+    assert stop["board_badge"]["label"] == "IN TRANSIT"
+    # Classification: destination is known, but the leg is not a delivery.
+    assert stop["board_flow"]["deliver"] == "Raleigh East"
+    assert stop["board_flow"]["deliver_state"] == "destination"
+
+    with app.test_request_context("/mobile"):
+        html = render_template(
+            "partials/_compact_route_map.html",
+            route_map=ctx,
+            route_cta={"next_action": "Add Stop"},
+            route_cta_urls={"add_stop": "/new_driving_log"},
+        )
+
+    # The exact contradiction the driver reported must be gone on mobile.
+    assert "<em>Destination</em><strong>Raleigh East</strong>" in html
+    assert "<em>Delivered</em><strong>Raleigh East</strong>" not in html
+
+
+def test_pickup_label_graduates_to_delivered_after_drop_completes(app):
+    """After the Raleigh East drop is recorded, the pickup leg may read Delivered.
+
+    Pill and inline label agree (both DELIVERED) once the drop completes.
+    """
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("pickup_graduates_driver")
+    _driver_log(
+        driver,
+        plant_name="PC",
+        arrive_time="2026-05-28 08:00:00",
+        depart_time="08:15",
+        load_size="Empty",
+        depart_load_size="Raleigh East Load",
+    )
+    _driver_log(
+        driver,
+        plant_name="RE",
+        arrive_time="2026-05-28 09:00:00",
+        depart_time="09:20",
+        load_size="Raleigh East Load",
+        depart_load_size="Empty",
+    )
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    pickup = ctx["stops"][0]
+
+    assert pickup["board_badge"]["label"] == "DELIVERED"
+    assert pickup["board_flow"]["deliver"] == "Raleigh East"
+    assert pickup["board_flow"]["deliver_state"] == "delivered"
+
+
+def test_in_transit_cta_names_destination_instead_of_generic_add_stop(app):
+    """A known in-transit destination makes the CTA say 'Arrive at <plant>'."""
+    from types import SimpleNamespace
+    from app.services.route_context import build_route_cta_context
+
+    departed_stop = SimpleNamespace(id=1, depart_time="08:20")
+    route_context = SimpleNamespace(
+        rows=[{"log_id": 1}],
+        current_stop=departed_stop,
+        route_status="active",
+        route_finalized=False,
+        all_departed=True,
+        posttrip_status=None,
+        current_cargo={"destination_label": "Raleigh East", "destination": "RE"},
+    )
+
+    cta = build_route_cta_context(
+        route_context,
+        route_is_active=True,
+        has_active_shift=True,
+        route_date=date.today(),
+        today_local_date=date.today(),
+    )
+
+    assert cta["primary_cta"]["label"] == "Arrive at Raleigh East"
+    # Action and its route guards are unchanged — only the label is specific.
+    assert cta["primary_cta"]["action"] == "add_stop"
+
+
+def test_idle_active_route_keeps_generic_add_stop_cta(app):
+    """With no cargo in transit, the CTA stays the generic 'Add Stop'."""
+    from types import SimpleNamespace
+    from app.services.route_context import build_route_cta_context
+
+    departed_stop = SimpleNamespace(id=1, depart_time="08:20")
+    route_context = SimpleNamespace(
+        rows=[{"log_id": 1}],
+        current_stop=departed_stop,
+        route_status="active",
+        route_finalized=False,
+        all_departed=True,
+        posttrip_status=None,
+        current_cargo={"destination_label": None, "destination": None},
+    )
+
+    cta = build_route_cta_context(
+        route_context,
+        route_is_active=True,
+        has_active_shift=True,
+        route_date=date.today(),
+        today_local_date=date.today(),
+    )
+
+    assert cta["primary_cta"]["label"] == "Add Stop"
+    assert cta["primary_cta"]["action"] == "add_stop"
+
+
+def test_left_empty_stop_has_no_delivered_wording(app):
+    """A no-load stop away from origin stays 'left empty' with no route pair."""
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("left_empty_label_driver")
+    _driver_log(driver, plant_name="RE", arrive_time="2026-05-28 08:00:00", depart_time="08:20", load_size="Empty", depart_load_size="PPL Load")
+    _driver_log(driver, plant_name="PPL", arrive_time="2026-05-28 09:00:00", depart_time="09:20", load_size="PPL Load", depart_load_size="Empty")
+    _driver_log(driver, plant_name="PC", arrive_time="2026-05-28 10:00:00", depart_time="10:10", load_size="Empty", depart_load_size="Empty", no_pickup=True)
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][2]
+
+    assert stop["board_flow"]["text"] == "Paint Central · left empty"
+    assert "deliver_state" not in stop["board_flow"]
+    assert "empty return" not in stop["board_detail"].lower()
+
+
+def test_actual_empty_return_stop_keeps_empty_return_wording(app):
+    """A true empty return to origin stays 'empty return' with no route pair."""
+    from app.services.route_map import build_driver_route_map_context
+
+    driver = _user("empty_return_label_driver")
+    _driver_log(driver, plant_name="PC", arrive_time="2026-05-28 08:00:00", depart_time="08:20", load_size="Empty", depart_load_size="Raleigh East Load")
+    _driver_log(driver, plant_name="RE", arrive_time="2026-05-28 09:00:00", depart_time="09:20", load_size="Raleigh East Load", depart_load_size="Empty")
+    _driver_log(driver, plant_name="PC", arrive_time="2026-05-28 10:00:00", depart_time="10:10", load_size="Empty", depart_load_size="Empty", no_pickup=True)
+
+    ctx = build_driver_route_map_context(driver=driver, date=date.today())
+    stop = ctx["stops"][2]
+
+    assert stop["board_flow"]["text"] == "Paint Central · empty return"
+    assert "deliver_state" not in stop["board_flow"]

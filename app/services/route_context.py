@@ -338,6 +338,21 @@ def build_route_cta_context(
             allowed_actions = ["start_shift", "route_history"]
             route_message = "No active route for this date."
 
+    # When cargo is in transit toward a known plant, name it in the generic
+    # "Add Stop" CTA so the next action reads "Arrive at <plant>". This is a
+    # label-only change; the add_stop action and its route guards are untouched.
+    current_cargo = getattr(route_context, "current_cargo", None)
+    in_transit_destination = (
+        current_cargo.get("destination_label") if isinstance(current_cargo, dict) else None
+    )
+    if (
+        in_transit_destination
+        and primary
+        and primary.get("action") == "add_stop"
+        and primary.get("label") == "Add Stop"
+    ):
+        primary = _route_cta(f"Arrive at {in_transit_destination}", "add_stop")
+
     if proof_missing and not route_finalized and next_action not in {"Confirm cargo", "Record departure", "Finalize route"}:
         display_mode = "proof_needed"
         next_action = "Attach document"

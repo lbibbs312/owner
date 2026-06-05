@@ -374,13 +374,16 @@ def _cargo_destination_label(value):
     return plant_label(destination) or ""
 
 
-def _with_route_pair(summary, *, pickup="", deliver=""):
+def _with_route_pair(summary, *, pickup="", deliver="", deliver_state="delivered"):
     pickup = _clean(pickup)
     deliver = _clean(deliver)
     if pickup:
         summary["pickup"] = pickup
     if deliver:
         summary["deliver"] = deliver
+        # "delivered" means the drop is complete; "destination" means cargo is
+        # still in transit toward a known plant. Drives the inline board label.
+        summary["deliver_state"] = deliver_state
     return summary
 
 
@@ -397,6 +400,7 @@ def _board_flow_summary(
     is_empty_return=False,
     wait_minutes=None,
     dropped_loads=(),
+    delivered=False,
 ):
     """Compact display copy for the live board.
 
@@ -416,6 +420,10 @@ def _board_flow_summary(
     arrived_destination = _cargo_destination_label(arrived_with)
     departed_destination = _cargo_destination_label(departed_with) if closed else ""
 
+    # A pickup/carry leg names where cargo is *headed*, not where it was dropped.
+    # Only call it "delivered" once the row's drop is actually complete.
+    transit_state = "delivered" if delivered else "destination"
+
     wait_suffix = f" · wait {int(wait_minutes)}m" if wait_minutes else ""
     if arrived == "Empty" and not closed and sequence == 1:
         return {"mode": "plain", "text": f"{label} · route start · arrived empty{wait_suffix} · needs departure"}
@@ -433,6 +441,7 @@ def _board_flow_summary(
             {"mode": "action", "plant": label, "action": "Picked up", "cargo": departed},
             pickup=label,
             deliver=delivery_label or departed_destination or UNKNOWN_DESTINATION_LABEL,
+            deliver_state=transit_state,
         )
     if arrived != "Empty" and departed == "Empty":
         return _with_route_pair(
@@ -453,11 +462,13 @@ def _board_flow_summary(
             {"mode": "action", "plant": label, "action": "Carrying", "cargo": arrived},
             pickup=pickup_label or UNKNOWN_PICKUP_SOURCE_LABEL,
             deliver=delivery_label or departed_destination or arrived_destination or UNKNOWN_DESTINATION_LABEL,
+            deliver_state=transit_state,
         )
     return _with_route_pair(
         {"mode": "change", "plant": label, "from": arrived, "to": departed},
         pickup=pickup_label or (label if departed != "Empty" else UNKNOWN_PICKUP_SOURCE_LABEL),
         deliver=delivery_label or departed_destination or arrived_destination or UNKNOWN_DESTINATION_LABEL,
+        deliver_state=transit_state,
     )
 
 
@@ -1267,6 +1278,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
                 pickup_label=drop_pickup_label,
                 delivery_label=label if dropped_loads else "",
                 dropped_loads=dropped_loads,
+                delivered=board_status_badge["label"] == "DELIVERED",
             ),
             "movement_code": movement["code"],
             "movement_label": movement["label"],
