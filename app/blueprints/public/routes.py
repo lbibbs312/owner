@@ -35,6 +35,7 @@ def plant_directory():
 
 @bp.route("/operations-board")
 @bp.route("/production-flow-board")
+@bp.route("/production_flow_board")
 @login_required
 def production_flow_board():
     selected_plant = (request.args.get("plant") or "").strip() or None

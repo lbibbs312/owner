@@ -70,7 +70,6 @@
 {# Accurate count of every selectable row rendered on the board. #}
 {% set obj = namespace(count=0) %}
 {% set obj.count = obj.count + ((rm.stops|length) if (rm and rm.stops) else 1) %}
-{% set obj.count = obj.count + desktop.load_items|length + route_transfers|length %}
 {% if rm and rm.stops %}{% set obj.count = obj.count + desk.issues + route_damage_reports|length + route_packet_flag_count %}{% endif %}
 
 {% macro clean_value(value, action='ACTION REQUIRED') -%}
@@ -175,25 +174,6 @@
           {% set desk.default_set = true %}
         {% endif %}
       </div>
-
-      {% if desktop.load_items or route_transfers %}
-        <div class="desk-row-group">
-          <h3>Loads / Parts</h3>
-          {% for item in desktop.load_items %}
-            {% set detail = item.details[0] if item.details else none %}
-            {% set is_default = not desk.default_set %}
-            {% if is_default %}{% set desk.default_set = true %}{% endif %}
-            {% set row_meta %}{{ clean_value(item.origin_label, 'SOURCE NOT CAPTURED') }} to {{ clean_value(item.destination_label, 'DESTINATION REQUIRED') }} / {{ item.load_count_label or item.route_line }}{% endset %}
-            {{ row_button('desktop-load-' ~ loop.index0, 'LOADED', item.title, row_meta, 'normal', is_default) }}
-          {% endfor %}
-          {% for transfer in route_transfers %}
-            {% set line_count = transfer.lines|length %}
-            {% set is_default = not desk.default_set %}
-            {% if is_default %}{% set desk.default_set = true %}{% endif %}
-            {{ row_button('desktop-transfer-' ~ transfer.id, 'XFER', transfer.transfer_number or ('Transfer ' ~ transfer.id), (transfer.ship_from ~ ' to ' ~ transfer.ship_to ~ ' / ' ~ line_count ~ ' line' ~ ('s' if line_count != 1 else '')), 'normal', is_default) }}
-          {% endfor %}
-        </div>
-      {% endif %}
 
       {% if rm and rm.stops %}
         <div class="desk-row-group">
@@ -343,9 +323,9 @@
           <section class="desk-route-packet-summary" aria-label="Compact route packet summary">
             <span>Route Packet:</span>
             <strong>{{ documents_attached }} attached &middot; {% if documents_needed %}{{ documents_needed }} required flagged{% else %}none required flagged{% endif %}</strong>
-            <button class="desk-inline-mode-link" type="button" data-desktop-mode="route-packet">Attach to Route Packet</button>
+            <button class="desk-inline-mode-link" type="button" data-desktop-mode="route-packet">{{ 'Review Route Packet' if route_finalized else 'Attach to Route Packet' }}</button>
           </section>
-          {% if log %}
+          {% if log and not route_finalized %}
             <div class="desk-overview-primary-action">
               {% if not log.depart_time and not (action_is_depart and current_stop and log.id == current_stop.id and cta_urls.get('record_departure')) %}
                 <a class="desk-action-link primary" href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}">Record departure</a>
@@ -375,10 +355,10 @@
           <section class="desk-route-packet-summary" aria-label="Compact route packet summary">
             <span>Route Packet:</span>
             <strong>{{ documents_attached }} attached &middot; {% if documents_needed %}{{ documents_needed }} required flagged{% else %}none required flagged{% endif %}</strong>
-            <button class="desk-inline-mode-link" type="button" data-desktop-mode="route-packet">Attach to Route Packet</button>
+            <button class="desk-inline-mode-link" type="button" data-desktop-mode="route-packet">{{ 'Review Route Packet' if route_finalized else 'Attach to Route Packet' }}</button>
           </section>
           <div class="desk-overview-primary-action">
-            {% if detail and detail.stop_id %}<a class="desk-action-link primary" href="{{ url_for('driver.edit_driver_log', log_id=detail.stop_id) }}">Change destination</a>{% else %}<button class="desk-action-link primary" type="button" data-desktop-mode="route-packet">Review route packet</button>{% endif %}
+            {% if detail and detail.stop_id and not route_finalized %}<a class="desk-action-link primary" href="{{ url_for('driver.edit_driver_log', log_id=detail.stop_id) }}">Change destination</a>{% else %}<button class="desk-action-link primary" type="button" data-desktop-mode="route-packet">Review route packet</button>{% endif %}
           </div>
         </div>
       </template>
@@ -672,7 +652,7 @@
                 </div>
                 <div class="desk-warning-strip tone-{{ 'issue' if issue.severity == 'risk' else 'warn' }}"><strong>{{ issue.label }}</strong><span>{{ issue.action }}</span></div>
               </section>
-              {% if log %}
+              {% if log and not route_finalized %}
                 <section class="desk-detail-section">
                   <div class="desk-section-title"><span>Actions</span><strong>Issue controls</strong></div>
                   <div class="desk-action-grid">
@@ -734,7 +714,7 @@
             <div class="desk-section-title"><span>Actions</span><strong>Damage controls</strong></div>
             <div class="desk-action-grid">
               <a class="desk-action-link primary" href="{{ url_for('driver.view_damage_report', report_id=report.id) }}">Open damage report</a>
-              <a class="desk-action-link" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Edit report</a>
+              {% if not route_finalized %}<a class="desk-action-link" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Edit report</a>{% endif %}
               <a class="desk-action-link" href="{{ url_for('driver.damage_evidence_packet', report_id=report.id) }}">Open packet</a>
             </div>
           </section>

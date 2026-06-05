@@ -640,7 +640,7 @@ def _critical_exception_rows(live_stop_rows, todays_logs):
             "url": summary["url"],
             "photo_url": summary.get("photo_url"),
         })
-    return rows[:8]
+    return rows
 
 def _exception_key(item):
     return ":".join(

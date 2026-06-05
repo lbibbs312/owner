@@ -571,10 +571,88 @@
       .ops-board-spatial .proof-trail-row.waiting { border-left-color: #f59e0b; }
       .ops-board-spatial .proof-trail-row.active, .ops-board-spatial .proof-trail-row.open { border-left-color: #6366f1; }
       .ops-board-spatial .proof-trail-row.completed { border-left-color: #10b981; }
-      .ops-board-spatial .proof-trail-row strong { display: block; color: #fff; font-size: 0.74rem; font-weight: 700; margin-bottom: 2px; }
-      .ops-board-spatial .proof-trail-row .proof-trail-edge { display: block; color: #94a3b8; font-size: 0.65rem; }
-      .ops-board-spatial .proof-trail-row .proof-trail-proof { display: block; color: #38bdf8; font-size: 0.62rem; margin-top: 3px; }
-    </style>
+	      .ops-board-spatial .proof-trail-row strong { display: block; color: #fff; font-size: 0.74rem; font-weight: 700; margin-bottom: 2px; }
+	      .ops-board-spatial .proof-trail-row .proof-trail-edge { display: block; color: #94a3b8; font-size: 0.65rem; }
+	      .ops-board-spatial .proof-trail-row .proof-trail-proof { display: block; color: #38bdf8; font-size: 0.62rem; margin-top: 3px; }
+	      body.mgr-active .production-flow--admin,
+	      body.mgr-active .production-flow--admin .ops-board-spatial {
+	        max-width: 100%;
+	        overflow: visible;
+	      }
+	      body.mgr-active .production-flow--admin .ops-board-spatial .ops-spatial-head {
+	        align-items: flex-start;
+	      }
+	      body.mgr-active .production-flow--admin .ops-board-spatial .ops-live-proof {
+	        min-width: min(100%, 320px);
+	      }
+	      body.mgr-active .production-flow--admin .ops-board-spatial .ops-live-proof .value,
+	      body.mgr-active .production-flow--admin .ops-board-spatial .flow-topbar span,
+	      body.mgr-active .production-flow--admin .ops-board-spatial .flow-topbar strong,
+	      body.mgr-active .production-flow--admin .ops-board-spatial .flow-alert-card,
+	      body.mgr-active .production-flow--admin .ops-board-spatial .flow-event-stream li,
+	      body.mgr-active .production-flow--admin .ops-board-spatial .route-proof-stop span,
+	      body.mgr-active .production-flow--admin .ops-board-spatial .flow-console-lines b,
+	      body.mgr-active .production-flow--admin .ops-board-spatial .proof-trail-row,
+	      body.mgr-active .production-flow--admin .ops-board-spatial .shadow-ledger-row {
+	        white-space: normal;
+	        overflow: visible;
+	        text-overflow: clip;
+	        overflow-wrap: anywhere;
+	      }
+	      body.mgr-active .production-flow--admin .ops-board-spatial .flow-ops-stream {
+	        min-height: 0;
+	        max-height: min(74vh, 880px);
+	        overflow-y: auto;
+	        overscroll-behavior: contain;
+	      }
+	      body.mgr-active .production-flow--admin .ops-board-spatial .flow-live-board,
+	      body.mgr-active .production-flow--admin .ops-board-spatial .flow-spatial-canvas {
+	        min-height: clamp(620px, 70vh, 980px);
+	      }
+	      body.mgr-active .production-flow--admin .ops-board-spatial .flow-drawer-panel {
+	        min-height: 0;
+	        max-height: min(74vh, 880px);
+	        overflow-y: auto;
+	        overscroll-behavior: contain;
+	      }
+	      body.mgr-active .production-flow--admin .ops-board-spatial .route-step-chip {
+	        min-height: 56px;
+	        height: auto;
+	      }
+	      body.mgr-active .production-flow--admin .ops-board-spatial .route-step-chip .chip-badge,
+	      body.mgr-active .production-flow--admin .ops-board-spatial .route-step-chip .chip-body strong,
+	      body.mgr-active .production-flow--admin .ops-board-spatial .route-step-chip .step-action {
+	        white-space: normal;
+	        overflow: visible;
+	        text-overflow: clip;
+	        overflow-wrap: anywhere;
+	      }
+	      body.mgr-active .production-flow--admin .ops-board-spatial .exception-ticker {
+	        white-space: normal;
+	        overflow-x: visible;
+	        flex-wrap: wrap;
+	      }
+	      body.mgr-active .production-flow--admin .ops-board-spatial .exception-item {
+	        flex-shrink: 1;
+	        min-width: 0;
+	        white-space: normal;
+	      }
+	      @media (max-width: 900px) {
+	        body.mgr-active .production-flow--admin .ops-board-spatial .ops-spatial-body {
+	          grid-template-columns: 1fr;
+	        }
+	        body.mgr-active .production-flow--admin .ops-board-spatial .flow-ops-stream,
+	        body.mgr-active .production-flow--admin .ops-board-spatial .flow-drawer-panel {
+	          max-height: none;
+	          overflow: visible;
+	        }
+	        body.mgr-active .production-flow--admin .ops-board-spatial .flow-live-board,
+	        body.mgr-active .production-flow--admin .ops-board-spatial .flow-spatial-canvas {
+	          min-height: 680px;
+	          aspect-ratio: auto;
+	        }
+	      }
+	    </style>
 
     {% set attention_ns = namespace(count=0) %}
     {% set attention_items = [] %}

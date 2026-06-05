@@ -1,6 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
 <style>
+  body.mgr-active .navbar,
+  body.mgr-active #fullscreenOverlay { display:none !important; }
+  body.mgr-active .container.mt-4.fade-in { max-width:none; margin:0 !important; padding:0 !important; animation:none; opacity:1; }
+  body.mgr-active { overflow-x:hidden; overflow-y:auto; background:#f8fafc; }
+  .mq-shell { min-height:100vh; width:100%; display:flex; background:#f8fafc; color:#0f172a; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; }
+  .mq-side { width:236px; flex:0 0 236px; height:100vh; position:sticky; top:0; overflow-y:auto; background:#0f172a; color:#cbd5e1; display:flex; flex-direction:column; }
+  .mq-brand { padding:22px 20px; border-bottom:1px solid rgba(148,163,184,.1); }
+  .mq-brand strong { display:block; color:#fff; font-size:1.05rem; font-weight:900; letter-spacing:-.02em; }
+  .mq-brand span { display:block; margin-top:3px; color:#60a5fa; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.08em; }
+  .mq-nav { padding:14px 10px; display:grid; gap:4px; }
+  .mq-nav a { color:#94a3b8; text-decoration:none; padding:11px 14px; border-radius:12px; font-weight:800; font-size:.84rem; display:flex; align-items:center; gap:10px; }
+  .mq-nav a.active { background:rgba(37,99,235,.18); color:#60a5fa; }
+  .mq-nav a:hover:not(.active) { background:rgba(148,163,184,.1); color:#e2e8f0; }
+  .mq-main { flex:1 1 auto; min-width:0; min-height:100vh; display:flex; flex-direction:column; }
+  .mq-topbar { position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #e2e8f0; padding:16px 28px; display:flex; justify-content:space-between; gap:14px; align-items:flex-start; flex-wrap:wrap; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+  .mq-body { padding:22px 28px; display:flex; flex-direction:column; gap:14px; min-width:0; }
   .queue-header { display:flex; justify-content:space-between; gap:1rem; align-items:flex-start; flex-wrap:wrap; margin-bottom:1rem; }
   .queue-header h1 { margin:0; font-size:1.65rem; font-weight:900; color:#0f172a; }
   .queue-header p { margin:.25rem 0 0; color:#64748b; }
@@ -8,13 +24,13 @@
   .queue-filter { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
   .queue-filter a { border:1px solid #cbd5e1; border-radius:999px; padding:.45rem .8rem; text-decoration:none; color:#334155; font-weight:800; font-size:.85rem; background:#fff; }
   .queue-filter a.active { background:#0f172a; color:#fff; border-color:#0f172a; }
-  .queue-table { background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; }
-  .queue-table table { margin:0; min-width:1420px; }
+  .queue-table { background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:auto; max-width:100%; -webkit-overflow-scrolling:touch; }
+  .queue-table table { margin:0; min-width:1180px; }
   .queue-table th { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:#64748b; background:#f8fafc; white-space:nowrap; }
-  .queue-table td { vertical-align:top; font-size:.86rem; }
-  .request-summary { max-width:260px; white-space:normal; color:#334155; }
+  .queue-table td { vertical-align:top; font-size:.86rem; overflow-wrap:anywhere; }
+  .request-summary { min-width:220px; max-width:360px; white-space:normal; color:#334155; line-height:1.35; }
   .muted-small { color:#64748b; font-size:.78rem; }
-  .pill { display:inline-flex; align-items:center; border-radius:999px; padding:.25rem .55rem; font-size:.72rem; font-weight:900; border:1px solid transparent; white-space:nowrap; }
+  .pill { display:inline-flex; align-items:center; border-radius:999px; padding:.25rem .55rem; font-size:.72rem; font-weight:900; border:1px solid transparent; white-space:normal; line-height:1.2; }
   .pill.priority-hot, .pill.priority-safety, .pill.status-blocked, .pill.status-cancelled { background:#ffe4e6; color:#be123c; border-color:#fecdd3; }
   .pill.priority-high { background:#fef3c7; color:#92400e; border-color:#fde68a; }
   .pill.priority-low { background:#e0f2fe; color:#075985; border-color:#bae6fd; }
@@ -26,39 +42,64 @@
   .assign-row { display:grid; grid-template-columns:1fr; gap:.35rem; }
   .assign-row .form-select, .assign-row .form-control { font-size:.78rem; min-height:34px; }
   .button-row { display:flex; gap:.35rem; flex-wrap:wrap; }
-  .button-row .btn { font-size:.76rem; font-weight:800; }
+  .button-row .btn,
+  .queue-actions .btn { font-size:.76rem; font-weight:800; white-space:normal; line-height:1.2; }
+  .queue-empty-state { padding:26px 14px; text-align:center; color:#64748b; font-weight:700; }
+  @media (max-width:980px) {
+    .mq-side { display:none; }
+    .mq-shell { display:block; }
+    .mq-topbar,
+    .mq-body { padding-left:16px; padding-right:16px; }
+  }
   @media (max-width:900px) {
     .queue-header { display:block; }
     .queue-actions { margin-top:.75rem; }
   }
 </style>
+<script>document.body.classList.add('mgr-active');</script>
 
-<div class="queue-header">
-  <div>
-    <h1>Move Request Queue</h1>
-    <p>Intake, assign, block, close, and link incoming move requests without changing driver logs or official records.</p>
-  </div>
-  <div class="queue-actions">
-    <a class="btn btn-primary" href="{{ url_for('manager.new_move_request') }}">New Request</a>
-    <a class="btn btn-outline-secondary" href="{{ url_for('manager.manager_dashboard') }}">Dashboard</a>
-  </div>
-</div>
+<div class="mq-shell">
+  <aside class="mq-side" aria-label="Manager navigation">
+    <div class="mq-brand">
+      <strong>MoveDefense</strong>
+      <span>Manager Console</span>
+    </div>
+    <nav class="mq-nav">
+      <a href="{{ url_for('manager.manager_dashboard') }}">Live Dispatch</a>
+      <a class="active" href="{{ url_for('manager.move_requests') }}">Move Requests</a>
+      <a href="{{ url_for('manager.driver_logs') }}">Driver Logs</a>
+      <a href="{{ url_for('manager.review_queue') }}">Reviews</a>
+    </nav>
+  </aside>
 
-<div class="queue-filter">
-  {% for value, label in [('active', 'Active'), ('open', 'Open'), ('assigned', 'Assigned'), ('blocked', 'Blocked'), ('completed', 'Completed'), ('cancelled', 'Cancelled'), ('all', 'All')] %}
-    <a class="{{ 'active' if selected_status == value else '' }}" href="{{ url_for('manager.move_requests', status=value) }}">{{ label }}</a>
-  {% endfor %}
-</div>
+  <main class="mq-main">
+    <header class="mq-topbar">
+      <div>
+        <h1 style="margin:0;font-size:1.5rem;font-weight:900;letter-spacing:-.02em;">Move Request Queue</h1>
+        <p style="margin:.25rem 0 0;color:#64748b;">Intake, assign, block, close, and link incoming move requests without changing driver logs or official records.</p>
+      </div>
+      <div class="queue-actions">
+        <a class="btn btn-primary" href="{{ url_for('manager.new_move_request') }}">New Request</a>
+        <a class="btn btn-outline-secondary" href="{{ url_for('manager.manager_dashboard') }}">Dashboard</a>
+      </div>
+    </header>
 
-{% if location_filter or origin_filter or destination_filter %}
-  <div class="queue-filter" aria-label="Active location filters">
-    {% if location_filter %}<a class="active" href="{{ url_for('manager.move_requests', status=selected_status) }}">Location: {{ location_filter }} ×</a>{% endif %}
-    {% if origin_filter %}<a class="active" href="{{ url_for('manager.move_requests', status=selected_status) }}">Origin: {{ origin_filter }} ×</a>{% endif %}
-    {% if destination_filter %}<a class="active" href="{{ url_for('manager.move_requests', status=selected_status) }}">Destination: {{ destination_filter }} ×</a>{% endif %}
-  </div>
-{% endif %}
+    <div class="mq-body">
+      <div class="queue-filter">
+        {% for value, label in [('active', 'Active'), ('open', 'Open'), ('assigned', 'Assigned'), ('blocked', 'Blocked'), ('completed', 'Completed'), ('cancelled', 'Cancelled'), ('all', 'All')] %}
+          <a class="{{ 'active' if selected_status == value else '' }}" href="{{ url_for('manager.move_requests', status=value) }}">{{ label }}</a>
+        {% endfor %}
+      </div>
 
-<div class="queue-table table-responsive">
+      {% if location_filter or origin_filter or destination_filter %}
+        <div class="queue-filter" aria-label="Active location filters">
+          {% if location_filter %}<a class="active" href="{{ url_for('manager.move_requests', status=selected_status) }}">Location: {{ location_filter }} x</a>{% endif %}
+          {% if origin_filter %}<a class="active" href="{{ url_for('manager.move_requests', status=selected_status) }}">Origin: {{ origin_filter }} x</a>{% endif %}
+          {% if destination_filter %}<a class="active" href="{{ url_for('manager.move_requests', status=selected_status) }}">Destination: {{ destination_filter }} x</a>{% endif %}
+        </div>
+      {% endif %}
+
+<div class="queue-table table-responsive" aria-label="Scrollable move request queue">
   <table class="table table-hover align-middle">
     <thead>
       <tr>
@@ -178,10 +219,13 @@
         </tr>
       {% else %}
         <tr>
-          <td colspan="15" class="text-muted py-4 text-center">No move requests in this queue.</td>
+          <td colspan="15" class="queue-empty-state">No move requests in this queue. New requests and dispatch captures will appear here.</td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
+</div>
+    </div>
+  </main>
 </div>
 {% endblock %}
