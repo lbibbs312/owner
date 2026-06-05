@@ -1408,3 +1408,39 @@ def test_actual_empty_return_stop_keeps_empty_return_wording(app):
 
     assert stop["board_flow"]["text"] == "Paint Central · empty return"
     assert "deliver_state" not in stop["board_flow"]
+
+
+def test_active_wait_banner_mutes_depart_button_when_board_cta_owns_it(app):
+    """When the green board CTA carries Depart/Load, the banner is a timer chip.
+
+    The duplicate "Depart / Load" button is dropped, but the wait timer and
+    stop context stay so the driver still sees the live clock.
+    """
+    from flask import render_template
+
+    wait = {"minutes": 2, "seconds": 134, "plant": "Raleigh East", "log_id": 1}
+
+    with app.test_request_context("/mobile"):
+        muted = render_template(
+            "_driver_active_wait_banner.html",
+            active_driver_wait=wait,
+            active_wait_show_action=False,
+        )
+        shown = render_template(
+            "_driver_active_wait_banner.html",
+            active_driver_wait=wait,
+            active_wait_show_action=True,
+        )
+
+    # Timer chip (label, plant, elapsed clock) stays in both states.
+    for html in (muted, shown):
+        assert "Active Stop Wait" in html
+        assert "Raleigh East" in html
+        assert "2:14" in html
+        assert "elapsed" in html
+
+    # The duplicate depart button is gone when muted, present otherwise.
+    assert "driver-active-wait-action" not in muted
+    assert ">Depart / Load<" not in muted
+    assert "driver-active-wait-action" in shown
+    assert ">Depart / Load<" in shown
