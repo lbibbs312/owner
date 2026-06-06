@@ -268,15 +268,23 @@ def test_manager_dashboard_layout_handles_large_ops_board(client, app):
     assert "AlexandriaLongRouteName OperationsDriverWithLongName14" in body
     assert ".mc-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; min-height:100vh; }" in body
     assert "font-family:'Montserrat',system-ui,sans-serif;" in body
-    assert "workspace-index" in body
-    assert "workspace-link" in body
-    assert "records-grid" in body
+    assert "data-manager-workspace" in body
+    assert "workspace-section active" in body
+    assert "record-table" in body
+    nav = body.split('<nav class="mc-nav"', 1)[1].split("</nav>", 1)[0]
+    assert '<button class="active" type="button" data-workspace-target="routes"' in nav
+    assert 'data-workspace-target="documents"' in nav
+    assert "mc-nav-badge" in nav
+    assert 'href="' not in nav
     for old_layout in (
         "summary-grid",
         "summary-tile",
         "Live Work Areas",
         "side-link",
         "lower-grid",
+        "workspace-index",
+        "workspace-link",
+        "records-grid",
         "border-left:4px solid",
     ):
         assert old_layout not in body
@@ -308,7 +316,7 @@ def test_manager_dashboard_v2_shell_uses_driver_workflow_records(client, app):
     body = response.get_data(as_text=True)
     for label in (
         "Manager Workspace",
-        "Open items needing review",
+        "Open Items",
         "Driver Routes",
         "Route Packets",
         "Documents",
@@ -333,6 +341,9 @@ def test_manager_dashboard_v2_shell_uses_driver_workflow_records(client, app):
         "summary-grid",
         "side-link",
         "lower-grid",
+        "workspace-index",
+        "workspace-link",
+        "records-grid",
         "border-left:4px solid",
         "Evidence",
         "Audit",

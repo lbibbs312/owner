@@ -80,6 +80,9 @@ def test_manager_workspace_does_not_embed_legacy_board_component(client, app):
     assert "Live Flow Map" not in body
     assert "Live Work Areas" not in body
     assert "summary-tile" not in body
+    assert "workspace-index" not in body
+    assert "workspace-link" not in body
+    assert "records-grid" not in body
     assert "border-left:4px solid" not in body
     assert 'data-component="FlowMapDashboard"' not in body
     assert 'data-route-map-mode="production"' not in body

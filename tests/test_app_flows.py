@@ -9031,7 +9031,8 @@ def test_manager_review_queue_lists_and_resolves_flagged_stop(client, app):
     # Pending-review count surfaces on the manager dashboard as a badge.
     dashboard = client.get("/manager/dashboard")
     assert dashboard.status_code == 200
-    assert b"Open items needing review" in dashboard.data
+    assert b"Open Items" in dashboard.data
+    assert b"mc-nav-badge" in dashboard.data
 
     # 2) Resolving creates a manager_review_resolved event.
     resolved = client.post(

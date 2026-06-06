@@ -2377,6 +2377,11 @@ def manager_dashboard():
     inspection_count = _active_pretrips_query().filter_by(pretrip_date=today).count()
     active_driver_count = len({log.driver_id for log in todays_logs})
     pending_review_count = len(review_rows)
+    move_request_count = (
+        MoveRequest.query
+        .filter(MoveRequest.status.notin_(["completed", "cancelled"]))
+        .count()
+    )
     return render_template(
         "manager_dashboard.html",
         active_driver_count=active_driver_count,
@@ -2385,6 +2390,7 @@ def manager_dashboard():
         inspection_count=inspection_count,
         inspection_rows=inspection_rows,
         live_stop_rows=live_stop_rows,
+        move_request_count=move_request_count,
         pending_review_count=pending_review_count,
         recent_documents=recent_documents,
         review_rows=review_rows,

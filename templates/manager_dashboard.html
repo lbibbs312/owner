@@ -22,12 +22,21 @@
   .mc-brand h1 { font-size:1.15rem; font-weight:700; color:#fff; margin:0; letter-spacing:0; }
   .mc-brand p { font-size:.68rem; font-weight:700; color:#60a5fa; margin:2px 0 0; letter-spacing:0; }
   .mc-nav { flex:1; padding:14px 10px; display:flex; flex-direction:column; gap:4px; }
-  .mc-nav a { color:#94a3b8; text-decoration:none; padding:11px 14px; border-radius:8px;
-              font-weight:700; font-size:.85rem; display:flex; align-items:center; gap:10px;
-              transition:background .15s,color .15s; }
-  .mc-nav a svg { width:18px; height:18px; flex:0 0 18px; opacity:.86; }
-  .mc-nav a.active { background:rgba(37,99,235,.18); color:#bfdbfe; }
-  .mc-nav a:hover:not(.active) { background:rgba(148,163,184,.1); color:#f8fafc; }
+  .mc-nav button { width:100%; border:0; background:transparent; color:#94a3b8; text-decoration:none; padding:11px 14px; border-radius:8px;
+                   font:inherit; font-weight:700; font-size:.85rem; display:flex; align-items:center; gap:10px; text-align:left;
+                   cursor:pointer; transition:background .15s,color .15s; }
+  .mc-nav button svg { width:18px; height:18px; flex:0 0 18px; opacity:.86; }
+  .mc-nav-label { min-width:0; flex:1 1 auto; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .mc-nav-label span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mc-nav-badge { min-width:24px; height:22px; padding:0 7px; border-radius:999px; display:inline-grid; place-items:center;
+                  background:rgba(148,163,184,.16); color:#cbd5e1; font-size:.72rem; font-weight:700; font-variant-numeric:tabular-nums; }
+  .mc-nav button.active .mc-nav-badge { background:#2563eb; color:#fff; }
+  .mc-nav button.active { background:rgba(37,99,235,.18); color:#bfdbfe; }
+  .mc-nav button:hover:not(.active) { background:rgba(148,163,184,.1); color:#f8fafc; }
+  .mc-logout { color:#94a3b8; text-decoration:none; padding:11px 14px; border-radius:8px;
+               font-weight:700; font-size:.85rem; display:flex; align-items:center; gap:10px; }
+  .mc-logout svg { width:18px; height:18px; flex:0 0 18px; opacity:.86; }
+  .mc-logout:hover { background:rgba(148,163,184,.1); color:#f8fafc; }
   .mc-user { padding:16px 18px; border-top:1px solid rgba(148,163,184,.16);
              display:flex; gap:10px; align-items:center; }
   .mc-avatar { width:38px; height:38px; border-radius:999px; background:#1e293b;
@@ -58,19 +67,8 @@
   .db-alert span { color:#450a0a; font-weight:500; }
 
   .mc-body { flex:1 0 auto; padding:22px 28px 30px; display:flex; flex-direction:column; gap:14px; min-width:0; }
-  .workspace-index { background:#fff; border:1px solid #e2e8f0; border-radius:8px;
-                     box-shadow:0 1px 2px rgba(15,23,42,.04); display:grid;
-                     grid-template-columns:repeat(6,minmax(0,1fr)); overflow:hidden; }
-  .workspace-link { min-height:76px; padding:13px 14px; color:#0f172a; text-decoration:none;
-                    display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
-                    border-right:1px solid #e2e8f0; }
-  .workspace-link:last-child { border-right:0; }
-  .workspace-link:hover { background:#f8fafc; }
-  .workspace-link span { color:#64748b; font-size:.74rem; font-weight:700; text-transform:uppercase; letter-spacing:0; line-height:1.25; }
-  .workspace-link strong { color:#0f172a; font-size:1.45rem; font-weight:700; line-height:1; }
-
-  .workspace-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; align-items:start; }
-  .dual-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; align-items:start; }
+  .workspace-section { display:none; }
+  .workspace-section.active { display:block; }
   .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px;
            box-shadow:0 1px 2px rgba(15,23,42,.04); overflow:hidden; }
   .panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px;
@@ -120,40 +118,31 @@
   .open-link { color:#2563eb; font-weight:700; text-decoration:none; white-space:nowrap; }
   .empty-state { border:1px dashed #cbd5e1; border-radius:8px; padding:14px; color:#64748b; font-weight:500; background:#f8fafc; }
 
-  .mini-list { display:flex; flex-direction:column; gap:8px; }
-  .mini-count { color:#64748b; font-size:.78rem; font-weight:500; }
-  .records-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
-  .record-group { display:flex; flex-direction:column; gap:8px; min-width:0; }
-  .record-group h4 { margin:0 0 2px; color:#64748b; font-size:.72rem; font-weight:700;
-                     text-transform:uppercase; letter-spacing:0; }
+  .record-table { width:100%; border-collapse:separate; border-spacing:0; min-width:680px; }
+  .record-table th { background:#f8fafc; color:#64748b; font-size:.68rem; text-transform:uppercase;
+                     letter-spacing:0; font-weight:700; text-align:left; padding:10px 12px; border-bottom:1px solid #e2e8f0; }
+  .record-table td { padding:11px 12px; border-bottom:1px solid #eef2f7; vertical-align:top; font-size:.86rem; }
+  .record-table tr:last-child td { border-bottom:0; }
+  .record-table a { color:#2563eb; font-weight:700; text-decoration:none; }
+  .workspace-note { margin:0; color:#64748b; font-size:.86rem; line-height:1.45; }
 
   @media (max-width:1180px) {
-    .workspace-index { grid-template-columns:repeat(3,minmax(0,1fr)); }
-    .workspace-link:nth-child(3n) { border-right:0; }
-    .dual-grid,
-    .records-grid { grid-template-columns:1fr; }
+    .record-table { min-width:620px; }
   }
   @media (max-width:760px) {
     .mc-side { display:none; }
     .mc-header { position:static; padding:14px 16px; flex-direction:column; align-items:flex-start; }
     .mc-header-r { width:100%; justify-content:flex-start; }
     .mc-body { padding:14px 16px 22px; }
-    .workspace-index { grid-template-columns:1fr 1fr; }
-    .workspace-link { min-height:68px; }
-    .workspace-link:nth-child(3n) { border-right:1px solid #e2e8f0; }
-    .workspace-link:nth-child(2n) { border-right:0; }
   }
   @media (max-width:460px) {
-    .workspace-index { grid-template-columns:1fr; }
-    .workspace-link { border-right:0; border-bottom:1px solid #e2e8f0; }
-    .workspace-link:last-child { border-bottom:0; }
     .btn-action { width:100%; justify-content:center; }
   }
 </style>
 
 <script>document.body.classList.add("mgr-active");</script>
 
-<div class="mc">
+<div class="mc" data-manager-workspace>
   <aside class="mc-side">
     <div class="mc-brand">
       <div class="mc-brand-icon">
@@ -167,39 +156,35 @@
       </div>
     </div>
 
-    <nav class="mc-nav">
-      <a class="active" href="{{ url_for('manager.manager_dashboard') }}">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-        Workspace
-      </a>
-      <a href="{{ url_for('manager.move_requests') }}">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-        Move Requests
-      </a>
-      <a href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">
+    <nav class="mc-nav" aria-label="Manager workspace sections">
+      <button class="active" type="button" data-workspace-target="routes" aria-controls="workspace-routes" aria-selected="true">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-12M4 6h16M4 18h16"/></svg>
-        Driver Routes
-      </a>
-      <a href="{{ url_for('manager.plant_transfers') }}">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h10v10H7zM4 4h16v16H4z"/></svg>
-        Route Packets
-      </a>
-      <a href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">
+        <span class="mc-nav-label"><span>Driver Routes</span><span class="mc-nav-badge">{{ route_count }}</span></span>
+      </button>
+      <button type="button" data-workspace-target="documents" aria-controls="workspace-documents" aria-selected="false">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3h7l5 5v13H7z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 3v6h5"/></svg>
-        Documents
-      </a>
-      <a href="{{ url_for('manager.review_dashboard') }}">
+        <span class="mc-nav-label"><span>Documents</span><span class="mc-nav-badge">{{ document_count }}</span></span>
+      </button>
+      <button type="button" data-workspace-target="review" aria-controls="workspace-review" aria-selected="false">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        <span class="mc-nav-label"><span>Open Items</span><span class="mc-nav-badge">{{ pending_review_count }}</span></span>
+      </button>
+      <button type="button" data-workspace-target="packets" aria-controls="workspace-packets" aria-selected="false">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h10v10H7zM4 4h16v16H4z"/></svg>
+        <span class="mc-nav-label"><span>Route Packets</span><span class="mc-nav-badge">{{ route_packet_count }}</span></span>
+      </button>
+      <button type="button" data-workspace-target="incidents" aria-controls="workspace-incidents" aria-selected="false">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 4.1L2.5 18a2 2 0 001.7 3h15.6a2 2 0 001.7-3L13.7 4.1a2 2 0 00-3.4 0z"/></svg>
-        Damage / Incidents
-      </a>
-      <a href="{{ url_for('manager.list_pretrips') }}">
+        <span class="mc-nav-label"><span>Damage / Incidents</span><span class="mc-nav-badge">{{ damage_reports|length }}</span></span>
+      </button>
+      <button type="button" data-workspace-target="inspections" aria-controls="workspace-inspections" aria-selected="false">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 11l2 2 4-4M7 4h10v16H7z"/></svg>
-        Inspections
-      </a>
-      <a href="{{ url_for('auth.logout') }}" style="margin-top:auto;">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4-4-4M21 12H9M13 5V4a2 2 0 00-2-2H5a2 2 0 00-2 2v16a2 2 0 002 2h6a2 2 0 002-2v-1"/></svg>
-        Logout
-      </a>
+        <span class="mc-nav-label"><span>Inspections</span><span class="mc-nav-badge">{{ inspection_count }}</span></span>
+      </button>
+      <button type="button" data-workspace-target="moves" aria-controls="workspace-moves" aria-selected="false">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        <span class="mc-nav-label"><span>Move Requests</span><span class="mc-nav-badge">{{ move_request_count }}</span></span>
+      </button>
     </nav>
 
     <div class="mc-user">
@@ -207,6 +192,10 @@
       <div>
         <p class="u-name">{{ current_user.display_name }}</p>
         <p class="u-role">Manager</p>
+        <a class="mc-logout" href="{{ url_for('auth.logout') }}">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4-4-4M21 12H9M13 5V4a2 2 0 00-2-2H5a2 2 0 00-2 2v16a2 2 0 002 2h6a2 2 0 002-2v-1"/></svg>
+          Logout
+        </a>
       </div>
     </div>
   </aside>
@@ -232,38 +221,11 @@
     {% endif %}
 
     <div class="mc-body">
-      <section class="workspace-index" aria-label="Live driver workspace context">
-        <a class="workspace-link" href="{{ url_for('manager.review_queue') }}">
-          <span>Open items needing review</span>
-          <strong>{{ pending_review_count }}</strong>
-        </a>
-        <a class="workspace-link" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">
-          <span>Driver routes</span>
-          <strong>{{ active_driver_count }}</strong>
-        </a>
-        <a class="workspace-link" href="{{ url_for('manager.plant_transfers') }}">
-          <span>Route packets</span>
-          <strong>{{ route_packet_count }}</strong>
-        </a>
-        <a class="workspace-link" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">
-          <span>Documents</span>
-          <strong>{{ document_count }}</strong>
-        </a>
-        <a class="workspace-link" href="{{ url_for('manager.review_dashboard') }}">
-          <span>Damage / incidents</span>
-          <strong>{{ damage_reports|length }}</strong>
-        </a>
-        <a class="workspace-link" href="{{ url_for('manager.list_pretrips') }}">
-          <span>Inspections</span>
-          <strong>{{ inspection_count }}</strong>
-        </a>
-      </section>
-
-      <section class="workspace-grid">
+      <section class="workspace-section active" id="workspace-routes" data-workspace-section="routes">
         <section class="panel">
           <div class="panel-head">
             <h3>Driver Routes</h3>
-            <a href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">Open routes</a>
+            <a href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">Open route records</a>
           </div>
           <div class="route-table-wrap">
             <table class="route-table">
@@ -317,118 +279,226 @@
         </section>
       </section>
 
-      <section class="dual-grid">
-        <section class="panel">
-          <div class="panel-head">
-            <h3>Open Items Needing Review</h3>
-            <a href="{{ url_for('manager.review_queue') }}">Open queue</a>
-          </div>
-          <div class="panel-body stack">
-            {% for row in review_rows[:5] %}
-              <a class="review-row" href="{{ row.url }}">
-                <div class="row-top">
-                  <span class="row-title">{{ row.plant }}</span>
-                  <span class="status-pill warn">Review</span>
-                </div>
-                <div class="row-meta">{{ row.requested_by }} - {{ row.requested_at|to_detroit_datetime if row.requested_at else 'Time not recorded' }}</div>
-                <div class="row-note">{{ row.reason }}</div>
-              </a>
-            {% else %}
-              <div class="empty-state">No manager reviews are waiting.</div>
-            {% endfor %}
-          </div>
-        </section>
-
+      <section class="workspace-section" id="workspace-documents" data-workspace-section="documents">
         <section class="panel">
           <div class="panel-head">
             <h3>Documents</h3>
-            <a href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">Open documents</a>
+            <a href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">Open route records</a>
           </div>
-          <div class="panel-body mini-list">
-            {% for doc in recent_documents %}
-              <a class="doc-row" href="{{ url_for('manager.view_driver_log', log_id=doc.driver_log_id) }}">
-                <div class="row-top">
-                  <span class="row-title">{{ doc.document_type_label }}</span>
-                  <span class="status-pill">File</span>
-                </div>
-                <div class="row-meta">{{ doc.log.driver.display_name if doc.log and doc.log.driver else 'Driver' }} - {{ doc.log.plant_name if doc.log else 'Route' }}</div>
-                <div class="row-note">{{ doc.note or doc.original_filename or 'Document attached' }}</div>
-              </a>
-            {% else %}
-              <div class="empty-state">No route documents attached today.</div>
-            {% endfor %}
+          <div class="route-table-wrap">
+            <table class="record-table">
+              <thead>
+                <tr>
+                  <th>Document</th>
+                  <th>Driver / Route</th>
+                  <th>Note</th>
+                  <th>Open</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for doc in recent_documents %}
+                  <tr>
+                    <td><strong>{{ doc.document_type_label }}</strong></td>
+                    <td>{{ doc.log.driver.display_name if doc.log and doc.log.driver else 'Driver' }}<br><span class="row-meta">{{ doc.log.plant_name if doc.log else 'Route' }}</span></td>
+                    <td>{{ doc.note or doc.original_filename or 'Document attached' }}</td>
+                    <td><a href="{{ url_for('manager.view_driver_log', log_id=doc.driver_log_id) }}">Open</a></td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="4"><div class="empty-state">No route documents attached today.</div></td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
         </section>
       </section>
 
-      <section class="panel">
-        <div class="panel-head">
-          <h3>Driver Records</h3>
-        </div>
-        <div class="panel-body records-grid">
-          <div class="record-group">
-            <h4>Route Packets</h4>
-            <div class="mini-list">
-              {% for transfer in todays_transfers %}
-                <a class="transfer-row" href="{{ url_for('manager.view_plant_transfer', transfer_id=transfer.id) }}">
-                  <div class="row-top">
-                    <span class="row-title">{{ transfer.transfer_number if transfer.transfer_number is defined and transfer.transfer_number else 'Transfer #' ~ transfer.id }}</span>
-                    <span class="status-pill">Packet</span>
-                  </div>
-                  <div class="row-meta">{{ transfer.transfer_date }} - {{ transfer.driver.display_name if transfer.driver else (transfer.driver_name or 'Driver') }}</div>
-                </a>
-              {% else %}
-                <div class="empty-state">No transfer records filed today.</div>
-              {% endfor %}
-            </div>
+      <section class="workspace-section" id="workspace-review" data-workspace-section="review">
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Open Items Needing Review</h3>
+            <a href="{{ url_for('manager.review_queue') }}">Open review queue</a>
           </div>
+          <div class="route-table-wrap">
+            <table class="record-table">
+              <thead>
+                <tr>
+                  <th>Route Item</th>
+                  <th>Driver</th>
+                  <th>Reason</th>
+                  <th>Open</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in review_rows[:12] %}
+                  <tr>
+                    <td><strong>{{ row.plant }}</strong></td>
+                    <td>{{ row.requested_by }}<br><span class="row-meta">{{ row.requested_at|to_detroit_datetime if row.requested_at else 'Time not recorded' }}</span></td>
+                    <td>{{ row.reason }}</td>
+                    <td><a href="{{ row.url }}">Open</a></td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="4"><div class="empty-state">No manager reviews are waiting.</div></td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
 
-          <div class="record-group">
-            <h4>Damage / Incidents</h4>
-            <div class="mini-list">
-              {% for report in damage_reports %}
-                <a class="damage-row" href="{{ url_for('manager.view_damage_report', report_id=report.id) }}">
-                  <div class="row-top">
-                    <span class="row-title">{{ report.plant_name or 'Route incident' }}</span>
-                    <span class="status-pill issue">{{ report.status|replace('_', ' ')|title }}</span>
-                  </div>
-                  <div class="row-meta">{{ report.created_at|to_detroit_datetime if report.created_at else 'Time not recorded' }} - {{ report.reported_by.display_name if report.reported_by else 'Driver' }}</div>
-                  <div class="row-note">{{ report.description }}</div>
-                </a>
-              {% else %}
-                <div class="empty-state">No open damage or incident reports.</div>
-              {% endfor %}
-            </div>
+      <section class="workspace-section" id="workspace-packets" data-workspace-section="packets">
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Route Packets</h3>
+            <a href="{{ url_for('manager.plant_transfers') }}">Open route packets</a>
           </div>
+          <div class="route-table-wrap">
+            <table class="record-table">
+              <thead>
+                <tr>
+                  <th>Packet</th>
+                  <th>Driver</th>
+                  <th>Date</th>
+                  <th>Open</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for transfer in todays_transfers %}
+                  <tr>
+                    <td><strong>{{ transfer.transfer_number if transfer.transfer_number is defined and transfer.transfer_number else 'Transfer #' ~ transfer.id }}</strong></td>
+                    <td>{{ transfer.driver.display_name if transfer.driver else (transfer.driver_name or 'Driver') }}</td>
+                    <td>{{ transfer.transfer_date }}</td>
+                    <td><a href="{{ url_for('manager.view_plant_transfer', transfer_id=transfer.id) }}">Open</a></td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="4"><div class="empty-state">No transfer records filed today.</div></td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
 
-          <div class="record-group">
-            <h4>Inspections</h4>
-            <div class="mini-list">
-              {% for inspection in inspection_rows %}
-                <a class="inspection-row" href="{{ url_for('manager.pretrip_printable', pretrip_id=inspection.id) }}">
-                  <div class="row-top">
-                    <span class="row-title">{{ inspection.truck_number or 'Truck not set' }}</span>
-                    <span class="status-pill complete">Filed</span>
-                  </div>
-                  <div class="row-meta">{{ inspection.pretrip_date }} - {{ inspection.driver.display_name if inspection.driver else 'Driver' }}</div>
-                  <div class="row-note">
-                    {% if inspection.damage_report %}
-                      {{ inspection.damage_report }}
-                    {% elif inspection.trailer_number %}
-                      Trailer {{ inspection.trailer_number }}
-                    {% else %}
-                      Vehicle check filed
-                    {% endif %}
-                  </div>
-                </a>
-              {% else %}
-                <div class="empty-state">No inspections filed today.</div>
-              {% endfor %}
-            </div>
+      <section class="workspace-section" id="workspace-incidents" data-workspace-section="incidents">
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Damage / Incidents</h3>
+            <a href="{{ url_for('manager.review_dashboard') }}">Open incident review</a>
           </div>
-        </div>
+          <div class="route-table-wrap">
+            <table class="record-table">
+              <thead>
+                <tr>
+                  <th>Location</th>
+                  <th>Driver</th>
+                  <th>Description</th>
+                  <th>Open</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for report in damage_reports %}
+                  <tr>
+                    <td><strong>{{ report.plant_name or 'Route incident' }}</strong><br><span class="status-pill issue">{{ report.status|replace('_', ' ')|title }}</span></td>
+                    <td>{{ report.reported_by.display_name if report.reported_by else 'Driver' }}<br><span class="row-meta">{{ report.created_at|to_detroit_datetime if report.created_at else 'Time not recorded' }}</span></td>
+                    <td>{{ report.description }}</td>
+                    <td><a href="{{ url_for('manager.view_damage_report', report_id=report.id) }}">Open</a></td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="4"><div class="empty-state">No open damage or incident reports.</div></td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section class="workspace-section" id="workspace-inspections" data-workspace-section="inspections">
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Inspections</h3>
+            <a href="{{ url_for('manager.list_pretrips') }}">Open inspections</a>
+          </div>
+          <div class="route-table-wrap">
+            <table class="record-table">
+              <thead>
+                <tr>
+                  <th>Truck</th>
+                  <th>Driver</th>
+                  <th>Detail</th>
+                  <th>Open</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for inspection in inspection_rows %}
+                  <tr>
+                    <td><strong>{{ inspection.truck_number or 'Truck not set' }}</strong><br><span class="row-meta">{{ inspection.pretrip_date }}</span></td>
+                    <td>{{ inspection.driver.display_name if inspection.driver else 'Driver' }}</td>
+                    <td>
+                      {% if inspection.damage_report %}
+                        {{ inspection.damage_report }}
+                      {% elif inspection.trailer_number %}
+                        Trailer {{ inspection.trailer_number }}
+                      {% else %}
+                        Vehicle check filed
+                      {% endif %}
+                    </td>
+                    <td><a href="{{ url_for('manager.pretrip_printable', pretrip_id=inspection.id) }}">Open</a></td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="4"><div class="empty-state">No inspections filed today.</div></td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section class="workspace-section" id="workspace-moves" data-workspace-section="moves">
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Move Requests</h3>
+            <a href="{{ url_for('manager.move_requests') }}">Open move requests</a>
+          </div>
+          <div class="panel-body">
+            <p class="workspace-note">Move requests stay in their own manager queue so the dashboard remains focused on live driver route data.</p>
+          </div>
+        </section>
       </section>
     </div>
   </main>
 </div>
+<script>
+  (function () {
+    var shell = document.querySelector('[data-manager-workspace]');
+    if (!shell) return;
+    var buttons = Array.prototype.slice.call(shell.querySelectorAll('[data-workspace-target]'));
+    var sections = Array.prototype.slice.call(shell.querySelectorAll('[data-workspace-section]'));
+
+    function showWorkspace(name, updateHash) {
+      var hasSection = sections.some(function (section) {
+        return section.getAttribute('data-workspace-section') === name;
+      });
+      if (!hasSection) name = 'routes';
+
+      buttons.forEach(function (button) {
+        var active = button.getAttribute('data-workspace-target') === name;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      sections.forEach(function (section) {
+        section.classList.toggle('active', section.getAttribute('data-workspace-section') === name);
+      });
+      if (updateHash && window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', '#' + name);
+      }
+    }
+
+    buttons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        showWorkspace(button.getAttribute('data-workspace-target'), true);
+      });
+    });
+
+    showWorkspace((window.location.hash || '').replace('#', ''), false);
+  })();
+</script>
 {% endblock %}
