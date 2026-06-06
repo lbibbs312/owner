@@ -293,14 +293,44 @@ def test_login_redirects_by_role(client, app):
     assert manager_response.headers["Location"].endswith("/manager/dashboard")
 
 
-def test_auth_pages_use_movedefense_shell(client):
-    login_page = client.get("/login")
-    assert login_page.status_code == 200
-    assert b"md-shell" in login_page.data
-    assert b"MOVEDEFENSE ACCESS" in login_page.data
-    assert b"Operations Sign In" in login_page.data
-    assert b"Driver logs, route timing, cargo proof" in login_page.data
+def assert_login_page_is_standalone(data, subtitle):
+    assert b"MoveDefense Sign In" in data
+    assert subtitle in data
+    assert b"Operations Sign In" not in data
+    assert b"NEEDS REVIEW" not in data.upper()
+    assert b"Driver credentials required" not in data
+    assert b"md-shell" not in data
+    assert b"_driver_active_wait_banner" not in data
+    assert b"md-driver-bottom-nav" not in data
+    assert b"compact-route-map" not in data
+    assert b"LIVE FLOW BOARD" not in data
+    assert b"navbar" not in data
+    assert data.count(b'href="/register"') == 1
 
+
+@pytest.mark.parametrize(
+    ("path", "subtitle"),
+    [
+        ("/login", b"Sign in to continue."),
+        ("/login?next=/mobile&required_role=driver", b"Driver access required."),
+        ("/login?next=/reports&required_role=driver", b"Driver access required."),
+    ],
+)
+def test_login_pages_use_standalone_auth_layout(client, path, subtitle):
+    login_page = client.get(path)
+    assert login_page.status_code == 200
+    assert_login_page_is_standalone(login_page.data, subtitle)
+
+
+def test_driver_auth_redirect_uses_sign_in_required_language(client):
+    response = client.get("/mobile", follow_redirects=True)
+    assert response.status_code == 200
+    assert b"SIGN IN REQUIRED" in response.data
+    assert b"Driver access required. Sign in to continue." in response.data
+    assert_login_page_is_standalone(response.data, b"Driver access required.")
+
+
+def test_register_page_uses_movedefense_shell(client):
     register_page = client.get("/register")
     assert register_page.status_code == 200
     assert b"md-shell" in register_page.data

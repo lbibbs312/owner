@@ -225,10 +225,7 @@ def login():
                     required_role=required_role,
                     user_id=user.id,
                 )
-                flash(
-                    f"{_role_label(required_role).title()} credentials are required for that area.",
-                    "warning",
-                )
+                flash(f"{_role_label(required_role).title()} access required.", "warning")
                 return _redirect_user_home(user)
             if next_url:
                 return redirect(next_url)
@@ -243,7 +240,7 @@ def login():
             flash("Invalid credentials.", "danger")
     elif request.method == "POST":
         _flash_form_errors(form, "auth.login.validation_failed")
-    return render_template("login.html", form=form)
+    return render_template("login.html", form=form, required_role=required_role)
 
 
 @bp.route("/logout")

@@ -338,7 +338,7 @@ def require_driver_role_for_driver_actions():
         return None
     if restore_role_user("driver"):
         return None
-    flash("Driver credentials required.", "warning")
+    flash("Driver access required. Sign in to continue.", "warning")
     return redirect(
         url_for("auth.login", next=_requested_url(), required_role="driver")
     )
@@ -360,7 +360,7 @@ def _selected_log_date_from_request():
 
 def _can_driver_change_same_day(record_user_id, record_date, record_label, action):
     if current_user.role != "driver":
-        flash("Driver credentials required.", "warning")
+        flash("Driver access required.", "warning")
         return False
     if record_user_id != current_user.id:
         flash(f"Not authorized to {action} another driver's {record_label}.", "danger")
@@ -3714,7 +3714,7 @@ def add_stop():
 
     form = DriverLogForm()
     if current_user.role != "driver":
-        flash("Driver credentials required.", "warning")
+        flash("Driver access required.", "warning")
         return redirect(url_for("driver.dashboard"))
     if _driver_route_record_finalized(current_user.id, log_date):
         flash("That route is finalized. Driver Log entries cannot be changed.", "warning")
@@ -6057,7 +6057,7 @@ def list_tasks():
 def _get_driver_task_or_redirect(task_id, *, allow_open=True):
     task = Task.query.get_or_404(task_id)
     if current_user.role != "driver":
-        flash("Driver credentials required.", "warning")
+        flash("Driver access required.", "warning")
         return None
     if task.assigned_to == current_user.id:
         return task
