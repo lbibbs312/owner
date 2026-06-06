@@ -67,7 +67,7 @@
   }
   .driver-report-choice {
     display:grid;
-    grid-template-columns:auto minmax(0,1fr) auto;
+    grid-template-columns:minmax(0,1fr) auto;
     gap:12px;
     align-items:center;
     min-height:82px;
@@ -84,19 +84,6 @@
     color:var(--md-text);
     border-color:rgba(91,157,255,.55);
     background:linear-gradient(180deg, rgba(20,35,56,.98), rgba(10,17,28,.98));
-  }
-  .driver-report-code {
-    display:grid;
-    place-items:center;
-    width:44px;
-    height:44px;
-    border:1px solid rgba(255,178,36,.38);
-    border-radius:8px;
-    color:var(--md-amber);
-    background:rgba(255,178,36,.08);
-    font-family:var(--md-mono);
-    font-size:.78rem;
-    font-weight:950;
   }
   .driver-report-text {
     min-width:0;
@@ -158,10 +145,11 @@
   }
   @media (max-width:520px) {
     .driver-report-choice {
-      grid-template-columns:auto minmax(0,1fr);
+      grid-template-columns:minmax(0,1fr);
     }
     .driver-report-arrow {
-      grid-column:2;
+      grid-column:1;
+      justify-self:start;
     }
   }
 </style>
@@ -179,7 +167,6 @@
   <section class="driver-report-list" aria-label="Driver report choices">
     {% for choice in report_choices %}
       <a class="driver-report-choice" href="{{ choice.url }}">
-        <span class="driver-report-code" aria-hidden="true">{{ choice.code }}</span>
         <span class="driver-report-text">
           <strong>{{ choice.label }}</strong>
           <span>{{ choice.meta }}</span>

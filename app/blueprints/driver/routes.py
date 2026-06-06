@@ -4897,31 +4897,26 @@ def driver_reports():
             "label": "Fuel / Low Fuel",
             "meta": "Fuel purchase, low fuel, receipt, odometer, and IFTA support details.",
             "url": url_for("driver.new_ifta_worksheet"),
-            "code": "FL",
         },
         {
             "label": "Physical Damage",
             "meta": "Visible vehicle, trailer, cargo, or property damage.",
             "url": url_for("driver.new_damage_report"),
-            "code": "PD",
         },
         {
             "label": "Crash / Safety Incident",
             "meta": "Crash, hit, dock or yard safety event, injury, tow-away, police, or claim details.",
             "url": url_for("driver.new_accident_incident"),
-            "code": "CS",
         },
         {
             "label": "Truck Issue / Maintenance",
             "meta": "Opens the route stop form because truck issues are recorded on the stop.",
             "url": url_for("driver.new_driving_log", report_type="truck_issue"),
-            "code": "TM",
         },
         {
             "label": "Route Note / Other",
             "meta": "Opens the route stop form because route notes are recorded with the stop record.",
             "url": url_for("driver.new_driving_log", report_type="route_note"),
-            "code": "RN",
         },
     ]
     recent_reports = []

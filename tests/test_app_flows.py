@@ -6365,6 +6365,7 @@ def test_driver_reports_hub_lists_report_choices_with_correct_destinations(clien
     choices_start = body.index('<section class="driver-report-list"')
     choices = body[choices_start: body.index("</section>", choices_start)]
     assert 'href="/driver_logs"' not in choices
+    assert "driver-report-code" not in choices
 
     expected_choices = {
         "Fuel / Low Fuel": 'href="/ifta-worksheet/new"',
