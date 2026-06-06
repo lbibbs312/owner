@@ -220,9 +220,9 @@ def test_manager_dashboard_renders_move_queue_and_request(client, app):
     resp = client.get("/manager/dashboard")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "Move Queue" in body
-    assert "Floor Operations" in body
-    assert "Live Flow Map" in body
+    assert "Manager Workspace" in body
+    assert "Move Requests" in body
+    assert "Live Flow Map" not in body
     # The seeded request and its derived data surface on the dashboard.
     assert "Raleigh East" in body
     assert "Paint West" in body

@@ -1647,8 +1647,8 @@ def _plant_seed(plants, label, *, role="driver"):
             "related_plant_transfer_ids": [],
             "worst_status": "none",
             "move_queue_url": _safe_url("manager.move_requests", location=label) if role == "manager" else None,
-            "active_moves_url": _safe_url("manager.manager_dashboard", plant=label, focus="routes") if role == "manager" else None,
-            "timing_url": _safe_url("manager.manager_dashboard", plant=label, focus="routes") if role == "manager" else None,
+            "active_moves_url": _safe_url("manager.move_requests", location=label) if role == "manager" else None,
+            "timing_url": _safe_url("manager.driver_logs") if role == "manager" else None,
         }
     return plants[key]
 

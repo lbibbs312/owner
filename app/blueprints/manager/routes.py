@@ -34,13 +34,11 @@ from app.services.document_numbers import (
 from app.extensions import db, socketio
 from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
-from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DispatchCapture, DriverLog, DriverLogPhoto, ExceptionEvent, HotPartPhoto, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, ShiftRecord, Task, User
+from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DispatchCapture, DriverLog, DriverLogPhoto, ExceptionEvent, HotPartPhoto, MoveRequest, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, ShiftRecord, Task, User
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
 from app.services.dispatch_capture import create_dispatch_capture, convert_dispatch_capture, dismiss_dispatch_capture, open_dispatch_captures
 from app.services.operations import build_exception_items
-from app.services.floor_operations import build_floor_operations_snapshot
-from app.services.production_flow import build_production_flow_context
 from app.services.load_state import build_driver_log_route_context, route_problem_reason, secondary_not_dropped_reason, truck_issue_reason
 from app.services.cargo_reconciliation_service import reconcile_cargo
 from app.services.media_attachment_service import upload_file_path
@@ -2334,92 +2332,67 @@ def dismiss_dispatch_capture_route(capture_id):
 
 @bp.route("/dashboard", methods=["GET", "POST"])
 def manager_dashboard():
-    create_task_form = TaskForm()
-    drivers = _populate_task_driver_choices(create_task_form)
     today = date.today()
-    division_filter = request.args.get("division", "All")
-    if division_filter not in {"All", "Plastics", "Trim"}:
-        division_filter = "All"
-    selected_driver_id = request.args.get("driver_id", type=int)
-    selected_plant = (request.args.get("plant") or "").strip() or None
-    focus_panel = request.args.get("focus", "jobs")
-    if focus_panel not in {"jobs", "routes"}:
-        focus_panel = "jobs"
-    focus_target = request.args.get("target", "")
-    if focus_target not in {"attention", "capture", "jobs", "routes", "reviews", "cases"}:
-        focus_target = ""
-
     day_start = datetime.combine(today, datetime.min.time())
-    uncompleted_tasks = (
-        Task.query.filter(or_(Task.status != "completed", Task.completed_at >= day_start))
-        .order_by(Task.created_at.desc())
-        .all()
-    )
+    open_task_count = Task.query.filter(or_(Task.status != "completed", Task.completed_at >= day_start)).count()
     todays_transfers = (
         _active_plant_transfers_query().filter_by(transfer_date=today)
         .order_by(PlantTransfer.created_at.desc())
+        .limit(6)
         .all()
     )
+    todays_transfer_count = _active_plant_transfers_query().filter_by(transfer_date=today).count()
     todays_logs = _active_driver_logs_query().filter_by(date=today).all()
-    live_logs = [log for log in todays_logs if not selected_driver_id or log.driver_id == selected_driver_id]
-    live_stop_rows = _live_stop_rows(live_logs)
-
-    dispatch_rows = _build_dispatch_rows(uncompleted_tasks, todays_transfers)
-    if division_filter != "All":
-        dispatch_rows = [row for row in dispatch_rows if row["division"] == division_filter]
-    dispatch_capture_rows = open_dispatch_captures()
-    dispatch_capture_count = len(dispatch_capture_rows)
-
-    reported_delay_count = len([log for log in todays_logs if (log.dock_wait_minutes or 0) > 0])
-    critical_exceptions = _critical_exception_rows(live_stop_rows, live_logs)
-    followup_cases = build_followup_cases(anchor=today)
-    live_problem_count = len(critical_exceptions)
+    live_stop_rows = _live_stop_rows(todays_logs)
+    critical_exceptions = _critical_exception_rows(live_stop_rows, todays_logs)
     review_rows = _pending_review_rows()
-    pending_review_count = len(review_rows)
-
-    active_driver_ids = {log.driver_id for log in todays_logs}
-    active_drivers = [driver for driver in drivers if driver.id in active_driver_ids]
-    floor = build_floor_operations_snapshot(today)
-    production_flow = build_production_flow_context(
-        date=today,
-        mode="admin",
-        selected_plant=selected_plant,
-        driver_id=selected_driver_id,
-        can_edit=True,
-        can_assign=True,
-        can_review=True,
-        can_export=True,
+    move_requests = (
+        MoveRequest.query
+        .filter(MoveRequest.status.notin_(["completed", "cancelled"]))
+        .order_by(MoveRequest.requested_at.desc(), MoveRequest.id.desc())
+        .limit(6)
+        .all()
     )
-    if floor and floor.get("queue_summary") is not None:
-        floor["queue_summary"]["captured_requests"] = dispatch_capture_count
-    if production_flow is not None:
-        production_flow["dispatch_capture_count"] = dispatch_capture_count
+    damage_reports = (
+        DamageReport.query
+        .filter(DamageReport.status != "closed")
+        .order_by(DamageReport.created_at.desc())
+        .limit(6)
+        .all()
+    )
+    recent_documents = (
+        DriverLogPhoto.query.join(DriverLog)
+        .filter(DriverLog.date == today, DriverLog.deleted_at.is_(None))
+        .order_by(DriverLogPhoto.uploaded_at.desc())
+        .limit(6)
+        .all()
+    )
+    document_count = (
+        DriverLogPhoto.query.join(DriverLog)
+        .filter(DriverLog.date == today, DriverLog.deleted_at.is_(None))
+        .count()
+    )
+    inspection_count = _active_pretrips_query().filter_by(pretrip_date=today).count()
+    active_driver_count = len({log.driver_id for log in todays_logs})
+    pending_review_count = len(review_rows)
+    dispatch_capture_count = len(open_dispatch_captures())
     return render_template(
         "manager_dashboard.html",
-        create_task_form=create_task_form,
-        floor=floor,
-        production_flow=production_flow,
-        dispatch_capture_rows=dispatch_capture_rows,
         dispatch_capture_count=dispatch_capture_count,
-        selected_plant=selected_plant,
-        uncompleted_tasks=uncompleted_tasks,
-        dispatch_rows=dispatch_rows,
-        live_stop_rows=live_stop_rows,
-        selected_driver_id=selected_driver_id,
-        focus_panel=focus_panel,
-        focus_target=focus_target,
-        drivers=drivers,
-        division_filter=division_filter,
-        total_active_moves=len(uncompleted_tasks) + len(todays_transfers),
-        active_driver_count=len(active_drivers),
-        reported_delay_count=reported_delay_count,
-        live_problem_count=live_problem_count,
+        total_active_moves=open_task_count + todays_transfer_count,
+        active_driver_count=active_driver_count,
         critical_exceptions=critical_exceptions,
-        review_rows=review_rows,
+        damage_reports=damage_reports,
+        document_count=document_count,
+        inspection_count=inspection_count,
+        live_stop_rows=live_stop_rows,
+        move_requests=move_requests,
         pending_review_count=pending_review_count,
-        followup_cases=followup_cases,
-        plant_forecasts=plant_forecast_rows(today)[:6],
-        has_drivers=bool(drivers),
+        recent_documents=recent_documents,
+        review_rows=review_rows,
+        route_packet_count=len(todays_logs) + todays_transfer_count,
+        route_count=len(todays_logs),
+        todays_transfers=todays_transfers,
         today=today,
         database_status=database_status(current_app.config.get("SQLALCHEMY_DATABASE_URI", "")),
     )
@@ -2428,7 +2401,7 @@ def manager_dashboard():
 @bp.route("/trim")
 @bp.route("/trim-dashboard")
 def trim_dashboard():
-    flash("Trim dashboard was removed; use Live Dispatch filters instead.", "info")
+    flash("Trim dashboard was removed; use Manager Workspace links instead.", "info")
     return redirect(url_for("manager.manager_dashboard"))
 
 

@@ -197,16 +197,17 @@ def test_manager_dashboard_layout_handles_large_ops_board(client, app):
 
     assert response.status_code == 200
     body = response.get_data(as_text=True)
-    assert "Live Routes &amp; Stops" in body
-    count_match = re.search(r"(\d+) issues visible; scroll this panel for the full list", body)
+    assert "Manager Workspace" in body
+    assert "Driver Routes" in body
+    count_match = re.search(r"(\d+) route item", body)
     assert count_match
     assert int(count_match.group(1)) >= 15
     assert "AlexandriaLongRouteName OperationsDriverWithLongName14" in body
     assert "Raleigh East Long Origin Lane 4 With Extra Dispatch Detail" in body
-    assert ".mc-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; min-height:100vh; overflow:visible; }" in body
-    assert ".critical-list { display:grid; gap:8px; padding:12px 16px; max-height:min(72vh,720px); overflow-y:auto;" in body
-    assert ".kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; }" in body
-    assert "body.mgr-active .production-flow--admin" in body
+    assert ".mc-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; min-height:100vh; }" in body
+    assert ".summary-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }" in body
+    assert "body.mgr-active .production-flow--admin" not in body
+    assert "Live Flow Map" not in body
     assert 'style="grid-template-columns:repeat(' not in body
 
 

@@ -573,26 +573,18 @@ def test_detroit_time_display_uses_12_hour_local_time(client, app):
 
     with app.app_context():
         from app.extensions import db
-        from app.models import Task
+        from app.models import MoveRequest
 
-        driver = create_user(
-            "driver1",
-            "driver1@example.com",
-            "driver",
-            first_name="Driver",
-            last_name="One",
-            employee_id="1001",
-            department="Plastic Plate",
+        manager = create_user("manager1", "manager1@example.com", "management")
+        request_row = MoveRequest(
+            raw_text="Time format check",
+            created_by_id=manager.id,
+            status="open",
+            origin_location_text="RW",
+            destination_location_text="KP",
+            requested_at=datetime(2026, 5, 13, 16, 5),
         )
-        create_user("manager1", "manager1@example.com", "management")
-        task = Task(
-            title="Time format check",
-            details="Verify display time",
-            status="pending",
-            assigned_to=driver.id,
-            created_at=datetime(2026, 5, 13, 16, 5),
-        )
-        db.session.add(task)
+        db.session.add(request_row)
         db.session.commit()
 
     login(client, "manager1")
@@ -619,16 +611,11 @@ def test_manager_assigns_task_and_driver_updates_status(client, app):
     login(client, "manager1")
     manager_page = client.get("/manager/dashboard")
     assert manager_page.status_code == 200
-    assert b"Live Dispatch" in manager_page.data
-    assert b"Dispatch Queue" in manager_page.data
-    assert b"Create Hot Move" in manager_page.data
-    assert b"From Plant" in manager_page.data
-    assert b"To Plant" in manager_page.data
-    assert b"Part Number" in manager_page.data
-    assert b"Open for any driver" in manager_page.data
-    assert b"Driver One" in manager_page.data
-    assert b"Plastic Plate" in manager_page.data
-    assert b"Badge 1001" in manager_page.data
+    assert b"Manager Workspace" in manager_page.data
+    assert b"Move Requests" in manager_page.data
+    assert b"Driver Routes" in manager_page.data
+    assert b"Live Flow Map" not in manager_page.data
+    assert b"Dispatch Queue" not in manager_page.data
     assert b">driver1<" not in manager_page.data
     assert b'id="fullscreenOverlay"' not in manager_page.data
     assert b'class="nav-link openOverlayLink"' not in manager_page.data
@@ -1162,10 +1149,9 @@ def test_dispatch_capture_inbox_saves_raw_text_and_converts_with_audit(client, a
 
     dashboard = client.get("/manager/dashboard")
     assert dashboard.status_code == 200
-    assert raw_text.encode() in dashboard.data
-    assert b"Universal Dispatch Capture Inbox" in dashboard.data
-    assert b"Captured Requests" in dashboard.data
-    assert b"Needs owner/action" in dashboard.data
+    assert b"Manager Workspace" in dashboard.data
+    assert raw_text.encode() not in dashboard.data
+    assert b"Universal Dispatch Capture Inbox" not in dashboard.data
 
     converted = client.post(
         f"/manager/dispatch-captures/{capture_id}/convert",
@@ -1333,10 +1319,9 @@ def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
     assert b"Avg Dock Wait" not in dashboard.data
     assert b"Trim Division" not in dashboard.data
     assert b"Plastics Division" not in dashboard.data
-    assert b"Delay" in dashboard.data
+    assert b"Dock wait" in dashboard.data
     assert b"17 min" in dashboard.data or b"18 min" in dashboard.data
     assert b"focus=delays" not in dashboard.data
-    assert b"focus-panel" in dashboard.data
 
 
 def test_service_stop_closes_without_cargo_questions_and_preserves_load(client, app):
@@ -1456,7 +1441,7 @@ def test_plant_load_timing_uses_today_average_on_driver_and_manager_dashboards(c
     login(client, "manager1")
     manager = client.get(f"/manager/dashboard?driver_id={driver_id}&focus=routes")
     assert manager.status_code == 200
-    assert b"Plant load timing" in manager.data
+    assert b"Expected wait" in manager.data
     assert b"Kraft Plater" in manager.data
     assert b"1h 30m" in manager.data
     assert b"forecast" not in manager.data.lower()
@@ -3331,29 +3316,22 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
 
     dashboard = client.get(f"/manager/dashboard?driver_id={driver_id}")
     assert dashboard.status_code == 200
-    assert b"Live Routes &amp; Stops" in dashboard.data
+    assert b"Driver Routes" in dashboard.data
     assert b"Missing Departure" in dashboard.data
     assert b"Completed" in dashboard.data
     assert b"Needs Attention" in dashboard.data
     assert b"Critical Exceptions" not in dashboard.data
     assert b"Truck Issue" in dashboard.data
-    assert b"status-dot open" in dashboard.data
-    assert b"status-dot complete" in dashboard.data
+    assert b"status-pill open" in dashboard.data
+    assert b"status-pill complete" in dashboard.data
     assert b"Needs Attention" in dashboard.data
     assert b'<span class="sbadge problem">Problem</span>' not in dashboard.data
     focused_dashboard = client.get(
         f"/manager/dashboard?driver_id={driver_id}&focus=routes&target=attention"
     )
     assert focused_dashboard.status_code == 200
-    assert b'data-dashboard-target="needsAttentionPanel"' in focused_dashboard.data
-    assert b'target=attention#needsAttentionPanel' in focused_dashboard.data
-    assert b'<div class="panel focus-panel" id="needsAttentionPanel">' in focused_dashboard.data
-    assert b'<div class="panel focus-panel" id="liveRoutesPanel">' not in focused_dashboard.data
-    assert b"const focusTarget = \"attention\";" in focused_dashboard.data
-    assert b"#needsAttentionPanel.focus-panel" in focused_dashboard.data
-    assert b"rgba(245,158,11,.24)" in focused_dashboard.data
-    assert b"sameDashboardDataset" in focused_dashboard.data
-    assert b"scroller.scrollTo" in focused_dashboard.data
+    assert b"Driver Routes" in focused_dashboard.data
+    assert b"Live Flow Map" not in focused_dashboard.data
     detail_page = client.get(f"/manager/driver-logs/{log_id}")
     assert detail_page.status_code == 200
     assert b"Avg Dock Wait" not in detail_page.data
@@ -4095,9 +4073,9 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
 
     manager_dashboard = client.get(f"/manager/dashboard?driver_id={driver_id}&focus=routes")
     assert manager_dashboard.status_code == 200
-    assert b"Cargo Photo Proof" in manager_dashboard.data
+    assert b"Documents" in manager_dashboard.data
     assert b"Departing load proof from gallery" in manager_dashboard.data
-    assert f"/manager/driver-log-photos/{second_photo_id}".encode() in manager_dashboard.data
+    assert f"/manager/driver-logs/{log_id}".encode() in manager_dashboard.data
 
     manager_print = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
     assert manager_print.status_code == 200
@@ -6491,7 +6469,7 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"data-active-wait-minutes" in page.data
     assert b"data-active-wait-seconds" in page.data
     assert b"driver-active-wait.js?v=2" in page.data
-    assert b"/mobile?flow=depart" in page.data
+    assert b'data-flow-open-panel="depart"' in page.data
     assert b"Save Ryder Status" in page.data
     assert b"CEL light" in page.data
     assert b"Need tow" in page.data
@@ -8490,7 +8468,7 @@ def test_manager_trim_dashboard_removed_and_live_dispatch_filters_driver(client,
     dashboard = client.get(f"/manager/dashboard?driver_id={driver_id}")
     assert dashboard.status_code == 200
     assert b"Trim Dashboard" not in dashboard.data
-    assert b"Live Routes &amp; Stops" in dashboard.data
+    assert b"Driver Routes" in dashboard.data
     assert b"Trim DC" in dashboard.data
     assert b"Stop 1" in dashboard.data
 
@@ -9054,7 +9032,7 @@ def test_manager_review_queue_lists_and_resolves_flagged_stop(client, app):
     # Pending-review count surfaces on the manager dashboard as a badge.
     dashboard = client.get("/manager/dashboard")
     assert dashboard.status_code == 200
-    assert b"Pending Reviews" in dashboard.data
+    assert b"Open items needing review" in dashboard.data
 
     # 2) Resolving creates a manager_review_resolved event.
     resolved = client.post(

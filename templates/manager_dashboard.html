@@ -1,1405 +1,460 @@
 {% extends "base.html" %}
+
+{% block title %}Manager Workspace{% endblock %}
+
 {% block content %}
 <style>
   body.mgr-active .navbar,
   body.mgr-active #fullscreenOverlay { display:none !important; }
   body.mgr-active .container.mt-4.fade-in { max-width:none; margin:0 !important; padding:0 !important; animation:none; opacity:1; }
   body.mgr-active { overflow-x:hidden; overflow-y:auto; background:#f8fafc; }
-
   *, *::before, *::after { box-sizing:border-box; }
 
-  /* ── Layout shell ── */
   .mc { min-height:100vh; width:100%; display:flex; background:#f8fafc; color:#0f172a;
-        font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; }
-
-  /* ── Sidebar ── */
+        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; }
   .mc-side { width:256px; flex:0 0 256px; background:#0f172a; color:#cbd5e1;
              display:flex; flex-direction:column; height:100vh; position:sticky; top:0;
              overflow-y:auto; overscroll-behavior:contain; }
-  .mc-brand { padding:22px 20px; border-bottom:1px solid rgba(148,163,184,.1);
+  .mc-brand { padding:22px 20px; border-bottom:1px solid rgba(148,163,184,.16);
               display:flex; gap:12px; align-items:center; }
-  .mc-brand-icon { width:42px; height:42px; border-radius:12px; background:#2563eb;
+  .mc-brand-icon { width:42px; height:42px; border-radius:8px; background:#2563eb;
                    display:grid; place-items:center; color:#fff; flex-shrink:0; }
-  .mc-brand h1 { font-size:1.15rem; font-weight:900; color:#fff; margin:0; letter-spacing:-.02em; }
-  .mc-brand p  { font-size:.68rem; font-weight:800; color:#60a5fa; margin:2px 0 0; }
+  .mc-brand h1 { font-size:1.15rem; font-weight:900; color:#fff; margin:0; letter-spacing:0; }
+  .mc-brand p { font-size:.68rem; font-weight:800; color:#60a5fa; margin:2px 0 0; letter-spacing:0; }
   .mc-nav { flex:1; padding:14px 10px; display:flex; flex-direction:column; gap:4px; }
-  .mc-nav a { color:#94a3b8; text-decoration:none; padding:11px 14px; border-radius:12px;
-              font-weight:700; font-size:.85rem; display:flex; align-items:center; gap:10px;
+  .mc-nav a { color:#94a3b8; text-decoration:none; padding:11px 14px; border-radius:8px;
+              font-weight:800; font-size:.85rem; display:flex; align-items:center; gap:10px;
               transition:background .15s,color .15s; }
-  .mc-nav a svg { width:18px; height:18px; flex-shrink:0; opacity:.8; }
-  .mc-nav a.active { background:rgba(37,99,235,.18); color:#60a5fa; }
-  .mc-nav a:hover:not(.active) { background:rgba(148,163,184,.1); color:#e2e8f0; }
-  .mc-user { padding:16px 18px; border-top:1px solid rgba(148,163,184,.1);
+  .mc-nav a svg { width:18px; height:18px; flex:0 0 18px; opacity:.86; }
+  .mc-nav a.active { background:rgba(37,99,235,.18); color:#bfdbfe; }
+  .mc-nav a:hover:not(.active) { background:rgba(148,163,184,.1); color:#f8fafc; }
+  .mc-user { padding:16px 18px; border-top:1px solid rgba(148,163,184,.16);
              display:flex; gap:10px; align-items:center; }
   .mc-avatar { width:38px; height:38px; border-radius:999px; background:#1e293b;
                color:#e2e8f0; display:grid; place-items:center; font-weight:900;
                font-size:.88rem; flex-shrink:0; }
   .u-name { color:#f1f5f9; font-size:.875rem; font-weight:800; margin:0; }
-  .u-role { color:#475569; font-size:.68rem; margin:2px 0 0; }
+  .u-role { color:#64748b; font-size:.68rem; margin:2px 0 0; }
 
-  /* ── Main ── */
-  .mc-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; min-height:100vh; overflow:visible; }
-
-  /* Header */
+  .mc-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; min-height:100vh; }
   .mc-header { background:#fff; border-bottom:1px solid #e2e8f0; padding:16px 28px;
                display:flex; align-items:center; justify-content:space-between; gap:14px;
-               z-index:10; box-shadow:0 1px 2px rgba(15,23,42,.04); flex-shrink:0;
-               position:sticky; top:0; }
-  .mc-header h2 { font-size:1.5rem; font-weight:900; color:#0f172a; margin:0; letter-spacing:-.02em; }
-  .mc-header-r { display:flex; align-items:center; justify-content:flex-end; gap:10px; flex-wrap:wrap; min-width:0; }
-  .mc-srch-wrap { position:relative; min-width:min(250px,100%); }
-  .mc-srch-wrap svg { position:absolute; left:11px; top:50%; transform:translateY(-50%);
-                      color:#94a3b8; width:16px; height:16px; pointer-events:none; }
-  .mc-srch { background:#f1f5f9; border:none; border-radius:10px; padding:9px 14px 9px 34px;
-             font-size:.85rem; width:250px; outline:none; color:#334155; font-family:inherit; }
-  .mc-srch:focus { background:#e2e8f0; }
-  .search-suggestions { position:absolute; top:calc(100% + 6px); left:0; right:0; background:#fff; border:1px solid #cbd5e1; border-radius:12px; box-shadow:0 14px 30px rgba(15,23,42,.16); z-index:80; overflow:hidden; display:none; }
-  .search-suggestions.open { display:block; }
-  .suggestion-item { width:100%; border:0; background:#fff; padding:9px 11px; display:flex; justify-content:space-between; gap:10px; cursor:pointer; text-align:left; font:inherit; }
-  .suggestion-item:hover { background:#eff6ff; }
-  .suggestion-term { color:#0f172a; font-weight:900; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .suggestion-meta { color:#64748b; font-size:.68rem; font-weight:900; text-transform:uppercase; white-space:nowrap; }
-  .btn-create { background:#2563eb; color:#fff; border:none; border-radius:10px;
-                padding:9px 16px; font-size:.85rem; font-weight:800; cursor:pointer;
-                display:flex; align-items:center; gap:6px; transition:background .15s; white-space:normal; line-height:1.2; }
-  .btn-create:hover { background:#1d4ed8; }
-  .btn-create svg { width:15px; height:15px; }
+               z-index:10; box-shadow:0 1px 2px rgba(15,23,42,.04); position:sticky; top:0; }
+  .mc-header h2 { font-size:1.5rem; font-weight:900; color:#0f172a; margin:0; letter-spacing:0; }
+  .mc-header p { margin:3px 0 0; color:#64748b; font-size:.85rem; font-weight:700; }
+  .mc-header-r { display:flex; align-items:center; justify-content:flex-end; gap:10px; flex-wrap:wrap; }
+  .btn-action { border:1px solid #cbd5e1; background:#fff; color:#0f172a; border-radius:8px;
+                padding:9px 13px; font-weight:900; font-size:.84rem; text-decoration:none;
+                display:inline-flex; align-items:center; gap:7px; line-height:1.2; }
+  .btn-action.primary { background:#2563eb; border-color:#2563eb; color:#fff; }
+  .btn-action:hover { border-color:#2563eb; color:#1d4ed8; }
+  .btn-action.primary:hover { background:#1d4ed8; color:#fff; }
+  .btn-action svg { width:16px; height:16px; flex:0 0 16px; }
 
   .db-alert { margin:0 28px; border:1px solid #fecaca; background:#fef2f2; color:#991b1b;
-              padding:10px 12px; border-radius:0 0 12px 12px; font-size:.82rem;
+              padding:10px 12px; border-radius:0 0 8px 8px; font-size:.82rem;
               font-weight:800; display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .db-alert strong { color:#991b1b; }
   .db-alert span { color:#450a0a; font-weight:700; }
 
-  /* Body scroll area */
-  .mc-body { flex:1 0 auto; overflow:visible; padding:22px 28px; display:flex; flex-direction:column; gap:18px; min-width:0; }
+  .mc-body { flex:1 0 auto; padding:22px 28px 30px; display:flex; flex-direction:column; gap:18px; min-width:0; }
+  .summary-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }
+  .summary-tile { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:13px 14px;
+                  box-shadow:0 1px 2px rgba(15,23,42,.04); text-decoration:none; color:#0f172a;
+                  display:flex; flex-direction:column; min-height:104px; }
+  .summary-tile:hover { border-color:#93c5fd; box-shadow:0 10px 24px rgba(15,23,42,.08); }
+  .summary-tile span { color:#64748b; font-size:.7rem; font-weight:900; text-transform:uppercase; letter-spacing:0; }
+  .summary-tile strong { margin-top:8px; font-size:2rem; font-weight:950; line-height:1; }
+  .summary-tile small { margin-top:auto; color:#475569; font-weight:750; line-height:1.25; }
+  .summary-tile.review { border-left:4px solid #ef4444; }
+  .summary-tile.routes { border-left:4px solid #2563eb; }
+  .summary-tile.packets { border-left:4px solid #0f766e; }
+  .summary-tile.documents { border-left:4px solid #7c3aed; }
+  .summary-tile.damage { border-left:4px solid #f97316; }
+  .summary-tile.inspections { border-left:4px solid #16a34a; }
 
-  /* ── KPI cards ── */
-  .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; }
-  .kpi { background:#fff; border:1px solid #e2e8f0; border-radius:10px;
-         padding:12px 14px; box-shadow:0 1px 2px rgba(15,23,42,.04); text-decoration:none; display:block; cursor:pointer; transition:transform .15s, box-shadow .15s, border-color .15s; }
-  .kpi:hover { transform:translateY(-1px); box-shadow:0 10px 24px rgba(15,23,42,.09); border-color:#93c5fd; }
-  .kpi.active { outline:2px solid rgba(37,99,235,.35); }
-  .kpi.blue  { background:#eff6ff; border-color:#bfdbfe; }
-  .kpi.green { background:#ecfdf5; border-color:#a7f3d0; }
-  .kpi.danger { background:#fff1f2; border-color:#fecdd3; }
-  .kpi-lbl { font-size:.64rem; font-weight:900; text-transform:uppercase;
-             letter-spacing:.07em; color:#64748b; margin:0 0 5px; }
-  .kpi.blue  .kpi-lbl { color:#2563eb; }
-  .kpi.green .kpi-lbl { color:#047857; }
-  .kpi.danger .kpi-lbl { color:#be123c; }
-  .kpi-val { display:flex; align-items:flex-end; justify-content:space-between; gap:10px; }
-  .kpi-num { font-size:1.65rem; font-weight:900; line-height:1; color:#0f172a; }
-  .kpi-tag { font-size:.71rem; font-weight:800; padding:3px 8px; border-radius:8px;
-             background:#e2e8f0; color:#334155; white-space:normal; line-height:1.2; }
-  .kpi.blue  .kpi-tag { background:#bfdbfe; color:#1d4ed8; }
-  .kpi.green .kpi-tag { background:#a7f3d0; color:#047857; }
-  .kpi.danger .kpi-tag { background:#ffe4e6; color:#be123c; }
+  .workspace-grid { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(320px,.55fr); gap:18px; align-items:start; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px;
+           box-shadow:0 1px 2px rgba(15,23,42,.04); overflow:hidden; }
+  .panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px;
+                padding:14px 16px; border-bottom:1px solid #e2e8f0; background:#f8fafc; }
+  .panel-head h3 { margin:0; font-size:.95rem; color:#0f172a; font-weight:950; letter-spacing:0; }
+  .panel-head a { color:#2563eb; font-weight:900; text-decoration:none; font-size:.82rem; white-space:nowrap; }
+  .panel-body { padding:14px 16px; }
+  .stack { display:flex; flex-direction:column; gap:12px; }
 
-  /* ── Panel ── */
-  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:18px;
-           scroll-margin-top:22px;
-           box-shadow:0 1px 2px rgba(15,23,42,.04); overflow:visible; }
-  .panel.focus-panel,
-  .capture-panel.focus-panel {
-    border-color:#38bdf8;
-    box-shadow:0 0 0 3px rgba(56,189,248,.2), 0 18px 42px rgba(15,23,42,.12);
+  .review-row,
+  .route-row,
+  .doc-row,
+  .damage-row,
+  .transfer-row { border:1px solid #e2e8f0; border-radius:8px; padding:11px 12px; display:grid; gap:6px; text-decoration:none; color:#0f172a; }
+  .review-row:hover,
+  .route-row:hover,
+  .doc-row:hover,
+  .damage-row:hover,
+  .transfer-row:hover { border-color:#93c5fd; background:#f8fbff; }
+  .row-top { display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; }
+  .row-title { font-weight:950; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row-meta { color:#64748b; font-size:.8rem; font-weight:750; line-height:1.35; overflow-wrap:anywhere; }
+  .row-note { color:#334155; font-size:.84rem; line-height:1.35; overflow-wrap:anywhere; }
+  .status-pill { flex:0 0 auto; border-radius:999px; padding:4px 8px; font-size:.66rem;
+                 font-weight:950; text-transform:uppercase; letter-spacing:0; background:#e2e8f0; color:#334155; }
+  .status-pill.open,
+  .status-pill.current { background:#dbeafe; color:#1d4ed8; }
+  .status-pill.complete { background:#dcfce7; color:#166534; }
+  .status-pill.issue,
+  .status-pill.problem { background:#fee2e2; color:#b91c1c; }
+  .status-pill.warn { background:#fef3c7; color:#92400e; }
+
+  .route-table-wrap { overflow:auto; }
+  .route-table { width:100%; border-collapse:separate; border-spacing:0; min-width:720px; }
+  .route-table th { background:#f8fafc; color:#64748b; font-size:.68rem; text-transform:uppercase;
+                    letter-spacing:0; font-weight:950; text-align:left; padding:10px 12px; border-bottom:1px solid #e2e8f0; }
+  .route-table td { padding:11px 12px; border-bottom:1px solid #eef2f7; vertical-align:top; font-size:.86rem; }
+  .route-table tr:last-child td { border-bottom:0; }
+  .driver-cell { display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .driver-cell strong { font-weight:950; }
+  .driver-cell small { color:#64748b; font-weight:750; }
+  .issue-list { display:flex; flex-wrap:wrap; gap:5px; }
+  .issue-chip { border-radius:999px; padding:3px 7px; background:#fef3c7; color:#92400e; font-weight:900; font-size:.7rem; }
+  .issue-chip.issue { background:#fee2e2; color:#b91c1c; }
+  .open-link { color:#2563eb; font-weight:950; text-decoration:none; white-space:nowrap; }
+  .empty-state { border:1px dashed #cbd5e1; border-radius:8px; padding:14px; color:#64748b; font-weight:800; background:#f8fafc; }
+
+  .side-links { display:grid; grid-template-columns:1fr; gap:8px; }
+  .side-link { border:1px solid #e2e8f0; border-radius:8px; padding:10px 11px; text-decoration:none; color:#0f172a;
+               display:flex; align-items:center; justify-content:space-between; gap:12px; font-weight:900; }
+  .side-link small { color:#64748b; font-weight:800; }
+  .side-link:hover { border-color:#93c5fd; background:#f8fbff; }
+
+  .lower-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+  .mini-list { display:flex; flex-direction:column; gap:8px; }
+  .mini-count { color:#64748b; font-size:.78rem; font-weight:800; }
+
+  @media (max-width:1180px) {
+    .summary-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .workspace-grid,
+    .lower-grid { grid-template-columns:1fr; }
   }
-  #needsAttentionPanel.focus-panel {
-    border-color:#f59e0b;
-    box-shadow:0 0 0 3px rgba(245,158,11,.24), 0 0 36px rgba(245,158,11,.18), 0 18px 42px rgba(15,23,42,.12);
-  }
-  .panel.dashboard-focus-pulse,
-  .capture-panel.dashboard-focus-pulse { animation:dashboard-focus-pulse 1.4s ease-out 1; }
-  @keyframes dashboard-focus-pulse {
-    0% { transform:translateY(-2px); box-shadow:0 0 0 0 rgba(245,158,11,.55), 0 18px 42px rgba(15,23,42,.12); }
-    58% { box-shadow:0 0 0 11px rgba(245,158,11,0), 0 18px 42px rgba(15,23,42,.12); }
-    100% { transform:none; }
-  }
-  .panel-top { padding:14px 20px; border-bottom:1px solid #e2e8f0; background:#f8fafc;
-               display:flex; align-items:center; justify-content:space-between;
-               gap:12px; flex-wrap:wrap; }
-  .panel-top h3 { font-size:.95rem; font-weight:900; color:#0f172a; margin:0;
-                  display:flex; align-items:center; gap:8px; }
-  .panel-top h3 svg { width:17px; height:17px; color:#64748b; }
-
-  /* Division tabs */
-  .div-tabs { display:flex; background:rgba(226,232,240,.6); border:1px solid #e2e8f0;
-              border-radius:10px; padding:3px; gap:2px; }
-  .div-tabs a { text-decoration:none; color:#64748b; font-weight:800; font-size:.8rem;
-                padding:6px 14px; border-radius:8px; transition:all .15s; white-space:normal; line-height:1.2; }
-  .div-tabs a.active { background:#fff; color:#1d4ed8; box-shadow:0 1px 3px rgba(15,23,42,.1); }
-  .div-tabs a:hover:not(.active) { color:#334155; }
-
-  /* ── Table ── */
-  .tbl-wrap { max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  .tbl-wrap.live-stops-scroll { max-height:min(78vh,960px); overflow:auto; overscroll-behavior:contain; }
-  .tbl-wrap.live-stops-scroll table.dtbl thead th { position:sticky; top:0; z-index:2; }
-  table.dtbl { width:100%; border-collapse:collapse; min-width:720px; }
-  table.dtbl th { padding:11px 14px; text-align:left; font-size:.63rem; font-weight:900;
-                  text-transform:uppercase; letter-spacing:.07em; color:#64748b;
-                  border-bottom:1px solid #e2e8f0; background:#f8fafc; white-space:nowrap; }
-  table.dtbl th:last-child { text-align:right; }
-  table.dtbl td { padding:13px 14px; border-bottom:1px solid #f1f5f9; vertical-align:middle; overflow-wrap:anywhere; }
-  .align-middle { vertical-align:middle !important; }
-  .whitespace-nowrap { white-space:nowrap; }
-  table.dtbl tbody tr:last-child td { border-bottom:none; }
-  table.dtbl tbody tr:hover td { background:rgba(239,246,255,.45); }
-  .cell-id   { font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
-               font-size:.84rem; font-weight:800; color:#0f172a; }
-  .cell-sub  { font-size:.72rem; color:#64748b; margin-top:2px; }
-  .part-main { font-size:.9rem; font-weight:900; line-height:1.15; color:#0f172a; }
-  .part-meta { margin-top:3px; }
-  .text-sm { font-size:.72rem; line-height:1.25; }
-  .text-muted { color:#64748b !important; }
-
-  /* Division badge */
-  .div-badge { display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px;
-               font-size:.64rem; font-weight:900; text-transform:uppercase;
-               letter-spacing:.06em; border:1px solid transparent; white-space:nowrap; }
-  .div-badge.trim     { background:#d1fae5; color:#047857; border-color:#a7f3d0; }
-  .div-badge.plastics { background:#dbeafe; color:#1d4ed8; border-color:#bfdbfe; }
-
-  /* Route cell */
-  .route-cell { display:inline-flex; align-items:center; gap:8px; font-size:.84rem;
-                color:#334155; font-weight:800; white-space:normal; flex-wrap:wrap; }
-  .route-arrow { color:#7f1d2d; font-weight:900; }
-
-  /* Driver cell */
-  .driver-cell { display:flex; align-items:center; gap:8px; font-size:.84rem;
-                 font-weight:800; color:#0f172a; min-width:0; overflow-wrap:anywhere; }
-  .driver-stack { display:grid; gap:3px; min-width:0; }
-  .driver-meta, .truck-meta { font-size:.72rem; color:#64748b; font-weight:700; line-height:1.25; }
-  .truck-pill { display:inline-flex; align-items:center; gap:5px; margin-top:4px; padding:3px 8px;
-                border-radius:8px; background:#f8fafc; border:1px solid #e2e8f0;
-                color:#334155; font-size:.72rem; font-weight:900; white-space:nowrap; }
-  .truck-pill.missing { color:#b45309; background:#fffbeb; border-color:#fde68a; }
-  .d-av { width:26px; height:26px; border-radius:999px; background:#e2e8f0; color:#475569;
-          display:grid; place-items:center; font-size:.64rem; font-weight:900; flex-shrink:0; }
-  .unassigned-cell { display:inline-flex; align-items:center; gap:5px; font-size:.8rem;
-                     font-weight:900; color:#be123c; background:#fff1f2;
-                     padding:4px 9px; border-radius:8px; }
-  .unassigned-cell svg { width:13px; height:13px; }
-
-  /* Status badge */
-  .sbadge { display:inline-flex; align-items:center; padding:4px 9px; border-radius:8px;
-            font-size:.72rem; font-weight:900; white-space:nowrap; }
-  .sbadge.hot        { background:#ffe4e6; color:#be123c; box-shadow:0 0 0 1px #fecdd3; }
-  .sbadge.in-progress{ background:#fef3c7; color:#92400e; }
-  .sbadge.logged     { background:#dcfce7; color:#166534; }
-  .sbadge.loading    { background:#e0e7ff; color:#3730a3; }
-  .sbadge.pending    { background:#f1f5f9; color:#475569; }
-  .sbadge.completed  { background:#dcfce7; color:#166534; }
-  .sbadge.open       { background:#fef3c7; color:#92400e; }
-  .sbadge.complete   { background:#dcfce7; color:#166534; }
-  .sbadge.problem    { background:#fee2e2; color:#991b1b; box-shadow:0 0 0 1px #fecaca; }
-  .status-signal { display:inline-flex; align-items:center; gap:8px; }
-  .status-dot { width:10px; height:10px; border-radius:999px; flex:0 0 10px; display:inline-block; vertical-align:-1px; }
-  .status-dot.problem { background:#dc2626; animation:pulse-red 1.15s infinite; box-shadow:0 0 0 0 rgba(220,38,38,.55); }
-  .status-dot.open { background:#f59e0b; animation:pulse-yellow 1.35s infinite; box-shadow:0 0 0 0 rgba(245,158,11,.55); }
-  .status-dot.complete { background:#16a34a; }
-  .problem-line { display:flex; align-items:center; gap:8px; margin-top:6px; max-width:100%; color:#991b1b; font-size:.72rem; line-height:1.25; font-weight:800; overflow-wrap:anywhere; }
-  .problem-thumb { width:42px; height:32px; object-fit:cover; border-radius:6px; border:1px solid #fecaca; background:#fff; flex:0 0 42px; }
-  .problem-label { color:#be123c; text-transform:uppercase; letter-spacing:.04em; font-size:.62rem; display:block; }
-  .critical-list { display:grid; gap:8px; padding:12px 16px; max-height:min(72vh,720px); overflow-y:auto; overscroll-behavior:contain; }
-  .critical-row { display:grid; grid-template-columns:minmax(120px,.8fr) minmax(150px,1fr) minmax(0,2fr) auto; gap:10px; align-items:flex-start; border:1px solid #fee2e2; background:#fff7f7; border-radius:10px; padding:10px; color:#991b1b; text-decoration:none; min-height:max-content; }
-  .critical-row:hover { background:#fff1f2; color:#991b1b; }
-  .critical-type { font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; color:#be123c; }
-  .critical-stop { font-size:.82rem; font-weight:900; color:#0f172a; overflow-wrap:anywhere; }
-  .critical-issue { font-size:.78rem; font-weight:800; color:#991b1b; overflow-wrap:anywhere; line-height:1.35; }
-  .exception-chip-list { display:flex; flex-wrap:wrap; gap:5px; max-width:100%; }
-  .exception-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 7px; border-radius:999px; font-size:.64rem; font-weight:900; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; white-space:normal; line-height:1.2; }
-  .exception-chip.damage { background:#fff1f2; color:#be123c; border-color:#fecdd3; }
-  .exception-chip.missing { background:#fef3c7; color:#92400e; border-color:#fde68a; }
-  .exception-chip.truck { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
-  .exception-chip.photo { background:#eef2ff; color:#3730a3; border-color:#c7d2fe; }
-  .exception-chip-thumb { width:22px; height:18px; object-fit:cover; border-radius:4px; border:1px solid rgba(55,48,163,.25); margin-left:-2px; }
-  @keyframes pulse-red { 70% { box-shadow:0 0 0 8px rgba(220,38,38,0); } 100% { box-shadow:0 0 0 0 rgba(220,38,38,0); } }
-  @keyframes pulse-yellow { 70% { box-shadow:0 0 0 8px rgba(245,158,11,0); } 100% { box-shadow:0 0 0 0 rgba(245,158,11,0); } }
-  .driver-filter-row { display:flex; flex-wrap:wrap; gap:7px; padding:12px 20px; border-bottom:1px solid #e2e8f0; background:#fff; }
-  .driver-filter-row a { text-decoration:none; border:1px solid #cbd5e1; border-radius:999px; padding:5px 11px; color:#334155; font-size:.78rem; font-weight:900; background:#fff; }
-  .driver-filter-row a.active { background:#0f172a; color:#fff; border-color:#0f172a; }
-  .live-route-stack { display:grid; gap:3px; }
-  .live-route-main { font-weight:900; color:#0f172a; overflow-wrap:anywhere; }
-  .live-route-sub { font-size:.72rem; color:#64748b; font-weight:700; overflow-wrap:anywhere; }
-  .timing-cell { display:grid; gap:3px; min-width:130px; }
-  .timing-main { font-weight:900; color:#0f172a; white-space:normal; line-height:1.25; }
-  .timing-sub { color:#64748b; font-size:.7rem; font-weight:700; line-height:1.3; overflow-wrap:anywhere; }
-  .timing-state { display:inline-flex; width:auto; max-width:100%; border-radius:999px; padding:2px 7px; font-size:.62rem; font-weight:900; text-transform:uppercase; background:#f1f5f9; color:#475569; white-space:normal; line-height:1.2; }
-  .timing-state.ok { background:#dcfce7; color:#166534; }
-  .timing-state.warning { background:#fef3c7; color:#92400e; }
-  .timing-state.high { background:#fee2e2; color:#991b1b; }
-  .plant-timing-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; padding:10px 20px 14px; }
-  .plant-timing-card { border:1px solid #e2e8f0; border-radius:10px; padding:9px 10px; background:#f8fafc; min-width:0; overflow-wrap:anywhere; }
-  .plant-timing-card strong { display:block; font-size:.86rem; line-height:1.25; }
-  .plant-timing-card span { display:block; color:#64748b; font-size:.72rem; margin-top:2px; }
-
-  .capture-panel { background:#0f172a; color:#e2e8f0; border:1px solid #1e293b; border-radius:16px; overflow:hidden; scroll-margin-top:22px; box-shadow:0 18px 42px rgba(15,23,42,.16); }
-  .capture-head { padding:14px 16px; display:flex; justify-content:space-between; gap:12px; align-items:center; border-bottom:1px solid rgba(148,163,184,.16); }
-  .capture-head h3 { margin:0; font-size:1rem; font-weight:900; color:#fff; }
-  .capture-head span { font-size:.72rem; font-weight:800; color:#93c5fd; }
-  .capture-form { padding:14px 16px; display:grid; gap:10px; border-bottom:1px solid rgba(148,163,184,.16); }
-  .capture-text { width:100%; min-height:92px; resize:vertical; border:1px solid #334155; background:#020617; color:#f8fafc; border-radius:12px; padding:12px 13px; font:inherit; font-size:.9rem; outline:none; }
-  .capture-text:focus { border-color:#60a5fa; box-shadow:0 0 0 3px rgba(96,165,250,.16); }
-  .capture-actions { display:flex; flex-wrap:wrap; gap:8px; }
-  .capture-actions button { border:1px solid #334155; background:#1e293b; color:#e2e8f0; border-radius:999px; padding:7px 11px; font-size:.74rem; font-weight:900; cursor:pointer; white-space:normal; line-height:1.2; }
-  .capture-actions button:hover { border-color:#93c5fd; color:#fff; }
-  .capture-actions .hot { background:#991b1b; border-color:#b91c1c; }
-  .capture-inbox { display:grid; gap:8px; padding:12px 16px 16px; }
-  .capture-card { background:#020617; border:1px solid #1e293b; border-radius:12px; padding:11px 12px; display:grid; gap:8px; }
-  .capture-card-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
-  .capture-id { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-weight:900; color:#fff; font-size:.8rem; }
-  .capture-meta { color:#94a3b8; font-size:.68rem; font-weight:800; margin-top:2px; }
-  .capture-status { display:flex; flex-wrap:wrap; gap:5px; justify-content:flex-end; }
-  .capture-pill { display:inline-flex; align-items:center; border:1px solid #334155; border-radius:999px; padding:3px 8px; font-size:.62rem; font-weight:900; text-transform:uppercase; color:#cbd5e1; }
-  .capture-pill.warn { border-color:#f59e0b; color:#fbbf24; background:rgba(245,158,11,.08); }
-  .capture-pill.hot { border-color:#ef4444; color:#fca5a5; background:rgba(239,68,68,.1); }
-  .capture-raw { margin:0; color:#f8fafc; font-size:.88rem; line-height:1.35; }
-  .missing-chip-row { display:flex; flex-wrap:wrap; gap:5px; }
-  .missing-chip { border:1px solid #475569; background:#111827; color:#cbd5e1; border-radius:999px; padding:3px 8px; font-size:.65rem; font-weight:800; }
-  .missing-chip.warn { border-color:#f59e0b; color:#fbbf24; }
-  .capture-card-actions { display:flex; flex-wrap:wrap; gap:6px; }
-  .capture-card-actions form { margin:0; }
-  .capture-card-actions button { border:1px solid #334155; background:#0f172a; color:#e2e8f0; border-radius:8px; padding:6px 9px; font-size:.68rem; font-weight:900; cursor:pointer; white-space:normal; line-height:1.2; }
-  .capture-card-actions button:hover { border-color:#60a5fa; }
-  .capture-empty { color:#94a3b8; margin:0; font-size:.84rem; font-weight:700; }
-
-  /* Manage button */
-  .btn-manage { background:#fff; border:1px solid #cbd5e1; color:#334155;
-                border-radius:10px; padding:6px 13px; font-size:.8rem; font-weight:800;
-                cursor:pointer; transition:all .15s; white-space:normal; line-height:1.2; }
-  .btn-manage:hover { border-color:#93c5fd; color:#1d4ed8; background:#f8fafc; }
-  .btn-manage:active { transform:scale(.97); }
-
-  /* Empty row */
-  .empty-row td { text-align:center; padding:40px 14px; color:#94a3b8;
-                  font-size:.9rem; font-weight:600; }
-
-  /* ── Modal system ── */
-  .mbdrop { position:fixed; inset:0; background:rgba(15,23,42,.55);
-            backdrop-filter:blur(4px); z-index:300; display:none;
-            align-items:center; justify-content:center; padding:14px; }
-  .mbdrop.open { display:flex; }
-  .mdl { background:#fff; border-radius:20px; width:100%; max-width:500px;
-         box-shadow:0 24px 60px rgba(15,23,42,.22); border:1px solid #e2e8f0;
-         display:flex; flex-direction:column; overflow:hidden; max-height:92vh; }
-  .mdl-head { padding:18px 22px; display:flex; align-items:center;
-              justify-content:space-between; flex-shrink:0; }
-  .mdl-head.dark { background:#0f172a; }
-  .mdl-head.blue { background:#2563eb; }
-  .mdl-head h3 { font-size:1rem; font-weight:900; color:#fff; margin:0;
-                 display:flex; align-items:center; gap:8px; }
-  .mdl-head h3 svg { width:18px; height:18px; flex-shrink:0; }
-  .mdl-x { background:none; border:none; cursor:pointer; padding:4px;
-            border-radius:8px; color:rgba(255,255,255,.55); display:grid; place-items:center; }
-  .mdl-x:hover { color:#fff; }
-  .mdl-x svg { width:20px; height:20px; }
-  .mdl-body { padding:22px; overflow-y:auto; display:flex; flex-direction:column; gap:16px; }
-  .mdl-foot { padding:14px 22px; background:#f8fafc; border-top:1px solid #e2e8f0;
-              display:flex; justify-content:flex-end; gap:10px; flex-shrink:0; }
-
-  /* Modal context row */
-  .mrow-ctx { display:flex; justify-content:space-between; align-items:flex-start;
-              padding-bottom:16px; border-bottom:1px solid #f1f5f9; }
-  .mctx-item p:first-child { font-size:.64rem; font-weight:900; text-transform:uppercase;
-                              letter-spacing:.07em; color:#64748b; margin:0 0 4px; }
-  .mctx-item p:last-child  { font-size:.9rem; font-weight:700; color:#0f172a; margin:0; }
-  .mctx-item.right { text-align:right; }
-
-  /* Form fields */
-  .flbl { display:block; font-size:.78rem; font-weight:800; color:#334155; margin-bottom:6px; }
-  .flbl svg { width:13px; height:13px; vertical-align:-.1em; margin-right:4px; color:#94a3b8; }
-  .fi, .fs, .fta {
-    width:100%; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;
-    padding:9px 13px; font-size:.875rem; color:#334155; outline:none; font-family:inherit;
-    transition:border-color .15s,box-shadow .15s;
-  }
-  .fi:focus, .fs:focus, .fta:focus {
-    border-color:#93c5fd; background:#fff;
-    box-shadow:0 0 0 3px rgba(147,197,253,.2);
-  }
-  .fta { resize:vertical; min-height:62px; }
-  .act-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .btn-amber { background:#fffbeb; border:1px solid #fde68a; color:#b45309; border-radius:12px;
-               padding:11px 14px; font-size:.8rem; font-weight:900; cursor:pointer;
-               display:flex; align-items:center; justify-content:center; gap:7px;
-               transition:background .15s; }
-  .btn-amber:hover { background:#fef3c7; }
-  .btn-amber svg { width:14px; height:14px; }
-  .btn-sl { background:#f1f5f9; border:1px solid #e2e8f0; color:#334155; border-radius:12px;
-            padding:11px 14px; font-size:.8rem; font-weight:900; cursor:pointer;
-            display:flex; align-items:center; justify-content:center; gap:7px;
-            transition:background .15s; }
-  .btn-sl:hover { background:#e2e8f0; }
-  .btn-sl svg { width:14px; height:14px; }
-  .btn-cancel { background:none; border:none; padding:8px 14px; font-size:.875rem;
-                font-weight:700; color:#64748b; cursor:pointer; border-radius:8px; }
-  .btn-cancel:hover { color:#334155; background:#e2e8f0; }
-  .btn-save { background:#2563eb; border:none; color:#fff; padding:9px 20px;
-              font-size:.875rem; font-weight:800; border-radius:10px; cursor:pointer;
-              transition:background .15s; }
-  .btn-save:hover { background:#1d4ed8; }
-  .btn-dispatch { background:#2563eb; border:none; color:#fff; padding:9px 20px;
-                  font-size:.875rem; font-weight:800; border-radius:10px; cursor:pointer;
-                  display:flex; align-items:center; gap:8px; transition:background .15s; }
-  .btn-dispatch:hover { background:#1d4ed8; }
-  .btn-dispatch svg { width:14px; height:14px; }
-
-  /* Create modal specifics */
-  .cr-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-  .cr-flbl { font-size:.68rem; font-weight:900; text-transform:uppercase;
-             letter-spacing:.07em; color:#64748b; display:block; margin-bottom:5px; }
-  .hot-lbl { display:flex; align-items:center; gap:8px; font-size:.875rem;
-             font-weight:900; color:#be123c; cursor:pointer; padding-top:4px; }
-  .hot-lbl input { width:16px; height:16px; accent-color:#be123c; cursor:pointer; }
-
-  /* Responsive */
-  body.mgr-active .ops-panel { overflow:visible; }
-  body.mgr-active .ops-head { flex-wrap:wrap; align-items:flex-start; }
-  body.mgr-active .ops-link,
-  body.mgr-active .ops-btn,
-  body.mgr-active .next-action { white-space:normal; line-height:1.2; }
-  body.mgr-active .mq-grid { grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); }
-  body.mgr-active .fo-grid { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
-  body.mgr-active .mq-row { align-items:flex-start; }
-  body.mgr-active .mq-row-main,
-  body.mgr-active .mq-route,
-  body.mgr-active .mq-meta,
-  body.mgr-active .fo-card { min-width:0; overflow-wrap:anywhere; }
-
-  @media (max-width:1180px) and (min-width:961px) {
-    .mc-side { width:218px; flex-basis:218px; }
-    .mc-nav a { padding:10px 11px; font-size:.8rem; }
-  }
-  @media (max-width:960px) {
+  @media (max-width:760px) {
     .mc-side { display:none; }
-    .mc { display:block; }
-    .mc-main { min-height:100vh; }
-    .critical-row { grid-template-columns:1fr; }
-    .kpi-row  { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
-    .mc-header { padding:13px 16px; flex-wrap:wrap; }
-    .mc-body   { padding:14px 16px; }
-    .mc-srch-wrap { flex:1 1 220px; }
-    .mc-srch   { width:100%; }
-    .cr-grid   { grid-template-columns:1fr; }
+    .mc-header { position:static; padding:14px 16px; flex-direction:column; align-items:flex-start; }
+    .mc-header-r { width:100%; justify-content:flex-start; }
+    .mc-body { padding:14px 16px 22px; }
+    .summary-grid { grid-template-columns:1fr 1fr; }
+    .summary-tile { min-height:96px; }
+    .summary-tile strong { font-size:1.65rem; }
   }
-  @media (max-width:560px) {
-    .mc-header-r { width:100%; justify-content:stretch; }
-    .mc-srch-wrap { flex:1 1 100%; }
-    .btn-create { flex:1 1 auto; justify-content:center; }
-    .kpi-row   { gap:10px; }
-    .critical-list { max-height:none; overflow:visible; }
-    .div-tabs { width:100%; overflow-x:auto; }
+  @media (max-width:460px) {
+    .summary-grid { grid-template-columns:1fr; }
+    .btn-action { width:100%; justify-content:center; }
   }
 </style>
-<script>document.body.classList.add('mgr-active');</script>
 
-{# ── MANAGE MODAL ── #}
-<div class="mbdrop" id="manageModal" onclick="if(event.target===this)closeManage()">
-  <div class="mdl" onclick="event.stopPropagation()">
-    <div class="mdl-head dark">
-      <h3 id="mgTitle">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0
-               00 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0
-               00 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0
-               00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0
-               00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0
-               00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0
-               00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0
-               00 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07
-               2.572-1.065z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-        </svg>
-        <span id="mgTitleText">Manage Move</span>
-        <span id="mgDivBadge" style="margin-left:8px;font-size:.7rem;padding:3px 10px;
-          border-radius:6px;font-weight:900;text-transform:uppercase;"></span>
-      </h3>
-      <button class="mdl-x" onclick="closeManage()">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-      </button>
-    </div>
+<script>document.body.classList.add("mgr-active");</script>
 
-    <div class="mdl-body">
-      <div class="mrow-ctx">
-        <div class="mctx-item">
-          <p>Route</p>
-          <p id="mgRoute">—</p>
-        </div>
-        <div class="mctx-item right">
-          <p>Part / Cargo</p>
-          <p id="mgPart" style="font-family:ui-monospace,Consolas,monospace;font-weight:900;">—</p>
-        </div>
-      </div>
-      <div class="mrow-ctx">
-        <div class="mctx-item">
-          <p>Driver / Audit</p>
-          <p id="mgDriverContext">—</p>
-        </div>
-        <div class="mctx-item right">
-          <p>Truck ID</p>
-          <p id="mgTruck">—</p>
-        </div>
-      </div>
-
-      {# Task section (editable inline) #}
-      <div id="mgTaskSec" style="display:none;">
-        <form id="mgTaskForm" method="POST" style="display:contents;">
-          <input type="hidden" name="csrf_token" id="mgCSRF">
-
-          <div>
-            <label class="flbl">Assign / Reassign Driver</label>
-            <select name="assigned_to" class="fs" id="mgDriverSel"></select>
-          </div>
-
-          <div>
-            <label class="flbl">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8
-                     a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042
-                     3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-              </svg>
-              Dispatch Notes to Driver
-            </label>
-            <textarea name="details" class="fta" id="mgNotes" rows="2"
-              placeholder="e.g., Needs to be at dock 4."></textarea>
-          </div>
-
-          <div>
-            <label class="flbl">Status</label>
-            <select name="status" class="fs" id="mgStatus">
-              <option value="pending">Pending</option>
-              <option value="in-progress">In Transit</option>
-              <option value="completed">Completed</option>
-              <option value="declined">Declined</option>
-            </select>
-          </div>
-
-          <div class="act-grid">
-            <button type="button" class="btn-amber" onclick="escalateHot()">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667
-                     1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34
-                     16c-.77 1.333.192 3 1.732 3z"/>
-              </svg>
-              Escalate to Hot Move
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {# Transfer section (navigate to detail page) #}
-      <div id="mgXferSec" style="display:none;">
-        <p style="color:#64748b;font-size:.875rem;line-height:1.5;">
-          This is a logged plant transfer.
-          Use the transfer detail page to review or edit.
-        </p>
-        <a id="mgXferLink" href="{{ url_for('manager.plant_transfers') }}"
-          style="display:inline-flex;align-items:center;gap:7px;margin-top:10px;
-                 text-decoration:none;background:#2563eb;color:#fff;
-                 padding:9px 18px;border-radius:10px;font-size:.875rem;font-weight:800;">
-          View Transfer Detail
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24"
-               stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-          </svg>
-        </a>
-      </div>
-    </div>
-
-    <div class="mdl-foot">
-      <button class="btn-cancel" onclick="closeManage()">Cancel</button>
-      <button class="btn-save" id="mgSaveBtn" onclick="document.getElementById('mgTaskForm').submit()">
-        Save Changes
-      </button>
-    </div>
-  </div>
-</div>
-
-{# ── CREATE MOVE MODAL ── #}
-<div class="mbdrop" id="createModal" onclick="if(event.target===this)closeCreate()">
-  <div class="mdl" onclick="event.stopPropagation()">
-    <div class="mdl-head blue">
-      <h3>
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01"/>
-        </svg>
-        Dispatch New Move
-      </h3>
-      <button class="mdl-x" onclick="closeCreate()">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-      </button>
-    </div>
-
-    <form method="POST" action="{{ url_for('manager.create_task_from_dashboard') }}" data-autosave="true" data-autosave-key="manager-dashboard-task-new">
-      {{ create_task_form.hidden_tag() }}
-      <div class="mdl-body">
-        <div class="cr-grid">
-          <div>
-            <label class="cr-flbl">{{ create_task_form.shift.label.text }}</label>
-            {{ create_task_form.shift(class="fs") }}
-          </div>
-          <div>
-            <label class="cr-flbl">{{ create_task_form.title.label.text }}</label>
-            {{ create_task_form.title(class="fi", placeholder="Part, trailer, skid, or move note") }}
-          </div>
-        </div>
-        <div class="cr-grid">
-          <div>
-            <label class="cr-flbl">{{ create_task_form.route_from.label.text }}</label>
-            {{ create_task_form.route_from(class="fs") }}
-          </div>
-          <div>
-            <label class="cr-flbl">{{ create_task_form.route_to.label.text }}</label>
-            {{ create_task_form.route_to(class="fs") }}
-          </div>
-        </div>
-        <div>
-          <label class="cr-flbl">{{ create_task_form.part_number.label.text }}</label>
-          {{ create_task_form.part_number(class="fi", list="partSuggestions", placeholder="Search or enter part number") }}
-          <datalist id="partSuggestions">
-            {% for part in part_suggestions %}
-              <option value="{{ part }}"></option>
-            {% endfor %}
-          </datalist>
-        </div>
-        <div>
-          <label class="cr-flbl">{{ create_task_form.details.label.text }}</label>
-          {{ create_task_form.details(class="fta", rows="2",
-            placeholder="Dock, trailer, shipper notes, part count, timing") }}
-        </div>
-        <div>
-          <label class="cr-flbl">Assign / Post Open</label>
-          {{ create_task_form.assigned_to(class="fs") }}
-        </div>
-        <div>
-          <label class="hot-lbl">
-            {{ create_task_form.is_hot() }}
-            <span>Mark as HOT MOVE</span>
-          </label>
-        </div>
-      </div>
-
-      <div class="mdl-foot">
-        <button type="button" class="btn-cancel" onclick="closeCreate()">Cancel</button>
-        <button type="submit" class="btn-dispatch">
-          Dispatch to Fleet
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round"
-              d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
-          </svg>
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
-{# ── APP SHELL ── #}
 <div class="mc">
-
-  {# SIDEBAR #}
   <aside class="mc-side">
     <div class="mc-brand">
       <div class="mc-brand-icon">
-        <svg width="22" height="22" fill="none" viewBox="0 0 24 24"
-             stroke="currentColor" stroke-width="2.5">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9
-               0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0
-               011-1h2a1 1 0 011 1v5m-4 0h4"/>
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h10M4 18h16"/>
         </svg>
       </div>
       <div>
         <h1>MoveDefense</h1>
-        <p>Ops Console</p>
+        <p>Manager</p>
       </div>
     </div>
 
     <nav class="mc-nav">
       <a class="active" href="{{ url_for('manager.manager_dashboard') }}">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7" rx="1"/>
-          <rect x="14" y="3" width="7" height="7" rx="1"/>
-          <rect x="14" y="14" width="7" height="7" rx="1"/>
-          <rect x="3" y="14" width="7" height="7" rx="1"/>
-        </svg>
-        Live Dispatch
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        Workspace
       </a>
-      <a href="{{ url_for('manager.driver_logs') }}">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0
-               012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0
-               01.293.707V19a2 2 0 01-2 2z"/>
-        </svg>
-        Audit &amp; Logs
+      <a href="{{ url_for('manager.move_requests') }}">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        Move Requests
+      </a>
+      <a href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-12M4 6h16M4 18h16"/></svg>
+        Driver Routes
+      </a>
+      <a href="{{ url_for('manager.plant_transfers') }}">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h10v10H7zM4 4h16v16H4z"/></svg>
+        Route Packets
+      </a>
+      <a href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3h7l5 5v13H7z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 3v6h5"/></svg>
+        Documents
       </a>
       <a href="{{ url_for('manager.review_dashboard') }}">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5h6M9 12h6M9 19h6M5 5h.01M5 12h.01M5 19h.01"/>
-        </svg>
-        Issue Review
-      </a>
-      <a href="{{ url_for('manager.review_queue') }}">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7l-2 2-1-1"/>
-        </svg>
-        Review Queue{% if pending_review_count %} ({{ pending_review_count }}){% endif %}
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 4.1L2.5 18a2 2 0 001.7 3h15.6a2 2 0 001.7-3L13.7 4.1a2 2 0 00-3.4 0z"/></svg>
+        Damage / Incidents
       </a>
       <a href="{{ url_for('manager.list_pretrips') }}">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0
-               002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0
-               002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
-        </svg>
-        Pre-Trip Reports
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 11l2 2 4-4M7 4h10v16H7z"/></svg>
+        Inspections
+      </a>
+      <a href="{{ url_for('public.production_flow_board') }}">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v10H4zM8 19h8M12 15v4"/></svg>
+        Widescreen Board
       </a>
       <a href="{{ url_for('auth.logout') }}" style="margin-top:auto;">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0
-               01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-        </svg>
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4-4-4M21 12H9M13 5V4a2 2 0 00-2-2H5a2 2 0 00-2 2v16a2 2 0 002 2h6a2 2 0 002-2v-1"/></svg>
         Logout
       </a>
     </nav>
 
     <div class="mc-user">
-      <div class="mc-avatar">
-        {{ (current_user.first_name[:1] if current_user.first_name else current_user.username[:1])|upper }}
-      </div>
+      <div class="mc-avatar">{{ (current_user.first_name[:1] if current_user.first_name else current_user.username[:1])|upper }}</div>
       <div>
         <p class="u-name">{{ current_user.display_name }}</p>
-        <p class="u-role">Logistics Manager</p>
+        <p class="u-role">Manager</p>
       </div>
     </div>
   </aside>
 
-  {# MAIN #}
   <main class="mc-main">
     <header class="mc-header">
-      <h2>Dispatch Queue</h2>
+      <div>
+        <h2>Manager Workspace</h2>
+        <p>{{ today.strftime('%b %d, %Y') }} - live route, document, incident, and inspection work</p>
+      </div>
       <div class="mc-header-r">
-        <div class="mc-srch-wrap">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"/>
-            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35"/>
-          </svg>
-          <input class="mc-srch" type="search" id="dispatchSearch"
-            placeholder="Search parts, drivers, plants…" autocomplete="off">
-          <div class="search-suggestions" id="dispatchSuggestions"></div>
-        </div>
-        <button class="btn-create" onclick="openCreate()">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-          </svg>
-          <span>Create Hot Move</span>
-        </button>
+        <a class="btn-action" href="{{ url_for('public.production_flow_board') }}">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v10H4zM8 19h8M12 15v4"/></svg>
+          Widescreen Board
+        </a>
+        <a class="btn-action primary" href="{{ url_for('manager.new_move_request') }}">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
+          New Request
+        </a>
       </div>
     </header>
 
     {% if database_status and (database_status.warning or not database_status.schema_ready) %}
       <div class="db-alert">
         <strong>Database warning: {{ database_status.label }}{% if not database_status.schema_ready %} / missing schema{% endif %}</strong>
-        <span>{% if not database_status.schema_ready %}Required tables are missing; run deploy-db before company use.{% else %}Safe for local testing only. Company use requires Postgres/persistent storage.{% endif %}</span>
+        <span>{% if not database_status.schema_ready %}Required tables are missing; run deploy-db before company use.{% else %}Company use requires Postgres or persistent storage.{% endif %}</span>
       </div>
     {% endif %}
 
     <div class="mc-body">
-
-      <section class="capture-panel {% if focus_target == 'capture' %}focus-panel{% endif %}" id="dispatchCaptureInbox">
-        <div class="capture-head">
-          <div>
-            <h3>Universal Dispatch Capture Inbox</h3>
-            <span>{{ dispatch_capture_count or 0 }} captured request{{ '' if (dispatch_capture_count or 0) == 1 else 's' }} separate from converted moves</span>
-          </div>
-        </div>
-        <form class="capture-form" method="POST" action="{{ url_for('manager.create_dispatch_capture_route') }}">
-          <input type="hidden" name="source" value="manager_dashboard">
-          <textarea class="capture-text" name="raw_text" placeholder="Paste or type dispatch text exactly as received. Example: KP is really full so both of you work on it before shutdown." required></textarea>
-          <div class="capture-actions" aria-label="Quick capture type">
-            <button class="hot" type="submit" name="capture_type" value="hot_move">Hot Move</button>
-            <button type="submit" name="capture_type" value="empty_pack">Empty Pack</button>
-            <button type="submit" name="capture_type" value="quality_hold">Quality Hold</button>
-            <button type="submit" name="capture_type" value="delay_no_parts">Delay / No Parts</button>
-            <button type="submit" name="capture_type" value="damage">Damage</button>
-            <button type="submit" name="capture_type" value="trailer_request">Trailer Request</button>
-            <button type="submit" name="capture_type" value="maintenance">Maintenance</button>
-            <button type="submit" name="capture_type" value="general_note">General Note</button>
-          </div>
-        </form>
-        <div class="capture-inbox" aria-label="Dispatch captures needing triage">
-          {% for capture in dispatch_capture_rows %}
-            <article class="capture-card">
-              <div class="capture-card-top">
-                <div>
-                  <div class="capture-id">{{ capture.display_number }} · {{ capture.type_label }}</div>
-                  <div class="capture-meta">{{ capture.captured_at|to_detroit_datetime if capture.captured_at else '' }} · {{ capture.captured_by_label }}{% if capture.extracted_from_node or capture.extracted_to_node %} · {{ capture.extracted_from_node or 'Unknown' }}{% if capture.extracted_to_node %} → {{ capture.extracted_to_node }}{% endif %}{% endif %}</div>
-                </div>
-                <div class="capture-status">
-                  <span class="capture-pill {% if capture.status == 'needs_triage' %}warn{% endif %}">{{ capture.status_label }}</span>
-                  <span class="capture-pill {% if capture.priority in ['hot','high','safety'] %}hot{% endif %}">{{ capture.priority_label }}</span>
-                  <span class="capture-pill">{{ capture.confidence or 'low' }}</span>
-                </div>
-              </div>
-              <p class="capture-raw">{{ capture.raw_text }}</p>
-              <div class="missing-chip-row">
-                {% for field in capture.missing_fields %}
-                  <span class="missing-chip warn">Needs {{ field }}</span>
-                {% else %}
-                  <span class="missing-chip">Ready to convert</span>
-                {% endfor %}
-                {% for part in capture.extracted_part_numbers[:3] %}
-                  <span class="missing-chip">Part {{ part }}</span>
-                {% endfor %}
-                {% for qty in capture.extracted_quantities[:2] %}
-                  <span class="missing-chip">{{ qty }}</span>
-                {% endfor %}
-              </div>
-              <div class="capture-card-actions" aria-label="Convert or dismiss capture {{ capture.display_number }}">
-                <form method="POST" action="{{ url_for('manager.convert_dispatch_capture_route', capture_id=capture.id) }}"><button type="submit" name="entity_type" value="move_request">MoveRequest</button></form>
-                <form method="POST" action="{{ url_for('manager.convert_dispatch_capture_route', capture_id=capture.id) }}"><button type="submit" name="entity_type" value="empty_pack_return">EmptyPackReturn</button></form>
-                <form method="POST" action="{{ url_for('manager.convert_dispatch_capture_route', capture_id=capture.id) }}"><button type="submit" name="entity_type" value="quality_hold">QualityHold</button></form>
-                <form method="POST" action="{{ url_for('manager.convert_dispatch_capture_route', capture_id=capture.id) }}"><button type="submit" name="entity_type" value="damage_issue">DamageIssue</button></form>
-                <form method="POST" action="{{ url_for('manager.convert_dispatch_capture_route', capture_id=capture.id) }}"><button type="submit" name="entity_type" value="delay_report">DelayReport</button></form>
-                <form method="POST" action="{{ url_for('manager.convert_dispatch_capture_route', capture_id=capture.id) }}"><button type="submit" name="entity_type" value="maintenance_issue">MaintenanceIssue</button></form>
-                <form method="POST" action="{{ url_for('manager.dismiss_dispatch_capture_route', capture_id=capture.id) }}"><button type="submit">Dismiss</button></form>
-              </div>
-            </article>
-          {% else %}
-            <p class="capture-empty">No raw dispatch captures waiting. Pasted texts will appear here immediately, even when fields are missing.</p>
-          {% endfor %}
-        </div>
+      <section class="summary-grid" aria-label="Live manager summary">
+        <a class="summary-tile review" href="{{ url_for('manager.review_queue') }}">
+          <span>Open items needing review</span>
+          <strong>{{ pending_review_count }}</strong>
+          <small>{{ critical_exceptions|length }} route item{{ '' if critical_exceptions|length == 1 else 's' }} needing attention</small>
+        </a>
+        <a class="summary-tile routes" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">
+          <span>Driver routes</span>
+          <strong>{{ active_driver_count }}</strong>
+          <small>{{ route_count }} stop{{ '' if route_count == 1 else 's' }} logged today</small>
+        </a>
+        <a class="summary-tile packets" href="{{ url_for('manager.plant_transfers') }}">
+          <span>Route packets</span>
+          <strong>{{ route_packet_count }}</strong>
+          <small>{{ todays_transfers|length }} recent transfer record{{ '' if todays_transfers|length == 1 else 's' }}</small>
+        </a>
+        <a class="summary-tile documents" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">
+          <span>Documents</span>
+          <strong>{{ document_count }}</strong>
+          <small>Attached to today&apos;s driver routes</small>
+        </a>
+        <a class="summary-tile damage" href="{{ url_for('manager.review_dashboard') }}">
+          <span>Damage / incidents</span>
+          <strong>{{ damage_reports|length }}</strong>
+          <small>Open reports routed to manager review</small>
+        </a>
+        <a class="summary-tile inspections" href="{{ url_for('manager.list_pretrips') }}">
+          <span>Inspections</span>
+          <strong>{{ inspection_count }}</strong>
+          <small>Vehicle checks filed today</small>
+        </a>
       </section>
 
-      {# Compact live summary - division counts stay in the detailed table filters below #}
-      {% set kpi_count = 3 + (1 if live_problem_count else 0) + (1 if pending_review_count else 0) %}
-      <div class="kpi-row">
-        <a class="kpi {% if division_filter == 'All' and focus_panel == 'jobs' and focus_target in ['', 'jobs'] %}active{% endif %}" data-dashboard-target="dispatchJobsPanel" href="{{ url_for('manager.manager_dashboard', division='All', focus='jobs', target='jobs') }}#dispatchJobsPanel" aria-label="Show all active moves">
-          <p class="kpi-lbl">Active Moves</p>
-          <div class="kpi-val">
-            <span class="kpi-num">{{ total_active_moves }}</span>
-            <span class="kpi-tag">Open jobs</span>
-          </div>
-        </a>
-        <a class="kpi green {% if focus_target == 'capture' %}active{% endif %}" data-dashboard-target="dispatchCaptureInbox" href="{{ url_for('manager.manager_dashboard', division=division_filter, focus='jobs', target='capture') }}#dispatchCaptureInbox" aria-label="Show captured dispatch requests">
-          <p class="kpi-lbl">Captured Requests</p>
-          <div class="kpi-val">
-            <span class="kpi-num">{{ dispatch_capture_count or 0 }}</span>
-            <span class="kpi-tag">Needs triage</span>
-          </div>
-        </a>
-        <a class="kpi blue {% if focus_panel == 'routes' and focus_target in ['', 'routes'] %}active{% endif %}" data-dashboard-target="liveRoutesPanel" href="{{ url_for('manager.manager_dashboard', division=division_filter, focus='routes', target='routes') }}#liveRoutesPanel" aria-label="Show live driver routes">
-          <p class="kpi-lbl">Drivers Moving</p>
-          <div class="kpi-val">
-            <span class="kpi-num">{{ active_driver_count }}</span>
-            <span class="kpi-tag">Live stops</span>
-          </div>
-        </a>
-        {% if live_problem_count %}
-        <a class="kpi danger {% if focus_target == 'attention' %}active{% endif %}" data-dashboard-target="needsAttentionPanel" href="{{ url_for('manager.manager_dashboard', division=division_filter, focus='routes', target='attention') }}#needsAttentionPanel" aria-label="Show live route problems">
-          <p class="kpi-lbl">Needs Attention</p>
-          <div class="kpi-val">
-            <span class="kpi-num">{{ live_problem_count }}</span>
-            <span class="kpi-tag"><span class="status-dot problem" aria-hidden="true"></span>Needs review</span>
-          </div>
-        </a>
-        {% endif %}
-        {% if pending_review_count %}
-        <a class="kpi danger" href="{{ url_for('manager.review_queue') }}" aria-label="Show stops awaiting manager review">
-          <p class="kpi-lbl">Pending Reviews</p>
-          <div class="kpi-val">
-            <span class="kpi-num">{{ pending_review_count }}</span>
-            <span class="kpi-tag"><span class="status-dot problem" aria-hidden="true"></span>Awaiting manager</span>
-          </div>
-        </a>
-        {% endif %}
-      </div>
-
-      {# Operations console: Flow Map first; queue and route panels stay as operational side surfaces. #}
-      {% if production_flow %}
-        {% include "partials/_production_flow_map.html" %}
-      {% endif %}
-      {% if floor %}
-        {% include "partials/_move_queue_summary.html" %}
-      {% endif %}
-      {% if floor %}
-        {% set heading = "Floor Operations Snapshot" %}
-        {% include "partials/_floor_operations_snapshot.html" %}
-      {% endif %}
-
-      <div class="panel {% if focus_target == 'attention' %}focus-panel{% endif %}" id="needsAttentionPanel">
-        <div class="panel-top">
-          <h3>
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-            </svg>
-            Needs Attention
-          </h3>
-          <span class="text-sm text-muted">{{ critical_exceptions|length }} issue{{ '' if critical_exceptions|length == 1 else 's' }} visible; scroll this panel for the full list</span>
-        </div>
-        <div class="critical-list">
-          {% for item in critical_exceptions %}
-            <a class="critical-row" href="{{ item.url }}">
-              <span class="critical-type">{{ item.type }}</span>
-              <span class="critical-stop">{{ item.route_stop }}</span>
-              <span class="critical-issue">{{ item.issue }}</span>
-              {% if item.photo_url %}<img class="problem-thumb" src="{{ item.photo_url }}" alt="Proof photo">{% endif %}
-            </a>
-          {% else %}
-            <div class="empty-row"><span>No open issues for this filter.</span></div>
-          {% endfor %}
-        </div>
-      </div>
-
-
-      {% if review_rows %}
-      <div class="panel {% if focus_target == 'reviews' %}focus-panel{% endif %}" id="reviewQueuePanel">
-        <div class="panel-top">
-          <h3>
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            Stops Awaiting Manager Review
-          </h3>
-          <a class="text-sm text-muted" href="{{ url_for('manager.review_queue') }}">Open full queue &rarr;</a>
-        </div>
-        <div class="tbl-wrap">
-          <table class="dtbl">
-            <thead>
-              <tr>
-                <th>Stop</th>
-                <th>Reason</th>
-                <th>Cargo (In &rarr; Out)</th>
-                <th>Requested By</th>
-                <th>When</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in review_rows %}
-              <tr>
-                <td class="align-middle"><a class="cell-id" href="{{ row.url }}">{{ row.plant }}</a><br><span class="text-sm text-muted">{{ row.log.date }}</span></td>
-                <td class="align-middle">{{ row.reason }}</td>
-                <td class="align-middle whitespace-nowrap">{{ row.arrived_cargo }} &rarr; {{ row.departed_cargo }}</td>
-                <td class="align-middle">{{ row.requested_by }}</td>
-                <td class="align-middle whitespace-nowrap">{{ row.requested_at.strftime('%b %d, %I:%M %p') if row.requested_at else '--' }}</td>
-                <td class="align-middle whitespace-nowrap" style="text-align:right;">
-                  <form method="POST" action="{{ url_for('manager.resolve_review', log_id=row.log_id) }}" style="margin:0;">
-                    <button type="submit" class="btn-create" style="display:inline-flex;">Mark reviewed</button>
-                  </form>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {% endif %}
-
-      {% if followup_cases %}
-      <div class="panel {% if focus_target == 'cases' %}focus-panel{% endif %}" id="followupCasesPanel">
-        <div class="panel-top">
-          <h3>Grouped Management Cases</h3>
-          <span class="text-sm text-muted">Related history only, not route evidence</span>
-        </div>
-        <div class="critical-list">
-          {% for case in followup_cases %}
-            <div class="critical-row">
-              <span class="critical-type">{{ case.case_type|replace('_', ' ')|title }}</span>
-              <span class="critical-stop">{{ case.title }}</span>
-              <span class="critical-issue">{{ case.summary }} {{ case.metrics|join('; ') }}</span>
+      <section class="workspace-grid">
+        <div class="stack">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Move Requests</h3>
+              <a href="{{ url_for('manager.move_requests') }}">Open requests</a>
             </div>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
-
-      {# Live route/stop panel #}
-      <div class="panel {% if focus_panel == 'routes' and focus_target in ['', 'routes'] %}focus-panel{% endif %}" id="liveRoutesPanel">
-        <div class="panel-top">
-          <h3>
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-            </svg>
-            Live Routes &amp; Stops
-          </h3>
-          <span class="text-sm text-muted">Updates when drivers add, depart, or edit stops</span>
-        </div>
-        <div class="driver-filter-row">
-          <a class="{% if not selected_driver_id %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division=division_filter, focus='routes') }}">All Drivers</a>
-          {% for driver in drivers %}
-            <a class="{% if selected_driver_id == driver.id %}active{% endif %}" href="{{ url_for('manager.manager_dashboard', division=division_filter, driver_id=driver.id, focus='routes') }}">{{ driver.display_name }}</a>
-          {% endfor %}
-        </div>
-        {% if plant_forecasts %}
-        <div class="plant-timing-strip" aria-label="Plant load timing">
-          {% for timing in plant_forecasts %}
-            <div class="plant-timing-card">
-              <strong>{{ timing.plant }}</strong>
-              {% if timing.estimate_minutes is none %}
-                <span>No timing history yet</span>
+            <div class="panel-body stack">
+              {% for req in move_requests %}
+                <a class="review-row" href="{{ url_for('manager.edit_move_request', request_id=req.id) }}">
+                  <div class="row-top">
+                    <span class="row-title">{{ req.display_number }}{% if req.origin_location_text or req.destination_location_text %} - {{ req.origin_location_text or 'Origin pending' }} to {{ req.destination_location_text or 'Destination pending' }}{% endif %}</span>
+                    <span class="status-pill {% if req.priority in ['hot', 'high', 'safety'] %}issue{% elif req.status in ['blocked', 'waiting'] %}warn{% else %}open{% endif %}">{{ req.status|replace('_', ' ')|title }}</span>
+                  </div>
+                  <div class="row-meta">{{ req.assigned_display or 'Open driver assignment' }} - {{ req.requested_at|to_detroit_datetime if req.requested_at else 'Time not recorded' }}</div>
+                  <div class="row-note">{{ req.cargo_part_display or req.raw_text }}</div>
+                </a>
               {% else %}
-                <span>Expected Wait {{ timing.estimate_label }} - {{ 'Low confidence' if timing.today_count < 2 else timing.confidence }}</span>
-                <span>Based on {{ timing.today_count }} load{{ 's' if timing.today_count != 1 else '' }} today</span>
-                <span>30-day average: {{ timing.history_average_label }}</span>
-              {% endif %}
-            </div>
-          {% endfor %}
-        </div>
-        {% endif %}
-        <div class="tbl-wrap live-stops-scroll" tabindex="0" aria-label="Scrollable live route stops">
-          <table class="dtbl" id="liveStopsTable">
-            <thead>
-              <tr>
-                <th>Stop</th>
-                <th>Driver</th>
-                <th>Route / Plant</th>
-                <th>Cargo</th>
-                <th>Arrive</th>
-                <th>Depart</th>
-                {% if reported_delay_count %}<th>Delay</th>{% endif %}
-                <th>Expected Wait</th>
-                <th>Issues</th>
-                <th>Stop Status</th>
-                <th style="text-align:right;">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in live_stop_rows %}
-                {% set log = row.log %}
-                {% set route = row.route %}
-                <tr data-driver-id="{{ log.driver_id }}">
-                  <td class="align-middle"><div class="cell-id">Stop {{ row.stop_number }}</div><div class="cell-sub">{{ log.date }}</div></td>
-                  <td class="align-middle"><span class="driver-cell"><span class="d-av">{{ row.driver.display_name[:1]|upper }}</span>{{ row.driver.display_name }}</span></td>
-                  <td class="align-middle">
-                    <div class="live-route-stack">
-                      <span class="live-route-main">{{ route.plant if route else log.plant_name }}</span>
-                      <span class="live-route-sub">{{ route.action if route else 'Logged stop' }}{% if route %} · {{ route.state }}{% endif %}</span>
-                    </div>
-                  </td>
-                  <td class="align-middle">{{ row.cargo }}</td>
-                  <td class="align-middle whitespace-nowrap">{{ log.arrive_time|to_local_time if log.arrive_time else '—' }}</td>
-                  <td class="align-middle whitespace-nowrap">{{ log.depart_time|to_12h_format if log.depart_time else '—' }}</td>
-                  {% if reported_delay_count %}<td class="align-middle whitespace-nowrap">{{ row.dock_wait }}</td>{% endif %}
-                  <td class="align-middle">
-                    <div class="timing-cell">
-                      {% if row.forecast %}
-                        <span class="timing-main">{{ row.forecast.estimate_label }}</span>
-                        <span class="timing-sub">{% if row.forecast.ready_at_label %}Expected wait {{ row.forecast.ready_at_label }}{% else %}{{ row.forecast.confidence }}{% endif %}</span>
-                        <span class="timing-state {{ row.forecast.severity }}">{{ row.forecast.status }}</span>
-                      {% else %}
-                        <span class="timing-main">Complete</span>
-                        <span class="timing-sub">No active wait</span>
-                      {% endif %}
-                    </div>
-                  </td>
-                  <td class="align-middle">
-                    {% if row.exceptions %}
-                      <div class="exception-chip-list">
-                        {% for item in row.exceptions %}
-                          <span class="exception-chip {% if 'Damage' in item.label %}damage{% elif 'Missing' in item.label %}missing{% elif 'Truck' in item.label %}truck{% elif 'Photo' in item.label %}photo{% endif %}" title="{{ item.detail }}">{% if item.photo_url %}<img class="exception-chip-thumb" src="{{ item.photo_url }}" alt="Photo proof">{% endif %}{{ item.label }}</span>
-                        {% endfor %}
-                      </div>
-                    {% else %}
-                      <span class="text-muted text-sm">None</span>
-                    {% endif %}
-                  </td>
-                  <td class="align-middle">
-                    <span class="status-signal"><span class="status-dot {{ row.status_key }}" aria-hidden="true"></span><span class="sbadge {{ row.status_key }}">{{ row.status }}</span></span>
-                  </td>
-                  <td class="align-middle" style="text-align:right;"><a class="btn-manage" href="{{ row.url }}">Open</a></td>
-                </tr>
-              {% else %}
-                <tr class="empty-row"><td colspan="{{ 11 if reported_delay_count else 10 }}">No driver stops logged for this filter today.</td></tr>
+                <div class="empty-state">No active move requests are waiting.</div>
               {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </div>
+          </section>
 
-      {# Dispatch queue panel #}
-      <div class="panel {% if focus_panel == 'jobs' and focus_target in ['', 'jobs'] %}focus-panel{% endif %}" id="dispatchJobsPanel">
-        <div class="panel-top">
-          <h3>
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0
-                   01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0
-                   012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-            </svg>
-            Active Jobs
-          </h3>
-          <div class="div-tabs">
-            {% for tab in ['All', 'Plastics', 'Trim'] %}
-              <a class="{% if division_filter == tab %}active{% endif %}"
-                 href="{{ url_for('manager.manager_dashboard', division=tab, focus='jobs') }}">{{ tab }}</a>
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Open Items Needing Review</h3>
+              <a href="{{ url_for('manager.review_queue') }}">Open queue</a>
+            </div>
+            <div class="panel-body stack">
+              {% for row in review_rows[:5] %}
+                <a class="review-row" href="{{ row.url }}">
+                  <div class="row-top">
+                    <span class="row-title">{{ row.plant }}</span>
+                    <span class="status-pill warn">Review</span>
+                  </div>
+                  <div class="row-meta">{{ row.requested_by }} - {{ row.requested_at|to_detroit_datetime if row.requested_at else 'Time not recorded' }}</div>
+                  <div class="row-note">{{ row.reason }}</div>
+                </a>
+              {% else %}
+                <div class="empty-state">No manager reviews are waiting.</div>
+              {% endfor %}
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Driver Routes</h3>
+              <a href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">Open routes</a>
+            </div>
+            <div class="route-table-wrap">
+              <table class="route-table">
+                <thead>
+                  <tr>
+                    <th>Driver</th>
+                    <th>Stop / Location</th>
+                    <th>Cargo</th>
+                    <th>Status</th>
+                    <th>Needs Attention</th>
+                    <th>Open</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in live_stop_rows[:20] %}
+                    {% set location = row.route.plant if row.route and row.route.plant else row.log.plant_name %}
+                    <tr>
+                      <td>
+                        <span class="driver-cell">
+                          <strong>{{ row.driver.display_name if row.driver else 'Driver' }}</strong>
+                          <small>{{ row.log.date }}</small>
+                        </span>
+                      </td>
+                      <td>
+                        <strong>Stop {{ row.stop_number }}</strong><br>
+                        <span class="row-meta">{{ location }}</span>
+                      </td>
+                      <td>
+                        {{ row.cargo }}
+                        {% if row.dock_wait and row.dock_wait != '--' %}<div class="row-meta">Dock wait {{ row.dock_wait }}</div>{% endif %}
+                        {% if row.forecast %}<div class="row-meta">Expected wait {{ row.forecast.estimate_label }}</div>{% endif %}
+                      </td>
+                      <td><span class="status-pill {{ row.status_key }}">{{ row.status }}</span></td>
+                      <td>
+                        <div class="issue-list">
+                          {% for item in row.exceptions[:3] %}
+                            <span class="issue-chip {% if item.label in ['Missing Departure', 'Cargo Mismatch', 'Truck Issue'] %}issue{% endif %}">{{ item.label }}</span>
+                          {% else %}
+                            <span class="row-meta">None</span>
+                          {% endfor %}
+                        </div>
+                      </td>
+                      <td><a class="open-link" href="{{ row.url }}">Open</a></td>
+                    </tr>
+                  {% else %}
+                    <tr><td colspan="6"><div class="empty-state">No driver stops are logged for today.</div></td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <aside class="panel">
+          <div class="panel-head">
+            <h3>Live Work Areas</h3>
+          </div>
+          <div class="panel-body side-links">
+            <a class="side-link" href="{{ url_for('manager.move_requests') }}"><span>Move Requests</span><small>{{ total_active_moves }} active</small></a>
+            <a class="side-link" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}"><span>Driver Routes</span><small>{{ route_count }} stops</small></a>
+            <a class="side-link" href="{{ url_for('manager.plant_transfers') }}"><span>Route Packets</span><small>{{ route_packet_count }} items</small></a>
+            <a class="side-link" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}"><span>Documents</span><small>{{ document_count }} attached</small></a>
+            <a class="side-link" href="{{ url_for('manager.review_dashboard') }}"><span>Damage / Incidents</span><small>{{ damage_reports|length }} open</small></a>
+            <a class="side-link" href="{{ url_for('manager.list_pretrips') }}"><span>Inspections</span><small>{{ inspection_count }} today</small></a>
+            <a class="side-link" href="{{ url_for('public.production_flow_board') }}"><span>Widescreen Board</span><small>Shared view</small></a>
+          </div>
+        </aside>
+      </section>
+
+      <section class="lower-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Route Packets</h3>
+            <a href="{{ url_for('manager.plant_transfers') }}">Open packets</a>
+          </div>
+          <div class="panel-body mini-list">
+            {% for transfer in todays_transfers %}
+              <a class="transfer-row" href="{{ url_for('manager.view_plant_transfer', transfer_id=transfer.id) }}">
+                <div class="row-top">
+                  <span class="row-title">{{ transfer.transfer_number if transfer.transfer_number is defined and transfer.transfer_number else 'Transfer #' ~ transfer.id }}</span>
+                  <span class="status-pill">Packet</span>
+                </div>
+                <div class="row-meta">{{ transfer.transfer_date }} - {{ transfer.driver.display_name if transfer.driver else (transfer.driver_name or 'Driver') }}</div>
+              </a>
+            {% else %}
+              <div class="empty-state">No transfer records filed today.</div>
             {% endfor %}
           </div>
-        </div>
+        </section>
 
-        <div class="tbl-wrap">
-          <table class="dtbl" id="dispatchTable">
-            <thead>
-              <tr>
-                <th>Move ID</th>
-                <th>Division</th>
-                <th>Part / Skid</th>
-                <th>Route</th>
-                <th>Driver</th>
-                <th>Status</th>
-                <th style="text-align:right;">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% if dispatch_rows %}
-                {% for row in dispatch_rows %}
-                  <tr
-                    data-id="{{ row.id }}"
-                    data-route="{{ row.route | e }}"
-                    data-part="{{ row.part | e }}"
-                    data-driver="{{ row.driver | e }}"
-                    data-driver-meta="{{ row.driver_meta | e }}"
-                    data-truck="{{ row.truck_id | e }}"
-                    data-truck-meta="{{ row.truck_meta | e }}"
-                    data-status="{{ row.status_key }}"
-                    data-division="{{ row.division }}"
-                    data-notes="{{ row.notes | e }}"
-                    data-action="{{ row.action_url }}"
-                    data-is-task="{{ '1' if row.id.startswith('T-') else '0' }}"
-                  >
-                    <td class="align-middle">
-                      <div class="cell-id">{{ row.id }}</div>
-                      <div class="truck-pill {% if row.truck_id in ['Truck not set', 'Truck pending'] %}missing{% endif %}">{{ row.truck_id }}</div>
-                      <div class="cell-sub">{{ row.time|to_detroit_datetime if row.time else '—' }}</div>
-                    </td>
-                    <td class="align-middle">
-                      <span class="div-badge {% if row.division == 'Trim' %}trim{% else %}plastics{% endif %}">
-                        {{ row.division }}
-                      </span>
-                    </td>
-                    <td class="align-middle">
-                      <div class="part-main">{{ row.part_primary }}</div>
-                      {% if row.part_meta %}
-                        <div class="part-meta text-muted text-sm">{{ row.part_meta }}</div>
-                      {% endif %}
-                    </td>
-                    <td class="align-middle whitespace-nowrap">
-                      <div class="route-cell whitespace-nowrap">
-                        {% if row.route_to %}
-                          <span>{{ row.route_from }}</span>
-                          <span class="route-arrow" aria-hidden="true">⇌</span>
-                          <span>{{ row.route_to }}</span>
-                        {% else %}
-                          <span>{{ row.route_from or row.route }}</span>
-                        {% endif %}
-                      </div>
-                    </td>
-                    <td class="align-middle">
-                      {% if row.driver == 'Open for any driver' %}
-                        <span class="unassigned-cell">
-                          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01"/>
-                          </svg>
-                          Open
-                        </span>
-                        <div class="driver-meta">{{ row.driver_meta }}</div>
-                      {% else %}
-                        <div class="driver-stack">
-                          <span class="driver-cell">
-                            <span class="d-av">{{ row.driver[:1]|upper }}</span>
-                            {{ row.driver }}
-                          </span>
-                          <span class="driver-meta">{{ row.driver_meta }}</span>
-                        </div>
-                      {% endif %}
-                    </td>
-                    <td class="align-middle">
-                      {% set sk = row.status_key %}
-                      <span class="sbadge
-                        {% if sk == 'hot' %}hot
-                        {% elif sk == 'in-progress' %}in-progress
-                        {% elif sk == 'logged' %}logged
-                        {% elif sk == 'loading' %}loading
-                        {% elif sk == 'completed' %}completed
-                        {% else %}pending{% endif %}">
-                        {{ row.status }}
-                      </span>
-                    </td>
-                    <td class="align-middle" style="text-align:right;">
-                      <button class="btn-manage"
-                        onclick="openManage(this.closest('tr'))">Manage</button>
-                    </td>
-                  </tr>
-                {% endfor %}
-              {% else %}
-                <tr class="empty-row">
-                  <td colspan="7">No active moves for this filter.</td>
-                </tr>
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
-      </div>
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Documents</h3>
+            <a href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">Open documents</a>
+          </div>
+          <div class="panel-body mini-list">
+            {% for doc in recent_documents %}
+              <a class="doc-row" href="{{ url_for('manager.view_driver_log', log_id=doc.driver_log_id) }}">
+                <div class="row-top">
+                  <span class="row-title">{{ doc.document_type_label }}</span>
+                  <span class="status-pill">File</span>
+                </div>
+                <div class="row-meta">{{ doc.log.driver.display_name if doc.log and doc.log.driver else 'Driver' }} - {{ doc.log.plant_name if doc.log else 'Route' }}</div>
+                <div class="row-note">{{ doc.note or doc.original_filename or 'Document attached' }}</div>
+              </a>
+            {% else %}
+              <div class="empty-state">No route documents attached today.</div>
+            {% endfor %}
+          </div>
+        </section>
 
-    </div>{# /mc-body #}
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Damage / Incidents</h3>
+            <a href="{{ url_for('manager.review_dashboard') }}">Open review</a>
+          </div>
+          <div class="panel-body mini-list">
+            {% for report in damage_reports %}
+              <a class="damage-row" href="{{ url_for('manager.view_damage_report', report_id=report.id) }}">
+                <div class="row-top">
+                  <span class="row-title">{{ report.plant_name or 'Route incident' }}</span>
+                  <span class="status-pill issue">{{ report.status|replace('_', ' ')|title }}</span>
+                </div>
+                <div class="row-meta">{{ report.created_at|to_detroit_datetime if report.created_at else 'Time not recorded' }} - {{ report.reported_by.display_name if report.reported_by else 'Driver' }}</div>
+                <div class="row-note">{{ report.description }}</div>
+              </a>
+            {% else %}
+              <div class="empty-state">No open damage or incident reports.</div>
+            {% endfor %}
+          </div>
+        </section>
+      </section>
+    </div>
   </main>
 </div>
-
-{% if config.ENABLE_SOCKETIO %}
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-{% endif %}
-<script src="{{ url_for('static', filename='js/live_route_map.js') }}"></script>
-<script>
-// ── Driver choices for Manage modal ──
-const DRIVERS = [
-  {id: '', label: '— Unassign —'},
-  {% for val, label in (create_task_form.assigned_to.choices or []) %}
-  {id: {{ val }}, label: {{ label | tojson }}},
-  {% endfor %}
-];
-const CSRF = {{ (create_task_form.csrf_token._value() if create_task_form.csrf_token is defined else '') | tojson }};
-
-// ── Learned search ──
-const srch = document.getElementById('dispatchSearch');
-const suggestions = document.getElementById('dispatchSuggestions');
-let searchTimer = null;
-
-function applyDispatchSearch(value) {
-  const q = (value || '').trim().toLowerCase();
-  ['#dispatchTable tbody tr:not(.empty-row)', '#liveStopsTable tbody tr:not(.empty-row)'].forEach(selector => {
-    document.querySelectorAll(selector).forEach(row => {
-      row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
-    });
-  });
-}
-
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
-}
-
-function renderSuggestions(results) {
-  if (!suggestions) return;
-  if (!results.length) {
-    suggestions.classList.remove('open');
-    suggestions.innerHTML = '';
-    return;
-  }
-  suggestions.innerHTML = results.map(item => {
-    const term = escapeHtml(item.term);
-    const category = escapeHtml(String(item.category || '').replace('_', ' '));
-    return `
-      <button type="button" class="suggestion-item" data-term="${term}">
-        <span class="suggestion-term">${term}</span>
-        <span class="suggestion-meta">${category} · ${Number(item.frequency || 0)}</span>
-      </button>
-    `;
-  }).join('');
-  suggestions.classList.add('open');
-}
-
-srch?.addEventListener('input', () => {
-  const q = srch.value.trim();
-  applyDispatchSearch(q);
-  clearTimeout(searchTimer);
-  if (q.length < 2) { renderSuggestions([]); return; }
-  searchTimer = setTimeout(async () => {
-    try {
-      const res = await fetch(`{{ url_for('manager.search_suggest') }}?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
-      renderSuggestions(data.results || []);
-    } catch (err) {
-      if (window.console && console.warn) console.warn('Dispatch search suggestions failed', err);
-      if (suggestions) {
-        suggestions.innerHTML = '<div class="suggestion-item" role="status"><span class="suggestion-term">Suggestions unavailable</span><span class="suggestion-meta">Search still filtered</span></div>';
-        suggestions.classList.add('open');
-      }
-    }
-  }, 200);
-});
-
-suggestions?.addEventListener('click', event => {
-  const btn = event.target.closest('.suggestion-item');
-  if (!btn) return;
-  srch.value = btn.dataset.term || '';
-  applyDispatchSearch(srch.value);
-  renderSuggestions([]);
-});
-
-document.addEventListener('click', event => {
-  if (suggestions && !event.target.closest('.mc-srch-wrap')) renderSuggestions([]);
-});
-
-// ── Manage modal ──
-function openManage(tr) {
-  const d = tr.dataset;
-  const isTask = d.isTask === '1';
-  const div = d.division || '';
-
-  document.getElementById('mgTitleText').textContent = 'Manage Move ' + d.id;
-  document.getElementById('mgRoute').textContent = d.route || '—';
-  document.getElementById('mgPart').textContent  = d.part || '—';
-  document.getElementById('mgDriverContext').textContent = [d.driver, d.driverMeta].filter(Boolean).join(' | ') || '—';
-  document.getElementById('mgTruck').textContent = [d.truck, d.truckMeta].filter(Boolean).join(' | ') || '—';
-
-  const badge = document.getElementById('mgDivBadge');
-  badge.textContent = div + ' DIV';
-  badge.style.cssText = div === 'Trim'
-    ? 'background:rgba(16,185,129,.2);color:#6ee7b7;'
-    : 'background:rgba(59,130,246,.2);color:#93c5fd;';
-
-  if (isTask) {
-    document.getElementById('mgTaskSec').style.display = '';
-    document.getElementById('mgXferSec').style.display  = 'none';
-    document.getElementById('mgSaveBtn').style.display  = '';
-
-    document.getElementById('mgTaskForm').action = d.action;
-    document.getElementById('mgCSRF').value  = CSRF;
-    document.getElementById('mgNotes').value = d.notes || '';
-
-    // Set status dropdown
-    const sSel = document.getElementById('mgStatus');
-    for (const opt of sSel.options) opt.selected = (opt.value === d.status);
-
-    // Populate driver dropdown
-    const dSel = document.getElementById('mgDriverSel');
-    dSel.innerHTML = '';
-    DRIVERS.forEach(drv => {
-      const o = document.createElement('option');
-      o.value = drv.id;
-      o.textContent = drv.label;
-      if (drv.label === d.driver) o.selected = true;
-      dSel.appendChild(o);
-    });
-  } else {
-    document.getElementById('mgTaskSec').style.display = 'none';
-    document.getElementById('mgXferSec').style.display  = '';
-    document.getElementById('mgSaveBtn').style.display  = 'none';
-    document.getElementById('mgXferLink').href = d.action;
-  }
-
-  document.getElementById('manageModal').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-
-function closeManage() {
-  document.getElementById('manageModal').classList.remove('open');
-  document.body.style.overflow = '';
-}
-
-function escalateHot() {
-  const form = document.getElementById('mgTaskForm');
-  let inp = form.querySelector('[name="is_hot"]');
-  if (!inp) { inp = Object.assign(document.createElement('input'), {type:'hidden', name:'is_hot'}); form.appendChild(inp); }
-  inp.value = '1';
-  form.submit();
-}
-
-// ── Create modal ──
-function openCreate()  {
-  document.getElementById('createModal').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-function closeCreate() {
-  document.getElementById('createModal').classList.remove('open');
-  document.body.style.overflow = '';
-}
-
-const focusTarget = {{ focus_target|tojson }};
-const dashboardFocusTargets = {
-  attention: 'needsAttentionPanel',
-  capture: 'dispatchCaptureInbox',
-  jobs: 'dispatchJobsPanel',
-  routes: 'liveRoutesPanel',
-  reviews: 'reviewQueuePanel',
-  cases: 'followupCasesPanel',
-};
-
-function pulseDashboardTarget(target) {
-  if (!target) return;
-  target.classList.remove('dashboard-focus-pulse');
-  void target.offsetWidth;
-  target.classList.add('dashboard-focus-pulse');
-  target.setAttribute('tabindex', '-1');
-  target.focus({ preventScroll: true });
-}
-
-function sameDashboardDataset(currentUrl, targetUrl) {
-  if (targetUrl.pathname !== currentUrl.pathname) return false;
-  const currentParams = new URLSearchParams(currentUrl.search);
-  const targetParams = new URLSearchParams(targetUrl.search);
-  if (!currentParams.has('division')) currentParams.set('division', 'All');
-  if (!targetParams.has('division')) targetParams.set('division', 'All');
-  ['focus', 'target'].forEach(key => {
-    currentParams.delete(key);
-    targetParams.delete(key);
-  });
-  const serialize = params => Array.from(params.entries())
-    .sort(([leftKey, leftValue], [rightKey, rightValue]) =>
-      leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue))
-    .map(([key, value]) => `${key}=${value}`)
-    .join('&');
-  return serialize(currentParams) === serialize(targetParams);
-}
-
-function focusDashboardTarget(targetId, behavior = 'smooth') {
-  const target = document.getElementById(targetId);
-  if (!target) return;
-  const scroller = target.closest('.mc-body');
-  if (scroller) {
-    const scrollerRect = scroller.getBoundingClientRect();
-    const targetRect = target.getBoundingClientRect();
-    const targetTop = scroller.scrollTop + targetRect.top - scrollerRect.top - 18;
-    scroller.scrollTo({ top: Math.max(0, targetTop), behavior });
-  } else {
-    target.scrollIntoView({ behavior, block: 'start' });
-  }
-  window.setTimeout(() => pulseDashboardTarget(target), behavior === 'smooth' ? 360 : 0);
-}
-
-function focusDashboardTargetFromUrl(behavior = 'smooth') {
-  const hashTarget = window.location.hash ? window.location.hash.slice(1) : '';
-  const targetId = hashTarget || dashboardFocusTargets[focusTarget] || '';
-  if (targetId) focusDashboardTarget(targetId, behavior);
-}
-
-window.addEventListener('load', () => focusDashboardTargetFromUrl('auto'));
-window.addEventListener('pageshow', () => focusDashboardTargetFromUrl('auto'));
-
-document.querySelectorAll('[data-dashboard-target]').forEach(link => {
-  link.addEventListener('click', event => {
-    const targetId = link.dataset.dashboardTarget;
-    if (!targetId) return;
-    const targetUrl = new URL(link.href, window.location.href);
-    if (!sameDashboardDataset(new URL(window.location.href), targetUrl)) return;
-    event.preventDefault();
-    window.history.pushState(null, '', targetUrl);
-    focusDashboardTarget(targetId);
-  });
-});
-
-{% if config.ENABLE_SOCKETIO %}
-if (window.io) {
-  const socket = io();
-  socket.on('task_updated', () => window.location.reload());
-  socket.on('task_assigned', () => window.location.reload());
-  socket.on('driver_log_updated', () => window.location.reload());
-}
-{% endif %}
-
-// ESC closes any open modal
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeManage(); closeCreate(); }
-});
-</script>
 {% endblock %}

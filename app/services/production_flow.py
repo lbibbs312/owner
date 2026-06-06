@@ -935,8 +935,8 @@ def _node(nodes, label, *, node_type="plant"):
                 "rack_empty_state": RACK_SNAPSHOT_EMPTY,
             },
             "view_url": _safe_url("manager.move_requests", location=label),
-            "active_moves_url": _safe_url("manager.manager_dashboard", plant=label, focus="routes"),
-            "timing_url": _safe_url("manager.manager_dashboard", plant=label, focus="routes"),
+            "active_moves_url": _safe_url("manager.move_requests", location=label),
+            "timing_url": _safe_url("manager.driver_logs"),
         }
     return nodes[key]
 

@@ -357,7 +357,7 @@ def test_hot_part_focuses_destination_plant_card(client, app):
         assert by_label["Kraft Plater"]["hot_count"] == 0
 
     _login(client, "hot-map-manager")
-    resp = client.get("/manager/dashboard")
+    resp = client.get("/production-flow-board")
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
@@ -381,7 +381,7 @@ def test_no_fake_telemetry_fields_appear(app):
         assert term not in rendered_contract
 
 
-def test_manager_dashboard_uses_production_flow_mode(client, app):
+def test_manager_dashboard_does_not_embed_production_flow_mode(client, app):
     with app.app_context():
         manager = _user("boss", "management")
         _move_request(manager.id, request_number="MR-PROD-1")
@@ -391,9 +391,10 @@ def test_manager_dashboard_uses_production_flow_mode(client, app):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert 'data-route-map-mode="production"' in body
-    assert 'data-production-flow-mode="admin"' in body
-    assert "Live Flow Map" in body
+    assert "Manager Workspace" in body
+    assert 'data-route-map-mode="production"' not in body
+    assert 'data-production-flow-mode="admin"' not in body
+    assert "Live Flow Map" not in body
     assert "MR-PROD-1" in body
     assert 'class="route-stop-rail"' not in body
 
@@ -744,11 +745,13 @@ def test_board_uses_production_flow_wording_not_audit_defense(client, app):
     resp = client.get("/manager/dashboard")
 
     body = resp.get_data(as_text=True)
-    assert "Live Flow Map" in body
+    assert "Manager Workspace" in body
+    assert "Live Flow Map" not in body
     assert "Operations &amp; Audit Defense Board" not in body
     assert "Operations & Audit Defense Board" not in body
     assert "Spatial Network Flow" not in body
     assert "Exception Management" not in body
+    assert "MR-WORD-1" in body
 
 
 def test_no_action_needed_no_exceptions_contradiction(client, app):
@@ -764,7 +767,8 @@ def test_no_action_needed_no_exceptions_contradiction(client, app):
     assert "No active exceptions" not in body
     assert "Top Active Exceptions" not in body
     assert "Top Needs Attention" not in body
-    assert "Replay Lines" in body
+    assert "Manager Workspace" in body
+    assert "Replay Lines" not in body
 
 
 def test_route_stops_display_as_sequence_not_database_id(app):

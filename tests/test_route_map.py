@@ -74,6 +74,7 @@ def _move_request(creator_id, **kw):
         origin_location_text="Raleigh East",
         destination_location_text="Paint West",
         cargo_text="HDPE",
+        requested_at=datetime.combine(date.today(), datetime.min.time()),
     )
     base.update(kw)
     req = MoveRequest(**base)
@@ -1077,7 +1078,7 @@ def test_manager_dashboard_uses_issue_terminology(client, app):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "Needs Attention" in body
-    assert "Live Flow Map" in body
+    assert "Live Flow Map" not in body
     assert "Critical Exceptions" not in body
 
 
