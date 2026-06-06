@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MoveDefense Terms of Use</title>
+  <style>
+    :root {
+      --ink:#0f172a;
+      --muted:#475569;
+      --line:#dbe4ef;
+      --blue:#2563eb;
+      --bg:#f8fafc;
+      --panel:#ffffff;
+    }
+    *,
+    *::before,
+    *::after {
+      box-sizing:border-box;
+    }
+    html,
+    body {
+      width:100%;
+      max-width:100%;
+      min-height:100%;
+      margin:0;
+      overflow-x:hidden;
+    }
+    body {
+      background:var(--bg);
+      color:var(--ink);
+      font-family:Arial, Helvetica, sans-serif;
+      line-height:1.55;
+    }
+    a { color:var(--blue); }
+    .public-page {
+      width:100%;
+      max-width:100%;
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+    }
+    .public-header,
+    .public-footer {
+      background:#fff;
+      border-bottom:1px solid var(--line);
+    }
+    .public-footer {
+      margin-top:auto;
+      border-top:1px solid var(--line);
+      border-bottom:0;
+    }
+    .public-header-inner,
+    .public-footer-inner,
+    .terms-wrap {
+      width:min(880px, 100%);
+      margin:0 auto;
+      padding:16px 18px;
+    }
+    .brand {
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      color:var(--ink);
+      font-weight:800;
+      text-decoration:none;
+    }
+    .brand-mark {
+      width:30px;
+      height:30px;
+      border-radius:8px;
+      background:var(--blue);
+      color:#fff;
+      display:grid;
+      place-items:center;
+      font-size:.88rem;
+      font-weight:900;
+    }
+    .terms-wrap {
+      padding-top:34px;
+      padding-bottom:42px;
+    }
+    .terms-card {
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:8px;
+      padding:26px;
+    }
+    h1 {
+      margin:0 0 8px;
+      font-size:2.1rem;
+      line-height:1.1;
+      letter-spacing:0;
+    }
+    .effective-date {
+      margin:0 0 20px;
+      color:var(--muted);
+      font-size:.95rem;
+      font-weight:700;
+    }
+    .terms-lead {
+      margin:0 0 24px;
+      color:var(--muted);
+      font-size:1rem;
+    }
+    section + section {
+      margin-top:24px;
+      padding-top:20px;
+      border-top:1px solid #e8eef6;
+    }
+    h2 {
+      margin:0 0 8px;
+      font-size:1.12rem;
+      line-height:1.25;
+    }
+    p {
+      margin:0;
+      color:#334155;
+    }
+    p + p {
+      margin-top:10px;
+    }
+    ul {
+      margin:8px 0 0;
+      padding-left:20px;
+      color:#334155;
+    }
+    li + li {
+      margin-top:6px;
+    }
+    .public-footer-links {
+      display:flex;
+      justify-content:center;
+      gap:8px;
+      flex-wrap:wrap;
+      color:var(--muted);
+      font-size:.92rem;
+    }
+    .public-footer-links a {
+      color:var(--blue);
+      font-weight:700;
+      text-decoration:none;
+    }
+    @media (max-width: 560px) {
+      .terms-wrap {
+        padding:22px 12px 30px;
+      }
+      .terms-card {
+        padding:20px 16px;
+      }
+      h1 {
+        font-size:1.72rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="public-page">
+    <header class="public-header">
+      <div class="public-header-inner">
+        <a class="brand" href="{{ url_for('public.welcome') }}">
+          <span class="brand-mark" aria-hidden="true">MD</span>
+          <span>MoveDefense</span>
+        </a>
+      </div>
+    </header>
+
+    <main class="terms-wrap">
+      <article class="terms-card">
+        <h1>MoveDefense Terms of Use</h1>
+        <p class="effective-date">Effective date: June 6, 2026</p>
+        <p class="terms-lead">These terms explain the basic rules for using MoveDefense. They are written for the drivers, managers, administrators, and companies that use the service for work records.</p>
+
+        <section>
+          <h2>Use of MoveDefense</h2>
+          <p>MoveDefense is a business recordkeeping workspace for routes, stops, reports, documents, photos, and related packets. Use the service only for lawful business purposes and only within the account or company workspace you are allowed to access.</p>
+        </section>
+
+        <section>
+          <h2>Accounts and access</h2>
+          <p>Users are responsible for keeping their sign-in information secure. Do not share accounts or use another person's account. The company or account administrator controls who may use the workspace, what role each user has, and when access should be changed or removed.</p>
+        </section>
+
+        <section>
+          <h2>Driver, route, report, and document records</h2>
+          <p>Users should enter records that are accurate to the best of their knowledge at the time they are created. If a record is wrong or incomplete, use the available correction, edit, or manager review process instead of entering false information.</p>
+          <p>Records created in MoveDefense may be reviewed by authorized users in the same company or account.</p>
+        </section>
+
+        <section>
+          <h2>Uploaded files and photos</h2>
+          <p>Only upload files and photos that belong with the related route, stop, driver, truck, report, or document record. Do not upload malicious files, unrelated personal material, or files you do not have authority to provide.</p>
+          <p>Restricted documents should only be uploaded when required by the company or account administrator and should be limited to authorized users.</p>
+        </section>
+
+        <section>
+          <h2>Customer/company responsibility</h2>
+          <p>The customer, company, or account administrator is responsible for deciding how MoveDefense is used in its operations. This includes user access, record requirements, internal review, retention needs, exports, and any company-specific procedures.</p>
+        </section>
+
+        <section>
+          <h2>Acceptable use</h2>
+          <p>Do not use MoveDefense to break the law, access systems or records without permission, interfere with the service, upload harmful code, misuse another user's credentials, or intentionally create false records.</p>
+        </section>
+
+        <section>
+          <h2>No legal, tax, insurance, or safety compliance advice</h2>
+          <p>MoveDefense provides software for organizing and reviewing work records. It does not provide legal, tax, insurance, or safety compliance advice. Users and companies should review their own requirements and work with qualified professionals when advice is needed.</p>
+        </section>
+
+        <section>
+          <h2>Service changes and availability</h2>
+          <p>MoveDefense may change features, pages, workflows, or service providers over time. The service may also be unavailable at times because of maintenance, hosting issues, network problems, or other events outside normal control.</p>
+        </section>
+
+        <section>
+          <h2>Contact</h2>
+          <p>Questions about these terms can be sent to <a href="mailto:{{ public_contact_email }}">{{ public_contact_email }}</a>.</p>
+        </section>
+      </article>
+    </main>
+
+    <footer class="public-footer">
+      <div class="public-footer-inner">
+        {% include "partials/_public_footer_links.html" %}
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

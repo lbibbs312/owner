@@ -192,7 +192,8 @@
       <a class="md-auth-link" href="{{ url_for('auth.login') }}">Sign in</a>
     </p>
     <p class="md-register-legal">
-      By creating an account, you acknowledge the
+      By creating an account, you agree to the
+      <a href="{{ url_for('public.terms') }}">Terms</a> and acknowledge the
       <a href="{{ url_for('public.privacy') }}">Privacy Notice</a>.
     </p>
     {% set footer_class = "md-register-footer-links" %}

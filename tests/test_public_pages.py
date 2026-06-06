@@ -132,7 +132,7 @@ def test_privacy_notice_is_public_plain_language_and_standalone(client):
     assert "social security" not in lower_text
 
 
-@pytest.mark.parametrize("path", ["/", "/login", "/register", "/privacy"])
+@pytest.mark.parametrize("path", ["/", "/login", "/register", "/privacy", "/terms"])
 def test_public_and_auth_pages_include_public_footer_links(client, path):
     response = client.get(path)
 
@@ -153,19 +153,43 @@ def test_register_page_links_terms_and_privacy_notice(client):
     body = response.get_data(as_text=True)
     text = _visible_text(body)
 
-    assert "By creating an account, you acknowledge the Privacy Notice." in text
-    assert "agree to the Terms" not in text
+    assert "By creating an account, you agree to the Terms and acknowledge the Privacy Notice." in text
+    assert 'href="/terms"' in body
     assert 'href="/privacy"' in body
 
 
-def test_terms_placeholder_is_public_and_not_an_agreement_page(client):
+def test_terms_page_is_public_plain_language_and_not_placeholder(client):
     response = client.get("/terms")
 
     assert response.status_code == 200
-    text = _visible_text(response.get_data(as_text=True))
-    assert "MoveDefense Terms" in text
-    assert "placeholder" in text.lower()
-    assert "legal agreement page" in text.lower()
+    body = response.get_data(as_text=True)
+    text = _visible_text(body)
+    lower_text = text.lower()
+
+    assert "MoveDefense Terms of Use" in text
+    assert "Effective date: June 6, 2026" in text
+    for section in (
+        "Use of MoveDefense",
+        "Accounts and access",
+        "Driver, route, report, and document records",
+        "Uploaded files and photos",
+        "Customer/company responsibility",
+        "Acceptable use",
+        "No legal, tax, insurance, or safety compliance advice",
+        "Service changes and availability",
+        "Contact",
+    ):
+        assert section in text
+    assert "Questions about these terms can be sent to bibbstechnology@gmail.com." in text
+    assert 'href="mailto:bibbstechnology@gmail.com"' in body
+    assert "placeholder" not in lower_text
+    assert "coming soon" not in lower_text
+    assert "will be published later" not in lower_text
+    assert "will be published here" not in lower_text
+    assert "audit" not in lower_text
+    assert "md-shell" not in body
+    assert "md-driver-bottom-nav" not in body
+    assert "navbar" not in body
 
 
 def test_contact_page_is_public_and_production_ready(client):

@@ -26,13 +26,8 @@ def privacy():
 @bp.route("/terms")
 def terms():
     return render_template(
-        "public_placeholder.html",
-        page_title="MoveDefense Terms",
-        page_heading="MoveDefense Terms",
-        page_message=(
-            "Terms will be published here when they are ready. "
-            "This placeholder should not be used as a legal agreement page."
-        ),
+        "terms.html",
+        public_contact_email=current_app.config["PUBLIC_CONTACT_EMAIL"],
     )
 
 
