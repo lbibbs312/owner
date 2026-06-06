@@ -131,6 +131,7 @@ class BaseConfig:
     APP_URL = os.environ.get("APP_URL", PUBLIC_BASE_URL).rstrip("/")
     BASE_URL = os.environ.get("BASE_URL", PUBLIC_BASE_URL).rstrip("/")
     PUBLIC_URL = os.environ.get("PUBLIC_URL", PUBLIC_BASE_URL).rstrip("/")
+    PUBLIC_CONTACT_EMAIL = os.environ.get("PUBLIC_CONTACT_EMAIL", "bibbstechnology@gmail.com")
     CANONICAL_SCHEME = _canonical_scheme()
     CANONICAL_HOST = _canonical_host()
     ENFORCE_CANONICAL_HOST = _env_bool("ENFORCE_CANONICAL_HOST", False)

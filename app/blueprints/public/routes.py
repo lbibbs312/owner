@@ -17,7 +17,10 @@ def welcome():
 
 @bp.route("/privacy")
 def privacy():
-    return render_template("privacy.html")
+    return render_template(
+        "privacy.html",
+        public_contact_email=current_app.config["PUBLIC_CONTACT_EMAIL"],
+    )
 
 
 @bp.route("/terms")
@@ -36,13 +39,8 @@ def terms():
 @bp.route("/contact")
 def contact():
     return render_template(
-        "public_placeholder.html",
-        page_title="MoveDefense Contact",
-        page_heading="MoveDefense Contact",
-        page_message=(
-            "Contact options will be published here when they are ready. "
-            "This placeholder is not a legal agreement page."
-        ),
+        "contact.html",
+        public_contact_email=current_app.config["PUBLIC_CONTACT_EMAIL"],
     )
 
 

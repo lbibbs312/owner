@@ -121,7 +121,7 @@ def test_privacy_notice_is_public_plain_language_and_standalone(client):
         "company or account administrator. These records should be limited to authorized users."
     ) in text
     assert "MoveDefense is not intended for children under 13." in text
-    assert "Privacy contact: privacy@movedefense.com" in text
+    assert "Privacy contact: bibbstechnology@gmail.com" in text
     assert "md-shell" not in body
     assert "md-driver-bottom-nav" not in body
     assert "navbar" not in body
@@ -158,18 +158,23 @@ def test_register_page_links_terms_and_privacy_notice(client):
     assert 'href="/privacy"' in body
 
 
-@pytest.mark.parametrize(
-    ("path", "heading"),
-    [
-        ("/terms", "MoveDefense Terms"),
-        ("/contact", "MoveDefense Contact"),
-    ],
-)
-def test_terms_and_contact_placeholders_are_public(client, path, heading):
-    response = client.get(path)
+def test_terms_placeholder_is_public_and_not_an_agreement_page(client):
+    response = client.get("/terms")
 
     assert response.status_code == 200
     text = _visible_text(response.get_data(as_text=True))
-    assert heading in text
+    assert "MoveDefense Terms" in text
     assert "placeholder" in text.lower()
     assert "legal agreement page" in text.lower()
+
+
+def test_contact_page_is_public_and_production_ready(client):
+    response = client.get("/contact")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    text = _visible_text(body)
+    assert "MoveDefense Contact" in text
+    assert "bibbstechnology@gmail.com" in text
+    assert 'href="mailto:bibbstechnology@gmail.com"' in body
+    assert "placeholder" not in text.lower()
