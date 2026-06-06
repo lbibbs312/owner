@@ -122,6 +122,73 @@ def _plant_transfer(driver, **kw):
     return transfer
 
 
+def _driver_log_document(log, uploader, **kw):
+    from app.extensions import db
+    from app.models import DriverLogPhoto
+
+    base = dict(
+        driver_log_id=log.id,
+        filename="route-doc-layout.jpg",
+        original_filename="route-doc-layout.jpg",
+        content_type="image/jpeg",
+        source="bol_manifest",
+        document_type="bol_manifest",
+        note="Stamped route sheet photo",
+        uploaded_by_id=uploader.id,
+    )
+    base.update(kw)
+    photo = DriverLogPhoto(**base)
+    db.session.add(photo)
+    db.session.commit()
+    return photo
+
+
+def _pretrip(driver, **kw):
+    from app.extensions import db
+    from app.models import PreTrip
+
+    base = dict(
+        user_id=driver.id,
+        truck_number="MD-TRUCK-44",
+        trailer_number="MD-TRAILER-77",
+        pretrip_date=date.today(),
+        shift="AM",
+        start_mileage=128400,
+        truck_type="box",
+        gc_no_defects=True,
+        incab_no_defects=True,
+        ec_no_defects=True,
+        exterior_no_defects=True,
+        towed_no_defects=True,
+        damage_report="Left mirror marker scuff noted before route.",
+    )
+    base.update(kw)
+    pretrip = PreTrip(**base)
+    db.session.add(pretrip)
+    db.session.commit()
+    return pretrip
+
+
+def _damage_report(driver, log, **kw):
+    from app.extensions import db
+    from app.models import DamageReport
+
+    base = dict(
+        reported_by_id=driver.id,
+        driver_log_id=log.id,
+        truck_number="MD-TRUCK-44",
+        trailer_number="MD-TRAILER-77",
+        plant_name="Paint Central Door 4",
+        description="Fork nick on return rack needs manager review.",
+        status="open",
+    )
+    base.update(kw)
+    report = DamageReport(**base)
+    db.session.add(report)
+    db.session.commit()
+    return report
+
+
 def _seed_large_manager_dashboard(manager):
     from app.extensions import db
     from app.models import ExceptionEvent, Task
@@ -208,6 +275,55 @@ def test_manager_dashboard_layout_handles_large_ops_board(client, app):
     assert ".summary-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }" in body
     assert "Live Flow Map" not in body
     assert 'style="grid-template-columns:repeat(' not in body
+
+
+def test_manager_dashboard_v2_shell_uses_driver_workflow_records(client, app):
+    with app.app_context():
+        manager = _user("workspace_boss", "management")
+        driver = _user("workspace_driver", "driver", first_name="Dana", last_name="Route")
+        log = _driver_log(driver, plant_name="PC", load_size="Raleigh East Load")
+        _move_request(
+            manager.id,
+            request_number="MR-WORKSPACE-1",
+            origin_location_text="Raleigh East",
+            destination_location_text="Paint Central",
+            cargo_text="Rack load",
+        )
+        _plant_transfer(driver, transfer_number="TRX-WORKSPACE")
+        _driver_log_document(log, driver)
+        _pretrip(driver)
+        _damage_report(driver, log)
+
+    _login(client, "workspace_boss")
+    response = client.get("/manager/dashboard")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    for label in (
+        "Manager Workspace",
+        "Open items needing review",
+        "Driver Routes",
+        "Route Packets",
+        "Documents",
+        "Damage / Incidents",
+        "Inspections",
+    ):
+        assert label in body
+    assert "MR-WORKSPACE-1" in body
+    assert "TRX-WORKSPACE" in body
+    assert "Stamped route sheet photo" in body
+    assert "MD-TRUCK-44" in body
+    assert "Left mirror marker scuff noted before route." in body
+    assert "Fork nick on return rack needs manager review." in body
+    for old_label in (
+        "Live Flow Map",
+        "FlowMapDashboard",
+        "Production Flow",
+        "Dispatch Queue",
+        "Evidence",
+        "Audit",
+    ):
+        assert old_label not in body
 
 
 def test_move_requests_uses_movedefense_manager_shell(client, app):

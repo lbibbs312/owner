@@ -590,7 +590,7 @@ def _live_exceptions_for_log(log, route=None, *, is_current_active=False, route_
     return exceptions
 
 
-def _critical_exception_rows(live_stop_rows, todays_logs):
+def _route_attention_rows(live_stop_rows, todays_logs):
     rows = []
     seen = set()
     for row in live_stop_rows:
@@ -639,6 +639,16 @@ def _critical_exception_rows(live_stop_rows, todays_logs):
             "photo_url": summary.get("photo_url"),
         })
     return rows
+
+
+def _dashboard_inspection_rows(target_date, limit=6):
+    return (
+        _active_pretrips_query()
+        .filter_by(pretrip_date=target_date)
+        .order_by(PreTrip.created_at.desc(), PreTrip.id.desc())
+        .limit(limit)
+        .all()
+    )
 
 def _exception_key(item):
     return ":".join(
@@ -2344,7 +2354,7 @@ def manager_dashboard():
     todays_transfer_count = _active_plant_transfers_query().filter_by(transfer_date=today).count()
     todays_logs = _active_driver_logs_query().filter_by(date=today).all()
     live_stop_rows = _live_stop_rows(todays_logs)
-    critical_exceptions = _critical_exception_rows(live_stop_rows, todays_logs)
+    route_attention_rows = _route_attention_rows(live_stop_rows, todays_logs)
     review_rows = _pending_review_rows()
     move_requests = (
         MoveRequest.query
@@ -2372,6 +2382,7 @@ def manager_dashboard():
         .filter(DriverLog.date == today, DriverLog.deleted_at.is_(None))
         .count()
     )
+    inspection_rows = _dashboard_inspection_rows(today)
     inspection_count = _active_pretrips_query().filter_by(pretrip_date=today).count()
     active_driver_count = len({log.driver_id for log in todays_logs})
     pending_review_count = len(review_rows)
@@ -2381,15 +2392,16 @@ def manager_dashboard():
         dispatch_capture_count=dispatch_capture_count,
         total_active_moves=open_task_count + todays_transfer_count,
         active_driver_count=active_driver_count,
-        critical_exceptions=critical_exceptions,
         damage_reports=damage_reports,
         document_count=document_count,
         inspection_count=inspection_count,
+        inspection_rows=inspection_rows,
         live_stop_rows=live_stop_rows,
         move_requests=move_requests,
         pending_review_count=pending_review_count,
         recent_documents=recent_documents,
         review_rows=review_rows,
+        route_attention_rows=route_attention_rows,
         route_packet_count=len(todays_logs) + todays_transfer_count,
         route_count=len(todays_logs),
         todays_transfers=todays_transfers,

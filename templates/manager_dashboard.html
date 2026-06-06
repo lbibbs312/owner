@@ -87,11 +87,13 @@
   .route-row,
   .doc-row,
   .damage-row,
+  .inspection-row,
   .transfer-row { border:1px solid #e2e8f0; border-radius:8px; padding:11px 12px; display:grid; gap:6px; text-decoration:none; color:#0f172a; }
   .review-row:hover,
   .route-row:hover,
   .doc-row:hover,
   .damage-row:hover,
+  .inspection-row:hover,
   .transfer-row:hover { border-color:#93c5fd; background:#f8fbff; }
   .row-top { display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; }
   .row-title { font-weight:950; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -127,7 +129,7 @@
   .side-link small { color:#64748b; font-weight:800; }
   .side-link:hover { border-color:#93c5fd; background:#f8fbff; }
 
-  .lower-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+  .lower-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; }
   .mini-list { display:flex; flex-direction:column; gap:8px; }
   .mini-count { color:#64748b; font-size:.78rem; font-weight:800; }
 
@@ -237,7 +239,7 @@
         <a class="summary-tile review" href="{{ url_for('manager.review_queue') }}">
           <span>Open items needing review</span>
           <strong>{{ pending_review_count }}</strong>
-          <small>{{ critical_exceptions|length }} route item{{ '' if critical_exceptions|length == 1 else 's' }} needing attention</small>
+          <small>{{ route_attention_rows|length }} route item{{ '' if route_attention_rows|length == 1 else 's' }} needing attention</small>
         </a>
         <a class="summary-tile routes" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">
           <span>Driver routes</span>
@@ -441,6 +443,35 @@
               </a>
             {% else %}
               <div class="empty-state">No open damage or incident reports.</div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Inspections</h3>
+            <a href="{{ url_for('manager.list_pretrips') }}">Open inspections</a>
+          </div>
+          <div class="panel-body mini-list">
+            {% for inspection in inspection_rows %}
+              <a class="inspection-row" href="{{ url_for('manager.pretrip_printable', pretrip_id=inspection.id) }}">
+                <div class="row-top">
+                  <span class="row-title">{{ inspection.truck_number or 'Truck not set' }}</span>
+                  <span class="status-pill complete">Filed</span>
+                </div>
+                <div class="row-meta">{{ inspection.pretrip_date }} - {{ inspection.driver.display_name if inspection.driver else 'Driver' }}</div>
+                <div class="row-note">
+                  {% if inspection.damage_report %}
+                    {{ inspection.damage_report }}
+                  {% elif inspection.trailer_number %}
+                    Trailer {{ inspection.trailer_number }}
+                  {% else %}
+                    Vehicle check filed
+                  {% endif %}
+                </div>
+              </a>
+            {% else %}
+              <div class="empty-state">No inspections filed today.</div>
             {% endfor %}
           </div>
         </section>
