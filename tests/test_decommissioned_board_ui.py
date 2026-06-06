@@ -76,8 +76,11 @@ def test_manager_workspace_does_not_embed_legacy_board_component(client, app):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "Manager Workspace" in body
-    assert "MR-DECOM-1" in body
+    assert "MR-DECOM-1" not in body
     assert "Live Flow Map" not in body
+    assert "Live Work Areas" not in body
+    assert "summary-tile" not in body
+    assert "border-left:4px solid" not in body
     assert 'data-component="FlowMapDashboard"' not in body
     assert 'data-route-map-mode="production"' not in body
 

@@ -210,7 +210,7 @@ def _login(client, username):
     )
 
 
-def test_manager_dashboard_renders_move_queue_and_request(client, app):
+def test_manager_dashboard_keeps_move_request_details_off_live_driver_context(client, app):
     with app.app_context():
         manager = _user("boss", "management")
         _move_request(manager.id, priority="hot", origin_location_text="Raleigh East",
@@ -223,9 +223,8 @@ def test_manager_dashboard_renders_move_queue_and_request(client, app):
     assert "Manager Workspace" in body
     assert "Move Requests" in body
     assert "Live Flow Map" not in body
-    # The seeded request and its derived data surface on the dashboard.
-    assert "Raleigh East" in body
-    assert "Paint West" in body
+    assert "Raleigh East" not in body
+    assert "Paint West" not in body
 
 
 def test_driver_dashboard_survives_no_assigned_requests(client, app):

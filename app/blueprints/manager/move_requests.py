@@ -50,6 +50,16 @@ MOVE_REQUEST_AUDIT_FIELDS = [
 ]
 
 CLOSED_MOVE_REQUEST_STATUSES = {"completed", "cancelled"}
+MOVE_REQUEST_SOURCE_LABELS = {
+    "dispatch": "Request Capture",
+    "dispatch_capture": "Message Capture",
+    "chat": "Message Capture",
+    "group_chat": "Message Capture",
+    "text": "Text Request",
+    "manual": "Manual Request",
+    "phone": "Phone Request",
+    "email": "Email Request",
+}
 MOVE_REQUEST_LIFECYCLE_TRANSITIONS = {
     "assign": {
         "open": "assigned",
@@ -354,6 +364,7 @@ def move_requests():
         drivers=drivers,
         acknowledgements=_latest_move_request_events(requests, "acknowledged"),
         plant_transfer_choices=_plant_transfer_choices(),
+        source_labels=MOVE_REQUEST_SOURCE_LABELS,
         selected_status=selected_status,
         location_filter=location_filter,
         origin_filter=origin_filter,

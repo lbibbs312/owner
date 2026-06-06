@@ -62,25 +62,25 @@
   <aside class="mq-side" aria-label="Manager navigation">
     <div class="mq-brand">
       <strong>MoveDefense</strong>
-      <span>Manager Console</span>
+      <span>Manager Workspace</span>
     </div>
     <nav class="mq-nav">
       <a href="{{ url_for('manager.manager_dashboard') }}">Workspace</a>
       <a class="active" href="{{ url_for('manager.move_requests') }}">Move Requests</a>
-      <a href="{{ url_for('manager.driver_logs') }}">Driver Logs</a>
-      <a href="{{ url_for('manager.review_queue') }}">Reviews</a>
+      <a href="{{ url_for('manager.driver_logs') }}">Driver Routes</a>
+      <a href="{{ url_for('manager.review_queue') }}">Review Queue</a>
     </nav>
   </aside>
 
   <main class="mq-main">
     <header class="mq-topbar">
       <div>
-        <h1 style="margin:0;font-size:1.5rem;font-weight:900;letter-spacing:-.02em;">Move Request Queue</h1>
-        <p style="margin:.25rem 0 0;color:#64748b;">Intake, assign, block, close, and link incoming move requests without changing driver logs or official records.</p>
+        <h1 style="margin:0;font-size:1.5rem;font-weight:900;letter-spacing:-.02em;">Move Requests</h1>
+        <p style="margin:.25rem 0 0;color:#64748b;">Intake, assign, block, close, and link incoming move requests without changing driver routes or official records.</p>
       </div>
       <div class="queue-actions">
         <a class="btn btn-primary" href="{{ url_for('manager.new_move_request') }}">New Request</a>
-        <a class="btn btn-outline-secondary" href="{{ url_for('manager.manager_dashboard') }}">Dashboard</a>
+        <a class="btn btn-outline-secondary" href="{{ url_for('manager.manager_dashboard') }}">Workspace</a>
       </div>
     </header>
 
@@ -124,7 +124,7 @@
       {% for req in move_requests %}
         <tr>
           <td><strong>{{ req.display_number }}</strong></td>
-          <td>{{ req.source.replace('_', ' ')|title }}</td>
+          <td>{{ source_labels.get(req.source, req.source.replace('_', ' ')|title) }}</td>
           <td class="request-summary">{{ req.raw_text }}</td>
           <td>{{ req.requested_by or '' }}</td>
           <td>
@@ -157,7 +157,7 @@
           </td>
           <td>
             {% if req.linked_driver_log %}
-              <a href="{{ url_for('manager.view_driver_log', log_id=req.linked_driver_log_id) }}">Driver Log #{{ req.linked_driver_log_id }}</a><br>
+              <a href="{{ url_for('manager.view_driver_log', log_id=req.linked_driver_log_id) }}">Driver Route #{{ req.linked_driver_log_id }}</a><br>
             {% endif %}
             {% if req.linked_route_id %}
               <span>Route {{ req.linked_route_id }}</span><br>
@@ -179,7 +179,7 @@
                   {% endfor %}
                 </select>
                 <input class="form-control" name="linked_document_id" value="{{ req.linked_document_id or '' }}" placeholder="Document ID">
-                <button class="btn btn-sm btn-outline-secondary" type="submit">Link Evidence</button>
+                <button class="btn btn-sm btn-outline-secondary" type="submit">Link Records</button>
               </form>
               {% if req.status in ['completed', 'cancelled'] %}
                 <span class="text-muted small">Closed. Correction/reopen required for lifecycle actions.</span>
@@ -219,7 +219,7 @@
         </tr>
       {% else %}
         <tr>
-          <td colspan="15" class="queue-empty-state">No move requests in this queue. New requests and dispatch captures will appear here.</td>
+          <td colspan="15" class="queue-empty-state">No move requests match this view. New requests will appear here.</td>
         </tr>
       {% endfor %}
     </tbody>

@@ -765,7 +765,7 @@ def test_manager_move_request_queue_create_edit_and_actions(client, app):
     login(client, "queue_manager")
     queue_page = client.get("/manager/move-requests")
     assert queue_page.status_code == 200
-    assert b"Move Request Queue" in queue_page.data
+    assert b"Move Requests" in queue_page.data
     assert b"New Request" in queue_page.data
 
     created = client.post(

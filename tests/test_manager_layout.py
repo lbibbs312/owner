@@ -1,6 +1,5 @@
 """Layout and route smoke tests for manager ops-board surfaces."""
 from datetime import date, datetime, timedelta
-import re
 
 import pytest
 
@@ -266,13 +265,21 @@ def test_manager_dashboard_layout_handles_large_ops_board(client, app):
     body = response.get_data(as_text=True)
     assert "Manager Workspace" in body
     assert "Driver Routes" in body
-    count_match = re.search(r"(\d+) route item", body)
-    assert count_match
-    assert int(count_match.group(1)) >= 15
     assert "AlexandriaLongRouteName OperationsDriverWithLongName14" in body
-    assert "Raleigh East Long Origin Lane 4 With Extra Dispatch Detail" in body
     assert ".mc-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; min-height:100vh; }" in body
-    assert ".summary-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }" in body
+    assert "font-family:'Montserrat',system-ui,sans-serif;" in body
+    assert "workspace-index" in body
+    assert "workspace-link" in body
+    assert "records-grid" in body
+    for old_layout in (
+        "summary-grid",
+        "summary-tile",
+        "Live Work Areas",
+        "side-link",
+        "lower-grid",
+        "border-left:4px solid",
+    ):
+        assert old_layout not in body
     assert "Live Flow Map" not in body
     assert 'style="grid-template-columns:repeat(' not in body
 
@@ -309,7 +316,8 @@ def test_manager_dashboard_v2_shell_uses_driver_workflow_records(client, app):
         "Inspections",
     ):
         assert label in body
-    assert "MR-WORKSPACE-1" in body
+    assert "MR-WORKSPACE-1" not in body
+    assert "Raleigh East to Paint Central" not in body
     assert "TRX-WORKSPACE" in body
     assert "Stamped route sheet photo" in body
     assert "MD-TRUCK-44" in body
@@ -317,9 +325,15 @@ def test_manager_dashboard_v2_shell_uses_driver_workflow_records(client, app):
     assert "Fork nick on return rack needs manager review." in body
     for old_label in (
         "Live Flow Map",
+        "Live Work Areas",
         "FlowMapDashboard",
         "Production Flow",
         "Dispatch Queue",
+        "summary-tile",
+        "summary-grid",
+        "side-link",
+        "lower-grid",
+        "border-left:4px solid",
         "Evidence",
         "Audit",
     ):
@@ -338,15 +352,29 @@ def test_move_requests_uses_movedefense_manager_shell(client, app):
     assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert "mq-shell" in body
-    assert "Manager Console" in body
-    assert "Move Request Queue" in body
+    assert "Manager Workspace" in body
+    assert "Move Requests" in body
+    assert "Driver Routes" in body
+    assert "Review Queue" in body
+    for old_label in (
+        "Manager Console",
+        "Move Request Queue",
+        "Link Evidence",
+        "Evidence",
+        "Audit",
+        "Dispatch Queue",
+        "Production Flow",
+        "Live Flow Map",
+        "FlowMapDashboard",
+    ):
+        assert old_label not in body
     assert "Raleigh East North Overflow Staging Lane With Long Name" in body
     assert ".queue-table { background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:auto;" in body
 
     empty_response = client.get("/manager/move-requests?status=cancelled")
     assert empty_response.status_code == 200
     empty_body = empty_response.get_data(as_text=True)
-    assert "No move requests in this queue. New requests and dispatch captures will appear here." in empty_body
+    assert "No move requests match this view. New requests will appear here." in empty_body
 
 
 def test_legacy_operations_board_alias_redirects_to_manager_workspace(client, app):

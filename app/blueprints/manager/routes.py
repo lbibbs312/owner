@@ -2343,8 +2343,6 @@ def dismiss_dispatch_capture_route(capture_id):
 @bp.route("/dashboard", methods=["GET", "POST"])
 def manager_dashboard():
     today = date.today()
-    day_start = datetime.combine(today, datetime.min.time())
-    open_task_count = Task.query.filter(or_(Task.status != "completed", Task.completed_at >= day_start)).count()
     todays_transfers = (
         _active_plant_transfers_query().filter_by(transfer_date=today)
         .order_by(PlantTransfer.created_at.desc())
@@ -2356,13 +2354,6 @@ def manager_dashboard():
     live_stop_rows = _live_stop_rows(todays_logs)
     route_attention_rows = _route_attention_rows(live_stop_rows, todays_logs)
     review_rows = _pending_review_rows()
-    move_requests = (
-        MoveRequest.query
-        .filter(MoveRequest.status.notin_(["completed", "cancelled"]))
-        .order_by(MoveRequest.requested_at.desc(), MoveRequest.id.desc())
-        .limit(6)
-        .all()
-    )
     damage_reports = (
         DamageReport.query
         .filter(DamageReport.status != "closed")
@@ -2386,18 +2377,14 @@ def manager_dashboard():
     inspection_count = _active_pretrips_query().filter_by(pretrip_date=today).count()
     active_driver_count = len({log.driver_id for log in todays_logs})
     pending_review_count = len(review_rows)
-    dispatch_capture_count = len(open_dispatch_captures())
     return render_template(
         "manager_dashboard.html",
-        dispatch_capture_count=dispatch_capture_count,
-        total_active_moves=open_task_count + todays_transfer_count,
         active_driver_count=active_driver_count,
         damage_reports=damage_reports,
         document_count=document_count,
         inspection_count=inspection_count,
         inspection_rows=inspection_rows,
         live_stop_rows=live_stop_rows,
-        move_requests=move_requests,
         pending_review_count=pending_review_count,
         recent_documents=recent_documents,
         review_rows=review_rows,

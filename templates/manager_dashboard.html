@@ -11,7 +11,7 @@
   *, *::before, *::after { box-sizing:border-box; }
 
   .mc { min-height:100vh; width:100%; display:flex; background:#f8fafc; color:#0f172a;
-        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; }
+        font-family:'Montserrat',system-ui,sans-serif; }
   .mc-side { width:256px; flex:0 0 256px; background:#0f172a; color:#cbd5e1;
              display:flex; flex-direction:column; height:100vh; position:sticky; top:0;
              overflow-y:auto; overscroll-behavior:contain; }
@@ -19,11 +19,11 @@
               display:flex; gap:12px; align-items:center; }
   .mc-brand-icon { width:42px; height:42px; border-radius:8px; background:#2563eb;
                    display:grid; place-items:center; color:#fff; flex-shrink:0; }
-  .mc-brand h1 { font-size:1.15rem; font-weight:900; color:#fff; margin:0; letter-spacing:0; }
-  .mc-brand p { font-size:.68rem; font-weight:800; color:#60a5fa; margin:2px 0 0; letter-spacing:0; }
+  .mc-brand h1 { font-size:1.15rem; font-weight:700; color:#fff; margin:0; letter-spacing:0; }
+  .mc-brand p { font-size:.68rem; font-weight:700; color:#60a5fa; margin:2px 0 0; letter-spacing:0; }
   .mc-nav { flex:1; padding:14px 10px; display:flex; flex-direction:column; gap:4px; }
   .mc-nav a { color:#94a3b8; text-decoration:none; padding:11px 14px; border-radius:8px;
-              font-weight:800; font-size:.85rem; display:flex; align-items:center; gap:10px;
+              font-weight:700; font-size:.85rem; display:flex; align-items:center; gap:10px;
               transition:background .15s,color .15s; }
   .mc-nav a svg { width:18px; height:18px; flex:0 0 18px; opacity:.86; }
   .mc-nav a.active { background:rgba(37,99,235,.18); color:#bfdbfe; }
@@ -31,20 +31,20 @@
   .mc-user { padding:16px 18px; border-top:1px solid rgba(148,163,184,.16);
              display:flex; gap:10px; align-items:center; }
   .mc-avatar { width:38px; height:38px; border-radius:999px; background:#1e293b;
-               color:#e2e8f0; display:grid; place-items:center; font-weight:900;
+               color:#e2e8f0; display:grid; place-items:center; font-weight:700;
                font-size:.88rem; flex-shrink:0; }
-  .u-name { color:#f1f5f9; font-size:.875rem; font-weight:800; margin:0; }
+  .u-name { color:#f1f5f9; font-size:.875rem; font-weight:700; margin:0; }
   .u-role { color:#64748b; font-size:.68rem; margin:2px 0 0; }
 
   .mc-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; min-height:100vh; }
   .mc-header { background:#fff; border-bottom:1px solid #e2e8f0; padding:16px 28px;
                display:flex; align-items:center; justify-content:space-between; gap:14px;
                z-index:10; box-shadow:0 1px 2px rgba(15,23,42,.04); position:sticky; top:0; }
-  .mc-header h2 { font-size:1.5rem; font-weight:900; color:#0f172a; margin:0; letter-spacing:0; }
-  .mc-header p { margin:3px 0 0; color:#64748b; font-size:.85rem; font-weight:700; }
+  .mc-header h2 { font-size:1.5rem; font-weight:700; color:#0f172a; margin:0; letter-spacing:0; }
+  .mc-header p { margin:3px 0 0; color:#64748b; font-size:.85rem; font-weight:500; }
   .mc-header-r { display:flex; align-items:center; justify-content:flex-end; gap:10px; flex-wrap:wrap; }
   .btn-action { border:1px solid #cbd5e1; background:#fff; color:#0f172a; border-radius:8px;
-                padding:9px 13px; font-weight:900; font-size:.84rem; text-decoration:none;
+                padding:9px 13px; font-weight:700; font-size:.84rem; text-decoration:none;
                 display:inline-flex; align-items:center; gap:7px; line-height:1.2; }
   .btn-action.primary { background:#2563eb; border-color:#2563eb; color:#fff; }
   .btn-action:hover { border-color:#2563eb; color:#1d4ed8; }
@@ -53,33 +53,30 @@
 
   .db-alert { margin:0 28px; border:1px solid #fecaca; background:#fef2f2; color:#991b1b;
               padding:10px 12px; border-radius:0 0 8px 8px; font-size:.82rem;
-              font-weight:800; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+              font-weight:700; display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .db-alert strong { color:#991b1b; }
-  .db-alert span { color:#450a0a; font-weight:700; }
+  .db-alert span { color:#450a0a; font-weight:500; }
 
-  .mc-body { flex:1 0 auto; padding:22px 28px 30px; display:flex; flex-direction:column; gap:18px; min-width:0; }
-  .summary-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }
-  .summary-tile { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:13px 14px;
-                  box-shadow:0 1px 2px rgba(15,23,42,.04); text-decoration:none; color:#0f172a;
-                  display:flex; flex-direction:column; min-height:104px; }
-  .summary-tile:hover { border-color:#93c5fd; box-shadow:0 10px 24px rgba(15,23,42,.08); }
-  .summary-tile span { color:#64748b; font-size:.7rem; font-weight:900; text-transform:uppercase; letter-spacing:0; }
-  .summary-tile strong { margin-top:8px; font-size:2rem; font-weight:950; line-height:1; }
-  .summary-tile small { margin-top:auto; color:#475569; font-weight:750; line-height:1.25; }
-  .summary-tile.review { border-left:4px solid #ef4444; }
-  .summary-tile.routes { border-left:4px solid #2563eb; }
-  .summary-tile.packets { border-left:4px solid #0f766e; }
-  .summary-tile.documents { border-left:4px solid #7c3aed; }
-  .summary-tile.damage { border-left:4px solid #f97316; }
-  .summary-tile.inspections { border-left:4px solid #16a34a; }
+  .mc-body { flex:1 0 auto; padding:22px 28px 30px; display:flex; flex-direction:column; gap:14px; min-width:0; }
+  .workspace-index { background:#fff; border:1px solid #e2e8f0; border-radius:8px;
+                     box-shadow:0 1px 2px rgba(15,23,42,.04); display:grid;
+                     grid-template-columns:repeat(6,minmax(0,1fr)); overflow:hidden; }
+  .workspace-link { min-height:76px; padding:13px 14px; color:#0f172a; text-decoration:none;
+                    display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+                    border-right:1px solid #e2e8f0; }
+  .workspace-link:last-child { border-right:0; }
+  .workspace-link:hover { background:#f8fafc; }
+  .workspace-link span { color:#64748b; font-size:.74rem; font-weight:700; text-transform:uppercase; letter-spacing:0; line-height:1.25; }
+  .workspace-link strong { color:#0f172a; font-size:1.45rem; font-weight:700; line-height:1; }
 
-  .workspace-grid { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(320px,.55fr); gap:18px; align-items:start; }
+  .workspace-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; align-items:start; }
+  .dual-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; align-items:start; }
   .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px;
            box-shadow:0 1px 2px rgba(15,23,42,.04); overflow:hidden; }
   .panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px;
                 padding:14px 16px; border-bottom:1px solid #e2e8f0; background:#f8fafc; }
-  .panel-head h3 { margin:0; font-size:.95rem; color:#0f172a; font-weight:950; letter-spacing:0; }
-  .panel-head a { color:#2563eb; font-weight:900; text-decoration:none; font-size:.82rem; white-space:nowrap; }
+  .panel-head h3 { margin:0; font-size:.95rem; color:#0f172a; font-weight:700; letter-spacing:0; }
+  .panel-head a { color:#2563eb; font-weight:700; text-decoration:none; font-size:.82rem; white-space:nowrap; }
   .panel-body { padding:14px 16px; }
   .stack { display:flex; flex-direction:column; gap:12px; }
 
@@ -96,11 +93,11 @@
   .inspection-row:hover,
   .transfer-row:hover { border-color:#93c5fd; background:#f8fbff; }
   .row-top { display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; }
-  .row-title { font-weight:950; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .row-meta { color:#64748b; font-size:.8rem; font-weight:750; line-height:1.35; overflow-wrap:anywhere; }
+  .row-title { font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row-meta { color:#64748b; font-size:.8rem; font-weight:500; line-height:1.35; overflow-wrap:anywhere; }
   .row-note { color:#334155; font-size:.84rem; line-height:1.35; overflow-wrap:anywhere; }
   .status-pill { flex:0 0 auto; border-radius:999px; padding:4px 8px; font-size:.66rem;
-                 font-weight:950; text-transform:uppercase; letter-spacing:0; background:#e2e8f0; color:#334155; }
+                 font-weight:700; text-transform:uppercase; letter-spacing:0; background:#e2e8f0; color:#334155; }
   .status-pill.open,
   .status-pill.current { background:#dbeafe; color:#1d4ed8; }
   .status-pill.complete { background:#dcfce7; color:#166534; }
@@ -111,44 +108,45 @@
   .route-table-wrap { overflow:auto; }
   .route-table { width:100%; border-collapse:separate; border-spacing:0; min-width:720px; }
   .route-table th { background:#f8fafc; color:#64748b; font-size:.68rem; text-transform:uppercase;
-                    letter-spacing:0; font-weight:950; text-align:left; padding:10px 12px; border-bottom:1px solid #e2e8f0; }
+                    letter-spacing:0; font-weight:700; text-align:left; padding:10px 12px; border-bottom:1px solid #e2e8f0; }
   .route-table td { padding:11px 12px; border-bottom:1px solid #eef2f7; vertical-align:top; font-size:.86rem; }
   .route-table tr:last-child td { border-bottom:0; }
   .driver-cell { display:flex; flex-direction:column; gap:2px; min-width:0; }
-  .driver-cell strong { font-weight:950; }
-  .driver-cell small { color:#64748b; font-weight:750; }
+  .driver-cell strong { font-weight:700; }
+  .driver-cell small { color:#64748b; font-weight:500; }
   .issue-list { display:flex; flex-wrap:wrap; gap:5px; }
-  .issue-chip { border-radius:999px; padding:3px 7px; background:#fef3c7; color:#92400e; font-weight:900; font-size:.7rem; }
+  .issue-chip { border-radius:999px; padding:3px 7px; background:#fef3c7; color:#92400e; font-weight:700; font-size:.7rem; }
   .issue-chip.issue { background:#fee2e2; color:#b91c1c; }
-  .open-link { color:#2563eb; font-weight:950; text-decoration:none; white-space:nowrap; }
-  .empty-state { border:1px dashed #cbd5e1; border-radius:8px; padding:14px; color:#64748b; font-weight:800; background:#f8fafc; }
+  .open-link { color:#2563eb; font-weight:700; text-decoration:none; white-space:nowrap; }
+  .empty-state { border:1px dashed #cbd5e1; border-radius:8px; padding:14px; color:#64748b; font-weight:500; background:#f8fafc; }
 
-  .side-links { display:grid; grid-template-columns:1fr; gap:8px; }
-  .side-link { border:1px solid #e2e8f0; border-radius:8px; padding:10px 11px; text-decoration:none; color:#0f172a;
-               display:flex; align-items:center; justify-content:space-between; gap:12px; font-weight:900; }
-  .side-link small { color:#64748b; font-weight:800; }
-  .side-link:hover { border-color:#93c5fd; background:#f8fbff; }
-
-  .lower-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; }
   .mini-list { display:flex; flex-direction:column; gap:8px; }
-  .mini-count { color:#64748b; font-size:.78rem; font-weight:800; }
+  .mini-count { color:#64748b; font-size:.78rem; font-weight:500; }
+  .records-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+  .record-group { display:flex; flex-direction:column; gap:8px; min-width:0; }
+  .record-group h4 { margin:0 0 2px; color:#64748b; font-size:.72rem; font-weight:700;
+                     text-transform:uppercase; letter-spacing:0; }
 
   @media (max-width:1180px) {
-    .summary-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
-    .workspace-grid,
-    .lower-grid { grid-template-columns:1fr; }
+    .workspace-index { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .workspace-link:nth-child(3n) { border-right:0; }
+    .dual-grid,
+    .records-grid { grid-template-columns:1fr; }
   }
   @media (max-width:760px) {
     .mc-side { display:none; }
     .mc-header { position:static; padding:14px 16px; flex-direction:column; align-items:flex-start; }
     .mc-header-r { width:100%; justify-content:flex-start; }
     .mc-body { padding:14px 16px 22px; }
-    .summary-grid { grid-template-columns:1fr 1fr; }
-    .summary-tile { min-height:96px; }
-    .summary-tile strong { font-size:1.65rem; }
+    .workspace-index { grid-template-columns:1fr 1fr; }
+    .workspace-link { min-height:68px; }
+    .workspace-link:nth-child(3n) { border-right:1px solid #e2e8f0; }
+    .workspace-link:nth-child(2n) { border-right:0; }
   }
   @media (max-width:460px) {
-    .summary-grid { grid-template-columns:1fr; }
+    .workspace-index { grid-template-columns:1fr; }
+    .workspace-link { border-right:0; border-bottom:1px solid #e2e8f0; }
+    .workspace-link:last-child { border-bottom:0; }
     .btn-action { width:100%; justify-content:center; }
   }
 </style>
@@ -217,12 +215,11 @@
     <header class="mc-header">
       <div>
         <h2>Manager Workspace</h2>
-        <p>{{ today.strftime('%b %d, %Y') }} - live route, document, incident, and inspection work</p>
+        <p>{{ today.strftime('%b %d, %Y') }} - live driver route, document, incident, and inspection context</p>
       </div>
       <div class="mc-header-r">
-        <a class="btn-action primary" href="{{ url_for('manager.new_move_request') }}">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
-          New Request
+        <a class="btn-action" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">
+          Driver Routes
         </a>
       </div>
     </header>
@@ -235,172 +232,109 @@
     {% endif %}
 
     <div class="mc-body">
-      <section class="summary-grid" aria-label="Live manager summary">
-        <a class="summary-tile review" href="{{ url_for('manager.review_queue') }}">
+      <section class="workspace-index" aria-label="Live driver workspace context">
+        <a class="workspace-link" href="{{ url_for('manager.review_queue') }}">
           <span>Open items needing review</span>
           <strong>{{ pending_review_count }}</strong>
-          <small>{{ route_attention_rows|length }} route item{{ '' if route_attention_rows|length == 1 else 's' }} needing attention</small>
         </a>
-        <a class="summary-tile routes" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">
+        <a class="workspace-link" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">
           <span>Driver routes</span>
           <strong>{{ active_driver_count }}</strong>
-          <small>{{ route_count }} stop{{ '' if route_count == 1 else 's' }} logged today</small>
         </a>
-        <a class="summary-tile packets" href="{{ url_for('manager.plant_transfers') }}">
+        <a class="workspace-link" href="{{ url_for('manager.plant_transfers') }}">
           <span>Route packets</span>
           <strong>{{ route_packet_count }}</strong>
-          <small>{{ todays_transfers|length }} recent transfer record{{ '' if todays_transfers|length == 1 else 's' }}</small>
         </a>
-        <a class="summary-tile documents" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">
+        <a class="workspace-link" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">
           <span>Documents</span>
           <strong>{{ document_count }}</strong>
-          <small>Attached to today&apos;s driver routes</small>
         </a>
-        <a class="summary-tile damage" href="{{ url_for('manager.review_dashboard') }}">
+        <a class="workspace-link" href="{{ url_for('manager.review_dashboard') }}">
           <span>Damage / incidents</span>
           <strong>{{ damage_reports|length }}</strong>
-          <small>Open reports routed to manager review</small>
         </a>
-        <a class="summary-tile inspections" href="{{ url_for('manager.list_pretrips') }}">
+        <a class="workspace-link" href="{{ url_for('manager.list_pretrips') }}">
           <span>Inspections</span>
           <strong>{{ inspection_count }}</strong>
-          <small>Vehicle checks filed today</small>
         </a>
       </section>
 
       <section class="workspace-grid">
-        <div class="stack">
-          <section class="panel">
-            <div class="panel-head">
-              <h3>Move Requests</h3>
-              <a href="{{ url_for('manager.move_requests') }}">Open requests</a>
-            </div>
-            <div class="panel-body stack">
-              {% for req in move_requests %}
-                <a class="review-row" href="{{ url_for('manager.edit_move_request', request_id=req.id) }}">
-                  <div class="row-top">
-                    <span class="row-title">{{ req.display_number }}{% if req.origin_location_text or req.destination_location_text %} - {{ req.origin_location_text or 'Origin pending' }} to {{ req.destination_location_text or 'Destination pending' }}{% endif %}</span>
-                    <span class="status-pill {% if req.priority in ['hot', 'high', 'safety'] %}issue{% elif req.status in ['blocked', 'waiting'] %}warn{% else %}open{% endif %}">{{ req.status|replace('_', ' ')|title }}</span>
-                  </div>
-                  <div class="row-meta">{{ req.assigned_display or 'Open driver assignment' }} - {{ req.requested_at|to_detroit_datetime if req.requested_at else 'Time not recorded' }}</div>
-                  <div class="row-note">{{ req.cargo_part_display or req.raw_text }}</div>
-                </a>
-              {% else %}
-                <div class="empty-state">No active move requests are waiting.</div>
-              {% endfor %}
-            </div>
-          </section>
-
-          <section class="panel">
-            <div class="panel-head">
-              <h3>Open Items Needing Review</h3>
-              <a href="{{ url_for('manager.review_queue') }}">Open queue</a>
-            </div>
-            <div class="panel-body stack">
-              {% for row in review_rows[:5] %}
-                <a class="review-row" href="{{ row.url }}">
-                  <div class="row-top">
-                    <span class="row-title">{{ row.plant }}</span>
-                    <span class="status-pill warn">Review</span>
-                  </div>
-                  <div class="row-meta">{{ row.requested_by }} - {{ row.requested_at|to_detroit_datetime if row.requested_at else 'Time not recorded' }}</div>
-                  <div class="row-note">{{ row.reason }}</div>
-                </a>
-              {% else %}
-                <div class="empty-state">No manager reviews are waiting.</div>
-              {% endfor %}
-            </div>
-          </section>
-
-          <section class="panel">
-            <div class="panel-head">
-              <h3>Driver Routes</h3>
-              <a href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">Open routes</a>
-            </div>
-            <div class="route-table-wrap">
-              <table class="route-table">
-                <thead>
-                  <tr>
-                    <th>Driver</th>
-                    <th>Stop / Location</th>
-                    <th>Cargo</th>
-                    <th>Status</th>
-                    <th>Needs Attention</th>
-                    <th>Open</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for row in live_stop_rows[:20] %}
-                    {% set location = row.route.plant if row.route and row.route.plant else row.log.plant_name %}
-                    <tr>
-                      <td>
-                        <span class="driver-cell">
-                          <strong>{{ row.driver.display_name if row.driver else 'Driver' }}</strong>
-                          <small>{{ row.log.date }}</small>
-                        </span>
-                      </td>
-                      <td>
-                        <strong>Stop {{ row.stop_number }}</strong><br>
-                        <span class="row-meta">{{ location }}</span>
-                      </td>
-                      <td>
-                        {{ row.cargo }}
-                        {% if row.dock_wait and row.dock_wait != '--' %}<div class="row-meta">Dock wait {{ row.dock_wait }}</div>{% endif %}
-                        {% if row.forecast %}<div class="row-meta">Expected wait {{ row.forecast.estimate_label }}</div>{% endif %}
-                      </td>
-                      <td><span class="status-pill {{ row.status_key }}">{{ row.status }}</span></td>
-                      <td>
-                        <div class="issue-list">
-                          {% for item in row.exceptions[:3] %}
-                            <span class="issue-chip {% if item.label in ['Missing Departure', 'Cargo Mismatch', 'Truck Issue'] %}issue{% endif %}">{{ item.label }}</span>
-                          {% else %}
-                            <span class="row-meta">None</span>
-                          {% endfor %}
-                        </div>
-                      </td>
-                      <td><a class="open-link" href="{{ row.url }}">Open</a></td>
-                    </tr>
-                  {% else %}
-                    <tr><td colspan="6"><div class="empty-state">No driver stops are logged for today.</div></td></tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-
-        <aside class="panel">
-          <div class="panel-head">
-            <h3>Live Work Areas</h3>
-          </div>
-          <div class="panel-body side-links">
-            <a class="side-link" href="{{ url_for('manager.move_requests') }}"><span>Move Requests</span><small>{{ total_active_moves }} active</small></a>
-            <a class="side-link" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}"><span>Driver Routes</span><small>{{ route_count }} stops</small></a>
-            <a class="side-link" href="{{ url_for('manager.plant_transfers') }}"><span>Route Packets</span><small>{{ route_packet_count }} items</small></a>
-            <a class="side-link" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}"><span>Documents</span><small>{{ document_count }} attached</small></a>
-            <a class="side-link" href="{{ url_for('manager.review_dashboard') }}"><span>Damage / Incidents</span><small>{{ damage_reports|length }} open</small></a>
-            <a class="side-link" href="{{ url_for('manager.list_pretrips') }}"><span>Inspections</span><small>{{ inspection_count }} today</small></a>
-          </div>
-        </aside>
-      </section>
-
-      <section class="lower-grid">
         <section class="panel">
           <div class="panel-head">
-            <h3>Route Packets</h3>
-            <a href="{{ url_for('manager.plant_transfers') }}">Open packets</a>
+            <h3>Driver Routes</h3>
+            <a href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}">Open routes</a>
           </div>
-          <div class="panel-body mini-list">
-            {% for transfer in todays_transfers %}
-              <a class="transfer-row" href="{{ url_for('manager.view_plant_transfer', transfer_id=transfer.id) }}">
+          <div class="route-table-wrap">
+            <table class="route-table">
+              <thead>
+                <tr>
+                  <th>Driver</th>
+                  <th>Stop / Location</th>
+                  <th>Cargo</th>
+                  <th>Status</th>
+                  <th>Needs Attention</th>
+                  <th>Open</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in live_stop_rows[:20] %}
+                  {% set location = row.route.plant if row.route and row.route.plant else row.log.plant_name %}
+                  <tr>
+                    <td>
+                      <span class="driver-cell">
+                        <strong>{{ row.driver.display_name if row.driver else 'Driver' }}</strong>
+                        <small>{{ row.log.date }}</small>
+                      </span>
+                    </td>
+                    <td>
+                      <strong>Stop {{ row.stop_number }}</strong><br>
+                      <span class="row-meta">{{ location }}</span>
+                    </td>
+                    <td>
+                      {{ row.cargo }}
+                      {% if row.dock_wait and row.dock_wait != '--' %}<div class="row-meta">Dock wait {{ row.dock_wait }}</div>{% endif %}
+                      {% if row.forecast %}<div class="row-meta">Expected wait {{ row.forecast.estimate_label }}</div>{% endif %}
+                    </td>
+                    <td><span class="status-pill {{ row.status_key }}">{{ row.status }}</span></td>
+                    <td>
+                      <div class="issue-list">
+                        {% for item in row.exceptions[:3] %}
+                          <span class="issue-chip {% if item.label in ['Missing Departure', 'Cargo Mismatch', 'Truck Issue'] %}issue{% endif %}">{{ item.label }}</span>
+                        {% else %}
+                          <span class="row-meta">None</span>
+                        {% endfor %}
+                      </div>
+                    </td>
+                    <td><a class="open-link" href="{{ row.url }}">Open</a></td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="6"><div class="empty-state">No driver stops are logged for today.</div></td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section class="dual-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Open Items Needing Review</h3>
+            <a href="{{ url_for('manager.review_queue') }}">Open queue</a>
+          </div>
+          <div class="panel-body stack">
+            {% for row in review_rows[:5] %}
+              <a class="review-row" href="{{ row.url }}">
                 <div class="row-top">
-                  <span class="row-title">{{ transfer.transfer_number if transfer.transfer_number is defined and transfer.transfer_number else 'Transfer #' ~ transfer.id }}</span>
-                  <span class="status-pill">Packet</span>
+                  <span class="row-title">{{ row.plant }}</span>
+                  <span class="status-pill warn">Review</span>
                 </div>
-                <div class="row-meta">{{ transfer.transfer_date }} - {{ transfer.driver.display_name if transfer.driver else (transfer.driver_name or 'Driver') }}</div>
+                <div class="row-meta">{{ row.requested_by }} - {{ row.requested_at|to_detroit_datetime if row.requested_at else 'Time not recorded' }}</div>
+                <div class="row-note">{{ row.reason }}</div>
               </a>
             {% else %}
-              <div class="empty-state">No transfer records filed today.</div>
+              <div class="empty-state">No manager reviews are waiting.</div>
             {% endfor %}
           </div>
         </section>
@@ -425,56 +359,74 @@
             {% endfor %}
           </div>
         </section>
+      </section>
 
-        <section class="panel">
-          <div class="panel-head">
-            <h3>Damage / Incidents</h3>
-            <a href="{{ url_for('manager.review_dashboard') }}">Open review</a>
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Driver Records</h3>
+        </div>
+        <div class="panel-body records-grid">
+          <div class="record-group">
+            <h4>Route Packets</h4>
+            <div class="mini-list">
+              {% for transfer in todays_transfers %}
+                <a class="transfer-row" href="{{ url_for('manager.view_plant_transfer', transfer_id=transfer.id) }}">
+                  <div class="row-top">
+                    <span class="row-title">{{ transfer.transfer_number if transfer.transfer_number is defined and transfer.transfer_number else 'Transfer #' ~ transfer.id }}</span>
+                    <span class="status-pill">Packet</span>
+                  </div>
+                  <div class="row-meta">{{ transfer.transfer_date }} - {{ transfer.driver.display_name if transfer.driver else (transfer.driver_name or 'Driver') }}</div>
+                </a>
+              {% else %}
+                <div class="empty-state">No transfer records filed today.</div>
+              {% endfor %}
+            </div>
           </div>
-          <div class="panel-body mini-list">
-            {% for report in damage_reports %}
-              <a class="damage-row" href="{{ url_for('manager.view_damage_report', report_id=report.id) }}">
-                <div class="row-top">
-                  <span class="row-title">{{ report.plant_name or 'Route incident' }}</span>
-                  <span class="status-pill issue">{{ report.status|replace('_', ' ')|title }}</span>
-                </div>
-                <div class="row-meta">{{ report.created_at|to_detroit_datetime if report.created_at else 'Time not recorded' }} - {{ report.reported_by.display_name if report.reported_by else 'Driver' }}</div>
-                <div class="row-note">{{ report.description }}</div>
-              </a>
-            {% else %}
-              <div class="empty-state">No open damage or incident reports.</div>
-            {% endfor %}
-          </div>
-        </section>
 
-        <section class="panel">
-          <div class="panel-head">
-            <h3>Inspections</h3>
-            <a href="{{ url_for('manager.list_pretrips') }}">Open inspections</a>
+          <div class="record-group">
+            <h4>Damage / Incidents</h4>
+            <div class="mini-list">
+              {% for report in damage_reports %}
+                <a class="damage-row" href="{{ url_for('manager.view_damage_report', report_id=report.id) }}">
+                  <div class="row-top">
+                    <span class="row-title">{{ report.plant_name or 'Route incident' }}</span>
+                    <span class="status-pill issue">{{ report.status|replace('_', ' ')|title }}</span>
+                  </div>
+                  <div class="row-meta">{{ report.created_at|to_detroit_datetime if report.created_at else 'Time not recorded' }} - {{ report.reported_by.display_name if report.reported_by else 'Driver' }}</div>
+                  <div class="row-note">{{ report.description }}</div>
+                </a>
+              {% else %}
+                <div class="empty-state">No open damage or incident reports.</div>
+              {% endfor %}
+            </div>
           </div>
-          <div class="panel-body mini-list">
-            {% for inspection in inspection_rows %}
-              <a class="inspection-row" href="{{ url_for('manager.pretrip_printable', pretrip_id=inspection.id) }}">
-                <div class="row-top">
-                  <span class="row-title">{{ inspection.truck_number or 'Truck not set' }}</span>
-                  <span class="status-pill complete">Filed</span>
-                </div>
-                <div class="row-meta">{{ inspection.pretrip_date }} - {{ inspection.driver.display_name if inspection.driver else 'Driver' }}</div>
-                <div class="row-note">
-                  {% if inspection.damage_report %}
-                    {{ inspection.damage_report }}
-                  {% elif inspection.trailer_number %}
-                    Trailer {{ inspection.trailer_number }}
-                  {% else %}
-                    Vehicle check filed
-                  {% endif %}
-                </div>
-              </a>
-            {% else %}
-              <div class="empty-state">No inspections filed today.</div>
-            {% endfor %}
+
+          <div class="record-group">
+            <h4>Inspections</h4>
+            <div class="mini-list">
+              {% for inspection in inspection_rows %}
+                <a class="inspection-row" href="{{ url_for('manager.pretrip_printable', pretrip_id=inspection.id) }}">
+                  <div class="row-top">
+                    <span class="row-title">{{ inspection.truck_number or 'Truck not set' }}</span>
+                    <span class="status-pill complete">Filed</span>
+                  </div>
+                  <div class="row-meta">{{ inspection.pretrip_date }} - {{ inspection.driver.display_name if inspection.driver else 'Driver' }}</div>
+                  <div class="row-note">
+                    {% if inspection.damage_report %}
+                      {{ inspection.damage_report }}
+                    {% elif inspection.trailer_number %}
+                      Trailer {{ inspection.trailer_number }}
+                    {% else %}
+                      Vehicle check filed
+                    {% endif %}
+                  </div>
+                </a>
+              {% else %}
+                <div class="empty-state">No inspections filed today.</div>
+              {% endfor %}
+            </div>
           </div>
-        </section>
+        </div>
       </section>
     </div>
   </main>
