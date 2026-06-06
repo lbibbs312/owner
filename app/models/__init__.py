@@ -47,6 +47,16 @@ from app.models.part import (
     PartScanEvent,
 )
 from app.models.node import Node
+from app.models.packet import (
+    AccidentIncidentReport,
+    AccidentWitness,
+    IftaBulkFuelWithdrawal,
+    IftaFuelRecord,
+    IftaTripDistanceRow,
+    IftaWorksheet,
+    PacketManagerReview,
+    ProofMediaFile,
+)
 from app.models.voyager import Voyager
 
 __all__ = [
@@ -99,5 +109,13 @@ __all__ = [
     "PlantPredictionRule",
     "PlantTimeSample",
     "Node",
+    "AccidentIncidentReport",
+    "AccidentWitness",
+    "ProofMediaFile",
+    "IftaWorksheet",
+    "IftaTripDistanceRow",
+    "IftaFuelRecord",
+    "IftaBulkFuelWithdrawal",
+    "PacketManagerReview",
     "Voyager",
 ]

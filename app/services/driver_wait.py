@@ -58,12 +58,25 @@ def wait_minutes_for_log(log, now=None):
     return None
 
 
+def dock_time_review_label(minutes):
+    if minutes is None:
+        return ""
+    try:
+        minutes = int(minutes)
+    except (TypeError, ValueError):
+        return ""
+    if minutes >= 180:
+        return "Extended wait — manager review required"
+    if minutes >= 120:
+        return "Long wait — needs review"
+    return f"Dock time: {minutes} min"
+
+
 def wait_label_for_log(log, now=None):
     minutes = wait_minutes_for_log(log, now=now)
     if minutes is None:
         return ""
-    prefix = "Active wait" if not getattr(log, "depart_time", None) and getattr(log, "dock_wait_minutes", None) is None else "Wait"
-    return f"{prefix} {minutes} min"
+    return dock_time_review_label(minutes)
 
 
 def _shift_route_date(shift):
@@ -150,5 +163,6 @@ def register_context_processors(app):
             active_wait = active_driver_wait_status(current_user.id)
         return {
             "active_driver_wait": active_wait,
+            "dock_time_review_label": dock_time_review_label,
             "wait_label_for_log": wait_label_for_log,
         }

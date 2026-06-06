@@ -1096,7 +1096,7 @@
           {% set can_manage_log = log.driver_id == current_user.id and not route_locked %}
           {% set can_delete_log = can_manage_log and log.date == today_local_date %}
           {% set wait_label = wait_label_for_log(log) %}
-          {% set wait_value = wait_label|replace('Active wait ', '', 1)|replace('Wait ', '', 1) if wait_label else '' %}
+          {% set wait_value = wait_label if wait_label else '' %}
           {% set arrive_label = route.arrive_cargo_desc if route else (log.load_size or 'Empty') %}
           {% if route and route.depart_desc is none %}
             {% set depart_label = '--' %}
@@ -1144,7 +1144,7 @@
               <span class="md-stop-sequence">Stop <strong>{{ stop_sequence }}</strong></span>
               <span class="md-row-detail flow-detail">
                 <strong>{{ ledger_title }}</strong>
-                <small>Stop {{ stop_sequence }} · {{ ledger_meta }}{% if wait_value and 'wait' not in ledger_meta_lower %} · Wait {{ wait_value }}{% endif %}</small>
+                <small>Stop {{ stop_sequence }} · {{ ledger_meta }}{% if wait_value and 'wait' not in ledger_meta_lower and 'dock time' not in ledger_meta_lower %} · {{ wait_value }}{% endif %}</small>
               </span>
             </summary>
 

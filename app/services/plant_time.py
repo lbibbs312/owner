@@ -6,6 +6,7 @@ from flask import g, has_request_context
 import pytz
 
 from app.models import AuditEvent, DriverLog
+from app.services.driver_wait import dock_time_review_label
 from app.services.load_state import build_driver_log_route_context, cargo_delta_for_stop, classify_stop_role, is_empty_load
 from app.services.plant_addresses import PLANT_LABELS, plant_label
 
@@ -325,31 +326,14 @@ def forecast_for_stop(log, *, now=None):
     status = "Collecting samples"
     severity = "muted"
     delay_minutes = None
-    if estimate is not None and elapsed is not None:
-        delay_minutes = max(0, int(round(elapsed - estimate)))
-        warning_margin = 15 if getattr(log, "hot_parts", False) else 20
-        notify_margin = 15 if getattr(log, "hot_parts", False) else 45
-        if departure:
-            if delay_minutes >= notify_margin:
-                status = f"Behind +{delay_minutes}m"
-                severity = "high"
-            elif delay_minutes >= warning_margin:
-                status = f"Behind +{delay_minutes}m"
-                severity = "warning"
-            else:
-                status = "On time"
-                severity = "ok"
-        elif delay_minutes >= notify_margin:
-            status = f"Behind +{delay_minutes}m"
+    if elapsed is not None:
+        delay_minutes = max(0, int(round(elapsed - estimate))) if estimate is not None else None
+        status = dock_time_review_label(elapsed)
+        if elapsed >= 180:
             severity = "high"
-        elif delay_minutes >= warning_margin:
-            status = f"Behind +{delay_minutes}m"
-            severity = "warning"
-        elif delay_minutes > 0:
-            status = f"Behind +{delay_minutes}m"
+        elif elapsed >= 120:
             severity = "warning"
         else:
-            status = "On pace"
             severity = "ok"
 
     return {

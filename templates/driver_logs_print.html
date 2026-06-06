@@ -146,7 +146,7 @@
             {% set route = (log_routes or {}).get(log.id) %}
             {% set row_state = route_context.rows[loop.index0] if route_context and route_context.rows and loop.index0 < (route_context.rows|length) else none %}
             {% set plant_name = route.plant if route else log.plant_name %}
-            {% set wait_label = wait_label_for_log(log)|replace('Active wait ', '')|replace('Wait ', '') %}
+            {% set wait_label = wait_label_for_log(log) %}
             {% set inbound = row_state.cargo_in if row_state else (route.arrive_cargo_desc if route else log.load_size) %}
             {% set outbound = row_state.cargo_out if row_state else (route.depart_cargo_desc if route and route.depart_cargo_desc is not none else '') %}
             {% set issue = (log_issue_details or {}).get(log.id, {}) %}
@@ -171,6 +171,9 @@
                     {% for line in route.summary_lines %}
                       <li>{{ line }}</li>
                     {% endfor %}
+                  {% endif %}
+                  {% if route and route.deviation_reason %}
+                    <li>Deviation: {{ route.deviation_reason }}</li>
                   {% endif %}
                   {% if log.no_pickup %}<li>No pickup</li>{% endif %}
                   {% if log.hot_parts or log.part_number %}<li>{% if log.hot_parts %}Hot part {% endif %}{{ log.part_number or '' }}</li>{% endif %}

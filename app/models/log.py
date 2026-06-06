@@ -46,6 +46,7 @@ class DriverLogPhoto(db.Model):
     filename = db.Column(db.String(255), nullable=False)
     original_filename = db.Column(db.String(255), nullable=True)
     content_type = db.Column(db.String(100), nullable=True)
+    sha256_hash = db.Column(db.String(64), nullable=True)
     source = db.Column(db.String(40), nullable=False, default="gallery")
     document_type = db.Column(db.String(40), nullable=True)
     owner_type = db.Column(db.String(30), nullable=True)
@@ -102,4 +103,3 @@ class DriverLogPhoto(db.Model):
         if code:
             return self.DOCUMENT_TYPE_LABELS.get(code, code.replace("_", " ").title())
         return (self.source or "Document").replace("_", " ").title()
-

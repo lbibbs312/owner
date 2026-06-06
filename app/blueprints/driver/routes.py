@@ -29,7 +29,16 @@ from app.forms.trip import PostTripForm, PreTripForm
 from app.forms.user import ProfileForm
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
+from app.services.accident_packets import (
+    accident_form_required,
+    accident_media_path,
+    build_accident_packet,
+    create_accident_report_from_form,
+)
 from app.services.evidence_packet import build_damage_evidence_packet
+from app.services.file_integrity import sha256_file
+from app.services.ifta_worksheets import build_ifta_packet, create_ifta_worksheet_from_form, ifta_receipt_path
+from app.services.packet_classification import PacketClassification, classify_damage_report, packet_label_for_report
 from app.services.document_numbers import (
     document_meta,
     eod_document_number,
@@ -81,6 +90,9 @@ from app.services.role_session import restore_role_user
 from app.services.search_corpus import ingest_driver_log
 from app.models import (
     ActivityEvent,
+    AccidentIncidentReport,
+    IftaFuelRecord,
+    IftaWorksheet,
     DamagePhoto,
     DamageReport,
     HotMove,
@@ -91,6 +103,7 @@ from app.models import (
     PlantTransfer,
     PlantTransferLine,
     PostTrip,
+    ProofMediaFile,
     PreTrip,
     ShiftRecord,
     Task,
@@ -182,7 +195,7 @@ def _transfer_document_meta(transfer, page="1 of 1"):
 
 
 def _evidence_document_meta(report, page="1 of 1"):
-    return document_meta("DAMAGE PROOF RECORD", evidence_document_number(report), page=page)
+    return document_meta(packet_label_for_report(report), evidence_document_number(report), page=page)
 
 
 def _draw_pdf_header(pdf, title, document_no, generated_at, page_label, *, driver=None, truck=None, date_value=None):
@@ -1431,13 +1444,15 @@ def _save_damage_photo(report, uploaded_file):
     os.makedirs(upload_path, exist_ok=True)
     original = secure_filename(uploaded_file.filename) or "damage-photo"
     filename = f"damage-{report.id}-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}-{original}"
-    uploaded_file.save(os.path.join(upload_path, filename))
+    stored_path = os.path.join(upload_path, filename)
+    uploaded_file.save(stored_path)
     photo = DamagePhoto(
         damage_report_id=report.id,
         stage=report.stage,
         filename=filename,
         original_filename=original,
         content_type=uploaded_file.content_type,
+        sha256_hash=sha256_file(stored_path),
     )
     db.session.add(photo)
     return photo
@@ -1487,12 +1502,14 @@ def _save_driver_log_photo(log, uploaded_file, *, source="gallery", note=None, u
     source_text = (source or "gallery").strip() or "gallery"
     note_text = (note or "").strip() or _driver_log_photo_default_note(source_text)
     filename = f"driver-log-{log.id}-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}-{uuid4().hex}{ext or '.jpg'}"
-    uploaded_file.save(os.path.join(_driver_log_photo_upload_path(), filename))
+    stored_path = os.path.join(_driver_log_photo_upload_path(), filename)
+    uploaded_file.save(stored_path)
     photo = DriverLogPhoto(
         driver_log_id=log.id,
         filename=filename,
         original_filename=original,
         content_type=getattr(uploaded_file, "mimetype", None) or getattr(uploaded_file, "content_type", None),
+        sha256_hash=sha256_file(stored_path),
         source=source_text[:40],
         note=note_text[:500],
         uploaded_by_id=uploaded_by_id,
@@ -2629,13 +2646,13 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
             plant_label,
             _arrival_utc_to_local_hhmm(log.arrive_time) or "--",
             _format_hhmm_12h(log.depart_time) or "--",
-            (wait_label or "--").replace("Active wait ", "").replace("Wait ", ""),
+            wait_label or "--",
             snapshot.get("cargo_in") or route.get("arrive_cargo_desc") or route.get("arrive_desc") or load_display(log.load_size),
             "Pending" if not log.depart_time else (snapshot.get("cargo_out") or route.get("depart_cargo_desc") or "--"),
             notes if not snapshot else f"{notes}; {status}",
         ])
     if rows:
-        y = pdf.table(36, y, [22, 82, 42, 42, 36, 88, 88, 124], 24, ["#", "Location", "Arrive", "Depart", "Wait", "In Truck", "Out Truck", "Notes"], rows, font_size=6)
+        y = pdf.table(36, y, [22, 82, 42, 42, 84, 88, 88, 76], 24, ["#", "Location", "Arrive", "Depart", "Wait", "In Truck", "Out Truck", "Notes"], rows, font_size=6)
     else:
         pdf.text(44, y, "No stops for selected date.", size=8)
         y -= 18
@@ -2706,7 +2723,7 @@ def _build_eod_pdf(the_date, logs, plant_transfers, driver_signature=None, signa
         ])
     pdf.text(36, y, "1. Route Detail Table", size=11, bold=True)
     y -= 12
-    y = pdf.table(36, y, [32, 58, 48, 48, 100, 108, 62, 92], 24, ["Stop #", "Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Wait", "Parts"], log_rows or [["--", "No logs", "", "", "", "", "", ""]], font_size=7)
+    y = pdf.table(36, y, [32, 58, 48, 48, 100, 108, 86, 68], 24, ["Stop #", "Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Wait", "Parts"], log_rows or [["--", "No logs", "", "", "", "", "", ""]], font_size=7)
     y -= 34
     pdf.text(36, y, "2. Plant Transfers", size=12, bold=True)
     y -= 14
@@ -4994,11 +5011,13 @@ def view_damage_report(report_id):
     report = _damage_report_or_404(report_id)
     if report is None:
         return redirect(url_for("driver.damage_reports"))
+    classification = classify_damage_report(report)
     return render_template(
         "view_damage_report.html",
         report=report,
         can_modify=_can_modify_damage_report(report),
         route_finalized=_is_damage_report_route_finalized(report),
+        accident_form_available=classification.packet_type == PacketClassification.ACCIDENT_INCIDENT.value,
     )
 
 
@@ -5008,12 +5027,13 @@ def damage_evidence_packet(report_id):
     report = _damage_report_or_404(report_id)
     if report is None:
         return redirect(url_for("driver.damage_reports"))
+    packet_label = packet_label_for_report(report)
     record_activity(
         user_id=current_user.id,
         category="damage",
         action="evidence_packet_generated",
-        title="Damage proof record generated",
-        details=f"Generated damage proof record #{report.id}.",
+        title=f"{packet_label} generated",
+        details=f"Generated {packet_label} #{report.id}.",
         target_type="damage_report",
         target_id=report.id,
     )
@@ -5025,6 +5045,188 @@ def damage_evidence_packet(report_id):
         document_meta=_evidence_document_meta(report, page="1 of 5"),
         back_url=url_for("driver.view_damage_report", report_id=report.id),
     )
+
+
+def _driver_can_view_accident(report):
+    if current_user.role == "management":
+        return True
+    return report.driver_id == current_user.id or report.created_by_id == current_user.id
+
+
+def _driver_can_view_ifta(worksheet):
+    if current_user.role == "management":
+        return True
+    return worksheet.driver_id == current_user.id or worksheet.created_by_id == current_user.id
+
+
+@bp.route("/packet-media/<int:media_id>")
+@login_required
+def packet_media(media_id):
+    media = ProofMediaFile.query.get_or_404(media_id)
+    if media.owner_type == "accident_incident_report":
+        report = AccidentIncidentReport.query.get_or_404(media.owner_id)
+        if not _driver_can_view_accident(report):
+            abort(403)
+    path = accident_media_path(media)
+    if not path:
+        abort(404)
+    return send_from_directory(os.path.dirname(path), os.path.basename(path))
+
+
+@bp.route("/accident-incident/new", methods=["GET", "POST"])
+@login_required
+def new_accident_incident():
+    damage_report = None
+    driver_log = None
+    damage_report_id = request.values.get("damage_report_id", type=int)
+    driver_log_id = request.values.get("driver_log_id", type=int)
+    if damage_report_id:
+        damage_report = _damage_report_or_404(damage_report_id)
+        if damage_report is None:
+            return redirect(url_for("driver.damage_reports"))
+    if driver_log_id:
+        driver_log = _active_driver_logs_query().filter_by(id=driver_log_id).first_or_404()
+        if current_user.role != "management" and driver_log.driver_id != current_user.id:
+            abort(403)
+    if request.method == "POST":
+        if not accident_form_required(
+            packet_type=request.form.get("packet_type") or "accident_incident",
+            answers=request.form,
+        ):
+            flash("Choose Accident / Incident or answer yes to an accident trigger question before opening this form.", "warning")
+            return redirect(url_for("driver.new_accident_incident"))
+        report = create_accident_report_from_form(
+            request.form,
+            request.files,
+            user=current_user,
+            damage_report=damage_report,
+            driver_log=driver_log,
+        )
+        record_activity(
+            user_id=current_user.id,
+            category="accident_incident",
+            action="created",
+            title="Accident / Incident recorded",
+            details=f"Accident / Incident #{report.id} saved for manager review.",
+            target_type="accident_incident_report",
+            target_id=report.id,
+            commit=False,
+        )
+        db.session.commit()
+        flash("Accident / Incident saved for Manager Review.", "success")
+        return redirect(url_for("driver.view_accident_incident", report_id=report.id))
+    return render_template(
+        "accident_incident_form.html",
+        report=None,
+        damage_report=damage_report,
+        driver_log=driver_log,
+        manager_view=False,
+    )
+
+
+@bp.route("/damage_reports/<int:report_id>/accident-incident")
+@login_required
+def accident_incident_from_damage_report(report_id):
+    return redirect(
+        url_for(
+            "driver.new_accident_incident",
+            damage_report_id=report_id,
+            packet_type="accident_incident",
+        )
+    )
+
+
+@bp.route("/driver_logs/<int:log_id>/accident-incident")
+@login_required
+def accident_incident_from_driver_log(log_id):
+    return redirect(
+        url_for(
+            "driver.new_accident_incident",
+            driver_log_id=log_id,
+            packet_type="accident_incident",
+        )
+    )
+
+
+@bp.route("/accident-incident/<int:report_id>")
+@login_required
+def view_accident_incident(report_id):
+    report = AccidentIncidentReport.query.get_or_404(report_id)
+    if not _driver_can_view_accident(report):
+        abort(403)
+    return render_template("accident_incident_view.html", report=report, manager_view=False)
+
+
+@bp.route("/accident-incident/<int:report_id>/packet")
+@login_required
+def accident_incident_packet(report_id):
+    report = AccidentIncidentReport.query.get_or_404(report_id)
+    if not _driver_can_view_accident(report):
+        abort(403)
+    packet = build_accident_packet(report, generated_by=current_user)
+    return render_template(
+        "accident_incident_packet.html",
+        packet=packet,
+        manager_view=False,
+        back_url=url_for("driver.view_accident_incident", report_id=report.id),
+    )
+
+
+@bp.route("/ifta-worksheet/new", methods=["GET", "POST"])
+@login_required
+def new_ifta_worksheet():
+    if request.method == "POST":
+        worksheet = create_ifta_worksheet_from_form(request.form, request.files, user=current_user)
+        record_activity(
+            user_id=current_user.id,
+            category="ifta",
+            action="created",
+            title="IFTA Support Worksheet created",
+            details=f"IFTA Support Worksheet #{worksheet.id} saved.",
+            target_type="ifta_worksheet",
+            target_id=worksheet.id,
+            commit=False,
+        )
+        db.session.commit()
+        flash("IFTA Support Worksheet saved.", "success")
+        return redirect(url_for("driver.view_ifta_worksheet", worksheet_id=worksheet.id))
+    return render_template("ifta_worksheet_form.html", worksheet=None, manager_view=False)
+
+
+@bp.route("/ifta-worksheet/<int:worksheet_id>")
+@login_required
+def view_ifta_worksheet(worksheet_id):
+    worksheet = IftaWorksheet.query.get_or_404(worksheet_id)
+    if not _driver_can_view_ifta(worksheet):
+        abort(403)
+    return render_template("ifta_worksheet_view.html", worksheet=worksheet, manager_view=False)
+
+
+@bp.route("/ifta-worksheet/<int:worksheet_id>/packet")
+@login_required
+def ifta_worksheet_packet(worksheet_id):
+    worksheet = IftaWorksheet.query.get_or_404(worksheet_id)
+    if not _driver_can_view_ifta(worksheet):
+        abort(403)
+    packet = build_ifta_packet(worksheet, generated_by=current_user)
+    return render_template(
+        "ifta_worksheet_packet.html",
+        packet=packet,
+        manager_view=False,
+        back_url=url_for("driver.view_ifta_worksheet", worksheet_id=worksheet.id),
+    )
+
+
+@bp.route("/ifta-worksheet/receipt/<int:fuel_id>")
+@login_required
+def ifta_receipt(fuel_id):
+    fuel = IftaFuelRecord.query.get_or_404(fuel_id)
+    if not _driver_can_view_ifta(fuel.worksheet):
+        abort(403)
+    path = ifta_receipt_path(fuel.receipt_photo)
+    if not path:
+        abort(404)
+    return send_from_directory(os.path.dirname(path), os.path.basename(path))
 
 
 @bp.route("/damage_reports/<int:report_id>/edit", methods=["GET", "POST"])

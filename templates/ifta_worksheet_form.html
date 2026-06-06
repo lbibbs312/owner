@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block content %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+<style>
+  .ifta-form { max-width:1120px; margin:0 auto; padding:22px; }
+  .ifta-form h1 { font-weight:950; margin:0 0 4px; }
+  .ifta-form .lead { color:var(--md-muted, #64748b); font-weight:750; margin:0 0 18px; }
+  .ifta-section { border:1px solid rgba(148,163,184,.26); border-radius:8px; padding:14px; margin-bottom:14px; background:rgba(255,255,255,.04); }
+  .ifta-section h2 { font-size:.9rem; text-transform:uppercase; letter-spacing:.05em; font-weight:950; margin:0 0 12px; color:var(--md-amber, #c9972b); }
+  .field-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+  .field-grid label { display:grid; gap:5px; font-weight:800; }
+  .field-grid input, .field-grid select, .field-grid textarea { width:100%; border:1px solid rgba(148,163,184,.38); border-radius:8px; padding:9px 10px; background:#fff; color:#0f172a; }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+  @media (max-width:800px) { .field-grid { grid-template-columns:1fr; } }
+</style>
+
+<main class="ifta-form responsive-workspace">
+  <h1>Fuel / Odometer / IFTA Worksheet</h1>
+  <p class="lead">This is an IFTA support worksheet for owner-operators and small fleets. This is not tax filing or tax advice.</p>
+  <form method="POST" action="{{ url_for('driver.new_ifta_worksheet') }}" enctype="multipart/form-data">
+    <section class="ifta-section">
+      <h2>A. Vehicle / Period</h2>
+      <div class="field-grid">
+        <label>Reporting period quarter <input type="text" name="reporting_period_quarter" placeholder="Q1"></label>
+        <label>Reporting year <input type="number" name="reporting_year"></label>
+        <label>Driver <input type="text" value="{{ current_user.display_name }}" disabled></label>
+        <label>Truck <input type="text" name="truck"></label>
+        <label>Trailer <input type="text" name="trailer"></label>
+        <label>VIN or vehicle unit number <input type="text" name="vin_or_vehicle_unit_number"></label>
+        <label>Fleet number <input type="text" name="fleet_number"></label>
+        <label>Base jurisdiction <input type="text" name="base_jurisdiction"></label>
+        <label>Carrier name <input type="text" name="carrier_name"></label>
+        <label>IFTA license number <input type="text" name="ifta_license_number"></label>
+      </div>
+    </section>
+
+    <section class="ifta-section">
+      <h2>B. Trip Distance Record</h2>
+      <div class="field-grid">
+        <label>Trip start date <input type="date" name="trip_start_date"></label>
+        <label>Trip end date <input type="date" name="trip_end_date"></label>
+        <label>Origin city <input type="text" name="origin_city"></label>
+        <label>Origin state <input type="text" name="origin_state"></label>
+        <label>Destination city <input type="text" name="destination_city"></label>
+        <label>Destination state <input type="text" name="destination_state"></label>
+        <label>Route traveled <input type="text" name="route_traveled"></label>
+        <label>Beginning odometer <input type="number" name="beginning_odometer" step="any"></label>
+        <label>Ending odometer <input type="number" name="ending_odometer" step="any"></label>
+        <label>Total trip distance <input type="number" name="total_trip_distance" step="any"></label>
+        <label>Jurisdiction <input type="text" name="jurisdiction"></label>
+        <label>Jurisdiction distance <input type="number" name="jurisdiction_distance" step="any"></label>
+        <label>Taxable distance <input type="number" name="taxable_distance" step="any"></label>
+        <label>Nontaxable distance <input type="number" name="nontaxable_distance" step="any"></label>
+        <label>Toll distance <input type="number" name="toll_distance" step="any"></label>
+        <label>Loaded / empty / deadhead
+          <select name="loaded_empty_deadhead">
+            <option value="loaded">Loaded</option>
+            <option value="empty">Empty</option>
+            <option value="deadhead">Deadhead</option>
+            <option value="mixed">Mixed</option>
+          </select>
+        </label>
+        <label>Notes <textarea name="trip_notes"></textarea></label>
+      </div>
+    </section>
+
+    <section class="ifta-section">
+      <h2>C. Fuel Record</h2>
+      <div class="field-grid">
+        <label>Purchase date <input type="date" name="purchase_date"></label>
+        <label>Seller name <input type="text" name="seller_name"></label>
+        <label>Seller address <input type="text" name="seller_address"></label>
+        <label>City <input type="text" name="fuel_city"></label>
+        <label>State or province <input type="text" name="state_or_province"></label>
+        <label>Gallons or liters <input type="number" name="gallons_or_liters" step="any"></label>
+        <label>Fuel type <input type="text" name="fuel_type"></label>
+        <label>Price per gallon or liter <input type="number" name="price_per_gallon_or_liter" step="any"></label>
+        <label>Total sale amount <input type="number" name="total_sale_amount" step="any"></label>
+        <label>Vehicle unit number <input type="text" name="vehicle_unit_number"></label>
+        <label>Purchaser name <input type="text" name="purchaser_name"></label>
+        <label>Receipt photo <input type="file" name="receipt_photo" accept="image/*,.pdf"></label>
+        <label>Tax paid <select name="tax_paid"><option>unknown</option><option>yes</option><option>no</option></select></label>
+        <label><span>Bulk fuel</span><span><input type="checkbox" name="bulk_fuel" value="yes"> Bulk fuel purchase</span></label>
+      </div>
+    </section>
+
+    <section class="ifta-section">
+      <h2>F. IFTA Review Status</h2>
+      <div class="field-grid">
+        <label>Review status
+          <select name="review_status">
+            <option>Draft</option>
+            <option>Needs Review</option>
+            <option>Ready for Tax Preparer</option>
+            <option>Closed</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <div class="actions">
+      <a class="btn btn-outline-secondary" href="{{ url_for('driver.mobile_dashboard') }}">Cancel</a>
+      <button class="btn btn-primary" type="submit">Save IFTA Support Worksheet</button>
+    </div>
+  </form>
+</main>
+{% include 'partials/_md_bottom_nav.html' %}
+{% endblock %}

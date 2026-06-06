@@ -22,7 +22,11 @@ from sqlalchemy import or_
 
 from app.blueprints.manager import bp
 from app.services.database_status import database_status
+from app.services.accident_packets import build_accident_packet
+from app.services.driver_wait import dock_time_review_label
 from app.services.evidence_packet import build_damage_evidence_packet
+from app.services.ifta_worksheets import build_ifta_packet
+from app.services.packet_classification import PacketClassification, classify_damage_report, packet_label_for_report
 from app.services.document_numbers import (
     document_meta,
     evidence_document_number,
@@ -34,7 +38,7 @@ from app.services.document_numbers import (
 from app.extensions import db, socketio
 from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
-from app.models import ActivityEvent, AuditEvent, DamagePhoto, DamageReport, DispatchCapture, DriverLog, DriverLogPhoto, ExceptionEvent, HotPartPhoto, MoveRequest, OperationalFollowUp, PartScanEvent, PlantTransfer, PreTrip, ShiftRecord, Task, User
+from app.models import ActivityEvent, AccidentIncidentReport, AuditEvent, DamagePhoto, DamageReport, DispatchCapture, DriverLog, DriverLogPhoto, ExceptionEvent, HotPartPhoto, IftaWorksheet, MoveRequest, OperationalFollowUp, PacketManagerReview, PartScanEvent, PlantTransfer, PreTrip, ShiftRecord, Task, User
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
 from app.services.dispatch_capture import create_dispatch_capture, convert_dispatch_capture, dismiss_dispatch_capture, open_dispatch_captures
@@ -69,6 +73,15 @@ from app.blueprints.driver.routes import (
 
 
 TRIM_PLANTS = ("Trim DC", "PPL", "DC")
+MANAGER_PACKET_DECISIONS = {
+    "Accepted as complete",
+    "Needs more information",
+    "Safety Review needed",
+    "Claim Review needed",
+    "DOT Review needed",
+    "IFTA Review needed",
+    "Closed with no further action",
+}
 
 
 def _first_record_id(records):
@@ -97,7 +110,7 @@ def _transfer_document_meta(transfer, page="1 of 1"):
 
 
 def _evidence_document_meta(report, page="1 of 1"):
-    return document_meta("DAMAGE PROOF RECORD", evidence_document_number(report), page=page)
+    return document_meta(packet_label_for_report(report), evidence_document_number(report), page=page)
 
 
 def _draw_pdf_header(pdf, title, document_no, generated_at, page_label, *, driver=None, truck=None, date_value=None):
@@ -739,7 +752,7 @@ def _live_stop_rows(logs):
             "status": status,
             "status_key": status_key,
             "cargo": snapshot_row.get("cargo_out") or snapshot_row.get("cargo_in") or log.depart_load_size or log.load_size or "--",
-            "dock_wait": f"{log.dock_wait_minutes} min" if (log.dock_wait_minutes or 0) > 0 else "--",
+            "dock_wait": dock_time_review_label(log.dock_wait_minutes) if (log.dock_wait_minutes or 0) > 0 else "--",
             "forecast": timing,
             "exceptions": exceptions,
             "url": url_for("manager.view_driver_log", log_id=log.id),
@@ -2198,7 +2211,13 @@ def delete_driver_log_photo(photo_id):
 @bp.route("/damage-reports/<int:report_id>")
 def view_damage_report(report_id):
     report = DamageReport.query.get_or_404(report_id)
-    return render_template("view_damage_report.html", report=report, manager_view=True)
+    classification = classify_damage_report(report)
+    return render_template(
+        "view_damage_report.html",
+        report=report,
+        manager_view=True,
+        accident_form_available=classification.packet_type == PacketClassification.ACCIDENT_INCIDENT.value,
+    )
 
 
 @bp.route("/damage-reports/<int:report_id>/delete", methods=["POST"])
@@ -2262,12 +2281,13 @@ def delete_damage_report(report_id):
 @bp.route("/damage-reports/<int:report_id>/evidence-packet")
 def damage_evidence_packet(report_id):
     report = DamageReport.query.get_or_404(report_id)
+    packet_label = packet_label_for_report(report)
     record_activity(
         user_id=current_user.id,
         category="damage",
         action="evidence_packet_generated",
-        title="Damage proof record generated",
-        details=f"Generated damage proof record #{report.id}.",
+        title=f"{packet_label} generated",
+        details=f"Generated {packet_label} #{report.id}.",
         target_type="damage_report",
         target_id=report.id,
     )
@@ -2279,6 +2299,125 @@ def damage_evidence_packet(report_id):
         document_meta=_evidence_document_meta(report, page="1 of 5"),
         back_url=url_for("manager.view_damage_report", report_id=report.id),
     )
+
+
+@bp.route("/accident-incident/<int:report_id>")
+def view_accident_incident(report_id):
+    report = AccidentIncidentReport.query.get_or_404(report_id)
+    return render_template("accident_incident_view.html", report=report, manager_view=True)
+
+
+@bp.route("/accident-incident/<int:report_id>/packet")
+def accident_incident_packet(report_id):
+    report = AccidentIncidentReport.query.get_or_404(report_id)
+    packet = build_accident_packet(report, generated_by=current_user)
+    return render_template(
+        "accident_incident_packet.html",
+        packet=packet,
+        manager_view=True,
+        back_url=url_for("manager.view_accident_incident", report_id=report.id),
+    )
+
+
+@bp.route("/accident-incident/<int:report_id>/review", methods=["POST"])
+def review_accident_incident(report_id):
+    report = AccidentIncidentReport.query.get_or_404(report_id)
+    decision = request.form.get("close_status") or "Needs more information"
+    if decision not in MANAGER_PACKET_DECISIONS:
+        decision = "Needs more information"
+    report.close_status = decision
+    report.manager_note = (request.form.get("manager_note") or "").strip() or None
+    report.manager_signature = (request.form.get("manager_signature") or "").strip() or None
+    report.reviewed_by_id = current_user.id
+    report.reviewed_at = datetime.utcnow()
+    report.manager_review_status = "closed" if decision in {"Accepted as complete", "Closed with no further action"} else "open"
+    if decision == "DOT Review needed":
+        report.dot_review_status = "needs_review"
+    if decision == "Claim Review needed":
+        report.claim_review_status = "needs_review"
+    db.session.add(
+        PacketManagerReview(
+            packet_type="accident_incident",
+            owner_type="accident_incident_report",
+            owner_id=report.id,
+            close_status=decision,
+            manager_note=report.manager_note,
+            manager_signature=report.manager_signature,
+            reviewed_by_id=current_user.id,
+            reviewed_at=report.reviewed_at,
+        )
+    )
+    record_activity(
+        user_id=current_user.id,
+        category="manager_review",
+        action="reviewed",
+        title="Accident / Incident Manager Review",
+        details=f"Accident / Incident #{report.id}: {decision}.",
+        target_type="accident_incident_report",
+        target_id=report.id,
+        commit=False,
+    )
+    db.session.commit()
+    flash("Manager Review saved.", "success")
+    return redirect(url_for("manager.view_accident_incident", report_id=report.id))
+
+
+@bp.route("/ifta-worksheet/<int:worksheet_id>")
+def view_ifta_worksheet(worksheet_id):
+    worksheet = IftaWorksheet.query.get_or_404(worksheet_id)
+    return render_template("ifta_worksheet_view.html", worksheet=worksheet, manager_view=True)
+
+
+@bp.route("/ifta-worksheet/<int:worksheet_id>/packet")
+def ifta_worksheet_packet(worksheet_id):
+    worksheet = IftaWorksheet.query.get_or_404(worksheet_id)
+    packet = build_ifta_packet(worksheet, generated_by=current_user)
+    return render_template(
+        "ifta_worksheet_packet.html",
+        packet=packet,
+        manager_view=True,
+        back_url=url_for("manager.view_ifta_worksheet", worksheet_id=worksheet.id),
+    )
+
+
+@bp.route("/ifta-worksheet/<int:worksheet_id>/review", methods=["POST"])
+def review_ifta_worksheet(worksheet_id):
+    worksheet = IftaWorksheet.query.get_or_404(worksheet_id)
+    decision = request.form.get("close_status") or "Needs more information"
+    if decision not in MANAGER_PACKET_DECISIONS:
+        decision = "Needs more information"
+    worksheet.review_status = "Ready for Tax Preparer" if decision == "Accepted as complete" else "Needs Review"
+    if decision == "Closed with no further action":
+        worksheet.review_status = "Closed"
+    worksheet.manager_note = (request.form.get("manager_note") or "").strip() or None
+    worksheet.manager_signature = (request.form.get("manager_signature") or "").strip() or None
+    worksheet.reviewed_by_id = current_user.id
+    worksheet.reviewed_at = datetime.utcnow()
+    db.session.add(
+        PacketManagerReview(
+            packet_type="fuel_odo_ifta",
+            owner_type="ifta_worksheet",
+            owner_id=worksheet.id,
+            close_status=decision,
+            manager_note=worksheet.manager_note,
+            manager_signature=worksheet.manager_signature,
+            reviewed_by_id=current_user.id,
+            reviewed_at=worksheet.reviewed_at,
+        )
+    )
+    record_activity(
+        user_id=current_user.id,
+        category="manager_review",
+        action="reviewed",
+        title="IFTA Review",
+        details=f"IFTA Support Worksheet #{worksheet.id}: {decision}.",
+        target_type="ifta_worksheet",
+        target_id=worksheet.id,
+        commit=False,
+    )
+    db.session.commit()
+    flash("IFTA Review saved.", "success")
+    return redirect(url_for("manager.view_ifta_worksheet", worksheet_id=worksheet.id))
 
 
 @bp.route("/audit-history")
@@ -2382,6 +2521,13 @@ def manager_dashboard():
         .filter(MoveRequest.status.notin_(["completed", "cancelled"]))
         .count()
     )
+    move_request_rows = (
+        MoveRequest.query
+        .filter(MoveRequest.status.notin_(["completed", "cancelled"]))
+        .order_by(MoveRequest.requested_at.desc(), MoveRequest.created_at.desc())
+        .limit(6)
+        .all()
+    )
     return render_template(
         "manager_dashboard.html",
         active_driver_count=active_driver_count,
@@ -2391,6 +2537,7 @@ def manager_dashboard():
         inspection_rows=inspection_rows,
         live_stop_rows=live_stop_rows,
         move_request_count=move_request_count,
+        move_request_rows=move_request_rows,
         pending_review_count=pending_review_count,
         recent_documents=recent_documents,
         review_rows=review_rows,

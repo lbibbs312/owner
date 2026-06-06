@@ -20,7 +20,6 @@ from the typed cargo deltas already computed in ``load_state``:
     Loaded {cargo}.           (one line per pickup event)
     Continuing with {cargo}.  (only when carry-through cargo + a drop)
     Departed empty.           (only when departing empty after work here)
-    Deviation: {reason}.      (when deviation flagged, with reason)
     Wait {label}.             (when wait time recorded)
     {exception lines...}      (unload blocked, secondary not dropped, etc.)
 
@@ -185,7 +184,8 @@ def build_stop_summary(
     lines describe events at this stop in a fixed order: deliveries,
     pickups, retained cargo (only when paired with a delivery), departure
     state (only when the stop changed nothing or was a shift-end), the
-    deviation reason (only when flagged), wait time, and exceptions.
+    wait time, and route issues. Deviation is returned separately as
+    ``deviation_reason`` so badges and print layouts own that display.
     """
     purpose = classify_stop_purpose(
         route, log,
@@ -231,8 +231,6 @@ def build_stop_summary(
         lines.append("Departed empty.")
 
     reason = deviation_reason(route)
-    if reason:
-        lines.append(f"Deviation: {reason}.")
 
     if wait_label:
         lines.append(f"{wait_label}.")

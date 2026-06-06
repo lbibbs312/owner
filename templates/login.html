@@ -92,12 +92,21 @@
     text-decoration:none;
   }
   .md-auth-link:hover { color:var(--md-text); }
-  @media (max-width:760px) {
-    body.md-shell #pageContent { align-items:flex-start; }
+  @media (max-width:980px) {
+    body.md-shell #pageContent {
+      align-items:flex-start;
+      padding:18px 10px;
+    }
     .md-auth-wrap { grid-template-columns:1fr; }
     .md-auth-brief {
       min-height:0;
       padding:20px;
+    }
+    .md-auth-brief h1 {
+      font-size:clamp(2rem, 10vw, 3rem);
+    }
+    .md-auth-card {
+      padding:18px;
     }
   }
 </style>
@@ -106,7 +115,7 @@
   <div class="md-auth-brief">
     <p class="md-section-label mb-1">MOVEDEFENSE ACCESS</p>
     <h1>Operations Sign In</h1>
-    <p>Driver logs, route timing, cargo proof, damage evidence, and manager visibility stay inside one audit-ready workflow.</p>
+    <p>Driver logs, route timing, cargo proof, damage photos, and manager review stay inside one clean packet workflow.</p>
   </div>
 
   <form class="md-auth-card" method="POST" action="">

@@ -20,7 +20,7 @@ def _driver_label(user):
     return user.display_name if user else "Unassigned"
 
 
-def build_exception_items(anchor=None, dock_delay_minutes=30):
+def build_exception_items(anchor=None, dock_delay_minutes=120):
     today = anchor or date.today()
     week_start, week_end = week_bounds(today)
     items = []
@@ -80,7 +80,7 @@ def build_exception_items(anchor=None, dock_delay_minutes=30):
         if route_problem:
             items.append({"severity": "medium", "category": "Route issue", "label": label, "detail": route_problem, "target_type": "driver_log", "target_id": log.id})
         if log.dock_wait_minutes is not None and log.dock_wait_minutes >= dock_delay_minutes:
-            items.append({"severity": "high", "category": "Delayed dock time", "label": label, "detail": f"Dock wait recorded at {log.dock_wait_minutes} minutes.", "target_type": "driver_log", "target_id": log.id})
+            items.append({"severity": "high", "category": "Delayed dock time", "label": label, "detail": f"Long wait — needs review ({log.dock_wait_minutes} min).", "target_type": "driver_log", "target_id": log.id})
         if not log.depart_time:
             forecast = forecast_for_stop(log)
             current_active = latest_log_ids.get((log.driver_id, log.date)) == log.id

@@ -3,76 +3,248 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MoveDefense Operations</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <title>MoveDefense Paperwork Packets</title>
   <style>
-    body { background:#f4f6f8; color:#172033; }
-    .shell { min-height:100vh; display:flex; flex-direction:column; }
-    .topbar { background:#0b3768; color:white; }
-    .brand { font-weight:800; letter-spacing:.02em; }
-    .hero { flex:1; display:flex; align-items:center; padding:48px 0; }
-    .panel { background:white; border:1px solid #d9e2ec; border-radius:8px; box-shadow:0 18px 40px rgba(15, 23, 42, .08); }
-    .portal-link { display:block; border:1px solid #d9e2ec; border-radius:8px; padding:18px; text-decoration:none; color:#172033; height:100%; }
-    .portal-link:hover { border-color:#0d6efd; box-shadow:0 8px 24px rgba(13,110,253,.12); }
-    .portal-link strong { display:block; font-size:1.05rem; margin-bottom:4px; }
-    .status-pill { display:inline-flex; align-items:center; gap:8px; background:#e8f5ee; color:#166534; border:1px solid #bbf7d0; border-radius:999px; padding:6px 12px; font-weight:700; font-size:.85rem; }
-    .dot { width:8px; height:8px; border-radius:50%; background:#16a34a; }
+    :root {
+      --ink:#0f172a;
+      --muted:#64748b;
+      --line:#dbe4ef;
+      --blue:#2563eb;
+      --blue-dark:#1d4ed8;
+      --green:#16a34a;
+      --bg:#f8fafc;
+      --panel:#ffffff;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:Montserrat,Inter,Arial,sans-serif; }
+    a { color:inherit; }
+    .topbar { border-bottom:1px solid var(--line); background:#fff; position:sticky; top:0; z-index:20; }
+    .topbar-inner { max-width:1180px; margin:0 auto; padding:16px 22px; display:flex; align-items:center; justify-content:space-between; gap:18px; }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:0; }
+    .brand-mark { width:36px; height:36px; border-radius:8px; background:var(--blue); display:grid; place-items:center; color:#fff; }
+    .nav-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .btn { border:1px solid var(--line); border-radius:8px; padding:10px 14px; text-decoration:none; font-weight:800; font-size:.9rem; display:inline-flex; align-items:center; justify-content:center; line-height:1.2; }
+    .btn.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
+    .btn.primary:hover { background:var(--blue-dark); }
+    .btn.ghost { background:#fff; color:var(--ink); }
+    .wrap { max-width:1180px; margin:0 auto; padding:46px 22px 58px; }
+    .hero { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr); gap:32px; align-items:center; }
+    .eyebrow { display:inline-flex; align-items:center; gap:8px; color:#166534; background:#dcfce7; border:1px solid #bbf7d0; border-radius:999px; padding:6px 10px; font-size:.78rem; font-weight:800; }
+    .eyebrow::before { content:""; width:8px; height:8px; background:var(--green); clip-path:polygon(50% 0,100% 100%,0 100%); }
+    h1 { margin:18px 0 14px; font-size:clamp(2.2rem,5vw,4.8rem); line-height:.96; letter-spacing:0; font-weight:900; }
+    .lead { max-width:650px; color:#475569; font-size:1.1rem; line-height:1.55; margin:0 0 22px; }
+    .hero-actions { display:flex; gap:12px; flex-wrap:wrap; margin-top:24px; }
+    .proof-panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 18px 45px rgba(15,23,42,.08); overflow:hidden; }
+    .proof-head { padding:18px 20px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .proof-head strong { font-size:1rem; }
+    .proof-state { color:#166534; font-weight:900; font-size:.76rem; }
+    .proof-body { padding:18px 20px; display:grid; gap:12px; }
+    .proof-row { display:grid; grid-template-columns:130px minmax(0,1fr); gap:10px; padding:10px 0; border-bottom:1px solid #eef2f7; }
+    .proof-row:last-child { border-bottom:0; }
+    .proof-row span { color:var(--muted); font-size:.78rem; font-weight:800; text-transform:uppercase; }
+    .proof-row strong { font-size:.95rem; overflow-wrap:anywhere; }
+    .section { margin-top:48px; }
+    .section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-bottom:18px; }
+    .section h2 { margin:0; font-size:2rem; letter-spacing:0; }
+    .section p { margin:7px 0 0; color:var(--muted); line-height:1.5; }
+    .cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+    .card, .price-card, .service-card { background:#fff; border:1px solid var(--line); border-radius:8px; padding:18px; }
+    .card h3, .service-card h3 { margin:0 0 8px; font-size:1.05rem; }
+    .card p, .service-card p { margin:0; color:#475569; line-height:1.48; }
+    .pricing-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:14px; }
+    .price-card { display:flex; flex-direction:column; gap:12px; min-height:100%; }
+    .price-name { font-weight:900; font-size:1rem; }
+    .price { font-size:1.7rem; font-weight:900; }
+    .price small { color:var(--muted); font-size:.8rem; font-weight:700; }
+    .price-card ul { margin:0; padding-left:18px; color:#334155; line-height:1.45; font-size:.88rem; }
+    .price-card li + li { margin-top:6px; }
+    .product-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+    .product-pill { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; display:flex; justify-content:space-between; gap:10px; font-weight:800; }
+    .product-pill span:last-child { color:var(--blue); white-space:nowrap; }
+    .disclaimer { margin-top:22px; padding:16px 18px; background:#fff; border:1px solid var(--line); border-radius:8px; color:#475569; line-height:1.55; font-weight:600; }
+    @media (max-width:980px) {
+      .hero, .pricing-grid { grid-template-columns:1fr; }
+      .cards, .product-row { grid-template-columns:1fr; }
+      .section-head { display:block; }
+    }
+    @media (max-width:560px) {
+      .topbar-inner { align-items:flex-start; flex-direction:column; }
+      .nav-actions, .btn { width:100%; }
+      .hero-actions { display:grid; grid-template-columns:1fr; }
+      .proof-row { grid-template-columns:1fr; }
+    }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <nav class="topbar py-3">
-      <div class="container d-flex justify-content-between align-items-center gap-3">
-        <div class="brand">MoveDefense Operations</div>
-        <div class="d-flex gap-2">
-          <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.login') }}">Login</a>
-          <a class="btn btn-light btn-sm" href="{{ url_for('auth.register') }}">Register</a>
-        </div>
+  <nav class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h10M4 18h16"/>
+          </svg>
+        </span>
+        <span>MoveDefense</span>
       </div>
-    </nav>
+      <div class="nav-actions">
+        <a class="btn ghost" href="{{ url_for('auth.login') }}">Login</a>
+        <a class="btn primary" href="{{ url_for('auth.register') }}">Start free</a>
+      </div>
+    </div>
+  </nav>
 
-    <main class="hero">
-      <div class="container">
-        <div class="panel p-4 p-md-5">
-          <div class="row g-4 align-items-center">
-            <div class="col-lg-5">
-              <span class="status-pill"><span class="dot"></span> Route operations app</span>
-              <h1 class="mt-3 mb-3">Driver logs, route reviews, inspections, and route paperwork.</h1>
-              <p class="text-secondary mb-0">Use the correct portal for your role. Drivers get the mobile workflow; managers get the route workspace and review desk.</p>
-            </div>
-            <div class="col-lg-7">
-              <div class="row g-3">
-                <div class="col-md-6">
-                  <a class="portal-link" href="{{ url_for('driver.mobile_dashboard') }}">
-                    <strong>Driver Mobile</strong>
-                    <span>Route status, plant stops, inspections, Ryder follow-up, and damage reports.</span>
-                  </a>
-                </div>
-                <div class="col-md-6">
-                  <a class="portal-link" href="{{ url_for('manager.manager_dashboard') }}">
-                    <strong>Manager Workspace</strong>
-                    <span>Route review, documents, incidents, inspections, route packets, and move requests.</span>
-                  </a>
-                </div>
-                <div class="col-md-6">
-                  <a class="portal-link" href="{{ url_for('auth.login') }}?required_role=driver">
-                    <strong>Driver Login</strong>
-                    <span>Sign in with driver credentials for same-day route controls.</span>
-                  </a>
-                </div>
-                <div class="col-md-6">
-                  <a class="portal-link" href="{{ url_for('auth.login') }}?required_role=management">
-                    <strong>Manager Login</strong>
-                    <span>Sign in with manager credentials for route review and workspace controls.</span>
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
+  <main class="wrap">
+    <section class="hero">
+      <div>
+        <span class="eyebrow">DOT-ready recordkeeping</span>
+        <h1>Turn driver paperwork into clean route, incident, and IFTA support packets.</h1>
+        <p class="lead">We help owner-operators and small fleets capture the facts before texts, photos, receipts, and paper forms get lost.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="#pricing">Start free</a>
+          <a class="btn ghost" href="#packets">Preview packets</a>
+          <a class="btn ghost" href="#fleet-office">Set up small fleet</a>
         </div>
       </div>
-    </main>
-  </div>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+      <aside class="proof-panel" aria-label="Sample packet summary">
+        <div class="proof-head">
+          <strong>MoveDefense packet preview</strong>
+          <span class="proof-state">Ready for review</span>
+        </div>
+        <div class="proof-body">
+          <div class="proof-row"><span>Packet</span><strong>Route packet with inspection, fuel, documents, and photos</strong></div>
+          <div class="proof-row"><span>Records</span><strong>PreTrip, PostTrip, route stops, fuel/odometer, and uploaded files</strong></div>
+          <div class="proof-row"><span>Review</span><strong>Manager Review, Safety Review, Claim Review, DOT Review, or IFTA Review when needed</strong></div>
+          <div class="proof-row"><span>Output</span><strong>PDF packet, document wallet, and tax-preparer support worksheet</strong></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="section" id="packets">
+      <div class="section-head">
+        <div>
+          <h2>What we organize</h2>
+          <p>MoveDefense turns daily route activity into packets that are easier to store, review, and send when needed.</p>
+        </div>
+      </div>
+      <div class="cards">
+        <article class="card">
+          <h3>Route packets</h3>
+          <p>We connect driver routes, stop notes, document uploads, signatures, and manager closeout into one route record.</p>
+        </article>
+        <article class="card">
+          <h3>Incident and damage packets</h3>
+          <p>We separate accident facts, vehicle damage, cargo damage, photos, statements, and claim review instead of mixing every issue into one bucket.</p>
+        </article>
+        <article class="card">
+          <h3>Fuel and odometer records</h3>
+          <p>We prepare an IFTA support worksheet from available vehicle, distance, fuel, receipt, and route data without calculating tax due.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="pricing">
+      <div class="section-head">
+        <div>
+          <h2>Pricing</h2>
+          <p>Start with forms, then move into our packet workspace as your recordkeeping grows.</p>
+        </div>
+      </div>
+      <div class="pricing-grid">
+        <article class="price-card">
+          <div class="price-name">Free Preview</div>
+          <div class="price">$0</div>
+          <ul>
+            <li>Create forms</li>
+            <li>Save 3 records/month</li>
+            <li>Watermarked packet previews</li>
+            <li>7-day record history</li>
+            <li>No full packet export</li>
+            <li>No accident/incident packet</li>
+            <li>No manager review</li>
+            <li>No long-term document storage</li>
+          </ul>
+        </article>
+        <article class="price-card">
+          <div class="price-name">Solo Driver</div>
+          <div class="price">$19<small>/month</small></div>
+          <ul>
+            <li>Personal route records</li>
+            <li>PDF packets</li>
+            <li>Driver document wallet</li>
+            <li>Basic damage/pretrip notes</li>
+            <li>Fuel and odometer records</li>
+            <li>30-day record history</li>
+          </ul>
+        </article>
+        <article class="price-card">
+          <div class="price-name">Owner-Operator</div>
+          <div class="price">$49<small>/month</small></div>
+          <ul>
+            <li>Route packets</li>
+            <li>Fuel / odometer / IFTA support worksheet</li>
+            <li>Accident / Incident Packet</li>
+            <li>Damage photo packet</li>
+            <li>Driver document uploads</li>
+            <li>Receipt photo storage</li>
+            <li>Ready-for-tax-preparer exports</li>
+          </ul>
+        </article>
+        <article class="price-card">
+          <div class="price-name">Small Fleet</div>
+          <div class="price">$149<small>/month</small></div>
+          <ul>
+            <li>Includes up to 5 drivers or vehicles</li>
+            <li>$15/month per extra driver or vehicle</li>
+            <li>Manager dashboard</li>
+            <li>Review queue</li>
+            <li>Multiple drivers</li>
+            <li>Accident / incident records</li>
+            <li>Damage and inspection packets</li>
+            <li>Document storage</li>
+            <li>Manager closeout and signatures</li>
+          </ul>
+        </article>
+        <article class="price-card" id="fleet-office">
+          <div class="price-name">Fleet Office</div>
+          <div class="price">$299+<small>/month</small></div>
+          <ul>
+            <li>Custom templates</li>
+            <li>Branded packets</li>
+            <li>Monthly paperwork cleanup</li>
+            <li>Manager closeout support</li>
+            <li>Up to 25 completed packets/month</li>
+            <li>Extra packets: $10-$15 each</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>One-time products</h2>
+          <p>Use downloadable forms when you are not ready for the online workspace yet.</p>
+        </div>
+      </div>
+      <div class="product-row">
+        <div class="product-pill"><span>Driver Forms Pack</span><span>$19</span></div>
+        <div class="product-pill"><span>Owner-Operator Record Kit</span><span>$49</span></div>
+        <div class="product-pill"><span>IFTA / Fuel / Odometer Worksheet Bundle</span><span>$99</span></div>
+        <div class="product-pill"><span>Basic branded packet setup</span><span>$149</span></div>
+        <div class="product-pill"><span>Paper form conversion</span><span>$299</span></div>
+        <div class="product-pill"><span>Full small-fleet packet setup</span><span>$499</span></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <article class="service-card">
+        <h3>MoveDefense Paperwork Cleanup — starting at $299/month</h3>
+        <p>We turn messy driver paperwork, route records, damage notes, fuel/odometer logs, and incident forms into clean packets your business can store, review, and send when needed.</p>
+      </article>
+      <div class="disclaimer">
+        We do not replace your safety manager, insurer, tax preparer, or DOT compliance officer. MoveDefense makes the record cleaner for FMCSA-aligned review, DOT-ready recordkeeping, insurance-ready packets, and IFTA support worksheets.
+      </div>
+    </section>
+  </main>
 </body>
 </html>

@@ -25,7 +25,7 @@ ACTIVE_STATUSES = ("open", "acknowledged", "assigned", "in_progress", "waiting",
 HOT_PRIORITIES = ("hot", "safety")
 DECLINE_ACTIONS = ("declined", "decline", "rejected", "reassign_declined")
 DUE_SOON_HOURS = 2
-DEFAULT_WAIT_THRESHOLD = 30
+DEFAULT_WAIT_THRESHOLD = 120
 
 STATUS_LABELS = {
     "open": "Open",
@@ -476,8 +476,8 @@ def build_floor_operations_snapshot(date=None, driver_id=None, wait_threshold=No
             })
     for log, minutes in waiting_over:
         needs_attention.append({
-            "label": f"Long wait at {plant_label(log.plant_name)}",
-            "detail": f"Stop open {minutes} min (over {threshold} min limit).",
+            "label": "Long wait — needs review",
+            "detail": f"{plant_label(log.plant_name)} dock time: {minutes} min.",
             "issue": classify_issue(category="Delayed dock time", minutes=minutes, wait_threshold=threshold),
             "target_type": "driver_log", "target_id": log.id,
         })

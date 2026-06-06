@@ -242,7 +242,7 @@
                     </td>
                     <td>
                       {{ row.cargo }}
-                      {% if row.dock_wait and row.dock_wait != '--' %}<div class="row-meta">Dock wait {{ row.dock_wait }}</div>{% endif %}
+                      {% if row.dock_wait and row.dock_wait != '--' %}<div class="row-meta">{{ row.dock_wait }}</div>{% endif %}
                       {% if row.forecast %}<div class="row-meta">Expected wait {{ row.forecast.estimate_label }}</div>{% endif %}
                     </td>
                     <td><span class="status-pill {{ row.status_key }}">{{ row.status }}</span></td>
@@ -446,7 +446,12 @@
             <a href="{{ url_for('manager.move_requests') }}">Open move requests</a>
           </div>
           <div class="panel-body">
-            <p class="workspace-note">Move requests stay in their own manager queue so the dashboard remains focused on live driver route data.</p>
+            <p class="workspace-note">
+              {{ move_request_count }} open move request{{ '' if move_request_count == 1 else 's' }}.
+              {% if move_request_rows %}
+                Latest request: {{ move_request_rows[0].requested_at|to_detroit_datetime if move_request_rows[0].requested_at else 'Time not recorded' }}.
+              {% endif %}
+            </p>
           </div>
         </section>
       </section>

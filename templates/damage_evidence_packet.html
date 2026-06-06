@@ -27,8 +27,8 @@
   .packet-table { width:100%; border-collapse:collapse; font-size:.82rem; }
   .packet-table th { background:#f3f4f6; color:#374151; text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.05em; }
   .packet-table th, .packet-table td { border:1px solid #d1d5db; padding:8px; vertical-align:top; }
-  .warning-list { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
-  .warning-list li { border:1px solid #f59e0b; background:#fffbeb; padding:8px 10px; font-weight:800; color:#78350f; }
+  .open-item-list { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+  .open-item-list li { border:1px solid #f59e0b; background:#fffbeb; padding:8px 10px; font-weight:800; color:#78350f; }
   .photo-proof { display:grid; grid-template-columns:260px minmax(0,1fr); gap:14px; border:1px solid #d1d5db; padding:12px; margin-bottom:12px; page-break-inside:avoid; }
   .photo-proof img { width:100%; max-height:260px; object-fit:contain; background:#f9fafb; border:1px solid #e5e7eb; }
   .hash { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.68rem; overflow-wrap:anywhere; }
@@ -54,6 +54,9 @@
   <div class="evidence-toolbar print-controls no-print">
     <a class="btn btn-outline-secondary" href="{{ back_url }}">Back to Report</a>
     <div class="actions">
+      {% if packet.packet_type == 'accident_incident' %}
+        <a class="btn btn-outline-primary" href="{{ url_for('driver.accident_incident_from_damage_report', report_id=packet.report.id) }}">Open Accident / Incident Form</a>
+      {% endif %}
       <button class="btn btn-primary" type="button" onclick="window.print()">Print Document</button>
     </div>
   </div>
@@ -76,9 +79,10 @@
     </header>
 
     <div class="packet-section">
-      <h2>1. Evidence Cover Page</h2>
+      <h2>1. Packet Cover Page</h2>
       <div class="cover-grid">
-        <div class="cover-field"><span>Damage Report ID</span><strong>#{{ report.id }}</strong></div>
+        <div class="cover-field"><span>Report ID</span><strong>#{{ report.id }}</strong></div>
+        <div class="cover-field"><span>Packet Type</span><strong>{{ packet.packet_label }}</strong></div>
         <div class="cover-field"><span>Truck</span><strong>{{ packet.truck_label }}</strong></div>
         <div class="cover-field"><span>Trailer</span><strong>{{ packet.trailer_label }}</strong></div>
         <div class="cover-field"><span>Driver</span><strong>{{ report.reported_by.display_name }}</strong></div>
@@ -99,37 +103,27 @@
     </div>
 
     <div class="packet-section">
-      <h2>3. Exceptions and Warnings</h2>
-      {% if packet.warnings %}
-        <ul class="warning-list">
-          {% for warning in packet.warnings %}<li>{{ warning }}</li>{% endfor %}
+      <h2>3. Open Items for Review</h2>
+      {% if packet.open_items %}
+        <ul class="open-item-list">
+          {% for item in packet.open_items %}<li>{{ item }}</li>{% endfor %}
         </ul>
       {% else %}
-        <div class="packet-copy">No evidence warnings generated.</div>
+        <div class="packet-copy">No open items for review.</div>
       {% endif %}
     </div>
   </section>
 
   <section class="packet-page">
     <div class="packet-section">
-      <h2>4. Full Event Timeline</h2>
-      <table class="packet-table">
-        <thead><tr><th>Item #</th><th>Time</th><th>Event</th><th>User</th><th>Source</th><th>Detail</th></tr></thead>
-        <tbody>
-          {% for item in packet.timeline %}
-            <tr><td>{{ loop.index }}</td><td>{{ item.time }}</td><td><strong>{{ item.event }}</strong></td><td>{{ item.user }}</td><td>{{ item.source }}</td><td>{{ item.detail }}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="packet-page">
-    <div class="packet-section">
-      <h2>5. Photo Evidence</h2>
+      <h2>4. Photo / Media Evidence</h2>
       {% for row in packet.photos %}
         <article class="photo-proof">
-          <a href="{{ url_for(photo_endpoint, photo_id=row.photo.id) }}" target="_blank" rel="noopener"><img src="{{ url_for(photo_endpoint, photo_id=row.photo.id) }}" alt="Damage photo {{ row.number }}"></a>
+          {% if row.file_exists %}
+            <a href="{{ url_for(photo_endpoint, photo_id=row.photo.id) }}" target="_blank" rel="noopener"><img src="{{ url_for(photo_endpoint, photo_id=row.photo.id) }}" alt="Packet photo {{ row.number }}"></a>
+          {% else %}
+            <div class="packet-copy">Photo not available in upload storage</div>
+          {% endif %}
           <div>
             <table class="packet-table">
               <tbody>
@@ -150,6 +144,20 @@
       {% else %}
         <div class="packet-copy">No photos attached to this report.</div>
       {% endfor %}
+    </div>
+  </section>
+
+  <section class="packet-page">
+    <div class="packet-section">
+      <h2>5. Full Event Timeline</h2>
+      <table class="packet-table">
+        <thead><tr><th>Item #</th><th>Time</th><th>Event</th><th>User</th><th>Source</th><th>Detail</th></tr></thead>
+        <tbody>
+          {% for item in packet.timeline %}
+            <tr><td>{{ loop.index }}</td><td>{{ item.time }}</td><td><strong>{{ item.event }}</strong></td><td>{{ item.user }}</td><td>{{ item.source }}</td><td>{{ item.detail }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </section>
 

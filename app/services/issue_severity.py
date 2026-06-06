@@ -35,7 +35,7 @@ CATEGORIES = {
 
 DEFAULT_LEVEL = "info"
 DEFAULT_CATEGORY = "workflow"
-DEFAULT_WAIT_THRESHOLD = 30
+DEFAULT_WAIT_THRESHOLD = 120
 
 # Categories that may never escalate to High/Critical at the display layer.
 # A 1-minute wait or a blank field must never look like an emergency.
@@ -192,11 +192,11 @@ def classify_wait(minutes, threshold=None):
         minutes = int(minutes)
     except (TypeError, ValueError):
         return None
-    limit = threshold if threshold else DEFAULT_WAIT_THRESHOLD
-    if minutes >= limit:
+    limit = max(120, int(threshold or DEFAULT_WAIT_THRESHOLD))
+    if minutes >= 180:
+        level = "high"
+    elif minutes >= limit:
         level = "action"
-    elif minutes >= 10:
-        level = "watch"
     else:
         level = "info"
     return _build("delay", level)

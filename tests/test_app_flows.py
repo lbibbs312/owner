@@ -1319,7 +1319,7 @@ def test_departure_dock_wait_feeds_manager_dashboard_cards(client, app):
     assert b"Avg Dock Wait" not in dashboard.data
     assert b"Trim Division" not in dashboard.data
     assert b"Plastics Division" not in dashboard.data
-    assert b"Dock wait" in dashboard.data
+    assert b"Dock time:" in dashboard.data
     assert b"17 min" in dashboard.data or b"18 min" in dashboard.data
     assert b"focus=delays" not in dashboard.data
 
@@ -2484,9 +2484,9 @@ def test_damage_evidence_packet_includes_timeline_hashes_related_records_and_war
 
     packet = client.get(f"/manager/damage-reports/{report_id}/evidence-packet")
     assert packet.status_code == 200
-    assert b"Evidence Cover Page" in packet.data
+    assert b"Packet Cover Page" in packet.data
     assert b"Full Event Timeline" in packet.data
-    assert b"Photo Evidence" in packet.data
+    assert b"Photo / Media Evidence" in packet.data
     assert b"Chain of Custody" in packet.data
     assert b"Related Route Records" in packet.data
     assert b"PreTrip DVIR created" in packet.data
@@ -2494,7 +2494,7 @@ def test_damage_evidence_packet_includes_timeline_hashes_related_records_and_war
     assert b"Audit: reviewed" in packet.data
     assert expected_hash in packet.data
     assert b"Verify odometer entry" in packet.data
-    assert b"No manager/auditor signature field is stored" in packet.data
+    assert b"Manager signature not captured" in packet.data
     assert_official_record_output(packet.data)
 
 
@@ -5165,7 +5165,7 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
     assert print_response.status_code == 200
     assert b"DRIVER ROUTE SHEET" in print_response.data
     assert b"5:45pm" in print_response.data
-    assert b"Wait 12 min" in print_response.data
+    assert b"Dock time: 12 min" in print_response.data
     assert b"17:45" not in print_response.data
     assert b"1. STOP TIMELINE" in print_response.data
     assert b"Location" in print_response.data
@@ -5179,14 +5179,14 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
     eod_print = client.get("/end_of_day_print")
     assert eod_print.status_code == 200
     assert b"5:45pm" in eod_print.data
-    assert b"Wait 12 min" in eod_print.data
+    assert b"Dock time: 12 min" in eod_print.data
     assert b"17:45" not in eod_print.data
     assert_official_record_output(eod_print.data)
 
     eod_attachment = client.get("/end_of_day_print/attachment")
     assert eod_attachment.status_code == 200
     assert eod_attachment.headers["Content-Type"] == "application/pdf"
-    assert b"Wait 12 min" in eod_attachment.data
+    assert b"Dock time: 12 min" in eod_attachment.data
     assert_official_record_output(eod_attachment.data)
 
     eod_response = client.post("/submit_end_of_day", follow_redirects=False)
@@ -6507,7 +6507,7 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert today_report.status_code == 200
     assert b"Raleigh East" in today_report.data
     assert b"Active Stop Wait" in today_report.data
-    assert b"Active wait" in today_report.data
+    assert b"Dock time:" in today_report.data
     assert b"Edit" in today_report.data
     assert b"Pickup" not in today_report.data
     assert b"Depart / Load" in today_report.data
@@ -7727,7 +7727,7 @@ def test_driver_logs_ledger_uses_plain_status_text_and_explicit_unknowns(client,
     assert "Earlier stop" not in body
     assert "Next stop" not in body
     assert "Wait Wait" not in body
-    assert "Wait 1 min" in body
+    assert "Dock time: 1 min" in body
     assert 'class="badge bg' not in body
     assert "status-pill" not in body
     assert "severity-pill" not in body

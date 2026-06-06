@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+{% if not manager_view|default(false) %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+{% endif %}
+<style>
+  .ifta-view { max-width:1040px; margin:0 auto; padding:22px; }
+  .ifta-top { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; flex-wrap:wrap; margin-bottom:16px; }
+  .ifta-top h1 { margin:0; font-weight:950; }
+  .ifta-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .ifta-panel { border:1px solid #e2e8f0; border-radius:8px; background:#fff; margin-bottom:14px; overflow:hidden; }
+  .ifta-panel h2 { margin:0; padding:12px 14px; border-bottom:1px solid #e2e8f0; font-size:.85rem; text-transform:uppercase; letter-spacing:.05em; font-weight:950; color:#475569; }
+  .ifta-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .ifta-field { padding:12px 14px; border-bottom:1px solid #f1f5f9; }
+  .ifta-field span { display:block; color:#64748b; font-size:.7rem; text-transform:uppercase; font-weight:900; }
+  .ifta-field strong { display:block; color:#0f172a; font-weight:900; }
+  .review-form { padding:14px; display:grid; gap:10px; }
+  .review-form textarea, .review-form input, .review-form select { width:100%; padding:9px 10px; border:1px solid #cbd5e1; border-radius:8px; }
+  @media (max-width:760px) { .ifta-grid { grid-template-columns:1fr 1fr; } }
+  @media (max-width:520px) { .ifta-grid { grid-template-columns:1fr; } }
+</style>
+
+<main class="ifta-view responsive-workspace">
+  <div class="ifta-top">
+    <div>
+      <h1>IFTA Support Worksheet #{{ worksheet.id }}</h1>
+      <p class="text-muted mb-0">This worksheet supports record review and is not tax filing.</p>
+    </div>
+    <div class="ifta-actions">
+      {% if manager_view|default(false) %}
+        <a class="btn btn-outline-secondary" href="{{ url_for('manager.review_dashboard') }}">Review Queue</a>
+        <a class="btn btn-primary" href="{{ url_for('manager.ifta_worksheet_packet', worksheet_id=worksheet.id) }}">Packet</a>
+      {% else %}
+        <a class="btn btn-outline-secondary" href="{{ url_for('driver.mobile_dashboard') }}">Workspace</a>
+        <a class="btn btn-primary" href="{{ url_for('driver.ifta_worksheet_packet', worksheet_id=worksheet.id) }}">Packet</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <section class="ifta-panel">
+    <h2>Vehicle / Period</h2>
+    <div class="ifta-grid">
+      <div class="ifta-field"><span>Quarter</span><strong>{{ worksheet.reporting_period_quarter or 'Not recorded' }}</strong></div>
+      <div class="ifta-field"><span>Year</span><strong>{{ worksheet.reporting_year or 'Not recorded' }}</strong></div>
+      <div class="ifta-field"><span>Truck</span><strong>{{ worksheet.truck or 'Not recorded' }}</strong></div>
+      <div class="ifta-field"><span>VIN / unit</span><strong>{{ worksheet.vin_or_vehicle_unit_number or 'Not recorded' }}</strong></div>
+      <div class="ifta-field"><span>Base jurisdiction</span><strong>{{ worksheet.base_jurisdiction or 'Not recorded' }}</strong></div>
+      <div class="ifta-field"><span>Carrier</span><strong>{{ worksheet.carrier_name or 'Not recorded' }}</strong></div>
+      <div class="ifta-field"><span>Review status</span><strong>{{ worksheet.review_status }}</strong></div>
+    </div>
+  </section>
+
+  {% if manager_view|default(false) %}
+    <section class="ifta-panel">
+      <h2>Manager Review</h2>
+      <form class="review-form" method="POST" action="{{ url_for('manager.review_ifta_worksheet', worksheet_id=worksheet.id) }}">
+        <label>Decision
+          <select name="close_status">
+            {% for decision in ['Accepted as complete','Needs more information','Safety Review needed','Claim Review needed','DOT Review needed','IFTA Review needed','Closed with no further action'] %}
+              <option value="{{ decision }}">{{ decision }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Manager note <textarea name="manager_note" rows="3">{{ worksheet.manager_note or '' }}</textarea></label>
+        <label>Manager signature <input type="text" name="manager_signature" value="{{ worksheet.manager_signature or '' }}"></label>
+        <button class="btn btn-primary" type="submit">Save IFTA Review</button>
+      </form>
+    </section>
+  {% endif %}
+</main>
+{% if not manager_view|default(false) %}{% include 'partials/_md_bottom_nav.html' %}{% endif %}
+{% endblock %}

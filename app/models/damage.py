@@ -43,4 +43,5 @@ class DamagePhoto(db.Model):
     filename = db.Column(db.String(255), nullable=False)
     original_filename = db.Column(db.String(255), nullable=True)
     content_type = db.Column(db.String(100), nullable=True)
+    sha256_hash = db.Column(db.String(64), nullable=True)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)

@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .packet-doc { max-width:960px; margin:0 auto; padding:20px; color:#111827; background:#fff; }
+  .packet-actions { display:flex; justify-content:flex-end; gap:8px; margin-bottom:12px; }
+  .packet-page { border:1px solid #d1d5db; padding:18px; margin-bottom:18px; page-break-after:always; }
+  .packet-brand { display:flex; justify-content:space-between; gap:12px; border-bottom:2px solid #111827; padding-bottom:10px; margin-bottom:12px; }
+  .packet-brand h1 { margin:0; font-weight:950; font-size:1.25rem; }
+  .packet-meta { font-size:.78rem; font-weight:800; text-align:right; }
+  .packet-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 14px; }
+  .packet-field { border-bottom:1px solid #e5e7eb; padding:6px 0; }
+  .packet-field span { display:block; color:#6b7280; font-size:.68rem; font-weight:900; text-transform:uppercase; }
+  .packet-field strong { display:block; font-weight:900; }
+  .open-list { margin:8px 0 0; padding-left:18px; }
+  .media-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .media-card { border:1px solid #d1d5db; padding:8px; }
+  .media-card img { width:100%; max-height:260px; object-fit:contain; background:#f9fafb; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; }
+  th, td { border:1px solid #d1d5db; padding:6px; font-size:.78rem; text-align:left; vertical-align:top; }
+  th { background:#f3f4f6; }
+  @media print { .packet-actions, nav, header.app-nav, .navbar { display:none !important; } .packet-doc { max-width:none; padding:0; } .packet-page { border:0; margin:0; } }
+</style>
+
+<main class="packet-doc official-print-document">
+  <div class="packet-actions no-print">
+    <a class="btn btn-outline-secondary" href="{{ back_url }}">Back</a>
+    <button class="btn btn-primary" onclick="window.print()" type="button">Print Packet</button>
+  </div>
+
+  <section class="packet-page">
+    <div class="packet-brand">
+      <div>
+        <h1>MoveDefense</h1>
+        <strong>Executive Cover</strong>
+      </div>
+      <div class="packet-meta">
+        Document number: {{ packet.document_number }}<br>
+        Packet type: {{ packet.packet_type }}<br>
+        Generated: {{ packet.generated_at }}<br>
+        Accurate Page 1 of 6
+      </div>
+    </div>
+    <div class="packet-grid">
+      <div class="packet-field"><span>Driver</span><strong>{{ packet.report.driver.display_name if packet.report.driver else 'Not recorded' }}</strong></div>
+      <div class="packet-field"><span>Truck</span><strong>{{ packet.report.truck or 'Not recorded' }}</strong></div>
+      <div class="packet-field"><span>Trailer</span><strong>{{ packet.report.trailer or 'Not recorded' }}</strong></div>
+      <div class="packet-field"><span>Incident date/time</span><strong>{{ packet.report.incident_date_time or 'Not recorded' }}</strong></div>
+      <div class="packet-field"><span>Reported date/time</span><strong>{{ packet.report.reported_date_time or 'Not recorded' }}</strong></div>
+      <div class="packet-field"><span>Location</span><strong>{{ packet.report.exact_location_text or packet.report.plant_or_location or 'Not recorded' }}</strong></div>
+      <div class="packet-field"><span>Route/stop</span><strong>{{ packet.report.route_id or 'Not recorded' }} / {{ packet.report.stop_id or 'Not recorded' }}</strong></div>
+      <div class="packet-field"><span>Current status</span><strong>{{ packet.current_status }}</strong></div>
+      <div class="packet-field"><span>Photo/media status</span><strong>{{ 'Available' if packet.media else 'Photo not available' }}</strong></div>
+      <div class="packet-field"><span>Driver statement status</span><strong>{{ 'Captured' if packet.report.driver_statement else 'Driver statement missing' }}</strong></div>
+      <div class="packet-field"><span>Manager review status</span><strong>{{ packet.report.manager_review_status|replace('_',' ')|title }}</strong></div>
+      <div class="packet-field"><span>DOT review status</span><strong>{{ packet.dot_review_label }}</strong></div>
+      <div class="packet-field"><span>Claim review status</span><strong>{{ packet.report.claim_review_status|replace('_',' ')|title }}</strong></div>
+    </div>
+    {% if packet.open_items %}
+      <h2>Open Items for Review</h2>
+      <ul class="open-list">
+        {% for item in packet.open_items %}<li>{{ item }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+  </section>
+
+  <section class="packet-page">
+    <div class="packet-brand"><h1>Photo / Media Evidence</h1><div class="packet-meta">Accurate Page 2 of 6</div></div>
+    <div class="media-grid">
+      {% for row in packet.media %}
+        <article class="media-card">
+          {% if row.file_available %}
+            <img src="{{ url_for('driver.packet_media', media_id=row.media.id) }}" alt="{{ row.category|replace('_',' ')|title }} for accident packet {{ packet.report.id }}">
+          {% else %}
+            <strong>Photo not available in upload storage</strong>
+          {% endif %}
+          <table>
+            <tr><th>Category</th><td>{{ row.category|replace('_',' ')|title }}</td></tr>
+            <tr><th>Original filename</th><td>{{ row.original_filename }}</td></tr>
+            <tr><th>Stored filename</th><td>{{ row.stored_filename }}</td></tr>
+            <tr><th>Uploaded by</th><td>{{ row.uploaded_by }}</td></tr>
+            <tr><th>Uploaded at</th><td>{{ row.uploaded_at }}</td></tr>
+            <tr><th>Related truck/trailer/route/stop</th><td>{{ row.related_truck }} / {{ row.related_trailer }} / {{ row.related_route }} / {{ row.related_stop }}</td></tr>
+            <tr><th>SHA-256 hash</th><td>{{ row.sha256_hash }}</td></tr>
+            <tr><th>File status</th><td>{{ row.file_status }}</td></tr>
+            <tr><th>Manager note</th><td>{{ row.manager_note }}</td></tr>
+          </table>
+        </article>
+      {% else %}
+        <div class="media-card"><strong>Photo not available in upload storage</strong></div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="packet-page">
+    <div class="packet-brand"><h1>Accident / Incident Details</h1><div class="packet-meta">Accurate Page 3 of 6</div></div>
+    <div class="packet-grid">
+      <div class="packet-field"><span>Weather</span><strong>{{ packet.report.weather or 'Not recorded' }}</strong></div>
+      <div class="packet-field"><span>Lighting</span><strong>{{ packet.report.lighting or 'Not recorded' }}</strong></div>
+      <div class="packet-field"><span>Surface condition</span><strong>{{ packet.report.surface_condition or 'Not recorded' }}</strong></div>
+      <div class="packet-field"><span>Road / property / yard / dock</span><strong>{{ packet.report.public_road_private_property_yard_dock or 'Not recorded' }}</strong></div>
+      <div class="packet-field"><span>Anyone hurt</span><strong>{{ packet.report.anyone_hurt or 'unknown' }}</strong></div>
+      <div class="packet-field"><span>Other vehicle involved</span><strong>{{ 'yes' if packet.report.other_vehicle_involved else (packet.report.other_vehicle_involved_quick or 'unknown') }}</strong></div>
+      <div class="packet-field"><span>Property damage</span><strong>{{ 'yes' if packet.report.property_damage else (packet.report.property_damage_quick or 'unknown') }}</strong></div>
+      <div class="packet-field"><span>Police called</span><strong>{{ packet.report.police_called or packet.report.police_called_quick or 'unknown' }}</strong></div>
+    </div>
+    <h2>Driver Statement</h2>
+    <p>{{ packet.report.driver_statement or 'Driver statement missing' }}</p>
+    <p><strong>Facts-only acknowledgement:</strong> {{ 'yes' if packet.report.facts_only_acknowledgement else 'no' }}</p>
+    <h2>Damage Details</h2>
+    <p>{{ packet.report.company_vehicle_damage_description or packet.report.other_vehicle_damage_description or packet.report.property_damage_description or packet.report.cargo_damage_description or 'Not recorded' }}</p>
+    <h2>Other Party / Witnesses / Police / Claim</h2>
+    <table>
+      <tr><th>Other driver</th><td>{{ packet.report.other_driver_name or 'Not recorded' }} / {{ packet.report.other_driver_phone or 'Not recorded' }}</td></tr>
+      <tr><th>Other vehicle</th><td>{{ packet.report.other_vehicle_make_model or 'Not recorded' }} / {{ packet.report.other_vehicle_plate or 'Not recorded' }}</td></tr>
+      <tr><th>Other insurance</th><td>{{ packet.report.other_insurance_company or 'Not recorded' }} / {{ packet.report.other_policy_or_claim_number or 'Not recorded' }}</td></tr>
+      <tr><th>Witnesses</th><td>{% for witness in packet.report.witnesses %}{{ witness.witness_name or 'Name not recorded' }} — {{ witness.witness_statement_summary or 'Statement not recorded' }}{% if not loop.last %}<br>{% endif %}{% else %}Not recorded{% endfor %}</td></tr>
+      <tr><th>Police / claim</th><td>{{ packet.report.police_agency or 'Not recorded' }} / {{ packet.report.police_report_number or 'Not recorded' }} / {{ packet.report.claim_number or 'Not recorded' }}</td></tr>
+    </table>
+  </section>
+
+  <section class="packet-page">
+    <div class="packet-brand"><h1>DOT / FMCSA Review Screen</h1><div class="packet-meta">Accurate Page 4 of 6</div></div>
+    <p>{{ packet.dot_review_label }}</p>
+    <table>
+      <tr><th>Date</th><td>{{ packet.report.incident_date_time or packet.report.reported_date_time or 'Not recorded' }}</td></tr>
+      <tr><th>Nearest city/town</th><td>{{ packet.report.nearest_city_or_town or 'Not recorded' }}</td></tr>
+      <tr><th>State</th><td>{{ packet.report.state or 'Not recorded' }}</td></tr>
+      <tr><th>Driver name</th><td>{{ packet.report.driver.display_name if packet.report.driver else 'Not recorded' }}</td></tr>
+      <tr><th>Number of injuries</th><td>{{ packet.report.number_of_injuries if packet.report.number_of_injuries is not none else 'Not recorded' }}</td></tr>
+      <tr><th>Number of fatalities</th><td>{{ packet.report.number_of_fatalities if packet.report.number_of_fatalities is not none else 'Not recorded' }}</td></tr>
+      <tr><th>Hazmat release other than fuel</th><td>{{ packet.report.hazmat_released_other_than_fuel or 'unknown' }}</td></tr>
+      <tr><th>Copies of required state/government/insurer reports attached</th><td>{{ packet.report.required_reports_attached or 'unknown' }}</td></tr>
+      <tr><th>DOT review status</th><td>{{ packet.report.dot_review_status|replace('_',' ')|title }}</td></tr>
+      <tr><th>Reviewer</th><td>{{ packet.report.reviewed_by.display_name if packet.report.reviewed_by else 'Not reviewed' }}</td></tr>
+      <tr><th>Reviewed at</th><td>{{ packet.report.reviewed_at or 'Not reviewed' }}</td></tr>
+    </table>
+  </section>
+
+  <section class="packet-page">
+    <div class="packet-brand"><h1>Post-Accident Testing Review</h1><div class="packet-meta">Accurate Page 5 of 6</div></div>
+    {% if packet.testing_review_visible %}
+      <p>Post-accident testing review</p>
+      <table>
+        <tr><th>Safety-sensitive function</th><td>{{ packet.report.driver_performing_safety_sensitive_function or 'unknown' }}</td></tr>
+        <tr><th>Loss of human life</th><td>{{ packet.report.loss_of_human_life or 'unknown' }}</td></tr>
+        <tr><th>Moving violation citation</th><td>{{ packet.report.moving_violation_citation or 'unknown' }}</td></tr>
+        <tr><th>Bodily injury treatment away from scene</th><td>{{ packet.report.bodily_injury_treatment_away_from_scene or 'unknown' }}</td></tr>
+        <tr><th>Tow-away disabling damage</th><td>{{ packet.report.tow_away_disabling_damage or 'unknown' }}</td></tr>
+        <tr><th>Alcohol test review</th><td>{{ packet.report.alcohol_test_review|replace('_',' ')|title }}</td></tr>
+        <tr><th>Alcohol test time</th><td>{{ packet.report.alcohol_test_time or 'Not recorded' }}</td></tr>
+        <tr><th>Alcohol delay reason</th><td>{{ packet.report.alcohol_delay_reason or 'Not recorded' }}</td></tr>
+        <tr><th>Controlled substance test review</th><td>{{ packet.report.controlled_substance_test_review|replace('_',' ')|title }}</td></tr>
+        <tr><th>Controlled substance test time</th><td>{{ packet.report.controlled_substance_test_time or 'Not recorded' }}</td></tr>
+        <tr><th>Controlled substance delay reason</th><td>{{ packet.report.controlled_substance_delay_reason or 'Not recorded' }}</td></tr>
+        <tr><th>Testing reviewed by</th><td>{{ packet.report.testing_reviewed_by.display_name if packet.report.testing_reviewed_by else 'Not reviewed' }}</td></tr>
+        <tr><th>Testing reviewed at</th><td>{{ packet.report.testing_reviewed_at or 'Not reviewed' }}</td></tr>
+      </table>
+    {% else %}
+      <p>Post-accident testing review not indicated from entered facts.</p>
+    {% endif %}
+  </section>
+
+  <section class="packet-page">
+    <div class="packet-brand"><h1>Chain of Custody + Signatures</h1><div class="packet-meta">Accurate Page 6 of 6</div></div>
+    <table>
+      <tr><th>Created by</th><td>{{ packet.chain.created_by }}</td></tr>
+      <tr><th>Created at</th><td>{{ packet.chain.created_at }}</td></tr>
+      <tr><th>Submitted at</th><td>{{ packet.chain.submitted_at }}</td></tr>
+      <tr><th>Driver can edit</th><td>{{ packet.chain.driver_can_edit }}</td></tr>
+      <tr><th>Route finalized</th><td>{{ packet.chain.route_finalized }}</td></tr>
+      <tr><th>Locked by</th><td>{{ packet.chain.locked_by }}</td></tr>
+      <tr><th>Locked at</th><td>{{ packet.chain.locked_at }}</td></tr>
+      <tr><th>Driver signature</th><td>{{ packet.report.driver_signature or 'Not captured' }}</td></tr>
+      <tr><th>Manager signature</th><td>{{ packet.report.manager_signature or 'Manager signature not captured' }}</td></tr>
+      <tr><th>Manager review status</th><td>{{ packet.report.manager_review_status|replace('_',' ')|title }}</td></tr>
+      <tr><th>Packet generated at</th><td>{{ packet.chain.packet_generated_at }}</td></tr>
+    </table>
+  </section>
+
+  <section class="packet-page">
+    <div class="packet-brand"><h1>Appendix A — Route Summary</h1></div>
+    <p>Route ID: {{ packet.report.route_id or 'Not recorded' }} / Stop ID: {{ packet.report.stop_id or 'Not recorded' }}</p>
+  </section>
+  <section class="packet-page">
+    <div class="packet-brand"><h1>Appendix B — Full Event Timeline</h1></div>
+    <table>
+      <tr><th>Event</th><th>Time</th></tr>
+      <tr><td>Record created</td><td>{{ packet.chain.created_at }}</td></tr>
+      <tr><td>Packet generated</td><td>{{ packet.chain.packet_generated_at }}</td></tr>
+      {% if packet.report.reviewed_at %}<tr><td>Manager Review</td><td>{{ packet.report.reviewed_at }}</td></tr>{% endif %}
+    </table>
+  </section>
+  <section class="packet-page">
+    <div class="packet-brand"><h1>Appendix C — Raw Audit Log</h1></div>
+    <p>Raw packet event export is not attached to this record.</p>
+  </section>
+</main>
+{% endblock %}

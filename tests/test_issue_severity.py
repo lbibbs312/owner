@@ -10,6 +10,7 @@ from app.services.issue_severity import (
     classify_wait,
     severity_level,
 )
+from app.services.driver_wait import dock_time_review_label
 
 
 def _level(**kwargs):
@@ -51,16 +52,26 @@ def test_one_minute_wait_is_not_critical():
 
 
 def test_nineteen_minute_wait_is_not_critical_without_threshold():
-    assert classify_wait(19)["level"] == "watch"
-    assert classify_wait(19, threshold=30)["level"] == "watch"
+    assert classify_wait(19)["level"] == "info"
+    assert classify_wait(19, threshold=30)["level"] == "info"
     assert classify_wait(19)["level"] != "critical"
 
 
-def test_wait_escalates_only_past_configured_threshold():
-    assert classify_wait(19, threshold=15)["level"] == "action"
-    assert classify_wait(45)["level"] == "action"
-    # even a very long wait stays Action Needed, never Critical
-    assert classify_wait(600)["level"] == "action"
+def test_wait_escalates_only_at_two_hour_review_threshold():
+    assert classify_wait(19, threshold=15)["level"] == "info"
+    assert classify_wait(45)["level"] == "info"
+    assert classify_wait(119)["level"] == "info"
+    assert classify_wait(120)["level"] == "action"
+    assert classify_wait(180)["level"] == "high"
+    # even a very long wait stays below the old Critical display level
+    assert classify_wait(600)["level"] == "high"
+    assert classify_wait(600)["level"] != "critical"
+
+
+def test_dock_time_display_language_uses_review_thresholds():
+    assert dock_time_review_label(57) == "Dock time: 57 min"
+    assert dock_time_review_label(120) == "Long wait — needs review"
+    assert dock_time_review_label(180) == "Extended wait — manager review required"
 
 
 def test_classify_wait_handles_none_and_garbage():

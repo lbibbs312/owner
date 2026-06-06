@@ -13,6 +13,7 @@ from app.services.load_state import (
     secondary_not_dropped_reason,
     truck_issue_reason,
 )
+from app.services.packet_classification import classify_damage_report
 from app.services.plant_addresses import plant_label
 
 
@@ -211,9 +212,9 @@ def _photo_rows(report):
                 "filename": photo.original_filename or photo.filename,
                 "stored_filename": photo.filename,
                 "content_type": photo.content_type or "Not recorded",
-                "hash": _file_hash(path),
+                "hash": photo.sha256_hash or _file_hash(path),
                 "file_exists": path.exists(),
-                "file_status": "Original retained" if path.exists() else "File missing from upload storage",
+                "file_status": "Available" if path.exists() else "Photo not available in upload storage",
                 "driver_note": report.description,
                 "manager_note": "No manager photo note recorded",
             }
@@ -225,16 +226,16 @@ def _timeline(report, logs, pretrips, transfers, tasks, signature_shift):
     events = [
         _event(
             report.created_at,
-            "Damage report created",
+            "Report created",
             report.reported_by.display_name if report.reported_by else "Driver",
-            "Damage workflow",
+            "Driver report",
             report.description,
         )
     ]
     if report.damage_time and report.damage_time != report.created_at:
-        events.append(_event(report.damage_time, "Damage reported time", report.reported_by.display_name if report.reported_by else "Driver", "Driver entry"))
+        events.append(_event(report.damage_time, "Report time", report.reported_by.display_name if report.reported_by else "Driver", "Driver entry"))
     for photo in report.photos:
-        events.append(_event(photo.uploaded_at, "Photo uploaded", report.reported_by.display_name if report.reported_by else "Driver", "Mobile damage photo", photo.original_filename or photo.filename))
+        events.append(_event(photo.uploaded_at, "Photo uploaded", report.reported_by.display_name if report.reported_by else "Driver", "Mobile report photo", photo.original_filename or photo.filename))
     for pretrip in pretrips:
         events.append(_event(pretrip.created_at, "PreTrip DVIR created", report.reported_by.display_name if report.reported_by else "Driver", "DVIR", f"Truck {pretrip.truck_number or 'not set'} / trailer {pretrip.trailer_number or 'not set'}"))
     routes = build_driver_log_route_context(logs)
@@ -281,38 +282,38 @@ def _timeline(report, logs, pretrips, transfers, tasks, signature_shift):
     return sorted(events, key=lambda row: row["sort_time"])
 
 
-def _warning_rows(report, logs, pretrips, photos, signature_shift, route_finalized):
-    warnings = []
+def _open_item_rows(report, logs, pretrips, photos, signature_shift, route_finalized):
+    open_items = []
     if not photos:
-        warnings.append("No photo is attached to the damage report.")
+        open_items.append("Photo not attached to this report.")
     for photo in photos:
         if not photo["file_exists"]:
-            warnings.append(f"Photo #{photo['number']} is missing from upload storage.")
+            open_items.append(f"Photo #{photo['number']} not available in upload storage.")
     if not pretrips:
-        warnings.append("No same-day PreTrip DVIR is linked to this driver/date.")
+        open_items.append("No same-day PreTrip DVIR is linked to this driver/date.")
     if not signature_shift or not signature_shift.driver_signature:
-        warnings.append("No driver route signature is captured for this date.")
-    warnings.append("No manager/auditor signature field is stored for damage packets yet.")
+        open_items.append("No driver route signature is captured for this date.")
+    open_items.append("Manager signature not captured for this packet.")
     if _driver_can_edit(report):
-        warnings.append("Report is still editable by the driver; submit or finalize to lock it.")
+        open_items.append("Report is still editable by the driver; submit or finalize to lock it.")
     if report.status != "closed":
-        warnings.append("Manager review is not closed.")
+        open_items.append("Manager review is not closed.")
     for log in logs:
         plant = plant_label(log.plant_name)
         if not log.depart_time:
-            warnings.append(f"No departure recorded for {plant}.")
+            open_items.append(f"No departure recorded for {plant}.")
         route_issue = route_problem_reason(log) or secondary_not_dropped_reason(log)
         if route_issue:
-            warnings.append(f"Route exception at {plant}: {route_issue}")
+            open_items.append(f"Route issue at {plant}: {route_issue}")
         truck_issue = truck_issue_reason(log)
         if truck_issue:
-            warnings.append(f"Truck issue at {plant}: {truck_issue}")
+            open_items.append(f"Truck issue at {plant}: {truck_issue}")
     for pretrip in pretrips:
         if pretrip.start_mileage is not None and pretrip.start_mileage >= 1_000_000:
-            warnings.append(f"Verify odometer entry on PreTrip #{pretrip.id}: {pretrip.start_mileage:,} mi.")
+            open_items.append(f"Verify odometer entry on PreTrip #{pretrip.id}: {pretrip.start_mileage:,} mi.")
     if route_finalized and report.status == "open":
-        warnings.append("Route is finalized, but the damage report status still shows open.")
-    return warnings
+        open_items.append("Route is finalized, but this report is still open.")
+    return open_items
 
 
 def build_damage_evidence_packet(report, *, generated_by):
@@ -323,10 +324,16 @@ def build_damage_evidence_packet(report, *, generated_by):
     routes = build_driver_log_route_context(logs)
     audit_count = AuditEvent.query.filter_by(target_type="damage_report", target_id=report.id).count()
     generated_at = datetime.utcnow()
+    classification = classify_damage_report(report)
+    open_items = _open_item_rows(report, logs, pretrips, photo_rows, signature_shift, route_finalized)
     return {
         "report": report,
         "report_date": report_date,
-        "packet_title": f"Damage Proof Record #{report.id}",
+        "packet_type": classification.packet_type,
+        "packet_label": classification.label,
+        "packet_title": f"{classification.label} #{report.id}",
+        "needs_clarification": classification.needs_clarification,
+        "classification_question": classification.question,
         "packet_version": f"1.{audit_count}",
         "generated_by": generated_by.display_name,
         "generated_at": _label_dt(generated_at),
@@ -335,7 +342,7 @@ def build_damage_evidence_packet(report, *, generated_by):
         "current_status": "Locked" if route_finalized or report.status != "open" else "Editable by driver",
         "photos": photo_rows,
         "timeline": _timeline(report, logs, pretrips, transfers, tasks, signature_shift),
-        "warnings": _warning_rows(report, logs, pretrips, photo_rows, signature_shift, route_finalized),
+        "open_items": open_items,
         "logs": logs,
         "log_routes": routes,
         "pretrips": pretrips,
