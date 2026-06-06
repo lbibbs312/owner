@@ -1,4 +1,5 @@
 import re
+from datetime import date, datetime
 
 import pytest
 
@@ -74,20 +75,105 @@ def test_driver_packet_entry_pages_use_clear_labels_and_neutral_defaults(client,
     accident_body = accident.get_data(as_text=True)
     assert "Crash or Safety Incident" in accident_body
     assert "Save Crash or Safety Incident" in accident_body
-    assert '<select name="anyone_hurt">\n              <option value="unknown">Unknown</option>' in accident_body
-    assert '<select name="vehicle_safe_to_operate_quick">\n              <option value="needs_review">Needs Review</option>' in accident_body
+    assert '<option value="">Select</option>' in accident_body
+    assert '<option value="unknown">Unknown</option>' in accident_body
+    assert '<option value="needs_review">Needs Review</option>' in accident_body
+    assert 'data-conditional-section="other-party" hidden' in accident_body
+    assert "DOT review status" not in accident_body
+    assert "Post-accident testing review" not in accident_body
 
     fuel = client.get("/ifta-worksheet/new")
     assert fuel.status_code == 200
     fuel_body = fuel.get_data(as_text=True)
     assert "<h1>Fuel Records</h1>" in fuel_body
     assert "Save Fuel Record" in fuel_body
+    assert "IFTA license number" not in fuel_body
+    assert "Base jurisdiction" not in fuel_body
+    assert 'name="tax_paid"' not in fuel_body
+    assert "Unknown</option>" not in fuel_body
 
     damage = client.get("/damage_reports/new")
     assert damage.status_code == 200
     damage_body = damage.get_data(as_text=True)
     assert "Physical Damage" in damage_body
     assert "Save Physical Damage" in damage_body
+
+
+def test_report_forms_prefill_known_route_context_and_hide_admin_fields(client, app):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("prefill_driver", "prefill@example.com", "driver", first_name="Lamar", last_name="Bibbs")
+        route_date = date.today()
+        pretrip = PreTrip(
+            user_id=driver.id,
+            pretrip_date=route_date,
+            truck_number="ST4",
+            trailer_number="TR9",
+            shift="1st",
+            start_mileage=244914,
+        )
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all(
+            [
+                ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime.utcnow()),
+                DriverLog(
+                    driver_id=driver.id,
+                    date=route_date,
+                    plant_name="RE",
+                    load_size="Empty",
+                    arrive_time="08:00",
+                    created_at=datetime.utcnow(),
+                ),
+            ]
+        )
+        db.session.commit()
+
+    login(client, "prefill_driver")
+    accident_body = client.get("/accident-incident/new").get_data(as_text=True)
+    fuel_body = client.get("/ifta-worksheet/new").get_data(as_text=True)
+
+    assert 'name="truck" value="ST4"' in accident_body
+    assert 'name="trailer" value="TR9"' in accident_body
+    assert "Raleigh East" in accident_body
+    assert "3505 Kraft Ave SE" in accident_body
+    assert 'name="truck" value="ST4"' in fuel_body
+    assert 'name="trailer" value="TR9"' in fuel_body
+    assert 'name="vehicle_unit_number" value="ST4"' in fuel_body
+    assert 'name="purchaser_name" value="Lamar Bibbs"' in fuel_body
+    assert 'name="beginning_odometer" value="244914"' in fuel_body
+    assert 'value="244914"' in fuel_body
+
+
+def test_blank_driver_answers_do_not_save_fake_unknown_values(client, app):
+    with app.app_context():
+        create_user("blank_driver", "blank@example.com", "driver")
+
+    login(client, "blank_driver")
+    accident_response = client.post(
+        "/accident-incident/new",
+        data={"packet_type": "accident_incident", "driver_statement": "Facts only."},
+        follow_redirects=False,
+    )
+    assert accident_response.status_code == 302
+    fuel_response = client.post(
+        "/ifta-worksheet/new",
+        data={"seller_name": "Fuel Stop", "gallons_or_liters": "10", "fuel_type": "diesel"},
+        follow_redirects=False,
+    )
+    assert fuel_response.status_code == 302
+
+    with app.app_context():
+        from app.models import AccidentIncidentReport, IftaFuelRecord
+
+        report = AccidentIncidentReport.query.one()
+        fuel = IftaFuelRecord.query.one()
+        assert report.anyone_hurt is None
+        assert report.police_called_quick is None
+        assert report.other_vehicle_involved_quick is None
+        assert fuel.tax_paid is None
 
 
 def test_accident_packet_contains_review_sections_without_driver_legal_conclusion(client, app):

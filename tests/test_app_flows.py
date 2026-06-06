@@ -6292,6 +6292,11 @@ def test_mobile_dashboard_does_not_render_permanent_packet_workflows_strip(clien
     assert "Packet Workflows" not in body
     assert 'class="card packet-workflows"' not in body
     assert 'id="packet-workflows"' not in body
+    assert '<div class="md-flow-top-actions"' not in body
+    assert "md-flow-action-tab" not in body
+    assert "Camera</strong>" not in body
+    assert "PreTrip and Shift</strong>" not in body
+    assert "Sheet</strong>" not in body
 
 
 def test_driver_reports_hub_lists_report_choices_with_correct_destinations(client, app):
@@ -6305,6 +6310,7 @@ def test_driver_reports_hub_lists_report_choices_with_correct_destinations(clien
     assert response.status_code == 200
     assert "<h1>Reports</h1>" in body
     assert "Driver Logs stay as the route ledger." in body
+    assert "0 Recent" in body
     choices_start = body.index('<section class="driver-report-list"')
     choices = body[choices_start: body.index("</section>", choices_start)]
     assert 'href="/driver_logs"' not in choices
@@ -6327,6 +6333,35 @@ def test_driver_reports_hub_lists_report_choices_with_correct_destinations(clien
     fuel_link = choices[fuel_link_start: choices.index("</a>", fuel_label_start)]
     assert 'href="/ifta-worksheet/new"' in fuel_link
     assert 'href="/damage_reports/new"' not in fuel_link
+
+
+def test_widescreen_driver_actions_have_reports_entry_without_report_shortcut_row(client, app):
+    with app.app_context():
+        from datetime import date
+
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("wide_reports_driver", "wide-reports@example.com", "driver")
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=date.today(),
+                plant_name="RE",
+                load_size="Empty",
+                arrive_time="08:00",
+            )
+        )
+        db.session.commit()
+
+    login(client, "wide_reports_driver")
+    response = client.get("/mobile")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert '<a class="logout-link desktop-work-link" href="/reports">Reports</a>' in body
+    assert 'href="/damage_reports">Physical Damage</a>' not in body
+    assert 'href="/ifta-worksheet/new">Fuel Records</a>' not in body
 
 
 def test_mobile_dashboard_focuses_latest_stop_when_no_current_stop(client, app):
@@ -7072,8 +7107,8 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "md-flow-primary-cta" in body
     assert "Required driver action" in body
     assert "record departure" in body
-    assert 'class="md-flow-action-tab primary" href' in body
-    assert 'class="md-flow-action-tab primary is-next-required"' not in body
+    assert '<div class="md-flow-top-actions"' not in body
+    assert "md-flow-action-tab" not in body
     assert 'flow-status status-attention">NEEDS DEPARTURE' not in body
     assert '<div class="md-flow-ticker" aria-hidden="true">' not in body
     assert ".md-flow-board .md-flow-row.tone-active" in body
@@ -7097,19 +7132,17 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "border-left: 3px solid rgba(255,178,36" not in body
     assert "border-left: 3px solid rgba(255,82,71" not in body
     assert "content: none!important" in body
-    assert ".md-flow-action-tab::before" in body
-    assert "animation: actionDotPulse 1.9s ease-in-out infinite" in body
-    assert ".md-flow-action-tab.is-next-required:not(.add-stop-action)" in body
-    assert "animation: actionButtonBreath 2.6s ease-in-out infinite" in body
-    assert "@keyframes actionButtonBreath" in body
-    assert ".md-flow-action-tab.add-stop-action" in body
-    assert "animation: addStopBreath 2.45s ease-in-out infinite" in body
+    assert ".md-flow-action-tab::before" not in body
+    assert "animation: actionDotPulse 1.9s ease-in-out infinite" not in body
+    assert ".md-flow-action-tab.is-next-required:not(.add-stop-action)" not in body
+    assert "animation: actionButtonBreath 2.6s ease-in-out infinite" not in body
+    assert "@keyframes actionButtonBreath" not in body
+    assert "addStopBreath 2.45s ease-in-out infinite" in body
     assert "@keyframes addStopBreath" in body
     assert "animation: primaryFlowActionBreath 2.6s ease-in-out infinite" in body
     assert "@keyframes primaryFlowActionBreath" in body
-    assert "background: rgba(43,213,118,.15)" in body
-    assert "@keyframes actionDotPulse" in body
-    assert "grid-template-columns: 9px max-content" in body
+    assert "@keyframes actionDotPulse" not in body
+    assert "grid-template-columns: 9px max-content" not in body
     assert "border: 1px solid rgba(91,157,255,.28)" not in body
     assert "linear-gradient(180deg, rgba(47,109,240,.22)" not in body
     assert "inset 0 0 18px rgba(91,157,255,.04)" not in body
@@ -7179,10 +7212,10 @@ def test_mobile_dashboard_active_shift_without_stops_keeps_add_stop_primary(clie
 
     assert page.status_code == 200
     assert b"PostTrip Due" not in page.data
-    assert b"PostTrip Available" in page.data
-    assert b"Optional until route close" in page.data
     assert b'<a class="md-flow-primary-cta add-stop-action"' in page.data
     assert b"<strong>Add Stop</strong>" in page.data
+    assert b'<div class="md-flow-top-actions"' not in page.data
+    assert b"md-flow-action-tab" not in page.data
 
 
 def test_mobile_dashboard_active_between_stops_prioritizes_add_stop_over_posttrip(client, app):
@@ -7217,10 +7250,11 @@ def test_mobile_dashboard_active_between_stops_prioritizes_add_stop_over_posttri
 
     assert page.status_code == 200
     assert b"PostTrip Due" not in page.data
-    assert b"PostTrip Available" in page.data
     assert b'<a class="md-flow-primary-cta add-stop-action"' in page.data
     assert b"<strong>Add Stop</strong>" in page.data
     assert b"Finalize Route" not in page.data
+    assert b'<div class="md-flow-top-actions"' not in page.data
+    assert b"md-flow-action-tab" not in page.data
 
 
 def test_end_of_day_summary_shows_posttrip_due_when_finalizing_without_posttrip(client, app):

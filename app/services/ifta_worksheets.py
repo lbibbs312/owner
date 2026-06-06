@@ -70,15 +70,16 @@ def ifta_receipt_path(filename):
     return path if os.path.isfile(path) else None
 
 
-def create_ifta_worksheet_from_form(form, files, *, user):
+def create_ifta_worksheet_from_form(form, files, *, user, report_context=None):
     now = datetime.utcnow()
+    context = report_context or {}
     worksheet = IftaWorksheet(
-        reporting_period_quarter=_clean(form.get("reporting_period_quarter")),
-        reporting_year=_int_or_none(form.get("reporting_year")),
+        reporting_period_quarter=_clean(form.get("reporting_period_quarter")) or context.get("reporting_period_quarter"),
+        reporting_year=_int_or_none(form.get("reporting_year") or context.get("reporting_year")),
         driver_id=user.id if getattr(user, "role", None) == "driver" else _int_or_none(form.get("driver_id")),
-        truck=_clean(form.get("truck")),
-        trailer=_clean(form.get("trailer")),
-        vin_or_vehicle_unit_number=_clean(form.get("vin_or_vehicle_unit_number")),
+        truck=_clean(form.get("truck")) or context.get("truck"),
+        trailer=_clean(form.get("trailer")) or context.get("trailer"),
+        vin_or_vehicle_unit_number=_clean(form.get("vin_or_vehicle_unit_number")) or context.get("vehicle_unit_number"),
         fleet_number=_clean(form.get("fleet_number")),
         base_jurisdiction=_clean(form.get("base_jurisdiction")),
         carrier_name=_clean(form.get("carrier_name")),
@@ -93,16 +94,16 @@ def create_ifta_worksheet_from_form(form, files, *, user):
     db.session.flush()
     trip = IftaTripDistanceRow(
         worksheet_id=worksheet.id,
-        trip_start_date=_parse_date(form.get("trip_start_date")),
-        trip_end_date=_parse_date(form.get("trip_end_date")),
+        trip_start_date=_parse_date(form.get("trip_start_date") or context.get("trip_start_date")),
+        trip_end_date=_parse_date(form.get("trip_end_date") or context.get("trip_end_date")),
         origin_city=_clean(form.get("origin_city")),
         origin_state=_clean(form.get("origin_state")),
         destination_city=_clean(form.get("destination_city")),
         destination_state=_clean(form.get("destination_state")),
         route_traveled=_clean(form.get("route_traveled")),
-        beginning_odometer=_float_or_none(form.get("beginning_odometer")),
-        ending_odometer=_float_or_none(form.get("ending_odometer")),
-        total_trip_distance=_float_or_none(form.get("total_trip_distance")),
+        beginning_odometer=_float_or_none(form.get("beginning_odometer") or context.get("start_mileage")),
+        ending_odometer=_float_or_none(form.get("ending_odometer") or context.get("current_mileage")),
+        total_trip_distance=_float_or_none(form.get("total_trip_distance") or context.get("total_route_miles")),
         jurisdiction=_clean(form.get("jurisdiction")),
         jurisdiction_distance=_float_or_none(form.get("jurisdiction_distance")),
         taxable_distance=_float_or_none(form.get("taxable_distance")),
@@ -114,9 +115,20 @@ def create_ifta_worksheet_from_form(form, files, *, user):
     if any(getattr(trip, field) is not None for field in ("trip_start_date", "origin_city", "destination_city", "total_trip_distance", "jurisdiction")):
         db.session.add(trip)
     receipt_filename, receipt_hash = save_ifta_receipt(files.get("receipt_photo"), worksheet.id)
+    fuel_driver_supplied = bool(
+        receipt_filename
+        or _clean(form.get("purchase_date"))
+        or _clean(form.get("seller_name"))
+        or _clean(form.get("fuel_city"))
+        or _clean(form.get("state_or_province"))
+        or _clean(form.get("gallons_or_liters"))
+        or _clean(form.get("fuel_type"))
+        or _clean(form.get("ending_odometer"))
+        or _clean(form.get("tax_paid"))
+    )
     fuel = IftaFuelRecord(
         worksheet_id=worksheet.id,
-        purchase_date=_parse_date(form.get("purchase_date")),
+        purchase_date=_parse_date(form.get("purchase_date") or context.get("route_date_value")),
         seller_name=_clean(form.get("seller_name")),
         seller_address=_clean(form.get("seller_address")),
         city=_clean(form.get("fuel_city")),
@@ -125,14 +137,14 @@ def create_ifta_worksheet_from_form(form, files, *, user):
         fuel_type=_clean(form.get("fuel_type")),
         price_per_gallon_or_liter=_float_or_none(form.get("price_per_gallon_or_liter")),
         total_sale_amount=_float_or_none(form.get("total_sale_amount")),
-        vehicle_unit_number=_clean(form.get("vehicle_unit_number")) or worksheet.vin_or_vehicle_unit_number,
-        purchaser_name=_clean(form.get("purchaser_name")),
+        vehicle_unit_number=_clean(form.get("vehicle_unit_number")) or context.get("vehicle_unit_number") or worksheet.vin_or_vehicle_unit_number,
+        purchaser_name=_clean(form.get("purchaser_name")) or context.get("purchaser_name"),
         receipt_photo=receipt_filename,
         receipt_hash=receipt_hash,
-        tax_paid=_clean(form.get("tax_paid"), "unknown"),
+        tax_paid=_clean(form.get("tax_paid")),
         bulk_fuel=str(form.get("bulk_fuel") or "").lower() in {"1", "yes", "true", "on"},
     )
-    if any(getattr(fuel, field) is not None for field in ("purchase_date", "seller_name", "gallons_or_liters", "fuel_type", "receipt_photo")):
+    if fuel_driver_supplied:
         db.session.add(fuel)
     return worksheet
 

@@ -13,6 +13,12 @@
     gap:6px;
     margin-bottom:18px;
   }
+  .driver-report-hero-top {
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:12px;
+  }
   .driver-report-kicker {
     margin:0;
     color:var(--md-amber);
@@ -42,6 +48,22 @@
   .driver-report-list {
     display:grid;
     gap:10px;
+  }
+  .driver-report-count {
+    display:inline-flex;
+    align-items:center;
+    min-height:32px;
+    border:1px solid rgba(43,213,118,.42);
+    border-radius:8px;
+    padding:0 10px;
+    color:#9df8be;
+    background:rgba(43,213,118,.10);
+    font-family:var(--md-mono);
+    font-size:.7rem;
+    font-weight:950;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    white-space:nowrap;
   }
   .driver-report-choice {
     display:grid;
@@ -104,6 +126,36 @@
     text-transform:uppercase;
     white-space:nowrap;
   }
+  .recent-report-list {
+    display:grid;
+    gap:8px;
+    margin-top:18px;
+  }
+  .recent-report-row {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:10px;
+    align-items:center;
+    min-height:58px;
+    padding:10px 12px;
+    border:1px solid rgba(148,163,184,.18);
+    border-radius:8px;
+    background:rgba(255,255,255,.035);
+    color:var(--md-text);
+    text-decoration:none;
+  }
+  .recent-report-row:hover,
+  .recent-report-row:focus { color:var(--md-text); border-color:rgba(91,157,255,.42); }
+  .recent-report-row strong { display:block; font-size:.86rem; font-weight:950; overflow-wrap:anywhere; }
+  .recent-report-row span { display:block; margin-top:3px; color:var(--md-muted); font-size:.74rem; font-weight:750; }
+  .recent-report-status {
+    color:var(--md-amber);
+    font-family:var(--md-mono);
+    font-size:.64rem;
+    font-weight:950;
+    text-transform:uppercase;
+    white-space:nowrap;
+  }
   @media (max-width:520px) {
     .driver-report-choice {
       grid-template-columns:auto minmax(0,1fr);
@@ -117,7 +169,10 @@
 <main class="driver-report-hub responsive-workspace">
   <header class="driver-report-hero">
     <p class="driver-report-kicker">Driver report hub</p>
-    <h1>Reports</h1>
+    <div class="driver-report-hero-top">
+      <h1>Reports</h1>
+      <span class="driver-report-count">{{ report_count|default(0) }} Recent</span>
+    </div>
     <p>Choose the record you are submitting. Driver Logs stay as the route ledger.</p>
   </header>
 
@@ -133,6 +188,20 @@
       </a>
     {% endfor %}
   </section>
+
+  {% if recent_reports %}
+    <section class="recent-report-list" aria-label="Recent reports">
+      {% for item in recent_reports %}
+        <a class="recent-report-row" href="{{ item.url }}">
+          <span>
+            <strong>{{ item.type }}{% if item.title %} · {{ item.title }}{% endif %}</strong>
+            <span>{% if item.created_at %}{{ item.created_at|to_detroit_datetime }}{% else %}Saved report{% endif %}</span>
+          </span>
+          <span class="recent-report-status">{{ item.status }}</span>
+        </a>
+      {% endfor %}
+    </section>
+  {% endif %}
 </main>
 
 {% set md_nav_active = 'reports' %}

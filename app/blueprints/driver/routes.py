@@ -39,6 +39,7 @@ from app.services.evidence_packet import build_damage_evidence_packet
 from app.services.file_integrity import sha256_file
 from app.services.ifta_worksheets import build_ifta_packet, create_ifta_worksheet_from_form, ifta_receipt_path
 from app.services.packet_classification import PacketClassification, classify_damage_report, packet_label_for_report
+from app.services.report_context import build_report_context
 from app.services.document_numbers import (
     document_meta,
     eod_document_number,
@@ -4885,6 +4886,12 @@ def damage_reports():
 @bp.route("/reports")
 @login_required
 def driver_reports():
+    report_context = build_report_context(
+        user=current_user,
+        selected_report_type=request.args.get("report_type"),
+        driver_log_id=request.args.get("driver_log_id", type=int),
+        stop_id=request.args.get("stop_id", type=int),
+    )
     report_choices = [
         {
             "label": "Fuel / Low Fuel",
@@ -4917,7 +4924,71 @@ def driver_reports():
             "code": "RN",
         },
     ]
-    return render_template("driver_reports.html", report_choices=report_choices)
+    recent_reports = []
+    for report in (
+        DamageReport.query.filter_by(reported_by_id=current_user.id)
+        .order_by(DamageReport.created_at.desc())
+        .limit(5)
+    ):
+        recent_reports.append(
+            {
+                "type": "Physical Damage",
+                "title": report.description or "Damage report",
+                "status": report.status or "open",
+                "created_at": report.created_at,
+                "url": url_for("driver.view_damage_report", report_id=report.id),
+            }
+        )
+    for report in (
+        AccidentIncidentReport.query.filter(
+            or_(
+                AccidentIncidentReport.driver_id == current_user.id,
+                AccidentIncidentReport.created_by_id == current_user.id,
+            )
+        )
+        .order_by(AccidentIncidentReport.created_at.desc())
+        .limit(5)
+    ):
+        recent_reports.append(
+            {
+                "type": "Crash or Safety Incident",
+                "title": report.plant_or_location or "Incident report",
+                "status": report.manager_review_status or "open",
+                "created_at": report.created_at,
+                "url": url_for("driver.view_accident_incident", report_id=report.id),
+            }
+        )
+    for worksheet in (
+        IftaWorksheet.query.filter(
+            or_(
+                IftaWorksheet.driver_id == current_user.id,
+                IftaWorksheet.created_by_id == current_user.id,
+            )
+        )
+        .order_by(IftaWorksheet.created_at.desc())
+        .limit(5)
+    ):
+        recent_reports.append(
+            {
+                "type": "Fuel Record",
+                "title": worksheet.truck or "Fuel or odometer record",
+                "status": worksheet.review_status or "Draft",
+                "created_at": worksheet.created_at,
+                "url": url_for("driver.view_ifta_worksheet", worksheet_id=worksheet.id),
+            }
+        )
+    recent_reports = sorted(
+        recent_reports,
+        key=lambda item: item["created_at"] or datetime.min,
+        reverse=True,
+    )[:8]
+    return render_template(
+        "driver_reports.html",
+        report_choices=report_choices,
+        report_context=report_context,
+        report_count=len(recent_reports),
+        recent_reports=recent_reports,
+    )
 
 
 @bp.route("/driver_logs/<int:log_id>/request_review", methods=["POST"], strict_slashes=False)
@@ -5140,6 +5211,12 @@ def new_accident_incident():
         driver_log = _active_driver_logs_query().filter_by(id=driver_log_id).first_or_404()
         if current_user.role != "management" and driver_log.driver_id != current_user.id:
             abort(403)
+    report_context = build_report_context(
+        user=current_user,
+        selected_report_type="accident_incident",
+        driver_log_id=getattr(driver_log, "id", None) or driver_log_id,
+        stop_id=request.values.get("stop_id", type=int),
+    )
     if request.method == "POST":
         if not accident_form_required(
             packet_type=request.form.get("packet_type") or "accident_incident",
@@ -5153,6 +5230,7 @@ def new_accident_incident():
             user=current_user,
             damage_report=damage_report,
             driver_log=driver_log,
+            report_context=report_context,
         )
         record_activity(
             user_id=current_user.id,
@@ -5172,6 +5250,7 @@ def new_accident_incident():
         report=None,
         damage_report=damage_report,
         driver_log=driver_log,
+        report_context=report_context,
         manager_view=False,
     )
 
@@ -5227,8 +5306,19 @@ def accident_incident_packet(report_id):
 @bp.route("/ifta-worksheet/new", methods=["GET", "POST"])
 @login_required
 def new_ifta_worksheet():
+    report_context = build_report_context(
+        user=current_user,
+        selected_report_type="fuel_odo_ifta",
+        driver_log_id=request.values.get("driver_log_id", type=int),
+        stop_id=request.values.get("stop_id", type=int),
+    )
     if request.method == "POST":
-        worksheet = create_ifta_worksheet_from_form(request.form, request.files, user=current_user)
+        worksheet = create_ifta_worksheet_from_form(
+            request.form,
+            request.files,
+            user=current_user,
+            report_context=report_context,
+        )
         record_activity(
             user_id=current_user.id,
             category="ifta",
@@ -5242,7 +5332,12 @@ def new_ifta_worksheet():
         db.session.commit()
         flash("Fuel Record saved.", "success")
         return redirect(url_for("driver.view_ifta_worksheet", worksheet_id=worksheet.id))
-    return render_template("ifta_worksheet_form.html", worksheet=None, manager_view=False)
+    return render_template(
+        "ifta_worksheet_form.html",
+        worksheet=None,
+        manager_view=False,
+        report_context=report_context,
+    )
 
 
 @bp.route("/ifta-worksheet/<int:worksheet_id>")

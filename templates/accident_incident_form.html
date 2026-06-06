@@ -2,15 +2,20 @@
 {% block content %}
 <script>document.body.classList.add('md-shell');</script>
 {% include 'partials/_md_shell.html' %}
+{% set ctx = report_context or {} %}
 <style>
-  .packet-form { max-width:1120px; margin:0 auto; padding:22px; }
-  .packet-form h1 { font-weight:950; margin:0 0 4px; }
-  .packet-form .lead { color:var(--md-muted, #64748b); font-weight:750; margin:0 0 18px; }
-  .packet-section { border:1px solid rgba(148,163,184,.26); border-radius:8px; padding:14px; margin-bottom:14px; background:rgba(255,255,255,.04); }
-  .packet-section h2 { font-size:.9rem; text-transform:uppercase; letter-spacing:.05em; font-weight:950; margin:0 0 12px; color:var(--md-amber, #c9972b); }
-  .field-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
-  .field-grid.two { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .field-grid label, .check-grid label { display:grid; gap:5px; font-weight:800; color:var(--md-text, #f8fafc); }
+  .packet-form { max-width:920px; margin:0 auto; padding:22px 14px; }
+  .packet-form h1 { margin:0 0 4px; color:var(--md-text); font-family:var(--md-display); font-size:clamp(2rem, 6vw, 3rem); font-weight:950; letter-spacing:0; line-height:.98; text-transform:uppercase; }
+  .packet-form .lead { margin:0 0 18px; color:var(--md-muted, #64748b); font-weight:750; line-height:1.45; }
+  .packet-section { border:1px solid rgba(91,157,255,.22); border-radius:8px; padding:14px; margin-bottom:14px; background:rgba(8,14,24,.88); box-shadow:inset 0 1px 0 rgba(91,157,255,.06); }
+  .packet-section h2 { margin:0 0 12px; color:var(--md-amber, #c9972b); font-family:var(--md-mono); font-size:.76rem; font-weight:950; letter-spacing:.08em; text-transform:uppercase; }
+  .context-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+  .context-pill { border:1px solid rgba(148,163,184,.18); border-radius:8px; padding:9px 10px; background:rgba(255,255,255,.035); min-width:0; }
+  .context-pill span { display:block; color:var(--md-muted); font-family:var(--md-mono); font-size:.58rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
+  .context-pill strong { display:block; margin-top:4px; color:var(--md-text); font-size:.86rem; font-weight:900; overflow-wrap:anywhere; }
+  .field-grid, .quick-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .quick-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .field-grid label, .quick-grid label, .fact-check { display:grid; gap:5px; color:var(--md-text); font-size:.82rem; font-weight:850; }
   .field-grid input,
   .field-grid select,
   .field-grid textarea,
@@ -22,46 +27,70 @@
     padding:9px 10px;
     background:rgba(5,13,23,.82);
     color:var(--md-text, #f8fafc);
+    font:inherit;
   }
-  .field-grid input:disabled { color:var(--md-muted, #94a3b8); opacity:1; }
   .field-grid option, .quick-grid option { background:#07111f; color:#f8fafc; }
-  .check-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
-  .check-grid label { grid-template-columns:auto 1fr; align-items:center; }
-  .quick-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+  .field-grid textarea { min-height:96px; resize:vertical; }
+  .fact-check { grid-template-columns:auto minmax(0,1fr); align-items:center; padding:10px; border:1px solid rgba(148,163,184,.18); border-radius:8px; background:rgba(255,255,255,.03); }
+  .conditional-section[hidden] { display:none; }
   .actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
-  @media (max-width:800px) { .field-grid, .field-grid.two, .quick-grid, .check-grid { grid-template-columns:1fr; } }
+  @media (max-width:800px) { .context-grid, .field-grid, .quick-grid { grid-template-columns:1fr; } }
 </style>
 
 <main class="packet-form responsive-workspace">
   <h1>Crash or Safety Incident</h1>
   <p class="lead">Record facts only. Do not guess fault.</p>
-  <form method="POST" action="{{ request.full_path if request.query_string else request.path }}" enctype="multipart/form-data">
+  <form method="POST" action="{{ request.full_path if request.query_string else request.path }}" enctype="multipart/form-data" data-accident-driver-form>
     <input type="hidden" name="packet_type" value="accident_incident">
+    <input type="hidden" name="incident_date_time" value="{{ ctx.incident_datetime_value or '' }}">
+    <input type="hidden" name="reported_date_time" value="{{ ctx.reported_datetime_value or '' }}">
+    <input type="hidden" name="truck" value="{{ (damage_report.truck_number if damage_report else ctx.truck) or '' }}">
+    <input type="hidden" name="trailer" value="{{ (damage_report.trailer_number if damage_report else ctx.trailer) or '' }}">
+    <input type="hidden" name="route_id" value="{{ ctx.route_id or '' }}">
+    <input type="hidden" name="plant_or_location" value="{{ (damage_report.plant_name if damage_report else (driver_log.plant_name if driver_log else ctx.plant_or_location)) or '' }}">
+    <input type="hidden" name="exact_location_text" value="{{ ctx.exact_location_text or '' }}">
+    <input type="hidden" name="city" value="{{ ctx.city or '' }}">
+    <input type="hidden" name="state" value="{{ ctx.state or '' }}">
 
     <section class="packet-section">
-      <h2>Quick Questions</h2>
+      <h2>Known context</h2>
+      <div class="context-grid">
+        <div class="context-pill"><span>Driver</span><strong>{{ current_user.display_name }}</strong></div>
+        <div class="context-pill"><span>Truck</span><strong>{{ (damage_report.truck_number if damage_report else ctx.truck) or 'Blank' }}</strong></div>
+        <div class="context-pill"><span>Trailer</span><strong>{{ (damage_report.trailer_number if damage_report else ctx.trailer) or 'Blank' }}</strong></div>
+        <div class="context-pill"><span>Route date</span><strong>{{ ctx.route_date_value or 'Blank' }}</strong></div>
+        <div class="context-pill"><span>Stop</span><strong>{{ ctx.stop_label or (driver_log.plant_name if driver_log else '') or 'Blank' }}</strong></div>
+        <div class="context-pill"><span>Location</span><strong>{{ ctx.exact_location_text or 'Blank' }}</strong></div>
+      </div>
+    </section>
+
+    <section class="packet-section">
+      <h2>Quick questions</h2>
       <div class="quick-grid">
         {% for name, label, choices in [
-          ('anyone_hurt','Anyone hurt?', ['unknown','yes','no']),
-          ('other_vehicle_involved_quick','Other vehicle involved?', ['unknown','yes','no']),
-          ('property_damage_quick','Property damage?', ['unknown','yes','no']),
-          ('police_called_quick','Police called?', ['unknown','yes','no']),
-          ('tow_away_needed','Tow-away needed?', ['unknown','yes','no']),
-          ('vehicle_safe_to_operate_quick','Vehicle safe to operate?', ['needs_review','yes','no']),
-          ('manager_notified_quick','Manager notified?', ['no','yes'])
+          ('anyone_hurt','Anyone hurt?', ['yes','no','unknown']),
+          ('other_vehicle_involved_quick','Other vehicle involved?', ['yes','no','unknown']),
+          ('property_damage_quick','Property damage?', ['yes','no','unknown']),
+          ('police_called_quick','Police called?', ['yes','no','unknown']),
+          ('tow_away_needed','Tow-away needed?', ['yes','no','unknown']),
+          ('vehicle_safe_to_operate_quick','Vehicle safe to operate?', ['yes','no','needs_review']),
+          ('manager_notified_quick','Manager notified?', ['yes','no'])
         ] %}
           <label>{{ label }}
-            <select name="{{ name }}">
-              {% for choice in choices %}<option value="{{ choice }}">{{ choice.replace('_',' ')|title }}</option>{% endfor %}
+            <select name="{{ name }}" data-accident-answer="{{ name }}">
+              <option value="">Select</option>
+              {% for choice in choices %}
+                <option value="{{ choice }}">{{ choice.replace('_',' ')|title }}</option>
+              {% endfor %}
             </select>
           </label>
         {% endfor %}
         <label>Add photos now
           <input type="file" name="photos" accept="image/*,.pdf" multiple>
         </label>
-        <label>Photo category
+        <label>Photo type
           <select name="photo_category">
-            {% for category in ['scene_wide','company_vehicle_front','company_vehicle_rear','company_vehicle_left','company_vehicle_right','damage_closeup','plate_or_unit_number','other_vehicle','property_damage','cargo_damage','police_report','insurance_document','fuel_receipt','odometer_photo','other'] %}
+            {% for category in ['scene_wide','company_vehicle_front','company_vehicle_rear','company_vehicle_left','company_vehicle_right','damage_closeup','plate_or_unit_number','other_vehicle','property_damage','cargo_damage','police_report','insurance_document','other'] %}
               <option value="{{ category }}">{{ category.replace('_',' ')|title }}</option>
             {% endfor %}
           </select>
@@ -70,95 +99,56 @@
     </section>
 
     <section class="packet-section">
-      <h2>A. Incident Basics</h2>
-      <div class="field-grid">
-        <label>Incident date and time <input type="datetime-local" name="incident_date_time"></label>
-        <label>Reported date and time <input type="datetime-local" name="reported_date_time"></label>
-        <label>Driver <input type="text" value="{{ current_user.display_name }}" disabled></label>
-        <label>Truck <input type="text" name="truck" value="{{ damage_report.truck_number if damage_report else '' }}"></label>
-        <label>Trailer <input type="text" name="trailer" value="{{ damage_report.trailer_number if damage_report else '' }}"></label>
-        <label>Route ID <input type="text" name="route_id"></label>
-        <label>Stop ID <input type="text" value="{{ driver_log.id if driver_log else '' }}" disabled></label>
-        <label>Plant or location <input type="text" name="plant_or_location" value="{{ damage_report.plant_name if damage_report else (driver_log.plant_name if driver_log else '') }}"></label>
-        <label>Exact location <input type="text" name="exact_location_text"></label>
-        <label>GPS latitude <input type="number" name="gps_latitude" step="any"></label>
-        <label>GPS longitude <input type="number" name="gps_longitude" step="any"></label>
-        <label>Road, property, yard, or dock
-          <select name="public_road_private_property_yard_dock">
-            <option value="">Not recorded</option>
-            <option value="public_road">Public road</option>
-            <option value="private_property">Private property</option>
-            <option value="yard">Yard</option>
-            <option value="dock">Dock</option>
-          </select>
-        </label>
-        <label>City <input type="text" name="city"></label>
-        <label>State <input type="text" name="state"></label>
-        <label>Nearest city or town <input type="text" name="nearest_city_or_town"></label>
-        <label>Weather <input type="text" name="weather"></label>
-        <label>Lighting <input type="text" name="lighting"></label>
-        <label>Surface condition <input type="text" name="surface_condition"></label>
-      </div>
-    </section>
-
-    <section class="packet-section">
-      <h2>B. Incident Type</h2>
-      <div class="check-grid">
-        {% for name, label in [
-          ('hit_object','Hit object'),('hit_by_third_party','Hit by third party'),('backing_incident','Backing incident'),
-          ('dock_or_yard_incident','Dock or yard incident'),('cargo_damage','Cargo damage'),('vehicle_damage','Vehicle damage'),
-          ('property_damage','Property damage'),('injury_reported','Injury reported'),('tow_away','Tow-away'),
-          ('other_vehicle_involved','Other vehicle involved'),('claim_expected','Claim expected'),('other_incident_type','Other')
-        ] %}
-          <label><input type="checkbox" name="{{ name }}" value="yes"> {{ label }}</label>
-        {% endfor %}
-      </div>
-      <div class="field-grid">
-        <label>Police called
-          <select name="police_called"><option>unknown</option><option>yes</option><option>no</option></select>
-        </label>
-      </div>
-    </section>
-
-    <section class="packet-section">
-      <h2>C. Driver Statement</h2>
+      <h2>Driver statement</h2>
       <p class="lead">Record facts only. Do not guess fault or admit liability.</p>
-      <div class="field-grid two">
-        <label>Driver statement <textarea name="driver_statement" rows="5"></textarea></label>
-        <label><span>Facts-only acknowledgement</span><span><input type="checkbox" name="facts_only_acknowledgement" value="yes"> Driver recorded facts only</span></label>
+      <div class="field-grid">
+        <label>Driver statement <textarea name="driver_statement" rows="5" placeholder="What happened? Use facts only."></textarea></label>
+        <label class="fact-check"><input type="checkbox" name="facts_only_acknowledgement" value="yes"> <span>Driver recorded facts only</span></label>
       </div>
     </section>
 
-    <section class="packet-section">
-      <h2>D. Damage Details</h2>
-      <div class="field-grid two">
-        <label>Company vehicle damage <textarea name="company_vehicle_damage_description"></textarea></label>
-        <label>Other vehicle damage <textarea name="other_vehicle_damage_description"></textarea></label>
-        <label>Property damage <textarea name="property_damage_description"></textarea></label>
-        <label>Cargo damage <textarea name="cargo_damage_description"></textarea></label>
-        <label>Visible damage location <input type="text" name="visible_damage_location"></label>
-        <label>Vehicle safe to operate <select name="vehicle_safe_to_operate"><option value="needs_review">Needs Review</option><option>yes</option><option>no</option></select></label>
-        <label>Repair needed <select name="repair_needed"><option value="needs_review">Needs Review</option><option>yes</option><option>no</option></select></label>
-        <label>Vehicle removed from service <select name="vehicle_removed_from_service"><option value="needs_review">Needs Review</option><option>yes</option><option>no</option></select></label>
-      </div>
-    </section>
-
-    <section class="packet-section">
-      <h2>E. Other Party Information</h2>
+    <section class="packet-section conditional-section" data-conditional-section="other-party" hidden>
+      <h2>Other party</h2>
+      <input type="hidden" name="other_vehicle_involved" value="yes" data-conditional-hidden="other-party" disabled>
       <div class="field-grid">
         <label>Other driver name <input type="text" name="other_driver_name"></label>
         <label>Other driver phone <input type="text" name="other_driver_phone"></label>
-        <label>Other driver license number <input type="text" name="other_driver_license_number"></label>
         <label>Other vehicle make and model <input type="text" name="other_vehicle_make_model"></label>
         <label>Other vehicle plate <input type="text" name="other_vehicle_plate"></label>
         <label>Other insurance company <input type="text" name="other_insurance_company"></label>
-        <label>Other policy or claim number <input type="text" name="other_policy_or_claim_number"></label>
         <label>Other party notes <textarea name="other_party_notes"></textarea></label>
       </div>
     </section>
 
-    <section class="packet-section">
-      <h2>F. Witnesses</h2>
+    <section class="packet-section conditional-section" data-conditional-section="police-claim" hidden>
+      <h2>Police and claim</h2>
+      <div class="field-grid">
+        <label>Claim opened
+          <select name="claim_opened" data-accident-answer="claim_opened">
+            <option value="">Select</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>Police agency <input type="text" name="police_agency"></label>
+        <label>Police report number <input type="text" name="police_report_number"></label>
+        <label>Claim number <input type="text" name="claim_number"></label>
+        <label>Insurance company <input type="text" name="insurance_company"></label>
+        <label>Claim notes <textarea name="claim_notes"></textarea></label>
+      </div>
+    </section>
+
+    <section class="packet-section conditional-section" data-conditional-section="injury" hidden>
+      <h2>Injury details</h2>
+      <input type="hidden" name="injury_reported" value="yes" data-conditional-hidden="injury" disabled>
+      <div class="field-grid">
+        <label>Number of injuries <input type="number" name="number_of_injuries" min="0"></label>
+        <label>Number of fatalities <input type="number" name="number_of_fatalities" min="0"></label>
+      </div>
+    </section>
+
+    <section class="packet-section conditional-section" data-conditional-section="witness" hidden>
+      <h2>Witness</h2>
       <div class="field-grid">
         <label>Witness name <input type="text" name="witness_name"></label>
         <label>Witness phone <input type="text" name="witness_phone"></label>
@@ -167,78 +157,81 @@
     </section>
 
     <section class="packet-section">
-      <h2>G. Police and Insurance Claim</h2>
+      <h2>More details</h2>
       <div class="field-grid">
-        <label>Police agency <input type="text" name="police_agency"></label>
-        <label>Police report number <input type="text" name="police_report_number"></label>
-        <label>Citation issued <select name="citation_issued"><option>unknown</option><option>yes</option><option>no</option></select></label>
-        <label>Citation to company driver <select name="citation_to_company_driver"><option>unknown</option><option>yes</option><option>no</option></select></label>
-        <label>Claim opened <select name="claim_opened"><option>no</option><option>yes</option></select></label>
-        <label>Claim number <input type="text" name="claim_number"></label>
-        <label>Insurance company <input type="text" name="insurance_company"></label>
-        <label>Insurance contact <input type="text" name="insurance_contact"></label>
-        <label>Insurer notified at <input type="datetime-local" name="insurer_notified_at"></label>
-        <label>Claim notes <textarea name="claim_notes"></textarea></label>
+        <label>Any visible damage? <textarea name="company_vehicle_damage_description" placeholder="Describe visible damage only if seen."></textarea></label>
+        <label>Witness present?
+          <select data-accident-answer="witness_present">
+            <option value="">Select</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
       </div>
     </section>
 
-    <section class="packet-section">
-      <h2>H. FMCSA and DOT Review Screen</h2>
-      <div class="field-grid">
-        {% for name, label in [
-          ('public_road_in_commerce','Public road in commerce'),('fatality','Fatality'),('medical_treatment_away_from_scene','Medical treatment away from scene'),
-          ('disabling_damage_tow_away','Disabling damage tow-away'),('hazmat_released_other_than_fuel','Hazmat released other than fuel'),
-          ('loading_or_unloading_only','Loading or unloading only'),('boarding_or_alighting_only','Boarding or alighting only')
-        ] %}
-          <label>{{ label }} <select name="{{ name }}"><option>unknown</option><option>yes</option><option>no</option></select></label>
-        {% endfor %}
-        <label>Number of injuries <input type="number" name="number_of_injuries" min="0"></label>
-        <label>Number of fatalities <input type="number" name="number_of_fatalities" min="0"></label>
-        <label>Required state, government, or insurer reports attached <select name="required_reports_attached"><option>unknown</option><option>yes</option><option>no</option></select></label>
-        <label>DOT review status <select name="dot_review_status"><option value="not_indicated">Not indicated</option><option value="needs_review">Needs Review</option><option value="reviewed">Reviewed</option></select></label>
-        <label>DOT review note <textarea name="dot_review_note"></textarea></label>
-      </div>
-    </section>
+    {% if manager_view|default(false) %}
+      <section class="packet-section">
+        <h2>DOT and FMCSA review</h2>
+        <div class="field-grid">
+          {% for name, label in [
+            ('public_road_in_commerce','Public road in commerce'),('fatality','Fatality'),('medical_treatment_away_from_scene','Medical treatment away from scene'),
+            ('disabling_damage_tow_away','Disabling damage tow-away'),('hazmat_released_other_than_fuel','Hazmat released other than fuel'),
+            ('loading_or_unloading_only','Loading or unloading only'),('boarding_or_alighting_only','Boarding or alighting only')
+          ] %}
+            <label>{{ label }} <select name="{{ name }}"><option value="">Select</option><option>yes</option><option>no</option><option>unknown</option></select></label>
+          {% endfor %}
+          <label>DOT review status <select name="dot_review_status"><option value="not_indicated">Not indicated</option><option value="needs_review">Needs Review</option><option value="reviewed">Reviewed</option></select></label>
+          <label>DOT review note <textarea name="dot_review_note"></textarea></label>
+        </div>
+      </section>
 
-    <section class="packet-section">
-      <h2>I. Post-accident Testing Review</h2>
-      <div class="field-grid">
-        {% for name, label in [
-          ('driver_performing_safety_sensitive_function','Driver performing safety-sensitive function'),('loss_of_human_life','Loss of human life'),('moving_violation_citation','Moving violation citation'),
-          ('bodily_injury_treatment_away_from_scene','Bodily injury treatment away from scene'),('tow_away_disabling_damage','Tow-away disabling damage')
-        ] %}
-          <label>{{ label }} <select name="{{ name }}"><option>unknown</option><option>yes</option><option>no</option></select></label>
-        {% endfor %}
-        <label>Citation time <input type="datetime-local" name="citation_time"></label>
-        <label>Alcohol test review <select name="alcohol_test_review"><option value="not_indicated">Not indicated</option><option value="needs_review">Needs Review</option><option>ordered</option><option>completed</option><option>not_completed</option></select></label>
-        <label>Alcohol test time <input type="datetime-local" name="alcohol_test_time"></label>
-        <label>Alcohol delay reason <textarea name="alcohol_delay_reason"></textarea></label>
-        <label>Controlled substance test review <select name="controlled_substance_test_review"><option value="not_indicated">Not indicated</option><option value="needs_review">Needs Review</option><option>ordered</option><option>completed</option><option>not_completed</option></select></label>
-        <label>Controlled substance test time <input type="datetime-local" name="controlled_substance_test_time"></label>
-        <label>Controlled substance delay reason <textarea name="controlled_substance_delay_reason"></textarea></label>
-      </div>
-    </section>
-
-    <section class="packet-section">
-      <h2>J. Post-incident Actions</h2>
-      <div class="field-grid">
-        <label>Manager notified <select name="manager_notified"><option>no</option><option>yes</option></select></label>
-        <label>Manager notified at <input type="datetime-local" name="manager_notified_at"></label>
-        <label>Dispatcher notified <select name="dispatcher_notified"><option>no</option><option>yes</option></select></label>
-        <label>Dispatcher notified at <input type="datetime-local" name="dispatcher_notified_at"></label>
-        <label>Vehicle removed from service <select name="vehicle_removed_from_service"><option>no</option><option>yes</option><option value="needs_review">Needs Review</option></select></label>
-        <label>Replacement vehicle needed <select name="replacement_vehicle_needed"><option>no</option><option>yes</option></select></label>
-        <label>Driver relieved from route <select name="driver_relieved_from_route"><option>no</option><option>yes</option></select></label>
-        <label>Photos required complete <select name="photos_required_complete"><option>no</option><option>yes</option></select></label>
-        <label>Follow-up notes <textarea name="follow_up_notes"></textarea></label>
-      </div>
-    </section>
+      <section class="packet-section">
+        <h2>Post-accident testing review</h2>
+        <div class="field-grid">
+          <label>Alcohol test review <select name="alcohol_test_review"><option value="not_indicated">Not indicated</option><option value="needs_review">Needs Review</option><option>ordered</option><option>completed</option><option>not_completed</option></select></label>
+          <label>Controlled substance test review <select name="controlled_substance_test_review"><option value="not_indicated">Not indicated</option><option value="needs_review">Needs Review</option><option>ordered</option><option>completed</option><option>not_completed</option></select></label>
+          <label>Manager note <textarea name="manager_note"></textarea></label>
+        </div>
+      </section>
+    {% endif %}
 
     <div class="actions">
-      <a class="btn btn-outline-secondary" href="{{ url_for('driver.mobile_dashboard') }}">Cancel</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('driver.driver_reports') }}">Cancel</a>
       <button class="btn btn-primary" type="submit">Save Crash or Safety Incident</button>
     </div>
   </form>
 </main>
+
+<script>
+  (function () {
+    var form = document.querySelector('[data-accident-driver-form]');
+    if (!form) return;
+    function answer(name) {
+      var field = form.querySelector('[data-accident-answer="' + name + '"]');
+      return field ? field.value : '';
+    }
+    function setSection(name, show) {
+      var section = form.querySelector('[data-conditional-section="' + name + '"]');
+      if (!section) return;
+      section.hidden = !show;
+      section.querySelectorAll('input, select, textarea').forEach(function (field) {
+        if (field.hasAttribute('data-conditional-hidden')) field.disabled = !show;
+      });
+    }
+    function sync() {
+      setSection('other-party', answer('other_vehicle_involved_quick') === 'yes');
+      setSection('police-claim', answer('police_called_quick') === 'yes' || answer('claim_opened') === 'yes');
+      setSection('injury', answer('anyone_hurt') === 'yes');
+      setSection('witness', answer('witness_present') === 'yes');
+    }
+    form.querySelectorAll('[data-accident-answer]').forEach(function (field) {
+      field.addEventListener('change', sync);
+    });
+    sync();
+  })();
+</script>
+
+{% set md_nav_active = 'reports' %}
 {% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

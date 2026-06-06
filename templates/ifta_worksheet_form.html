@@ -2,14 +2,19 @@
 {% block content %}
 <script>document.body.classList.add('md-shell');</script>
 {% include 'partials/_md_shell.html' %}
+{% set ctx = report_context or {} %}
 <style>
-  .ifta-form { max-width:1120px; margin:0 auto; padding:22px; }
-  .ifta-form h1 { font-weight:950; margin:0 0 4px; }
-  .ifta-form .lead { color:var(--md-muted, #64748b); font-weight:750; margin:0 0 18px; }
-  .ifta-section { border:1px solid rgba(148,163,184,.26); border-radius:8px; padding:14px; margin-bottom:14px; background:rgba(255,255,255,.04); }
-  .ifta-section h2 { font-size:.9rem; text-transform:uppercase; letter-spacing:.05em; font-weight:950; margin:0 0 12px; color:var(--md-amber, #c9972b); }
-  .field-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
-  .field-grid label { display:grid; gap:5px; font-weight:800; }
+  .fuel-form { max-width:920px; margin:0 auto; padding:22px 14px; }
+  .fuel-form h1 { margin:0 0 4px; color:var(--md-text); font-family:var(--md-display); font-size:clamp(2rem, 6vw, 3rem); font-weight:950; letter-spacing:0; line-height:.98; text-transform:uppercase; }
+  .fuel-form .lead { margin:0 0 18px; color:var(--md-muted, #64748b); font-weight:750; line-height:1.45; }
+  .fuel-section { border:1px solid rgba(91,157,255,.22); border-radius:8px; padding:14px; margin-bottom:14px; background:rgba(8,14,24,.88); box-shadow:inset 0 1px 0 rgba(91,157,255,.06); }
+  .fuel-section h2 { margin:0 0 12px; color:var(--md-amber, #c9972b); font-family:var(--md-mono); font-size:.76rem; font-weight:950; letter-spacing:.08em; text-transform:uppercase; }
+  .context-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+  .context-pill { border:1px solid rgba(148,163,184,.18); border-radius:8px; padding:9px 10px; background:rgba(255,255,255,.035); min-width:0; }
+  .context-pill span { display:block; color:var(--md-muted); font-family:var(--md-mono); font-size:.58rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
+  .context-pill strong { display:block; margin-top:4px; color:var(--md-text); font-size:.86rem; font-weight:900; overflow-wrap:anywhere; }
+  .field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .field-grid label { display:grid; gap:5px; color:var(--md-text); font-size:.82rem; font-weight:850; }
   .field-grid input,
   .field-grid select,
   .field-grid textarea {
@@ -19,102 +24,97 @@
     padding:9px 10px;
     background:rgba(5,13,23,.82);
     color:var(--md-text, #f8fafc);
+    font:inherit;
   }
-  .field-grid input:disabled { color:var(--md-muted, #94a3b8); opacity:1; }
   .field-grid option { background:#07111f; color:#f8fafc; }
+  .field-grid textarea { min-height:96px; resize:vertical; }
   .actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
-  @media (max-width:800px) { .field-grid { grid-template-columns:1fr; } }
+  @media (max-width:800px) { .context-grid, .field-grid { grid-template-columns:1fr; } }
 </style>
 
-<main class="ifta-form responsive-workspace">
+<main class="fuel-form responsive-workspace">
   <h1>Fuel Records</h1>
-  <p class="lead">Save fuel, receipt, odometer, and trip distance details. MoveDefense can use these records to build an IFTA support worksheet.</p>
+  <p class="lead">Save fuel, receipt, odometer, and route notes. MoveDefense can use these records for an IFTA support worksheet later.</p>
   <form method="POST" action="{{ url_for('driver.new_ifta_worksheet') }}" enctype="multipart/form-data">
-    <section class="ifta-section">
-      <h2>A. Vehicle and Period</h2>
-      <div class="field-grid">
-        <label>Reporting period quarter <input type="text" name="reporting_period_quarter" placeholder="Q1"></label>
-        <label>Reporting year <input type="number" name="reporting_year"></label>
-        <label>Driver <input type="text" value="{{ current_user.display_name }}" disabled></label>
-        <label>Truck <input type="text" name="truck"></label>
-        <label>Trailer <input type="text" name="trailer"></label>
-        <label>VIN or vehicle unit number <input type="text" name="vin_or_vehicle_unit_number"></label>
-        <label>Fleet number <input type="text" name="fleet_number"></label>
-        <label>Base jurisdiction <input type="text" name="base_jurisdiction"></label>
-        <label>Carrier name <input type="text" name="carrier_name"></label>
-        <label>IFTA license number <input type="text" name="ifta_license_number"></label>
+    <input type="hidden" name="reporting_period_quarter" value="{{ ctx.reporting_period_quarter or '' }}">
+    <input type="hidden" name="reporting_year" value="{{ ctx.reporting_year or '' }}">
+    <input type="hidden" name="truck" value="{{ ctx.truck or '' }}">
+    <input type="hidden" name="trailer" value="{{ ctx.trailer or '' }}">
+    <input type="hidden" name="vin_or_vehicle_unit_number" value="{{ ctx.vehicle_unit_number or '' }}">
+    <input type="hidden" name="vehicle_unit_number" value="{{ ctx.vehicle_unit_number or '' }}">
+    <input type="hidden" name="purchaser_name" value="{{ ctx.purchaser_name or '' }}">
+    <input type="hidden" name="trip_start_date" value="{{ ctx.trip_start_date or '' }}">
+    <input type="hidden" name="trip_end_date" value="{{ ctx.trip_end_date or '' }}">
+    <input type="hidden" name="beginning_odometer" value="{{ ctx.start_mileage or '' }}">
+    <input type="hidden" name="total_trip_distance" value="{{ ctx.total_route_miles or '' }}">
+
+    <section class="fuel-section">
+      <h2>Known context</h2>
+      <div class="context-grid">
+        <div class="context-pill"><span>Driver</span><strong>{{ current_user.display_name }}</strong></div>
+        <div class="context-pill"><span>Truck</span><strong>{{ ctx.truck or 'Blank' }}</strong></div>
+        <div class="context-pill"><span>Trailer</span><strong>{{ ctx.trailer or 'Blank' }}</strong></div>
+        <div class="context-pill"><span>Route date</span><strong>{{ ctx.route_date_value or 'Blank' }}</strong></div>
+        <div class="context-pill"><span>Period</span><strong>{{ ctx.reporting_period_quarter or 'Blank' }} {{ ctx.reporting_year or '' }}</strong></div>
+        <div class="context-pill"><span>Last mileage</span><strong>{% if ctx.current_mileage %}{{ "{:,}".format(ctx.current_mileage) }} mi{% else %}Blank{% endif %}</strong></div>
       </div>
     </section>
 
-    <section class="ifta-section">
-      <h2>B. Trip Distance Record</h2>
+    <section class="fuel-section">
+      <h2>Fuel details</h2>
       <div class="field-grid">
-        <label>Trip start date <input type="date" name="trip_start_date"></label>
-        <label>Trip end date <input type="date" name="trip_end_date"></label>
-        <label>Origin city <input type="text" name="origin_city"></label>
-        <label>Origin state <input type="text" name="origin_state"></label>
-        <label>Destination city <input type="text" name="destination_city"></label>
-        <label>Destination state <input type="text" name="destination_state"></label>
-        <label>Route traveled <input type="text" name="route_traveled"></label>
-        <label>Beginning odometer <input type="number" name="beginning_odometer" step="any"></label>
-        <label>Ending odometer <input type="number" name="ending_odometer" step="any"></label>
-        <label>Total trip distance <input type="number" name="total_trip_distance" step="any"></label>
-        <label>Jurisdiction <input type="text" name="jurisdiction"></label>
-        <label>Jurisdiction distance <input type="number" name="jurisdiction_distance" step="any"></label>
-        <label>Taxable distance <input type="number" name="taxable_distance" step="any"></label>
-        <label>Nontaxable distance <input type="number" name="nontaxable_distance" step="any"></label>
-        <label>Toll distance <input type="number" name="toll_distance" step="any"></label>
-        <label>Loaded, empty, or deadhead
-          <select name="loaded_empty_deadhead">
-            <option value="loaded">Loaded</option>
-            <option value="empty">Empty</option>
-            <option value="deadhead">Deadhead</option>
-            <option value="mixed">Mixed</option>
-          </select>
-        </label>
-        <label>Notes <textarea name="trip_notes"></textarea></label>
-      </div>
-    </section>
-
-    <section class="ifta-section">
-      <h2>C. Fuel Record</h2>
-      <div class="field-grid">
-        <label>Purchase date <input type="date" name="purchase_date"></label>
-        <label>Seller name <input type="text" name="seller_name"></label>
-        <label>Seller address <input type="text" name="seller_address"></label>
+        <label>Purchase date <input type="date" name="purchase_date" value="{{ ctx.route_date_value or '' }}"></label>
+        <label>Fuel location <input type="text" name="seller_name" placeholder="Station, Ryder, yard, or fuel stop"></label>
         <label>City <input type="text" name="fuel_city"></label>
         <label>State or province <input type="text" name="state_or_province"></label>
-        <label>Gallons or liters <input type="number" name="gallons_or_liters" step="any"></label>
-        <label>Fuel type <input type="text" name="fuel_type"></label>
-        <label>Price per gallon or liter <input type="number" name="price_per_gallon_or_liter" step="any"></label>
-        <label>Total sale amount <input type="number" name="total_sale_amount" step="any"></label>
-        <label>Vehicle unit number <input type="text" name="vehicle_unit_number"></label>
-        <label>Purchaser name <input type="text" name="purchaser_name"></label>
+        <label>Gallons or liters <input type="number" name="gallons_or_liters" step="any" inputmode="decimal"></label>
+        <label>Fuel type <input type="text" name="fuel_type" placeholder="Diesel, gas, DEF, other"></label>
+        <label>Odometer now <input type="number" name="ending_odometer" step="any" inputmode="decimal" value="{{ ctx.current_mileage or '' }}"></label>
         <label>Receipt photo <input type="file" name="receipt_photo" accept="image/*,.pdf"></label>
-        <label>Tax paid <select name="tax_paid"><option>unknown</option><option>yes</option><option>no</option></select></label>
-        <label><span>Bulk fuel</span><span><input type="checkbox" name="bulk_fuel" value="yes"> Bulk fuel purchase</span></label>
+        <label>Note <textarea name="trip_notes" placeholder="Low fuel note, receipt issue, route mileage note, or other context."></textarea></label>
       </div>
     </section>
 
-    <section class="ifta-section">
-      <h2>F. IFTA Review Status</h2>
-      <div class="field-grid">
-        <label>Review status
-          <select name="review_status">
-            <option>Draft</option>
-            <option>Needs Review</option>
-            <option>Ready for Tax Preparer</option>
-            <option>Closed</option>
-          </select>
-        </label>
-      </div>
-    </section>
+    {% if manager_view|default(false) %}
+      <section class="fuel-section">
+        <h2>Office review details</h2>
+        <div class="field-grid">
+          <label>Fleet number <input type="text" name="fleet_number"></label>
+          <label>Base jurisdiction <input type="text" name="base_jurisdiction"></label>
+          <label>Carrier name <input type="text" name="carrier_name"></label>
+          <label>IFTA license number <input type="text" name="ifta_license_number"></label>
+          <label>Route traveled <input type="text" name="route_traveled"></label>
+          <label>Jurisdiction <input type="text" name="jurisdiction"></label>
+          <label>Jurisdiction distance <input type="number" name="jurisdiction_distance" step="any"></label>
+          <label>Taxable distance <input type="number" name="taxable_distance" step="any"></label>
+          <label>Nontaxable distance <input type="number" name="nontaxable_distance" step="any"></label>
+          <label>Tax paid
+            <select name="tax_paid">
+              <option value="">Select</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </label>
+          <label>Review status
+            <select name="review_status">
+              <option>Draft</option>
+              <option>Needs Review</option>
+              <option>Ready for Tax Preparer</option>
+              <option>Closed</option>
+            </select>
+          </label>
+        </div>
+      </section>
+    {% endif %}
 
     <div class="actions">
-      <a class="btn btn-outline-secondary" href="{{ url_for('driver.mobile_dashboard') }}">Cancel</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('driver.driver_reports') }}">Cancel</a>
       <button class="btn btn-primary" type="submit">Save Fuel Record</button>
     </div>
   </form>
 </main>
+
+{% set md_nav_active = 'reports' %}
 {% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

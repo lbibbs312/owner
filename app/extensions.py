@@ -22,6 +22,7 @@ login_manager.login_view = "auth.login"
 
 def _socketio_options(app):
     options = {
+        "manage_session": False,
         "path": app.config.get("SOCKETIO_PATH", "socket.io"),
         "ping_interval": app.config.get("SOCKETIO_PING_INTERVAL", 25),
         "ping_timeout": app.config.get("SOCKETIO_PING_TIMEOUT", 20),

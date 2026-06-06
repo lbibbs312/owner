@@ -285,47 +285,6 @@
   </div>
 
   {% if map_mode != 'route_replay' %}
-  <div class="md-flow-top-actions" aria-label="Live flow workflow actions">
-    {% if not route_finalized_for_cta and depart_url and primary_stop and primary_action != 'end_route' %}
-    <a class="md-flow-action-tab primary" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow" data-flow-panel-kicker="DEPART QUICK FLOW">
-      <strong>Depart and Load</strong>
-      <span>Departure proof</span>
-    </a>
-    {% endif %}
-    {% for route_action in board_ctas %}
-      {% set route_action_key = 'finalize' if route_action.action == 'finalize_route' else ('transfer' if route_action.action == 'attach_document' else route_action.action) %}
-      {% if not route_finalized_for_cta or route_action.action in ['attach_document', 'print_route', 'view_route', 'route_history'] %}
-        <a class="md-flow-action-tab primary {% if pulse_key == route_action_key %}is-next-required{% endif %}" href="{{ urls.get(route_action.action) }}" data-flow-open-url="{{ urls.get(route_action.action) }}" data-flow-panel-title="{{ route_action.label }}">
-          <strong>{% if route_action.action == 'attach_document' %}{{ route_action.label }}{% else %}{{ route_action.label.replace(' Route', '').replace(' Document', '') }}{% endif %}</strong>
-          <span>{% if route_action.action == 'finalize_route' %}Ready To Finalize{% elif route_action.action == 'print_route' %}Route packet{% elif route_action.action == 'attach_document' %}Proof document{% elif route_action.action == 'confirm_cargo' %}Cargo check{% else %}{{ cta.next_action or route_action.label }}{% endif %}</span>
-        </a>
-      {% endif %}
-    {% endfor %}
-    {% if not route_finalized_for_cta %}
-    <a class="md-flow-action-tab {% if pulse_key == 'camera' %}is-next-required{% endif %}" href="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-open-url="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-panel-title="Camera and Proof">
-      <strong>Camera</strong>
-      <span>Photo proof</span>
-    </a>
-    <a class="md-flow-action-tab {% if pulse_key == 'transfer' and 'transfer' not in route_action_keys %}is-next-required{% endif %}" href="{{ transfer_url }}" data-flow-open-url="{{ transfer_url }}" data-flow-panel-title="Plant Transfer">
-      <strong>Transfer</strong>
-      <span>{{ transfer_note }}</span>
-    </a>
-    {% endif %}
-    {% if not (posttrip_url and primary_action == 'posttrip') %}
-      <a class="md-flow-action-tab {% if pending_pt and pulse_key == 'posttrip' %}is-next-required{% endif %}" href="{{ shift_url }}" data-flow-open-url="{{ shift_url }}" data-flow-panel-title="{{ 'PostTrip Work' if posttrip_url else 'PreTrip and Shift' }}">
-        <strong>{{ shift_label }}</strong>
-        <span>{{ shift_note }}</span>
-      </a>
-    {% endif %}
-    <a class="md-flow-action-tab" href="{{ history_url }}" data-flow-open-url="{{ history_url }}" data-flow-panel-title="TRUCK DETAIL">
-      <strong>Maintenance</strong>
-      <span>Ryder and truck</span>
-    </a>
-    <a class="md-flow-action-tab" href="{{ route_sheet_url or '#' }}" data-flow-open-url="{{ route_sheet_url or '#' }}" data-flow-panel-title="Full Route Sheet">
-      <strong>Sheet</strong>
-      <span>Full details</span>
-    </a>
-  </div>
   {% if not route_finalized_for_cta and end_route_url and primary_action == 'end_route' %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <form action="{{ end_route_url }}" method="POST" style="margin:0">
@@ -336,7 +295,7 @@
       </button>
       </form>
     </div>
-  {% elif posttrip_url and primary_action == 'posttrip' %}
+  {% elif posttrip_url and (primary_action == 'posttrip' or pending_pt) %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta" href="{{ posttrip_url }}" data-flow-open-url="{{ posttrip_url }}">
         <span>Required driver action</span>
@@ -358,6 +317,14 @@
         <span>Required driver action</span>
         <strong>Add Stop</strong>
         <small>Continue route</small>
+      </a>
+    </div>
+  {% elif primary_cta and primary_action in ['attach_document', 'finalize_route', 'print_route', 'view_route', 'route_history'] and urls.get(primary_action) %}
+    <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
+      <a class="md-flow-primary-cta" href="{{ urls.get(primary_action) }}" data-flow-open-url="{{ urls.get(primary_action) }}" data-flow-panel-title="{{ primary_cta.label }}">
+        <span>Required driver action</span>
+        <strong>{{ primary_cta.label }}</strong>
+        <small>{% if primary_action == 'finalize_route' %}Ready To Finalize{% else %}{{ cta.route_state_message or cta.next_action or 'Open route details' }}{% endif %}</small>
       </a>
     </div>
   {% endif %}
