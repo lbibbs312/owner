@@ -351,6 +351,8 @@ def test_manager_dashboard_v2_shell_uses_driver_workflow_records(client, app):
         "Inspections",
     ):
         assert label in body
+    assert "Packet Workflows" in body
+    assert 'data-workspace-target="packets"' in body
     assert "MR-WORKSPACE-1" not in body
     assert "Raleigh East to Paint Central" not in body
     assert "TRX-WORKSPACE" in body

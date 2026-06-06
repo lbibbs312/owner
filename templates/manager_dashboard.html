@@ -56,6 +56,26 @@
                z-index:10; box-shadow:0 1px 2px rgba(15,23,42,.04); position:sticky; top:0; }
   .mc-header h2 { font-size:1.5rem; font-weight:700; color:#0f172a; margin:0; letter-spacing:0; }
   .mc-header p { margin:3px 0 0; color:#64748b; font-size:.85rem; font-weight:500; }
+  .mc-header-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+  .mc-header-action {
+    border:1px solid #bfdbfe;
+    background:#eff6ff;
+    color:#1d4ed8;
+    border-radius:8px;
+    min-height:36px;
+    padding:0 12px;
+    font:inherit;
+    font-size:.82rem;
+    font-weight:700;
+    text-decoration:none;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .mc-header-action:hover,
+  .mc-header-action.active { background:#dbeafe; color:#1e40af; }
   .db-alert { margin:0 28px; border:1px solid #fecaca; background:#fef2f2; color:#991b1b;
               padding:10px 12px; border-radius:0 0 8px 8px; font-size:.82rem;
               font-weight:700; display:flex; align-items:center; justify-content:space-between; gap:12px; }
@@ -198,6 +218,10 @@
       <div>
         <h2>Manager Workspace</h2>
         <p>{{ today.strftime('%b %d, %Y') }} - live driver route, document, incident, and inspection context</p>
+      </div>
+      <div class="mc-header-actions">
+        <button class="mc-header-action" type="button" data-workspace-target="packets" aria-controls="workspace-packets" aria-selected="false">Packet Workflows</button>
+        <button class="mc-header-action" type="button" data-workspace-target="review" aria-controls="workspace-review" aria-selected="false">Open Items</button>
       </div>
     </header>
 

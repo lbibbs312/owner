@@ -6280,6 +6280,25 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert b"desk-detail-section" not in stop_template
 
 
+def test_mobile_dashboard_exposes_packet_workflows_without_secret_urls(client, app):
+    with app.app_context():
+        create_user("packet_entry_driver", "packet-entry@example.com", "driver")
+
+    login(client, "packet_entry_driver")
+    response = client.get("/mobile")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "Packet Workflows" in body
+    assert "Fuel Records" in body
+    assert "Crash or Safety Incident" in body
+    assert "Physical Damage" in body
+    assert 'href="/ifta-worksheet/new"' in body
+    assert 'href="/accident-incident/new"' in body
+    assert 'href="/damage_reports/new"' in body
+    assert 'href="/driver_logs_print?date=' in body
+
+
 def test_mobile_dashboard_focuses_latest_stop_when_no_current_stop(client, app):
     from datetime import date
 
