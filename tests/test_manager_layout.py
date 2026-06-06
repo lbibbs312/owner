@@ -335,6 +335,8 @@ def test_manager_dashboard_v2_shell_uses_driver_workflow_records(client, app):
     assert "MD-TRUCK-44" in body
     assert "Left mirror marker scuff noted before route." in body
     assert "Fork nick on return rack needs manager review." in body
+    assert "mc-nav-badge::before" in body
+    assert "mc-nav-badge has-count danger-count" in body
     for old_label in (
         "Live Flow Map",
         "Live Work Areas",
@@ -358,7 +360,9 @@ def test_manager_dashboard_v2_shell_uses_driver_workflow_records(client, app):
 def test_move_requests_uses_movedefense_manager_shell(client, app):
     with app.app_context():
         manager = _user("queue_boss", "management")
-        _user("queue_driver", "driver", first_name="Driver", last_name="WithLongName")
+        driver = _user("queue_driver", "driver", first_name="Driver", last_name="WithLongName")
+        log = _driver_log(driver)
+        _damage_report(driver, log)
         _move_request(manager.id)
 
     _login(client, "queue_boss")
@@ -378,6 +382,8 @@ def test_move_requests_uses_movedefense_manager_shell(client, app):
     assert "Inspections" in body
     nav = body.split('<nav class="mq-nav"', 1)[1].split("</nav>", 1)[0]
     assert "mq-nav-badge" in nav
+    assert "mq-nav-badge::before" in body
+    assert "mq-nav-badge has-count danger-count" in nav
     assert 'class="active" href="/manager/move-requests"' in nav
     for old_label in (
         "Manager Console",
