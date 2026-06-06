@@ -337,6 +337,7 @@ def test_manager_dashboard_v2_shell_uses_driver_workflow_records(client, app):
     assert "Fork nick on return rack needs manager review." in body
     assert "mc-nav-badge::before" in body
     assert "mc-nav-badge has-count danger-count" in body
+    assert 'danger-count">+1</span>' in body
     for old_label in (
         "Live Flow Map",
         "Live Work Areas",
@@ -384,6 +385,7 @@ def test_move_requests_uses_movedefense_manager_shell(client, app):
     assert "mq-nav-badge" in nav
     assert "mq-nav-badge::before" in body
     assert "mq-nav-badge has-count danger-count" in nav
+    assert 'danger-count">+1</span>' in nav
     assert 'class="active" href="/manager/move-requests"' in nav
     for old_label in (
         "Manager Console",
