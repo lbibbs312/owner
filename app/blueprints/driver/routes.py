@@ -257,6 +257,7 @@ DRIVER_ONLY_ENDPOINTS = {
     "dashboard",
     "mobile_dashboard",
     "mobile_ryder_service",
+    "driver_reports",
     "mobile_history",
     "mobile_day_report",
     "truck_maintenance_history",
@@ -3678,6 +3679,10 @@ def new_driving_log():
     _prefill_log_form_from_task(form)
     form.load_size.data = current_load_value if current_load_value != "Empty" else "Empty"
     form.secondary_load.data = current_secondary_value
+    if request.args.get("report_type") == "truck_issue":
+        form.maintenance.data = True
+    elif request.args.get("report_type") == "route_note":
+        form.meeting.data = True
     return _render_new_driving_log(form, current_load)
 
 
@@ -4875,6 +4880,44 @@ def damage_reports():
         can_modify_damage_report=_can_modify_damage_report,
         route_finalized_for_report=_is_damage_report_route_finalized,
     )
+
+
+@bp.route("/reports")
+@login_required
+def driver_reports():
+    report_choices = [
+        {
+            "label": "Fuel / Low Fuel",
+            "meta": "Fuel purchase, low fuel, receipt, odometer, and IFTA support details.",
+            "url": url_for("driver.new_ifta_worksheet"),
+            "code": "FL",
+        },
+        {
+            "label": "Physical Damage",
+            "meta": "Visible vehicle, trailer, cargo, or property damage.",
+            "url": url_for("driver.new_damage_report"),
+            "code": "PD",
+        },
+        {
+            "label": "Crash / Safety Incident",
+            "meta": "Crash, hit, dock or yard safety event, injury, tow-away, police, or claim details.",
+            "url": url_for("driver.new_accident_incident"),
+            "code": "CS",
+        },
+        {
+            "label": "Truck Issue / Maintenance",
+            "meta": "Opens the route stop form because truck issues are recorded on the stop.",
+            "url": url_for("driver.new_driving_log", report_type="truck_issue"),
+            "code": "TM",
+        },
+        {
+            "label": "Route Note / Other",
+            "meta": "Opens the route stop form because route notes are recorded with the stop record.",
+            "url": url_for("driver.new_driving_log", report_type="route_note"),
+            "code": "RN",
+        },
+    ]
+    return render_template("driver_reports.html", report_choices=report_choices)
 
 
 @bp.route("/driver_logs/<int:log_id>/request_review", methods=["POST"], strict_slashes=False)

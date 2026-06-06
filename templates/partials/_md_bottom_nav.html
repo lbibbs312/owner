@@ -9,8 +9,8 @@
 {% if not md_nav_active %}
   {% if 'plant_transfer' in endpoint %}
     {% set md_nav_active = 'transfers' %}
-  {% elif 'damage_report' in endpoint or endpoint == 'driver.damage_reports' %}
-    {% set md_nav_active = 'damage' %}
+  {% elif endpoint == 'driver.driver_reports' or 'damage_report' in endpoint or 'accident_incident' in endpoint or 'ifta_worksheet' in endpoint %}
+    {% set md_nav_active = 'reports' %}
   {% elif 'pretrip' in endpoint or 'posttrip' in endpoint or 'truck_maintenance' in endpoint %}
     {% set md_nav_active = 'pretrip' %}
   {% elif 'driver_log' in endpoint or endpoint in ['driver.driver_logs', 'driver.new_driving_log', 'driver.add_stop', 'driver.mobile_history', 'driver.mobile_day_report', 'driver.end_of_day_summary'] %}
@@ -90,7 +90,7 @@
   <a class="md-nav-link {% if md_nav_active == 'home' %}active{% endif %}" href="{{ url_for('driver.mobile_dashboard') }}"><strong>HM</strong><span>Home</span></a>
   <a class="md-nav-link {% if md_nav_active == 'transfers' %}active{% endif %}" href="{{ url_for('driver.plant_transfers') }}"><strong>PT</strong><span>Transfer</span></a>
   <a class="md-nav-link {% if md_nav_active == 'logs' %}active{% endif %}" href="{{ url_for('driver.driver_logs') }}"><strong>DL</strong><span>Logs</span></a>
-  <a class="md-nav-link {% if md_nav_active == 'damage' %}active{% endif %}" href="{{ url_for('driver.damage_reports') }}"><strong>DR</strong><span>Damage</span></a>
+  <a class="md-nav-link {% if md_nav_active in ['reports', 'damage'] %}active{% endif %}" href="{{ url_for('driver.driver_reports') }}"><strong>RP</strong><span>Reports</span></a>
   <a class="md-nav-link {% if md_nav_active == 'pretrip' %}active{% endif %}" href="{{ url_for('driver.list_pretrips') }}"><strong>IN</strong><span>Inspections</span></a>
 </nav>
 {% endif %}

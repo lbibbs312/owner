@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block content %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+<style>
+  .driver-report-hub {
+    width:min(920px, 100%);
+    margin:0 auto;
+    padding:22px 14px;
+  }
+  .driver-report-hero {
+    display:grid;
+    gap:6px;
+    margin-bottom:18px;
+  }
+  .driver-report-kicker {
+    margin:0;
+    color:var(--md-amber);
+    font-family:var(--md-mono);
+    font-size:.72rem;
+    font-weight:950;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+  }
+  .driver-report-hero h1 {
+    margin:0;
+    color:var(--md-text);
+    font-family:var(--md-display);
+    font-size:clamp(2rem, 6vw, 3.2rem);
+    font-weight:950;
+    letter-spacing:0;
+    line-height:.95;
+    text-transform:uppercase;
+  }
+  .driver-report-hero p:last-child {
+    margin:0;
+    max-width:52rem;
+    color:var(--md-muted);
+    font-weight:750;
+    line-height:1.45;
+  }
+  .driver-report-list {
+    display:grid;
+    gap:10px;
+  }
+  .driver-report-choice {
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr) auto;
+    gap:12px;
+    align-items:center;
+    min-height:82px;
+    padding:14px;
+    border:1px solid rgba(91,157,255,.22);
+    border-radius:8px;
+    background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(10,17,28,.96));
+    color:var(--md-text);
+    text-decoration:none;
+    box-shadow:0 18px 40px rgba(0,0,0,.28), inset 0 1px 0 rgba(91,157,255,.08);
+  }
+  .driver-report-choice:hover,
+  .driver-report-choice:focus {
+    color:var(--md-text);
+    border-color:rgba(91,157,255,.55);
+    background:linear-gradient(180deg, rgba(20,35,56,.98), rgba(10,17,28,.98));
+  }
+  .driver-report-code {
+    display:grid;
+    place-items:center;
+    width:44px;
+    height:44px;
+    border:1px solid rgba(255,178,36,.38);
+    border-radius:8px;
+    color:var(--md-amber);
+    background:rgba(255,178,36,.08);
+    font-family:var(--md-mono);
+    font-size:.78rem;
+    font-weight:950;
+  }
+  .driver-report-text {
+    min-width:0;
+    display:grid;
+    gap:4px;
+  }
+  .driver-report-text strong {
+    color:var(--md-text);
+    font-family:var(--md-display);
+    font-size:1.02rem;
+    font-weight:950;
+    letter-spacing:0;
+    text-transform:uppercase;
+  }
+  .driver-report-text span {
+    color:var(--md-muted);
+    font-size:.84rem;
+    font-weight:700;
+    line-height:1.35;
+  }
+  .driver-report-arrow {
+    color:var(--md-blue-bright);
+    font-family:var(--md-mono);
+    font-size:.74rem;
+    font-weight:950;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    white-space:nowrap;
+  }
+  @media (max-width:520px) {
+    .driver-report-choice {
+      grid-template-columns:auto minmax(0,1fr);
+    }
+    .driver-report-arrow {
+      grid-column:2;
+    }
+  }
+</style>
+
+<main class="driver-report-hub responsive-workspace">
+  <header class="driver-report-hero">
+    <p class="driver-report-kicker">Driver report hub</p>
+    <h1>Reports</h1>
+    <p>Choose the record you are submitting. Driver Logs stay as the route ledger.</p>
+  </header>
+
+  <section class="driver-report-list" aria-label="Driver report choices">
+    {% for choice in report_choices %}
+      <a class="driver-report-choice" href="{{ choice.url }}">
+        <span class="driver-report-code" aria-hidden="true">{{ choice.code }}</span>
+        <span class="driver-report-text">
+          <strong>{{ choice.label }}</strong>
+          <span>{{ choice.meta }}</span>
+        </span>
+        <span class="driver-report-arrow">Open</span>
+      </a>
+    {% endfor %}
+  </section>
+</main>
+
+{% set md_nav_active = 'reports' %}
+{% include 'partials/_md_bottom_nav.html' %}
+{% endblock %}

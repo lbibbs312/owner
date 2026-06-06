@@ -6294,6 +6294,41 @@ def test_mobile_dashboard_does_not_render_permanent_packet_workflows_strip(clien
     assert 'id="packet-workflows"' not in body
 
 
+def test_driver_reports_hub_lists_report_choices_with_correct_destinations(client, app):
+    with app.app_context():
+        create_user("reports_hub_driver", "reports-hub@example.com", "driver")
+
+    login(client, "reports_hub_driver")
+    response = client.get("/reports")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "<h1>Reports</h1>" in body
+    assert "Driver Logs stay as the route ledger." in body
+    choices_start = body.index('<section class="driver-report-list"')
+    choices = body[choices_start: body.index("</section>", choices_start)]
+    assert 'href="/driver_logs"' not in choices
+
+    expected_choices = {
+        "Fuel / Low Fuel": 'href="/ifta-worksheet/new"',
+        "Physical Damage": 'href="/damage_reports/new"',
+        "Crash / Safety Incident": 'href="/accident-incident/new"',
+        "Truck Issue / Maintenance": 'href="/new_driving_log?report_type=truck_issue"',
+        "Route Note / Other": 'href="/new_driving_log?report_type=route_note"',
+    }
+    for label, href in expected_choices.items():
+        assert label in choices
+        assert href in choices
+        path = href.removeprefix('href="').removesuffix('"')
+        assert client.get(path).status_code == 200
+
+    fuel_label_start = choices.index("Fuel / Low Fuel")
+    fuel_link_start = choices.rfind("<a ", 0, fuel_label_start)
+    fuel_link = choices[fuel_link_start: choices.index("</a>", fuel_label_start)]
+    assert 'href="/ifta-worksheet/new"' in fuel_link
+    assert 'href="/damage_reports/new"' not in fuel_link
+
+
 def test_mobile_dashboard_focuses_latest_stop_when_no_current_stop(client, app):
     from datetime import date
 
@@ -6598,15 +6633,18 @@ def test_driver_mobile_pages_share_single_five_tab_bottom_nav(client, app):
         "<strong>HM</strong><span>Home</span>",
         "<strong>PT</strong><span>Transfer</span>",
         "<strong>DL</strong><span>Logs</span>",
-        "<strong>DR</strong><span>Damage</span>",
+        "<strong>RP</strong><span>Reports</span>",
         "<strong>IN</strong><span>Inspections</span>",
     ]
     pages = [
         ("/mobile", "Home"),
         ("/plant_transfers", "Transfer"),
         ("/driver_logs", "Logs"),
-        ("/damage_reports", "Damage"),
-        ("/damage_reports/new", "Damage"),
+        ("/reports", "Reports"),
+        ("/damage_reports", "Reports"),
+        ("/damage_reports/new", "Reports"),
+        ("/ifta-worksheet/new", "Reports"),
+        ("/accident-incident/new", "Reports"),
         ("/list_pretrips", "Inspections"),
         ("/new_pretrip", "Inspections"),
         ("/profile", "Home"),
@@ -6623,6 +6661,13 @@ def test_driver_mobile_pages_share_single_five_tab_bottom_nav(client, app):
         positions = [nav.index(item) for item in expected_items]
         assert positions == sorted(positions)
         assert 'href="/list_pretrips"' in nav
+        reports_label_start = nav.index("<strong>RP</strong><span>Reports</span>")
+        reports_link_start = nav.rfind("<a ", 0, reports_label_start)
+        reports_link = nav[reports_link_start:nav.index("</a>", reports_label_start)]
+        assert 'href="/reports"' in reports_link
+        assert 'href="/driver_logs"' not in reports_link
+        assert "<span>Damage</span>" not in nav
+        assert "<strong>DR</strong>" not in nav
         assert nav.count('class="md-nav-link active"') == 1
         active_start = nav.index('class="md-nav-link active"')
         active_end = nav.index("</a>", active_start)
