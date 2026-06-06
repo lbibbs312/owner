@@ -23,14 +23,23 @@
       --md-font:"Montserrat", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       --md-mono:"SFMono-Regular", Consolas, monospace;
     }
-    * { box-sizing:border-box; }
+    *,
+    *::before,
+    *::after {
+      box-sizing:border-box;
+    }
     html {
+      width:100%;
+      max-width:100%;
       min-height:100%;
       overflow-x:hidden;
       background:var(--md-bg);
     }
     body {
+      width:100%;
+      max-width:100%;
       min-width:0;
+      min-height:100vh;
       min-height:100svh;
       margin:0;
       overflow-x:hidden;
@@ -43,14 +52,20 @@
     a { color:var(--md-blue-bright); }
     .md-auth-page {
       width:100%;
+      max-width:100%;
+      min-width:0;
+      min-height:100vh;
       min-height:100svh;
-      display:grid;
-      grid-template-rows:auto minmax(0, 1fr);
-      padding:18px max(14px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+      display:flex;
+      flex-direction:column;
+      padding:18px 14px;
+      overflow-x:hidden;
     }
     .md-auth-header {
       display:flex;
       justify-content:center;
+      width:100%;
+      max-width:100%;
       min-width:0;
       padding:2px 0;
     }
@@ -73,18 +88,25 @@
     }
     .md-auth-main {
       width:100%;
+      max-width:100%;
       min-width:0;
-      display:grid;
-      place-items:center;
+      flex:1 1 auto;
+      display:flex;
+      align-items:center;
+      justify-content:center;
       padding:24px 0 14px;
+      overflow-x:hidden;
     }
     .md-auth-wrap {
-      width:min(440px, 100%);
+      width:100%;
+      max-width:440px;
       min-width:0;
       display:grid;
       gap:14px;
     }
     .md-auth-intro {
+      width:100%;
+      max-width:100%;
       min-width:0;
       text-align:center;
     }
@@ -100,28 +122,34 @@
     .md-auth-intro h1 {
       margin:0;
       color:var(--md-text);
-      font-size:clamp(2rem, 10vw, 3.25rem);
+      font-size:2rem;
       font-weight:900;
-      line-height:1.02;
+      line-height:1.08;
       letter-spacing:0;
-      text-transform:uppercase;
-      overflow-wrap:anywhere;
+      text-transform:none;
+      overflow-wrap:break-word;
     }
     .md-auth-intro p {
-      width:min(34rem, 100%);
+      width:100%;
+      max-width:34rem;
       margin:10px auto 0;
       color:var(--md-muted);
-      font-size:clamp(.95rem, 2.5vw, 1.05rem);
+      font-size:.96rem;
       font-weight:700;
       line-height:1.45;
     }
     .md-auth-flashes {
       display:grid;
       gap:8px;
+      width:100%;
+      max-width:100%;
+      min-width:0;
     }
     .md-auth-flash {
       display:grid;
       gap:5px;
+      max-width:100%;
+      min-width:0;
       padding:11px 12px;
       border:1px solid rgba(91,157,255,.3);
       border-radius:10px;
@@ -149,6 +177,7 @@
     .md-auth-flash--success { border-color:rgba(43,213,118,.38); }
     .md-auth-card {
       width:100%;
+      max-width:100%;
       min-width:0;
       display:grid;
       gap:15px;
@@ -164,7 +193,8 @@
       font-size:1.1rem;
       font-weight:900;
       letter-spacing:0;
-      text-transform:uppercase;
+      text-transform:none;
+      overflow-wrap:break-word;
     }
     .md-auth-field {
       display:grid;
@@ -215,6 +245,7 @@
       font-size:.9rem;
       letter-spacing:0;
       text-transform:none;
+      overflow-wrap:break-word;
     }
     .md-auth-submit {
       width:100%;
@@ -246,6 +277,22 @@
       text-decoration:none;
     }
     .md-auth-link:hover { color:var(--md-text); }
+    .md-auth-legal {
+      display:flex;
+      justify-content:center;
+      gap:8px;
+      flex-wrap:wrap;
+      padding:8px 0 2px;
+      color:var(--md-muted);
+      font-size:.82rem;
+      font-weight:800;
+      line-height:1.35;
+    }
+    .md-auth-legal a {
+      color:var(--md-blue-bright);
+      text-decoration:none;
+    }
+    .md-auth-legal a:hover { color:var(--md-text); }
     .md-form-alert {
       display:grid;
       gap:8px;
@@ -275,13 +322,15 @@
     @media (min-width: 760px) {
       .md-auth-page { padding:24px; }
       .md-auth-main { padding:34px 0 24px; }
-      .md-auth-wrap { width:min(460px, 100%); }
+      .md-auth-wrap { max-width:460px; }
+      .md-auth-intro h1 { font-size:2.55rem; }
+      .md-auth-intro p { font-size:1.03rem; }
       .md-auth-card { padding:24px; }
     }
     @media (max-width: 380px) {
       .md-auth-page { padding-left:10px; padding-right:10px; }
       .md-auth-card { padding:18px 14px; }
-      .md-auth-intro h1 { font-size:1.9rem; }
+      .md-auth-intro h1 { font-size:1.75rem; }
     }
   </style>
 </head>
@@ -349,6 +398,10 @@
         </form>
       </section>
     </main>
+    <footer>
+      {% set footer_class = "md-auth-legal" %}
+      {% include "partials/_public_footer_links.html" %}
+    </footer>
   </div>
 </body>
 </html>

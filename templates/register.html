@@ -86,6 +86,32 @@
     text-decoration:none;
   }
   .md-auth-link:hover { color:var(--md-text); }
+  .md-register-legal,
+  .md-register-footer-links {
+    color:var(--md-muted);
+    font-size:.84rem;
+    font-weight:700;
+    line-height:1.45;
+    text-align:center;
+  }
+  .md-register-legal {
+    margin:14px 0 0;
+  }
+  .md-register-footer-links {
+    display:flex;
+    justify-content:center;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:12px;
+  }
+  .md-register-legal a,
+  .md-register-footer-links a {
+    color:var(--md-blue-bright);
+    font-weight:900;
+    text-decoration:none;
+  }
+  .md-register-legal a:hover,
+  .md-register-footer-links a:hover { color:var(--md-text); }
   @media (max-width:820px) {
     .md-register-wrap { grid-template-columns:1fr; }
     .md-register-panel { position:static; }
@@ -165,6 +191,12 @@
       Already have access?
       <a class="md-auth-link" href="{{ url_for('auth.login') }}">Sign in</a>
     </p>
+    <p class="md-register-legal">
+      By creating an account, you acknowledge the
+      <a href="{{ url_for('public.privacy') }}">Privacy Notice</a>.
+    </p>
+    {% set footer_class = "md-register-footer-links" %}
+    {% include "partials/_public_footer_links.html" %}
   </form>
 </section>
 {% endblock %}

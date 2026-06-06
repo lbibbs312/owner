@@ -1,0 +1,7 @@
+<nav class="{{ footer_class|default('public-footer-links') }}" aria-label="Public links">
+  <a href="{{ url_for('public.privacy') }}">Privacy</a>
+  <span aria-hidden="true">&middot;</span>
+  <a href="{{ url_for('public.terms') }}">Terms</a>
+  <span aria-hidden="true">&middot;</span>
+  <a href="{{ url_for('public.contact') }}">Contact</a>
+</nav>

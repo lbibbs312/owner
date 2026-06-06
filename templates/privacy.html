@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MoveDefense Privacy Notice</title>
+  <style>
+    :root {
+      --ink:#0f172a;
+      --muted:#475569;
+      --line:#dbe4ef;
+      --blue:#2563eb;
+      --bg:#f8fafc;
+      --panel:#ffffff;
+    }
+    *,
+    *::before,
+    *::after {
+      box-sizing:border-box;
+    }
+    html,
+    body {
+      width:100%;
+      max-width:100%;
+      min-height:100%;
+      margin:0;
+      overflow-x:hidden;
+    }
+    body {
+      background:var(--bg);
+      color:var(--ink);
+      font-family:Arial, Helvetica, sans-serif;
+      line-height:1.55;
+    }
+    a { color:var(--blue); }
+    .public-page {
+      width:100%;
+      max-width:100%;
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+    }
+    .public-header,
+    .public-footer {
+      background:#fff;
+      border-bottom:1px solid var(--line);
+    }
+    .public-footer {
+      margin-top:auto;
+      border-top:1px solid var(--line);
+      border-bottom:0;
+    }
+    .public-header-inner,
+    .public-footer-inner,
+    .notice-wrap {
+      width:min(880px, 100%);
+      margin:0 auto;
+      padding:16px 18px;
+    }
+    .brand {
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      color:var(--ink);
+      font-weight:800;
+      text-decoration:none;
+    }
+    .brand-mark {
+      width:30px;
+      height:30px;
+      border-radius:8px;
+      background:var(--blue);
+      color:#fff;
+      display:grid;
+      place-items:center;
+      font-size:.88rem;
+      font-weight:900;
+    }
+    .notice-wrap {
+      padding-top:34px;
+      padding-bottom:42px;
+    }
+    .notice-card {
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:8px;
+      padding:26px;
+    }
+    h1 {
+      margin:0 0 10px;
+      font-size:2.1rem;
+      line-height:1.1;
+      letter-spacing:0;
+    }
+    .notice-lead {
+      margin:0 0 24px;
+      color:var(--muted);
+      font-size:1rem;
+    }
+    section + section {
+      margin-top:24px;
+      padding-top:20px;
+      border-top:1px solid #e8eef6;
+    }
+    h2 {
+      margin:0 0 8px;
+      font-size:1.12rem;
+      line-height:1.25;
+    }
+    p {
+      margin:0;
+      color:#334155;
+    }
+    p + p {
+      margin-top:10px;
+    }
+    ul {
+      margin:8px 0 0;
+      padding-left:20px;
+      color:#334155;
+    }
+    li + li {
+      margin-top:6px;
+    }
+    .public-footer-links {
+      display:flex;
+      justify-content:center;
+      gap:8px;
+      flex-wrap:wrap;
+      color:var(--muted);
+      font-size:.92rem;
+    }
+    .public-footer-links a {
+      color:var(--blue);
+      font-weight:700;
+      text-decoration:none;
+    }
+    @media (max-width: 560px) {
+      .notice-wrap {
+        padding:22px 12px 30px;
+      }
+      .notice-card {
+        padding:20px 16px;
+      }
+      h1 {
+        font-size:1.72rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="public-page">
+    <header class="public-header">
+      <div class="public-header-inner">
+        <a class="brand" href="{{ url_for('public.welcome') }}">
+          <span class="brand-mark" aria-hidden="true">MD</span>
+          <span>MoveDefense</span>
+        </a>
+      </div>
+    </header>
+
+    <main class="notice-wrap">
+      <article class="notice-card">
+        <h1>MoveDefense Privacy Notice</h1>
+        <p class="notice-lead">This notice explains what information MoveDefense handles and how it is used inside the route and recordkeeping workspace.</p>
+
+        <section>
+          <h2>Who operates MoveDefense</h2>
+          <p>MoveDefense is operated as a business recordkeeping service. The company or account administrator that gives a user access controls who should use the account and what records should be added.</p>
+        </section>
+
+        <section>
+          <h2>Information we collect</h2>
+          <p>MoveDefense may collect account details, driver names, truck and trailer details, route dates, stop notes, inspection entries, fuel entries, report details, uploaded files, and basic technical information needed to keep a user signed in.</p>
+        </section>
+
+        <section>
+          <h2>Route, stop, and driver records</h2>
+          <p>MoveDefense is used to create route, stop, report, document, and route packet records. Uploaded documents and photos are stored with the related route, stop, truck, driver, or report and are visible to authorized users.</p>
+        </section>
+
+        <section>
+          <h2>Reports, inspections, and fuel records</h2>
+          <p>Users may enter inspection records, fuel records, mileage, damage reports, incident reports, and other work records. These records help the company review daily work, prepare reports, and keep related documents together.</p>
+        </section>
+
+        <section>
+          <h2>Documents and photos</h2>
+          <p>Users may upload documents, receipts, inspection photos, damage photos, and other files related to a route, stop, vehicle, driver, or report. These files should match the work record they are attached to.</p>
+        </section>
+
+        <section>
+          <h2>Restricted documents</h2>
+          <p>Restricted documents, such as driver credentials, DOT cards, licenses, insurance, registration, or medical documents, should only be uploaded when required by the company or account administrator. These records should be limited to authorized users.</p>
+        </section>
+
+        <section>
+          <h2>How we use information</h2>
+          <p>MoveDefense uses information to provide the workspace, save records, show route and report history, prepare packets, support account administration, troubleshoot issues, and protect the service.</p>
+        </section>
+
+        <section>
+          <h2>Who can access information</h2>
+          <p>Access depends on the account setup. Authorized drivers, managers, administrators, and support users may see records when their role or account permissions allow it.</p>
+        </section>
+
+        <section>
+          <h2>Service providers</h2>
+          <p>MoveDefense may use service providers for hosting, storage, email, security, support, and similar service operations. These providers help run the service and may handle information for those purposes.</p>
+        </section>
+
+        <section>
+          <h2>Cookies and session data</h2>
+          <p>MoveDefense uses cookies and session data to keep users signed in, protect forms, remember basic session choices, and operate the application. Browser settings may affect how cookies work.</p>
+        </section>
+
+        <section>
+          <h2>How long records are kept</h2>
+          <p>Records may be kept while an account is active and for the time needed by the company, account administrator, or service operations. Some records may be retained longer when needed for business, legal, billing, or safety-related reasons.</p>
+        </section>
+
+        <section>
+          <h2>User choices and requests</h2>
+          <p>Users can ask their company or account administrator about access, corrections, exports, or removal requests. Privacy questions can also be sent to the contact below.</p>
+        </section>
+
+        <section>
+          <h2>Children&rsquo;s privacy</h2>
+          <p>MoveDefense is not intended for children under 13.</p>
+        </section>
+
+        <section>
+          <h2>Changes to this notice</h2>
+          <p>This notice may be updated as the service changes. The updated notice will be posted on this page.</p>
+        </section>
+
+        <section>
+          <h2>Contact</h2>
+          <p>Privacy contact: privacy@movedefense.com</p>
+        </section>
+      </article>
+    </main>
+
+    <footer class="public-footer">
+      <div class="public-footer-inner">
+        {% include "partials/_public_footer_links.html" %}
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

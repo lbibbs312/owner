@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ page_title }}</title>
+  <style>
+    * { box-sizing:border-box; }
+    html,
+    body {
+      width:100%;
+      max-width:100%;
+      min-height:100%;
+      margin:0;
+      overflow-x:hidden;
+    }
+    body {
+      background:#f8fafc;
+      color:#0f172a;
+      font-family:Arial, Helvetica, sans-serif;
+      line-height:1.55;
+    }
+    .public-page {
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+    }
+    .public-header,
+    .public-footer {
+      background:#fff;
+      border-bottom:1px solid #dbe4ef;
+    }
+    .public-footer {
+      margin-top:auto;
+      border-top:1px solid #dbe4ef;
+      border-bottom:0;
+    }
+    .public-header-inner,
+    .public-footer-inner,
+    .public-wrap {
+      width:min(760px, 100%);
+      margin:0 auto;
+      padding:16px 18px;
+    }
+    .brand {
+      color:#0f172a;
+      font-weight:800;
+      text-decoration:none;
+    }
+    .public-card {
+      margin:34px 0;
+      padding:26px;
+      background:#fff;
+      border:1px solid #dbe4ef;
+      border-radius:8px;
+    }
+    h1 {
+      margin:0 0 10px;
+      font-size:2rem;
+      line-height:1.1;
+    }
+    p {
+      margin:0;
+      color:#475569;
+    }
+    .public-footer-links {
+      display:flex;
+      justify-content:center;
+      gap:8px;
+      flex-wrap:wrap;
+      color:#475569;
+      font-size:.92rem;
+    }
+    .public-footer-links a {
+      color:#2563eb;
+      font-weight:700;
+      text-decoration:none;
+    }
+  </style>
+</head>
+<body>
+  <div class="public-page">
+    <header class="public-header">
+      <div class="public-header-inner">
+        <a class="brand" href="{{ url_for('public.welcome') }}">MoveDefense</a>
+      </div>
+    </header>
+
+    <main class="public-wrap">
+      <section class="public-card">
+        <h1>{{ page_heading }}</h1>
+        <p>{{ page_message }}</p>
+      </section>
+    </main>
+
+    <footer class="public-footer">
+      <div class="public-footer-inner">
+        {% include "partials/_public_footer_links.html" %}
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

@@ -20,8 +20,11 @@ def _reload_config(monkeypatch, **values):
         "SOCKETIO_PATH",
         "APP_URL",
         "BASE_URL",
+        "PUBLIC_BASE_URL",
         "PUBLIC_URL",
         "CANONICAL_HOST",
+        "CANONICAL_SCHEME",
+        "ENFORCE_CANONICAL_HOST",
         "REDIRECT_HOSTS",
         "DRIVER_LOG_PHOTO_UPLOAD_FOLDER",
         "DAMAGE_UPLOAD_FOLDER",
@@ -33,6 +36,15 @@ def _reload_config(monkeypatch, **values):
     import app.config as config
 
     return importlib.reload(config)
+
+
+def _canonical_redirect_app(config):
+    from app import create_app
+
+    class CanonicalRedirectConfig(config.TestConfig):
+        TESTING = False
+
+    return create_app(CanonicalRedirectConfig)
 
 
 def test_render_runtime_requires_database_url_even_without_flask_env(monkeypatch):
@@ -173,49 +185,138 @@ def test_deploy_db_bootstraps_empty_database_and_stamps_head(monkeypatch):
 def test_public_url_config_normalizes_move_defense_hosts(monkeypatch):
     config = _reload_config(
         monkeypatch,
-        APP_URL="https://movedefense.com/",
-        REDIRECT_HOSTS="https://lacksdrivers.com, www.lacksdrivers.com/",
+        PUBLIC_BASE_URL="https://movedefense.com/",
+        CANONICAL_HOST="movedefense.com",
+        CANONICAL_SCHEME="https://",
+        ENFORCE_CANONICAL_HOST="true",
+        RENDER_EXTERNAL_HOSTNAME="lacksdrivers-com.onrender.com",
     )
 
+    assert config.BaseConfig.PUBLIC_BASE_URL == "https://movedefense.com"
     assert config.BaseConfig.APP_URL == "https://movedefense.com"
     assert config.BaseConfig.BASE_URL == "https://movedefense.com"
     assert config.BaseConfig.PUBLIC_URL == "https://movedefense.com"
     assert config.BaseConfig.CANONICAL_HOST == "movedefense.com"
-    assert config.BaseConfig.REDIRECT_HOSTS == ("lacksdrivers.com", "www.lacksdrivers.com")
+    assert config.BaseConfig.CANONICAL_SCHEME == "https"
+    assert config.BaseConfig.ENFORCE_CANONICAL_HOST is True
+    assert config.BaseConfig.REDIRECT_HOSTS == ("lacksdrivers-com.onrender.com",)
 
 
-def test_legacy_domain_redirect_preserves_path_and_query(monkeypatch):
+def test_old_render_host_redirects_mobile_path_to_movedefense(monkeypatch):
     config = _reload_config(
         monkeypatch,
         FLASK_ENV="testing",
-        APP_URL="https://movedefense.com",
+        PUBLIC_BASE_URL="https://movedefense.com",
         CANONICAL_HOST="movedefense.com",
-        REDIRECT_HOSTS="lacksdrivers.com,www.lacksdrivers.com",
+        CANONICAL_SCHEME="https",
+        ENFORCE_CANONICAL_HOST="true",
+        RENDER_EXTERNAL_HOSTNAME="lacksdrivers-com.onrender.com",
     )
-    from app import create_app
 
-    app = create_app(config.TestConfig)
+    app = _canonical_redirect_app(config)
+    response = app.test_client().get("/mobile", headers={"Host": "lacksdrivers-com.onrender.com"})
+
+    assert response.status_code == 308
+    assert response.headers["Location"] == "https://movedefense.com/mobile"
+
+
+def test_old_render_host_redirect_preserves_login_query_string(monkeypatch):
+    config = _reload_config(
+        monkeypatch,
+        FLASK_ENV="testing",
+        PUBLIC_BASE_URL="https://movedefense.com",
+        CANONICAL_HOST="movedefense.com",
+        CANONICAL_SCHEME="https",
+        ENFORCE_CANONICAL_HOST="true",
+        RENDER_EXTERNAL_HOSTNAME="lacksdrivers-com.onrender.com",
+    )
+
+    app = _canonical_redirect_app(config)
     response = app.test_client().get(
-        "/driver/logs?date=2026-05-20",
-        headers={"Host": "www.lacksdrivers.com"},
+        "/login?next=/reports&required_role=driver",
+        headers={"Host": "lacksdrivers-com.onrender.com"},
     )
 
     assert response.status_code == 308
-    assert response.headers["Location"] == "https://movedefense.com/driver/logs?date=2026-05-20"
+    assert (
+        response.headers["Location"]
+        == "https://movedefense.com/login?next=/reports&required_role=driver"
+    )
 
 
-def test_non_legacy_hosts_are_not_redirected(monkeypatch):
+@pytest.mark.parametrize("host", ["localhost", "127.0.0.1", "movedefense.com"])
+def test_localhost_and_canonical_hosts_do_not_redirect(monkeypatch, host):
     config = _reload_config(
         monkeypatch,
         FLASK_ENV="testing",
-        APP_URL="https://movedefense.com",
+        PUBLIC_BASE_URL="https://movedefense.com",
         CANONICAL_HOST="movedefense.com",
-        REDIRECT_HOSTS="lacksdrivers.com,www.lacksdrivers.com",
+        CANONICAL_SCHEME="https",
+        ENFORCE_CANONICAL_HOST="true",
+        RENDER_EXTERNAL_HOSTNAME="lacksdrivers-com.onrender.com",
     )
-    from app import create_app
 
-    app = create_app(config.TestConfig)
+    app = _canonical_redirect_app(config)
+    response = app.test_client().get("/healthz", headers={"Host": host})
+
+    assert response.status_code == 200
+    assert response.get_json() == {"status": "ok"}
+
+
+def test_health_check_on_old_render_host_is_not_redirected(monkeypatch):
+    config = _reload_config(
+        monkeypatch,
+        FLASK_ENV="testing",
+        PUBLIC_BASE_URL="https://movedefense.com",
+        CANONICAL_HOST="movedefense.com",
+        CANONICAL_SCHEME="https",
+        ENFORCE_CANONICAL_HOST="true",
+        RENDER_EXTERNAL_HOSTNAME="lacksdrivers-com.onrender.com",
+    )
+
+    app = _canonical_redirect_app(config)
     response = app.test_client().get("/healthz", headers={"Host": "lacksdrivers-com.onrender.com"})
 
     assert response.status_code == 200
     assert response.get_json() == {"status": "ok"}
+
+
+def test_testing_config_does_not_enforce_canonical_redirect(monkeypatch):
+    config = _reload_config(
+        monkeypatch,
+        FLASK_ENV="testing",
+        PUBLIC_BASE_URL="https://movedefense.com",
+        CANONICAL_HOST="movedefense.com",
+        CANONICAL_SCHEME="https",
+        ENFORCE_CANONICAL_HOST="true",
+        RENDER_EXTERNAL_HOSTNAME="lacksdrivers-com.onrender.com",
+    )
+    from app import create_app
+
+    app = create_app(config.TestConfig)
+    response = app.test_client().get("/mobile", headers={"Host": "lacksdrivers-com.onrender.com"})
+
+    assert response.status_code == 302
+    assert "/login" in response.headers["Location"]
+
+
+def test_generated_absolute_links_use_public_base_url(monkeypatch):
+    config = _reload_config(
+        monkeypatch,
+        FLASK_ENV="testing",
+        PUBLIC_BASE_URL="https://movedefense.com",
+        CANONICAL_HOST="movedefense.com",
+        CANONICAL_SCHEME="https",
+        ENFORCE_CANONICAL_HOST="true",
+        RENDER_EXTERNAL_HOSTNAME="lacksdrivers-com.onrender.com",
+    )
+    from app import create_app
+    from app.services.public_urls import absolute_public_url, public_url_for
+
+    app = create_app(config.TestConfig)
+    with app.test_request_context("/", headers={"Host": "lacksdrivers-com.onrender.com"}):
+        assert public_url_for("public.healthz") == "https://movedefense.com/healthz"
+        assert (
+            absolute_public_url("/login?next=/reports&required_role=driver")
+            == "https://movedefense.com/login?next=/reports&required_role=driver"
+        )

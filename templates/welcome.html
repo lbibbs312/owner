@@ -62,6 +62,10 @@
     .product-pill { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; display:flex; justify-content:space-between; gap:10px; font-weight:800; }
     .product-pill span:last-child { color:var(--blue); white-space:nowrap; }
     .disclaimer { margin-top:22px; padding:16px 18px; background:#fff; border:1px solid var(--line); border-radius:8px; color:#475569; line-height:1.55; font-weight:600; }
+    .site-footer { border-top:1px solid var(--line); background:#fff; }
+    .site-footer-inner { max-width:1180px; margin:0 auto; padding:18px 22px; }
+    .public-footer-links { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; color:var(--muted); font-size:.92rem; }
+    .public-footer-links a { color:var(--blue); font-weight:800; text-decoration:none; }
     @media (max-width:980px) {
       .hero, .pricing-grid { grid-template-columns:1fr; }
       .cards, .product-row { grid-template-columns:1fr; }
@@ -246,5 +250,10 @@
       </div>
     </section>
   </main>
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      {% include "partials/_public_footer_links.html" %}
+    </div>
+  </footer>
 </body>
 </html>

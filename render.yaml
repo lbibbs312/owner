@@ -20,16 +20,14 @@ services:
         value: "true"
       - key: ENABLE_SOCKETIO
         value: "false"
-      - key: APP_URL
-        value: "https://movedefense.com"
-      - key: BASE_URL
-        value: "https://movedefense.com"
-      - key: PUBLIC_URL
+      - key: PUBLIC_BASE_URL
         value: "https://movedefense.com"
       - key: CANONICAL_HOST
         value: "movedefense.com"
-      - key: REDIRECT_HOSTS
-        value: "lacksdrivers.com,www.lacksdrivers.com"
+      - key: CANONICAL_SCHEME
+        value: "https"
+      - key: ENFORCE_CANONICAL_HOST
+        value: "true"
       - key: SECRET_KEY
         sync: false
       - key: SQLALCHEMY_DATABASE_URI

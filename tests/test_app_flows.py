@@ -1,5 +1,6 @@
 from io import BytesIO
 import os
+import re
 
 import pytest
 
@@ -297,6 +298,7 @@ def assert_login_page_is_standalone(data, subtitle):
     assert b"MoveDefense Sign In" in data
     assert subtitle in data
     assert b"Operations Sign In" not in data
+    assert b"OPERATIONS SIGN IN" not in data.upper()
     assert b"NEEDS REVIEW" not in data.upper()
     assert b"Driver credentials required" not in data
     assert b"md-shell" not in data
@@ -305,7 +307,22 @@ def assert_login_page_is_standalone(data, subtitle):
     assert b"compact-route-map" not in data
     assert b"LIVE FLOW BOARD" not in data
     assert b"navbar" not in data
+    assert b"hamburger" not in data.lower()
+    assert b"sidebar" not in data.lower()
     assert data.count(b'href="/register"') == 1
+    assert_login_page_has_responsive_auth_guards(data)
+
+
+def assert_login_page_has_responsive_auth_guards(data):
+    compact = re.sub(rb"\s+", b"", data)
+    assert b"box-sizing:border-box" in compact
+    assert compact.count(b"overflow-x:hidden") >= 3
+    assert b"max-width:100%" in compact
+    assert b".md-auth-wrap{width:100%;max-width:440px" in compact
+    assert b"grid-template-columns" not in data
+    assert b"position:absolute" not in compact
+    css_without_text_transform = re.sub(rb"text-transform:[^;]+;", b"", compact)
+    assert b"transform:" not in css_without_text_transform
 
 
 @pytest.mark.parametrize(

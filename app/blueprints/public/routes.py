@@ -15,6 +15,37 @@ def welcome():
     return render_template("welcome.html", bulletins=bulletins)
 
 
+@bp.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+
+@bp.route("/terms")
+def terms():
+    return render_template(
+        "public_placeholder.html",
+        page_title="MoveDefense Terms",
+        page_heading="MoveDefense Terms",
+        page_message=(
+            "Terms will be published here when they are ready. "
+            "This placeholder should not be used as a legal agreement page."
+        ),
+    )
+
+
+@bp.route("/contact")
+def contact():
+    return render_template(
+        "public_placeholder.html",
+        page_title="MoveDefense Contact",
+        page_heading="MoveDefense Contact",
+        page_message=(
+            "Contact options will be published here when they are ready. "
+            "This placeholder is not a legal agreement page."
+        ),
+    )
+
+
 @bp.route("/OneSignalSDKWorker.js")
 def onesignal_sw():
     return send_from_directory(

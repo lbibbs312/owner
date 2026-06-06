@@ -46,13 +46,26 @@ def _env_upload_folder(name, default):
     return os.environ.get(name, default)
 
 
-def _public_url():
+def _public_base_url():
     return (
-        os.environ.get("APP_URL")
-        or os.environ.get("BASE_URL")
+        os.environ.get("PUBLIC_BASE_URL")
         or os.environ.get("PUBLIC_URL")
+        or os.environ.get("APP_URL")
+        or os.environ.get("BASE_URL")
         or ""
     ).rstrip("/")
+
+
+def _canonical_scheme():
+    parsed_public_url = urlparse(_public_base_url())
+    raw_scheme = (
+        os.environ.get("CANONICAL_SCHEME")
+        or parsed_public_url.scheme
+        or "https"
+    ).strip().lower()
+    if raw_scheme.endswith("://"):
+        raw_scheme = raw_scheme[:-3]
+    return raw_scheme if raw_scheme in {"http", "https"} else "https"
 
 
 def _canonical_host():
@@ -60,7 +73,13 @@ def _canonical_host():
     if explicit_host:
         return explicit_host
 
-    return _normalize_host(_public_url())
+    return _normalize_host(_public_base_url())
+
+
+def _canonical_redirect_hosts():
+    canonical_host = _canonical_host()
+    hosts = [*_env_csv("REDIRECT_HOSTS"), _normalize_host(os.environ.get("RENDER_EXTERNAL_HOSTNAME"))]
+    return tuple(dict.fromkeys(host for host in hosts if host and host != canonical_host))
 
 
 def _normalize_database_uri(uri):
@@ -108,11 +127,14 @@ class BaseConfig:
     )
     SOCKETIO_PING_INTERVAL = int(os.environ.get("SOCKETIO_PING_INTERVAL", "25"))
     SOCKETIO_PING_TIMEOUT = int(os.environ.get("SOCKETIO_PING_TIMEOUT", "20"))
-    APP_URL = _public_url()
-    BASE_URL = os.environ.get("BASE_URL", APP_URL).rstrip("/")
-    PUBLIC_URL = os.environ.get("PUBLIC_URL", APP_URL).rstrip("/")
+    PUBLIC_BASE_URL = _public_base_url()
+    APP_URL = os.environ.get("APP_URL", PUBLIC_BASE_URL).rstrip("/")
+    BASE_URL = os.environ.get("BASE_URL", PUBLIC_BASE_URL).rstrip("/")
+    PUBLIC_URL = os.environ.get("PUBLIC_URL", PUBLIC_BASE_URL).rstrip("/")
+    CANONICAL_SCHEME = _canonical_scheme()
     CANONICAL_HOST = _canonical_host()
-    REDIRECT_HOSTS = _env_csv("REDIRECT_HOSTS")
+    ENFORCE_CANONICAL_HOST = _env_bool("ENFORCE_CANONICAL_HOST", False)
+    REDIRECT_HOSTS = _canonical_redirect_hosts()
     DRIVER_LOG_PHOTO_UPLOAD_FOLDER = _env_upload_folder(
         "DRIVER_LOG_PHOTO_UPLOAD_FOLDER",
         "uploads/driver_log_photos",
