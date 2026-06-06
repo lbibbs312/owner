@@ -295,8 +295,12 @@ def test_login_redirects_by_role(client, app):
 
 
 def assert_login_page_is_standalone(data, subtitle):
-    assert b"MoveDefense Sign In" in data
+    assert b"<title>MoveDefense Sign In</title>" in data
+    assert b"Account Access" in data
+    assert b"<h1>Sign In</h1>" in data
+    assert b"<h2>Account Details</h2>" in data
     assert subtitle in data
+    assert b"MoveDefense Access" not in data
     assert b"Operations Sign In" not in data
     assert b"OPERATIONS SIGN IN" not in data.upper()
     assert b"NEEDS REVIEW" not in data.upper()

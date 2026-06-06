@@ -344,10 +344,10 @@
     </header>
 
     <main class="md-auth-main">
-      <section class="md-auth-wrap" aria-label="MoveDefense sign in">
+      <section class="md-auth-wrap" aria-label="Account sign in">
         <div class="md-auth-intro">
-          <p class="md-auth-kicker">MoveDefense Access</p>
-          <h1>MoveDefense Sign In</h1>
+          <p class="md-auth-kicker">Account Access</p>
+          <h1>Sign In</h1>
           <p>
             {% if required_role == "driver" %}
               Driver access required.
@@ -374,7 +374,7 @@
 
         <form class="md-auth-card" method="POST" action="">
           {{ form.hidden_tag() }}
-          <h2>Sign In</h2>
+          <h2>Account Details</h2>
           {{ form_error_summary(form) }}
           <div class="md-auth-field">
             {{ form.login_name.label }}
