@@ -18,7 +18,7 @@
   .cargo-scan-panel .text-muted { color:#8a99b3!important; }
 </style>
 <div class="container">
-  <h2 class="mt-3">{{ 'Close ' ~ service_stop_label if service_stop else 'Depart / Load' }} {{ log.plant_name }}</h2>
+  <h2 class="mt-3">{{ 'Close ' ~ service_stop_label if service_stop else 'Depart and Load' }} {{ log.plant_name }}</h2>
   <p class="text-muted">
     Closing this stop with: <strong>{{ route.arrive_cargo_desc if route else log.load_size }}</strong>
     {% if route and route.unloaded_on_arrival %}&nbsp;·&nbsp; Primary unloaded{% endif %}
@@ -102,11 +102,11 @@
       <h3 class="h6 mb-1">Cargo Scan Verification</h3>
       <p class="text-muted small mb-2">Scan cargo coming off this stop or leaving with you. Unknown parts are saved for manager confirmation instead of being lost.</p>
       <div class="scan-actions">
-        <button type="button" data-scan-context="drop_scan">Scan Unloaded / Dropped Cargo</button>
-        <button type="button" data-scan-context="departure_scan">Scan Loaded / Departing Cargo</button>
+        <button type="button" data-scan-context="drop_scan">Scan Unloaded and Dropped Cargo</button>
+        <button type="button" data-scan-context="departure_scan">Scan Loaded and Departing Cargo</button>
       </div>
       <div class="input-group input-group-sm" style="max-width:520px;">
-        <input class="form-control" id="manualScanValue" autocomplete="off" placeholder="Manual barcode / part fallback">
+        <input class="form-control" id="manualScanValue" autocomplete="off" placeholder="Manual barcode or part fallback">
         <button class="btn btn-outline-secondary" type="button" id="manualScanBtn">Save Manual Scan</button>
       </div>
       <div class="scanner-stage" id="scannerStage">
@@ -122,7 +122,7 @@
         {% endfor %}
       </div>
       <div class="mt-3">
-        <label class="form-label" for="cargoOverrideReason">Manager review / override note</label>
+        <label class="form-label" for="cargoOverrideReason">Manager review override note</label>
         <textarea class="form-control" id="cargoOverrideReason" name="cargo_override_reason" rows="2" placeholder="Optional. If a scan looks wrong, close the stop and leave a note for manager review."></textarea>
       </div>
     </section>

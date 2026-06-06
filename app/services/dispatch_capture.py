@@ -17,7 +17,7 @@ CAPTURE_TYPE_LABELS = {
     "hot_move": "Hot Move",
     "empty_pack": "Empty Pack",
     "quality_hold": "Quality Hold",
-    "delay_no_parts": "Delay / No Parts",
+    "delay_no_parts": "Delay and No Parts",
     "damage": "Damage",
     "trailer_request": "Trailer Request",
     "maintenance": "Maintenance",

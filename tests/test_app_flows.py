@@ -78,7 +78,7 @@ def assert_driver_route_sheet_output(data):
     assert b"Transit Cargo" not in data
     assert b"In Truck" in data
     assert b"Out Truck" in data
-    assert b"Manager / Reviewer Signature" in data
+    assert b"Manager and Reviewer Signature" in data
     assert b"Manager / Auditor" not in data
 
 
@@ -651,7 +651,7 @@ def test_manager_assigns_task_and_driver_updates_status(client, app):
     manage_page = client.get(f"/manager/tasks/{task_id}")
     assert manage_page.status_code == 200
     assert b"Manage Move" in manage_page.data
-    assert b"Assign / Reassign Driver" in manage_page.data
+    assert b"Assign or Reassign Driver" in manage_page.data
     assert b"Print Audit Log" in manage_page.data
     assert b"Driver One | Plastic Plate | Badge 1001" in manage_page.data
 
@@ -823,7 +823,7 @@ def test_manager_move_request_queue_create_edit_and_actions(client, app):
 
     edit_page = client.get(f"/manager/move-requests/{request_id}/edit")
     assert edit_page.status_code == 200
-    assert b"Original Request / Message" in edit_page.data
+    assert b"Original Request and Message" in edit_page.data
 
     edited = client.post(
         f"/manager/move-requests/{request_id}/edit",
@@ -1496,7 +1496,7 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
     assert page.status_code == 200
     assert b"Mileage:" in page.data
     assert b"Pending posttrip" in page.data
-    assert b"DAMAGE / INCIDENTS" in page.data
+    assert b"DAMAGE AND INCIDENTS" in page.data
     assert b"Incident - Other" in page.data
     assert b"Damage - RE" in page.data
     assert b"Timing status pending" not in page.data
@@ -1582,7 +1582,7 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
     assert b"Cargo safety review" in response.data
     assert b"The load is unbalanced. This is what causes skids to tip over." in response.data
     assert b"Uploaded 5:34pm EDT" in response.data
-    assert b"Cargo / Manifest Review" in response.data
+    assert b"Cargo and Manifest Review" in response.data
     assert b"Clean" in response.data
     assert b"Manifest linked" in response.data
     assert b"No" in response.data
@@ -1592,7 +1592,7 @@ def test_manager_route_review_is_decision_copy_not_driver_receipt(client, app):
     assert b"Picked Up / Departed With" not in response.data
     assert b"Manifest Linked: Yes" not in response.data
     assert b"Scan records are attached to this route." not in response.data
-    assert b"Delay / Dock Time Review" in response.data
+    assert b"Delay and Dock Time Review" in response.data
     assert b"First-time stop - no historical baseline for dock time" in response.data
     assert b"Not enough plant history yet" not in response.data
     assert b"Collecting samples" not in response.data
@@ -2198,7 +2198,7 @@ def test_manager_route_review_regression_missing_stop_photo_file_blocks_approval
     response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
 
     assert response.status_code == 200
-    assert b"Photo / Damage / Safety Review" in response.data
+    assert b"Photo, Damage, and Safety Review" in response.data
     assert b"Photo record exists but file failed to render. Review in system before approval." in response.data
     assert b"Photo ID #" in response.data
     assert b"Cargo safety photo needs classification" in response.data
@@ -2486,7 +2486,7 @@ def test_damage_evidence_packet_includes_timeline_hashes_related_records_and_war
     assert packet.status_code == 200
     assert b"Packet Cover Page" in packet.data
     assert b"Full Event Timeline" in packet.data
-    assert b"Photo / Media Evidence" in packet.data
+    assert b"Photo and Media Evidence" in packet.data
     assert b"Chain of Custody" in packet.data
     assert b"Related Route Records" in packet.data
     assert b"PreTrip DVIR created" in packet.data
@@ -2587,7 +2587,7 @@ def test_pretrip_create_and_print_route(client, app):
 
     edit_page = client.get(f"/edit_pretrip_entry/{pretrip_id}")
     assert edit_page.status_code == 200
-    assert b"Truck / Tractor #" in edit_page.data
+    assert b"Truck and Tractor #" in edit_page.data
     assert b"No Defects" in edit_page.data
     assert b'capture="environment"' in edit_page.data
 
@@ -3150,7 +3150,7 @@ def test_driver_log_edit_and_depart_are_separate_actions(client, app):
     assert b"Edit" in list_page.data
     assert b"Depart" in list_page.data
     assert b"Delete" in list_page.data
-    assert b"Depart / Load" in list_page.data
+    assert b"Depart and Load" in list_page.data
 
     edited = client.post(
         f"/edit_driver_log/{log_id}",
@@ -3258,7 +3258,7 @@ def test_manager_can_view_but_not_edit_driver_logs(client, app):
     page = client.get("/manager/driver-logs")
     assert page.status_code == 200
     assert b"RE" in page.data
-    assert b"Cargo In / Out" in page.data
+    assert b"Cargo In and Out" in page.data
     assert b"At stop" in page.data
     assert b"Open" in page.data
     assert b"Completed" in page.data
@@ -3445,10 +3445,10 @@ def test_manager_driver_day_log_uses_management_readout_narrative(client, app):
     assert b"Current Active Stop: Unknown plant / needs confirmation" in page.data
     assert b"Open Route Stop" not in page.data
     assert b"Stop #3 - Unknown plant / needs confirmation" in page.data
-    assert b"Damage / Delay" in page.data
+    assert b"Damage and Delay" in page.data
     assert b"Damage Evidence" not in page.data
     assert b"Cargo Scan Proof" not in page.data
-    assert b"Signature / Audit Footer" in page.data
+    assert b"Signature and Record Footer" in page.data
     assert b"Selected Stop" in page.data
     assert b"Stop #1 - Raleigh East" in page.data
     assert b"Stop #3 - Unknown plant / needs confirmation" in page.data
@@ -3570,14 +3570,14 @@ def test_manager_route_audit_treats_latest_open_stop_as_current_activity(client,
     assert page.status_code == 200
     assert b"Lamar completed 4 of 5 stops. He is currently at Paint Central getting loaded. No delay or damage events were reported today. Two cargo scans need manager confirmation." in page.data
     assert b"Current Active Stop: Paint Central" in page.data
-    assert b"Driver arrived at 3:07pm and is getting loaded / awaiting departure." in page.data
+    assert b"Driver arrived at 3:07pm and is getting loaded and awaiting departure." in page.data
     assert b"Needs Review" in page.data
     assert b"2 cargo scans require manager confirmation." in page.data
     assert b"Cargo Review" in page.data
     assert b"Damage Evidence" not in page.data
     assert b"Damage Reports (0)" not in page.data
     assert b"Delay Events (0)" not in page.data
-    assert b"Damage / Delay" not in page.data
+    assert b"Damage and Delay" not in page.data
     assert b"Critical Exceptions" not in page.data
     assert b"Open Route Stop" not in page.data
     assert b"No damage reports were filed" not in page.data
@@ -3964,9 +3964,9 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     login(client, "photo_driver")
     edit_page = client.get(f"/edit_driver_log/{log_id}")
     assert edit_page.status_code == 200
-    assert b"Add Paperwork / Proof Photo" in edit_page.data
+    assert b"Add Paperwork and Proof Photo" in edit_page.data
     assert b"Why are you adding this picture?" not in edit_page.data
-    assert b"BOL / Manifest" in edit_page.data
+    assert b"BOL and Manifest" in edit_page.data
     assert b"Optional note" in edit_page.data
     assert b"Upload From Gallery" in edit_page.data
     assert b'data-stop-photo-input="edit_gallery"' in edit_page.data
@@ -3984,7 +3984,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert paperwork_upload.status_code == 200
     paperwork_photo = paperwork_upload.get_json()["photo"]
     assert paperwork_photo["source"] == "Bol Manifest Edit Gallery"
-    assert paperwork_photo["note"] == "BOL / manifest paperwork"
+    assert paperwork_photo["note"] == "BOL and manifest paperwork"
 
     first_upload = client.post(
         f"/driver_logs/{log_id}/photos",
@@ -4005,9 +4005,9 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
 
     depart_page = client.get(f"/driver_logs/{log_id}/depart")
     assert depart_page.status_code == 200
-    assert b"Add Paperwork / Proof Photo" in depart_page.data
+    assert b"Add Paperwork and Proof Photo" in depart_page.data
     assert b"Why are you adding this picture?" not in depart_page.data
-    assert b"BOL / Manifest" in depart_page.data
+    assert b"BOL and Manifest" in depart_page.data
     assert b"Upload From Gallery" in depart_page.data
     assert b'data-stop-photo-input="departure_gallery"' in depart_page.data
     assert b"Upload Label Photo" not in depart_page.data
@@ -4030,14 +4030,14 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     driver_list = client.get("/driver_logs")
     assert driver_list.status_code == 200
     assert b"Photo proof 1" in driver_list.data
-    assert b"BOL / manifest paperwork" in driver_list.data
+    assert b"BOL and manifest paperwork" in driver_list.data
     assert b"Loaded seal photo from gallery" in driver_list.data
     assert b"Departing load proof from gallery" in driver_list.data
 
     driver_detail = client.get(f"/view_driver_log/{log_id}")
     assert driver_detail.status_code == 200
     assert b"Stop Photo Proof" in driver_detail.data
-    assert b"BOL / manifest paperwork" in driver_detail.data
+    assert b"BOL and manifest paperwork" in driver_detail.data
     assert b"Loaded seal photo from gallery" in driver_detail.data
     assert b"Remove Photo" in driver_detail.data
 
@@ -4067,7 +4067,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     manager_list = client.get(f"/manager/driver-logs?date={date.today().isoformat()}")
     assert manager_list.status_code == 200
     assert b"Proof" in manager_list.data
-    assert b"BOL / manifest paperwork" in manager_list.data
+    assert b"BOL and manifest paperwork" in manager_list.data
     assert b"Loaded seal photo from gallery" in manager_list.data
     assert b"Departing load proof from gallery" in manager_list.data
 
@@ -4079,7 +4079,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
 
     manager_print = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
     assert manager_print.status_code == 200
-    assert b"Photo / Damage / Safety Review" in manager_print.data
+    assert b"Photo, Damage, and Safety Review" in manager_print.data
     assert b"Departing load proof from gallery" in manager_print.data
     assert b"height:2.15in" in manager_print.data
     assert b"Timing status pending" not in manager_print.data
@@ -4090,7 +4090,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert b"Cargo Photo Proof" in manager_page.data
     assert b"Three stop photo proofs were attached" in manager_page.data
     assert b"Latest proof from Paint Central says: Departing load proof from gallery" in manager_page.data
-    assert b"BOL / manifest paperwork" in manager_page.data
+    assert b"BOL and manifest paperwork" in manager_page.data
     assert b"Loaded seal photo from gallery" in manager_page.data
     assert b"Remove Photo" in manager_page.data
     assert f"/manager/driver-log-photos/{paperwork_photo_id}".encode() in manager_page.data
@@ -4107,7 +4107,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     )
     assert manager_delete.status_code == 302
     manager_page_after_delete = client.get(f"/manager/driver-logs/{log_id}")
-    assert b"BOL / manifest paperwork" in manager_page_after_delete.data
+    assert b"BOL and manifest paperwork" in manager_page_after_delete.data
     assert b"Loaded seal photo from gallery" not in manager_page_after_delete.data
     assert b"Departing load proof from gallery" in manager_page_after_delete.data
     assert client.get(f"/manager/driver-log-photos/{first_photo_id}").status_code == 404
@@ -4186,17 +4186,17 @@ def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_rev
     login(client, "driver_scan")
     depart_page = client.get(f"/driver_logs/{log_id}/depart")
     assert depart_page.status_code == 200
-    assert b"Scan Unloaded / Dropped Cargo" in depart_page.data
-    assert b"Scan Loaded / Departing Cargo" in depart_page.data
+    assert b"Scan Unloaded and Dropped Cargo" in depart_page.data
+    assert b"Scan Loaded and Departing Cargo" in depart_page.data
     assert b"Scan Arriving Cargo" not in depart_page.data
     assert b"Scan Picked-Up Cargo" not in depart_page.data
-    assert b"Add Paperwork / Proof Photo" in depart_page.data
+    assert b"Add Paperwork and Proof Photo" in depart_page.data
     assert b"Upload From Gallery" in depart_page.data
     assert b'data-stop-photo-input="departure_gallery"' in depart_page.data
     assert b"Upload Label Photo" not in depart_page.data
     assert b"galleryScanImage" not in depart_page.data
     assert b"@zxing/browser" in depart_page.data
-    assert b"Manager review / override note" in depart_page.data
+    assert b"Manager review override note" in depart_page.data
 
     scan = client.post(
         f"/driver_logs/{log_id}/part-scans",
@@ -4230,7 +4230,7 @@ def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_rev
     login(client, "scan_manager")
     manager_print = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
     assert manager_print.status_code == 200
-    assert b"Cargo / Manifest Review" in manager_print.data
+    assert b"Cargo and Manifest Review" in manager_print.data
     assert b"Cargo status" in manager_print.data
     assert b"Needs Review" in manager_print.data
     assert b"Verification level" in manager_print.data
@@ -6510,7 +6510,7 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert b"Dock time:" in today_report.data
     assert b"Edit" in today_report.data
     assert b"Pickup" not in today_report.data
-    assert b"Depart / Load" in today_report.data
+    assert b"Depart and Load" in today_report.data
     assert b"/mobile?flow=depart" in today_report.data
     assert b"Delete" in today_report.data
     assert b"13:30" not in today_report.data
@@ -6675,7 +6675,7 @@ def test_completed_posttrip_route_shows_ended_across_driver_and_manager_surfaces
 
     driver_print = client.get("/driver_logs_print")
     assert driver_print.status_code == 200
-    assert b"Route completed / awaiting final review" in driver_print.data
+    assert b"Route completed and awaiting final review" in driver_print.data
     assert b"Route open / not finalized" not in driver_print.data
 
     client.get("/logout")
@@ -7008,7 +7008,7 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "driver-active-wait-action" in body
     assert "animation:activeStopWaitBreath 4.6s ease-in-out infinite" in body
     assert "@keyframes activeStopWaitBreath" in body
-    assert "Depart / Load" in body
+    assert "Depart and Load" in body
     assert "md-flow-primary-cta" in body
     assert "Required driver action" in body
     assert "record departure" in body
@@ -7763,7 +7763,7 @@ def test_empty_active_stop_quick_depart_starts_at_load_check(client, app):
     assert '<section class="depart-step is-active" data-depart-step="1">' in body
     assert 'name="secondary_destination" data-depart-field="secondary_destination" value=""' in body
     assert '<label for="departSecondaryDestination">Optional second stop</label>' in body
-    assert '<option value="">None / not applicable</option>' in body
+    assert '<option value="">None or not applicable</option>' in body
 
 
 def test_mobile_quick_depart_optional_second_stop_defaults_to_none(client, app):
@@ -7825,7 +7825,7 @@ def test_mobile_quick_depart_optional_second_stop_defaults_to_none(client, app):
     mobile = client.get("/mobile")
     assert mobile.status_code == 200
     assert b"Raleigh East" in mobile.data
-    assert b"Depart / Load" in mobile.data
+    assert b"Depart and Load" in mobile.data
 
 
 def test_mobile_quick_depart_returns_to_live_board_without_full_depart_form(client, app):
@@ -8233,7 +8233,7 @@ def test_mobile_dashboard_shows_truck_maintenance_history_from_previous_posttrip
 
     detail = client.get("/truck-maintenance-history?truck_number=ST4")
     assert detail.status_code == 200
-    assert b"Issues Opened / Closed" in detail.data
+    assert b"Issues Opened and Closed" in detail.data
     assert b"Regen" in detail.data
     assert b"Fuel Stops" in detail.data
     assert b"Start Fuel" in detail.data
@@ -8362,8 +8362,8 @@ def test_driver_inspections_page_is_scoped_to_current_truck(client, app):
     assert page.status_code == 200
     assert b"Truck Inspections" in page.data
     assert b"Truck ST4" in page.data
-    assert b"PreTrips / PostTrips" in page.data
-    assert b"Fuel / Maintenance" in page.data
+    assert b"PreTrips and PostTrips" in page.data
+    assert b"Fuel and Maintenance" in page.data
     # Records stay collapsed behind a segmented switch until the driver picks a section.
     assert b"Inspection Sections" not in page.data
     assert b"data-inspection-switch" in page.data
@@ -8905,7 +8905,7 @@ def test_route_context_golden_route_current_open_stop_is_not_final_or_missing(cl
         assert snapshot.route_status == "active"
         assert snapshot.current_stop.id == logs[-1].id
         assert snapshot.current_stop_status == "current"
-        assert snapshot.current_activity_label == "Awaiting departure / load intent"
+        assert snapshot.current_activity_label == "Awaiting departure and load intent"
         assert snapshot.previous_cargo_cycle_status == "complete"
         assert snapshot.current_cargo["cargo_display"] == "Empty"
         assert snapshot.next_load_intent_status == "unknown"

@@ -30,7 +30,7 @@ FUEL_LEVEL_CHOICES = [
 
 class PreTripForm(FlaskForm):
     # Basic info
-    truck_number = StringField("Truck / Tractor #", validators=[DataRequired()])
+    truck_number = StringField("Truck and Tractor #", validators=[DataRequired()])
     trailer_number = StringField("Trailer #")
     pretrip_date = DateField("PreTrip Date", format="%Y-%m-%d")
     shift = SelectField("Shift", choices=[("1st", "1st"), ("2nd", "2nd"), ("3rd", "3rd")])

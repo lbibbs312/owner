@@ -426,7 +426,7 @@ def build_management_narrative(day_log):
             "status": "Active",
             "summary": f"Driver is currently at {open_stop} getting loaded.",
             "detail": (
-                f"Driver arrived at {_arrival_label(open_log)} and is getting loaded / awaiting departure."
+                f"Driver arrived at {_arrival_label(open_log)} and is getting loaded and awaiting departure."
             ),
         }
 

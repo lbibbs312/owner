@@ -407,7 +407,7 @@ def build_accident_packet(report, *, generated_by):
     return {
         "report": report,
         "document_number": f"ACCIDENT-{report.id:06d}",
-        "packet_type": "Accident / Incident Packet",
+        "packet_type": "Accident and Incident Packet",
         "generated_by": generated_by.display_name,
         "generated_at": _label_dt(generated_at),
         "current_status": accident_packet_status(report, media),

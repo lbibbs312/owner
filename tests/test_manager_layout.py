@@ -347,7 +347,7 @@ def test_manager_dashboard_v2_shell_uses_driver_workflow_records(client, app):
         "Route Packets",
         "IFTA Support Worksheets",
         "Documents",
-        "Damage / Incidents",
+        "Damage and Incidents",
         "Inspections",
     ):
         assert label in body
@@ -404,7 +404,7 @@ def test_move_requests_uses_movedefense_manager_shell(client, app):
     assert "Documents" in body
     assert "Open Items" in body
     assert "Route Packets" in body
-    assert "Damage / Incidents" in body
+    assert "Damage and Incidents" in body
     assert "Inspections" in body
     nav = body.split('<nav class="mq-nav"', 1)[1].split("</nav>", 1)[0]
     assert "mq-nav-badge" in nav

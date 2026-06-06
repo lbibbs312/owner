@@ -155,7 +155,7 @@ def _require_lifecycle_reason(field_name, value):
     reason = _clean_text(value)
     if reason:
         return reason
-    label = "Blocked reason" if field_name == "blocked_reason" else "Closed / cancel reason"
+    label = "Blocked reason" if field_name == "blocked_reason" else "Closed or cancel reason"
     flash(f"{label} is required for this move-request action.", "danger")
     return None
 
@@ -171,7 +171,7 @@ def _driver_log_choices():
     for log in logs:
         driver = log.driver.display_name if log.driver else f"Driver {log.driver_id}"
         plant = _plant_label(log.plant_name)
-        choices.append((log.id, f"Log #{log.id} / {log.date} / {driver} / {plant}"))
+        choices.append((log.id, f"Log #{log.id} - {log.date} - {driver} - {plant}"))
     return choices
 
 
@@ -185,7 +185,7 @@ def _plant_transfer_choices():
     choices = [(0, "No linked plant transfer")]
     for transfer in transfers:
         transfer_no = transfer.transfer_number or transfer.id
-        choices.append((transfer.id, f"Transfer {transfer_no} / {transfer.ship_from} to {transfer.ship_to}"))
+        choices.append((transfer.id, f"Transfer {transfer_no} - {transfer.ship_from} to {transfer.ship_to}"))
     return choices
 
 

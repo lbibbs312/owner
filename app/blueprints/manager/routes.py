@@ -1008,7 +1008,7 @@ def _manager_mileage_review(pretrips, logs, route_truck_context=None):
     route_mileage_label = _manager_mileage_label(route_total_miles, "miles") if route_completed else "Pending posttrip mileage"
     if route_issue_details:
         detail = route_issue_details[0]
-        quality_item = {"label": "Mileage", "status": "Needs correction", "detail": detail, "blocks_approval": True, "blocker_label": "Mileage conflict / correction required", "action": "Correct route mileage before approving route."}
+        quality_item = {"label": "Mileage", "status": "Needs correction", "detail": detail, "blocks_approval": True, "blocker_label": "Mileage conflict correction required", "action": "Correct route mileage before approving route."}
         label = "Needs correction"
         total_value = route_total_miles if route_completed else None
     elif route_pending or not route_completed:
@@ -1357,7 +1357,7 @@ def _manager_approval_blockers(data_quality_items, photo_reviews, cargo_review, 
         if mileage_item and mileage_item.get("blocks_approval"):
             blockers.append({"label": "PostTrip mileage not yet due", "detail": "PostTrip mileage is pending until the route is closed."})
     elif mileage_item and mileage_item.get("blocks_approval"):
-        blockers.append({"label": mileage_item.get("blocker_label") or "Mileage conflict / correction required", "detail": mileage_item["detail"]})
+        blockers.append({"label": mileage_item.get("blocker_label") or "Mileage conflict correction required", "detail": mileage_item["detail"]})
 
     if cargo_review.get("pending_scan_count"):
         blockers.append({"label": cargo_review["pending_scan_label"], "detail": "Final cargo approval is blocked until scans are confirmed."})
@@ -1453,7 +1453,7 @@ def _manager_blocker_phrase(blockers):
             signature_blocked = True
         elif label == "Mileage pending PostTrip":
             labels.append("pending posttrip mileage")
-        elif label == "Mileage conflict / correction required":
+        elif label == "Mileage conflict correction required":
             labels.append("mileage correction")
         else:
             labels.append(label[:1].lower() + label[1:])
@@ -1659,7 +1659,7 @@ def _build_manager_route_review_pdf(review):
     y -= 18
 
     y = _pdf_new_page_if_needed(pdf, y, 190)
-    pdf.text(36, y, "6. Cargo / Manifest Review", size=11, bold=True)
+    pdf.text(36, y, "6. Cargo and Manifest Review", size=11, bold=True)
     y -= 14
     cargo_rows = [[row["label"], row["value"], row["detail"]] for row in review["cargo_review"]["summary_rows"]]
     y = pdf.table(36, y, [125, 125, 290], 22, ["Audit", "Status", "Detail"], cargo_rows[:8], font_size=7)
@@ -1676,12 +1676,12 @@ def _build_manager_route_review_pdf(review):
         pdf.text(36, y, "Timing Intelligence", size=9, bold=True)
         y -= 12
         timing_rows = [[row["plant"], row["actual"], row["average"], row["status"]] for row in review["cargo_review"]["timing_rows"][:6]]
-        y = pdf.table(36, y, [140, 120, 130, 150], 20, ["Stop", "Load / Dock", "Plant Avg", "Status"], timing_rows, font_size=7)
+        y = pdf.table(36, y, [140, 120, 130, 150], 20, ["Stop", "Load and Dock", "Plant Avg", "Status"], timing_rows, font_size=7)
     y -= 18
 
     if review.get("photo_reviews") or review.get("damage_report_rows"):
         y = _pdf_new_page_if_needed(pdf, y, 260)
-        pdf.text(36, y, "7. Photo Proof / Damage Review", size=11, bold=True)
+        pdf.text(36, y, "7. Photo Proof and Damage Review", size=11, bold=True)
         y -= 16
         if review.get("damage_report_rows"):
             damage_rows = [[f"#{row['id']}", row["type"], row["stop"], row["status"], row["photo_attached"], row["note"]] for row in review["damage_report_rows"][:5]]
@@ -1731,7 +1731,7 @@ def _build_manager_route_review_pdf(review):
     y -= 18
 
     y = _pdf_new_page_if_needed(pdf, y, 185)
-    pdf.text(36, y, "9. Signatures / Manager Decision", size=11, bold=True)
+    pdf.text(36, y, "9. Signatures and Manager Decision", size=11, bold=True)
     y -= 14
     if review.get("approval_blocked"):
         pdf.text(44, y, "Approval unavailable until blocked items are resolved.", size=8, bold=True, color=(176, 0, 32))
@@ -1757,7 +1757,7 @@ def _build_manager_route_review_pdf(review):
     y -= 70
     pdf.text(36, y, "Manager Signature", size=9, bold=True)
     pdf.line(36, y - 18, 270, y - 18)
-    pdf.text(330, y, "Reviewed date/time", size=9, bold=True)
+    pdf.text(330, y, "Reviewed date and time", size=9, bold=True)
     pdf.line(330, y - 18, 576, y - 18)
     if review.get("driver_signature"):
         pdf.text(36, 42, "Driver e-signature captured", size=8)
@@ -2356,8 +2356,8 @@ def review_accident_incident(report_id):
         user_id=current_user.id,
         category="manager_review",
         action="reviewed",
-        title="Accident / Incident Manager Review",
-        details=f"Accident / Incident #{report.id}: {decision}.",
+        title="Accident and Incident Manager Review",
+        details=f"Accident and Incident #{report.id}: {decision}.",
         target_type="accident_incident_report",
         target_id=report.id,
         commit=False,

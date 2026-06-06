@@ -80,7 +80,7 @@
       <section class="metric-grid" aria-label="Exception summary">
         <div class="metric"><span>Active Exceptions</span><strong>{{ metrics.active_count }}</strong></div>
         <div class="metric"><span>High Priority</span><strong>{{ metrics.high_count }}</strong></div>
-        <div class="metric"><span>Truck / Damage</span><strong>{{ metrics.truck_damage_count }}</strong></div>
+        <div class="metric"><span>Truck and Damage</span><strong>{{ metrics.truck_damage_count }}</strong></div>
         <div class="metric"><span>Open Follow-ups</span><strong>{{ metrics.followup_count }}</strong></div>
         <div class="metric"><span>Unassigned Issues</span><strong>{{ metrics.unassigned_issue_count }}</strong></div>
       </section>
@@ -127,7 +127,7 @@
         <div class="review-panel-head"><h3>Exception Inbox</h3><span>View, resolve, or escalate from the row</span></div>
         <div class="table-responsive">
           <table class="exception-table">
-            <thead><tr><th>Priority</th><th>Type</th><th>Route / Stop</th><th>Issue</th><th>Owner</th><th>Age</th><th></th></tr></thead>
+            <thead><tr><th>Priority</th><th>Type</th><th>Route and Stop</th><th>Issue</th><th>Owner</th><th>Age</th><th></th></tr></thead>
             <tbody>
               {% for item in exceptions %}
                 <tr>
@@ -208,7 +208,7 @@
             <div class="damage-mini-row">
               <a href="{{ url_for('manager.view_damage_report', report_id=report.id) }}">
                 <span><strong>{{ report.plant_name }}</strong> {{ report.stage|title }} move</span>
-                <span class="text-muted small">{{ report.truck_number or 'Truck not set' }} / {{ report.trailer_number or 'Trailer not set' }}</span>
+                <span class="text-muted small">{{ report.truck_number or 'Truck not set' }} - {{ report.trailer_number or 'Trailer not set' }}</span>
               </a>
               <form method="POST" action="{{ url_for('manager.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report from active review? Evidence will remain attached.');">
                 <input type="hidden" name="next" value="{{ url_for('manager.review_dashboard') }}">

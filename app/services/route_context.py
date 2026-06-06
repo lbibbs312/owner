@@ -528,7 +528,7 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
         if is_current:
             status = "Current"
             status_key = "current"
-            note = "Awaiting departure / load intent"
+            note = "Awaiting departure and load intent"
         elif is_missing_departure:
             status = "Missing Departure"
             status_key = "open"
@@ -540,7 +540,7 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
         else:
             status = "Completed" if log.depart_time else "Open"
             status_key = "complete" if log.depart_time else "open"
-            note = route.get("action") or ("Awaiting departure / load intent" if not log.depart_time else "Completed")
+            note = route.get("action") or ("Awaiting departure and load intent" if not log.depart_time else "Completed")
         delay_required = bool(is_current and _delay_reason_required(log, timing_row))
         row = {
             "index": index,
@@ -655,7 +655,7 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
 
     current_label = ""
     if current_open:
-        current_label = "Awaiting departure / load intent"
+        current_label = "Awaiting departure and load intent"
     elif rows:
         current_label = "Route completed" if all_departed else "Route open"
     current_stop_status = "current" if current_open else ("finalized" if route_finalized else ("completed" if all_departed else "open"))

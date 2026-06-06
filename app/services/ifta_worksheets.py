@@ -230,7 +230,7 @@ def build_ifta_packet(worksheet, *, generated_by):
     return {
         "worksheet": worksheet,
         "document_number": f"IFTA-{worksheet.id:06d}",
-        "packet_type": "Fuel / Odometer / IFTA Worksheet",
+        "packet_type": "IFTA Support Worksheet",
         "packet_title": "IFTA Support Worksheet",
         "generated_by": generated_by.display_name,
         "generated_at": _label_dt(generated_at),

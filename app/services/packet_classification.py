@@ -16,11 +16,11 @@ class PacketClassification(str, Enum):
 
 
 PACKET_TYPE_LABELS = {
-    PacketClassification.PRETRIP_DVIR_ISSUE.value: "Pretrip / DVIR Issue Packet",
+    PacketClassification.PRETRIP_DVIR_ISSUE.value: "PreTrip and DVIR Issue Packet",
     PacketClassification.DAMAGE_ISSUE.value: "Damage Issue Packet",
-    PacketClassification.ACCIDENT_INCIDENT.value: "Accident / Incident Packet",
-    PacketClassification.FUEL_ODO_IFTA.value: "Fuel / Odometer / IFTA Worksheet",
-    PacketClassification.CARGO_PLANT_TRANSFER_ISSUE.value: "Cargo / Plant Transfer Issue Packet",
+    PacketClassification.ACCIDENT_INCIDENT.value: "Accident and Incident Packet",
+    PacketClassification.FUEL_ODO_IFTA.value: "IFTA Support Worksheet",
+    PacketClassification.CARGO_PLANT_TRANSFER_ISSUE.value: "Cargo and Plant Transfer Issue Packet",
     PacketClassification.ROUTE_ISSUE.value: "Route Issue Packet",
     PacketClassification.DOCUMENT_RECORD.value: "Document Record Packet",
     PacketClassification.OTHER_ISSUE.value: "Other Issue Packet",

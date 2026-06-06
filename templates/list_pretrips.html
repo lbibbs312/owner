@@ -306,18 +306,18 @@
         {% set open_posttrip_count = pretrips|length - completed_posttrip_count.value %}
         <div class="inspection-switch" role="tablist" aria-label="Inspection views" data-inspection-switch>
           <button type="button" class="inspection-switch-btn" role="tab" aria-selected="false" aria-controls="panel-prepost" data-insp-target="panel-prepost">
-            <strong>PreTrips / PostTrips</strong>
+            <strong>PreTrips and PostTrips</strong>
             <span>{{ pretrips|length }} record{{ 's' if pretrips|length != 1 else '' }}{% if open_posttrip_count %} &middot; {{ open_posttrip_count }} open{% else %} &middot; all complete{% endif %}</span>
           </button>
           <button type="button" class="inspection-switch-btn" role="tab" aria-selected="false" aria-controls="panel-maintenance" data-insp-target="panel-maintenance">
-            <strong>Fuel / Maintenance</strong>
+            <strong>Fuel and Maintenance</strong>
             <span>{{ truck_history|length }} histor{{ 'ies' if truck_history|length != 1 else 'y' }}</span>
           </button>
         </div>
-        <p class="inspection-hint" data-inspection-hint>Select PreTrips / PostTrips or Fuel / Maintenance to view records for Truck {{ selected_truck_number }}.</p>
+        <p class="inspection-hint" data-inspection-hint>Select PreTrips and PostTrips or Fuel and Maintenance to view records for Truck {{ selected_truck_number }}.</p>
 
         <section id="panel-prepost" class="inspection-panel" role="tabpanel" aria-label="PreTrip and PostTrip records" hidden>
-        <p class="inspection-section-title">PreTrip / PostTrip Records</p>
+        <p class="inspection-section-title">PreTrip and PostTrip Records</p>
         {% if pretrips %}
           <div class="inspection-card-list">
             {% for pt in pretrips %}
@@ -375,7 +375,7 @@
         </section>
 
         <section id="panel-maintenance" class="inspection-panel" role="tabpanel" aria-label="Fuel and maintenance history" hidden>
-        <p class="inspection-section-title">Fuel / Maintenance History</p>
+        <p class="inspection-section-title">Fuel and Maintenance History</p>
         {% if truck_history %}
           <div class="inspection-history-list">
             {% for item in truck_history %}

@@ -6,6 +6,7 @@
   .packet-page { display:block; border:1px solid #d1d5db; padding:22px; margin-bottom:20px; page-break-after:always; break-after:page; overflow:hidden; }
   .packet-brand { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; align-items:start; border-bottom:2px solid #111827; padding-bottom:12px; margin-bottom:14px; }
   .packet-brand-title { display:block; min-width:0; }
+  .packet-brand-label { display:block; margin-bottom:5px; color:#374151; font-size:.72rem; font-weight:950; text-transform:uppercase; letter-spacing:.08em; }
   .packet-brand h1,
   .packet-brand h2 { display:block; margin:0; font-weight:950; font-size:1.35rem; line-height:1.15; }
   .packet-brand strong,
@@ -32,8 +33,8 @@
   <section class="packet-page">
     <div class="packet-brand">
       <div class="packet-brand-title">
-        <h1>MoveDefense</h1>
-        <span class="packet-subtitle">IFTA Support Worksheet Cover</span>
+        <span class="packet-brand-label">MoveDefense</span>
+        <h1>IFTA Support Worksheet</h1>
       </div>
       <div class="packet-meta">
         Document number: {{ packet.document_number }}<br>
@@ -48,8 +49,8 @@
       <div class="packet-field"><span>Driver</span><strong>{{ packet.worksheet.driver.display_name if packet.worksheet.driver else 'Not recorded' }}</strong></div>
       <div class="packet-field"><span>Truck</span><strong>{{ packet.worksheet.truck or 'Not recorded' }}</strong></div>
       <div class="packet-field"><span>Trailer</span><strong>{{ packet.worksheet.trailer or 'Not recorded' }}</strong></div>
-      <div class="packet-field"><span>VIN / unit</span><strong>{{ packet.worksheet.vin_or_vehicle_unit_number or 'Not recorded' }}</strong></div>
-      <div class="packet-field"><span>Quarter / year</span><strong>{{ packet.worksheet.reporting_period_quarter or 'Not recorded' }} / {{ packet.worksheet.reporting_year or 'Not recorded' }}</strong></div>
+      <div class="packet-field"><span>VIN and unit</span><strong>{{ packet.worksheet.vin_or_vehicle_unit_number or 'Not recorded' }}</strong></div>
+      <div class="packet-field"><span>Quarter and year</span><strong>{{ packet.worksheet.reporting_period_quarter or 'Not recorded' }} {{ packet.worksheet.reporting_year or 'Not recorded' }}</strong></div>
       <div class="packet-field"><span>Review status</span><strong>{{ packet.worksheet.review_status }}</strong></div>
     </div>
     <p>We provide this as an IFTA support worksheet for record review. We do not provide tax filing or tax advice.</p>
@@ -60,7 +61,7 @@
   </section>
 
   <section class="packet-page">
-    <div class="packet-brand"><div class="packet-brand-title"><h2>Vehicle / Reporting Period Summary</h2></div><div class="packet-meta">Accurate Page 2 of 5</div></div>
+    <div class="packet-brand"><div class="packet-brand-title"><h2>Vehicle and Reporting Period Summary</h2></div><div class="packet-meta">Accurate Page 2 of 5</div></div>
     <div class="packet-grid">
       <div class="packet-field"><span>Base jurisdiction</span><strong>{{ packet.worksheet.base_jurisdiction or 'Not recorded' }}</strong></div>
       <div class="packet-field"><span>Carrier name</span><strong>{{ packet.worksheet.carrier_name or 'Not recorded' }}</strong></div>
@@ -89,7 +90,7 @@
   <section class="packet-page">
     <div class="packet-brand"><div class="packet-brand-title"><h2>Fuel Purchases</h2></div><div class="packet-meta">Accurate Page 4 of 5</div></div>
     <table>
-      <tr><th>Purchase date</th><th>Seller</th><th>Location</th><th>Gallons/liters</th><th>Fuel type</th><th>Tax paid</th></tr>
+      <tr><th>Purchase date</th><th>Seller</th><th>Location</th><th>Gallons or liters</th><th>Fuel type</th><th>Tax paid</th></tr>
       {% for row in packet.worksheet.fuel_records %}
         <tr>
           <td>{{ row.purchase_date or 'Not recorded' }}</td>
@@ -106,7 +107,7 @@
   </section>
 
   <section class="packet-page">
-    <div class="packet-brand"><div class="packet-brand-title"><h2>Receipt Photos / File Hashes</h2></div><div class="packet-meta">Accurate Page 5 of 5</div></div>
+    <div class="packet-brand"><div class="packet-brand-title"><h2>Receipt Photos and File Hashes</h2></div><div class="packet-meta">Accurate Page 5 of 5</div></div>
     <table>
       <tr><th>Fuel row</th><th>Receipt photo</th><th>Receipt hash</th><th>File status</th></tr>
       {% for row in packet.fuel_rows %}
@@ -140,7 +141,7 @@
           <td>{{ row.route_traveled or 'Not recorded' }}</td>
           <td>{{ row.beginning_odometer if row.beginning_odometer is not none else 'Not recorded' }} to {{ row.ending_odometer if row.ending_odometer is not none else 'Not recorded' }}</td>
           <td>{{ row.total_trip_distance if row.total_trip_distance is not none else 'Not recorded' }}</td>
-          <td>{{ row.jurisdiction }} / {{ row.jurisdiction_distance if row.jurisdiction_distance is not none else 'Not recorded' }}</td>
+          <td>{{ row.jurisdiction }} - {{ row.jurisdiction_distance if row.jurisdiction_distance is not none else 'Not recorded' }}</td>
         </tr>
       {% else %}
         <tr><td colspan="7">No trip rows recorded.</td></tr>

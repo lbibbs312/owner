@@ -179,12 +179,12 @@
         <div class="desk-row-group">
           <h3>Issues</h3>
           {% if route_packet_missing_transfer %}
-            {{ row_button('desktop-route-packet-transfer-sheet', 'DOC', 'Transfer sheet needed', ((packet_transfer_load.title if packet_transfer_load else 'Route packet') ~ ' / missing transfer sheet'), 'warn', false) }}
+            {{ row_button('desktop-route-packet-transfer-sheet', 'DOC', 'Transfer sheet needed', ((packet_transfer_load.title if packet_transfer_load else 'Route packet') ~ ' - missing transfer sheet'), 'warn', false) }}
           {% endif %}
           {% for stop in rm.stops %}
             {% for issue in stop.issues|default([]) %}
               {% if issue.code != 'needs_departure' %}
-                {{ row_button('desktop-issue-' ~ stop.stop_id ~ '-' ~ issue.code, 'ISSUE', issue.label, (stop.plant_name ~ ' / ' ~ issue.action), 'issue' if issue.severity == 'risk' else 'warn', false) }}
+                {{ row_button('desktop-issue-' ~ stop.stop_id ~ '-' ~ issue.code, 'ISSUE', issue.label, (stop.plant_name ~ ' - ' ~ issue.action), 'issue' if issue.severity == 'risk' else 'warn', false) }}
               {% endif %}
             {% endfor %}
           {% endfor %}
@@ -310,7 +310,7 @@
           </div>
           <div class="desk-overview-loads" aria-label="Stop load state">
             <div><span>Arrived with</span><strong>{{ 'No load captured for this stop' if not cargo_expected and arrived_empty else clean_value(stop.arrived_with, 'SOURCE NOT CAPTURED' if cargo_expected else 'EMPTY MOVEMENT') }}</strong></div>
-            <div><span>Departed with</span><strong>{{ 'No load captured for this stop' if not cargo_expected and departed_empty else clean_value(('No pickup / empty' if stop.no_pickup and departed_empty else stop.departed_with), 'DESTINATION REQUIRED' if cargo_expected else 'EMPTY MOVEMENT') }}</strong></div>
+            <div><span>Departed with</span><strong>{{ 'No load captured for this stop' if not cargo_expected and departed_empty else clean_value(('No pickup or empty' if stop.no_pickup and departed_empty else stop.departed_with), 'DESTINATION REQUIRED' if cargo_expected else 'EMPTY MOVEMENT') }}</strong></div>
           </div>
           {% if log and log.downtime_reason %}
             <div class="desk-overview-note"><span>Driver note</span><strong>{{ log.downtime_reason }}</strong></div>
@@ -381,7 +381,7 @@
             </div>
             <div class="desk-transfer-lines">
               {% for line in transfer.lines %}
-                <div class="desk-transfer-line"><span>{{ line.line_number }}</span><strong>{{ line.part_number or 'ITEM NUMBER NOT CAPTURED' }}</strong><small>{{ line.skids or 'LP NOT CAPTURED' }} LP / {{ line.quantity or 'COUNT NOT CAPTURED' }} pcs{% if line.remarks %} / {{ line.remarks }}{% endif %}</small></div>
+                <div class="desk-transfer-line"><span>{{ line.line_number }}</span><strong>{{ line.part_number or 'ITEM NUMBER NOT CAPTURED' }}</strong><small>{{ line.skids or 'LP NOT CAPTURED' }} LP - {{ line.quantity or 'COUNT NOT CAPTURED' }} pcs{% if line.remarks %} - {{ line.remarks }}{% endif %}</small></div>
               {% else %}
                 <div class="desk-warning-strip tone-warn"><strong>COUNT NOT CAPTURED</strong><span>No transfer lines are recorded.</span></div>
               {% endfor %}
@@ -442,7 +442,7 @@
           {% endif %}
         </section>
         <section class="desk-detail-section">
-          <div class="desk-section-title"><span>Print / Export</span><strong>Packet controls</strong></div>
+          <div class="desk-section-title"><span>Print and Export</span><strong>Packet controls</strong></div>
           <div class="desk-action-grid">
             <a class="desk-action-link primary" href="{{ route_audit_url }}">Open route audit</a>
             <button class="desk-action-link" type="button" data-desktop-mode="documents">Review documents</button>
@@ -488,7 +488,7 @@
                 <a class="desk-proof-thumb" href="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" target="_blank" rel="noopener">
                   <img src="{{ url_for('driver.driver_log_photo', photo_id=photo.id) }}" alt="Attached document {{ loop.index }}">
                   <span>{{ photo.document_type_label }}</span>
-                  <small>{{ dl.plant_name }} &middot; {{ photo.uploaded_at|to_detroit_datetime }}{% if photo.uploaded_by %} / {{ photo.uploaded_by.display_name }}{% endif %}</small>
+                  <small>{{ dl.plant_name }} &middot; {{ photo.uploaded_at|to_detroit_datetime }}{% if photo.uploaded_by %} - {{ photo.uploaded_by.display_name }}{% endif %}</small>
                 </a>
               {% endfor %}
             {% endfor %}
@@ -522,7 +522,7 @@
             {{ fact('Start mileage', ('{:,}'.format(route_pretrip.start_mileage) ~ ' mi') if route_pretrip.start_mileage else none, 'Not recorded') }}
             {{ fact('Fuel at start', route_pretrip.start_fuel_level if route_pretrip.start_fuel_level else none, 'Not recorded') }}
             {{ fact('Fuel logs', insp.fuel ~ ' today') }}
-            {{ fact('Defects / issues', insp_issue_count) }}
+            {{ fact('Defects and issues', insp_issue_count) }}
             {% if posttrip %}
             {{ fact('PostTrip', 'Complete') }}
             {{ fact('End mileage', ('{:,}'.format(posttrip.end_mileage) ~ ' mi') if posttrip.end_mileage else none, 'Not recorded') }}
@@ -548,7 +548,7 @@
                 <small>Start {{ '{:,}'.format(row.start_mileage) if row.start_mileage else '--' }} &middot; End {{ '{:,}'.format(row.end_mileage) if row.end_mileage else '--' }} &middot; {{ row.fuel_count }} fuel log{{ 's' if row.fuel_count != 1 else '' }} &middot; {{ row.issue_count }} issue{{ 's' if row.issue_count != 1 else '' }}{% if row.closed_at %} &middot; closed {{ row.closed_at|to_detroit_datetime }}{% endif %}</small>
               </a>
             {% else %}
-              <div class="desk-warning-strip"><strong>No recent truck history</strong><span>Completed PreTrip / PostTrip cycles for this truck will appear here.</span></div>
+              <div class="desk-warning-strip"><strong>No recent truck history</strong><span>Completed PreTrip and PostTrip cycles for this truck will appear here.</span></div>
             {% endfor %}
           </div>
         </section>
@@ -648,7 +648,7 @@
                   {{ fact('Why flagged', issue.reason) }}
                   {{ fact('Document found', stop.evidence.proof if stop.evidence else none, 'DOCUMENT NEEDED') }}
                   {{ fact('Required action', issue.action) }}
-                  {{ fact('Review owner', 'Driver / manager review') }}
+                  {{ fact('Review owner', 'Driver and manager review') }}
                 </div>
                 <div class="desk-warning-strip tone-{{ 'issue' if issue.severity == 'risk' else 'warn' }}"><strong>{{ issue.label }}</strong><span>{{ issue.action }}</span></div>
               </section>
@@ -659,7 +659,7 @@
                     {% if issue.code == 'destination_mismatch' %}<a class="desk-action-link primary" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Confirm destination</a>{% endif %}
                     {% if issue.code in ['missing_proof', 'unconfirmed_drop'] %}<button class="desk-action-link primary" type="button" data-desktop-mode="documents">Open documents</button>{% endif %}
                     <a class="desk-action-link" href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}">Add note</a>
-                    <form class="desk-action-form" method="POST" action="{{ url_for('driver.request_manager_review', log_id=log.id) }}"><button class="desk-action-link" type="submit">Manager override / review</button></form>
+                    <form class="desk-action-form" method="POST" action="{{ url_for('driver.request_manager_review', log_id=log.id) }}"><button class="desk-action-link" type="submit">Manager override review</button></form>
                   </div>
                 </section>
               {% endif %}
@@ -680,7 +680,7 @@
               {{ fact('Why flagged', 'A load is recorded on this route, but no transfer sheet or route transfer record is attached.') }}
               {{ fact('Evidence found', route_transfers|length ~ ' transfer records attached') }}
               {{ fact('Required action', 'Attach the transfer sheet to the Route Packet or open Documents to add it.') }}
-              {{ fact('Review owner', 'Driver / manager review') }}
+              {{ fact('Review owner', 'Driver and manager review') }}
             </div>
             <div class="desk-warning-strip tone-warn"><strong>Missing transfer sheet</strong><span>{{ packet_transfer_load.title if packet_transfer_load else 'A recorded route load' }} needs a transfer sheet before the route packet is ready.</span></div>
           </section>
@@ -697,7 +697,7 @@
     {% endif %}
 
     {% for report in route_damage_reports %}
-      <template data-desktop-detail-template="desktop-damage-{{ report.id }}" data-title="Damage report / {{ report.plant_name }}" data-kicker="Issue Review">
+      <template data-desktop-detail-template="desktop-damage-{{ report.id }}" data-title="Damage report - {{ report.plant_name }}" data-kicker="Issue Review">
         <div class="desk-detail-stack">
           <section class="desk-detail-section">
             <div class="desk-section-title"><span>Damage Report</span><strong>{{ report.status|upper }}</strong></div>

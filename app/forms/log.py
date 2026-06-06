@@ -47,7 +47,7 @@ TRUCK_ISSUE_LABELS = dict(TRUCK_ISSUE_CHOICES)
 
 
 class DriverLogForm(FlaskForm):
-    maintenance = BooleanField("Truck Issue / Maintenance")
+    maintenance = BooleanField("Truck Issue and Maintenance")
     fuel = BooleanField("Fuel")
     meeting = BooleanField("Meeting")
     plant_name = SelectField(
@@ -63,12 +63,12 @@ class DriverLogForm(FlaskForm):
     )
     departure_destination = SelectField(
         "Departed With",
-        choices=[("", "No pickup / empty")] + ACTIVE_PLANT_CHOICES,
+        choices=[("", "No pickup or empty")] + ACTIVE_PLANT_CHOICES,
         validators=[Optional()],
     )
     secondary_departure_dest = SelectField(
         "Also loaded for (second stop)",
-        choices=[("", "None / not applicable")] + ACTIVE_PLANT_CHOICES,
+        choices=[("", "None or not applicable")] + ACTIVE_PLANT_CHOICES,
         validators=[Optional()],
     )
     secondary_departure_type = SelectField(
@@ -91,9 +91,9 @@ class DriverLogForm(FlaskForm):
     )
     secondary_unload_reason = TextAreaField("Why?", validators=[Optional()])
     secondary_load = StringField("Second Stop Cargo", validators=[Optional()])
-    fuel_mileage = IntegerField("Odometer at Fuel / Truck Issue", validators=[Optional()])
+    fuel_mileage = IntegerField("Odometer at Fuel or Truck Issue", validators=[Optional()])
     hot_parts = BooleanField("Hot Parts")
-    part_number = StringField("Part Number / Hot Part Number")
+    part_number = StringField("Part Number or Hot Part Number")
     arrive_time = StringField(
         "Arrival Time",
         description="Enter Detroit local time like '545pm', '5:45pm', or '1:05pm'",

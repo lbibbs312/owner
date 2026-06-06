@@ -51,7 +51,7 @@ STATUS_CHOICES = [
 
 
 class MoveRequestForm(FlaskForm):
-    raw_text = TextAreaField("Original Request / Message", validators=[DataRequired()])
+    raw_text = TextAreaField("Original Request and Message", validators=[DataRequired()])
     source = SelectField("Source", choices=SOURCE_CHOICES, default="manual")
     requested_by = StringField("Requested By", validators=[Optional()])
     requested_at = DateTimeLocalField(
@@ -64,7 +64,7 @@ class MoveRequestForm(FlaskForm):
     priority = SelectField("Priority", choices=PRIORITY_CHOICES, default="normal")
     origin_location_text = StringField("Origin", validators=[Optional()])
     destination_location_text = StringField("Destination", validators=[Optional()])
-    cargo_text = StringField("Cargo / Description", validators=[Optional()])
+    cargo_text = StringField("Cargo Description", validators=[Optional()])
     part_number = StringField("Part Number", validators=[Optional()])
     quantity_value = FloatField("Quantity Value", validators=[Optional()])
     quantity_unit = StringField("Quantity Unit", validators=[Optional()])
@@ -74,7 +74,7 @@ class MoveRequestForm(FlaskForm):
     notes = TextAreaField("Notes", validators=[Optional()])
     status = SelectField("Status", choices=STATUS_CHOICES, default="open")
     blocked_reason = TextAreaField("Blocked Reason", validators=[Optional()])
-    closed_reason = TextAreaField("Closed / Cancel Reason", validators=[Optional()])
+    closed_reason = TextAreaField("Closed or Cancel Reason", validators=[Optional()])
     assigned_driver_id = SelectField("Assigned Driver", coerce=int, validators=[Optional()])
     assigned_driver_text = StringField("Assigned Driver Text", validators=[Optional()])
     equipment_id = StringField("Equipment ID", validators=[Optional()])

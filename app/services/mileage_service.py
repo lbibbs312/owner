@@ -35,7 +35,7 @@ def calculate_mileage_record(pretrip, *, normal_max=DEFAULT_NORMAL_ROUTE_MILES_M
             "status": "Needs correction",
             "detail": "Beginning odometer is missing or zero; ending odometer cannot be used as route miles.",
             "blocks_approval": True,
-            "blocker_label": "Mileage conflict / correction required",
+            "blocker_label": "Mileage conflict correction required",
             "action": "Correct route mileage before approving route.",
         }
 
@@ -48,7 +48,7 @@ def calculate_mileage_record(pretrip, *, normal_max=DEFAULT_NORMAL_ROUTE_MILES_M
             "status": "Needs correction",
             "detail": "Ending odometer is lower than beginning odometer.",
             "blocks_approval": True,
-            "blocker_label": "Mileage conflict / correction required",
+            "blocker_label": "Mileage conflict correction required",
             "action": "Correct route mileage before approving route.",
         }
     if calculated_miles > normal_max:
@@ -59,7 +59,7 @@ def calculate_mileage_record(pretrip, *, normal_max=DEFAULT_NORMAL_ROUTE_MILES_M
             "status": "Needs correction",
             "detail": f"{calculated_miles:,} miles is outside normal route range.",
             "blocks_approval": True,
-            "blocker_label": "Mileage conflict / correction required",
+            "blocker_label": "Mileage conflict correction required",
             "action": "Correct route mileage before approving route.",
         }
     return {

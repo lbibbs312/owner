@@ -20,7 +20,7 @@
   <p class="lead">This is an IFTA support worksheet for owner-operators and small fleets. This is not tax filing or tax advice.</p>
   <form method="POST" action="{{ url_for('driver.new_ifta_worksheet') }}" enctype="multipart/form-data">
     <section class="ifta-section">
-      <h2>A. Vehicle / Period</h2>
+      <h2>A. Vehicle and Period</h2>
       <div class="field-grid">
         <label>Reporting period quarter <input type="text" name="reporting_period_quarter" placeholder="Q1"></label>
         <label>Reporting year <input type="number" name="reporting_year"></label>
@@ -53,7 +53,7 @@
         <label>Taxable distance <input type="number" name="taxable_distance" step="any"></label>
         <label>Nontaxable distance <input type="number" name="nontaxable_distance" step="any"></label>
         <label>Toll distance <input type="number" name="toll_distance" step="any"></label>
-        <label>Loaded / empty / deadhead
+        <label>Loaded, empty, or deadhead
           <select name="loaded_empty_deadhead">
             <option value="loaded">Loaded</option>
             <option value="empty">Empty</option>

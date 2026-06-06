@@ -1410,7 +1410,7 @@ def test_actual_empty_return_stop_keeps_empty_return_wording(app):
 def test_active_wait_banner_mutes_depart_button_when_board_cta_owns_it(app):
     """When the green board CTA carries Depart/Load, the banner is a timer chip.
 
-    The duplicate "Depart / Load" button is dropped, but the wait timer and
+    The duplicate "Depart and Load" button is dropped, but the wait timer and
     stop context stay so the driver still sees the live clock.
     """
     from flask import render_template
@@ -1438,6 +1438,6 @@ def test_active_wait_banner_mutes_depart_button_when_board_cta_owns_it(app):
 
     # The duplicate depart button is gone when muted, present otherwise.
     assert "driver-active-wait-action" not in muted
-    assert ">Depart / Load<" not in muted
+    assert ">Depart and Load<" not in muted
     assert "driver-active-wait-action" in shown
-    assert ">Depart / Load<" in shown
+    assert ">Depart and Load<" in shown

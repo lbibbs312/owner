@@ -1472,7 +1472,7 @@ def _driver_log_photo_upload_path():
 def _driver_log_photo_default_note(source):
     source_text = (source or "").replace("_", " ").strip().lower()
     if any(term in source_text for term in ("bol", "manifest", "shipper")):
-        return "BOL / manifest paperwork"
+        return "BOL and manifest paperwork"
     if "transfer" in source_text:
         return "Transfer sheet paperwork"
     if "route_sheet" in source_text or "route packet" in source_text:
@@ -2387,7 +2387,7 @@ def _transfer_line_summary(transfer, limit=4):
             pieces.append(f"{line.skids} skid(s)")
         if line.quantity:
             pieces.append(f"qty {line.quantity}")
-        freight.append(" / ".join(pieces))
+        freight.append(" - ".join(pieces))
     if len(freight) > limit:
         return freight[:limit] + [f"+{len(freight) - limit} more"]
     return freight
@@ -2429,9 +2429,9 @@ def _build_pretrip_pdf(pretrip):
         date_value=pretrip.pretrip_date,
     )
     y = 704
-    pdf.text(36, y, "1. Vehicle / Shift Info", size=10, bold=True)
+    pdf.text(36, y, "1. Vehicle and Shift Info", size=10, bold=True)
     y -= 18
-    pdf.text(36, y, f"Truck/Tractor No: {pretrip.truck_number or ''}", size=10, bold=True)
+    pdf.text(36, y, f"Truck and Tractor No: {pretrip.truck_number or ''}", size=10, bold=True)
     pdf.text(265, y, f"Trailer No: {pretrip.trailer_number or ''}", size=10)
     pdf.text(445, y, f"Date: {pretrip.pretrip_date or ''}", size=10)
     y -= 18
@@ -2445,10 +2445,10 @@ def _build_pretrip_pdf(pretrip):
     y -= 18
     fuel_level = f"Start: {pretrip.start_fuel_level or 'Not recorded'}"
     if pretrip.posttrip:
-        fuel_level = f"{fuel_level} / End: {pretrip.posttrip.end_fuel_level or 'Not recorded'}"
+        fuel_level = f"{fuel_level} - End: {pretrip.posttrip.end_fuel_level or 'Not recorded'}"
     pdf.text(36, y, f"Fuel Level: {fuel_level}", size=10)
     y -= 25
-    pdf.text(36, y, "2. Power Unit Inspection / 3. In-Cab Inspection / 4. Engine Compartment / 5. Exterior", size=9, bold=True)
+    pdf.text(36, y, "2. Power Unit Inspection, 3. In-Cab Inspection, 4. Engine Compartment, 5. Exterior", size=9, bold=True)
     y -= 12
     rows = [
         ["Oil System", pretrip.oil_system_status or ""],
@@ -2492,7 +2492,7 @@ def _build_pretrip_pdf(pretrip):
     marked_defects = _pretrip_marked_defects(pretrip)
     if marked_defects:
         y -= 14
-        pdf.text(36, y, "6. Defects / Remarks - Defects Marked", size=10, bold=True, color=PDF_ALERT_RED)
+        pdf.text(36, y, "6. Defects and Remarks - Defects Marked", size=10, bold=True, color=PDF_ALERT_RED)
         pdf.multiline_text(
             42,
             y - 14,
@@ -2522,7 +2522,7 @@ def _build_pretrip_pdf(pretrip):
         remarks_lines.append("; ".join(posttrip_parts))
     remarks = "\n".join(remarks_lines)
     remarks_color = PDF_ALERT_RED if pretrip_remarks else None
-    pdf.text(36, y, "6. Defects / Remarks", size=10, bold=True, color=remarks_color)
+    pdf.text(36, y, "6. Defects and Remarks", size=10, bold=True, color=remarks_color)
     pdf.rect(36, y - 70, 540, 60)
     pdf.multiline_text(
         42,
@@ -2545,7 +2545,7 @@ def _build_pretrip_pdf(pretrip):
         y = 704
         pdf.text(36, y, "8. PreTrip Damage Evidence", size=14, bold=True)
         y -= 20
-        pdf.text(36, y, f"PreTrip #{pretrip.id} / Truck {pretrip.truck_number or ''}", size=9)
+        pdf.text(36, y, f"PreTrip #{pretrip.id} - Truck {pretrip.truck_number or ''}", size=9)
         y -= 18
         for report in evidence_reports[:4]:
             pdf.text(36, y, f"Damage Report #{report.id}: {report.description}", size=9, bold=True, color=PDF_ALERT_RED)
@@ -2587,7 +2587,7 @@ def _draw_signature_pdf_block(pdf, driver_signature=None, signature_timestamp=No
     pdf.fill_rect(36, 34, 540, 94, gray=1)
     pdf.rect(36, 34, 540, 94)
     pdf.text(44, 112, "Driver Signature", size=9, bold=True)
-    pdf.text(330, 112, "Manager / Reviewer Signature", size=9, bold=True)
+    pdf.text(330, 112, "Manager and Reviewer Signature", size=9, bold=True)
 
     if driver_signature:
         image_drawn = pdf.image_png_data_url(driver_signature, 44, 62, 190, 38)
@@ -2662,13 +2662,13 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
         y -= 18
     if support["parts_carried"] and y > 170:
         y -= 14
-        pdf.text(36, y, "LOAD / PART REFERENCES", size=10, bold=True)
+        pdf.text(36, y, "LOAD AND PART REFERENCES", size=10, bold=True)
         y -= 12
         pdf.multiline_text(44, y, ", ".join(support["parts_carried"]), width_chars=96, size=8, leading=10, max_lines=3)
         y -= 22
     if support["damage_report_details"] and y > 170:
         y -= 8
-        pdf.text(36, y, "DAMAGE / INCIDENTS", size=10, bold=True)
+        pdf.text(36, y, "DAMAGE AND INCIDENTS", size=10, bold=True)
         y -= 12
         pdf.multiline_text(44, y, "; ".join(support["damage_report_details"]), width_chars=96, size=8, leading=10, max_lines=3)
         y -= 22
@@ -5102,7 +5102,7 @@ def new_accident_incident():
             packet_type=request.form.get("packet_type") or "accident_incident",
             answers=request.form,
         ):
-            flash("Choose Accident / Incident or answer yes to an accident trigger question before opening this form.", "warning")
+            flash("Choose Accident and Incident or answer yes to an accident trigger question before opening this form.", "warning")
             return redirect(url_for("driver.new_accident_incident"))
         report = create_accident_report_from_form(
             request.form,
@@ -5115,14 +5115,14 @@ def new_accident_incident():
             user_id=current_user.id,
             category="accident_incident",
             action="created",
-            title="Accident / Incident recorded",
-            details=f"Accident / Incident #{report.id} saved for manager review.",
+            title="Accident and Incident recorded",
+            details=f"Accident and Incident #{report.id} saved for manager review.",
             target_type="accident_incident_report",
             target_id=report.id,
             commit=False,
         )
         db.session.commit()
-        flash("Accident / Incident saved for Manager Review.", "success")
+        flash("Accident and Incident saved for Manager Review.", "success")
         return redirect(url_for("driver.view_accident_incident", report_id=report.id))
     return render_template(
         "accident_incident_form.html",

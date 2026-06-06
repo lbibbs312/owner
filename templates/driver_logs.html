@@ -999,8 +999,8 @@
             {% endif %}
           </div>
           <a class="md-route-audit-card" href="{{ truck_inspections_url }}" aria-label="View truck inspections">
-            <span>Truck / Trailer</span>
-            <strong>{% if audit.truck_number or audit.trailer_number %}{{ audit.truck_number or 'Truck not set' }}{% if audit.trailer_number %} / {{ audit.trailer_number }}{% endif %}{% else %}Not recorded{% endif %}</strong>
+            <span>Truck and Trailer</span>
+            <strong>{% if audit.truck_number or audit.trailer_number %}{{ audit.truck_number or 'Truck not set' }}{% if audit.trailer_number %} - {{ audit.trailer_number }}{% endif %}{% else %}Not recorded{% endif %}</strong>
             <small>From route PreTrip.</small>
           </a>
           <a class="md-route-audit-card" href="{{ fuel_card_href }}" aria-label="View fuel details">
@@ -1158,7 +1158,7 @@
                 <div class="md-row-fact"><span>Depart</span><strong>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</strong></div>
                 <div class="md-row-fact"><span>In</span><strong>{{ arrive_label }}</strong></div>
                 <div class="md-row-fact"><span>Out</span><strong>{{ depart_label }}</strong></div>
-                <div class="md-row-fact"><span>Fuel / Odometer</span><strong>{% if log.fuel %}Fuel stop{% if log.fuel_mileage %} · {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}{% elif log.fuel_mileage %}{{ "{:,}".format(log.fuel_mileage) }} mi{% else %}No fuel logged{% endif %}</strong></div>
+                <div class="md-row-fact"><span>Fuel and Odometer</span><strong>{% if log.fuel %}Fuel stop{% if log.fuel_mileage %} · {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}{% elif log.fuel_mileage %}{{ "{:,}".format(log.fuel_mileage) }} mi{% else %}No fuel logged{% endif %}</strong></div>
               </div>
 
               {% if log.plant_name in PLANT_ADDRESSES %}
@@ -1260,7 +1260,7 @@
           <th>Department</th>
           <th>Date</th>
           <th>Plant</th>
-          <th>Cargo In / Out</th>
+          <th>Cargo In and Out</th>
           <th>Parts</th>
           <th>Maintenance</th>
           <th>Fuel</th>
@@ -1417,7 +1417,7 @@
                   </a>
                   {% if not log.depart_time %}
                     {% set depart_href = url_for('driver.mobile_dashboard', flow='depart') if active_driver_wait is defined and active_driver_wait and active_driver_wait.log_id == log.id else url_for('driver.depart_driver_log', log_id=log.id) %}
-                    <a href="{{ depart_href }}" class="btn btn-sm btn-success hover-btn">Depart / Load</a>
+                    <a href="{{ depart_href }}" class="btn btn-sm btn-success hover-btn">Depart and Load</a>
                   {% endif %}
                   {% if can_delete_log %}
                     {% if log.hot_parts or log.part_number %}

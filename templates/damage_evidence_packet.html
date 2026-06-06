@@ -55,7 +55,7 @@
     <a class="btn btn-outline-secondary" href="{{ back_url }}">Back to Report</a>
     <div class="actions">
       {% if packet.packet_type == 'accident_incident' %}
-        <a class="btn btn-outline-primary" href="{{ url_for('driver.accident_incident_from_damage_report', report_id=packet.report.id) }}">Open Accident / Incident Form</a>
+        <a class="btn btn-outline-primary" href="{{ url_for('driver.accident_incident_from_damage_report', report_id=packet.report.id) }}">Open Accident and Incident Form</a>
       {% endif %}
       <button class="btn btn-primary" type="button" onclick="window.print()">Print Document</button>
     </div>
@@ -86,7 +86,7 @@
         <div class="cover-field"><span>Truck</span><strong>{{ packet.truck_label }}</strong></div>
         <div class="cover-field"><span>Trailer</span><strong>{{ packet.trailer_label }}</strong></div>
         <div class="cover-field"><span>Driver</span><strong>{{ report.reported_by.display_name }}</strong></div>
-        <div class="cover-field"><span>Plant / Location</span><strong>{{ packet.plant_label }}</strong></div>
+        <div class="cover-field"><span>Plant and Location</span><strong>{{ packet.plant_label }}</strong></div>
         <div class="cover-field"><span>Stage</span><strong>{{ report.stage|title }}</strong></div>
         <div class="cover-field"><span>Related Move</span><strong>{{ packet.related_move_label }}</strong></div>
         <div class="cover-field"><span>Reported Time</span><strong>{{ packet.damage_time_label }}</strong></div>
@@ -116,7 +116,7 @@
 
   <section class="packet-page">
     <div class="packet-section">
-      <h2>4. Photo / Media Evidence</h2>
+      <h2>4. Photo and Media Evidence</h2>
       {% for row in packet.photos %}
         <article class="photo-proof">
           {% if row.file_exists %}
@@ -130,7 +130,7 @@
                 <tr><th>Photo</th><td>#{{ row.number }} - {{ row.stage|title }}</td></tr>
                 <tr><th>Uploaded By</th><td>{{ row.uploaded_by }}</td></tr>
                 <tr><th>Uploaded</th><td>{{ row.uploaded_at }}</td></tr>
-                <tr><th>Truck / Trailer</th><td>{{ row.related_truck }} / {{ row.related_trailer }}</td></tr>
+                <tr><th>Truck and Trailer</th><td>{{ row.related_truck }} and {{ row.related_trailer }}</td></tr>
                 <tr><th>Move</th><td>{{ row.related_move }}</td></tr>
                 <tr><th>File</th><td>{{ row.filename }}<br><span class="text-muted">Stored: {{ row.stored_filename }}</span></td></tr>
                 <tr><th>Hash</th><td class="hash">SHA-256: {{ row.hash }}</td></tr>
@@ -165,7 +165,7 @@
     <div class="packet-section">
       <h2>6. Related Route Records</h2>
       <table class="packet-table">
-        <thead><tr><th>Stop</th><th>Plant</th><th>Arrive</th><th>Depart</th><th>Cargo In</th><th>Cargo Out</th><th>Parts / Issues</th></tr></thead>
+        <thead><tr><th>Stop</th><th>Plant</th><th>Arrive</th><th>Depart</th><th>Cargo In</th><th>Cargo Out</th><th>Parts and Issues</th></tr></thead>
         <tbody>
           {% for log in packet.logs %}
             {% set r = packet.log_routes.get(log.id, {}) %}
@@ -186,7 +186,7 @@
     </div>
 
     <div class="packet-section">
-      <h2>7. DVIR / PreTrip</h2>
+      <h2>7. DVIR and PreTrip</h2>
       <table class="packet-table">
         <thead><tr><th>ID</th><th>Date</th><th>Truck</th><th>Trailer</th><th>Shift</th><th>Start Mileage</th><th>Damage Remarks</th></tr></thead>
         <tbody>
@@ -200,7 +200,7 @@
     </div>
 
     <div class="packet-section">
-      <h2>8. Cargo / Plant Transfer Records</h2>
+      <h2>8. Cargo and Plant Transfer Records</h2>
       <table class="packet-table">
         <thead><tr><th>ID</th><th>Route</th><th>Trailer</th><th>Time</th><th>Driver Initials</th><th>Lines</th></tr></thead>
         <tbody>
@@ -221,7 +221,7 @@
         <div class="cover-field"><span>Created By</span><strong>{{ report.reported_by.display_name }}</strong></div>
         <div class="cover-field"><span>Driver Can Edit</span><strong>{{ 'Yes' if packet.driver_can_edit else 'No' }}</strong></div>
         <div class="cover-field"><span>Route Finalized</span><strong>{{ 'Yes' if packet.route_finalized else 'No' }}</strong></div>
-        <div class="cover-field"><span>Manager Review</span><strong>{{ 'Closed' if report.status == 'closed' else 'Open / incomplete' }}</strong></div>
+        <div class="cover-field"><span>Manager Review</span><strong>{{ 'Closed' if report.status == 'closed' else 'Open and incomplete' }}</strong></div>
         <div class="cover-field"><span>Driver Signature</span><strong>{{ 'Complete' if packet.driver_signature_complete else 'Missing' }}</strong></div>
         <div class="cover-field"><span>Manager Signature</span><strong>{{ 'Complete' if packet.manager_signature_complete else 'Missing' }}</strong></div>
         <div class="cover-field"><span>Report Created</span><strong>{{ packet.created_time_label }}</strong></div>
@@ -242,7 +242,7 @@
           {% endif %}
         </div>
         <div class="signature-box">
-          <strong>Manager / Auditor Signature</strong>
+          <strong>Manager Signature</strong>
           <div class="signature-line">Signature not captured in app</div>
         </div>
       </div>

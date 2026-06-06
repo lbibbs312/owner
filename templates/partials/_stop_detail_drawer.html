@@ -12,12 +12,12 @@
       <dl class="drawer-facts">
         <div><dt>Arrival</dt><dd>{{ stop.arrival_at|display_time if stop.arrival_at else 'No current data' }}</dd></div>
         <div><dt>Departure</dt><dd>{{ stop.departure_at|to_12h_format if stop.departure_at else 'Not tracked yet' }}</dd></div>
-        <div><dt>Wait / dwell</dt><dd>{{ stop.wait_label or 'Not tracked yet' }}</dd></div>
+        <div><dt>Wait and dwell</dt><dd>{{ stop.wait_label or 'Not tracked yet' }}</dd></div>
         <div><dt>Arrived with</dt><dd>{{ stop.arrived_with or 'Not tracked yet' }}</dd></div>
         <div><dt>Departed with</dt><dd>{{ stop.departed_with or 'Not tracked yet' }}</dd></div>
-        <div><dt>Cargo / load</dt><dd>{{ stop.cargo_status or 'No current data' }}</dd></div>
+        <div><dt>Cargo and load</dt><dd>{{ stop.cargo_status or 'No current data' }}</dd></div>
         <div><dt>Linked move</dt><dd>{% if stop.linked_move_request_id %}{{ stop.linked_move_request_number or ('Move #' ~ stop.linked_move_request_id) }}{% else %}No linked move request{% endif %}</dd></div>
-        <div><dt>Transfer / document</dt><dd>{% if stop.linked_plant_transfer_id %}Plant Transfer #{{ stop.linked_plant_transfer_id }}{% elif stop.linked_document_id %}Document #{{ stop.linked_document_id }}{% else %}Document not attached{% endif %}</dd></div>
+        <div><dt>Transfer and document</dt><dd>{% if stop.linked_plant_transfer_id %}Plant Transfer #{{ stop.linked_plant_transfer_id }}{% elif stop.linked_document_id %}Document #{{ stop.linked_document_id }}{% else %}Document not attached{% endif %}</dd></div>
         <div><dt>Issue status</dt><dd>{% if stop.issues %}{{ stop.issues|length }} open issue{{ 's' if stop.issues|length != 1 else '' }}{% else %}No open issues{% endif %}</dd></div>
         <div><dt>Next action</dt><dd>{{ stop.next_action or 'No action needed' }}</dd></div>
       </dl>

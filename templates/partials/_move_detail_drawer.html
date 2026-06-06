@@ -13,12 +13,12 @@
         <div><dt>Requested by</dt><dd>{{ move.requested_by or 'Not tracked yet' }}</dd></div>
         <div><dt>Requested at</dt><dd>{{ move.requested_at or 'Not tracked yet' }}</dd></div>
         <div><dt>Origin to destination</dt><dd>{{ move.origin_location_text or 'Not tracked yet' }} &rarr; {{ move.destination_location_text or 'Not tracked yet' }}</dd></div>
-        <div><dt>Cargo / part / quantity</dt><dd>{{ move.cargo_text or 'No current data' }}{% if move.part_number %} · {{ move.part_number }}{% endif %}{% if move.quantity_text %} · {{ move.quantity_text }}{% endif %}</dd></div>
+        <div><dt>Cargo, part, and quantity</dt><dd>{{ move.cargo_text or 'No current data' }}{% if move.part_number %} · {{ move.part_number }}{% endif %}{% if move.quantity_text %} · {{ move.quantity_text }}{% endif %}</dd></div>
         <div><dt>Due time</dt><dd>{{ move.due_time_text or 'Not tracked yet' }}</dd></div>
         <div><dt>Assigned driver</dt><dd>{{ move.assigned_driver or 'Unassigned' }}</dd></div>
         <div><dt>Equipment</dt><dd>{{ move.equipment or 'Not tracked yet' }}</dd></div>
-        <div><dt>Linked route / stop</dt><dd>{% if move.linked_route_id %}Route {{ move.linked_route_id }}{% elif move.linked_stop_id %}Driver Log #{{ move.linked_stop_id }}{% else %}Not tracked yet{% endif %}</dd></div>
-        <div><dt>Transfer / document</dt><dd>{% if move.linked_plant_transfer_id %}Plant Transfer #{{ move.linked_plant_transfer_id }}{% elif move.linked_document_id %}Document #{{ move.linked_document_id }}{% else %}Document not attached{% endif %}</dd></div>
+        <div><dt>Linked route and stop</dt><dd>{% if move.linked_route_id %}Route {{ move.linked_route_id }}{% elif move.linked_stop_id %}Driver Log #{{ move.linked_stop_id }}{% else %}Not tracked yet{% endif %}</dd></div>
+        <div><dt>Transfer and document</dt><dd>{% if move.linked_plant_transfer_id %}Plant Transfer #{{ move.linked_plant_transfer_id }}{% elif move.linked_document_id %}Document #{{ move.linked_document_id }}{% else %}Document not attached{% endif %}</dd></div>
         <div><dt>Cargo status</dt><dd>{{ move.cargo_status or 'No current data' }}</dd></div>
         <div><dt>Next action</dt><dd>{{ move.next_action or 'No action needed' }}</dd></div>
       </dl>

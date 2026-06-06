@@ -21,11 +21,11 @@
 </style>
 {% set photo_source_prefix = photo_source_prefix|default('stop') %}
 <section class="stop-photo-panel" data-stop-photo-panel data-upload-url="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}">
-  <h3 class="h6 mb-1">Add Paperwork / Proof Photo</h3>
+  <h3 class="h6 mb-1">Add Paperwork and Proof Photo</h3>
   <p class="text-muted small mb-2">Take a picture or upload an image of the BOL, manifest, transfer sheet, route sheet, or stop proof.</p>
   <div class="stop-photo-type-grid" role="radiogroup" aria-label="Photo document type">
     <input id="stopPhotoTypeBol-{{ photo_source_prefix }}" type="radio" name="stop_photo_type_{{ photo_source_prefix }}" value="bol_manifest" data-stop-photo-type checked>
-    <label for="stopPhotoTypeBol-{{ photo_source_prefix }}">BOL / Manifest</label>
+    <label for="stopPhotoTypeBol-{{ photo_source_prefix }}">BOL and Manifest</label>
     <input id="stopPhotoTypeTransfer-{{ photo_source_prefix }}" type="radio" name="stop_photo_type_{{ photo_source_prefix }}" value="transfer_sheet" data-stop-photo-type>
     <label for="stopPhotoTypeTransfer-{{ photo_source_prefix }}">Transfer Sheet</label>
     <input id="stopPhotoTypeRoute-{{ photo_source_prefix }}" type="radio" name="stop_photo_type_{{ photo_source_prefix }}" value="route_packet" data-stop-photo-type>

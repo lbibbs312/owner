@@ -32,7 +32,7 @@ ISSUE_CATALOG = {
     "damage": (
         "DAMAGE", "risk",
         "Damage was reported against this load.",
-        "Add damage report / photo",
+        "Add damage report and photo",
     ),
     "missing_proof": (
         "MISSING PROOF", "risk",
@@ -52,7 +52,7 @@ ISSUE_CATALOG = {
     "count_short": (
         "COUNT SHORT", "risk",
         "The scanned or unracked count is short of what was staged.",
-        "Recount / scan",
+        "Recount and scan",
     ),
     "hold": (
         "HOLD", "attention",

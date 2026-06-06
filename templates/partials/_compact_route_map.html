@@ -207,7 +207,7 @@
 {% set posttrip_available = active_pt and not active_pt.posttrip and not route_finalized_for_cta %}
 {% set posttrip_url = url_for('driver.do_posttrip', pretrip_id=active_pt.id) if posttrip_available else none %}
 {% set shift_url = posttrip_url or pretrip_url %}
-{% set shift_label = 'PostTrip Due' if pending_pt and posttrip_url else ('PostTrip Available' if posttrip_url else 'PreTrip / Shift') %}
+{% set shift_label = 'PostTrip Due' if pending_pt and posttrip_url else ('PostTrip Available' if posttrip_url else 'PreTrip and Shift') %}
 {% set shift_note = 'Finish inspection and end shift' if pending_pt and posttrip_url else ('Optional until route close' if posttrip_url else ('Shift started from PreTrip' if active_pt else 'Start shift with PreTrip')) %}
 {% set transfer_url = document_url or url_for('driver.new_plant_transfer') %}
 {% set transfer_note = latest_transfer.ship_from ~ ' to ' ~ latest_transfer.ship_to if latest_transfer is defined and latest_transfer else 'Create a transfer sheet' %}
@@ -288,8 +288,8 @@
   <div class="md-flow-top-actions" aria-label="Live flow workflow actions">
     {% if not route_finalized_for_cta and depart_url and primary_stop and primary_action != 'end_route' %}
     <a class="md-flow-action-tab primary" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow" data-flow-panel-kicker="DEPART QUICK FLOW">
-      <strong>Depart / Load</strong>
-      <span>Departure / proof</span>
+      <strong>Depart and Load</strong>
+      <span>Departure proof</span>
     </a>
     {% endif %}
     {% for route_action in board_ctas %}
@@ -302,7 +302,7 @@
       {% endif %}
     {% endfor %}
     {% if not route_finalized_for_cta %}
-    <a class="md-flow-action-tab {% if pulse_key == 'camera' %}is-next-required{% endif %}" href="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-open-url="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-panel-title="Camera / Proof">
+    <a class="md-flow-action-tab {% if pulse_key == 'camera' %}is-next-required{% endif %}" href="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-open-url="{{ document_url or damage_url or route_sheet_url or '#' }}" data-flow-panel-title="Camera and Proof">
       <strong>Camera</strong>
       <span>Photo proof</span>
     </a>
@@ -312,14 +312,14 @@
     </a>
     {% endif %}
     {% if not (posttrip_url and primary_action == 'posttrip') %}
-      <a class="md-flow-action-tab {% if pending_pt and pulse_key == 'posttrip' %}is-next-required{% endif %}" href="{{ shift_url }}" data-flow-open-url="{{ shift_url }}" data-flow-panel-title="{{ 'PostTrip Work' if posttrip_url else 'PreTrip / Shift' }}">
+      <a class="md-flow-action-tab {% if pending_pt and pulse_key == 'posttrip' %}is-next-required{% endif %}" href="{{ shift_url }}" data-flow-open-url="{{ shift_url }}" data-flow-panel-title="{{ 'PostTrip Work' if posttrip_url else 'PreTrip and Shift' }}">
         <strong>{{ shift_label }}</strong>
         <span>{{ shift_note }}</span>
       </a>
     {% endif %}
     <a class="md-flow-action-tab" href="{{ history_url }}" data-flow-open-url="{{ history_url }}" data-flow-panel-title="TRUCK DETAIL">
       <strong>Maintenance</strong>
-      <span>Ryder / truck</span>
+      <span>Ryder and truck</span>
     </a>
     <a class="md-flow-action-tab" href="{{ route_sheet_url or '#' }}" data-flow-open-url="{{ route_sheet_url or '#' }}" data-flow-panel-title="Full Route Sheet">
       <strong>Sheet</strong>
@@ -348,7 +348,7 @@
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow" data-flow-panel-kicker="DEPART QUICK FLOW">
         <span>Required driver action</span>
-        <strong>Depart / Load</strong>
+        <strong>Depart and Load</strong>
         <small>{{ primary_stop.plant_name }} &middot; record departure</small>
       </a>
     </div>
@@ -453,7 +453,7 @@
               </select>
               <label for="departSecondaryDestination">Optional second stop</label>
               <select id="departSecondaryDestination" data-depart-select="secondary_destination">
-                <option value="">None / not applicable</option>
+                <option value="">None or not applicable</option>
                 {% for code, label in PLANT_LABELS.items() %}
                   <option value="{{ code }}">{{ label }}</option>
                 {% endfor %}
@@ -476,7 +476,7 @@
               <h4>Any damage, issue, or proof note?</h4>
               <div class="depart-choice-grid">
                 <button type="button" data-depart-choice data-field="cargo_override_reason" data-value="" data-next-step="4">No issue</button>
-                <a class="depart-risk-link" href="{{ damage_url or '#' }}">&#9650; Damage / missing proof</a>
+                <a class="depart-risk-link" href="{{ damage_url or '#' }}">&#9650; Damage or missing proof</a>
               </div>
               <label for="departProofNote">Optional note</label>
               <textarea id="departProofNote" data-depart-text="cargo_override_reason" placeholder="Short note only if something needs review"></textarea>

@@ -4996,8 +4996,8 @@
       <div class="driver-row">
         <a class="mobile-brand" href="{{ url_for('driver.mobile_dashboard') }}">{% include 'partials/_md_logo.html' %}MoveDefense</a>
         <div class="desktop-header-context" aria-label="Route context">
-          <div><span>Driver</span><strong>{{ current_user.display_name }}{% if current_user.department %} / {{ current_user.department }}{% endif %}</strong></div>
-          <div><span>Shift</span><strong>{% if open_shift %}On duty / {{ shift_elapsed if shift_elapsed else '--:--' }}{% else %}Off duty{% endif %}</strong></div>
+          <div><span>Driver</span><strong>{{ current_user.display_name }}{% if current_user.department %} - {{ current_user.department }}{% endif %}</strong></div>
+          <div><span>Shift</span><strong>{% if open_shift %}On duty - {{ shift_elapsed if shift_elapsed else '--:--' }}{% else %}Off duty{% endif %}</strong></div>
           <div><span>Truck</span><strong>{{ current_truck_number or 'TRUCK REQUIRED' }}</strong></div>
           <div><span>Route Date</span><strong>{{ route_date.strftime('%b %d, %Y') if route_date else today_local_date.strftime('%b %d, %Y') }}</strong></div>
         </div>
@@ -5029,7 +5029,7 @@
       <div class="driver-state {% if not open_shift %}muted{% endif %}">
         {% if open_shift %}On Duty{% else %}Off Duty{% endif %} · {{ current_user.display_name }}{% if current_user.department %} · {{ current_user.department }}{% endif %}
       </div>
-      {# The green board CTA already carries "Depart / Load" when a stop is open.
+      {# The green board CTA already carries "Depart and Load" when a stop is open.
          Mute the banner's duplicate button down to a timer-only chip in that
          state; other surfaces (base/day report/history) keep the button. #}
       {% set active_wait_show_action = not (route_cta is defined and route_cta and route_cta.primary_cta and route_cta.primary_cta.action == 'record_departure') %}
@@ -5640,7 +5640,7 @@
             var key = node.getAttribute('data-depart-summary');
             var value = fieldValue(key);
             if (key === 'destination') {
-              value = fieldValue('got_loaded') === 'yes' ? selectedSelectLabel('destination') : 'No pickup / empty';
+              value = fieldValue('got_loaded') === 'yes' ? selectedSelectLabel('destination') : 'No pickup or empty';
             } else if (key === 'secondary_destination') {
               value = fieldValue('got_loaded') === 'yes' ? selectedSelectLabel('secondary_destination') : '';
             }

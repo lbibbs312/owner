@@ -21,7 +21,7 @@
         </div>
         <div class="col-md-7">
           {{ form.truck_issue_notes.label(class="form-label") }}
-          {{ form.truck_issue_notes(class="form-control", rows="3", placeholder="CEL came on, leak, overheat, flat, tow, Ryder/rental details") }}
+          {{ form.truck_issue_notes(class="form-control", rows="3", placeholder="CEL came on, leak, overheat, flat, tow, Ryder or rental details") }}
         </div>
       </div>
     </div>
@@ -49,7 +49,7 @@
     <div class="mb-3">
       {{ form.departure_destination.label(class="form-label") }}
       {{ form.departure_destination(class="form-select") }}
-      <div class="form-text">Use No pickup / empty when the truck left this stop empty.</div>
+      <div class="form-text">Use No pickup or empty when the truck left this stop empty.</div>
     </div>
     <div class="mb-3">
       {{ form.secondary_departure_dest.label(class="form-label") }}
@@ -111,7 +111,7 @@ Enter Detroit local time only if you need to manually set or correct departure. 
   </form>
   {% if not log.depart_time %}
     <div class="alert alert-light border mt-3 mb-0">
-      This stop is still open. Use <strong>Depart / Load</strong> from the driver logs table when you are ready to close it.
+      This stop is still open. Use <strong>Depart and Load</strong> from the driver logs table when you are ready to close it.
     </div>
   {% endif %}
 </div>

@@ -123,7 +123,7 @@
       <div><span>Open Stops:</span><strong>{{ summary.open_stops }}</strong></div>
       <div><span>Mileage:</span><strong>{% if summary.total_miles is not none %}{{ summary.total_miles }} miles{% elif logs %}Pending posttrip{% else %}Not started{% endif %}</strong></div>
       <div><span>Total Wait:</span><strong>{{ summary.total_wait_minutes }} min</strong></div>
-      <div><span>Route Status:</span><strong>{% if route_context and route_context.route_status == 'completed' %}Route completed / awaiting final review{% elif route_context and route_context.route_status == 'finalized' %}Route finalized{% elif logs %}Route open / not finalized{% else %}No route recorded{% endif %}</strong></div>
+      <div><span>Route Status:</span><strong>{% if route_context and route_context.route_status == 'completed' %}Route completed and awaiting final review{% elif route_context and route_context.route_status == 'finalized' %}Route finalized{% elif logs %}Route open and not finalized{% else %}No route recorded{% endif %}</strong></div>
     </div>
 
     {% if logs %}
@@ -194,7 +194,7 @@
 
     {% set section_no = namespace(value=2) %}
     {% if parts_carried %}
-      <h2 class="section-title">{{ section_no.value }}. LOAD / PART REFERENCES</h2>
+      <h2 class="section-title">{{ section_no.value }}. LOAD AND PART REFERENCES</h2>
       {% set section_no.value = section_no.value + 1 %}
       <ul class="simple-list">
         {% for part in parts_carried %}<li>{{ part }}</li>{% endfor %}
@@ -212,7 +212,7 @@
     {% endif %}
 
     {% if damage_report_details %}
-      <h2 class="section-title">{{ section_no.value }}. DAMAGE / INCIDENTS</h2>
+      <h2 class="section-title">{{ section_no.value }}. DAMAGE AND INCIDENTS</h2>
       {% set section_no.value = section_no.value + 1 %}
       <ul class="simple-list">
         {% for detail in damage_report_details %}<li>{{ detail }}</li>{% endfor %}
@@ -247,7 +247,7 @@
         </div>
       </div>
       <div>
-        <div class="sig-label">Manager / Reviewer Signature</div>
+        <div class="sig-label">Manager and Reviewer Signature</div>
         <div class="sig-line"></div>
         <div class="sig-ts">&nbsp;</div>
       </div>

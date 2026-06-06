@@ -103,12 +103,12 @@ def test_accident_packet_contains_review_sections_without_driver_legal_conclusio
     body = packet.get_data(as_text=True)
     text = visible_text(body)
 
-    assert "Accident / Incident Packet" in text
-    assert "DOT / FMCSA Review Screen" in text
+    assert "Accident and Incident Packet" in text
+    assert "DOT and FMCSA Review Screen" in text
     assert "Post-accident testing review" in text
     assert "Number of injuries" in text
     assert "Number of fatalities" in text
-    assert "Copies of required state/government/insurer reports attached" in text
+    assert "Copies of required state, government, or insurer reports attached" in text
     assert "DOT review needed" in text
     assert "DOT reportable: Yes" not in text
     assert "failed" not in text.lower()
@@ -116,8 +116,8 @@ def test_accident_packet_contains_review_sections_without_driver_legal_conclusio
     assert "Manager signature not captured" in text
     assert "Needs Review" in text
     assert "Complete" not in text
-    assert body.index("Photo / Media Evidence") < body.index("Accident / Incident Details")
-    assert body.index("Photo / Media Evidence") < body.index("Appendix B")
+    assert body.index("Photo and Media Evidence") < body.index("Accident and Incident Details")
+    assert body.index("Photo and Media Evidence") < body.index("Appendix B")
 
 
 def test_ifta_packet_includes_support_fields_and_missing_receipt_state(client, app):
@@ -168,6 +168,7 @@ def test_ifta_packet_includes_support_fields_and_missing_receipt_state(client, a
 
     assert "IFTA Support Worksheet" in text
     assert "Fuel / Odometer / IFTA Worksheet Driver:" not in text
+    assert "IFTA Support Worksheet Driver:" not in text
     assert "Photo / Media EvidenceDVIR" not in text
     assert "DVIR / PreTripCargo" not in text
     assert "IFTA Return" not in text

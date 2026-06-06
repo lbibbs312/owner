@@ -245,7 +245,7 @@
               <tr>
                 <td class="align-middle">
                   <a class="cell-id" href="{{ row.url }}">{{ row.plant }}</a><br>
-                  <span class="text-sm text-muted">{{ row.log.date }} &middot; Arr {{ row.arrive_time }} / Dep {{ row.depart_time }}</span>
+                  <span class="text-sm text-muted">{{ row.log.date }} &middot; Arr {{ row.arrive_time }} - Dep {{ row.depart_time }}</span>
                 </td>
                 <td class="align-middle"><div class="review-reason">{{ row.reason }}</div></td>
                 <td class="align-middle whitespace-nowrap">
@@ -256,7 +256,7 @@
                 <td class="align-middle">
                   <form class="resolve-form" method="POST" action="{{ url_for('manager.resolve_review', log_id=row.log_id) }}">
                     <input class="resolve-note" type="text" name="note" placeholder="Resolution note (optional)" autocomplete="off">
-                    <button type="submit" class="btn-create">Mark reviewed / resolved</button>
+                    <button type="submit" class="btn-create">Mark reviewed and resolved</button>
                   </form>
                 </td>
               </tr>

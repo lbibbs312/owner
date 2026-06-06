@@ -1,7 +1,7 @@
 {% if route_map %}
   {% for plant in route_map.plants %}
     <div class="route-map-detail-source" hidden data-route-map-detail="plant-{{ plant.plant_key }}">
-      <div class="drawer-kicker">Plant / location · {{ plant.short_code or 'No current data' }}</div>
+      <div class="drawer-kicker">Plant and location · {{ plant.short_code or 'No current data' }}</div>
       <h3>{{ plant.label or 'No current data' }}</h3>
       <div class="drawer-badges">
         <span class="route-status-badge status-{{ plant.worst_status }}">{{ plant.worst_status|replace('_', ' ')|title }}</span>
@@ -10,8 +10,8 @@
         <div><dt>Today route stops</dt><dd>{{ plant.related_stop_ids|length }}</dd></div>
         <div><dt>Active stops</dt><dd>{{ plant.active_stop_count }}</dd></div>
         <div><dt>Open move requests</dt><dd>{{ plant.open_request_count }}</dd></div>
-        <div><dt>Waiting / backlog</dt><dd>{{ plant.waiting_count }}</dd></div>
-        <div><dt>Blocked / review</dt><dd>{{ plant.blocked_count }}</dd></div>
+        <div><dt>Waiting and backlog</dt><dd>{{ plant.waiting_count }}</dd></div>
+        <div><dt>Blocked and review</dt><dd>{{ plant.blocked_count }}</dd></div>
         <div><dt>Completed today</dt><dd>{{ plant.completed_today_count }}</dd></div>
         <div><dt>Related issues</dt><dd>{% if plant.blocked_count %}{{ plant.blocked_count }} need attention{% else %}No open issues{% endif %}</dd></div>
         <div><dt>Timing metrics</dt><dd>{% if plant.waiting_count %}Waiting tracked from open stops{% else %}Not tracked yet{% endif %}</dd></div>

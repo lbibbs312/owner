@@ -247,7 +247,7 @@
       {% include 'partials/_md_print_signature.html' %}
       <h1>{{ document_meta.title }}</h1>
       <div><strong>Driver:</strong> {{ pretrip.driver.display_name if pretrip.driver else current_user.display_name }}</div>
-      <div><strong>Truck:</strong> {{ pretrip.truck_number or '' }}{% if pretrip.trailer_number %} / Trailer {{ pretrip.trailer_number }}{% endif %}</div>
+      <div><strong>Truck:</strong> {{ pretrip.truck_number or '' }}{% if pretrip.trailer_number %} - Trailer {{ pretrip.trailer_number }}{% endif %}</div>
       <div><strong>Date:</strong> {{ pretrip.pretrip_date.strftime('%m/%d/%Y') if pretrip.pretrip_date else '' }}</div>
     </div>
     <div class="document-meta">
@@ -260,7 +260,7 @@
   <h2>Daily Vehicle Inspection Report</h2>
 
   <p>
-    <strong>Truck/Tractor No:</strong> {{ pretrip.truck_number or "" }}<br>
+    <strong>Truck and Tractor No:</strong> {{ pretrip.truck_number or "" }}<br>
 
     <!-- Show start mileage, plus end mileage if PostTrip exists -->
     <strong>Mileage (No tenths):</strong>
@@ -279,7 +279,7 @@
     <strong>Fuel Level:</strong>
     Start {{ pretrip.start_fuel_level or "Not recorded" }}
     {% if pretrip.posttrip %}
-      / End {{ pretrip.posttrip.end_fuel_level or "Not recorded" }}
+      - End {{ pretrip.posttrip.end_fuel_level or "Not recorded" }}
     {% endif %}
     <br>
 
@@ -389,7 +389,7 @@
 
   {% set has_written_remarks = pretrip.damage_report and pretrip.damage_report|trim %}
   <div class="remarks-block{% if has_written_remarks %} remarks-written{% endif %}">
-    <strong>6. Defects / Remarks:</strong><br>
+    <strong>6. Defects and Remarks:</strong><br>
     {{ pretrip.damage_report or "" }}
   </div>
 

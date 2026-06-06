@@ -70,7 +70,7 @@ def test_low_fuel_report_routes_to_ifta_not_damage_packet(client, app):
 
     result = classify_packet_text("low fuel reported at fuel stop")
     assert result.packet_type == "fuel_odo_ifta"
-    assert result.label == "Fuel / Odometer / IFTA Worksheet"
+    assert result.label == "IFTA Support Worksheet"
 
     with app.app_context():
         driver = _create_user("packet_driver", "packet-driver@example.com", first_name="Packet", last_name="Driver")
@@ -101,7 +101,7 @@ def test_damage_and_accident_terms_keep_correct_packet_labels():
 
     accident = classify_packet_text("Backing incident hit other vehicle. Police called.")
     assert accident.packet_type == "accident_incident"
-    assert accident.label == "Accident / Incident Packet"
+    assert accident.label == "Accident and Incident Packet"
 
 
 def test_uncertain_packet_result_asks_one_short_question():
@@ -138,5 +138,5 @@ def test_packet_media_page_comes_before_full_event_timeline_and_missing_file_tex
     body = response.data.decode("utf-8")
 
     assert response.status_code == 200
-    assert body.index("Photo / Media Evidence") < body.index("Full Event Timeline")
+    assert body.index("Photo and Media Evidence") < body.index("Full Event Timeline")
     assert "Photo not available in upload storage" in body

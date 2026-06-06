@@ -15,7 +15,7 @@
     In truck now: <span id="currentLoadLabel">{{ current_load.cargo_display if current_load else active_load }}</span>
   </div>
   {% if not has_today_logs %}
-    <div class="alert alert-info border fw-semibold">First stop is your start location. Cargo leaving that location is recorded on Depart / Load.</div>
+    <div class="alert alert-info border fw-semibold">First stop is your start location. Cargo leaving that location is recorded on Depart and Load.</div>
   {% endif %}
 
   {% if pending_ryder_event %}
@@ -78,7 +78,7 @@
       <div class="w-100 conditional-panel" id="truckIssuePanel">
         <div class="row g-3">
           <div class="col-md-5">{{ form.truck_issue.label(class="form-label") }}{{ form.truck_issue(class="form-select") }}</div>
-          <div class="col-md-7">{{ form.truck_issue_notes.label(class="form-label") }}{{ form.truck_issue_notes(class="form-control", rows="2", placeholder="CEL came on, leaking air, overheating, flat tire, Ryder/tow details") }}</div>
+          <div class="col-md-7">{{ form.truck_issue_notes.label(class="form-label") }}{{ form.truck_issue_notes(class="form-control", rows="2", placeholder="CEL came on, leaking air, overheating, flat tire, Ryder or tow details") }}</div>
         </div>
       </div>
       <div class="form-check">{{ form.fuel(class="form-check-input", id="fuelCheck") }} {{ form.fuel.label(class="form-check-label") }}</div>

@@ -119,9 +119,9 @@
           <form method="POST" class="manager-form" data-autosave="true" data-autosave-key="manager-task-{{ task.id }}">
             <div class="form-row">
               <div>
-                <label for="assigned_to">Assign / Reassign Driver</label>
+                <label for="assigned_to">Assign or Reassign Driver</label>
                 <select id="assigned_to" name="assigned_to" class="form-select">
-                  <option value="0" {% if not task.assigned_to %}selected{% endif %}>Unassigned / Broadcast</option>
+                  <option value="0" {% if not task.assigned_to %}selected{% endif %}>Unassigned or Broadcast</option>
                   {% for driver in drivers %}
                     <option value="{{ driver.id }}" {% if task.assigned_to == driver.id %}selected{% endif %}>{{ driver.manager_label }}</option>
                   {% endfor %}
@@ -154,7 +154,7 @@
               <label class="checkline"><input type="checkbox" name="is_hot" value="y" {% if task.is_hot %}checked{% endif %}> Mark as HOT MOVE</label>
             </div>
             <div>
-              <label for="details">Dispatch Notes / Skid / Trailer</label>
+              <label for="details">Dispatch Notes, Skid, and Trailer</label>
               <textarea id="details" name="details" rows="5" class="form-control" placeholder="Skid count, trailer number, dock notes, or compliance detail">{{ task.details or '' }}</textarea>
             </div>
             <div class="save-row">
@@ -168,7 +168,7 @@
       <aside class="panel">
         <div class="panel-head"><h2>Audit Context</h2></div>
         <div class="panel-body">
-          <p class="label">Route / Work</p>
+          <p class="label">Route and Work</p>
           <p class="value mb-3">{{ task.title }}</p>
           <p class="label">Part Number</p>
           <p class="value mb-3">{{ task.part_number or 'Not recorded' }}</p>

@@ -172,7 +172,7 @@
       </div>
       {% if mileage_review.rows %}
       <table>
-        <thead><tr><th>Scope</th><th>Truck / PreTrip</th><th>Start Odometer</th><th>End Odometer</th><th>Calculated Route Miles</th><th>Status</th></tr></thead>
+        <thead><tr><th>Scope</th><th>Truck and PreTrip</th><th>Start Odometer</th><th>End Odometer</th><th>Calculated Route Miles</th><th>Status</th></tr></thead>
         <tbody>
           {% for row in mileage_review.rows %}
             <tr><td>{{ row.scope }}</td><td>{{ row.truck }}</td><td>{{ row.start }}</td><td>{{ row.end }}</td><td>{{ row.miles }}</td><td>{{ row.detail }}</td></tr>
@@ -187,7 +187,7 @@
   <div class="section">
     <h2>4. Related Management Cases</h2>
     <div class="section-body">
-      <p><strong>Related history only. These cases do not become route evidence unless a record is tied to this route, stop, driver log, driver, truck, or shift/date.</strong></p>
+      <p><strong>Related history only. These cases do not become route evidence unless a record is tied to this route, stop, driver log, driver, truck, or shift date.</strong></p>
       <table>
         <thead><tr><th>Case</th><th>Summary</th><th>Signals</th><th>Owner</th><th>Status</th></tr></thead>
         <tbody>
@@ -223,7 +223,7 @@
   {% endif %}
 
   <div class="section">
-    <h2>7. Cargo / Manifest Review</h2>
+    <h2>7. Cargo and Manifest Review</h2>
     <div class="section-body">
       <div class="audit-grid">
         {% for item in cargo_review.summary_rows %}
@@ -244,7 +244,7 @@
       {% if cargo_review.timing_rows %}
         <h3 class="h6 text-uppercase text-muted">Timing Intelligence</h3>
         <table>
-          <thead><tr><th>Stop</th><th>Load / Dock Time</th><th>Plant Average</th><th>Status</th></tr></thead>
+          <thead><tr><th>Stop</th><th>Load and Dock Time</th><th>Plant Average</th><th>Status</th></tr></thead>
           <tbody>
             {% for row in cargo_review.timing_rows %}
               <tr><td>{{ row.plant }}</td><td>{{ row.actual }}</td><td>{{ row.average }}</td><td><span class="delay-status {{ row.class }}">{{ row.status }}</span></td></tr>
@@ -257,9 +257,9 @@
 
   {% if photo_reviews or damage_reports %}
   <div class="section">
-    <h2>8. Photo / Damage / Safety Review</h2>
+    <h2>8. Photo, Damage, and Safety Review</h2>
     <div class="section-body">
-      {% if not damage_reports and photo_reviews %}<p><strong>No formal damage report was filed. Cargo/photo proof requires manager classification.</strong></p>{% endif %}
+      {% if not damage_reports and photo_reviews %}<p><strong>No formal damage report was filed. Cargo and photo proof requires manager classification.</strong></p>{% endif %}
       {% if damage_reports %}<p><strong>{{ damage_report_summary }}.</strong></p>{% endif %}
       {% if damage_report_rows %}
         <table>
@@ -304,7 +304,7 @@
 
   {% if delay_review_rows %}
   <div class="section">
-    <h2>9. Delay / Dock Time Review</h2>
+    <h2>9. Delay and Dock Time Review</h2>
     <div class="section-body">
       <table><thead><tr><th>Stop</th><th>Dock Time</th><th>Load-Time Status</th><th>Reason</th></tr></thead><tbody>
       {% for row in delay_review_rows %}<tr><td>{{ row.plant }}</td><td>{{ row.dock_wait }}</td><td><span class="delay-status {{ row.forecast_class }}">{{ row.forecast }}</span></td><td>{{ row.reason }}{% if row.requires_reason %}<br><strong>{{ row.action }}</strong>{% endif %}</td></tr>{% endfor %}
@@ -339,7 +339,7 @@
   {% endif %}
 
   <div class="section">
-    <h2>11. Signatures / Manager Decision</h2>
+    <h2>11. Signatures and Manager Decision</h2>
     <div class="section-body">
       {% if approval_blocked %}<p class="decision-warning">Approval unavailable until blocked items are resolved.</p>{% endif %}
       <div class="decision-grid">
@@ -362,7 +362,7 @@
         <div>
           <p><strong>Manager Signature</strong></p>
           <div class="sig-line"></div>
-          <small class="muted">Reviewed date/time: ____________________</small>
+          <small class="muted">Reviewed date and time: ____________________</small>
         </div>
       </div>
     </div>
