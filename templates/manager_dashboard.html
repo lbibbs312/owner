@@ -196,10 +196,6 @@
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 11l2 2 4-4M7 4h10v16H7z"/></svg>
         Inspections
       </a>
-      <a href="{{ url_for('public.production_flow_board') }}">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v10H4zM8 19h8M12 15v4"/></svg>
-        Widescreen Board
-      </a>
       <a href="{{ url_for('auth.logout') }}" style="margin-top:auto;">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4-4-4M21 12H9M13 5V4a2 2 0 00-2-2H5a2 2 0 00-2 2v16a2 2 0 002 2h6a2 2 0 002-2v-1"/></svg>
         Logout
@@ -222,10 +218,6 @@
         <p>{{ today.strftime('%b %d, %Y') }} - live route, document, incident, and inspection work</p>
       </div>
       <div class="mc-header-r">
-        <a class="btn-action" href="{{ url_for('public.production_flow_board') }}">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v10H4zM8 19h8M12 15v4"/></svg>
-          Widescreen Board
-        </a>
         <a class="btn-action primary" href="{{ url_for('manager.new_move_request') }}">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
           New Request
@@ -386,7 +378,6 @@
             <a class="side-link" href="{{ url_for('manager.driver_logs', date=today.isoformat()) }}"><span>Documents</span><small>{{ document_count }} attached</small></a>
             <a class="side-link" href="{{ url_for('manager.review_dashboard') }}"><span>Damage / Incidents</span><small>{{ damage_reports|length }} open</small></a>
             <a class="side-link" href="{{ url_for('manager.list_pretrips') }}"><span>Inspections</span><small>{{ inspection_count }} today</small></a>
-            <a class="side-link" href="{{ url_for('public.production_flow_board') }}"><span>Widescreen Board</span><small>Shared view</small></a>
           </div>
         </aside>
       </section>

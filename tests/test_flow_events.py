@@ -160,7 +160,8 @@ def test_flow_map_dashboard_exposes_lane_first_contract(app):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert 'data-component="FlowMapDashboard"' in body
-    assert "WIP / Production" in body
-    assert "Manifested" in body
-    assert 'aria-label="View Production Flow facility map"' in body
+    assert "Manager Workspace" in body
+    assert 'data-component="FlowMapDashboard"' not in body
+    assert "WIP / Production" not in body
+    assert "Manifested" not in body
+    assert 'aria-label="View Production Flow facility map"' not in body

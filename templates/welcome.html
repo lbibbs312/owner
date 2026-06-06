@@ -36,9 +36,9 @@
         <div class="panel p-4 p-md-5">
           <div class="row g-4 align-items-center">
             <div class="col-lg-5">
-              <span class="status-pill"><span class="dot"></span> Production dispatch app</span>
-              <h1 class="mt-3 mb-3">Driver logs, live dispatch, inspections, and route paperwork.</h1>
-              <p class="text-secondary mb-0">Use the correct portal for your role. Drivers get the mobile workflow; managers get the live dispatch and review desk.</p>
+              <span class="status-pill"><span class="dot"></span> Route operations app</span>
+              <h1 class="mt-3 mb-3">Driver logs, route reviews, inspections, and route paperwork.</h1>
+              <p class="text-secondary mb-0">Use the correct portal for your role. Drivers get the mobile workflow; managers get the route workspace and review desk.</p>
             </div>
             <div class="col-lg-7">
               <div class="row g-3">
@@ -50,8 +50,8 @@
                 </div>
                 <div class="col-md-6">
                   <a class="portal-link" href="{{ url_for('manager.manager_dashboard') }}">
-                    <strong>Manager Dispatch</strong>
-                    <span>Live route view, driver filters, exceptions, follow-ups, and print review.</span>
+                    <strong>Manager Workspace</strong>
+                    <span>Route review, documents, incidents, inspections, route packets, and move requests.</span>
                   </a>
                 </div>
                 <div class="col-md-6">
@@ -63,7 +63,7 @@
                 <div class="col-md-6">
                   <a class="portal-link" href="{{ url_for('auth.login') }}?required_role=management">
                     <strong>Manager Login</strong>
-                    <span>Sign in with manager credentials for dispatch and QA review.</span>
+                    <span>Sign in with manager credentials for route review and workspace controls.</span>
                   </a>
                 </div>
               </div>

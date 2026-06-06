@@ -234,17 +234,15 @@ def test_move_requests_uses_movedefense_manager_shell(client, app):
     assert "No move requests in this queue. New requests and dispatch captures will appear here." in empty_body
 
 
-def test_production_flow_board_accepts_underscore_alias(client, app):
+def test_production_flow_board_alias_redirects_to_manager_workspace(client, app):
     with app.app_context():
         _user("flow_boss", "management")
 
     _login(client, "flow_boss")
-    response = client.get("/production_flow_board")
+    response = client.get("/production_flow_board", follow_redirects=False)
 
-    assert response.status_code == 200
-    body = response.get_data(as_text=True)
-    assert "Plant Floor Board" in body
-    assert "production-flow--plant-floor" in body
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/manager/dashboard")
 
 
 def test_driver_dashboard_visible_board_removes_loads_parts_group(client, app):

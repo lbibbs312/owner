@@ -1,14 +1,11 @@
 import os
-from datetime import date as date_cls, datetime
 
-from flask import abort, current_app, jsonify, render_template, request, send_from_directory
+from flask import abort, current_app, jsonify, redirect, render_template, send_from_directory, url_for
 from flask_login import current_user, login_required
 
 from app.blueprints.public import bp
 from app.models import Announcement
 from app.services.database_status import database_status
-from app.services.floor_operations import build_floor_operations_snapshot
-from app.services.production_flow import build_production_flow_context
 from app.services.route_context import build_route_context
 
 
@@ -34,31 +31,14 @@ def plant_directory():
 
 
 @bp.route("/operations-board")
+@bp.route("/operations_board")
 @bp.route("/production-flow-board")
 @bp.route("/production_flow_board")
 @login_required
 def production_flow_board():
-    selected_plant = (request.args.get("plant") or "").strip() or None
-    target_date = date_cls.today()
-    raw_date = (request.args.get("date") or "").strip()
-    if raw_date:
-        try:
-            target_date = datetime.strptime(raw_date, "%Y-%m-%d").date()
-        except ValueError:
-            target_date = date_cls.today()
-    floor = build_floor_operations_snapshot(target_date)
-    production_flow = build_production_flow_context(
-        date=target_date,
-        selected_plant=selected_plant,
-        mode="plant_floor",
-    )
-    return render_template(
-        "plant_floor_board.html",
-        floor=floor,
-        production_flow=production_flow,
-        selected_plant=selected_plant,
-        today=target_date,
-    )
+    if current_user.role == "management":
+        return redirect(url_for("manager.manager_dashboard"))
+    return redirect(url_for("driver.mobile_dashboard"))
 
 
 @bp.route("/healthz")

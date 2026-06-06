@@ -39,6 +39,7 @@ def _move_request(creator_id, **kw):
     from app.extensions import db
     from app.models import MoveRequest
 
+    requested_at = datetime.combine(date.today(), datetime.min.time())
     base = dict(
         raw_text="Move racks from Raleigh East to Plastic West",
         created_by_id=creator_id,
@@ -47,7 +48,7 @@ def _move_request(creator_id, **kw):
         origin_location_text="Raleigh East",
         destination_location_text="Plastic West",
         cargo_text="Rack load",
-        requested_at=datetime.utcnow() - timedelta(minutes=20),
+        requested_at=requested_at,
     )
     base.update(kw)
     req = MoveRequest(**base)
@@ -357,14 +358,10 @@ def test_hot_part_focuses_destination_plant_card(client, app):
         assert by_label["Kraft Plater"]["hot_count"] == 0
 
     _login(client, "hot-map-manager")
-    resp = client.get("/production-flow-board")
+    resp = client.get("/production-flow-board", follow_redirects=False)
 
-    assert resp.status_code == 200
-    body = resp.get_data(as_text=True)
-    assert "flow-node--hot-focus" in body
-    assert 'data-hot-count="1"' in body
-    assert "Hot part" in body
-    assert "centerHotNode" in body
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/manager/dashboard")
 
 
 def test_no_fake_telemetry_fields_appear(app):
@@ -648,9 +645,10 @@ def test_mobile_dashboard_uses_compact_shared_production_flow(client, app):
     assert "min-height: 960px" in fragment_body
 
 
-def test_operations_board_is_shared_read_only_plant_floor_board(client, app):
+def test_operations_board_redirects_to_manager_workspace(client, app):
     with app.app_context():
         manager = _user()
+        _user("ops-board-driver", "driver")
         _move_request(
             manager.id,
             request_number="MR-FLOOR-1",
@@ -661,19 +659,28 @@ def test_operations_board_is_shared_read_only_plant_floor_board(client, app):
         )
 
     _login(client, "mgr")
-    resp = client.get("/operations-board")
+    resp = client.get("/operations-board", follow_redirects=False)
 
-    assert resp.status_code == 200
-    body = resp.get_data(as_text=True)
-    assert "Plant Floor Board" in body
-    assert 'data-production-flow-mode="plant_floor"' in body
-    assert "mgr / management" in body
-    assert "MR-FLOOR-1" not in body
-    assert "Secret dispatch detail" not in body
-    assert "Sensitive cargo" not in body
-    assert "SECRET-PART" not in body
-    assert "Named Driver" not in body
-    assert "Requires authorized identity." in body
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/manager/dashboard")
+
+    client.get("/logout")
+    _login(client, "ops-board-driver")
+    driver_resp = client.get("/operations_board", follow_redirects=False)
+
+    assert driver_resp.status_code == 302
+    assert driver_resp.headers["Location"].endswith("/mobile")
+
+
+def test_operations_board_redirects_drivers_to_mobile_dashboard(client, app):
+    with app.app_context():
+        _user("driver-board", "driver")
+
+    _login(client, "driver-board")
+    resp = client.get("/operations-board", follow_redirects=False)
+
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/mobile")
 
 
 def test_active_move_requests_do_not_pollute_historical_production_flow_date(app):
