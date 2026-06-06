@@ -206,7 +206,6 @@ def test_manager_dashboard_layout_handles_large_ops_board(client, app):
     assert "Raleigh East Long Origin Lane 4 With Extra Dispatch Detail" in body
     assert ".mc-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; min-height:100vh; }" in body
     assert ".summary-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }" in body
-    assert "body.mgr-active .production-flow--admin" not in body
     assert "Live Flow Map" not in body
     assert 'style="grid-template-columns:repeat(' not in body
 
@@ -234,15 +233,16 @@ def test_move_requests_uses_movedefense_manager_shell(client, app):
     assert "No move requests in this queue. New requests and dispatch captures will appear here." in empty_body
 
 
-def test_production_flow_board_alias_redirects_to_manager_workspace(client, app):
+def test_legacy_operations_board_alias_redirects_to_manager_workspace(client, app):
     with app.app_context():
         _user("flow_boss", "management")
 
     _login(client, "flow_boss")
-    response = client.get("/production_flow_board", follow_redirects=False)
+    for path in ("/operations-board", "/operations_board"):
+        response = client.get(path, follow_redirects=False)
 
-    assert response.status_code == 302
-    assert response.headers["Location"].endswith("/manager/dashboard")
+        assert response.status_code == 302
+        assert response.headers["Location"].endswith("/manager/dashboard")
 
 
 def test_driver_dashboard_visible_board_removes_loads_parts_group(client, app):

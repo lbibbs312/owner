@@ -1999,19 +1999,13 @@ def _empty_states(route, stops, moves, lanes):
     }
 
 
-def build_driver_map_mode_context(route_context, route_map=None, production_flow_context=None, *, route_date=None, today_local_date=None, route_is_active=False):
+def build_driver_map_mode_context(route_context, route_map=None, *, route_date=None, today_local_date=None, route_is_active=False):
     """Choose the driver map mode without requiring active driving."""
     route_map = route_map or {}
-    production_flow_context = production_flow_context or {}
     stops = route_map.get("stops") or []
     ops_board_items = route_map.get("ops_board_items") or []
     has_route_history = bool(stops)
     has_board_activity = bool(stops or route_map.get("moves") or ops_board_items)
-    has_production = bool(
-        production_flow_context.get("flow_nodes")
-        or production_flow_context.get("flow_lanes")
-        or production_flow_context.get("flow_items")
-    )
     current_stop = getattr(route_context, "current_stop", None)
     is_today = bool(route_date and today_local_date and route_date == today_local_date)
 
@@ -2023,10 +2017,6 @@ def build_driver_map_mode_context(route_context, route_map=None, production_flow
         mode = "route_replay"
         label = "Last Route Replay" if not is_today else "Route Replay"
         empty = ""
-    elif has_production:
-        mode = "production_flow"
-        label = "Production Flow"
-        empty = ""
     else:
         mode = "no_current_activity"
         label = "Start Day" if is_today else "No Current Activity"
@@ -2037,7 +2027,6 @@ def build_driver_map_mode_context(route_context, route_map=None, production_flow
         "map_label": label,
         "map_empty_message": empty,
         "has_route_history": has_route_history,
-        "has_production_flow": has_production,
     }
 
 

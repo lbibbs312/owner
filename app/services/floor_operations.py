@@ -1,11 +1,10 @@
 """Floor-operations snapshot derived from real records.
 
-Builds the data behind shared production-flow surfaces — the Move Queue
-summary, Floor Operations cards, and the Live Flow Map (a
-*facility/process* map, not GPS). Everything is derived from existing records
-(MoveRequest, DriverLog, PlantTransfer, ShiftRecord, DamageReport,
-ActivityEvent); nothing is fabricated. When a signal is unavailable the count
-is 0 and lists are empty, so callers can safely render "No current data".
+Builds the data behind shared manager route and move summaries. Everything is
+derived from existing records (MoveRequest, DriverLog, PlantTransfer,
+ShiftRecord, DamageReport, ActivityEvent); nothing is fabricated. When a signal
+is unavailable the count is 0 and lists are empty, so callers can safely render
+"No current data".
 
 Public entry point: :func:`build_floor_operations_snapshot`.
 """

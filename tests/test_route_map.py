@@ -968,7 +968,6 @@ def test_driver_dashboard_shows_assigned_move_as_staged_board_row(client, app):
     assert "Assigned Move Queue" not in body
     assert "MR-REAL-1" in body
     assert ">STAGED<" in body
-    assert "Production Flow" not in body
 
 
 def test_driver_dashboard_renders_route_narrative_cards(client, app):
@@ -1048,10 +1047,9 @@ def test_driver_dashboard_renders_with_no_assigned_requests(client, app):
     assert "No stops logged yet today. Start day by recording the first stop." in body
     assert "Assigned Move Queue" not in body
     assert "Live Flow Map" not in body
-    assert "Production Flow" not in body
 
 
-def test_mobile_production_flow_view_is_not_driver_scoped(client, app):
+def test_mobile_route_board_does_not_show_manager_wide_requests(client, app):
     with app.app_context():
         manager = _user("flow_mgr", "management")
         _user("flow_driver", "driver")
@@ -1062,8 +1060,6 @@ def test_mobile_production_flow_view_is_not_driver_scoped(client, app):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert 'data-production-flow-mode="mobile"' not in body
-    assert "Production Flow" not in body
     assert "MR-BROAD-1" not in body
     assert "LIVE FLOW BOARD" in body
 

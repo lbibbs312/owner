@@ -6999,7 +6999,6 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert b"1 stop" in page.data
     assert b"Kraft" in page.data
     assert b"PostTrip Due" not in page.data
-    assert "Production Flow" not in body
     assert 'data-flow-open-panel="depart"' in body
     assert "data-depart-wizard" in body
     assert body.count('data-flow-panel-title="Add Stop"') <= 1

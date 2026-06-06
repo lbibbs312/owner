@@ -1,4 +1,4 @@
-"""Linear production-flow state machine.
+"""Linear route-event state machine.
 
 Six stages, each with its own sub-state enum. These constants are the canonical
 vocabulary the FlowEvent ledger, EntityCurrentState, and the constraint engine

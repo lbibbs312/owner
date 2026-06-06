@@ -32,10 +32,8 @@ def plant_directory():
 
 @bp.route("/operations-board")
 @bp.route("/operations_board")
-@bp.route("/production-flow-board")
-@bp.route("/production_flow_board")
 @login_required
-def production_flow_board():
+def legacy_operations_board():
     if current_user.role == "management":
         return redirect(url_for("manager.manager_dashboard"))
     return redirect(url_for("driver.mobile_dashboard"))

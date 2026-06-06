@@ -200,7 +200,6 @@ def _route_cta(label, action, style="primary"):
 def build_route_cta_context(
     route_context,
     driver_log=None,
-    production_flow_context=None,
     *,
     proof_missing=False,
     has_active_shift=False,

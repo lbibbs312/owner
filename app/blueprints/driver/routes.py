@@ -66,7 +66,6 @@ from app.services.parts import record_part_scan as save_part_scan, scan_event_pa
 from app.services.next_load_prediction import build_next_load_prediction
 from app.services.route_context import build_route_context, build_route_cta_context, unresolved_departure_logs
 from app.services.flow_events import FlowEventService
-from app.services.production_flow import build_production_flow_context
 from app.services.route_map import build_driver_route_map_context, build_driver_map_mode_context
 from app.services.plant_time import forecast_for_stop, plant_time_forecast, route_stop_forecasts
 from app.services.report_summary import damage_report_count_label, damage_report_detail_label
@@ -5302,7 +5301,6 @@ def _mobile_route_map_fragment_context(route_date=None):
         .first()
     )
     proof_missing = bool(departed_today and not has_transfer_today)
-    production_flow = None
     route_map = build_driver_route_map_context(
         driver=current_user,
         date=route_date,
@@ -5313,7 +5311,6 @@ def _mobile_route_map_fragment_context(route_date=None):
     )
     route_cta = build_route_cta_context(
         route_context,
-        production_flow_context=production_flow,
         proof_missing=proof_missing,
         has_active_shift=bool(open_shift),
         route_is_active=route_is_active,
@@ -5327,7 +5324,6 @@ def _mobile_route_map_fragment_context(route_date=None):
     route_map_mode = build_driver_map_mode_context(
         route_context,
         route_map,
-        production_flow,
         route_date=route_date,
         today_local_date=today_local_date,
         route_is_active=route_is_active,
@@ -5359,7 +5355,6 @@ def _mobile_route_map_fragment_context(route_date=None):
 
     return {
         "route_map": route_map,
-        "production_flow": production_flow,
         "route_map_mode": route_map_mode,
         "route_cta": route_cta,
         "route_cta_urls": route_cta_urls,
@@ -5521,7 +5516,6 @@ def mobile_dashboard():
         .filter_by(user_id=current_user.id, transfer_date=route_date)
         .first()
     )
-    production_flow = None
     proof_missing = bool(departed_today and not has_transfer_today)
     pending_posttrip = _posttrip_due_for_route(
         active_pretrip,
@@ -5538,7 +5532,6 @@ def mobile_dashboard():
     )
     route_cta = build_route_cta_context(
         route_context,
-        production_flow_context=production_flow,
         proof_missing=proof_missing,
         has_active_shift=bool(open_shift),
         route_is_active=route_is_active,
@@ -5553,7 +5546,6 @@ def mobile_dashboard():
     route_map_mode = build_driver_map_mode_context(
         route_context,
         route_map,
-        production_flow,
         route_date=route_date,
         today_local_date=today_local_date,
         route_is_active=route_is_active,
@@ -5570,7 +5562,6 @@ def mobile_dashboard():
     return render_template(
         "driver_mobile.html",
         route_map=route_map,
-        production_flow=production_flow,
         route_map_mode=route_map_mode,
         route_cta=route_cta,
         route_cta_urls=route_cta_urls,
@@ -5621,37 +5612,6 @@ def mobile_route_map_fragment():
     return render_template(
         "partials/_compact_route_map.html",
         **_mobile_route_map_fragment_context(),
-    )
-
-
-@bp.route("/mobile/production-flow-fragment")
-@login_required
-def mobile_production_flow_fragment():
-    if current_user.role == "management":
-        return redirect(url_for("manager.manager_dashboard"))
-
-    now_local, _ = _now_local_and_utc()
-    today_local_date = now_local.date()
-    _repair_today_pretrip_dates(current_user.id, today_local_date)
-    route_date = _requested_mobile_route_date() or _dashboard_route_date_for_driver(
-        current_user.id,
-        today_local_date,
-        open_shift=_open_shift_for_driver(current_user.id),
-    )
-    if route_date == today_local_date:
-        _repair_today_driver_log_dates(current_user.id, today_local_date)
-        _repair_today_pretrip_dates(current_user.id, today_local_date)
-    selected_stop_id = request.args.get("selected_stop_id", type=int)
-    production_flow = build_production_flow_context(
-        date=route_date,
-        driver_id=current_user.id,
-        selected_stop_id=selected_stop_id,
-        mode="mobile",
-    )
-    return render_template(
-        "partials/_production_flow_map.html",
-        production_flow=production_flow,
-        production_flow_mode="mobile",
     )
 
 

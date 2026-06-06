@@ -1,4 +1,4 @@
-"""Hard-constraint and soft-lock checker for production-flow assignments.
+"""Hard-constraint and soft-lock checker for route-event assignments.
 
 Validates a proposed state transition (load assignment, manifest lock,
 departure) against equipment-type rules and quality holds before the caller
