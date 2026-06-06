@@ -115,7 +115,7 @@ def build_followup_cases(*, anchor=None):
                 "summary": parts.get("Issue") or item.title or "Ryder service follow-up",
                 "target_type": item.target_type,
                 "target_id": item.target_id,
-                "last_seen": "Ryder Rentals" if "ryder" in details.lower() or "ryder" in (item.title or "").lower() else "Operations",
+                "last_seen": "Ryder Rentals" if "ryder" in details.lower() or "ryder" in (item.title or "").lower() else "Route records",
             })
 
     cases = []

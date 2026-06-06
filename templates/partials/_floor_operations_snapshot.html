@@ -1,11 +1,11 @@
-{# Floor Operations cards. Expects `floor`. Optional:
+{# Floor Activity cards. Expects `floor`. Optional:
    - card_keys: list to filter which cards render (default all 8)
-   - heading: panel heading (default "Floor Operations") #}
+   - heading: panel heading (default "Floor Activity") #}
 {% set _cards = floor.floor_cards if card_keys is not defined or not card_keys
    else floor.floor_cards | selectattr('key', 'in', card_keys) | list %}
 <div class="ops-panel">
   <div class="ops-head">
-    <h3>{{ heading if heading is defined else "Floor Operations" }}</h3>
+    <h3>{{ heading if heading is defined else "Floor Activity" }}</h3>
     <span class="ops-sub">{{ floor.date }}</span>
   </div>
   <div class="ops-body">

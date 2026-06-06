@@ -483,7 +483,7 @@ def test_driver_dashboard_visible_board_removes_loads_parts_group(client, app):
         body.index("<script>", body.index('<section class="desktop-ops-workspace"'))
     ]
     visible_board = workspace[: workspace.index('<div class="desktop-main-column">')]
-    assert "Live Ops Board" in visible_board
+    assert "Route Board" in visible_board
     assert "Loads / Parts" not in visible_board
     assert "desktop-load-" not in visible_board
     assert "desktop-transfer-" not in visible_board

@@ -6312,7 +6312,7 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
 
     workspace_start = page.data.index(b'<section class="desktop-ops-workspace"')
     workspace = page.data[workspace_start: page.data.index(b"<script>", workspace_start)]
-    assert b"Live Ops Board" in workspace
+    assert b"Route Board" in workspace
     assert b"Current Stop" in workspace
     assert b"<strong>Trim DC</strong>" in workspace
     assert b"<span>Stop</span>" in workspace
