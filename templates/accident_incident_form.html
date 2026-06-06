@@ -10,8 +10,21 @@
   .packet-section h2 { font-size:.9rem; text-transform:uppercase; letter-spacing:.05em; font-weight:950; margin:0 0 12px; color:var(--md-amber, #c9972b); }
   .field-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
   .field-grid.two { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .field-grid label, .check-grid label { display:grid; gap:5px; font-weight:800; color:var(--md-text, #0f172a); }
-  .field-grid input, .field-grid select, .field-grid textarea { width:100%; border:1px solid rgba(148,163,184,.38); border-radius:8px; padding:9px 10px; background:#fff; color:#0f172a; }
+  .field-grid label, .check-grid label { display:grid; gap:5px; font-weight:800; color:var(--md-text, #f8fafc); }
+  .field-grid input,
+  .field-grid select,
+  .field-grid textarea,
+  .quick-grid input,
+  .quick-grid select {
+    width:100%;
+    border:1px solid rgba(91,157,255,.24);
+    border-radius:8px;
+    padding:9px 10px;
+    background:rgba(5,13,23,.82);
+    color:var(--md-text, #f8fafc);
+  }
+  .field-grid input:disabled { color:var(--md-muted, #94a3b8); opacity:1; }
+  .field-grid option, .quick-grid option { background:#07111f; color:#f8fafc; }
   .check-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
   .check-grid label { grid-template-columns:auto 1fr; align-items:center; }
   .quick-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
@@ -20,7 +33,7 @@
 </style>
 
 <main class="packet-form responsive-workspace">
-  <h1>Accident and Incident</h1>
+  <h1>Crash or Safety Incident</h1>
   <p class="lead">Record facts only. Do not guess fault.</p>
   <form method="POST" action="{{ request.full_path if request.query_string else request.path }}" enctype="multipart/form-data">
     <input type="hidden" name="packet_type" value="accident_incident">
@@ -29,13 +42,13 @@
       <h2>Quick Questions</h2>
       <div class="quick-grid">
         {% for name, label, choices in [
-          ('anyone_hurt','Anyone hurt?', ['yes','no','unknown']),
-          ('other_vehicle_involved_quick','Other vehicle involved?', ['yes','no','unknown']),
-          ('property_damage_quick','Property damage?', ['yes','no','unknown']),
-          ('police_called_quick','Police called?', ['yes','no','unknown']),
-          ('tow_away_needed','Tow-away needed?', ['yes','no','unknown']),
-          ('vehicle_safe_to_operate_quick','Vehicle safe to operate?', ['yes','no','needs_review']),
-          ('manager_notified_quick','Manager notified?', ['yes','no'])
+          ('anyone_hurt','Anyone hurt?', ['unknown','yes','no']),
+          ('other_vehicle_involved_quick','Other vehicle involved?', ['unknown','yes','no']),
+          ('property_damage_quick','Property damage?', ['unknown','yes','no']),
+          ('police_called_quick','Police called?', ['unknown','yes','no']),
+          ('tow_away_needed','Tow-away needed?', ['unknown','yes','no']),
+          ('vehicle_safe_to_operate_quick','Vehicle safe to operate?', ['needs_review','yes','no']),
+          ('manager_notified_quick','Manager notified?', ['no','yes'])
         ] %}
           <label>{{ label }}
             <select name="{{ name }}">
@@ -222,8 +235,8 @@
     </section>
 
     <div class="actions">
-      <a class="btn btn-outline-secondary" href="{{ url_for('driver.damage_reports') }}">Cancel</a>
-      <button class="btn btn-primary" type="submit">Save Accident and Incident</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('driver.mobile_dashboard') }}">Cancel</a>
+      <button class="btn btn-primary" type="submit">Save Crash or Safety Incident</button>
     </div>
   </form>
 </main>

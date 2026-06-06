@@ -6280,7 +6280,7 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert b"desk-detail-section" not in stop_template
 
 
-def test_mobile_dashboard_exposes_packet_workflows_without_secret_urls(client, app):
+def test_mobile_dashboard_does_not_render_permanent_packet_workflows_strip(client, app):
     with app.app_context():
         create_user("packet_entry_driver", "packet-entry@example.com", "driver")
 
@@ -6289,14 +6289,9 @@ def test_mobile_dashboard_exposes_packet_workflows_without_secret_urls(client, a
     body = response.get_data(as_text=True)
 
     assert response.status_code == 200
-    assert "Packet Workflows" in body
-    assert "Fuel Records" in body
-    assert "Crash or Safety Incident" in body
-    assert "Physical Damage" in body
-    assert 'href="/ifta-worksheet/new"' in body
-    assert 'href="/accident-incident/new"' in body
-    assert 'href="/damage_reports/new"' in body
-    assert 'href="/driver_logs_print?date=' in body
+    assert "Packet Workflows" not in body
+    assert 'class="card packet-workflows"' not in body
+    assert 'id="packet-workflows"' not in body
 
 
 def test_mobile_dashboard_focuses_latest_stop_when_no_current_stop(client, app):
@@ -6611,6 +6606,7 @@ def test_driver_mobile_pages_share_single_five_tab_bottom_nav(client, app):
         ("/plant_transfers", "Transfer"),
         ("/driver_logs", "Logs"),
         ("/damage_reports", "Damage"),
+        ("/damage_reports/new", "Damage"),
         ("/list_pretrips", "Inspections"),
         ("/new_pretrip", "Inspections"),
         ("/profile", "Home"),

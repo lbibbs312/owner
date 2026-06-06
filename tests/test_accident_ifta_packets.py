@@ -63,6 +63,33 @@ def test_accident_form_trigger_logic_is_not_forced_for_regular_damage():
     assert accident_form_required(packet_type="damage_issue", answers={"anyone_hurt": "unknown"}) is False
 
 
+def test_driver_packet_entry_pages_use_clear_labels_and_neutral_defaults(client, app):
+    with app.app_context():
+        create_user("entry_driver", "entry@example.com", "driver")
+
+    login(client, "entry_driver")
+
+    accident = client.get("/accident-incident/new")
+    assert accident.status_code == 200
+    accident_body = accident.get_data(as_text=True)
+    assert "Crash or Safety Incident" in accident_body
+    assert "Save Crash or Safety Incident" in accident_body
+    assert '<select name="anyone_hurt">\n              <option value="unknown">Unknown</option>' in accident_body
+    assert '<select name="vehicle_safe_to_operate_quick">\n              <option value="needs_review">Needs Review</option>' in accident_body
+
+    fuel = client.get("/ifta-worksheet/new")
+    assert fuel.status_code == 200
+    fuel_body = fuel.get_data(as_text=True)
+    assert "<h1>Fuel Records</h1>" in fuel_body
+    assert "Save Fuel Record" in fuel_body
+
+    damage = client.get("/damage_reports/new")
+    assert damage.status_code == 200
+    damage_body = damage.get_data(as_text=True)
+    assert "Physical Damage" in damage_body
+    assert "Save Physical Damage" in damage_body
+
+
 def test_accident_packet_contains_review_sections_without_driver_legal_conclusion(client, app):
     with app.app_context():
         create_user("accident_driver", "accident@example.com", "driver", first_name="Alex", last_name="Driver")

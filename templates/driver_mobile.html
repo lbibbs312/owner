@@ -254,28 +254,6 @@
 
     .quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
     .wide-actions { display: none; }
-    .packet-workflows {
-      padding: 14px;
-      display: grid;
-      gap: 12px;
-      border-radius: 14px;
-    }
-    .packet-workflows .section-head { padding: 0; align-items: center; }
-    .packet-workflows .section-head h2 { font-size: .96rem; }
-    .packet-action-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-    .packet-action-grid .button {
-      min-height: 42px;
-      border-radius: 10px;
-      font-size: .78rem;
-      padding: 0 10px;
-      white-space: normal;
-      text-align: center;
-      line-height: 1.15;
-    }
     .quick-card {
       background: linear-gradient(180deg, rgba(15,23,42,.92), rgba(2,6,23,.84));
       border: 1px solid rgba(148,163,184,.2);
@@ -504,7 +482,6 @@
       main { padding-right: 0; }
       .quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .quick-card { min-height: 86px; padding: 12px 14px; }
-      .packet-action-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .wide-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
       .ryder-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr) minmax(170px, .7fr); }
       .maintenance-compact { display: none; }
@@ -5168,20 +5145,6 @@
           {% include "partials/_compact_route_map.html" %}
         {% endif %}
 
-      </section>
-
-      {% set route_packet_date = route_date or today_local_date %}
-      <section class="card packet-workflows" aria-label="Packet workflows">
-        <div class="section-head">
-          <h2>Packet Workflows</h2>
-          <span>choose the right record</span>
-        </div>
-        <div class="packet-action-grid">
-          <a class="button ghost" href="{{ url_for('driver.new_ifta_worksheet') }}">Fuel Records</a>
-          <a class="button ghost" href="{{ url_for('driver.new_accident_incident') }}">Crash or Safety Incident</a>
-          <a class="button ghost" href="{{ url_for('driver.new_damage_report') }}">Physical Damage</a>
-          <a class="button ghost" href="{{ url_for('driver.driver_logs_print', date=route_packet_date.isoformat()) }}">Route Packet</a>
-        </div>
       </section>
 
       {% if route_map %}

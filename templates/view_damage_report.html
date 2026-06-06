@@ -6,7 +6,7 @@
 {% endif %}
 {% set photo_endpoint = 'manager.damage_photo' if manager_view|default(false) else 'driver.damage_photo' %}
 {% set is_ifta_issue = ifta_form_available|default(false) %}
-{% set report_title = 'Fuel and Odometer Issue' if is_ifta_issue else ('Accident and Incident Issue' if accident_form_available|default(false) else 'Damage Report') %}
+{% set report_title = 'Fuel Record' if is_ifta_issue else ('Crash or Safety Incident' if accident_form_available|default(false) else 'Physical Damage') %}
 <style>
   .damage-shell { max-width:1120px; margin:0 auto; }
   .damage-head { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; flex-wrap:wrap; margin-bottom:16px; }
@@ -80,7 +80,7 @@
       {% endif %}
       <button class="btn btn-outline-primary" type="button" onclick="window.print()">Print Document</button>
       {% if accident_form_available|default(false) %}
-        <a class="btn btn-outline-primary" href="{{ url_for('driver.accident_incident_from_damage_report', report_id=report.id) }}">Accident and Incident</a>
+        <a class="btn btn-outline-primary" href="{{ url_for('driver.accident_incident_from_damage_report', report_id=report.id) }}">Crash or Safety Incident</a>
       {% endif %}
       {% if is_ifta_issue and not manager_view|default(false) %}
         <a class="btn btn-primary" href="{{ url_for('driver.new_ifta_worksheet') }}">IFTA Worksheet</a>

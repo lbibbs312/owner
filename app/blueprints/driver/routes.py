@@ -5102,7 +5102,7 @@ def new_accident_incident():
             packet_type=request.form.get("packet_type") or "accident_incident",
             answers=request.form,
         ):
-            flash("Choose Accident and Incident or answer yes to an accident trigger question before opening this form.", "warning")
+            flash("Choose Crash or Safety Incident or answer yes to a crash trigger question before opening this form.", "warning")
             return redirect(url_for("driver.new_accident_incident"))
         report = create_accident_report_from_form(
             request.form,
@@ -5115,14 +5115,14 @@ def new_accident_incident():
             user_id=current_user.id,
             category="accident_incident",
             action="created",
-            title="Accident and Incident recorded",
-            details=f"Accident and Incident #{report.id} saved for manager review.",
+            title="Crash or Safety Incident recorded",
+            details=f"Crash or Safety Incident #{report.id} saved for manager review.",
             target_type="accident_incident_report",
             target_id=report.id,
             commit=False,
         )
         db.session.commit()
-        flash("Accident and Incident saved for Manager Review.", "success")
+        flash("Crash or Safety Incident saved for Manager Review.", "success")
         return redirect(url_for("driver.view_accident_incident", report_id=report.id))
     return render_template(
         "accident_incident_form.html",
@@ -5190,14 +5190,14 @@ def new_ifta_worksheet():
             user_id=current_user.id,
             category="ifta",
             action="created",
-            title="IFTA Support Worksheet created",
+            title="Fuel Record created",
             details=f"IFTA Support Worksheet #{worksheet.id} saved.",
             target_type="ifta_worksheet",
             target_id=worksheet.id,
             commit=False,
         )
         db.session.commit()
-        flash("IFTA Support Worksheet saved.", "success")
+        flash("Fuel Record saved.", "success")
         return redirect(url_for("driver.view_ifta_worksheet", worksheet_id=worksheet.id))
     return render_template("ifta_worksheet_form.html", worksheet=None, manager_view=False)
 
