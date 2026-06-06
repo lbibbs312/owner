@@ -5,28 +5,31 @@
   body.mgr-active #fullscreenOverlay { display:none !important; }
   body.mgr-active .container.mt-4.fade-in { max-width:none; margin:0 !important; padding:0 !important; animation:none; opacity:1; }
   body.mgr-active { overflow-x:hidden; overflow-y:auto; background:#f8fafc; }
-  .mq-shell { min-height:100vh; width:100%; display:flex; background:#f8fafc; color:#0f172a; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; }
-  .mq-side { width:236px; flex:0 0 236px; height:100vh; position:sticky; top:0; overflow-y:auto; background:#0f172a; color:#cbd5e1; display:flex; flex-direction:column; }
-  .mq-brand { padding:22px 20px; border-bottom:1px solid rgba(148,163,184,.1); }
-  .mq-brand strong { display:block; color:#fff; font-size:1.05rem; font-weight:900; letter-spacing:-.02em; }
-  .mq-brand span { display:block; margin-top:3px; color:#60a5fa; font-size:.68rem; font-weight:900; text-transform:uppercase; letter-spacing:.08em; }
-  .mq-nav { padding:14px 10px; display:grid; gap:4px; }
-  .mq-nav a { color:#94a3b8; text-decoration:none; padding:11px 14px; border-radius:12px; font-weight:800; font-size:.84rem; display:flex; align-items:center; gap:10px; }
-  .mq-nav a.active { background:rgba(37,99,235,.18); color:#60a5fa; }
-  .mq-nav a:hover:not(.active) { background:rgba(148,163,184,.1); color:#e2e8f0; }
+  .mq-shell { min-height:100vh; width:100%; display:flex; background:#f8fafc; color:#0f172a; font-family:'Montserrat',system-ui,sans-serif; }
+  .mq-side { width:256px; flex:0 0 256px; height:100vh; position:sticky; top:0; overflow-y:auto; background:#0f172a; color:#cbd5e1; display:flex; flex-direction:column; }
+  .mq-brand { padding:22px 20px; border-bottom:1px solid rgba(148,163,184,.16); display:flex; gap:12px; align-items:center; }
+  .mq-brand-icon { width:42px; height:42px; border-radius:8px; background:#2563eb; display:grid; place-items:center; color:#fff; flex-shrink:0; }
+  .mq-brand strong { display:block; color:#fff; font-size:1.15rem; font-weight:700; letter-spacing:0; }
+  .mq-brand span { display:block; margin-top:3px; color:#60a5fa; font-size:.68rem; font-weight:700; letter-spacing:0; }
+  .mq-nav { flex:1; padding:14px 10px; display:flex; flex-direction:column; gap:4px; }
+  .mq-nav a { color:#94a3b8; text-decoration:none; padding:11px 14px; border-radius:8px; font-weight:700; font-size:.84rem; display:flex; align-items:center; gap:10px; }
+  .mq-nav a svg { width:18px; height:18px; flex:0 0 18px; opacity:.86; }
+  .mq-nav-label { min-width:0; flex:1 1 auto; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .mq-nav-label span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mq-nav-badge { min-width:24px; height:22px; padding:0 7px; border-radius:999px; display:inline-grid; place-items:center; background:rgba(148,163,184,.16); color:#cbd5e1; font-size:.72rem; font-weight:700; font-variant-numeric:tabular-nums; }
+  .mq-nav a.active { background:rgba(37,99,235,.18); color:#bfdbfe; }
+  .mq-nav a.active .mq-nav-badge { background:#2563eb; color:#fff; }
+  .mq-nav a:hover:not(.active) { background:rgba(148,163,184,.1); color:#f8fafc; }
   .mq-main { flex:1 1 auto; min-width:0; min-height:100vh; display:flex; flex-direction:column; }
   .mq-topbar { position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #e2e8f0; padding:16px 28px; display:flex; justify-content:space-between; gap:14px; align-items:flex-start; flex-wrap:wrap; box-shadow:0 1px 2px rgba(15,23,42,.04); }
   .mq-body { padding:22px 28px; display:flex; flex-direction:column; gap:14px; min-width:0; }
-  .queue-header { display:flex; justify-content:space-between; gap:1rem; align-items:flex-start; flex-wrap:wrap; margin-bottom:1rem; }
-  .queue-header h1 { margin:0; font-size:1.65rem; font-weight:900; color:#0f172a; }
-  .queue-header p { margin:.25rem 0 0; color:#64748b; }
   .queue-actions { display:flex; gap:.5rem; flex-wrap:wrap; }
   .queue-filter { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
-  .queue-filter a { border:1px solid #cbd5e1; border-radius:999px; padding:.45rem .8rem; text-decoration:none; color:#334155; font-weight:800; font-size:.85rem; background:#fff; }
-  .queue-filter a.active { background:#0f172a; color:#fff; border-color:#0f172a; }
-  .queue-table { background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:auto; max-width:100%; -webkit-overflow-scrolling:touch; }
+  .queue-filter a { border:1px solid #cbd5e1; border-radius:999px; padding:.45rem .8rem; text-decoration:none; color:#334155; font-weight:700; font-size:.85rem; background:#fff; }
+  .queue-filter a.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .queue-table { background:#fff; border:1px solid #e2e8f0; border-radius:8px; overflow:auto; max-width:100%; -webkit-overflow-scrolling:touch; }
   .queue-table table { margin:0; min-width:1180px; }
-  .queue-table th { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:#64748b; background:#f8fafc; white-space:nowrap; }
+  .queue-table th { font-size:.72rem; text-transform:uppercase; letter-spacing:0; color:#64748b !important; background:#f8fafc !important; white-space:nowrap; }
   .queue-table td { vertical-align:top; font-size:.86rem; overflow-wrap:anywhere; }
   .request-summary { min-width:220px; max-width:360px; white-space:normal; color:#334155; line-height:1.35; }
   .muted-small { color:#64748b; font-size:.78rem; }
@@ -44,6 +47,8 @@
   .button-row { display:flex; gap:.35rem; flex-wrap:wrap; }
   .button-row .btn,
   .queue-actions .btn { font-size:.76rem; font-weight:800; white-space:normal; line-height:1.2; }
+  .queue-actions .btn-primary { background:#2563eb; border-color:#2563eb; color:#fff; }
+  .queue-actions .btn-outline-secondary { background:#fff; color:#0f172a; border-color:#cbd5e1; }
   .queue-empty-state { padding:26px 14px; text-align:center; color:#64748b; font-weight:700; }
   @media (max-width:980px) {
     .mq-side { display:none; }
@@ -52,35 +57,64 @@
     .mq-body { padding-left:16px; padding-right:16px; }
   }
   @media (max-width:900px) {
-    .queue-header { display:block; }
     .queue-actions { margin-top:.75rem; }
   }
 </style>
 <script>document.body.classList.add('mgr-active');</script>
 
-<div class="mq-shell">
+<div class="mq-shell" data-manager-workspace>
   <aside class="mq-side" aria-label="Manager navigation">
     <div class="mq-brand">
-      <strong>MoveDefense</strong>
-      <span>Manager Workspace</span>
+      <div class="mq-brand-icon">
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h10M4 18h16"/>
+        </svg>
+      </div>
+      <div>
+        <strong>MoveDefense</strong>
+        <span>Manager</span>
+      </div>
     </div>
     <nav class="mq-nav">
-      <a href="{{ url_for('manager.manager_dashboard') }}">Workspace</a>
-      <a class="active" href="{{ url_for('manager.move_requests') }}">Move Requests</a>
-      <a href="{{ url_for('manager.driver_logs') }}">Driver Routes</a>
-      <a href="{{ url_for('manager.review_queue') }}">Review Queue</a>
+      <a href="{{ url_for('manager.manager_dashboard') }}#routes">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-12M4 6h16M4 18h16"/></svg>
+        <span class="mq-nav-label"><span>Driver Routes</span><span class="mq-nav-badge">{{ workspace_counts.route_count }}</span></span>
+      </a>
+      <a href="{{ url_for('manager.manager_dashboard') }}#documents">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3h7l5 5v13H7z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 3v6h5"/></svg>
+        <span class="mq-nav-label"><span>Documents</span><span class="mq-nav-badge">{{ workspace_counts.document_count }}</span></span>
+      </a>
+      <a href="{{ url_for('manager.manager_dashboard') }}#review">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        <span class="mq-nav-label"><span>Open Items</span><span class="mq-nav-badge">{{ workspace_counts.pending_review_count }}</span></span>
+      </a>
+      <a href="{{ url_for('manager.manager_dashboard') }}#packets">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h10v10H7zM4 4h16v16H4z"/></svg>
+        <span class="mq-nav-label"><span>Route Packets</span><span class="mq-nav-badge">{{ workspace_counts.route_packet_count }}</span></span>
+      </a>
+      <a href="{{ url_for('manager.manager_dashboard') }}#incidents">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 4.1L2.5 18a2 2 0 001.7 3h15.6a2 2 0 001.7-3L13.7 4.1a2 2 0 00-3.4 0z"/></svg>
+        <span class="mq-nav-label"><span>Damage / Incidents</span><span class="mq-nav-badge">{{ workspace_counts.damage_count }}</span></span>
+      </a>
+      <a href="{{ url_for('manager.manager_dashboard') }}#inspections">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 11l2 2 4-4M7 4h10v16H7z"/></svg>
+        <span class="mq-nav-label"><span>Inspections</span><span class="mq-nav-badge">{{ workspace_counts.inspection_count }}</span></span>
+      </a>
+      <a class="active" href="{{ url_for('manager.move_requests') }}">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        <span class="mq-nav-label"><span>Move Requests</span><span class="mq-nav-badge">{{ workspace_counts.move_request_count }}</span></span>
+      </a>
     </nav>
   </aside>
 
   <main class="mq-main">
     <header class="mq-topbar">
       <div>
-        <h1 style="margin:0;font-size:1.5rem;font-weight:900;letter-spacing:-.02em;">Move Requests</h1>
+        <h1 style="margin:0;font-size:1.5rem;font-weight:700;letter-spacing:0;">Move Requests</h1>
         <p style="margin:.25rem 0 0;color:#64748b;">Intake, assign, block, close, and link incoming move requests without changing driver routes or official records.</p>
       </div>
       <div class="queue-actions">
         <a class="btn btn-primary" href="{{ url_for('manager.new_move_request') }}">New Request</a>
-        <a class="btn btn-outline-secondary" href="{{ url_for('manager.manager_dashboard') }}">Workspace</a>
       </div>
     </header>
 

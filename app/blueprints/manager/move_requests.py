@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from flask import flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -7,7 +7,7 @@ from sqlalchemy import or_
 from app.blueprints.manager import bp
 from app.extensions import db
 from app.forms.move_request import MoveRequestForm
-from app.models import ActivityEvent, DriverLog, ExternalDocument, MoveRequest, PlantTransfer, User
+from app.models import ActivityEvent, DamageReport, DriverLog, DriverLogPhoto, ExceptionEvent, ExternalDocument, MoveRequest, PlantTransfer, PreTrip, User
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
 from app.services.document_numbers import move_request_number
@@ -333,6 +333,35 @@ def _request_or_404(request_id):
     return MoveRequest.query.get_or_404(request_id)
 
 
+def _manager_workspace_counts():
+    today = date.today()
+    route_count = DriverLog.query.filter(
+        DriverLog.date == today,
+        DriverLog.deleted_at.is_(None),
+    ).count()
+    transfer_count = PlantTransfer.query.filter(
+        PlantTransfer.transfer_date == today,
+        PlantTransfer.deleted_at.is_(None),
+    ).count()
+    return {
+        "route_count": route_count,
+        "document_count": (
+            DriverLogPhoto.query.join(DriverLog)
+            .filter(DriverLog.date == today, DriverLog.deleted_at.is_(None))
+            .count()
+        ),
+        "pending_review_count": ExceptionEvent.query.filter_by(
+            event_type="manager_review_requested"
+        ).count(),
+        "route_packet_count": route_count + transfer_count,
+        "damage_count": DamageReport.query.filter(DamageReport.status != "closed").count(),
+        "inspection_count": PreTrip.query.filter_by(pretrip_date=today).count(),
+        "move_request_count": MoveRequest.query.filter(
+            MoveRequest.status.notin_(["completed", "cancelled"])
+        ).count(),
+    }
+
+
 @bp.route("/move-requests")
 def move_requests():
     selected_status = request.args.get("status", "active")
@@ -369,6 +398,7 @@ def move_requests():
         location_filter=location_filter,
         origin_filter=origin_filter,
         destination_filter=destination_filter,
+        workspace_counts=_manager_workspace_counts(),
     )
 
 

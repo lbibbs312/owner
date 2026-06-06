@@ -271,6 +271,10 @@ def test_manager_dashboard_layout_handles_large_ops_board(client, app):
     assert "data-manager-workspace" in body
     assert "workspace-section active" in body
     assert "record-table" in body
+    header = body.split('<header class="mc-header"', 1)[1].split("</header>", 1)[0]
+    assert "Driver Routes" not in header
+    assert "mc-header-r" not in body
+    assert "btn-action" not in body
     nav = body.split('<nav class="mc-nav"', 1)[1].split("</nav>", 1)[0]
     assert '<button class="active" type="button" data-workspace-target="routes"' in nav
     assert 'data-workspace-target="documents"' in nav
@@ -363,13 +367,22 @@ def test_move_requests_uses_movedefense_manager_shell(client, app):
     assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert "mq-shell" in body
-    assert "Manager Workspace" in body
+    assert "data-manager-workspace" in body
+    assert "MoveDefense" in body
     assert "Move Requests" in body
     assert "Driver Routes" in body
-    assert "Review Queue" in body
+    assert "Documents" in body
+    assert "Open Items" in body
+    assert "Route Packets" in body
+    assert "Damage / Incidents" in body
+    assert "Inspections" in body
+    nav = body.split('<nav class="mq-nav"', 1)[1].split("</nav>", 1)[0]
+    assert "mq-nav-badge" in nav
+    assert 'class="active" href="/manager/move-requests"' in nav
     for old_label in (
         "Manager Console",
         "Move Request Queue",
+        "Review Queue",
         "Link Evidence",
         "Evidence",
         "Audit",
@@ -377,10 +390,13 @@ def test_move_requests_uses_movedefense_manager_shell(client, app):
         "Production Flow",
         "Live Flow Map",
         "FlowMapDashboard",
+        "Workspace</a>",
+        "queue-header",
     ):
         assert old_label not in body
     assert "Raleigh East North Overflow Staging Lane With Long Name" in body
-    assert ".queue-table { background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:auto;" in body
+    assert ".queue-table { background:#fff; border:1px solid #e2e8f0; border-radius:8px; overflow:auto;" in body
+    assert "letter-spacing:-" not in body
 
     empty_response = client.get("/manager/move-requests?status=cancelled")
     assert empty_response.status_code == 200
