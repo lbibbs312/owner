@@ -14,6 +14,7 @@ def app(monkeypatch, tmp_path):
         WTF_CSRF_ENABLED=False,
         DAMAGE_UPLOAD_FOLDER=str(tmp_path / "damage_uploads"),
         DRIVER_LOG_PHOTO_UPLOAD_FOLDER=str(tmp_path / "driver_log_photo_uploads"),
+        IFTA_UPLOAD_FOLDER=str(tmp_path / "ifta_receipts"),
     )
     with app.app_context():
         db.create_all()
@@ -64,7 +65,7 @@ def _create_report(driver, description):
     return report
 
 
-def test_low_fuel_packet_renders_ifta_label_not_damage_record(client, app):
+def test_low_fuel_report_routes_to_ifta_not_damage_packet(client, app):
     from app.services.packet_classification import classify_packet_text
 
     result = classify_packet_text("low fuel reported at fuel stop")
@@ -78,10 +79,15 @@ def test_low_fuel_packet_renders_ifta_label_not_damage_record(client, app):
         report_id = report.id
 
     _login(client, "packet_manager")
-    response = client.get(f"/manager/damage-reports/{report_id}/evidence-packet")
+    view_response = client.get(f"/manager/damage-reports/{report_id}")
+    response = client.get(f"/manager/damage-reports/{report_id}/evidence-packet", follow_redirects=False)
 
-    assert response.status_code == 200
-    assert b"Fuel / Odometer / IFTA Worksheet" in response.data
+    assert view_response.status_code == 200
+    assert b"Fuel and Odometer Issue" in view_response.data
+    assert b"IFTA Review Item" in view_response.data
+    assert b"Proof Record" not in view_response.data
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"/manager/damage-reports/{report_id}")
     assert b"Damage Proof Record" not in response.data
     assert b"DAMAGE PROOF RECORD" not in response.data
 

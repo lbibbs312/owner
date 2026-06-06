@@ -644,7 +644,7 @@
     .rp-footer { padding: 10px 14px 14px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
     .rp-footer a { display: block; text-align: center; padding: 9px; border-radius: 12px; background: rgba(47,109,240,.18); border: 1px solid rgba(91,157,255,.22); font-size: .76rem; font-weight: 900; color: #f8fafc; }
     .rp-footer a:hover { background: rgba(47,109,240,.28); border-color: rgba(91,157,255,.36); }
-    .rp-footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .rp-footer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(82px, 1fr)); gap: 8px; }
 
     /* ---- Read-only operations console components (mirrors static/css/style.css) ---- */
     .ops-console { display:flex; flex-direction:column; gap:0; margin:6px 0 4px; }
@@ -5214,6 +5214,7 @@
 		      {% if not board_only_home %}
 		      <section class="wide-actions" aria-label="Desktop driver actions">
 	        <a class="button ghost" href="{{ url_for('driver.damage_reports') }}">Damage Reports</a>
+	        <a class="button ghost" href="{{ url_for('driver.new_ifta_worksheet') }}">IFTA Worksheet</a>
 	        {% if cta.show_attach_document_button and cta_urls.get('attach_document') %}
 	          <a class="button ghost" href="{{ cta_urls.get('attach_document') }}">Attach Document</a>
 	        {% endif %}
@@ -5369,6 +5370,7 @@
         {% if not route_locked %}
           <div class="rp-footer-grid">
             <a href="{{ url_for('driver.new_driving_log') }}">Add Stop</a>
+            <a href="{{ url_for('driver.new_ifta_worksheet') }}">IFTA</a>
             <a href="{{ url_for('driver.new_damage_report') }}">Damage</a>
           </div>
         {% endif %}

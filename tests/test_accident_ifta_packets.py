@@ -167,6 +167,9 @@ def test_ifta_packet_includes_support_fields_and_missing_receipt_state(client, a
     text = visible_text(packet.get_data(as_text=True))
 
     assert "IFTA Support Worksheet" in text
+    assert "Fuel / Odometer / IFTA Worksheet Driver:" not in text
+    assert "Photo / Media EvidenceDVIR" not in text
+    assert "DVIR / PreTripCargo" not in text
     assert "IFTA Return" not in text
     assert "VIN123" in text
     assert "Detroit" in text

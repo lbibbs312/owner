@@ -71,6 +71,7 @@
                 padding:14px 16px; border-bottom:1px solid #e2e8f0; background:#f8fafc; }
   .panel-head h3 { margin:0; font-size:.95rem; color:#0f172a; font-weight:700; letter-spacing:0; }
   .panel-head a { color:#2563eb; font-weight:700; text-decoration:none; font-size:.82rem; white-space:nowrap; }
+  .panel-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
   .panel-body { padding:14px 16px; }
   .stack { display:flex; flex-direction:column; gap:12px; }
 
@@ -163,7 +164,7 @@
       </button>
       <button type="button" data-workspace-target="packets" aria-controls="workspace-packets" aria-selected="false">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h10v10H7zM4 4h16v16H4z"/></svg>
-        <span class="mc-nav-label"><span>Route Packets</span><span class="mc-nav-badge{% if route_packet_count %} has-count{% endif %}">{% if route_packet_count %}+{% endif %}{{ route_packet_count }}</span></span>
+        <span class="mc-nav-label"><span>Packets</span><span class="mc-nav-badge{% if route_packet_count %} has-count{% endif %}">{% if route_packet_count %}+{% endif %}{{ route_packet_count }}</span></span>
       </button>
       <button type="button" data-workspace-target="incidents" aria-controls="workspace-incidents" aria-selected="false">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 4.1L2.5 18a2 2 0 001.7 3h15.6a2 2 0 001.7-3L13.7 4.1a2 2 0 00-3.4 0z"/></svg>
@@ -336,7 +337,9 @@
         <section class="panel">
           <div class="panel-head">
             <h3>Route Packets</h3>
-            <a href="{{ url_for('manager.plant_transfers') }}">Open route packets</a>
+            <div class="panel-actions">
+              <a href="{{ url_for('manager.plant_transfers') }}">Open route packets</a>
+            </div>
           </div>
           <div class="route-table-wrap">
             <table class="record-table">
@@ -358,6 +361,36 @@
                   </tr>
                 {% else %}
                   <tr><td colspan="4"><div class="empty-state">No transfer records filed today.</div></td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel mt-3">
+          <div class="panel-head">
+            <h3>IFTA Support Worksheets</h3>
+            <span class="row-meta">{{ ifta_packet_count }} open for review</span>
+          </div>
+          <div class="route-table-wrap">
+            <table class="record-table">
+              <thead>
+                <tr>
+                  <th>Worksheet</th>
+                  <th>Driver / Truck</th>
+                  <th>Period</th>
+                  <th>Open</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for worksheet in recent_ifta_worksheets %}
+                  <tr>
+                    <td><strong>IFTA Support Worksheet #{{ worksheet.id }}</strong><br><span class="row-meta">{{ worksheet.review_status }}</span></td>
+                    <td>{{ worksheet.driver.display_name if worksheet.driver else 'Driver not assigned' }}<br><span class="row-meta">{{ worksheet.truck or worksheet.vin_or_vehicle_unit_number or 'Truck not recorded' }}</span></td>
+                    <td>{{ worksheet.reporting_period_quarter or 'Quarter not recorded' }} {{ worksheet.reporting_year or '' }}</td>
+                    <td><a href="{{ url_for('manager.view_ifta_worksheet', worksheet_id=worksheet.id) }}">Open</a></td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="4"><div class="empty-state">No IFTA support worksheets have been created yet.</div></td></tr>
                 {% endfor %}
               </tbody>
             </table>

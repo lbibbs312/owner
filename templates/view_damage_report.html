@@ -5,6 +5,8 @@
 {% include 'partials/_md_shell.html' %}
 {% endif %}
 {% set photo_endpoint = 'manager.damage_photo' if manager_view|default(false) else 'driver.damage_photo' %}
+{% set is_ifta_issue = ifta_form_available|default(false) %}
+{% set report_title = 'Fuel and Odometer Issue' if is_ifta_issue else ('Accident / Incident Issue' if accident_form_available|default(false) else 'Damage Report') %}
 <style>
   .damage-shell { max-width:1120px; margin:0 auto; }
   .damage-head { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; flex-wrap:wrap; margin-bottom:16px; }
@@ -62,7 +64,7 @@
 <div class="container-fluid py-4 responsive-workspace damage-shell">
   <div class="damage-head">
     <div class="damage-title">
-      <h1 class="h3">Damage Report #{{ report.id }}</h1>
+      <h1 class="h3">{{ report_title }} #{{ report.id }}</h1>
       <p class="text-muted mb-0 small">
         <strong class="status-label {% if route_finalized|default(false) or report.status != 'open' %}locked{% else %}open{% endif %}">
           {% if route_finalized|default(false) %}Locked{% else %}{{ report.status|title }}{% endif %}
@@ -80,14 +82,23 @@
       {% if accident_form_available|default(false) %}
         <a class="btn btn-outline-primary" href="{{ url_for('driver.accident_incident_from_damage_report', report_id=report.id) }}">Accident / Incident</a>
       {% endif %}
+      {% if is_ifta_issue and not manager_view|default(false) %}
+        <a class="btn btn-primary" href="{{ url_for('driver.new_ifta_worksheet') }}">IFTA Worksheet</a>
+      {% endif %}
       {% if manager_view|default(false) %}
-        <a class="btn btn-primary" href="{{ url_for('manager.damage_evidence_packet', report_id=report.id) }}">Proof Record</a>
+        {% if is_ifta_issue %}
+          <span class="status-label locked">IFTA Review Item</span>
+        {% else %}
+          <a class="btn btn-primary" href="{{ url_for('manager.damage_evidence_packet', report_id=report.id) }}">Proof Record</a>
+        {% endif %}
         <form method="POST" action="{{ url_for('manager.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report from active review? Evidence will remain attached.');">
           <input type="hidden" name="next" value="{{ url_for('manager.review_dashboard') }}">
           <button class="btn btn-outline-danger" type="submit">Archive Report</button>
         </form>
       {% else %}
-        <a class="btn btn-primary" href="{{ url_for('driver.damage_evidence_packet', report_id=report.id) }}">Proof Record</a>
+        {% if not is_ifta_issue %}
+          <a class="btn btn-primary" href="{{ url_for('driver.damage_evidence_packet', report_id=report.id) }}">Proof Record</a>
+        {% endif %}
       {% endif %}
       {% if can_modify|default(false) %}
         <a class="btn btn-primary" href="{{ url_for('driver.edit_damage_report', report_id=report.id) }}">Edit</a>
@@ -109,12 +120,12 @@
   {% endif %}
 
   <header class="document-header print-only">
-    <div>{% include 'partials/_md_print_signature.html' %}<h1>Damage Report</h1><div><strong>Driver:</strong> {{ report.reported_by.display_name }}</div><div><strong>Date:</strong> {{ report.damage_time|to_detroit_datetime if report.damage_time else report.created_at|to_detroit_datetime }}</div></div>
+    <div>{% include 'partials/_md_print_signature.html' %}<h1>{{ report_title }}</h1><div><strong>Driver:</strong> {{ report.reported_by.display_name }}</div><div><strong>Date:</strong> {{ report.damage_time|to_detroit_datetime if report.damage_time else report.created_at|to_detroit_datetime }}</div></div>
     <div><strong>Document No:</strong> EVIDENCE-REPORT-{{ "%03d"|format(report.id) }}<br><strong>Generated:</strong> {{ report.created_at|to_detroit_datetime if report.created_at else '' }}<br><strong>Page</strong> 1 of 1</div>
   </header>
 
   <section class="damage-card official-print-document">
-    <h2>1. Damage Summary</h2>
+    <h2>1. {{ 'Issue Summary' if is_ifta_issue else 'Damage Summary' }}</h2>
     <div class="damage-grid">
       <div class="damage-field"><span>Plant</span><strong>{{ report.plant_name }}</strong></div>
       <div class="damage-field"><span>Stage</span><strong>{{ report.stage|title }}</strong></div>

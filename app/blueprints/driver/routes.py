@@ -318,6 +318,10 @@ DRIVER_ONLY_ENDPOINTS = {
     "delete_damage_report",
     "submit_damage_report",
     "damage_evidence_packet",
+    "new_ifta_worksheet",
+    "view_ifta_worksheet",
+    "ifta_worksheet_packet",
+    "ifta_receipt",
 }
 
 
@@ -5018,6 +5022,7 @@ def view_damage_report(report_id):
         can_modify=_can_modify_damage_report(report),
         route_finalized=_is_damage_report_route_finalized(report),
         accident_form_available=classification.packet_type == PacketClassification.ACCIDENT_INCIDENT.value,
+        ifta_form_available=classification.packet_type == PacketClassification.FUEL_ODO_IFTA.value,
     )
 
 
@@ -5027,6 +5032,10 @@ def damage_evidence_packet(report_id):
     report = _damage_report_or_404(report_id)
     if report is None:
         return redirect(url_for("driver.damage_reports"))
+    classification = classify_damage_report(report)
+    if classification.packet_type == PacketClassification.FUEL_ODO_IFTA.value:
+        flash("Use the IFTA Support Worksheet for fuel and odometer records.", "info")
+        return redirect(url_for("driver.new_ifta_worksheet"))
     packet_label = packet_label_for_report(report)
     record_activity(
         user_id=current_user.id,

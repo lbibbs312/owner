@@ -2217,6 +2217,7 @@ def view_damage_report(report_id):
         report=report,
         manager_view=True,
         accident_form_available=classification.packet_type == PacketClassification.ACCIDENT_INCIDENT.value,
+        ifta_form_available=classification.packet_type == PacketClassification.FUEL_ODO_IFTA.value,
     )
 
 
@@ -2281,6 +2282,10 @@ def delete_damage_report(report_id):
 @bp.route("/damage-reports/<int:report_id>/evidence-packet")
 def damage_evidence_packet(report_id):
     report = DamageReport.query.get_or_404(report_id)
+    classification = classify_damage_report(report)
+    if classification.packet_type == PacketClassification.FUEL_ODO_IFTA.value:
+        flash("Fuel and odometer reports belong in the IFTA Support Worksheet flow.", "info")
+        return redirect(url_for("manager.view_damage_report", report_id=report.id))
     packet_label = packet_label_for_report(report)
     record_activity(
         user_id=current_user.id,
@@ -2528,6 +2533,13 @@ def manager_dashboard():
         .limit(6)
         .all()
     )
+    recent_ifta_worksheets = (
+        IftaWorksheet.query
+        .order_by(IftaWorksheet.created_at.desc(), IftaWorksheet.id.desc())
+        .limit(6)
+        .all()
+    )
+    ifta_packet_count = IftaWorksheet.query.filter(IftaWorksheet.review_status != "Closed").count()
     return render_template(
         "manager_dashboard.html",
         active_driver_count=active_driver_count,
@@ -2535,14 +2547,16 @@ def manager_dashboard():
         document_count=document_count,
         inspection_count=inspection_count,
         inspection_rows=inspection_rows,
+        ifta_packet_count=ifta_packet_count,
         live_stop_rows=live_stop_rows,
         move_request_count=move_request_count,
         move_request_rows=move_request_rows,
         pending_review_count=pending_review_count,
         recent_documents=recent_documents,
+        recent_ifta_worksheets=recent_ifta_worksheets,
         review_rows=review_rows,
         route_attention_rows=route_attention_rows,
-        route_packet_count=len(todays_logs) + todays_transfer_count,
+        route_packet_count=len(todays_logs) + todays_transfer_count + ifta_packet_count,
         route_count=len(todays_logs),
         todays_transfers=todays_transfers,
         today=today,

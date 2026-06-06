@@ -188,6 +188,27 @@ def _damage_report(driver, log, **kw):
     return report
 
 
+def _ifta_worksheet(driver, **kw):
+    from app.extensions import db
+    from app.models import IftaWorksheet
+
+    base = dict(
+        reporting_period_quarter="Q2",
+        reporting_year=2026,
+        driver_id=driver.id,
+        truck="IFTA-TRUCK-9",
+        vin_or_vehicle_unit_number="IFTA-UNIT-9",
+        carrier_name="MoveDefense Carrier",
+        review_status="Needs Review",
+        created_by_id=driver.id,
+    )
+    base.update(kw)
+    worksheet = IftaWorksheet(**base)
+    db.session.add(worksheet)
+    db.session.commit()
+    return worksheet
+
+
 def _seed_large_manager_dashboard(manager):
     from app.extensions import db
     from app.models import ExceptionEvent, Task
@@ -312,6 +333,7 @@ def test_manager_dashboard_v2_shell_uses_driver_workflow_records(client, app):
         _driver_log_document(log, driver)
         _pretrip(driver)
         _damage_report(driver, log)
+        _ifta_worksheet(driver)
 
     _login(client, "workspace_boss")
     response = client.get("/manager/dashboard")
@@ -323,6 +345,7 @@ def test_manager_dashboard_v2_shell_uses_driver_workflow_records(client, app):
         "Open Items",
         "Driver Routes",
         "Route Packets",
+        "IFTA Support Worksheets",
         "Documents",
         "Damage / Incidents",
         "Inspections",
@@ -331,6 +354,8 @@ def test_manager_dashboard_v2_shell_uses_driver_workflow_records(client, app):
     assert "MR-WORKSPACE-1" not in body
     assert "Raleigh East to Paint Central" not in body
     assert "TRX-WORKSPACE" in body
+    assert "IFTA Support Worksheet #1" in body
+    assert "IFTA-TRUCK-9" in body
     assert "Stamped route sheet photo" in body
     assert "MD-TRUCK-44" in body
     assert "Left mirror marker scuff noted before route." in body
