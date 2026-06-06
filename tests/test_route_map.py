@@ -1317,8 +1317,8 @@ def test_pickup_label_graduates_to_delivered_after_drop_completes(app):
     assert pickup["board_flow"]["deliver_state"] == "delivered"
 
 
-def test_in_transit_cta_names_destination_instead_of_generic_add_stop(app):
-    """A known in-transit destination makes the CTA say 'Arrive at <plant>'."""
+def test_in_transit_cta_uses_add_next_stop_action(app):
+    """A known in-transit destination keeps one add-stop continuation CTA."""
     from types import SimpleNamespace
     from app.services.route_context import build_route_cta_context
 
@@ -1341,8 +1341,7 @@ def test_in_transit_cta_names_destination_instead_of_generic_add_stop(app):
         today_local_date=date.today(),
     )
 
-    assert cta["primary_cta"]["label"] == "Arrive at Raleigh East"
-    # Action and its route guards are unchanged — only the label is specific.
+    assert cta["primary_cta"]["label"] == "Add Next Stop"
     assert cta["primary_cta"]["action"] == "add_stop"
 
 
@@ -1372,6 +1371,36 @@ def test_idle_active_route_keeps_generic_add_stop_cta(app):
 
     assert cta["primary_cta"]["label"] == "Add Stop"
     assert cta["primary_cta"]["action"] == "add_stop"
+
+
+def test_departed_loaded_route_stays_active_until_next_stop(app):
+    from app.services.route_context import build_route_context, build_route_cta_context
+
+    driver = _user("in_transit_continue_driver")
+    _driver_log(
+        driver,
+        plant_name="H",
+        depart_time="08:20",
+        load_size="Raleigh East Load",
+        depart_load_size="Raleigh East Load",
+    )
+
+    snapshot = build_route_context(driver_id=driver.id, route_date=date.today())
+    assert snapshot.route_status == "active"
+    assert snapshot.current_cargo["destination"] == "RE"
+
+    cta = build_route_cta_context(
+        snapshot,
+        proof_missing=True,
+        route_is_active=snapshot.route_status == "active",
+        has_active_shift=True,
+        route_date=date.today(),
+        today_local_date=date.today(),
+    )
+
+    assert cta["primary_cta"]["label"] == "Add Next Stop"
+    assert cta["primary_cta"]["action"] == "add_stop"
+    assert cta["show_attach_document_button"] is False
 
 
 def test_left_empty_stop_has_no_delivered_wording(app):

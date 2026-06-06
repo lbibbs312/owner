@@ -66,6 +66,7 @@
 {% set current_action_is_document = 'document' in current_action_lower or 'paperwork' in current_action_lower or 'proof' in current_action_lower %}
 {% set action_is_depart = 'depart' in current_action_lower %}
 {% set action_is_add_stop = ('add' in current_action_lower and 'stop' in current_action_lower) or not (rm and rm.stops) %}
+{% set add_stop_label = route_cta.primary_cta.label if route_cta and route_cta.primary_cta and route_cta.primary_cta.action == 'add_stop' else 'Add Stop' %}
 {% set route_finalized = route_context.route_finalized if route_context else false %}
 {# Accurate count of every selectable row rendered on the board. #}
 {% set obj = namespace(count=0) %}
@@ -208,7 +209,7 @@
               {% elif action_is_depart %}
                 {% if current_stop and cta_urls.get('record_departure') %}<a class="desk-current-cta is-go" href="{{ cta_urls.get('record_departure') }}">Record Departure</a>{% endif %}
               {% elif action_is_add_stop %}
-                {% if cta_urls.get('add_stop') %}<a class="desk-current-cta is-go" href="{{ cta_urls.get('add_stop') }}">Add Stop</a>{% endif %}
+                {% if cta_urls.get('add_stop') %}<a class="desk-current-cta is-go" href="{{ cta_urls.get('add_stop') }}">{{ add_stop_label }}</a>{% endif %}
               {% endif %}
             </div>
           </div>

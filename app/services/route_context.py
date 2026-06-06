@@ -325,9 +325,8 @@ def build_route_cta_context(
             allowed_actions = ["start_shift", "route_history"]
             route_message = "No active route for this date."
 
-    # When cargo is in transit toward a known plant, name it in the generic
-    # "Add Stop" CTA so the next action reads "Arrive at <plant>". This is a
-    # label-only change; the add_stop action and its route guards are untouched.
+    # In-transit cargo still continues through the add-stop route guard; keep
+    # the label generic enough that it does not look like a duplicate arrival.
     current_cargo = getattr(route_context, "current_cargo", None)
     in_transit_destination = (
         current_cargo.get("destination_label") if isinstance(current_cargo, dict) else None
@@ -338,9 +337,15 @@ def build_route_cta_context(
         and primary.get("action") == "add_stop"
         and primary.get("label") == "Add Stop"
     ):
-        primary = _route_cta(f"Arrive at {in_transit_destination}", "add_stop")
+        primary = _route_cta("Add Next Stop", "add_stop")
+        next_action = "Add Next Stop"
 
-    if proof_missing and not route_finalized and next_action not in {"Confirm cargo", "Record departure", "Finalize route"}:
+    if (
+        proof_missing
+        and not route_finalized
+        and next_action not in {"Confirm cargo", "Record departure", "Finalize route"}
+        and not (primary and primary.get("action") == "add_stop")
+    ):
         display_mode = "proof_needed"
         next_action = "Attach document"
         primary = _route_cta("Attach Document", "attach_document")
@@ -569,6 +574,14 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
         rows.append(row)
 
     current_cargo = current_load_after_logs(logs)
+    in_transit_cargo = bool(
+        (
+            current_cargo.get("destination")
+            or current_cargo.get("secondary_destination")
+        )
+        if isinstance(current_cargo, dict)
+        else False
+    )
     cargo_review = reconcile_cargo(logs, log_routes) if logs else {"issues": []}
     previous_cargo_cycle_status = "needs_review" if cargo_review.get("issues") else "complete"
     current_timing = timing.get(current_open.id, {}) if current_open else {}
@@ -596,7 +609,11 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
         truck_id = pretrips[-1].truck_number
     shift_id = _route_shift_id(driver_id, route_date, truck_id=truck_id, pretrips=pretrips, shift_id=scope.get("shift_id")) if driver_id and route_date else None
     route_id_value = _canonical_route_id(route_id, logs, driver_id, route_date, truck_id=truck_id, shift_id=shift_id)
-    active_route = bool(current_open or (logs and unresolved_departure_ids)) and not route_finalized
+    active_route = bool(
+        current_open
+        or (logs and unresolved_departure_ids)
+        or (logs and in_transit_cargo)
+    ) and not route_finalized
     if route_finalized:
         route_status = "finalized"
     elif active_route:

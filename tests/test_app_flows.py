@@ -1,6 +1,7 @@
 from io import BytesIO
 import os
 import re
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -48,6 +49,16 @@ def login(client, login_name, password="password1"):
         data={"login_name": login_name, "password": password},
         follow_redirects=False,
     )
+
+
+def assert_login_redirect(response, next_value, required_role):
+    assert response.status_code == 302
+    location = response.headers["Location"]
+    assert location.startswith("/login?")
+    parsed = urlsplit(location)
+    params = parse_qs(parsed.query)
+    assert params["next"] == [next_value]
+    assert params["required_role"] == [required_role]
 
 
 BANNED_PRINT_PHRASES = (
@@ -555,6 +566,52 @@ def test_cross_role_access_requires_matching_credentials(client, app):
     )
     assert wrong_role_login.status_code == 302
     assert wrong_role_login.headers["Location"].endswith("/manager/dashboard")
+
+
+def test_logged_out_reports_and_manager_dashboard_redirect_to_role_login(client):
+    assert_login_redirect(
+        client.get("/reports", follow_redirects=False),
+        "/reports",
+        "driver",
+    )
+    assert_login_redirect(
+        client.get("/reports?tab=recent", follow_redirects=False),
+        "/reports?tab=recent",
+        "driver",
+    )
+    assert_login_redirect(
+        client.get("/manager/dashboard", follow_redirects=False),
+        "/manager/dashboard",
+        "management",
+    )
+
+
+def test_logout_clears_driver_session_and_protects_mobile(client, app):
+    with app.app_context():
+        create_user("logout_driver", "logout-driver@example.com", "driver")
+
+    login(client, "logout_driver")
+    mobile = client.get("/mobile")
+    body = mobile.get_data(as_text=True)
+
+    assert mobile.status_code == 200
+    assert 'href="/logout">Logout</a>' in body
+    assert ".board-only-shell .topbar," not in body
+    assert ".logout-link { display: none; }" not in body
+
+    logout_response = client.get("/logout", follow_redirects=False)
+    assert logout_response.status_code == 302
+    assert logout_response.headers["Location"].endswith("/login")
+    with client.session_transaction() as sess:
+        assert "_user_id" not in sess
+        assert "driver_user_id" not in sess
+        assert "management_user_id" not in sess
+
+    assert_login_redirect(
+        client.get("/mobile", follow_redirects=False),
+        "/mobile",
+        "driver",
+    )
 
 
 def test_direct_messages_with_inbox_render_without_dead_reply_endpoint(client, app):
@@ -6412,6 +6469,9 @@ def test_widescreen_driver_actions_have_reports_entry_without_report_shortcut_ro
 
     assert response.status_code == 200
     assert '<a class="logout-link desktop-work-link" href="/reports">Reports</a>' in body
+    assert '<a class="logout-link" href="/logout">Logout</a>' in body
+    assert ".board-only-shell .topbar," not in body
+    assert ".logout-link { display: none; }" not in body
     assert 'href="/damage_reports">Physical Damage</a>' not in body
     assert 'href="/ifta-worksheet/new">Fuel Records</a>' not in body
 
@@ -7303,7 +7363,7 @@ def test_mobile_dashboard_active_between_stops_prioritizes_add_stop_over_posttri
     assert page.status_code == 200
     assert b"PostTrip Due" not in page.data
     assert b'<a class="md-flow-primary-cta add-stop-action"' in page.data
-    assert b"<strong>Add Stop</strong>" in page.data
+    assert b"<strong>Add Next Stop</strong>" in page.data
     assert b"Finalize Route" not in page.data
     assert b'<div class="md-flow-top-actions"' not in page.data
     assert b"md-flow-action-tab" not in page.data
@@ -8041,6 +8101,92 @@ def test_mobile_quick_depart_returns_to_live_board_without_full_depart_form(clie
         from app.models import DriverLog
 
         assert DriverLog.query.get(invalid_id).depart_time is None
+
+
+def test_mobile_quick_depart_shows_add_next_stop_and_creates_second_stop(client, app):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("quick_continue_driver", "quick-continue@example.com", "driver")
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=379000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime.utcnow()),
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="H",
+                load_size="Raleigh East Load",
+                arrive_time="00:01",
+            ),
+        ])
+        db.session.commit()
+        first_id = DriverLog.query.filter_by(driver_id=driver.id).one().id
+        driver_id = driver.id
+
+    login(client, "quick_continue_driver")
+    departed = client.post(
+        f"/driver_logs/{first_id}/depart",
+        data={
+            "next": "mobile",
+            "source": "live_flow",
+            "unloaded_on_departure": "yes",
+            "secondary_dropped_on_departure": "yes",
+            "got_loaded": "no",
+            "destination": "",
+            "secondary_destination": "",
+            "secondary_load_type": "load",
+        },
+        follow_redirects=False,
+    )
+
+    assert departed.status_code == 302
+    assert departed.headers["Location"].endswith("/mobile")
+    mobile = client.get("/mobile")
+    body = mobile.get_data(as_text=True)
+
+    assert mobile.status_code == 200
+    assert "Add Next Stop" in body
+    assert body.count('class="md-flow-primary-cta add-stop-action"') == 1
+    assert body.count('class="desk-current-cta is-go" href="/new_driving_log"') == 1
+    assert 'data-flow-panel-title="Depart Quick Flow"' not in body
+    assert 'class="driver-active-wait-action"' not in body
+
+    add_stop_form = client.get("/new_driving_log")
+    assert add_stop_form.status_code == 200
+    assert b"Plant Name" in add_stop_form.data
+
+    created = client.post(
+        "/new_driving_log",
+        data={"plant_name": "RE", "load_size": "Empty"},
+        follow_redirects=False,
+    )
+    assert created.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        route_logs = (
+            DriverLog.query
+            .filter_by(driver_id=driver_id, date=today)
+            .order_by(DriverLog.created_at.asc(), DriverLog.id.asc())
+            .all()
+        )
+        assert len(route_logs) == 2
+        assert route_logs[0].depart_time
+        assert route_logs[1].plant_name == "RE"
+        assert route_logs[1].load_size == "Raleigh East Load"
+        assert route_logs[1].depart_time is None
+
+    refreshed = client.get("/mobile")
+    assert refreshed.status_code == 200
+    assert b"Depart and Load" in refreshed.data
+    assert refreshed.get_data(as_text=True).count('data-flow-panel-title="Depart Quick Flow"') == 1
 
 
 def test_mobile_quick_depart_handles_secondary_drop_required(client, app):

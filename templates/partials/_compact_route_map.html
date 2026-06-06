@@ -203,6 +203,7 @@
 {% set damage_url = urls.get('add_damage') %}
 {% set document_url = urls.get('attach_document') %}
 {% set add_stop_url = urls.get('add_stop') %}
+{% set add_stop_label = primary_cta.label if primary_cta and primary_action == 'add_stop' else 'Add Stop' %}
 {% set pretrip_url = urls.get('start_shift') or url_for('driver.new_pretrip') %}
 {% set posttrip_available = active_pt and not active_pt.posttrip and not route_finalized_for_cta %}
 {% set posttrip_url = url_for('driver.do_posttrip', pretrip_id=active_pt.id) if posttrip_available else none %}
@@ -315,7 +316,7 @@
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta add-stop-action" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}" data-flow-panel-title="Add Stop">
         <span>Required driver action</span>
-        <strong>Add Stop</strong>
+        <strong>{{ add_stop_label }}</strong>
         <small>Continue route</small>
       </a>
     </div>

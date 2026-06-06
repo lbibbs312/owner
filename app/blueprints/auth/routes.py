@@ -2,8 +2,8 @@ import logging
 import os
 from urllib.parse import urlsplit
 
-from flask import current_app, flash, redirect, render_template, request, url_for
-from flask_login import current_user, login_required, login_user, logout_user
+from flask import current_app, flash, redirect, render_template, request, session, url_for
+from flask_login import current_user, login_user, logout_user
 
 from app.blueprints.auth import bp
 from app.extensions import db, login_manager
@@ -71,6 +71,29 @@ def _safe_next_url(next_url):
 
 def _role_label(role):
     return "manager" if role == "management" else "driver"
+
+
+def _requested_url():
+    return request.full_path if request.query_string else request.path
+
+
+def _required_role_for_request():
+    endpoint = request.endpoint or ""
+    if endpoint.startswith("manager.") or request.path.startswith("/manager/"):
+        return "management"
+    if endpoint.startswith("driver.") or request.path in {"/mobile", "/reports"}:
+        return "driver"
+    return None
+
+
+@login_manager.unauthorized_handler
+def redirect_unauthorized_user():
+    required_role = _required_role_for_request()
+    if required_role:
+        flash(f"{_role_label(required_role).title()} access required. Sign in to continue.", "warning")
+        return redirect(url_for("auth.login", next=_requested_url(), required_role=required_role))
+    flash("Sign in to continue.", "warning")
+    return redirect(url_for("auth.login", next=_requested_url()))
 
 
 def _safe_form_value(form, field_name):
@@ -244,9 +267,12 @@ def login():
 
 
 @bp.route("/logout")
-@login_required
 def logout():
     clear_role_logins()
     logout_user()
+    clear_role_logins()
+    for key in ("_user_id", "_fresh", "_id"):
+        session.pop(key, None)
+    session.modified = True
     flash("Logged out.", "info")
-    return redirect(url_for("public.welcome"))
+    return redirect(url_for("auth.login"))
