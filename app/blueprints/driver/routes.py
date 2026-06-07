@@ -723,11 +723,17 @@ def _route_can_end_at_current_stop(route_context, active_pretrip, route_date, to
     return not unresolved_departure_logs(logs, route_finalized=True)
 
 
+def _route_has_completed_posttrip(route_context, active_pretrip):
+    if active_pretrip and active_pretrip.posttrip:
+        return True
+    return getattr(route_context, "posttrip_status", None) == "complete"
+
+
 def _apply_route_end_cta(route_cta, route_context, active_pretrip, route_date, today_local_date):
     if _route_can_finish_after_closed_stops(route_context, route_date, today_local_date):
         patched = dict(route_cta or {})
         proof_missing = bool(patched.get("proof_missing"))
-        if active_pretrip and not active_pretrip.posttrip:
+        if not _route_has_completed_posttrip(route_context, active_pretrip):
             return route_cta
         route_message = "All recorded stops are closed. Finalize the route to lock the route sheet."
         if proof_missing:
@@ -4718,7 +4724,10 @@ def mobile_end_route():
         today_local_date,
         today_local_date,
     )
-    if can_finish_closed_route and active_pretrip and not active_pretrip.posttrip:
+    if can_finish_closed_route and not _route_has_completed_posttrip(route_context, active_pretrip):
+        if not active_pretrip:
+            flash("Complete PostTrip before finishing the route.", "warning")
+            return redirect(url_for("driver.mobile_dashboard"))
         flash("Complete PostTrip before finishing the route.", "warning")
         return redirect(url_for("driver.do_posttrip", pretrip_id=active_pretrip.id))
 

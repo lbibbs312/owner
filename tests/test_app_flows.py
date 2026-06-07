@@ -7330,6 +7330,50 @@ def test_mobile_dashboard_shows_posttrip_due_after_route_close_not_as_board_row(
     assert "<strong>TRUCK</strong>" not in body
 
 
+def test_mobile_dashboard_does_not_show_finalize_after_closed_delivery_without_posttrip(client, app):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ActivityEvent, DriverLog
+
+        driver = create_user("closed_delivery_no_posttrip", "closed-delivery-no-posttrip@example.com", "driver")
+        db.session.add(
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="RE",
+                load_size="Raleigh East Load",
+                depart_load_size="Empty",
+                no_pickup=True,
+                arrive_time=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                depart_time="08:20",
+            )
+        )
+        db.session.commit()
+        driver_id = driver.id
+
+    login(client, "closed_delivery_no_posttrip")
+    page = client.get("/mobile")
+
+    assert page.status_code == 200
+    assert b"Finalize Route" not in page.data
+    assert b'action="/mobile/end-route" method="POST"' not in page.data
+
+    response = client.post("/mobile/end-route", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"Complete PostTrip before finishing the route." in response.data
+    with app.app_context():
+        assert ActivityEvent.query.filter_by(
+            user_id=driver_id,
+            category="eod",
+            action="finalized",
+            target_type="end_of_day",
+        ).count() == 0
+
+
 def test_mobile_dashboard_active_shift_without_stops_keeps_add_stop_primary(client, app):
     from datetime import date, datetime
 
