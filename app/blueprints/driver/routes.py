@@ -466,40 +466,6 @@ def _sync_next_open_stop_arrival_cargo(log):
     return changed[-1] if changed else None
 
 
-def _create_quick_depart_next_stop(log, destination_code, arrival_load, secondary_load):
-    if not log or not destination_code or not arrival_load:
-        return None
-    if _driver_route_record_finalized(log.driver_id, log.date):
-        return None
-    logs = sorted(
-        _active_driver_logs_query().filter_by(driver_id=log.driver_id, date=log.date).all(),
-        key=_driver_log_sort_key,
-    )
-    current_index = next((index for index, item in enumerate(logs) if item.id == log.id), None)
-    if current_index is None or current_index + 1 < len(logs):
-        return None
-
-    now_utc = datetime.utcnow()
-    next_log = DriverLog(
-        driver_id=log.driver_id,
-        date=log.date,
-        plant_name=destination_code,
-        load_size=arrival_load or "Empty",
-        secondary_load=secondary_load or None,
-        arrive_time=now_utc.strftime("%Y-%m-%d %H:%M:%S"),
-        created_at=now_utc,
-    )
-    db.session.add(next_log)
-    db.session.flush()
-    _append_driver_log_flow_event(
-        next_log,
-        "ARRIVED_DESTINATION",
-        notes=f"Quick depart created next stop at {_plant_label(next_log.plant_name)}.",
-        payload={"driver_action": "quick_depart_next_stop", "source_log_id": log.id},
-    )
-    return next_log
-
-
 def _driver_log_context_for(log):
     logs = _active_driver_logs_query().filter_by(
         driver_id=log.driver_id, date=log.date
@@ -710,9 +676,35 @@ def _route_cta_urls(route_date, current_stop=None, active_pretrip=None, pending_
     if current_stop:
         urls["confirm_cargo"] = url_for("driver.pickup_driver_log", log_id=current_stop.id)
         urls["record_departure"] = url_for("driver.depart_driver_log", log_id=current_stop.id)
-    if pending_posttrip and active_pretrip:
+    if (pending_posttrip or (active_pretrip and not active_pretrip.posttrip)) and active_pretrip:
         urls["posttrip"] = url_for("driver.do_posttrip", pretrip_id=active_pretrip.id)
     return urls
+
+
+def _route_has_in_transit_cargo(route_context):
+    current_cargo = getattr(route_context, "current_cargo", None)
+    if not isinstance(current_cargo, dict):
+        return False
+    return bool(
+        current_cargo.get("destination")
+        or current_cargo.get("destination_label")
+        or current_cargo.get("secondary_destination")
+        or current_cargo.get("secondary_destination_label")
+    )
+
+
+def _route_can_finish_after_closed_stops(route_context, route_date, today_local_date):
+    if not route_date or not today_local_date or route_date != today_local_date:
+        return False
+    if getattr(route_context, "route_finalized", False):
+        return False
+    if getattr(route_context, "current_stop", None) is not None:
+        return False
+    if not getattr(route_context, "all_departed", False):
+        return False
+    if _route_has_in_transit_cargo(route_context):
+        return False
+    return bool(getattr(route_context, "rows", None))
 
 
 def _route_can_end_at_current_stop(route_context, active_pretrip, route_date, today_local_date):
@@ -732,22 +724,31 @@ def _route_can_end_at_current_stop(route_context, active_pretrip, route_date, to
 
 
 def _apply_route_end_cta(route_cta, route_context, active_pretrip, route_date, today_local_date):
-    if not _route_can_end_at_current_stop(route_context, active_pretrip, route_date, today_local_date):
-        return route_cta
-    patched = dict(route_cta or {})
-    patched.update(
-        {
-            "route_display_mode": "route_end_ready",
-            "next_action": "End route",
-            "primary_cta": {"label": "End Route", "action": "end_route", "style": "primary"},
-            "secondary_cta": {"label": "Print Route", "action": "print_route", "style": "ghost"},
-            "allowed_actions": ["end_route", "print_route", "view_route"],
-            "route_state_message": "PostTrip is complete. End the route here without recording a departure.",
-            "show_finalize_button": False,
-            "show_posttrip_button": False,
-        }
-    )
-    return patched
+    if _route_can_finish_after_closed_stops(route_context, route_date, today_local_date):
+        patched = dict(route_cta or {})
+        proof_missing = bool(patched.get("proof_missing"))
+        if active_pretrip and not active_pretrip.posttrip:
+            return route_cta
+        route_message = "All recorded stops are closed. Finish the route to lock the route sheet."
+        if proof_missing:
+            route_message = (
+                "Document proof is missing. Attach it if required by your company, "
+                "or finish the route if the record is ready."
+            )
+        patched.update(
+            {
+                "route_display_mode": "route_end_ready",
+                "next_action": "Finish Route",
+                "primary_cta": {"label": "Finish Route", "action": "end_route", "style": "primary"},
+                "secondary_cta": {"label": "View Route Sheet", "action": "view_route", "style": "ghost"},
+                "allowed_actions": ["end_route", "view_route", "print_route", "attach_document"],
+                "route_state_message": route_message,
+                "show_finalize_button": True,
+                "show_posttrip_button": False,
+            }
+        )
+        return patched
+    return route_cta
 
 
 def _posttrip_due_for_route(active_pretrip, route_context, *, route_is_active=False, finalizing=False):
@@ -3654,25 +3655,32 @@ def new_driving_log():
             meeting=form.meeting.data,
             date=local_date,
         )
-        db.session.add(newlog)
-        db.session.flush()
-        _append_driver_log_flow_event(
-            newlog,
-            "ARRIVED_DESTINATION",
-            notes=f"Arrived at {_plant_label(newlog.plant_name)}.",
-            payload={"driver_action": "arrive"},
-        )
-        db.session.commit()
-        record_activity(
-            user_id=current_user.id,
-            category="log",
-            action="submitted",
-            title="Driver log submitted",
-            details=f"{newlog.plant_name} arrival with {cargo_display(newlog.load_size, newlog.secondary_load)} for {newlog.date}.",
-            target_type="driver_log",
-            target_id=newlog.id,
-        )
-        ingest_driver_log(newlog, commit=True)
+        try:
+            db.session.add(newlog)
+            db.session.flush()
+            _append_driver_log_flow_event(
+                newlog,
+                "ARRIVED_DESTINATION",
+                notes=f"Arrived at {_plant_label(newlog.plant_name)}.",
+                payload={"driver_action": "arrive"},
+            )
+            record_activity(
+                user_id=current_user.id,
+                category="log",
+                action="submitted",
+                title="Driver log submitted",
+                details=f"{newlog.plant_name} arrival with {cargo_display(newlog.load_size, newlog.secondary_load)} for {newlog.date}.",
+                target_type="driver_log",
+                target_id=newlog.id,
+                commit=False,
+            )
+            ingest_driver_log(newlog, commit=False)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Driver arrival could not be saved for user_id=%s", current_user.id)
+            flash("Arrival could not be saved. Try again.", "danger")
+            return _render_new_driving_log(form, current_load)
         _emit_driver_log_updated(newlog, "submitted")
         flash("Arrival recorded.", "success")
         return redirect(_driver_logs_url_for_date(newlog.date))
@@ -4076,6 +4084,13 @@ def record_driver_log_photo(log_id):
             return jsonify({"error": "File was not saved. Try again."}), 400
         flash("UPLOAD FAILED\nFile was not saved. Try again.", "danger")
         return redirect(next_url)
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Driver log document upload failed for log_id=%s", log.id)
+        if _photo_upload_wants_json():
+            return jsonify({"error": "Upload failed. Try again."}), 500
+        flash("UPLOAD FAILED\nUpload failed. Try again.", "danger")
+        return redirect(next_url)
 
     if document_type:
         photo.document_type = document_type[:40]
@@ -4318,42 +4333,38 @@ def depart_driver_log(log_id):
         timing_errors = _route_timing_errors(log.driver_id, log.date, log.plant_name, _arrival_hhmm_for_log(log), depart_time, exclude_log_id=log.id, check_previous=False)
         if timing_errors:
             return quick_depart_error(timing_errors[0])
-        log.depart_time = depart_time
-        log.dock_wait_minutes = _auto_wait_minutes_for_departure(log, now_local)
-        log.depart_load_size = departure_load
-        log.secondary_load = secondary_load or None
-        _set_departure_unload_reasons(log, primary_unload_reason, secondary_drop_reason)
-        log.no_pickup = False if service_stop else departure_load == "Empty" and not log.secondary_load
-        _sync_next_open_stop_arrival_cargo(log)
-        quick_next_stop = None
-        if quick_depart and not service_stop and form.got_loaded.data == "yes":
-            quick_next_stop = _create_quick_depart_next_stop(
+        try:
+            log.depart_time = depart_time
+            log.dock_wait_minutes = _auto_wait_minutes_for_departure(log, now_local)
+            log.depart_load_size = departure_load
+            log.secondary_load = secondary_load or None
+            _set_departure_unload_reasons(log, primary_unload_reason, secondary_drop_reason)
+            log.no_pickup = False if service_stop else departure_load == "Empty" and not log.secondary_load
+            _sync_next_open_stop_arrival_cargo(log)
+            _append_driver_log_flow_event(
                 log,
-                form.destination.data,
-                departure_load,
-                log.secondary_load,
+                "DEPARTED_ORIGIN",
+                notes=f"Departed {_plant_label(log.plant_name)} with {cargo_display(log.depart_load_size, log.secondary_load)}.",
+                payload={"driver_action": "depart", "service_stop": bool(service_stop)},
             )
-        _append_driver_log_flow_event(
-            log,
-            "DEPARTED_ORIGIN",
-            notes=f"Departed {_plant_label(log.plant_name)} with {cargo_display(log.depart_load_size, log.secondary_load)}.",
-            payload={"driver_action": "depart", "service_stop": bool(service_stop)},
-        )
-        db.session.commit()
-        record_activity(
-            user_id=current_user.id,
-            category="log",
-            action="departed",
-            title="Driver log departed",
-            details=f"{log.plant_name} departed at {_format_display_time(log.depart_time)} with {cargo_display(log.depart_load_size, log.secondary_load)}.",
-            target_type="driver_log",
-            target_id=log.id,
-        )
-        ingest_driver_log(log, commit=True)
+            record_activity(
+                user_id=current_user.id,
+                category="log",
+                action="departed",
+                title="Driver log departed",
+                details=f"{log.plant_name} departed at {_format_display_time(log.depart_time)} with {cargo_display(log.depart_load_size, log.secondary_load)}.",
+                target_type="driver_log",
+                target_id=log.id,
+                commit=False,
+            )
+            ingest_driver_log(log, commit=False)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Driver departure could not be saved for log_id=%s", log.id)
+            return quick_depart_error("Departure could not be saved. Try again.", 500)
         _emit_driver_log_updated(log, "departed")
         success_message = f"Departed {log.plant_name} with {cargo_display(log.depart_load_size, log.secondary_load)}."
-        if quick_next_stop:
-            success_message = f"{success_message} Next stop opened: {_plant_label(quick_next_stop.plant_name)}."
         if quick_depart and form.got_loaded.data == "yes" and not form.secondary_destination.data:
             success_message = f"{success_message} No second stop selected."
         return quick_depart_success(success_message)
@@ -4660,7 +4671,7 @@ def mobile_end_route():
     if current_user.role == "management":
         return redirect(url_for("manager.manager_dashboard"))
     if request.method == "GET":
-        flash("Use End Route from the mobile board to close the route.", "info")
+        flash("Use Finish Route from the mobile board to close the route.", "info")
         return redirect(url_for("driver.mobile_dashboard"))
 
     now_local, _ = _now_local_and_utc()
@@ -4670,7 +4681,16 @@ def mobile_end_route():
     route_context = build_route_context(driver_id=current_user.id, route_date=today_local_date, now=now_local)
     active_pretrip = _select_route_pretrip(pretrips_today, route_context=route_context, open_shift=open_shift)
 
-    if not _route_can_end_at_current_stop(route_context, active_pretrip, today_local_date, today_local_date):
+    can_finish_closed_route = _route_can_finish_after_closed_stops(
+        route_context,
+        today_local_date,
+        today_local_date,
+    )
+    if can_finish_closed_route and active_pretrip and not active_pretrip.posttrip:
+        flash("Complete PostTrip before finishing the route.", "warning")
+        return redirect(url_for("driver.do_posttrip", pretrip_id=active_pretrip.id))
+
+    if not can_finish_closed_route:
         flash("Complete PostTrip first, or record departure if this stop continues the route.", "warning")
         return redirect(url_for("driver.mobile_dashboard"))
 
@@ -4680,18 +4700,12 @@ def mobile_end_route():
         flash(f"Correct departure for {_plant_label(stop.plant_name)} before ending the route.", "warning")
         return redirect(url_for("driver.view_driver_log", log_id=stop.id))
 
-    current_stop = route_context.current_stop
-    _append_driver_log_flow_event(
-        current_stop,
-        "ROUTE_ENDED_AT_STOP",
-        notes=f"Route ended at {_plant_label(current_stop.plant_name)} without recording a departure after PostTrip.",
-        payload={"driver_action": "end_route_at_current_stop", "posttrip_id": active_pretrip.posttrip.id},
-    )
     _end_open_shifts_for_driver(current_user.id)
     db.session.commit()
     _record_eod_finalized(today_local_date, logs, pretrips_today, plant_transfers_today)
-    _emit_driver_log_updated(current_stop, "route_ended")
-    flash(f"Route ended at {_plant_label(current_stop.plant_name)}. PostTrip is complete; no departure was recorded.", "success")
+    for log in logs[-1:]:
+        _emit_driver_log_updated(log, "route_finished")
+    flash("Route finished. The route sheet is finalized.", "success")
     return redirect(url_for("driver.mobile_dashboard"))
 
 

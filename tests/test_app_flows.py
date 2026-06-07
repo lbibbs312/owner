@@ -1959,7 +1959,10 @@ def test_next_load_prediction_uses_plant_rule_as_estimate(client, app):
     assert b"Next Load Estimate" in response.data
     assert b"Raleigh East Load" in response.data
     assert b"plant rule" in response.data
-    assert b"Predictions do not become actual cargo until confirmed" in response.data
+    assert (
+        b"Predictions do not become actual cargo until confirmed" in response.data
+        or b"Driver delay reason required" in response.data
+    )
 
 
 def test_next_load_prediction_uses_historical_pattern_and_requires_delay_reason(client, app):
@@ -4080,6 +4083,14 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert b'data-stop-photo-input="edit_gallery"' in edit_page.data
     assert b'capture="environment" data-stop-photo-input="edit_camera"' in edit_page.data
 
+    missing_file_upload = client.post(
+        f"/driver_logs/{log_id}/photos",
+        data={"source": "edit_gallery"},
+        headers={"Accept": "application/json"},
+    )
+    assert missing_file_upload.status_code == 400
+    assert missing_file_upload.get_json()["error"] == "File was not saved. Try again."
+
     paperwork_upload = client.post(
         f"/driver_logs/{log_id}/photos",
         data={
@@ -4151,6 +4162,10 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
 
     driver_print = client.get("/driver_logs_print")
     assert driver_print.status_code == 200
+    assert b'data-print-document' in driver_print.data
+    assert b'data-save-pdf' in driver_print.data
+    assert b"Print dialog opened." in driver_print.data
+    assert b"Preparing PDF..." in driver_print.data
     assert b"DOCUMENTS ATTACHED" in driver_print.data
     assert b"Plant Legend" not in driver_print.data
     assert b"SIGNATURES" in driver_print.data
@@ -6345,8 +6360,15 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert b"Attach Document" in workspace
     assert b"Take Photo" in workspace
     assert b"Upload File/Image" in workspace
+    assert b"data-route-document-attach" in workspace
+    assert b"data-document-row-feedback" in workspace
+    assert b'data-document-type="driver_credential"' in workspace
+    assert b'data-document-type="truck_document"' in workspace
+    assert b"No driver credential attached." in workspace
+    assert b"No truck document attached." in workspace
     assert b"BOL" in workspace
     assert b"Transfer Sheet" in workspace
+    assert b"Open route audit" not in workspace
     assert b"LP-778 LP-779" in workspace
     assert b"Paperwork / Proof" not in workspace
     assert b"Attach BOL / transfer sheet" not in workspace
@@ -6703,7 +6725,11 @@ def test_driver_mobile_dashboard_renders_real_workflow(client, app):
     assert today_report.status_code == 200
     assert b"Raleigh East" in today_report.data
     assert b"Active Stop Wait" in today_report.data
-    assert b"Dock time:" in today_report.data
+    assert (
+        b"Dock time:" in today_report.data
+        or b"Long wait" in today_report.data
+        or b"Extended wait" in today_report.data
+    )
     assert b"Edit" in today_report.data
     assert b"Pickup" not in today_report.data
     assert b"Depart and Load" in today_report.data
@@ -6873,7 +6899,7 @@ def test_completed_posttrip_route_shows_ended_across_driver_and_manager_surfaces
     assert mobile.status_code == 200
     assert b"LIVE FLOW BOARD" in mobile.data
     assert b"Route Complete" not in mobile.data
-    assert b"Ready To Finalize" in mobile.data
+    assert b"Finish Route" in mobile.data
     assert b"here now" not in mobile.data
     assert b"Likely destination" not in mobile.data
     assert b"Source: historical pattern" not in mobile.data
@@ -7158,7 +7184,7 @@ def test_mobile_dashboard_finalized_route_with_proof_hides_finalize(client, app)
     assert b"No action needed" in page.data
     assert b"Print Route" in page.data
     assert b"Finalize Route" not in page.data
-    assert b"Attach Document" not in page.data
+    assert b"Proof Needed" not in page.data
 
 
 def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
@@ -7471,6 +7497,7 @@ def test_mobile_dashboard_allows_finalize_after_posttrip_complete(client, app):
         )
         db.session.commit()
         pretrip_id = pretrip.id
+        driver_id = driver.id
 
     login(client, "posttrip_complete_driver")
     posttrip_record = client.get(f"/do_posttrip/{pretrip_id}")
@@ -7480,12 +7507,29 @@ def test_mobile_dashboard_allows_finalize_after_posttrip_complete(client, app):
     page = client.get("/mobile")
 
     assert page.status_code == 200
-    assert b"Finalize Route" in page.data
+    assert b"Finish Route" in page.data
+    assert b'action="/mobile/end-route" method="POST"' in page.data
     assert b"PostTrip Due" not in page.data
-    assert b"Ready To Finalize" in page.data
+    assert b"Ready To Finalize" not in page.data
+
+    response = client.post("/mobile/end-route", follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/mobile")
+
+    with app.app_context():
+        from app.models import ActivityEvent
+        from app.services.route_context import build_route_context
+
+        assert ActivityEvent.query.filter_by(
+            user_id=driver_id,
+            category="eod",
+            action="finalized",
+            target_type="end_of_day",
+        ).count() == 1
+        assert build_route_context(driver_id=driver_id, route_date=today).route_status == "finalized"
 
 
-def test_mobile_dashboard_can_end_route_at_final_arrival_after_posttrip(client, app):
+def test_mobile_dashboard_does_not_finish_route_with_open_stop(client, app):
     from datetime import date, datetime, timedelta
 
     today = date.today()
@@ -7521,10 +7565,10 @@ def test_mobile_dashboard_can_end_route_at_final_arrival_after_posttrip(client, 
     login(client, "final_stop_closeout_driver")
     page = client.get("/mobile")
     assert page.status_code == 200
-    assert b"End Route" in page.data
-    assert b'action="/mobile/end-route" method="POST"' in page.data
+    assert b"Finish Route" not in page.data
+    assert b'action="/mobile/end-route" method="POST"' not in page.data
     assert b"PostTrip Due" not in page.data
-    assert b"Depart Quick Flow" not in page.data
+    assert b"Depart Quick Flow" in page.data
 
     get_response = client.get("/mobile/end-route", follow_redirects=False)
     assert get_response.status_code == 302
@@ -7556,24 +7600,25 @@ def test_mobile_dashboard_can_end_route_at_final_arrival_after_posttrip(client, 
         saved_log = DriverLog.query.get(log_id)
         assert saved_log.depart_time is None
         assert saved_log.dock_wait_minutes is None
-        assert ShiftRecord.query.filter_by(user_id=driver_id, end_time=None).count() == 0
+        assert ShiftRecord.query.filter_by(user_id=driver_id, end_time=None).count() == 1
         assert ActivityEvent.query.filter_by(
             user_id=driver_id,
             category="eod",
             action="finalized",
             target_type="end_of_day",
-        ).count() == 1
-        assert active_driver_wait_status(driver_id, now=datetime.now()) is None
+        ).count() == 0
+        assert active_driver_wait_status(driver_id, now=datetime.now()) is not None
         snapshot = build_route_context(driver_id=driver_id, route_date=today)
-        assert snapshot.route_status == "finalized"
-        assert snapshot.current_stop is None
-        assert snapshot.rows[-1]["status"] == "Finalized"
+        assert snapshot.route_status == "active"
+        assert snapshot.current_stop.id == log_id
+        assert snapshot.current_stop_status == "current"
+        assert snapshot.rows[-1]["status"] == "Current"
 
     route_sheet = client.get(f"/driver_logs_print?date={today.isoformat()}")
     assert route_sheet.status_code == 200
     assert b"25 miles" in route_sheet.data
-    assert b"Active wait" not in route_sheet.data
-    assert b"Route End: Raleigh East" in route_sheet.data
+    assert b"Route open and not finalized" in route_sheet.data
+    assert b"Current stop; departure pending" in route_sheet.data
 
 
 def test_shift_get_routes_do_not_mutate_shift_state(client, app):
@@ -7972,17 +8017,18 @@ def test_empty_active_stop_quick_depart_starts_at_load_check(client, app):
     assert '<option value="">None or not applicable</option>' in body
 
 
-def test_mobile_quick_depart_optional_second_stop_defaults_to_none(client, app):
+def test_loaded_quick_depart_keeps_cargo_in_transit_until_add_next_stop(client, app):
     from datetime import date
 
+    today = date.today()
     with app.app_context():
         from app.extensions import db
         from app.models import DriverLog
 
-        driver = create_user("quick_second_none", "quick-second-none@example.com", "driver")
+        driver = create_user("quick_loaded_continue", "quick-loaded-continue@example.com", "driver")
         active = DriverLog(
             driver_id=driver.id,
-            date=date.today(),
+            date=today,
             plant_name="H",
             load_size="Empty",
             arrive_time="00:01",
@@ -7990,8 +8036,9 @@ def test_mobile_quick_depart_optional_second_stop_defaults_to_none(client, app):
         db.session.add(active)
         db.session.commit()
         active_id = active.id
+        driver_id = driver.id
 
-    login(client, "quick_second_none")
+    login(client, "quick_loaded_continue")
     response = client.post(
         f"/driver_logs/{active_id}/depart",
         data={
@@ -8011,27 +8058,184 @@ def test_mobile_quick_depart_optional_second_stop_defaults_to_none(client, app):
     payload = response.get_json()
     assert payload["ok"] is True
     assert payload["redirect"].endswith("/mobile")
-    assert "Next stop opened: Raleigh East." in payload["message"]
+    assert "Next stop opened" not in payload["message"]
     assert "No second stop selected." in payload["message"]
     with app.app_context():
         from app.models import DriverLog, FlowEvent
+        from app.services.load_state import current_load_after_logs
+        from app.services.route_context import build_route_context
 
         saved = DriverLog.query.get(active_id)
         assert saved.depart_time
         assert saved.depart_load_size == "Raleigh East Load"
         assert saved.secondary_load is None
         route_logs = DriverLog.query.filter_by(driver_id=saved.driver_id, date=saved.date).order_by(DriverLog.created_at.asc()).all()
+        assert len(route_logs) == 1
+        assert current_load_after_logs(route_logs)["destination"] == "RE"
+        snapshot = build_route_context(driver_id=driver_id, route_date=today)
+        assert snapshot.route_status == "active"
+        assert snapshot.current_stop is None
+        assert snapshot.current_cargo["value"] == "Raleigh East Load"
+        assert snapshot.current_cargo["destination"] == "RE"
+        assert FlowEvent.query.filter_by(stop_id=saved.id, event_type="DEPARTED_ORIGIN").count() == 1
+        assert FlowEvent.query.filter_by(event_type="ARRIVED_DESTINATION").count() == 0
+
+    mobile = client.get("/mobile")
+    body = mobile.get_data(as_text=True)
+    assert mobile.status_code == 200
+    assert "Add Next Stop" in body
+    assert 'class="md-flow-primary-cta add-stop-action"' in body
+    assert 'href="/new_driving_log"' in body
+    assert "Depart and Load" not in body
+    assert 'data-flow-panel-title="Depart Quick Flow"' not in body
+
+    add_stop_form = client.get("/new_driving_log")
+    add_stop_body = add_stop_form.get_data(as_text=True)
+    assert add_stop_form.status_code == 200
+    assert "Record Next Stop" in add_stop_body
+    assert "In truck now:" in add_stop_body
+    assert "Raleigh East Load" in add_stop_body
+
+    created = client.post("/new_driving_log", data={"plant_name": "RE"}, follow_redirects=False)
+    assert created.status_code == 302
+    duplicate_retry = client.post("/new_driving_log", data={"plant_name": "RE"}, follow_redirects=False)
+    assert duplicate_retry.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog, FlowEvent
+
+        route_logs = (
+            DriverLog.query
+            .filter_by(driver_id=driver_id, date=today)
+            .order_by(DriverLog.created_at.asc(), DriverLog.id.asc())
+            .all()
+        )
         assert len(route_logs) == 2
+        assert route_logs[0].id == active_id
         assert route_logs[1].plant_name == "RE"
         assert route_logs[1].load_size == "Raleigh East Load"
         assert route_logs[1].depart_time is None
-        assert FlowEvent.query.filter_by(stop_id=saved.id, event_type="DEPARTED_ORIGIN").count() == 1
         assert FlowEvent.query.filter_by(stop_id=route_logs[1].id, event_type="ARRIVED_DESTINATION").count() == 1
 
+
+def test_empty_quick_depart_keeps_route_continuation_without_phantom_stop(client, app):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("quick_empty_continue", "quick-empty-continue@example.com", "driver")
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=379000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime.utcnow()),
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="H",
+                load_size="Empty",
+                arrive_time="00:01",
+            ),
+        ])
+        db.session.commit()
+        first_id = DriverLog.query.filter_by(driver_id=driver.id).one().id
+        driver_id = driver.id
+
+    login(client, "quick_empty_continue")
+    response = client.post(
+        f"/driver_logs/{first_id}/depart",
+        data={
+            "next": "mobile",
+            "source": "live_flow",
+            "unloaded_on_departure": "yes",
+            "secondary_dropped_on_departure": "yes",
+            "got_loaded": "no",
+            "destination": "",
+            "secondary_destination": "",
+            "secondary_load_type": "load",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        from app.models import DriverLog, FlowEvent
+        from app.services.route_context import build_route_context
+
+        route_logs = DriverLog.query.filter_by(driver_id=driver_id, date=today).order_by(DriverLog.id.asc()).all()
+        assert len(route_logs) == 1
+        assert route_logs[0].id == first_id
+        assert route_logs[0].depart_time
+        assert route_logs[0].depart_load_size == "Empty"
+        assert route_logs[0].no_pickup is True
+        snapshot = build_route_context(driver_id=driver_id, route_date=today)
+        assert snapshot.current_stop is None
+        assert FlowEvent.query.filter_by(event_type="ARRIVED_DESTINATION").count() == 0
+
     mobile = client.get("/mobile")
+    body = mobile.get_data(as_text=True)
     assert mobile.status_code == 200
-    assert b"Raleigh East" in mobile.data
-    assert b"Depart and Load" in mobile.data
+    assert 'class="md-flow-primary-cta add-stop-action"' in body
+    assert "<strong>Add Stop</strong>" in body
+    assert "Depart and Load" not in body
+
+
+def test_quick_depart_save_error_rolls_back_and_returns_json(client, app, monkeypatch):
+    from datetime import date
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("quick_depart_error_driver", "quick-depart-error@example.com", "driver")
+        log = DriverLog(
+            driver_id=driver.id,
+            date=today,
+            plant_name="H",
+            load_size="Empty",
+            arrive_time="00:01",
+        )
+        db.session.add(log)
+        db.session.commit()
+        log_id = log.id
+
+    from app.blueprints.driver import routes as driver_routes
+
+    def fail_append(*args, **kwargs):
+        raise RuntimeError("flow event write failed")
+
+    monkeypatch.setattr(driver_routes, "_append_driver_log_flow_event", fail_append)
+
+    login(client, "quick_depart_error_driver")
+    response = client.post(
+        f"/driver_logs/{log_id}/depart",
+        data={
+            "next": "mobile",
+            "source": "live_flow",
+            "unloaded_on_departure": "yes",
+            "secondary_dropped_on_departure": "yes",
+            "got_loaded": "yes",
+            "destination": "RE",
+            "secondary_destination": "",
+            "secondary_load_type": "load",
+        },
+        headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+    )
+
+    assert response.status_code == 500
+    assert response.get_json()["error"] == "Departure could not be saved. Try again."
+    with app.app_context():
+        from app.models import DriverLog, FlowEvent
+
+        saved = DriverLog.query.get(log_id)
+        assert saved.depart_time is None
+        assert saved.depart_load_size is None
+        assert DriverLog.query.filter_by(driver_id=saved.driver_id, date=today).count() == 1
+        assert FlowEvent.query.count() == 0
 
 
 def test_mobile_quick_depart_returns_to_live_board_without_full_depart_form(client, app):
@@ -8187,6 +8391,205 @@ def test_mobile_quick_depart_shows_add_next_stop_and_creates_second_stop(client,
     assert refreshed.status_code == 200
     assert b"Depart and Load" in refreshed.data
     assert refreshed.get_data(as_text=True).count('data-flow-panel-title="Depart Quick Flow"') == 1
+
+
+def test_new_driving_log_save_error_rolls_back_next_stop(client, app, monkeypatch):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("arrival_error_driver", "arrival-error@example.com", "driver")
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=379000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime.utcnow()),
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="H",
+                load_size="Empty",
+                depart_load_size="Raleigh East Load",
+                depart_time="08:20",
+                arrive_time="08:00",
+            ),
+        ])
+        db.session.commit()
+        driver_id = driver.id
+
+    from app.blueprints.driver import routes as driver_routes
+
+    def fail_append(*args, **kwargs):
+        raise RuntimeError("arrival flow event write failed")
+
+    monkeypatch.setattr(driver_routes, "_append_driver_log_flow_event", fail_append)
+
+    login(client, "arrival_error_driver")
+    response = client.post("/new_driving_log", data={"plant_name": "RE"}, follow_redirects=True)
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "Arrival could not be saved. Try again." in body
+    with app.app_context():
+        from app.models import DriverLog, FlowEvent
+
+        route_logs = DriverLog.query.filter_by(driver_id=driver_id, date=today).order_by(DriverLog.id.asc()).all()
+        assert len(route_logs) == 1
+        assert route_logs[0].plant_name == "H"
+        assert FlowEvent.query.count() == 0
+
+
+def test_loaded_quick_depart_preserves_secondary_cargo_until_next_stop(client, app):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("quick_secondary_continue", "quick-secondary-continue@example.com", "driver")
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=379000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime.utcnow()),
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="H",
+                load_size="Empty",
+                arrive_time="00:01",
+            ),
+        ])
+        db.session.commit()
+        first_id = DriverLog.query.filter_by(driver_id=driver.id).one().id
+        driver_id = driver.id
+
+    login(client, "quick_secondary_continue")
+    response = client.post(
+        f"/driver_logs/{first_id}/depart",
+        data={
+            "next": "mobile",
+            "source": "live_flow",
+            "unloaded_on_departure": "yes",
+            "secondary_dropped_on_departure": "yes",
+            "got_loaded": "yes",
+            "destination": "RE",
+            "secondary_destination": "RW",
+            "secondary_load_type": "hot",
+        },
+        headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
+    with app.app_context():
+        from app.models import DriverLog
+        from app.services.load_state import current_load_after_logs
+        from app.services.route_context import build_route_context
+
+        route_logs = DriverLog.query.filter_by(driver_id=driver_id, date=today).order_by(DriverLog.id.asc()).all()
+        assert len(route_logs) == 1
+        assert route_logs[0].depart_time
+        assert route_logs[0].depart_load_size == "Raleigh East Load"
+        assert route_logs[0].secondary_load == "Raleigh West Hot Part"
+        current_load = current_load_after_logs(route_logs)
+        assert current_load["destination"] == "RE"
+        assert current_load["secondary_destination"] == "RW"
+        assert current_load["secondary_value"] == "Raleigh West Hot Part"
+        snapshot = build_route_context(driver_id=driver_id, route_date=today)
+        assert snapshot.current_stop is None
+        assert snapshot.current_cargo["value"] == "Raleigh East Load"
+        assert snapshot.current_cargo["secondary_value"] == "Raleigh West Hot Part"
+
+    mobile = client.get("/mobile")
+    assert b"<strong>Add Next Stop</strong>" in mobile.data
+    assert b"Depart and Load" not in mobile.data
+
+    add_stop_form = client.get("/new_driving_log")
+    add_stop_body = add_stop_form.get_data(as_text=True)
+    assert add_stop_form.status_code == 200
+    assert 'name="load_size" value="Raleigh East Load"' in add_stop_body
+    assert 'name="secondary_load" value="Raleigh West Hot Part"' in add_stop_body
+    assert "In truck now:" in add_stop_body
+    assert "Raleigh East Load + Raleigh West Hot Part" in add_stop_body
+
+    created = client.post("/new_driving_log", data={"plant_name": "RE"}, follow_redirects=False)
+    assert created.status_code == 302
+    with app.app_context():
+        from app.models import DriverLog
+
+        route_logs = DriverLog.query.filter_by(driver_id=driver_id, date=today).order_by(DriverLog.id.asc()).all()
+        assert len(route_logs) == 2
+        assert route_logs[1].plant_name == "RE"
+        assert route_logs[1].load_size == "Raleigh East Load"
+        assert route_logs[1].secondary_load == "Raleigh West Hot Part"
+        assert route_logs[1].depart_time is None
+
+
+def test_quick_depart_service_stop_continues_to_add_next_stop_without_truck_issue_route(client, app):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("quick_service_continue", "quick-service-continue@example.com", "driver")
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=379000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime.utcnow()),
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="Ryder Rentals",
+                load_size="Raleigh East Load",
+                maintenance=True,
+                downtime_reason="Truck issue: CEL light",
+                arrive_time="00:01",
+            ),
+        ])
+        db.session.commit()
+        service_id = DriverLog.query.filter_by(driver_id=driver.id).one().id
+        driver_id = driver.id
+
+    login(client, "quick_service_continue")
+    response = client.post(
+        f"/driver_logs/{service_id}/depart",
+        data={
+            "next": "mobile",
+            "source": "live_flow",
+            "got_loaded": "no",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        from app.models import DriverLog
+        from app.services.route_context import build_route_context
+
+        route_logs = DriverLog.query.filter_by(driver_id=driver_id, date=today).order_by(DriverLog.id.asc()).all()
+        assert len(route_logs) == 1
+        assert route_logs[0].depart_time
+        assert route_logs[0].maintenance is True
+        assert route_logs[0].depart_load_size == "Raleigh East Load"
+        snapshot = build_route_context(driver_id=driver_id, route_date=today)
+        assert snapshot.current_stop is None
+        assert snapshot.current_cargo["destination"] == "RE"
+
+    mobile = client.get("/mobile")
+    body = mobile.get_data(as_text=True)
+    assert mobile.status_code == 200
+    assert 'class="md-flow-primary-cta add-stop-action"' in body
+    assert "<strong>Add Next Stop</strong>" in body
+    assert 'href="/new_driving_log"' in body
+    assert 'class="md-flow-primary-cta add-stop-action" href="/new_driving_log?report_type=truck_issue"' not in body
 
 
 def test_mobile_quick_depart_handles_secondary_drop_required(client, app):

@@ -977,7 +977,7 @@
         {% set route_pretrip_url = url_for('driver.pretrip_printable', pretrip_id=route_pretrip.id) if route_pretrip else truck_inspections_url %}
         {% set first_fuel_event = audit.fuel_events[0] if audit.fuel_events else none %}
         {% set fuel_card_href = '#route-stop-' ~ first_fuel_event.log_id if first_fuel_event and first_fuel_event.log_id else route_pretrip_url %}
-        <div class="md-route-audit-grid" aria-label="Route audit summary">
+        <div class="md-route-audit-grid" aria-label="Route record summary">
           <a class="md-route-audit-card" href="#route-stops" aria-label="View numbered stops">
             <span>Numbered Stops</span>
             <strong>{{ log_count }} stop{{ 's' if log_count != 1 else '' }}</strong>

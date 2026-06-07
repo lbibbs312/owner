@@ -78,6 +78,7 @@
     .sig-line { border-bottom: 1.5px solid #111; min-height: 0.46in; display: flex; align-items: flex-end; padding-bottom: 3px; }
     .sig-line img { max-height: 0.4in; max-width: 100%; }
     .sig-ts { min-height: 0.14in; margin-top: 3px; font-size: 7pt; color: #555; }
+    .print-feedback { margin: 0.35rem 0 0.65rem; font-weight: 700; color: #334155; min-height: 1.25rem; }
     @media screen { body { padding: 1rem; } }
     @media print {
       body { padding: 0; }
@@ -95,11 +96,12 @@
   {% set route_date_label = the_date.strftime('%b %d, %Y') if the_date else '' %}
   {% set summary = route_sheet_summary|default({'total_stops': logs|length if logs else 0, 'open_stops': 0, 'total_miles': none, 'total_wait_minutes': 0}) %}
   <div class="print-controls no-print">
-    <button class="print-btn" onclick="window.print()">Print Document</button>
-    <a class="email-btn" href="{{ url_for('driver.driver_logs_print', date=the_date.isoformat(), autoprint=1) }}">Save PDF</a>
+    <button class="print-btn" type="button" data-print-document>Print Document</button>
+    <a class="email-btn" href="{{ attachment_url or url_for('driver.driver_logs_attachment', date=the_date.isoformat()) }}" data-save-pdf>Save PDF</a>
     {% if csv_url is defined %}<a class="email-btn" href="{{ csv_url }}">CSV Export</a>{% endif %}
     {% if sheets_url is defined %}<a class="email-btn" href="{{ sheets_url }}">Sheets Export</a>{% endif %}
   </div>
+  <div class="print-feedback no-print" data-print-feedback aria-live="polite"></div>
 
   <main class="official-print-document">
     <header class="document-header">
@@ -263,5 +265,29 @@
   });
 </script>
 {% endif %}
+<script>
+  (function () {
+    var feedback = document.querySelector("[data-print-feedback]");
+    function showFeedback(message) {
+      if (feedback) feedback.textContent = message;
+    }
+    var printButton = document.querySelector("[data-print-document]");
+    if (printButton) {
+      printButton.addEventListener("click", function () {
+        showFeedback("Print dialog opened.");
+        window.print();
+      });
+    }
+    var saveLink = document.querySelector("[data-save-pdf]");
+    if (saveLink) {
+      saveLink.addEventListener("click", function () {
+        showFeedback("Preparing PDF...");
+        window.setTimeout(function () {
+          showFeedback("PDF download started. If your browser blocked it, use the browser download prompt.");
+        }, 900);
+      });
+    }
+  })();
+</script>
 </body>
 </html>

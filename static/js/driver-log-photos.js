@@ -35,24 +35,28 @@
     }
 
     async function uploadFile(file, source) {
-      if (!file) return;
+      if (!file) {
+        if (status) status.textContent = 'No file selected.';
+        return;
+      }
       const note = noteInput ? noteInput.value.trim() : '';
       const docType = selectedType();
       const formData = new FormData();
       formData.append('photo', file);
       formData.append('source', docType + '_' + (source || 'gallery'));
       formData.append('note', note);
-      status.textContent = 'Uploading paperwork photo...';
+      if (status) status.textContent = 'Uploading paperwork photo...';
       const response = await fetch(uploadUrl, {
         method: 'POST',
         headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'},
         body: formData
       });
-      const payload = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      const payload = contentType.indexOf('application/json') !== -1 ? await response.json() : {};
       if (!response.ok) throw new Error(payload.error || 'Photo upload failed.');
       addPhotoCard(list, payload.photo);
       if (noteInput) noteInput.value = '';
-      status.textContent = 'Photo attached to this stop.';
+      if (status) status.textContent = 'Photo attached to this stop.';
       if (window.MoveDefenseToast && typeof window.MoveDefenseToast.success === 'function') {
         window.MoveDefenseToast.success('PHOTO ATTACHED', 'Paperwork / proof saved');
       }
@@ -83,7 +87,11 @@
         try {
           await uploadFile(file, input.dataset.stopPhotoInput || 'gallery');
         } catch (err) {
-          status.textContent = err.message || 'Photo upload failed.';
+          const message = err.message || 'Photo upload failed.';
+          if (status) status.textContent = message;
+          if (window.MoveDefenseToast && typeof window.MoveDefenseToast.show === 'function') {
+            window.MoveDefenseToast.show('UPLOAD FAILED', message, 'error');
+          }
         } finally {
           input.value = '';
         }

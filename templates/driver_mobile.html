@@ -3588,14 +3588,20 @@
       .desk-doc-row.tone-attached { border-left-color:#2bd576; background:rgba(43,213,118,.06); }
       .desk-doc-row.tone-missing { border-left-color:#ffb224; background:rgba(255,178,36,.07); }
       a.desk-doc-row,
+      button.desk-doc-row,
       a.desk-evidence-row { text-decoration:none; cursor:pointer; position:relative; padding-right:22px; transition:background .15s ease, border-color .15s ease; }
+      button.desk-doc-row { width:100%; border-top:0; border-right:0; border-bottom:0; color:inherit; font:inherit; text-align:left; }
       a.desk-doc-row::after,
+      button.desk-doc-row::after,
       a.desk-evidence-row::after { content:"\203A"; position:absolute; right:9px; top:50%; transform:translateY(-50%); color:#8a99b3; font-size:1rem; font-weight:900; }
-      a.desk-doc-row:hover { background:rgba(91,157,255,.16); }
+      a.desk-doc-row:hover,
+      button.desk-doc-row:hover { background:rgba(91,157,255,.16); }
       a.desk-doc-row.tone-attached:hover { background:rgba(43,213,118,.14); }
-      a.desk-doc-row.tone-missing:hover { background:rgba(255,178,36,.16); }
+      a.desk-doc-row.tone-missing:hover,
+      button.desk-doc-row.tone-missing:hover { background:rgba(255,178,36,.16); }
       a.desk-evidence-row:hover { background:rgba(91,157,255,.14); border-color:rgba(91,157,255,.45); }
       a.desk-doc-row:hover::after,
+      button.desk-doc-row:hover::after,
       a.desk-evidence-row:hover::after { color:#dbeafe; }
       .desk-doc-row strong {
         color:#e7edf6;
@@ -4882,7 +4888,7 @@
 	        {% else %}
 	          {% if cta.route_display_mode in ['completed_route', 'finalized_route', 'proof_needed', 'route_end_ready', 'last_route', 'read_only_history'] and todays_logs %}
 	            <div class="eyebrow"><span class="bolt"></span>{% if cta.route_display_mode == 'finalized_route' %}Route Finalized{% elif cta.route_display_mode == 'route_end_ready' %}Route Closeout{% elif cta.route_display_mode == 'completed_route' %}Route Complete{% elif cta.route_display_mode == 'proof_needed' %}Proof Needed{% elif cta.route_display_mode == 'read_only_history' %}Route History{% else %}Last Route{% endif %}</div>
-	            <h1>{% if cta.route_display_mode == 'completed_route' %}Ready To Finalize{% else %}{{ cta.next_action or 'No action needed' }}{% endif %}</h1>
+		            <h1>{% if cta.route_display_mode == 'completed_route' %}Ready To Finish{% else %}{{ cta.next_action or 'No action needed' }}{% endif %}</h1>
 	            <p>{{ cta.proof_state_message if cta.route_display_mode == 'proof_needed' else cta.route_state_message }}</p>
 	          {% elif next_load_prediction %}
             <div class="eyebrow"><span class="bolt"></span>{{ next_load_prediction.title }}</div>
@@ -4995,7 +5001,7 @@
 	          <a class="button ghost" href="{{ cta_urls.get('print_route') }}">Print Route</a>
 	        {% endif %}
 	        {% if cta.show_finalize_button and cta_urls.get('finalize_route') %}
-	          <a class="button ghost" href="{{ cta_urls.get('finalize_route') }}">Finalize Route</a>
+		          <a class="button ghost" href="{{ cta_urls.get('finalize_route') }}">Finish Route</a>
 	        {% endif %}
 	        <a class="button ghost" href="{{ url_for('driver.mobile_history') }}">Route History</a>
 		      </section>
@@ -5818,6 +5824,28 @@
       }
 
       workspace.addEventListener('click', function (event) {
+        var documentMessageTrigger = event.target.closest('[data-document-message]');
+        if (documentMessageTrigger && workspace.contains(documentMessageTrigger)) {
+          event.preventDefault();
+          var feedback = workspace.querySelector('[data-document-row-feedback]');
+          if (feedback) {
+            var feedbackText = feedback.querySelector('span');
+            if (feedbackText) feedbackText.textContent = documentMessageTrigger.getAttribute('data-document-message') || 'No document attached.';
+            feedback.hidden = false;
+          }
+          var attach = workspace.querySelector('[data-route-document-attach]');
+          if (attach) {
+            attach.open = true;
+            var documentType = documentMessageTrigger.getAttribute('data-document-type') || '';
+            if (documentType) {
+              var typeInput = attach.querySelector('input[name="document_type"][value="' + documentType + '"]');
+              if (typeInput) typeInput.checked = true;
+            }
+            attach.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+          return;
+        }
+
         var modeTrigger = event.target.closest('[data-desktop-mode]');
         if (modeTrigger && workspace.contains(modeTrigger)) {
           event.preventDefault();

@@ -106,13 +106,19 @@
   </button>
 {%- endmacro %}
 
-{% macro document_row(label, status, detail='', tone='normal', href=none) -%}
+  {% macro document_row(label, status, detail='', tone='normal', href=none, message=none, document_type=none) -%}
   {%- if href -%}
   <a class="desk-doc-row tone-{{ tone }} is-link" href="{{ href }}">
     <span>{{ label }}</span>
     <strong>{{ status }}</strong>
     <small>{{ detail }}</small>
   </a>
+  {%- elif message -%}
+  <button class="desk-doc-row tone-{{ tone }}" type="button" data-document-message="{{ message }}" {% if document_type %}data-document-type="{{ document_type }}"{% endif %}>
+    <span>{{ label }}</span>
+    <strong>{{ status }}</strong>
+    <small>{{ detail }}</small>
+  </button>
   {%- else -%}
   <div class="desk-doc-row tone-{{ tone }}">
     <span>{{ label }}</span>
@@ -124,7 +130,7 @@
 
 {% macro attach_document_control(log_id, owner_type='stop', owner_id='', primary=true, allowed=true) -%}
   {% if log_id and allowed %}
-    <details class="desk-attach-doc">
+    <details class="desk-attach-doc" id="route-document-attach" data-route-document-attach>
       <summary class="desk-action-link{% if primary %} primary{% endif %}">Attach Document</summary>
       <form class="desk-attach-doc-panel" method="POST" action="{{ url_for('driver.record_driver_log_photo', log_id=log_id) }}" enctype="multipart/form-data">
         <input type="hidden" name="source" value="route_workspace">
@@ -445,7 +451,7 @@
         <section class="desk-detail-section">
           <div class="desk-section-title"><span>Print and Export</span><strong>Packet controls</strong></div>
           <div class="desk-action-grid">
-            <a class="desk-action-link primary" href="{{ route_audit_url }}">Open route audit</a>
+            <a class="desk-action-link primary" href="{{ route_audit_url }}">View Route Sheet</a>
             <button class="desk-action-link" type="button" data-desktop-mode="documents">Review documents</button>
             <a class="desk-action-link" href="{{ url_for('driver.list_pretrips', truck_number=current_truck_number) if current_truck_number else url_for('driver.list_pretrips') }}">Inspection records</a>
           </div>
@@ -467,13 +473,14 @@
             {{ fact('Packet basis', 'Ready based on current route rules' if not documents_needed and not desk.issues else 'Review flagged items') }}
           </div>
           <div class="desk-doc-grid">
-            {{ document_row('BOL', (route_doc.bol ~ ' attached · fields not extracted · review optional') if route_doc.bol else ('Not attached' if desktop.load_items else 'Not required'), 'Saved with the route for review; no fields are auto-extracted.' if route_doc.bol else ('Attach the BOL if one was issued; use Attach Document.' if desktop.load_items else 'No BOL requirement is flagged by the current route rules.'), 'attached' if route_doc.bol else 'normal', route_audit_url) }}
-            {{ document_row('Transfer Sheet', (route_doc.transfer_doc ~ ' attached · fields not extracted · review optional') if route_doc.transfer_doc else (route_transfers|length ~ ' route transfer record' ~ ('s' if route_transfers|length != 1 else '') if route_transfers else 'Not attached'), 'Plant transfer records and uploaded transfer sheets live here, not inside every stop detail.', 'attached' if route_doc.transfer_doc or route_transfers else ('missing' if desktop.load_items else 'normal'), route_audit_url) }}
+            {{ document_row('BOL', (route_doc.bol ~ ' attached · fields not extracted · review optional') if route_doc.bol else ('Not attached' if desktop.load_items else 'Not required'), 'Saved with the route for review; no fields are auto-extracted.' if route_doc.bol else ('Attach the BOL if one was issued; use Attach Document.' if desktop.load_items else 'No BOL requirement is flagged by the current route rules.'), 'attached' if route_doc.bol else 'normal', route_audit_url if route_doc.bol else none, 'No BOL attached. Use Attach Document below if one was issued for this route.', 'bol_manifest') }}
+            {{ document_row('Transfer Sheet', (route_doc.transfer_doc ~ ' attached · fields not extracted · review optional') if route_doc.transfer_doc else (route_transfers|length ~ ' route transfer record' ~ ('s' if route_transfers|length != 1 else '') if route_transfers else 'Not attached'), 'Plant transfer records and uploaded transfer sheets live here, not inside every stop detail.', 'attached' if route_doc.transfer_doc or route_transfers else ('missing' if desktop.load_items else 'normal'), route_audit_url if route_doc.transfer_doc or route_transfers else none, 'No transfer sheet attached. Use Attach Document below if this route needs one.', 'transfer_sheet') }}
             {{ document_row('Route Sheet', 'Route log active', (desk.completed ~ '/' ~ todays_logs|length ~ ' stops captured'), 'attached', route_audit_url) }}
-            {{ document_row('Damage Photo', (route_damage_reports|length ~ ' report' ~ ('s' if route_damage_reports|length != 1 else '')) if route_damage_reports else 'None attached', 'Damage report photos and packets are reviewed from this document workspace.', 'missing' if route_damage_reports else 'normal', route_audit_url) }}
-            {{ document_row('Driver Credential', 'Workspace type available', 'License, DOT card, and credential documents stay out of the live stop view.', 'normal') }}
-            {{ document_row('Truck Document', 'Workspace type available', 'Insurance, registration, inspection records, and maintenance notes belong here.', 'normal') }}
+            {{ document_row('Damage Photo', (route_damage_reports|length ~ ' report' ~ ('s' if route_damage_reports|length != 1 else '')) if route_damage_reports else 'None attached', 'Damage report photos and packets are reviewed from this document workspace.', 'attached' if route_damage_reports else 'normal', url_for('driver.damage_reports') if route_damage_reports else none, 'No damage photo attached. Use Attach Document below, or create a damage report if there is damage to report.', 'damage_photo') }}
+            {{ document_row('Driver Credential', 'No document attached', 'License, DOT card, and credential documents stay out of the live stop view.', 'normal', none, 'No driver credential attached. Use Attach Document below only if your company requires it.', 'driver_credential') }}
+            {{ document_row('Truck Document', 'No document attached', 'Insurance, registration, inspection records, and maintenance notes belong here.', 'normal', none, 'No truck document attached. Use Attach Document below only if your company requires it.', 'truck_document') }}
           </div>
+          <div class="desk-warning-strip" data-document-row-feedback hidden><strong>No document attached</strong><span></span></div>
           {% if documents_needed %}
             <div class="desk-warning-strip tone-warn"><strong>DOCUMENT NEEDED</strong><span>{{ documents_needed }} route item{{ 's' if documents_needed != 1 else '' }} need a document before this route packet is ready for review.</span></div>
           {% endif %}
@@ -501,7 +508,7 @@
         <section class="desk-detail-section">
           <div class="desk-section-title"><span>Actions</span><strong>Route controls</strong></div>
           <div class="desk-action-grid">
-            <a class="desk-action-link" href="{{ url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) }}">Open route audit</a>
+            <a class="desk-action-link" href="{{ url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) }}">View Route Sheet</a>
             <a class="desk-action-link" href="{{ url_for('driver.list_pretrips', truck_number=current_truck_number) if current_truck_number else url_for('driver.list_pretrips') }}">Inspection records</a>
           </div>
         </section>
@@ -628,7 +635,7 @@
         <section class="desk-detail-section">
           <div class="desk-section-title"><span>Route Controls</span><strong>Review</strong></div>
           <div class="desk-action-grid">
-            <a class="desk-action-link primary" href="{{ url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) }}">Open route audit</a>
+            <a class="desk-action-link primary" href="{{ url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) }}">View Route Sheet</a>
             {% if cta_urls.get('add_stop') %}<a class="desk-action-link" href="{{ cta_urls.get('add_stop') }}">Add stop</a>{% endif %}
           </div>
         </section>
@@ -690,7 +697,7 @@
             <div class="desk-action-grid">
               <button class="desk-action-link primary" type="button" data-desktop-mode="documents">Open Documents</button>
               <button class="desk-action-link" type="button" data-desktop-mode="route-packet">Back to Route Packet</button>
-              <a class="desk-action-link" href="{{ url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) }}">Open route audit</a>
+              <a class="desk-action-link" href="{{ url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) }}">View Route Sheet</a>
             </div>
           </section>
         </div>

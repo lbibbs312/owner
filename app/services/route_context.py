@@ -280,8 +280,8 @@ def build_route_cta_context(
                 allowed_actions = ["posttrip", "print_route", "view_route"]
                 route_message = "All recorded stops are closed. Complete PostTrip before finalizing."
             elif posttrip_complete:
-                next_action = "Finalize route"
-                primary = _route_cta("Finalize Route", "finalize_route")
+                next_action = "Finish Route"
+                primary = _route_cta("Finish Route", "finalize_route")
                 show_finalize = True
                 allowed_actions = ["finalize_route", "print_route", "view_route"]
                 route_message = "All recorded stops and PostTrip are complete."
@@ -343,7 +343,7 @@ def build_route_cta_context(
     if (
         proof_missing
         and not route_finalized
-        and next_action not in {"Confirm cargo", "Record departure", "Finalize route"}
+        and next_action not in {"Confirm cargo", "Record departure", "Finish Route"}
         and not (primary and primary.get("action") == "add_stop")
     ):
         display_mode = "proof_needed"
