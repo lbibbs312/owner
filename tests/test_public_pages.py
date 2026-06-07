@@ -108,7 +108,7 @@ def test_billing_checkout_creates_stripe_session_and_redirects(client, app, monk
     app.config.update(
         PUBLIC_BASE_URL="https://movedefense.test",
         STRIPE_SECRET_KEY="sk_test_configured",
-        STRIPE_API_VERSION="2026-02-25.clover",
+        STRIPE_API_VERSION="2026-05-27.dahlia",
         STRIPE_PRICE_OWNER_OPERATOR="price_owner_operator",
         STRIPE_ALLOW_PROMOTION_CODES=True,
         STRIPE_AUTOMATIC_TAX=True,
@@ -119,7 +119,7 @@ def test_billing_checkout_creates_stripe_session_and_redirects(client, app, monk
     assert response.status_code == 303
     assert response.headers["Location"] == "https://checkout.stripe.test/session"
     assert fake_stripe.api_key == "sk_test_configured"
-    assert fake_stripe.api_version == "2026-02-25.clover"
+    assert fake_stripe.api_version == "2026-05-27.dahlia"
     assert created["mode"] == "subscription"
     assert created["line_items"] == [{"price": "price_owner_operator", "quantity": 1}]
     assert created["success_url"] == "https://movedefense.test/billing/success?session_id={CHECKOUT_SESSION_ID}"
