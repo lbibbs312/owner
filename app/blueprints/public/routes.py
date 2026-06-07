@@ -1,18 +1,69 @@
 import os
 
-from flask import abort, current_app, jsonify, redirect, render_template, send_from_directory, url_for
+from flask import abort, current_app, jsonify, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user, login_required
 
 from app.blueprints.public import bp
 from app.models import Announcement
 from app.services.database_status import database_status
 from app.services.route_context import build_route_context
+from app.services.stripe_checkout import StripeCheckoutError, billing_plan, create_checkout_session
 
 
 @bp.route("/")
 def welcome():
     bulletins = Announcement.query.order_by(Announcement.created_at.desc()).limit(5).all()
     return render_template("welcome.html", bulletins=bulletins)
+
+
+@bp.route("/billing/checkout/<plan_key>", methods=["POST"])
+def billing_checkout(plan_key):
+    plan = billing_plan(plan_key)
+    if not plan:
+        abort(404)
+    try:
+        checkout_url = create_checkout_session(plan.key, user=current_user)
+    except StripeCheckoutError as exc:
+        current_app.logger.warning("billing.checkout_unavailable plan=%s reason=%s", plan.key, exc)
+        return render_template(
+            "billing_status.html",
+            status_title="Checkout unavailable",
+            status_label="Checkout not configured",
+            status_message=(
+                "Online checkout is not ready for this item yet. Contact MoveDefense "
+                "to start this plan or finish payment setup."
+            ),
+            plan=plan,
+            retry_url=url_for("public.welcome", _anchor="pricing"),
+        ), 503
+    return redirect(checkout_url, code=303)
+
+
+@bp.route("/billing/success")
+def billing_success():
+    return render_template(
+        "billing_status.html",
+        status_title="Checkout received",
+        status_label="Payment started",
+        status_message=(
+            "Stripe accepted the checkout handoff. Sign in or contact MoveDefense if "
+            "your workspace needs to be connected to this purchase."
+        ),
+        session_id=request.args.get("session_id", ""),
+        retry_url=url_for("auth.login"),
+    )
+
+
+@bp.route("/billing/cancel")
+def billing_cancel():
+    return render_template(
+        "billing_status.html",
+        status_title="Checkout canceled",
+        status_label="No charge completed",
+        status_message="Your checkout session was canceled before payment was completed.",
+        plan=billing_plan(request.args.get("plan")),
+        retry_url=url_for("public.welcome", _anchor="pricing"),
+    )
 
 
 @bp.route("/privacy")

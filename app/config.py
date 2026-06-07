@@ -46,6 +46,10 @@ def _env_upload_folder(name, default):
     return os.environ.get(name, default)
 
 
+def _env_str(name):
+    return (os.environ.get(name) or "").strip()
+
+
 def _public_base_url():
     return (
         os.environ.get("PUBLIC_BASE_URL")
@@ -132,6 +136,21 @@ class BaseConfig:
     BASE_URL = os.environ.get("BASE_URL", PUBLIC_BASE_URL).rstrip("/")
     PUBLIC_URL = os.environ.get("PUBLIC_URL", PUBLIC_BASE_URL).rstrip("/")
     PUBLIC_CONTACT_EMAIL = os.environ.get("PUBLIC_CONTACT_EMAIL", "bibbstechnology@gmail.com")
+    STRIPE_SECRET_KEY = _env_str("STRIPE_SECRET_KEY")
+    STRIPE_PUBLISHABLE_KEY = _env_str("STRIPE_PUBLISHABLE_KEY")
+    STRIPE_API_VERSION = _env_str("STRIPE_API_VERSION") or "2026-02-25.clover"
+    STRIPE_ALLOW_PROMOTION_CODES = _env_bool("STRIPE_ALLOW_PROMOTION_CODES", True)
+    STRIPE_AUTOMATIC_TAX = _env_bool("STRIPE_AUTOMATIC_TAX", False)
+    STRIPE_PRICE_SOLO_DRIVER = _env_str("STRIPE_PRICE_SOLO_DRIVER")
+    STRIPE_PRICE_OWNER_OPERATOR = _env_str("STRIPE_PRICE_OWNER_OPERATOR")
+    STRIPE_PRICE_SMALL_FLEET = _env_str("STRIPE_PRICE_SMALL_FLEET")
+    STRIPE_PRICE_FLEET_OFFICE = _env_str("STRIPE_PRICE_FLEET_OFFICE")
+    STRIPE_PRICE_DRIVER_FORMS_PACK = _env_str("STRIPE_PRICE_DRIVER_FORMS_PACK")
+    STRIPE_PRICE_RECORD_KIT = _env_str("STRIPE_PRICE_RECORD_KIT")
+    STRIPE_PRICE_IFTA_WORKSHEET_BUNDLE = _env_str("STRIPE_PRICE_IFTA_WORKSHEET_BUNDLE")
+    STRIPE_PRICE_BRANDED_PACKET_SETUP = _env_str("STRIPE_PRICE_BRANDED_PACKET_SETUP")
+    STRIPE_PRICE_PAPER_FORM_CONVERSION = _env_str("STRIPE_PRICE_PAPER_FORM_CONVERSION")
+    STRIPE_PRICE_FLEET_PACKET_SETUP = _env_str("STRIPE_PRICE_FLEET_PACKET_SETUP")
     CANONICAL_SCHEME = _canonical_scheme()
     CANONICAL_HOST = _canonical_host()
     ENFORCE_CANONICAL_HOST = _env_bool("ENFORCE_CANONICAL_HOST", False)

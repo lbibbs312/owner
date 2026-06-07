@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ status_title }} · MoveDefense</title>
+  <style>
+    :root {
+      --ink:#0f172a;
+      --muted:#64748b;
+      --line:#dbe4ef;
+      --blue:#2563eb;
+      --bg:#f8fafc;
+      --panel:#ffffff;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:var(--bg); color:var(--ink); font-family:Montserrat,Inter,Arial,sans-serif; display:grid; place-items:center; padding:22px; }
+    .status-card { width:min(100%,680px); background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 18px 45px rgba(15,23,42,.08); padding:28px; }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:900; margin-bottom:26px; }
+    .brand-mark { width:36px; height:36px; border-radius:8px; background:var(--blue); display:grid; place-items:center; color:#fff; }
+    .status-label { display:inline-flex; align-items:center; gap:8px; color:#166534; background:#dcfce7; border:1px solid #bbf7d0; border-radius:999px; padding:6px 10px; font-size:.78rem; font-weight:900; }
+    h1 { margin:16px 0 10px; font-size:clamp(1.8rem,5vw,3rem); line-height:1; letter-spacing:0; }
+    p { color:#475569; line-height:1.55; margin:0; }
+    .facts { margin:22px 0; display:grid; gap:10px; }
+    .fact { display:grid; grid-template-columns:130px minmax(0,1fr); gap:10px; padding:10px 0; border-bottom:1px solid #eef2f7; }
+    .fact span { color:var(--muted); font-size:.78rem; font-weight:900; text-transform:uppercase; }
+    .fact strong { overflow-wrap:anywhere; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:24px; }
+    .btn { border:1px solid var(--line); border-radius:8px; padding:10px 14px; text-decoration:none; font-weight:900; display:inline-flex; align-items:center; justify-content:center; }
+    .btn.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
+    .btn.ghost { background:#fff; color:var(--ink); }
+    @media (max-width:560px) {
+      .status-card { padding:22px; }
+      .fact { grid-template-columns:1fr; }
+      .actions, .btn { width:100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="status-card">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h10M4 18h16"/>
+        </svg>
+      </span>
+      <span>MoveDefense</span>
+    </div>
+    <span class="status-label">{{ status_label }}</span>
+    <h1>{{ status_title }}</h1>
+    <p>{{ status_message }}</p>
+    <div class="facts">
+      {% if plan %}
+        <div class="fact"><span>Item</span><strong>{{ plan.name }}</strong></div>
+        <div class="fact"><span>Price</span><strong>{{ plan.price_label }}</strong></div>
+      {% endif %}
+      {% if session_id %}
+        <div class="fact"><span>Session</span><strong>{{ session_id }}</strong></div>
+      {% endif %}
+    </div>
+    <div class="actions">
+      <a class="btn primary" href="{{ retry_url }}">Continue</a>
+      <a class="btn ghost" href="{{ url_for('public.welcome') }}">Home</a>
+      <a class="btn ghost" href="{{ url_for('public.contact') }}">Contact</a>
+    </div>
+  </main>
+</body>
+</html>

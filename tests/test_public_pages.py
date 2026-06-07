@@ -1,4 +1,6 @@
 import re
+import sys
+from types import SimpleNamespace
 from html import unescape
 
 import pytest
@@ -53,6 +55,78 @@ def test_welcome_page_positions_packets_and_pricing(client):
     assert "$15/month per extra driver or vehicle" in text
     assert "MoveDefense Paperwork Cleanup" in text
     assert "starting at $299/month" in text
+
+
+def test_welcome_page_posts_paid_items_to_billing_checkout(client):
+    response = client.get("/")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+
+    for plan_key in (
+        "solo-driver",
+        "owner-operator",
+        "small-fleet",
+        "fleet-office",
+        "driver-forms-pack",
+        "record-kit",
+        "ifta-worksheet-bundle",
+        "branded-packet-setup",
+        "paper-form-conversion",
+        "fleet-packet-setup",
+    ):
+        assert f'action="/billing/checkout/{plan_key}" method="POST"' in body
+    assert 'action="/register" method="GET"' in body
+
+
+def test_billing_checkout_fails_closed_until_stripe_is_configured(client):
+    response = client.post("/billing/checkout/owner-operator")
+
+    assert response.status_code == 503
+    text = _visible_text(response.get_data(as_text=True))
+    assert "Checkout unavailable" in text
+    assert "Checkout not configured" in text
+    assert "Owner-Operator" in text
+    assert "$49/month" in text
+
+
+def test_billing_checkout_creates_stripe_session_and_redirects(client, app, monkeypatch):
+    created = {}
+
+    class FakeSession:
+        @staticmethod
+        def create(**params):
+            created.update(params)
+            return {"url": "https://checkout.stripe.test/session"}
+
+    fake_stripe = SimpleNamespace(
+        api_key=None,
+        api_version=None,
+        checkout=SimpleNamespace(Session=FakeSession),
+    )
+    monkeypatch.setitem(sys.modules, "stripe", fake_stripe)
+    app.config.update(
+        PUBLIC_BASE_URL="https://movedefense.test",
+        STRIPE_SECRET_KEY="sk_test_configured",
+        STRIPE_API_VERSION="2026-02-25.clover",
+        STRIPE_PRICE_OWNER_OPERATOR="price_owner_operator",
+        STRIPE_ALLOW_PROMOTION_CODES=True,
+        STRIPE_AUTOMATIC_TAX=True,
+    )
+
+    response = client.post("/billing/checkout/owner-operator")
+
+    assert response.status_code == 303
+    assert response.headers["Location"] == "https://checkout.stripe.test/session"
+    assert fake_stripe.api_key == "sk_test_configured"
+    assert fake_stripe.api_version == "2026-02-25.clover"
+    assert created["mode"] == "subscription"
+    assert created["line_items"] == [{"price": "price_owner_operator", "quantity": 1}]
+    assert created["success_url"] == "https://movedefense.test/billing/success?session_id={CHECKOUT_SESSION_ID}"
+    assert created["cancel_url"] == "https://movedefense.test/billing/cancel?plan=owner-operator"
+    assert created["metadata"]["billing_plan"] == "owner-operator"
+    assert created["allow_promotion_codes"] is True
+    assert created["automatic_tax"] == {"enabled": True}
 
 
 def test_welcome_page_uses_safe_product_language(client):

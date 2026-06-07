@@ -27,6 +27,8 @@
     .btn.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
     .btn.primary:hover { background:var(--blue-dark); }
     .btn.ghost { background:#fff; color:var(--ink); }
+    .checkout-form { margin-top:auto; }
+    .checkout-form .btn { width:100%; cursor:pointer; }
     .wrap { max-width:1180px; margin:0 auto; padding:46px 22px 58px; }
     .hero { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr); gap:32px; align-items:center; }
     .eyebrow { display:inline-flex; align-items:center; gap:8px; color:#166534; background:#dcfce7; border:1px solid #bbf7d0; border-radius:999px; padding:6px 10px; font-size:.78rem; font-weight:800; }
@@ -59,8 +61,10 @@
     .price-card ul { margin:0; padding-left:18px; color:#334155; line-height:1.45; font-size:.88rem; }
     .price-card li + li { margin-top:6px; }
     .product-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
-    .product-pill { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; display:flex; justify-content:space-between; gap:10px; font-weight:800; }
-    .product-pill span:last-child { color:var(--blue); white-space:nowrap; }
+    .product-pill { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:10px; font-weight:800; }
+    .product-pill span:nth-child(2) { color:var(--blue); white-space:nowrap; }
+    .product-pill form { grid-column:1 / -1; margin:4px 0 0; }
+    .product-pill button { width:100%; }
     .disclaimer { margin-top:22px; padding:16px 18px; background:#fff; border:1px solid var(--line); border-radius:8px; color:#475569; line-height:1.55; font-weight:600; }
     .site-footer { border-top:1px solid var(--line); background:#fff; }
     .site-footer-inner { max-width:1180px; margin:0 auto; padding:18px 22px; }
@@ -76,6 +80,7 @@
       .nav-actions, .btn { width:100%; }
       .hero-actions { display:grid; grid-template-columns:1fr; }
       .proof-row { grid-template-columns:1fr; }
+      .product-pill { grid-template-columns:1fr; }
     }
   </style>
 </head>
@@ -167,6 +172,9 @@
             <li>No manager review</li>
             <li>No long-term document storage</li>
           </ul>
+          <form class="checkout-form" action="{{ url_for('auth.register') }}" method="GET">
+            <button class="btn ghost" type="submit">Start free</button>
+          </form>
         </article>
         <article class="price-card">
           <div class="price-name">Solo Driver</div>
@@ -179,6 +187,9 @@
             <li>Fuel and odometer records</li>
             <li>30-day record history</li>
           </ul>
+          <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='solo-driver') }}" method="POST">
+            <button class="btn primary" type="submit">Subscribe</button>
+          </form>
         </article>
         <article class="price-card">
           <div class="price-name">Owner-Operator</div>
@@ -192,6 +203,9 @@
             <li>Receipt photo storage</li>
             <li>Ready-for-tax-preparer exports</li>
           </ul>
+          <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='owner-operator') }}" method="POST">
+            <button class="btn primary" type="submit">Subscribe</button>
+          </form>
         </article>
         <article class="price-card">
           <div class="price-name">Small Fleet</div>
@@ -207,6 +221,9 @@
             <li>Document storage</li>
             <li>Manager closeout and signatures</li>
           </ul>
+          <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='small-fleet') }}" method="POST">
+            <button class="btn primary" type="submit">Subscribe</button>
+          </form>
         </article>
         <article class="price-card" id="fleet-office">
           <div class="price-name">Fleet Office</div>
@@ -219,6 +236,9 @@
             <li>Up to 25 completed packets/month</li>
             <li>Extra packets: $10-$15 each</li>
           </ul>
+          <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='fleet-office') }}" method="POST">
+            <button class="btn primary" type="submit">Start checkout</button>
+          </form>
         </article>
       </div>
     </section>
@@ -231,12 +251,12 @@
         </div>
       </div>
       <div class="product-row">
-        <div class="product-pill"><span>Driver Forms Pack</span><span>$19</span></div>
-        <div class="product-pill"><span>Owner-Operator Record Kit</span><span>$49</span></div>
-        <div class="product-pill"><span>IFTA Fuel and Odometer Worksheet Bundle</span><span>$99</span></div>
-        <div class="product-pill"><span>Basic branded packet setup</span><span>$149</span></div>
-        <div class="product-pill"><span>Paper form conversion</span><span>$299</span></div>
-        <div class="product-pill"><span>Full small-fleet packet setup</span><span>$499</span></div>
+        <div class="product-pill"><span>Driver Forms Pack</span><span>$19</span><form action="{{ url_for('public.billing_checkout', plan_key='driver-forms-pack') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form></div>
+        <div class="product-pill"><span>Owner-Operator Record Kit</span><span>$49</span><form action="{{ url_for('public.billing_checkout', plan_key='record-kit') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form></div>
+        <div class="product-pill"><span>IFTA Fuel and Odometer Worksheet Bundle</span><span>$99</span><form action="{{ url_for('public.billing_checkout', plan_key='ifta-worksheet-bundle') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form></div>
+        <div class="product-pill"><span>Basic branded packet setup</span><span>$149</span><form action="{{ url_for('public.billing_checkout', plan_key='branded-packet-setup') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form></div>
+        <div class="product-pill"><span>Paper form conversion</span><span>$299</span><form action="{{ url_for('public.billing_checkout', plan_key='paper-form-conversion') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form></div>
+        <div class="product-pill"><span>Full small-fleet packet setup</span><span>$499</span><form action="{{ url_for('public.billing_checkout', plan_key='fleet-packet-setup') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form></div>
       </div>
     </section>
 
