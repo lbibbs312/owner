@@ -6899,7 +6899,7 @@ def test_completed_posttrip_route_shows_ended_across_driver_and_manager_surfaces
     assert mobile.status_code == 200
     assert b"LIVE FLOW BOARD" in mobile.data
     assert b"Route Complete" not in mobile.data
-    assert b"Finish Route" in mobile.data
+    assert b"Finalize Route" in mobile.data
     assert b"here now" not in mobile.data
     assert b"Likely destination" not in mobile.data
     assert b"Source: historical pattern" not in mobile.data
@@ -7507,7 +7507,7 @@ def test_mobile_dashboard_allows_finalize_after_posttrip_complete(client, app):
     page = client.get("/mobile")
 
     assert page.status_code == 200
-    assert b"Finish Route" in page.data
+    assert b"Finalize Route" in page.data
     assert b'action="/mobile/end-route" method="POST"' in page.data
     assert b"PostTrip Due" not in page.data
     assert b"Ready To Finalize" not in page.data
@@ -7527,6 +7527,14 @@ def test_mobile_dashboard_allows_finalize_after_posttrip_complete(client, app):
             target_type="end_of_day",
         ).count() == 1
         assert build_route_context(driver_id=driver_id, route_date=today).route_status == "finalized"
+        finalized_snapshot = build_route_context(driver_id=driver_id, route_date=today)
+        assert finalized_snapshot.route_finalized_at is not None
+        assert finalized_snapshot.route_summary["open_stops"] == 0
+
+    route_sheet = client.get(f"/driver_logs_print?date={today.isoformat()}")
+    assert route_sheet.status_code == 200
+    assert b"Route finalized" in route_sheet.data
+    assert b"Route open and not finalized" not in route_sheet.data
 
 
 def test_mobile_dashboard_does_not_finish_route_with_open_stop(client, app):
@@ -8085,21 +8093,25 @@ def test_loaded_quick_depart_keeps_cargo_in_transit_until_add_next_stop(client, 
     assert mobile.status_code == 200
     assert "Add Next Stop" in body
     assert 'class="md-flow-primary-cta add-stop-action"' in body
-    assert 'href="/new_driving_log"' in body
+    assert 'href="/new_driving_log?next=mobile' in body
+    assert 'expected_destination=RE' in body
     assert "Depart and Load" not in body
     assert 'data-flow-panel-title="Depart Quick Flow"' not in body
 
-    add_stop_form = client.get("/new_driving_log")
+    add_stop_form = client.get("/new_driving_log?next=mobile&expected_destination=RE")
     add_stop_body = add_stop_form.get_data(as_text=True)
     assert add_stop_form.status_code == 200
-    assert "Record Next Stop" in add_stop_body
+    assert "Add Next Stop" in add_stop_body
     assert "In truck now:" in add_stop_body
     assert "Raleigh East Load" in add_stop_body
+    assert 'name="next" value="mobile"' in add_stop_body
 
-    created = client.post("/new_driving_log", data={"plant_name": "RE"}, follow_redirects=False)
+    created = client.post("/new_driving_log?next=mobile&expected_destination=RE", data={"plant_name": "RE", "next": "mobile"}, follow_redirects=False)
     assert created.status_code == 302
-    duplicate_retry = client.post("/new_driving_log", data={"plant_name": "RE"}, follow_redirects=False)
+    assert created.headers["Location"].endswith("/mobile")
+    duplicate_retry = client.post("/new_driving_log?next=mobile&expected_destination=RE", data={"plant_name": "RE", "next": "mobile"}, follow_redirects=False)
     assert duplicate_retry.status_code == 302
+    assert duplicate_retry.headers["Location"].endswith("/mobile")
 
     with app.app_context():
         from app.models import DriverLog, FlowEvent
@@ -8357,20 +8369,23 @@ def test_mobile_quick_depart_shows_add_next_stop_and_creates_second_stop(client,
     assert mobile.status_code == 200
     assert "Add Next Stop" in body
     assert body.count('class="md-flow-primary-cta add-stop-action"') == 1
-    assert body.count('class="desk-current-cta is-go" href="/new_driving_log"') == 1
+    assert 'href="/new_driving_log?next=mobile' in body
+    assert 'expected_destination=RE' in body
     assert 'data-flow-panel-title="Depart Quick Flow"' not in body
     assert 'class="driver-active-wait-action"' not in body
 
-    add_stop_form = client.get("/new_driving_log")
+    add_stop_form = client.get("/new_driving_log?next=mobile&expected_destination=RE")
     assert add_stop_form.status_code == 200
     assert b"Plant Name" in add_stop_form.data
+    assert b'Add Next Stop' in add_stop_form.data
 
     created = client.post(
-        "/new_driving_log",
-        data={"plant_name": "RE", "load_size": "Empty"},
+        "/new_driving_log?next=mobile&expected_destination=RE",
+        data={"plant_name": "RE", "load_size": "Empty", "next": "mobile"},
         follow_redirects=False,
     )
     assert created.status_code == 302
+    assert created.headers["Location"].endswith("/mobile")
 
     with app.app_context():
         from app.models import DriverLog
@@ -8509,7 +8524,7 @@ def test_loaded_quick_depart_preserves_secondary_cargo_until_next_stop(client, a
     assert b"<strong>Add Next Stop</strong>" in mobile.data
     assert b"Depart and Load" not in mobile.data
 
-    add_stop_form = client.get("/new_driving_log")
+    add_stop_form = client.get("/new_driving_log?next=mobile&expected_destination=RE")
     add_stop_body = add_stop_form.get_data(as_text=True)
     assert add_stop_form.status_code == 200
     assert 'name="load_size" value="Raleigh East Load"' in add_stop_body
@@ -8517,8 +8532,9 @@ def test_loaded_quick_depart_preserves_secondary_cargo_until_next_stop(client, a
     assert "In truck now:" in add_stop_body
     assert "Raleigh East Load + Raleigh West Hot Part" in add_stop_body
 
-    created = client.post("/new_driving_log", data={"plant_name": "RE"}, follow_redirects=False)
+    created = client.post("/new_driving_log?next=mobile&expected_destination=RE", data={"plant_name": "RE", "next": "mobile"}, follow_redirects=False)
     assert created.status_code == 302
+    assert created.headers["Location"].endswith("/mobile")
     with app.app_context():
         from app.models import DriverLog
 
@@ -8528,6 +8544,102 @@ def test_loaded_quick_depart_preserves_secondary_cargo_until_next_stop(client, a
         assert route_logs[1].load_size == "Raleigh East Load"
         assert route_logs[1].secondary_load == "Raleigh West Hot Part"
         assert route_logs[1].depart_time is None
+
+
+def test_helios_quick_depart_with_second_stop_uses_mobile_add_next_stop(client, app):
+    from datetime import date, datetime
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord
+
+        driver = create_user("quick_helios_second", "quick-helios-second@example.com", "driver")
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=379000)
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add_all([
+            ShiftRecord(user_id=driver.id, pretrip_id=pretrip.id, start_time=datetime.utcnow()),
+            DriverLog(
+                driver_id=driver.id,
+                date=today,
+                plant_name="KP",
+                load_size="Empty",
+                arrive_time="00:01",
+            ),
+        ])
+        db.session.commit()
+        first_id = DriverLog.query.filter_by(driver_id=driver.id).one().id
+        driver_id = driver.id
+
+    login(client, "quick_helios_second")
+    departed = client.post(
+        f"/driver_logs/{first_id}/depart",
+        data={
+            "next": "mobile",
+            "source": "live_flow",
+            "unloaded_on_departure": "yes",
+            "secondary_dropped_on_departure": "yes",
+            "got_loaded": "yes",
+            "destination": "Trim DC",
+            "secondary_destination": "Helios",
+            "secondary_load_type": "load",
+        },
+        headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+    )
+
+    assert departed.status_code == 200
+    assert departed.get_json()["redirect"].endswith("/mobile")
+    with app.app_context():
+        from app.models import DriverLog
+        from app.services.route_context import build_route_context
+
+        route_logs = DriverLog.query.filter_by(driver_id=driver_id, date=today).order_by(DriverLog.id.asc()).all()
+        assert len(route_logs) == 1
+        assert route_logs[0].depart_load_size == "Trim DC Load"
+        assert route_logs[0].secondary_load == "Helios Load"
+        snapshot = build_route_context(driver_id=driver_id, route_date=today)
+        assert snapshot.route_status == "active"
+        assert snapshot.current_stop is None
+        assert snapshot.current_cargo["value"] == "Trim DC Load"
+        assert snapshot.current_cargo["secondary_value"] == "Helios Load"
+        assert snapshot.next_stop_context["destination"] == "Trim DC"
+        assert snapshot.next_stop_context["secondary_destination"] == "Helios"
+
+    mobile = client.get("/mobile")
+    body = mobile.get_data(as_text=True)
+    assert mobile.status_code == 200
+    assert "<strong>Add Next Stop</strong>" in body
+    assert 'href="/new_driving_log?next=mobile' in body
+    assert "expected_destination=Trim+DC" in body or "expected_destination=Trim%20DC" in body
+    assert "Depart and Load" not in body
+
+    add_stop_form = client.get("/new_driving_log?next=mobile&expected_destination=Trim+DC")
+    add_stop_body = add_stop_form.get_data(as_text=True)
+    assert add_stop_form.status_code == 200
+    assert "Add Next Stop" in add_stop_body
+    assert "Trim DC Load + Helios Load" in add_stop_body
+    assert 'name="load_size" value="Trim DC Load"' in add_stop_body
+    assert 'name="secondary_load" value="Helios Load"' in add_stop_body
+    assert 'name="next" value="mobile"' in add_stop_body
+
+    created = client.post(
+        "/new_driving_log?next=mobile&expected_destination=Trim+DC",
+        data={"plant_name": "Trim DC", "next": "mobile"},
+        follow_redirects=False,
+    )
+    assert created.status_code == 302
+    assert created.headers["Location"].endswith("/mobile")
+    with app.app_context():
+        from app.models import DriverLog, FlowEvent
+
+        route_logs = DriverLog.query.filter_by(driver_id=driver_id, date=today).order_by(DriverLog.id.asc()).all()
+        assert len(route_logs) == 2
+        assert route_logs[1].plant_name == "Trim DC"
+        assert route_logs[1].load_size == "Trim DC Load"
+        assert route_logs[1].secondary_load == "Helios Load"
+        assert route_logs[1].depart_time is None
+        assert FlowEvent.query.filter_by(stop_id=route_logs[1].id, event_type="ARRIVED_DESTINATION").count() == 1
 
 
 def test_quick_depart_service_stop_continues_to_add_next_stop_without_truck_issue_route(client, app):
@@ -8588,7 +8700,8 @@ def test_quick_depart_service_stop_continues_to_add_next_stop_without_truck_issu
     assert mobile.status_code == 200
     assert 'class="md-flow-primary-cta add-stop-action"' in body
     assert "<strong>Add Next Stop</strong>" in body
-    assert 'href="/new_driving_log"' in body
+    assert 'href="/new_driving_log?next=mobile' in body
+    assert 'expected_destination=RE' in body
     assert 'class="md-flow-primary-cta add-stop-action" href="/new_driving_log?report_type=truck_issue"' not in body
 
 

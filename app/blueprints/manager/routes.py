@@ -48,7 +48,7 @@ from app.services.cargo_reconciliation_service import reconcile_cargo
 from app.services.media_attachment_service import upload_file_path
 from app.services.mileage_service import calculate_mileage_record
 from app.services.next_load_prediction import build_next_load_prediction
-from app.services.route_context import build_route_context, unresolved_departure_logs
+from app.services.route_context import build_route_context, route_finalization_event, unresolved_departure_logs
 from app.services.route_state_service import build_route_state
 from app.services.scan_scope_service import route_scope_id, route_stop_ids
 from app.services.case_grouping import build_followup_cases, same_plant_intelligence, same_vehicle_intelligence
@@ -241,6 +241,12 @@ def _route_export_response(ctx, *, filename, delimiter, content_type, title):
     output = io.StringIO()
     writer = csv.writer(output, delimiter=delimiter)
     writer.writerow([
+        "Route Status",
+        "Total Stops",
+        "Open Stops",
+        "Documents",
+        "Damage",
+        "Issues",
         "Stop",
         "Date",
         "Driver",
@@ -258,9 +264,16 @@ def _route_export_response(ctx, *, filename, delimiter, content_type, title):
         "Fuel",
         "Fuel Mileage",
     ])
+    route_summary = ctx.get("route_summary") or {}
     for index, log in enumerate(ctx["logs"], 1):
         route = ctx["log_routes"].get(log.id, {})
         writer.writerow([
+            route_summary.get("route_status_label") or getattr(ctx.get("route_context"), "route_status", ""),
+            route_summary.get("total_stops", len(ctx["logs"])),
+            route_summary.get("open_stops", ""),
+            route_summary.get("route_document_count", ""),
+            route_summary.get("damage_count", ""),
+            route_summary.get("issue_count", ""),
             index,
             log.date,
             ctx["driver"].display_name,
@@ -767,7 +780,13 @@ def _route_print_context(driver_id, route_date):
         key=_driver_log_sort_key,
     )
     pretrips = _active_pretrips_query().filter_by(user_id=driver.id, pretrip_date=route_date).all()
-    log_routes = _driver_log_route_context(logs)
+    route_context = build_route_context(
+        driver_id=driver.id,
+        route_date=route_date,
+        truck_id=None,
+        now=None,
+    )
+    log_routes = route_context.log_routes
     damage_reports = (
         DamageReport.query
         .filter(
@@ -795,12 +814,6 @@ def _route_print_context(driver_id, route_date):
     current_stop = next((log for log in reversed(logs) if not log.depart_time), None) or (logs[-1] if logs else None)
     stop_forecasts = route_stop_forecasts(logs)
     current_stop_forecast = stop_forecasts.get(current_stop.id) if current_stop else None
-    route_context = build_route_context(
-        driver_id=driver.id,
-        route_date=route_date,
-        truck_id=route_truck_context.get("label"),
-        now=None,
-    )
     next_load_prediction = route_context.next_load_prediction or (build_next_load_prediction(
         current_stop=current_stop,
         driver_id=driver.id,
@@ -828,20 +841,16 @@ def _route_print_context(driver_id, route_date):
         "stop_forecasts": stop_forecasts,
         "next_load_prediction": next_load_prediction,
         "route_context": route_context,
+        "route_summary": route_context.route_summary,
         "driver_signature": signature_shift.driver_signature if signature_shift else None,
         "signature_timestamp": signature_shift.signature_timestamp if signature_shift else None,
-        "route_finalized": _route_finalized_for_driver_date(driver.id, route_date),
+        "route_finalized": route_context.route_finalized,
         "part_scan_events": _part_scan_events_for_logs(logs),
     }
 
 
 def _route_finalized_for_driver_date(driver_id, route_date):
-    return ActivityEvent.query.filter_by(
-        user_id=driver_id,
-        category="eod",
-        action="finalized",
-        target_type="end_of_day",
-    ).filter(ActivityEvent.details.contains(str(route_date))).first() is not None
+    return route_finalization_event(driver_id, route_date) is not None
 
 
 def _part_scan_events_for_logs(logs):

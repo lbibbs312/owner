@@ -8,7 +8,7 @@ import pytz
 from sqlalchemy import or_
 
 from app.extensions import db
-from app.models import ActivityEvent, DamageReport, DriverLog, DriverLogPhoto, LoadIntent, PartScanEvent, PlantTimeSample, PreTrip, ShiftRecord, User
+from app.models import ActivityEvent, DamageReport, DriverLog, DriverLogPhoto, LoadIntent, PartScanEvent, PlantTimeSample, PlantTransfer, PreTrip, ShiftRecord, User
 from app.services.cargo_state import cargo_state_for_log
 from app.services.cargo_reconciliation_service import reconcile_cargo
 from app.services.driver_wait import wait_label_for_log
@@ -59,13 +59,40 @@ def _shift_route_date(shift):
     return stamp.astimezone(DETROIT_TZ).date()
 
 
-def _route_finalized(driver_id, route_date):
+def route_finalization_event(driver_id, route_date):
+    if not driver_id or not route_date:
+        return None
     return ActivityEvent.query.filter_by(
         user_id=driver_id,
         category="eod",
         action="finalized",
         target_type="end_of_day",
-    ).filter(ActivityEvent.details.contains(str(route_date))).first() is not None
+    ).filter(ActivityEvent.details.contains(str(route_date))).order_by(
+        ActivityEvent.created_at.desc(), ActivityEvent.id.desc()
+    ).first()
+
+
+def _route_finalized(driver_id, route_date):
+    return route_finalization_event(driver_id, route_date) is not None
+
+
+def _route_damage_count(driver_id, route_date):
+    if not driver_id or not route_date:
+        return 0
+    return DamageReport.query.filter(
+        DamageReport.reported_by_id == driver_id,
+        db.func.date(DamageReport.created_at) == route_date,
+    ).count()
+
+
+def _route_transfer_count(driver_id, route_date):
+    if not driver_id or not route_date:
+        return 0
+    return PlantTransfer.query.filter(
+        PlantTransfer.user_id == driver_id,
+        PlantTransfer.transfer_date == route_date,
+        PlantTransfer.deleted_at.is_(None),
+    ).count()
 
 
 def route_end_arrival_log(logs, *, route_finalized=False):
@@ -280,8 +307,8 @@ def build_route_cta_context(
                 allowed_actions = ["posttrip", "print_route", "view_route"]
                 route_message = "All recorded stops are closed. Complete PostTrip before finalizing."
             elif posttrip_complete:
-                next_action = "Finish Route"
-                primary = _route_cta("Finish Route", "finalize_route")
+                next_action = "Finalize Route"
+                primary = _route_cta("Finalize Route", "finalize_route")
                 show_finalize = True
                 allowed_actions = ["finalize_route", "print_route", "view_route"]
                 route_message = "All recorded stops and PostTrip are complete."
@@ -343,7 +370,7 @@ def build_route_cta_context(
     if (
         proof_missing
         and not route_finalized
-        and next_action not in {"Confirm cargo", "Record departure", "Finish Route"}
+        and next_action not in {"Confirm cargo", "Record departure", "Finalize Route"}
         and not (primary and primary.get("action") == "add_stop")
     ):
         display_mode = "proof_needed"
@@ -429,6 +456,9 @@ class RouteStateSnapshot:
     scope_source: str
     all_departed: bool
     route_finalized: bool
+    route_finalized_at: object | None
+    route_summary: dict
+    next_stop_context: dict | None
     photo_reviews: list
 
     def to_dict(self):
@@ -471,6 +501,9 @@ class RouteStateSnapshot:
             "scope_source": self.scope_source,
             "all_departed": self.all_departed,
             "route_finalized": self.route_finalized,
+            "route_finalized_at": self.route_finalized_at.isoformat() if self.route_finalized_at else None,
+            "route_summary": self.route_summary,
+            "next_stop_context": self.next_stop_context,
             "photo_reviews": self.photo_reviews,
         }
 
@@ -496,7 +529,9 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
         logs = sorted(_active_logs_query().filter_by(driver_id=driver_id, date=route_date).all(), key=_driver_log_sort_key)
     log_routes = build_driver_log_route_context(logs)
     timing = route_stop_forecasts(logs, now=now)
-    route_finalized = bool(driver_id and route_date and _route_finalized(driver_id, route_date))
+    finalized_event = route_finalization_event(driver_id, route_date) if driver_id and route_date else None
+    route_finalized = bool(finalized_event)
+    route_finalized_at = getattr(finalized_event, "created_at", None)
     all_departed = bool(logs) and all(getattr(log, "depart_time", None) for log in logs)
     open_logs = [log for log in logs if not getattr(log, "depart_time", None)]
     current_open = open_logs[-1] if open_logs and open_logs[-1].id == logs[-1].id and not route_finalized else None
@@ -623,6 +658,29 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
     else:
         route_status = "active" if logs else "active"
 
+    next_stop_context = None
+    if active_route and in_transit_cargo and not current_open and logs:
+        last_departed = next((log for log in reversed(logs) if getattr(log, "depart_time", None)), None)
+        primary_destination = current_cargo.get("destination") if isinstance(current_cargo, dict) else None
+        secondary_destination = current_cargo.get("secondary_destination") if isinstance(current_cargo, dict) else None
+        destination = primary_destination or secondary_destination
+        next_stop_context = {
+            "source_log_id": getattr(last_departed, "id", None),
+            "destination": destination,
+            "destination_label": (
+                current_cargo.get("destination_label")
+                or current_cargo.get("secondary_destination_label")
+                or plant_label(destination)
+            ),
+            "primary_destination": primary_destination,
+            "primary_destination_label": current_cargo.get("destination_label"),
+            "primary_load": current_cargo.get("value"),
+            "secondary_destination": secondary_destination,
+            "secondary_destination_label": current_cargo.get("secondary_destination_label"),
+            "secondary_load": current_cargo.get("secondary_value"),
+            "cargo_display": current_cargo.get("cargo_display"),
+        }
+
     posttrip_status = "not due until route close" if route_status == "active" else "pending"
     mileage_status = "pending route close" if route_status == "active" else "not recorded"
     for pretrip in pretrips:
@@ -710,6 +768,26 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
         } if current_open else None,
         "all_departed": all_departed,
     }
+    open_stop_count = sum(1 for row in rows if row.get("status_key") in {"current", "open"})
+    document_count = len(photo_reviews)
+    transfer_count = _route_transfer_count(driver_id, route_date)
+    damage_count = _route_damage_count(driver_id, route_date)
+    issue_count = len(review_items)
+    route_summary = {
+        "total_stops": len(rows),
+        "open_stops": open_stop_count,
+        "closed_stops": max(len(rows) - open_stop_count, 0),
+        "route_status": route_status,
+        "route_status_label": legacy_route_status,
+        "route_finalized": route_finalized,
+        "route_finalized_at": route_finalized_at.isoformat() if route_finalized_at else None,
+        "document_count": document_count,
+        "transfer_count": transfer_count,
+        "route_document_count": document_count + transfer_count,
+        "damage_count": damage_count,
+        "issue_count": issue_count,
+    }
+    route_state["summary"] = route_summary
 
     return RouteStateSnapshot(
         route_id=route_id_value,
@@ -744,5 +822,8 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
         scope_source=scope.get("scope_source") or "fallback",
         all_departed=all_departed,
         route_finalized=route_finalized,
+        route_finalized_at=route_finalized_at,
+        route_summary=route_summary,
+        next_stop_context=next_stop_context,
         photo_reviews=photo_reviews,
     )

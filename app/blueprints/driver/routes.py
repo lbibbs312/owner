@@ -74,7 +74,7 @@ from app.services.load_state import (
 )
 from app.services.parts import record_part_scan as save_part_scan, scan_event_payload
 from app.services.next_load_prediction import build_next_load_prediction
-from app.services.route_context import build_route_context, build_route_cta_context, unresolved_departure_logs
+from app.services.route_context import build_route_context, build_route_cta_context, route_finalization_event, unresolved_departure_logs
 from app.services.flow_events import FlowEventService
 from app.services.route_map import build_driver_route_map_context, build_driver_map_mode_context
 from app.services.plant_time import forecast_for_stop, plant_time_forecast, route_stop_forecasts
@@ -414,30 +414,22 @@ def _driver_log_route_context(logs):
 
 
 def _route_finalized_for_driver_date(driver_id, route_date):
-    if not driver_id or not route_date:
-        return False
-    return ActivityEvent.query.filter_by(
-        user_id=driver_id,
-        category="eod",
-        action="finalized",
-        target_type="end_of_day",
-    ).filter(ActivityEvent.details.contains(str(route_date))).first() is not None
+    return route_finalization_event(driver_id, route_date) is not None
 
 
 def _active_driver_logs_query():
     return DriverLog.query.filter(DriverLog.deleted_at.is_(None))
 
 
-def _current_driver_load(driver_id, route_date=None):
+def _current_driver_load(driver_id, route_date=None, *, route_context=None):
     route_date = route_date or _today_local_date()
-    route_finalized = _route_finalized_for_driver_date(driver_id, route_date)
     open_shift = _open_shift_for_driver(driver_id)
     open_shift_route_date = _shift_route_date(open_shift)
     route_still_active = bool(open_shift and (not open_shift_route_date or open_shift_route_date == route_date))
-    if route_finalized and not route_still_active:
+    route_context = route_context or build_route_context(driver_id=driver_id, route_date=route_date)
+    if route_context.route_finalized and not route_still_active:
         return current_load_after_logs([])
-    logs = _active_driver_logs_query().filter_by(driver_id=driver_id, date=route_date).all()
-    return current_load_after_logs(logs)
+    return route_context.current_cargo
 
 
 def _sync_next_open_stop_arrival_cargo(log):
@@ -467,10 +459,12 @@ def _sync_next_open_stop_arrival_cargo(log):
 
 
 def _driver_log_context_for(log):
-    logs = _active_driver_logs_query().filter_by(
-        driver_id=log.driver_id, date=log.date
-    ).all()
-    return _driver_log_route_context(logs).get(log.id, {})
+    route_context = build_route_context(
+        driver_id=log.driver_id,
+        route_date=log.date,
+        selected_log_id=log.id,
+    )
+    return route_context.log_routes.get(log.id, {})
 
 
 def _active_pretrips_query():
@@ -659,12 +653,18 @@ def _mobile_route_date_options(driver_id, route_date, today_local_date):
     return options
 
 
-def _route_cta_urls(route_date, current_stop=None, active_pretrip=None, pending_posttrip=False):
+def _route_cta_urls(route_date, current_stop=None, active_pretrip=None, pending_posttrip=False, route_context=None):
     date_value = route_date.isoformat() if route_date else _today_local_date().isoformat()
+    add_stop_args = {"next": "mobile"}
+    next_stop_context = getattr(route_context, "next_stop_context", None) or {}
+    if next_stop_context.get("source_log_id"):
+        add_stop_args["from_log_id"] = next_stop_context["source_log_id"]
+    if next_stop_context.get("destination"):
+        add_stop_args["expected_destination"] = next_stop_context["destination"]
     urls = {
         "add_damage": url_for("driver.new_damage_report"),
         "add_note": url_for("driver.new_damage_report"),
-        "add_stop": url_for("driver.new_driving_log"),
+        "add_stop": url_for("driver.new_driving_log", **add_stop_args),
         "end_route": url_for("driver.mobile_end_route"),
         "attach_document": url_for("driver.new_plant_transfer"),
         "finalize_route": url_for("driver.end_of_day_summary"),
@@ -729,17 +729,17 @@ def _apply_route_end_cta(route_cta, route_context, active_pretrip, route_date, t
         proof_missing = bool(patched.get("proof_missing"))
         if active_pretrip and not active_pretrip.posttrip:
             return route_cta
-        route_message = "All recorded stops are closed. Finish the route to lock the route sheet."
+        route_message = "All recorded stops are closed. Finalize the route to lock the route sheet."
         if proof_missing:
             route_message = (
                 "Document proof is missing. Attach it if required by your company, "
-                "or finish the route if the record is ready."
+                "or finalize the route if the record is ready."
             )
         patched.update(
             {
                 "route_display_mode": "route_end_ready",
-                "next_action": "Finish Route",
-                "primary_cta": {"label": "Finish Route", "action": "end_route", "style": "primary"},
+                "next_action": "Finalize Route",
+                "primary_cta": {"label": "Finalize Route", "action": "end_route", "style": "primary"},
                 "secondary_cta": {"label": "View Route Sheet", "action": "view_route", "style": "ghost"},
                 "allowed_actions": ["end_route", "view_route", "print_route", "attach_document"],
                 "route_state_message": route_message,
@@ -1779,10 +1779,18 @@ def _route_sheet_supporting_data(driver_id, route_date, logs, log_routes, route_
         "log_issue_details": log_issue_details,
         "route_documents": collect_route_documents(logs, plant_label=_plant_label),
         "summary": {
-            "total_stops": len(logs or []),
-            "open_stops": sum(1 for log in logs or [] if not getattr(log, "depart_time", None)),
+            "total_stops": (getattr(route_context, "route_summary", {}) or {}).get("total_stops", len(logs or [])),
+            "open_stops": (getattr(route_context, "route_summary", {}) or {}).get(
+                "open_stops",
+                sum(1 for log in logs or [] if not getattr(log, "depart_time", None)),
+            ),
             "total_miles": total_miles,
             "total_wait_minutes": _route_sheet_wait_minutes(logs, now=now),
+            "route_status": getattr(route_context, "route_status", None),
+            "route_finalized_at": (getattr(route_context, "route_summary", {}) or {}).get("route_finalized_at"),
+            "route_document_count": (getattr(route_context, "route_summary", {}) or {}).get("route_document_count"),
+            "damage_count": (getattr(route_context, "route_summary", {}) or {}).get("damage_count", len(damage_reports)),
+            "issue_count": (getattr(route_context, "route_summary", {}) or {}).get("issue_count", len(exception_notes)),
         },
     }
 
@@ -2119,10 +2127,11 @@ def _ryder_followup_context(user_id):
     }
 
 
-def _render_new_driving_log(form, current_load):
-    has_today_logs = (
+def _render_new_driving_log(form, current_load, *, route_context=None, return_to_mobile=False):
+    route_date = getattr(route_context, "route_date", None) or _today_local_date()
+    has_today_logs = bool(getattr(route_context, "rows", None)) if route_context else (
         _active_driver_logs_query()
-        .filter_by(driver_id=current_user.id, date=_today_local_date())
+        .filter_by(driver_id=current_user.id, date=route_date)
         .first()
         is not None
     )
@@ -2131,6 +2140,9 @@ def _render_new_driving_log(form, current_load):
         form=form,
         current_load=current_load,
         has_today_logs=has_today_logs,
+        route_context=route_context,
+        next_stop_context=getattr(route_context, "next_stop_context", None),
+        return_to_mobile=return_to_mobile,
         **_ryder_followup_context(current_user.id),
     )
 
@@ -2838,7 +2850,7 @@ def list_pretrips():
         truck_history=truck_history,
         today_local_date=_today_local_date(),
         route_finalized_by_pretrip_id={
-            pretrip.id: _route_finalized_for_driver_date(pretrip.user_id, pretrip.pretrip_date)
+            pretrip.id: build_route_context(driver_id=pretrip.user_id, route_date=pretrip.pretrip_date).route_finalized
             for pretrip in pretrips
         },
     )
@@ -2988,12 +3000,13 @@ def new_pretrip():
 @login_required
 def do_posttrip(pretrip_id):
     pt = _active_pretrips_query().filter_by(id=pretrip_id).first_or_404()
+    route_context = build_route_context(driver_id=pt.user_id, route_date=pt.pretrip_date)
     if current_user.role == "driver" and pt.user_id != current_user.id:
         if request.method == "GET" and pt.posttrip and _driver_can_view_inspection_pretrip(pt):
             return redirect(url_for("driver.pretrip_printable", pretrip_id=pt.id, _anchor="posttrip-closeout"))
         flash("Not authorized to complete a PostTrip for someone else's PreTrip.", "danger")
         return redirect(url_for("driver.list_pretrips"))
-    if _driver_route_record_finalized(pt.user_id, pt.pretrip_date):
+    if route_context.route_finalized:
         if request.method == "GET" and pt.posttrip and _driver_can_view_inspection_pretrip(pt):
             return redirect(url_for("driver.pretrip_printable", pretrip_id=pt.id, _anchor="posttrip-closeout"))
         flash("That route is finalized. PostTrip entries cannot be changed.", "warning")
@@ -3019,7 +3032,7 @@ def do_posttrip(pretrip_id):
         end_mileage_val = form.end_mileage.data
         if pt.start_mileage is not None and end_mileage_val < pt.start_mileage:
             flash("End mileage cannot be lower than start mileage.", "danger")
-            return render_template("posttrip.html", form=form, pretrip=pt, posttrip=posttrip, fuel_logs=fuel_logs)
+            return render_template("posttrip.html", form=form, pretrip=pt, posttrip=posttrip, fuel_logs=fuel_logs, route_context=route_context, route_summary=route_context.route_summary)
         if pt.start_mileage is not None:
             miles_val = end_mileage_val - pt.start_mileage
         else:
@@ -3048,7 +3061,7 @@ def do_posttrip(pretrip_id):
 
         flash("PostTrip completed successfully and shift clock ended!", "success")
         return redirect(url_for("driver.view_pretrip", pretrip_id=pretrip_id))
-    return render_template("posttrip.html", form=form, pretrip=pt, posttrip=posttrip, fuel_logs=fuel_logs)
+    return render_template("posttrip.html", form=form, pretrip=pt, posttrip=posttrip, fuel_logs=fuel_logs, route_context=route_context, route_summary=route_context.route_summary)
 
 
 @bp.route("/view_pretrip/<int:pretrip_id>", methods=["GET", "POST"])
@@ -3217,6 +3230,7 @@ def pretrip_printable(pretrip_id):
 
     ephemeral_driver = session.get("reviewing_driver")
     ephemeral_date = session.get("reviewing_date")
+    route_context = build_route_context(driver_id=pt.user_id, route_date=pt.pretrip_date)
 
     return render_template(
         "pretrip_printable.html",
@@ -3225,6 +3239,8 @@ def pretrip_printable(pretrip_id):
         ephemeral_date=ephemeral_date,
         email_mode=False,
         pretrip_damage_reports=_pretrip_damage_reports(pt),
+        route_context=route_context,
+        route_summary=route_context.route_summary,
         document_meta=_pretrip_document_meta(pt),
     )
 
@@ -3546,13 +3562,17 @@ def driver_logs():
         selected_driver = User.query.get(selected_driver_id) if selected_driver_id else None
         route_map_stops_by_id = {}
         route_map_ctx = {}
+        route_context = None
         if selected_driver:
+            route_context = build_route_context(driver_id=selected_driver.id, route_date=search_date)
             route_map_ctx = build_driver_route_map_context(driver=selected_driver, date=search_date)
             route_map_stops_by_id = {stop["stop_id"]: stop for stop in route_map_ctx.get("stops", [])}
         return render_template(
             "driver_logs.html",
             logs=logs,
-            log_routes=_driver_log_route_context(logs),
+            log_routes=route_context.log_routes if route_context else _driver_log_route_context(logs),
+            route_context=route_context,
+            route_summary=getattr(route_context, "route_summary", None),
             route_map=route_map_ctx,
             route_map_stops_by_id=route_map_stops_by_id,
             route_task_events=_task_route_events_for_logs(logs),
@@ -3574,6 +3594,7 @@ def driver_logs():
             .all()
         )
         route_pretrip = sorted(pretrips, key=_route_pretrip_sort_key)[-1] if pretrips else None
+        route_context = build_route_context(driver_id=current_user.id, route_date=search_date)
         route_map_ctx = build_driver_route_map_context(
             driver=current_user,
             date=search_date,
@@ -3582,7 +3603,9 @@ def driver_logs():
         return render_template(
             "driver_logs.html",
             logs=logs,
-            log_routes=_driver_log_route_context(logs),
+            log_routes=route_context.log_routes,
+            route_context=route_context,
+            route_summary=route_context.route_summary,
             route_map=route_map_ctx,
             route_map_stops_by_id={stop["stop_id"]: stop for stop in route_map_ctx.get("stops", [])},
             route_audit_summary=_driver_route_audit_summary(
@@ -3593,7 +3616,7 @@ def driver_logs():
                 pretrips=pretrips,
             ),
             route_task_events=_task_route_events_for_logs(logs),
-            route_finalized=_driver_route_record_finalized(current_user.id, search_date),
+            route_finalized=route_context.route_finalized,
             search_date=search_date,
             today_local_date=_today_local_date(),
         )
@@ -3609,15 +3632,23 @@ def new_driving_log():
     now_local = datetime.now(local_tz)
     open_shift = _open_shift_for_driver(current_user.id)
     local_date = _active_route_date_for_driver(current_user.id, now_local.date(), open_shift=open_shift)
-    current_load = _current_driver_load(current_user.id, route_date=local_date)
+    try:
+        route_context = build_route_context(driver_id=current_user.id, route_date=local_date, now=now_local)
+        current_load = _current_driver_load(current_user.id, local_date, route_context=route_context)
+    except Exception:
+        current_app.logger.exception("Driver log route context could not be resolved for user_id=%s", current_user.id)
+        flash("Driver log could not be opened. Try again from Mobile Dashboard.", "danger")
+        return redirect(url_for("driver.mobile_dashboard"))
     current_load_value = current_load["value"] or "Empty"
     current_secondary_value = current_load.get("secondary_value") or ""
+    return_to_mobile = request.values.get("next") == "mobile"
+    next_url = url_for("driver.mobile_dashboard") if return_to_mobile else _driver_logs_url_for_date(local_date)
     guard = _guard_route_record_mutation(
         current_user.id,
         local_date,
         "driver log",
         "create",
-        next_url=_driver_logs_url_for_date(local_date),
+        next_url=next_url,
     )
     if guard:
         return guard
@@ -3625,14 +3656,14 @@ def new_driving_log():
     if form.validate_on_submit():
         if pending_ryder_event:
             flash("Close the Ryder status before entering the next stop.", "warning")
-            return _render_new_driving_log(form, current_load)
+            return _render_new_driving_log(form, current_load, route_context=route_context, return_to_mobile=return_to_mobile)
         if not form.plant_name.data:
             flash("Please select the plant you arrived at.", "danger")
-            return redirect(url_for("driver.new_driving_log"))
+            return _render_new_driving_log(form, current_load, route_context=route_context, return_to_mobile=return_to_mobile)
         open_stop = _open_stop_for_driver(current_user.id, local_date)
         if open_stop:
             flash(f"Close the open stop at {_plant_label(open_stop.plant_name)} before creating the next stop.", "warning")
-            return redirect(_driver_logs_url_for_date(local_date))
+            return redirect(next_url)
 
         arrival_load = current_load_value or "Empty"
         arrival_secondary_load = current_secondary_value or None
@@ -3680,19 +3711,26 @@ def new_driving_log():
             db.session.rollback()
             current_app.logger.exception("Driver arrival could not be saved for user_id=%s", current_user.id)
             flash("Arrival could not be saved. Try again.", "danger")
-            return _render_new_driving_log(form, current_load)
+            return _render_new_driving_log(form, current_load, route_context=route_context, return_to_mobile=return_to_mobile)
         _emit_driver_log_updated(newlog, "submitted")
         flash("Arrival recorded.", "success")
-        return redirect(_driver_logs_url_for_date(newlog.date))
+        return redirect(url_for("driver.mobile_dashboard") if return_to_mobile else _driver_logs_url_for_date(newlog.date))
 
     _prefill_log_form_from_task(form)
+    expected_destination = (
+        (request.args.get("expected_destination") or "").strip()
+        or ((route_context.next_stop_context or {}).get("destination") or "")
+    )
+    if expected_destination and not form.plant_name.data:
+        ensure_legacy_plant_choice(form.plant_name, expected_destination)
+        form.plant_name.data = expected_destination
     form.load_size.data = current_load_value if current_load_value != "Empty" else "Empty"
     form.secondary_load.data = current_secondary_value
     if request.args.get("report_type") == "truck_issue":
         form.maintenance.data = True
     elif request.args.get("report_type") == "route_note":
         form.meeting.data = True
-    return _render_new_driving_log(form, current_load)
+    return _render_new_driving_log(form, current_load, route_context=route_context, return_to_mobile=return_to_mobile)
 
 
 @bp.route("/add_stop", methods=["GET", "POST"])
@@ -4532,12 +4570,6 @@ def driver_logs_print():
     route_context = build_route_context(driver_id=current_user.id, route_date=selected_date, now=now_local)
     log_routes = route_context.log_routes if route_context else _driver_log_route_context(logs)
     route_sheet_data = _route_sheet_supporting_data(current_user.id, selected_date, logs, log_routes, route_context, now=now_local)
-    route_finalized = ActivityEvent.query.filter_by(
-        user_id=current_user.id,
-        category="eod",
-        action="finalized",
-        target_type="end_of_day",
-    ).filter(ActivityEvent.details.contains(str(selected_date))).first() is not None
     record_activity(
         user_id=current_user.id,
         category="print",
@@ -4566,7 +4598,7 @@ def driver_logs_print():
         stop_forecasts=route_context.stop_timing,
         route_state=route_context.route_state,
         route_context=route_context,
-        route_finalized=route_finalized,
+        route_finalized=route_context.route_finalized,
         driver_signature=shift_record.driver_signature if shift_record else None,
         signature_timestamp=shift_record.signature_timestamp if shift_record else None,
         document_meta=_route_document_meta(selected_date, current_user, logs, pretrips),
@@ -4671,7 +4703,7 @@ def mobile_end_route():
     if current_user.role == "management":
         return redirect(url_for("manager.manager_dashboard"))
     if request.method == "GET":
-        flash("Use Finish Route from the mobile board to close the route.", "info")
+        flash("Use Finalize Route from the mobile board to close the route.", "info")
         return redirect(url_for("driver.mobile_dashboard"))
 
     now_local, _ = _now_local_and_utc()
@@ -5692,6 +5724,7 @@ def _mobile_route_map_fragment_context(route_date=None):
         current_stop=current_stop,
         active_pretrip=active_pretrip,
         pending_posttrip=pending_posttrip,
+        route_context=route_context,
     )
 
     truck_source_pretrip = active_pretrip or route_pretrip or latest_pretrip
@@ -5915,6 +5948,7 @@ def mobile_dashboard():
         current_stop=current_stop,
         active_pretrip=active_pretrip,
         pending_posttrip=pending_posttrip,
+        route_context=route_context,
     )
 
     return render_template(

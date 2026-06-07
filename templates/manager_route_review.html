@@ -81,6 +81,7 @@
 </head>
 <body>
   {% set document_meta = document_meta|default({'title': 'MANAGER ROUTE REVIEW', 'document_no': 'MGR-REVIEW-' ~ the_date, 'generated_at': '', 'page': '1 of 1'}) %}
+  {% set resolved_route_summary = route_summary if route_summary is defined and route_summary else {} %}
   <div class="print-controls no-print">
   <button class="print-btn" onclick="window.print()">Print Document</button>
   <a class="email-btn" href="{{ attachment_url }}">Save PDF</a>
@@ -114,7 +115,9 @@
       <strong>Driver:</strong> {{ driver.display_name }}<br>
       <strong>Truck:</strong> {{ truck_label }}<br>
       <strong>Mileage:</strong> {{ mileage_review.label }}<br>
-      <strong>Stop Events:</strong> {{ logs|length if logs else 0 }}<br>
+      <strong>Stop Events:</strong> {{ resolved_route_summary.total_stops if resolved_route_summary.total_stops is defined else (logs|length if logs else 0) }}<br>
+      <strong>Open Stops:</strong> {{ resolved_route_summary.open_stops if resolved_route_summary.open_stops is defined else 0 }}<br>
+      <strong>Docs / Damage / Issues:</strong> {{ resolved_route_summary.route_document_count if resolved_route_summary.route_document_count is defined else 0 }} / {{ resolved_route_summary.damage_count if resolved_route_summary.damage_count is defined else 0 }} / {{ resolved_route_summary.issue_count if resolved_route_summary.issue_count is defined else 0 }}<br>
       <strong>Route Status:</strong> {{ route_status }}
     </div>
   </div>

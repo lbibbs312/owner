@@ -949,9 +949,15 @@
     }
     @media (min-width:1200px) { .driver-log-shell { padding-left:24px; padding-right:24px; } }
   </style>
-	  {% set log_view_endpoint = 'manager.view_driver_log' if current_user.role == 'management' else 'driver.view_driver_log' %}
+  {% set log_view_endpoint = 'manager.view_driver_log' if current_user.role == 'management' else 'driver.view_driver_log' %}
 	  {% if current_user.role == 'driver' %}
-	    {% set log_count = logs|length if logs else 0 %}
+	    {% set resolved_route_summary = route_summary if route_summary is defined and route_summary else {} %}
+	    {% set log_count = resolved_route_summary.total_stops if resolved_route_summary.total_stops is defined else (logs|length if logs else 0) %}
+	    {% set open_stop_count = resolved_route_summary.open_stops if resolved_route_summary.open_stops is defined else 0 %}
+	    {% set route_status_label = resolved_route_summary.route_status_label if resolved_route_summary.route_status_label is defined else 'No Route' %}
+	    {% set route_document_count = resolved_route_summary.route_document_count if resolved_route_summary.route_document_count is defined else 0 %}
+	    {% set route_damage_count = resolved_route_summary.damage_count if resolved_route_summary.damage_count is defined else 0 %}
+	    {% set route_issue_count = resolved_route_summary.issue_count if resolved_route_summary.issue_count is defined else 0 %}
 	    {% set is_current_route = search_date == today_local_date and log_count > 0 %}
 	    {% set is_replay_route = search_date != today_local_date and log_count > 0 %}
 	    {% set route_mode_label = 'CURRENT ROUTE' if is_current_route else ('PAST ROUTE' if log_count > 0 else 'NO LOGS') %}
@@ -981,7 +987,7 @@
           <a class="md-route-audit-card" href="#route-stops" aria-label="View numbered stops">
             <span>Numbered Stops</span>
             <strong>{{ log_count }} stop{{ 's' if log_count != 1 else '' }}</strong>
-            <small>Rows show route-order stop numbers.</small>
+            <small>{{ open_stop_count }} open · {{ route_status_label }} · Docs {{ route_document_count }} · Damage {{ route_damage_count }} · Issues {{ route_issue_count }}</small>
           </a>
           <div class="md-route-audit-slot md-route-mile-slot">
             <a class="md-route-audit-card" href="{{ route_pretrip_url }}" aria-label="View route mileage inspection record">

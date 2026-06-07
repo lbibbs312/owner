@@ -1801,6 +1801,7 @@ def _build_plants_and_lanes(stops, moves, transfers, *, role="driver"):
 
 
 def _route_summary(route_context, *, moves, stops, driver=None):
+    resolved_summary = getattr(route_context, "route_summary", None) or {}
     current_stop = getattr(route_context, "current_stop", None)
     current_stop_id = getattr(current_stop, "id", None)
     current_location = (
@@ -1821,6 +1822,12 @@ def _route_summary(route_context, *, moves, stops, driver=None):
         "truck": getattr(route_context, "truck_id", None) or NOT_TRACKED,
         "equipment": getattr(route_context, "truck_id", None) or NOT_TRACKED,
         "status": getattr(route_context, "route_status", None) or ("active" if stops else "no_route"),
+        "total_stops": resolved_summary.get("total_stops", len(stops)),
+        "open_stops": resolved_summary.get("open_stops", len([stop for stop in stops if stop.get("status") != "completed"])),
+        "route_status_label": resolved_summary.get("route_status_label"),
+        "document_count": resolved_summary.get("route_document_count", 0),
+        "damage_count": resolved_summary.get("damage_count", 0),
+        "issue_count": resolved_summary.get("issue_count", issue_count),
         "current_stop_id": current_stop_id,
         "current_location": current_location,
         "next_action": next_action,

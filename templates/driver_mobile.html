@@ -4888,7 +4888,7 @@
 	        {% else %}
 	          {% if cta.route_display_mode in ['completed_route', 'finalized_route', 'proof_needed', 'route_end_ready', 'last_route', 'read_only_history'] and todays_logs %}
 	            <div class="eyebrow"><span class="bolt"></span>{% if cta.route_display_mode == 'finalized_route' %}Route Finalized{% elif cta.route_display_mode == 'route_end_ready' %}Route Closeout{% elif cta.route_display_mode == 'completed_route' %}Route Complete{% elif cta.route_display_mode == 'proof_needed' %}Proof Needed{% elif cta.route_display_mode == 'read_only_history' %}Route History{% else %}Last Route{% endif %}</div>
-		            <h1>{% if cta.route_display_mode == 'completed_route' %}Ready To Finish{% else %}{{ cta.next_action or 'No action needed' }}{% endif %}</h1>
+		            <h1>{{ cta.next_action or 'No action needed' }}</h1>
 	            <p>{{ cta.proof_state_message if cta.route_display_mode == 'proof_needed' else cta.route_state_message }}</p>
 	          {% elif next_load_prediction %}
             <div class="eyebrow"><span class="bolt"></span>{{ next_load_prediction.title }}</div>
@@ -5001,7 +5001,7 @@
 	          <a class="button ghost" href="{{ cta_urls.get('print_route') }}">Print Route</a>
 	        {% endif %}
 	        {% if cta.show_finalize_button and cta_urls.get('finalize_route') %}
-		          <a class="button ghost" href="{{ cta_urls.get('finalize_route') }}">Finish Route</a>
+		          <a class="button ghost" href="{{ cta_urls.get('finalize_route') }}">Finalize Route</a>
 	        {% endif %}
 	        <a class="button ghost" href="{{ url_for('driver.mobile_history') }}">Route History</a>
 		      </section>
