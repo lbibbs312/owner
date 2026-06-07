@@ -1,5 +1,4 @@
 import logging
-import os
 from urllib.parse import urlsplit
 
 from flask import current_app, flash, redirect, render_template, request, session, url_for
@@ -9,6 +8,7 @@ from app.blueprints.auth import bp
 from app.extensions import db, login_manager
 from app.forms.auth import LoginForm, RegistrationForm
 from app.models import User
+from app.services.registration_access import clear_registration_checkout, registration_checkout
 from app.services.role_session import clear_role_logins, remember_role_login, restore_role_user
 
 
@@ -133,28 +133,32 @@ def _flash_form_errors(form, event_name):
 def register():
     if current_user.is_authenticated:
         return _redirect_authenticated_user()
+    checkout = registration_checkout()
+    if not checkout:
+        return render_template(
+            "billing_status.html",
+            status_title="Checkout required",
+            status_label="Account setup blocked",
+            status_message="Complete checkout before creating a MoveDefense account.",
+            retry_url=url_for("public.welcome", _anchor="pricing"),
+        ), 403
     form = RegistrationForm()
+    form.role.choices = [("driver", "Driver")]
+    form.role.data = "driver"
+    if request.method == "GET" and not form.email.data and checkout.get("customer_email"):
+        form.email.data = checkout["customer_email"]
     if form.validate_on_submit():
-        if form.role.data == "management":
-            expected_pin = (os.environ.get("MANAGER_REGISTRATION_PIN") or "").strip()
-            if not expected_pin:
-                _log_auth_event(
-                    logging.ERROR,
-                    "auth.register.manager_pin_unconfigured",
-                    role=form.role.data,
-                    username=form.username.data,
-                )
-                flash("Manager self-registration is not enabled.", "danger")
-                return redirect(url_for("auth.register"))
-            if form.manager_pin.data != expected_pin:
-                _log_auth_event(
-                    logging.WARNING,
-                    "auth.register.invalid_manager_pin",
-                    role=form.role.data,
-                    username=form.username.data,
-                )
-                flash("Invalid Manager PIN!", "danger")
-                return redirect(url_for("auth.register"))
+        checkout_email = (checkout.get("customer_email") or "").strip().lower()
+        form_email = (form.email.data or "").strip().lower()
+        if checkout_email and form_email != checkout_email:
+            _log_auth_event(
+                logging.WARNING,
+                "auth.register.checkout_email_mismatch",
+                billing_plan=checkout.get("plan_key"),
+                username=form.username.data,
+            )
+            flash("Use the same email address from checkout to create this account.", "danger")
+            return render_template("register.html", form=form), 200
         existing = User.query.filter(
             (User.email == form.email.data)
             | (User.username == form.username.data)
@@ -165,7 +169,8 @@ def register():
             _log_auth_event(
                 logging.WARNING,
                 "auth.register.duplicate_identity",
-                role=form.role.data,
+                role="driver",
+                billing_plan=checkout.get("plan_key"),
                 username=form.username.data,
             )
             flash("User already exists with that email or username.", "danger")
@@ -177,15 +182,18 @@ def register():
                 employee_id=form.employee_id.data,
                 department=form.department.data,
                 email=form.email.data,
-                role=form.role.data,
+                role="driver",
             )
             user.set_password(form.password.data)
             db.session.add(user)
             db.session.commit()
+            clear_registration_checkout()
             _log_auth_event(
                 logging.INFO,
                 "auth.register.success",
                 role=user.role,
+                billing_plan=checkout.get("plan_key"),
+                checkout_session=checkout.get("session_id"),
                 user_id=user.id,
                 username=user.username,
             )

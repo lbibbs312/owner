@@ -51,6 +51,19 @@ def login(client, login_name, password="password1"):
     )
 
 
+def allow_registration(client, **overrides):
+    checkout = {
+        "session_id": "cs_test_verified",
+        "plan_key": "solo-driver",
+        "plan_name": "Solo Driver",
+        "customer": "cus_test",
+        "customer_email": "",
+    }
+    checkout.update(overrides)
+    with client.session_transaction() as sess:
+        sess["registration_checkout"] = checkout
+
+
 def assert_login_redirect(response, next_value, required_role):
     assert response.status_code == 302
     location = response.headers["Location"]
@@ -197,66 +210,54 @@ def test_new_driver_log_ignores_stale_hidden_cargo(client, app):
         assert log.secondary_load is None
 
 
-def test_manager_registration_fails_closed_without_configured_pin(client, app, monkeypatch):
-    monkeypatch.delenv("MANAGER_REGISTRATION_PIN", raising=False)
+def test_public_registration_requires_verified_checkout(client, app):
+    response = client.get("/register", follow_redirects=False)
 
-    response = client.post(
+    assert response.status_code == 403
+    assert b"Checkout required" in response.data
+
+    post_response = client.post(
         "/register",
         data={
-            "username": "manager_unset",
-            "email": "manager-unset@example.com",
+            "username": "driver_unpaid",
+            "email": "driver-unpaid@example.com",
             "password": "password1",
             "confirm_password": "password1",
-            "role": "management",
-            "manager_pin": "0000",
+            "role": "driver",
         },
         follow_redirects=False,
     )
 
-    assert response.status_code == 302
-    assert response.headers["Location"].endswith("/register")
+    assert post_response.status_code == 403
+    assert b"Checkout required" in post_response.data
     with app.app_context():
         from app.models import User
 
-        assert User.query.filter_by(username="manager_unset").first() is None
+        assert User.query.filter_by(username="driver_unpaid").first() is None
 
 
-def test_manager_registration_rejects_wrong_configured_pin(client, app, monkeypatch):
-    monkeypatch.setenv("MANAGER_REGISTRATION_PIN", "2468")
+def test_public_registration_does_not_offer_manager_role(client):
+    allow_registration(client)
+
+    response = client.get("/register")
+
+    assert response.status_code == 200
+    assert b"Management" not in response.data
+    assert b"Manager PIN" not in response.data
+    assert b'value="driver"' in response.data
+
+
+def test_public_registration_forces_driver_role(client, app):
+    allow_registration(client)
 
     response = client.post(
         "/register",
         data={
-            "username": "manager_wrong_pin",
-            "email": "manager-wrong-pin@example.com",
+            "username": "driver1",
+            "email": "driver1@example.com",
             "password": "password1",
             "confirm_password": "password1",
             "role": "management",
-            "manager_pin": "0000",
-        },
-        follow_redirects=False,
-    )
-
-    assert response.status_code == 302
-    assert response.headers["Location"].endswith("/register")
-    with app.app_context():
-        from app.models import User
-
-        assert User.query.filter_by(username="manager_wrong_pin").first() is None
-
-
-def test_registration_uses_manager_pin(client, app, monkeypatch):
-    monkeypatch.setenv("MANAGER_REGISTRATION_PIN", "2468")
-
-    response = client.post(
-        "/register",
-        data={
-            "username": "manager1",
-            "email": "manager1@example.com",
-            "password": "password1",
-            "confirm_password": "password1",
-            "role": "management",
-            "manager_pin": "2468",
         },
         follow_redirects=False,
     )
@@ -266,8 +267,31 @@ def test_registration_uses_manager_pin(client, app, monkeypatch):
     with app.app_context():
         from app.models import User
 
-        user = User.query.filter_by(username="manager1").one()
-        assert user.role == "management"
+        user = User.query.filter_by(username="driver1").one()
+        assert user.role == "driver"
+
+
+def test_registration_email_must_match_checkout_email(client, app):
+    allow_registration(client, customer_email="paid@example.com")
+
+    response = client.post(
+        "/register",
+        data={
+            "username": "driver_mismatch",
+            "email": "other@example.com",
+            "password": "password1",
+            "confirm_password": "password1",
+            "role": "driver",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Use the same email address from checkout" in response.data
+    with app.app_context():
+        from app.models import User
+
+        assert User.query.filter_by(username="driver_mismatch").first() is None
 
 
 def test_password_hash_column_fits_werkzeug_hashes(app):
@@ -324,7 +348,8 @@ def assert_login_page_is_standalone(data, subtitle):
     assert b"navbar" not in data
     assert b"hamburger" not in data.lower()
     assert b"sidebar" not in data.lower()
-    assert data.count(b'href="/register"') == 1
+    assert data.count(b'href="/#pricing"') == 1
+    assert b'href="/register"' not in data
     assert_login_page_has_responsive_auth_guards(data)
 
 
@@ -363,49 +388,33 @@ def test_driver_auth_redirect_uses_sign_in_required_language(client):
 
 
 def test_register_page_uses_movedefense_shell(client):
+    allow_registration(client)
+
     register_page = client.get("/register")
     assert register_page.status_code == 200
     assert b"md-shell" in register_page.data
     assert b"MOVEDEFENSE SETUP" in register_page.data
     assert b"Create Access" in register_page.data
-    assert b"Required only for manager accounts." in register_page.data
+    assert b"checkout you just completed" in register_page.data
+    assert b"Required only for manager accounts." not in register_page.data
+    assert b"Manager PIN" not in register_page.data
 
 
 def test_unauthenticated_auth_errors_render_flash_messages(client, monkeypatch):
-    monkeypatch.delenv("MANAGER_REGISTRATION_PIN", raising=False)
-
-    disabled_response = client.post(
+    blocked_response = client.post(
         "/register",
         data={
-            "username": "manager_unset_visible",
-            "email": "manager-unset-visible@example.com",
+            "username": "driver_unpaid_visible",
+            "email": "driver-unpaid-visible@example.com",
             "password": "password1",
             "confirm_password": "password1",
-            "role": "management",
-            "manager_pin": "0000",
+            "role": "driver",
         },
         follow_redirects=True,
     )
-    assert disabled_response.status_code == 200
-    assert b"Manager self-registration is not enabled." in disabled_response.data
-    assert disabled_response.data.count(b"Manager self-registration is not enabled.") == 1
-
-    monkeypatch.setenv("MANAGER_REGISTRATION_PIN", "2468")
-    wrong_pin_response = client.post(
-        "/register",
-        data={
-            "username": "manager_wrong_visible",
-            "email": "manager-wrong-visible@example.com",
-            "password": "password1",
-            "confirm_password": "password1",
-            "role": "management",
-            "manager_pin": "0000",
-        },
-        follow_redirects=True,
-    )
-    assert wrong_pin_response.status_code == 200
-    assert b"Invalid Manager PIN!" in wrong_pin_response.data
-    assert wrong_pin_response.data.count(b"Invalid Manager PIN!") == 1
+    assert blocked_response.status_code == 403
+    assert b"Complete checkout before creating a MoveDefense account." in blocked_response.data
+    assert blocked_response.data.count(b"Complete checkout before creating a MoveDefense account.") == 1
 
     login_response = client.post(
         "/login",
@@ -419,6 +428,7 @@ def test_unauthenticated_auth_errors_render_flash_messages(client, monkeypatch):
 
 def test_registration_validation_errors_render_inline_feedback(client, monkeypatch):
     monkeypatch.setenv("MANAGER_REGISTRATION_PIN", "2468")
+    allow_registration(client)
 
     response = client.post(
         "/register",
@@ -427,8 +437,7 @@ def test_registration_validation_errors_render_inline_feedback(client, monkeypat
             "email": "not-an-email",
             "password": "short",
             "confirm_password": "different",
-            "role": "management",
-            "manager_pin": "2468",
+            "role": "driver",
         },
         follow_redirects=True,
     )
@@ -479,6 +488,7 @@ def test_login_checks_password_against_all_matching_usernames_and_emails(client,
 def test_registration_rejects_username_email_cross_collision(client, app):
     with app.app_context():
         create_user("driver1", "shared@example.com", "driver")
+    allow_registration(client)
 
     response = client.post(
         "/register",

@@ -7,7 +7,13 @@ from app.blueprints.public import bp
 from app.models import Announcement
 from app.services.database_status import database_status
 from app.services.route_context import build_route_context
-from app.services.stripe_checkout import StripeCheckoutError, billing_plan, create_checkout_session
+from app.services.registration_access import store_registration_checkout
+from app.services.stripe_checkout import (
+    StripeCheckoutError,
+    billing_plan,
+    create_checkout_session,
+    verified_registration_checkout,
+)
 
 
 @bp.route("/")
@@ -41,17 +47,24 @@ def billing_checkout(plan_key):
 
 @bp.route("/billing/success")
 def billing_success():
-    return render_template(
-        "billing_status.html",
-        status_title="Checkout received",
-        status_label="Payment started",
-        status_message=(
-            "Stripe accepted the checkout handoff. Sign in or contact MoveDefense if "
-            "your workspace needs to be connected to this purchase."
-        ),
-        session_id=request.args.get("session_id", ""),
-        retry_url=url_for("auth.login"),
-    )
+    session_id = request.args.get("session_id", "")
+    try:
+        checkout = verified_registration_checkout(session_id)
+    except StripeCheckoutError as exc:
+        current_app.logger.warning("billing.checkout_verify_failed reason=%s", exc)
+        return render_template(
+            "billing_status.html",
+            status_title="Checkout not verified",
+            status_label="Account setup blocked",
+            status_message=(
+                "MoveDefense could not verify a completed payment for this checkout. "
+                "Return to pricing and start checkout again."
+            ),
+            session_id=session_id,
+            retry_url=url_for("public.welcome", _anchor="pricing"),
+        ), 403
+    store_registration_checkout(checkout)
+    return redirect(url_for("auth.register"))
 
 
 @bp.route("/billing/cancel")

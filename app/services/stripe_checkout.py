@@ -119,3 +119,72 @@ def create_checkout_session(plan_key, *, user=None):
     if not checkout_url:
         raise StripeCheckoutError("Stripe did not return a checkout URL.")
     return checkout_url
+
+
+def retrieve_checkout_session(session_id):
+    session_id = (session_id or "").strip()
+    if not session_id:
+        raise StripeCheckoutError("Checkout session is missing.")
+
+    secret_key = current_app.config.get("STRIPE_SECRET_KEY")
+    if not secret_key:
+        raise StripeCheckoutError("Stripe checkout is not configured.")
+
+    stripe = _stripe_module()
+    stripe.api_key = secret_key
+    stripe.api_version = current_app.config.get("STRIPE_API_VERSION")
+
+    try:
+        return stripe.checkout.Session.retrieve(session_id)
+    except Exception as exc:
+        raise StripeCheckoutError("Stripe checkout session could not be verified.") from exc
+
+
+def _session_value(checkout_session, key, default=""):
+    if isinstance(checkout_session, dict):
+        return checkout_session.get(key, default)
+    getter = getattr(checkout_session, "get", None)
+    if callable(getter):
+        return getter(key, default)
+    return getattr(checkout_session, key, default)
+
+
+def _object_value(value, key, default=""):
+    if isinstance(value, dict):
+        return value.get(key, default)
+    getter = getattr(value, "get", None)
+    if callable(getter):
+        return getter(key, default)
+    return getattr(value, key, default)
+
+
+def verified_registration_checkout(session_id):
+    checkout_session = retrieve_checkout_session(session_id)
+    status = _session_value(checkout_session, "status", "")
+    payment_status = _session_value(checkout_session, "payment_status", "")
+    metadata = _session_value(checkout_session, "metadata", {}) or {}
+    if not isinstance(metadata, dict):
+        try:
+            metadata = dict(metadata)
+        except (TypeError, ValueError):
+            metadata = {}
+    plan_key = (metadata.get("billing_plan") or "").strip()
+    plan = billing_plan(plan_key)
+    if not plan:
+        raise StripeCheckoutError("Checkout session has no recognized billing plan.")
+    if status != "complete" or payment_status not in {"paid", "no_payment_required"}:
+        raise StripeCheckoutError("Checkout session is not complete.")
+    customer_details = _session_value(checkout_session, "customer_details", {}) or {}
+    customer_email = (
+        _session_value(checkout_session, "customer_email", "")
+        or _object_value(customer_details, "email", "")
+        or ""
+    )
+    return {
+        "session_id": _session_value(checkout_session, "id", session_id),
+        "plan_key": plan.key,
+        "plan_name": plan.name,
+        "customer": _session_value(checkout_session, "customer", "") or "",
+        "customer_email": customer_email,
+        "payment_status": payment_status,
+    }

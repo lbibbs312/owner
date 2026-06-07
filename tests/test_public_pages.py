@@ -35,6 +35,19 @@ def _visible_text(html):
     return re.sub(r"\s+([.,;:!?])", r"\1", text)
 
 
+def _allow_registration(client, **overrides):
+    checkout = {
+        "session_id": "cs_test_verified",
+        "plan_key": "solo-driver",
+        "plan_name": "Solo Driver",
+        "customer": "cus_test",
+        "customer_email": "",
+    }
+    checkout.update(overrides)
+    with client.session_transaction() as sess:
+        sess["registration_checkout"] = checkout
+
+
 def test_welcome_page_positions_packets_and_pricing(client):
     response = client.get("/")
 
@@ -44,7 +57,8 @@ def test_welcome_page_positions_packets_and_pricing(client):
     assert "Turn driver paperwork into clean route, incident, and IFTA support packets." in text
     assert "We help owner-operators and small fleets" in text
     assert "Preview packets" in text
-    assert "Start free" in text
+    assert "View pricing" in text
+    assert "Choose a paid plan" in text
     assert "Set up small fleet" in text
     assert "Free Preview" in text
     assert "Solo Driver" in text
@@ -76,10 +90,16 @@ def test_welcome_page_posts_paid_items_to_billing_checkout(client):
         "fleet-packet-setup",
     ):
         assert f'action="/billing/checkout/{plan_key}" method="POST"' in body
-    assert 'action="/register" method="GET"' in body
+    assert 'action="/register"' not in body
+    assert 'href="/register"' not in body
 
 
-def test_billing_checkout_fails_closed_until_stripe_is_configured(client):
+def test_billing_checkout_fails_closed_until_stripe_is_configured(client, app):
+    app.config.update(
+        STRIPE_SECRET_KEY="",
+        STRIPE_PRICE_OWNER_OPERATOR="",
+    )
+
     response = client.post("/billing/checkout/owner-operator")
 
     assert response.status_code == 503
@@ -127,6 +147,70 @@ def test_billing_checkout_creates_stripe_session_and_redirects(client, app, monk
     assert created["metadata"]["billing_plan"] == "owner-operator"
     assert created["allow_promotion_codes"] is True
     assert created["automatic_tax"] == {"enabled": True}
+
+
+def test_billing_success_verifies_checkout_before_registration(client, app, monkeypatch):
+    class FakeSession:
+        @staticmethod
+        def retrieve(session_id):
+            return {
+                "id": session_id,
+                "status": "complete",
+                "payment_status": "paid",
+                "metadata": {"billing_plan": "owner-operator"},
+                "customer": "cus_test",
+                "customer_details": {"email": "buyer@example.com"},
+            }
+
+    fake_stripe = SimpleNamespace(
+        api_key=None,
+        api_version=None,
+        checkout=SimpleNamespace(Session=FakeSession),
+    )
+    monkeypatch.setitem(sys.modules, "stripe", fake_stripe)
+    app.config.update(
+        STRIPE_SECRET_KEY="sk_test_configured",
+        STRIPE_API_VERSION="2026-05-27.dahlia",
+    )
+
+    response = client.get("/billing/success?session_id=cs_test_complete")
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/register")
+    with client.session_transaction() as sess:
+        checkout = sess["registration_checkout"]
+    assert checkout["session_id"] == "cs_test_complete"
+    assert checkout["plan_key"] == "owner-operator"
+    assert checkout["customer_email"] == "buyer@example.com"
+
+
+def test_billing_success_blocks_unverified_checkout(client, app, monkeypatch):
+    class FakeSession:
+        @staticmethod
+        def retrieve(session_id):
+            return {
+                "id": session_id,
+                "status": "open",
+                "payment_status": "unpaid",
+                "metadata": {"billing_plan": "owner-operator"},
+            }
+
+    fake_stripe = SimpleNamespace(
+        api_key=None,
+        api_version=None,
+        checkout=SimpleNamespace(Session=FakeSession),
+    )
+    monkeypatch.setitem(sys.modules, "stripe", fake_stripe)
+    app.config.update(STRIPE_SECRET_KEY="sk_test_configured")
+
+    response = client.get("/billing/success?session_id=cs_test_open")
+
+    assert response.status_code == 403
+    text = _visible_text(response.get_data(as_text=True))
+    assert "Checkout not verified" in text
+    assert "Account setup blocked" in text
+    with client.session_transaction() as sess:
+        assert "registration_checkout" not in sess
 
 
 def test_welcome_page_uses_safe_product_language(client):
@@ -206,7 +290,7 @@ def test_privacy_notice_is_public_plain_language_and_standalone(client):
     assert "social security" not in lower_text
 
 
-@pytest.mark.parametrize("path", ["/", "/login", "/register", "/privacy", "/terms"])
+@pytest.mark.parametrize("path", ["/", "/login", "/privacy", "/terms"])
 def test_public_and_auth_pages_include_public_footer_links(client, path):
     response = client.get(path)
 
@@ -221,6 +305,8 @@ def test_public_and_auth_pages_include_public_footer_links(client, path):
 
 
 def test_register_page_links_terms_and_privacy_notice(client):
+    _allow_registration(client)
+
     response = client.get("/register")
 
     assert response.status_code == 200
@@ -230,6 +316,17 @@ def test_register_page_links_terms_and_privacy_notice(client):
     assert "By creating an account, you agree to the Terms and acknowledge the Privacy Notice." in text
     assert 'href="/terms"' in body
     assert 'href="/privacy"' in body
+    assert "Management" not in text
+    assert "Manager PIN" not in text
+
+
+def test_direct_register_is_blocked_until_checkout_is_verified(client):
+    response = client.get("/register", follow_redirects=False)
+
+    assert response.status_code == 403
+    text = _visible_text(response.get_data(as_text=True))
+    assert "Checkout required" in text
+    assert "Account setup blocked" in text
 
 
 def test_terms_page_is_public_plain_language_and_not_placeholder(client):

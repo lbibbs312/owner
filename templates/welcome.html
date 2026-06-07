@@ -97,7 +97,7 @@
       </div>
       <div class="nav-actions">
         <a class="btn ghost" href="{{ url_for('auth.login') }}">Login</a>
-        <a class="btn primary" href="{{ url_for('auth.register') }}">Start free</a>
+        <a class="btn primary" href="#pricing">View pricing</a>
       </div>
     </div>
   </nav>
@@ -109,7 +109,7 @@
         <h1>Turn driver paperwork into clean route, incident, and IFTA support packets.</h1>
         <p class="lead">We help owner-operators and small fleets capture the facts before texts, photos, receipts, and paper forms get lost.</p>
         <div class="hero-actions">
-          <a class="btn primary" href="#pricing">Start free</a>
+          <a class="btn primary" href="#pricing">View pricing</a>
           <a class="btn ghost" href="#packets">Preview packets</a>
           <a class="btn ghost" href="#fleet-office">Set up small fleet</a>
         </div>
@@ -172,9 +172,9 @@
             <li>No manager review</li>
             <li>No long-term document storage</li>
           </ul>
-          <form class="checkout-form" action="{{ url_for('auth.register') }}" method="GET">
-            <button class="btn ghost" type="submit">Start free</button>
-          </form>
+          <div class="checkout-form">
+            <a class="btn ghost" href="#pricing">Choose a paid plan</a>
+          </div>
         </article>
         <article class="price-card">
           <div class="price-name">Solo Driver</div>
