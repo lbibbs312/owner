@@ -1,0 +1,73 @@
+{% extends "django_base.html" %}
+
+{% block title %}MoveDefense{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="hero" aria-labelledby="home-title">
+    <div>
+      <p class="eyebrow">MoveDefense</p>
+      <h1 id="home-title">Operational records for drivers and small fleets.</h1>
+      <p class="lede">
+        Keep route work, forms, closeout records, and supporting evidence in one account-backed workflow.
+      </p>
+      <div class="actions">
+        <a class="button primary" href="#pricing">View pricing</a>
+        <a class="button" href="/contact/">Contact</a>
+      </div>
+    </div>
+    <aside class="panel" aria-label="Public site status">
+      <dl>
+        <dt>Access</dt>
+        <dd>Checkout first</dd>
+        <dt>Accounts</dt>
+        <dd>Created after verified payment</dd>
+        <dt>Roles</dt>
+        <dd>Driver accounts only on public signup</dd>
+      </dl>
+    </aside>
+  </section>
+
+  <section class="section" id="pricing" aria-labelledby="pricing-title">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Pricing</p>
+        <h2 id="pricing-title">Choose the workflow size.</h2>
+      </div>
+      <p>Paid plans start at checkout. Account creation happens only after the checkout session is verified.</p>
+    </div>
+
+    <div class="grid">
+      <article class="plan">
+        <h3>Solo Driver</h3>
+        <p class="price">$19/mo</p>
+        <p>Daily records, driver forms, and closeout support for one driver.</p>
+        <form action="/billing/checkout/solo-driver/" method="post">
+          {% csrf_token %}
+          <button class="button primary" type="submit">Start checkout</button>
+        </form>
+      </article>
+
+      <article class="plan">
+        <h3>Owner Operator</h3>
+        <p class="price">$49/mo</p>
+        <p>Route records, audit-ready packets, and account-backed document history.</p>
+        <form action="/billing/checkout/owner-operator/" method="post">
+          {% csrf_token %}
+          <button class="button primary" type="submit">Start checkout</button>
+        </form>
+      </article>
+
+      <article class="plan">
+        <h3>Small Fleet</h3>
+        <p class="price">$149/mo</p>
+        <p>Driver workflows, management review, and operational record organization.</p>
+        <form action="/billing/checkout/small-fleet/" method="post">
+          {% csrf_token %}
+          <button class="button primary" type="submit">Start checkout</button>
+        </form>
+      </article>
+    </div>
+  </section>
+</div>
+{% endblock %}

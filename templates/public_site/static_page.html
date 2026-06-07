@@ -1,0 +1,18 @@
+{% extends "django_base.html" %}
+
+{% block title %}{{ page_title }} | MoveDefense{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="static-panel" aria-labelledby="page-title">
+    <p class="eyebrow">MoveDefense</p>
+    <h1 id="page-title">{{ page_title }}</h1>
+    <p class="lede">{{ lede }}</p>
+    <p>{{ body }}</p>
+    <div class="actions">
+      <a class="button primary" href="/#pricing">View pricing</a>
+      <a class="button" href="/">Back home</a>
+    </div>
+  </section>
+</div>
+{% endblock %}
