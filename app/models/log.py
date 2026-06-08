@@ -21,6 +21,11 @@ class DriverLog(db.Model):
     load_size = db.Column(db.String(80), nullable=False)
     depart_load_size = db.Column(db.String(80), nullable=True)
     secondary_load = db.Column(db.String(80), nullable=True)
+    # Day-driver freight detail: what is being hauled and how heavy. Additive to the
+    # plant/load_size routing model the Lacks flow uses; populated in day-driver mode
+    # and carried forward to the next open stop like load_size/secondary_load.
+    commodity = db.Column(db.String(120), nullable=True)
+    weight = db.Column(db.String(40), nullable=True)
     plant_name = db.Column(db.String(20), nullable=False)
     maintenance = db.Column(db.Boolean, default=False)
     fuel = db.Column(db.Boolean, default=False)

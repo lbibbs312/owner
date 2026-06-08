@@ -68,6 +68,19 @@
       {{ form.plant_name(class="form-select", id="arrivalPlant") }}
     </div>
 
+    {% if current_user.is_day_driver %}
+    <div class="row g-3 mb-3">
+      <div class="col-md-7">
+        {{ form.commodity.label(class="form-label") }}
+        {{ form.commodity(class="form-control", placeholder="What are you hauling in? (auto-fills from last stop)") }}
+      </div>
+      <div class="col-md-5">
+        {{ form.weight.label(class="form-label") }}
+        {{ form.weight(class="form-control", placeholder="e.g. 42000") }}
+      </div>
+    </div>
+    {% endif %}
+
     <div class="mb-3 form-check">
       {{ form.hot_parts(class="form-check-input", id="hotPartsCheck") }}
       {{ form.hot_parts.label(class="form-check-label") }}

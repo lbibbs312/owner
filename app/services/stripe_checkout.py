@@ -22,10 +22,14 @@ class BillingPlan:
 BILLING_PLANS = {
     plan.key: plan
     for plan in (
+        BillingPlan("daily-route-pass", "Daily Route Pass", "$3.99/day", "STRIPE_PRICE_DAILY_ROUTE_PASS", "payment"),
         BillingPlan("solo-driver", "Solo Driver", "$19/month", "STRIPE_PRICE_SOLO_DRIVER"),
         BillingPlan("owner-operator", "Owner-Operator", "$49/month", "STRIPE_PRICE_OWNER_OPERATOR"),
         BillingPlan("small-fleet", "Small Fleet", "$149/month", "STRIPE_PRICE_SMALL_FLEET"),
         BillingPlan("fleet-office", "Fleet Office", "$299+/month", "STRIPE_PRICE_FLEET_OFFICE"),
+        # Daily Route Pass export add-ons (one-time, in-app after the included export).
+        BillingPlan("route-pass-extra-export", "Additional route export", "$0.99", "STRIPE_PRICE_ROUTE_PASS_EXTRA_EXPORT", "payment"),
+        BillingPlan("route-pass-export-pack", "3 additional route exports", "$2.49", "STRIPE_PRICE_ROUTE_PASS_EXPORT_PACK", "payment"),
         BillingPlan("driver-forms-pack", "Driver Forms Pack", "$19", "STRIPE_PRICE_DRIVER_FORMS_PACK", "payment"),
         BillingPlan("record-kit", "Owner-Operator Record Kit", "$49", "STRIPE_PRICE_RECORD_KIT", "payment"),
         BillingPlan("ifta-worksheet-bundle", "IFTA Fuel and Odometer Worksheet Bundle", "$99", "STRIPE_PRICE_IFTA_WORKSHEET_BUNDLE", "payment"),

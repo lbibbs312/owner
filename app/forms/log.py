@@ -91,6 +91,8 @@ class DriverLogForm(FlaskForm):
     )
     secondary_unload_reason = TextAreaField("Why?", validators=[Optional()])
     secondary_load = StringField("Second Stop Cargo", validators=[Optional()])
+    commodity = StringField("Commodity (what are you hauling?)", validators=[Optional()])
+    weight = StringField("Weight (lbs)", validators=[Optional()])
     fuel_mileage = IntegerField("Odometer at Fuel or Truck Issue", validators=[Optional()])
     hot_parts = BooleanField("Hot Parts")
     part_number = StringField("Part Number or Hot Part Number")
@@ -154,6 +156,8 @@ class DepartForm(FlaskForm):
         choices=LOAD_SIZE_CHOICES,
         validators=[Optional()],
     )
+    commodity = StringField("Commodity picked up", validators=[Optional()])
+    weight = StringField("Weight (lbs)", validators=[Optional()])
     dock_wait_minutes = IntegerField("Dock Wait Minutes", validators=[Optional()])
     submit = SubmitField("Record Departure")
 

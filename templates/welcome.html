@@ -53,7 +53,13 @@
     .card, .price-card, .service-card { background:#fff; border:1px solid var(--line); border-radius:8px; padding:18px; }
     .card h3, .service-card h3 { margin:0 0 8px; font-size:1.05rem; }
     .card p, .service-card p { margin:0; color:#475569; line-height:1.48; }
-    .pricing-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:14px; }
+    .pricing-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:14px; }
+    .price-card.featured { border-color:var(--blue); box-shadow:0 0 0 1px var(--blue) inset, 0 12px 28px rgba(37,99,235,.14); }
+    .pass-best { margin:-4px 0 2px; color:#475569; font-size:.82rem; font-weight:700; }
+    .pass-badges { display:flex; gap:6px; flex-wrap:wrap; margin:2px 0 2px; }
+    .pass-badge { font-size:.68rem; font-weight:800; border:1px solid var(--line); border-radius:6px; padding:3px 6px; background:#f8fafc; }
+    .pass-badge.warn { border-color:#fde68a; background:#fffbeb; color:#92400e; }
+    .pass-upsell { margin:6px 0 0; color:#64748b; font-size:.74rem; font-weight:700; }
     .price-card { display:flex; flex-direction:column; gap:12px; min-height:100%; }
     .price-name { font-weight:900; font-size:1rem; }
     .price { font-size:1.7rem; font-weight:900; }
@@ -175,6 +181,29 @@
           <div class="checkout-form">
             <a class="btn ghost" href="#pricing">Choose a paid plan</a>
           </div>
+        </article>
+        <article class="price-card featured" id="daily-route-pass">
+          <div class="price-name">Daily Route Pass</div>
+          <div class="price">$3.99<small>/day</small></div>
+          <p class="pass-best">Best for one-time or occasional drivers who need today's route paperwork.</p>
+          <div class="pass-badges">
+            <span class="pass-badge">1 route card</span>
+            <span class="pass-badge">1 export</span>
+            <span class="pass-badge warn">Expires end of day &middot; no history</span>
+          </div>
+          <ul>
+            <li>1 same-day route workspace</li>
+            <li>Route completion + proof/photo upload</li>
+            <li>Choose 1 export: route log, PreTrip, PostTrip, route packet, damage, or fuel/odometer</li>
+            <li>Export / print before it expires</li>
+            <li>Extra exports: 99&cent; per additional export</li>
+            <li>Export pack: 3 for $2.49</li>
+            <li>No saved history, manager review, or multi-driver dashboard</li>
+          </ul>
+          <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='daily-route-pass') }}" method="POST">
+            <button class="btn primary" type="submit">Start Daily Route Pass</button>
+          </form>
+          <p class="pass-upsell">Driving more than 5 days/month? Solo Driver is cheaper.</p>
         </article>
         <article class="price-card">
           <div class="price-name">Solo Driver</div>

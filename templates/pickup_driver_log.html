@@ -21,6 +21,19 @@
       {{ form.part_number(class="form-control", placeholder="Part number from dispatch or shipper") }}
     </div>
 
+    {% if current_user.is_day_driver %}
+    <div class="row g-3 mb-3">
+      <div class="col-md-7">
+        {{ form.commodity.label(class="form-label") }}
+        {{ form.commodity(class="form-control", placeholder="e.g. Steel coil, lumber, pallets") }}
+      </div>
+      <div class="col-md-5">
+        {{ form.weight.label(class="form-label") }}
+        {{ form.weight(class="form-control", placeholder="e.g. 42000") }}
+      </div>
+    </div>
+    {% endif %}
+
     <div class="d-flex flex-wrap gap-3 mb-3">
       <div class="form-check">{{ form.maintenance(class="form-check-input", id="maintenanceCheck") }} {{ form.maintenance.label(class="form-check-label") }}</div>
       <div class="w-100 conditional-panel" id="truckIssuePanel">

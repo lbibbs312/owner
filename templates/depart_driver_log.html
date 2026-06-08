@@ -42,7 +42,7 @@
     </div>
     {% endif %}
 
-    {% if not service_stop and route and route.arrived_at_primary_destination %}
+    {% if not service_stop and ((route and route.arrived_at_primary_destination) or (current_user.is_day_driver and log.commodity)) %}
     <div class="border rounded p-3 mb-3">
       <div class="mb-3">
         {{ form.unloaded_on_departure.label(class="form-label") }}
@@ -81,6 +81,20 @@
       {{ form.destination.label(class="form-label") }}
       {{ form.destination(class="form-select") }}
     </div>
+
+    {% if current_user.is_day_driver %}
+    <div class="row g-3 mb-3" id="dayCargoPanel">
+      <div class="col-md-7">
+        {{ form.commodity.label(class="form-label") }}
+        {{ form.commodity(class="form-control", placeholder="What did you load? e.g. Steel coil") }}
+      </div>
+      <div class="col-md-5">
+        {{ form.weight.label(class="form-label") }}
+        {{ form.weight(class="form-control", placeholder="e.g. 42000") }}
+      </div>
+      <div class="form-text">Filled when you get loaded — carries to your next stop.</div>
+    </div>
+    {% endif %}
 
     <div class="mb-3">
       {{ form.secondary_destination.label(class="form-label") }}

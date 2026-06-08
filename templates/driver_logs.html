@@ -1319,9 +1319,10 @@
                 {% else %}
                   <span class="fw-semibold">{{ route.depart_cargo_desc }}</span>
                 {% endif %}
+                {% if log.commodity %}<span class="cargo-label">Commodity</span><span class="fw-semibold">{{ log.commodity }}{% if log.weight %} &middot; {{ log.weight }} lbs{% endif %}</span>{% endif %}
                 </div>
               {% else %}
-                {{ log.load_size }}
+                {{ log.load_size }}{% if log.commodity %} &middot; {{ log.commodity }}{% if log.weight %} ({{ log.weight }} lbs){% endif %}{% endif %}
               {% endif %}
             </td>
             <td class="parts-cell">

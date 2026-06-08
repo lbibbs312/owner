@@ -50,6 +50,12 @@
       <small class="text-muted">Role changes must be handled by management.</small>
     </div>
 
+    <div class="mb-3 form-check">
+      {{ profile_form.day_driver(class="form-check-input", id="dayDriverToggle") }}
+      {{ profile_form.day_driver.label(class="form-check-label") }}
+      <div><small class="text-muted">Switches arrive/depart questions to commodity + weight for one-day route drivers.</small></div>
+    </div>
+
     <!-- Optional password change -->
     <div class="mb-3">
       {{ profile_form.new_password.label }}:

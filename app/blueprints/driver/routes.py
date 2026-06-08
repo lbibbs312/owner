@@ -154,6 +154,8 @@ def _append_driver_log_flow_event(log, event_type, *, notes=None, payload=None, 
             "arrival_load": log.load_size,
             "departure_load": log.depart_load_size,
             "secondary_load": log.secondary_load,
+            "commodity": log.commodity,
+            "weight": log.weight,
             "no_pickup": bool(log.no_pickup),
             **(payload or {}),
         },
@@ -442,6 +444,9 @@ def _sync_next_open_stop_arrival_cargo(log):
     current_index = next((index for index, item in enumerate(logs) if item.id == log.id), None)
     if current_index is None or current_index + 1 >= len(logs):
         return None
+    departed_empty = (log.depart_load_size or "").strip().lower() in {"", "empty"}
+    onboard_commodity = None if departed_empty else (log.commodity or None)
+    onboard_weight = None if departed_empty else (log.weight or None)
     changed = []
     for next_index in range(current_index + 1, len(logs)):
         next_log = logs[next_index]
@@ -450,12 +455,47 @@ def _sync_next_open_stop_arrival_cargo(log):
         expected = current_load_after_logs(logs[:next_index])
         expected_primary = expected.get("value") or "Empty"
         expected_secondary = expected.get("secondary_value") or None
-        if next_log.load_size == expected_primary and (next_log.secondary_load or None) == expected_secondary:
-            continue
-        next_log.load_size = expected_primary
-        next_log.secondary_load = expected_secondary
-        changed.append(next_log)
+        log_changed = False
+        if next_log.load_size != expected_primary or (next_log.secondary_load or None) != expected_secondary:
+            next_log.load_size = expected_primary
+            next_log.secondary_load = expected_secondary
+            log_changed = True
+        # Day-driver freight detail carries forward with the load until it changes.
+        if (next_log.commodity or None) != onboard_commodity:
+            next_log.commodity = onboard_commodity
+            log_changed = True
+        if (next_log.weight or None) != onboard_weight:
+            next_log.weight = onboard_weight
+            log_changed = True
+        if log_changed:
+            changed.append(next_log)
     return changed[-1] if changed else None
+
+
+def _onboard_day_cargo(driver_id, route_date):
+    """Most-recent commodity/weight still onboard for a day driver.
+
+    Returns ``(None, None)`` once the latest departure left empty (unloaded).
+    """
+    logs = sorted(
+        _active_driver_logs_query().filter_by(driver_id=driver_id, date=route_date).all(),
+        key=_driver_log_sort_key,
+    )
+    for log in reversed(logs):
+        if log.depart_time and (log.depart_load_size or "").strip().lower() in {"", "empty"}:
+            return (None, None)
+        if log.commodity or log.weight:
+            return (log.commodity, log.weight)
+    return (None, None)
+
+
+def _prefill_day_driver_cargo(form, driver_id, route_date):
+    """Auto-fill the arrival form's commodity/weight from what is still onboard."""
+    commodity, weight = _onboard_day_cargo(driver_id, route_date)
+    if commodity and not (form.commodity.data or "").strip():
+        form.commodity.data = commodity
+    if weight and not (form.weight.data or "").strip():
+        form.weight.data = weight
 
 
 def _driver_log_context_for(log):
@@ -3682,6 +3722,8 @@ def new_driving_log():
             plant_name=form.plant_name.data,
             load_size=arrival_load,
             secondary_load=arrival_secondary_load,
+            commodity=(form.commodity.data or "").strip() or None,
+            weight=(form.weight.data or "").strip() or None,
             downtime_reason=_compose_downtime_reason([], _form_truck_issue_text(form), form.maintenance.data),
             part_number=_form_hot_part_number(form),
             hot_parts=bool(form.hot_parts.data),
@@ -3732,6 +3774,8 @@ def new_driving_log():
         form.plant_name.data = expected_destination
     form.load_size.data = current_load_value if current_load_value != "Empty" else "Empty"
     form.secondary_load.data = current_secondary_value
+    if getattr(current_user, "is_day_driver", False):
+        _prefill_day_driver_cargo(form, current_user.id, local_date)
     if request.args.get("report_type") == "truck_issue":
         form.maintenance.data = True
     elif request.args.get("report_type") == "route_note":
@@ -4297,7 +4341,8 @@ def depart_driver_log(log_id):
     if form.validate_on_submit():
         primary_unloaded = None
         primary_unload_reason = None
-        if not service_stop and route.get("arrived_at_primary_destination"):
+        day_driver_carrying = getattr(current_user, "is_day_driver", False) and bool(log.commodity)
+        if not service_stop and (route.get("arrived_at_primary_destination") or day_driver_carrying):
             primary_unloaded = form.unloaded_on_departure.data
             if primary_unloaded not in {"yes", "no"}:
                 return quick_depart_error("Please answer whether you got unloaded.")
@@ -4324,9 +4369,13 @@ def depart_driver_log(log_id):
         if service_stop:
             departure_load = route.get("after_arrival_primary") or load_display(log.load_size) or "Empty"
         elif form.got_loaded.data == "yes":
-            if not form.destination.data:
+            if form.destination.data:
+                departure_load = destination_load_value(form.destination.data)
+            elif getattr(current_user, "is_day_driver", False):
+                # Day drivers describe the load by commodity/weight, not a plant destination.
+                departure_load = "Loaded"
+            else:
                 return quick_depart_error("Please select where the primary load is going.")
-            departure_load = destination_load_value(form.destination.data)
         elif form.got_loaded.data == "no":
             departure_load = after_unload_primary
         else:
@@ -4382,6 +4431,14 @@ def depart_driver_log(log_id):
             log.dock_wait_minutes = _auto_wait_minutes_for_departure(log, now_local)
             log.depart_load_size = departure_load
             log.secondary_load = secondary_load or None
+            # Day-driver: capture commodity + weight when a load is picked up here;
+            # clear it when the truck leaves empty so nothing lingers onboard.
+            if form.got_loaded.data == "yes":
+                log.commodity = (form.commodity.data or "").strip() or log.commodity
+                log.weight = (form.weight.data or "").strip() or log.weight
+            elif primary_unloaded == "yes" or (departure_load == "Empty" and not (secondary_load or None)):
+                log.commodity = None
+                log.weight = None
             _set_departure_unload_reasons(log, primary_unload_reason, secondary_drop_reason)
             log.no_pickup = False if service_stop else departure_load == "Empty" and not log.secondary_load
             _sync_next_open_stop_arrival_cargo(log)
@@ -4492,6 +4549,8 @@ def pickup_driver_log(log_id):
             return render_template("pickup_driver_log.html", form=form, log=log)
         log.depart_time = depart_time
         log.depart_load_size = destination_load_value(form.plant_name.data)
+        log.commodity = (form.commodity.data or "").strip() or log.commodity
+        log.weight = (form.weight.data or "").strip() or log.weight
         log.hot_parts = bool(form.hot_parts.data)
         log.part_number = _form_hot_part_number(form) or (log.part_number if log.hot_parts else None)
         log.dock_wait_minutes = _auto_wait_minutes_for_departure(log, now_local)
@@ -6073,6 +6132,7 @@ def profile():
         current_user.last_name = form.last_name.data
         current_user.employee_id = form.employee_id.data
         current_user.department = form.department.data
+        current_user.day_driver = bool(form.day_driver.data)
         current_user.email = form.email.data
         if form.new_password.data:
             current_user.set_password(form.new_password.data)

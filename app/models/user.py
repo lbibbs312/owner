@@ -11,6 +11,10 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255))
     role = db.Column(db.String(20), default="driver")  # "driver" or "management"
+    # Day-driver workspace mode: swaps the Lacks plant/part questions for the
+    # generic commodity + weight DVIR flow. Off by default so existing drivers
+    # keep the plant-transfer flow unchanged.
+    day_driver = db.Column(db.Boolean, default=False)
     first_name = db.Column(db.String(64), nullable=True)
     last_name = db.Column(db.String(64), nullable=True)
     employee_id = db.Column(db.String(32), nullable=True)
@@ -41,6 +45,10 @@ class User(db.Model, UserMixin):
     def display_name(self):
         name = " ".join(part for part in [self.first_name, self.last_name] if part)
         return name or self.username
+
+    @property
+    def is_day_driver(self):
+        return bool(self.day_driver)
 
     @property
     def division_label(self):

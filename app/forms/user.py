@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import PasswordField, StringField, SubmitField
+from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo
 
 
@@ -9,6 +9,7 @@ class ProfileForm(FlaskForm):
     last_name = StringField("Last Name")
     employee_id = StringField("ID Number")
     department = StringField("Department")
+    day_driver = BooleanField("Day-driver workspace (commodity + weight DVIR)")
     email = StringField("Email", validators=[DataRequired(), Email()])
     new_password = PasswordField("New Password")
     confirm_password = PasswordField(
