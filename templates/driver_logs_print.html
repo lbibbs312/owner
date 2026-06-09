@@ -44,8 +44,8 @@
     .driver-name { margin: 1px 0; font-size: 15pt; font-weight: 900; text-transform: uppercase; line-height: 1; }
     .driver-route-meta { font-size: 8.4pt; font-weight: 700; color: var(--md-muted); }
     .document-meta { font-size: 8pt; line-height: 1.5; }
-    .document-meta .row { display: grid; grid-template-columns: 0.95in minmax(0, 1fr); gap: 0.08in; }
-    .document-meta .k { color: var(--md-muted); font-weight: 700; }
+    .document-meta .row { display: grid; grid-template-columns: 1.05in minmax(0, 1fr); gap: 0.06in; align-items: baseline; }
+    .document-meta .k { color: var(--md-muted); font-weight: 700; white-space: nowrap; }
     .document-meta .v { font-weight: 700; text-align: right; }
     .document-meta .v.mono { font-weight: 900; }
     .document-meta .spacer { height: 5px; }
@@ -101,7 +101,7 @@
     @media screen { body { padding: 1rem; } }
     @media print {
       body { padding: 0; }
-      .no-print, .print-controls, .print-btn, .email-btn { display: none !important; }
+      .no-print, .print-controls, .print-btn, .email-btn, .print-feedback, [data-print-feedback] { display: none !important; }
       .summary-cards, .summary-card, .rs-tile, table.timeline tr { break-inside: avoid; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
@@ -127,10 +127,11 @@
   {% set sheet = log_sheet|default({}) %}
   {% set print_driver_name = sheet.driver_name or (current_user.display_name if current_user else '') %}
   {% set route_date_label = sheet.route_date_label or (the_date.strftime('%b %d, %Y') if the_date else '') %}
+  {% set clean_route_no = ('RS-' ~ sheet.route_date.strftime('%Y-%m-%d')) if sheet.route_date else (('RS-' ~ the_date.strftime('%Y-%m-%d')) if the_date else (document_meta.document_no or '')) %}
   {# ELD hours-of-service tiles only appear when that data is actually captured (none yet), per print-only-real-data rule. #}
   <div class="print-controls no-print">
     <button class="print-btn" type="button" data-print-document>Print Document</button>
-    <a class="email-btn" href="{{ attachment_url or url_for('driver.driver_logs_attachment', date=the_date.isoformat()) }}" data-save-pdf>Save PDF</a>
+    <button class="email-btn" type="button" data-save-pdf>Save PDF</button>
   </div>
   <div class="print-feedback no-print" data-print-feedback aria-live="polite"></div>
 
@@ -146,13 +147,11 @@
         <div class="driver-route-meta">{% if sheet.route_label %}{{ sheet.route_label }} &middot; {% endif %}{{ route_date_label }}</div>
       </div>
       <div class="document-meta">
-        <div class="row"><span class="k">Route Sheet No:</span><span class="v mono">{{ document_meta.document_no }}</span></div>
+        <div class="row"><span class="k">Route Sheet No:</span><span class="v mono">{{ clean_route_no }}</span></div>
         <div class="row"><span class="k">Generated:</span><span class="v">{{ document_meta.generated_at }}</span></div>
         <div class="row"><span class="k">Page:</span><span class="v">{{ document_meta.page }}</span></div>
-        {% if sheet.truck or sheet.trailer or sheet.route_id %}<div class="spacer"></div>{% endif %}
         {% if sheet.truck %}<div class="row"><span class="k">Truck / Trailer:</span><span class="v">{{ sheet.truck }}{% if sheet.trailer %} / {{ sheet.trailer }}{% endif %}</span></div>
         {% elif sheet.trailer %}<div class="row"><span class="k">Trailer:</span><span class="v">{{ sheet.trailer }}</span></div>{% endif %}
-        {% if sheet.route_id %}<div class="row"><span class="k">Route ID:</span><span class="v">{{ sheet.route_id }}</span></div>{% endif %}
       </div>
     </header>
 
@@ -265,10 +264,10 @@
     var saveLink = document.querySelector("[data-save-pdf]");
     if (saveLink) {
       saveLink.addEventListener("click", function () {
+        // Save PDF uses the same branded print layout as Print Document —
+        // choose "Save as PDF" as the destination in the print dialog.
         showFeedback("Preparing PDF...");
-        window.setTimeout(function () {
-          showFeedback("PDF download started. If your browser blocked it, use the browser download prompt.");
-        }, 900);
+        window.print();
       });
     }
   })();

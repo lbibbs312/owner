@@ -2174,7 +2174,25 @@ def _sheet_cargo_label(log, route, row_state, key):
     return value or "Empty"
 
 
+_SHEET_NOTE_NOISE = {"stop complete", "picked up load", "departed empty", "unloaded, departed empty"}
+
+
+def _sheet_note_is_noise(line):
+    """Drop flow narration already conveyed by Time / Wait and Load Flow columns."""
+    low = (line or "").strip().lower().rstrip(".")
+    if low in _SHEET_NOTE_NOISE:
+        return True
+    if low.startswith("dock time"):
+        return True
+    if low.endswith(": pickup") or low.endswith(": delivery"):
+        return True
+    return False
+
+
 def _sheet_stop_notes(log, route, issue, route_task_events, row_state, plant_name, *, index, route_context):
+    # Notes carry only meaningful exceptions/details — the routine flow narrative
+    # ("Stop complete", "Dock time", "Picked up load", "Departed empty", plant
+    # pickup/delivery labels) already lives in the Time / Wait and Load Flow cells.
     notes = []
     if not log.depart_time:
         if getattr(route_context, "route_status", None) == "finalized":
@@ -2183,33 +2201,28 @@ def _sheet_stop_notes(log, route, issue, route_task_events, row_state, plant_nam
             notes.append("Current stop: departure pending")
     elif index == 1:
         notes.append("Shift start")
-    else:
-        notes.append("Stop complete")
     for line in (route or {}).get("summary_lines") or []:
-        if line not in notes:
-            notes.append(line)
-    action = (route or {}).get("action")
-    if action and action not in {"At stop", "Completed"} and action not in notes:
-        notes.append(action)
+        if _sheet_note_is_noise(line) or line in notes:
+            continue
+        notes.append(line)
     if (route or {}).get("unload_blocked"):
         notes.append(f"Not unloaded: {(route or {}).get('unload_reason') or 'reason not recorded'}")
     if (route or {}).get("secondary_drop_blocked"):
         notes.append(f"Second stop not unloaded: {(route or {}).get('secondary_drop_reason') or 'reason not recorded'}")
     if (route or {}).get("deviation_reason"):
         notes.append(f"Deviation: {(route or {}).get('deviation_reason')}")
-    if log.no_pickup:
+    if log.no_pickup and "No pickup" not in notes:
         notes.append("No pickup")
-    if log.commodity:
-        weight = f" ({log.weight} lbs)" if log.weight else ""
-        notes.append(f"Commodity: {log.commodity}{weight}")
     if log.hot_parts or log.part_number:
         notes.append((("Hot part " if log.hot_parts else "") + (log.part_number or "")).strip())
     if log.maintenance or (issue or {}).get("truck"):
         notes.append(f"Truck issue: {(issue or {}).get('truck') or 'Maintenance marked'}")
     if (issue or {}).get("route"):
         notes.append(f"Route issue: {(issue or {}).get('route')}")
-    if log.fuel and log.fuel_mileage is not None:
-        notes.append(f"Fuel/odometer recorded: {_sheet_miles(log.fuel_mileage)}")
+    if log.downtime_reason and log.downtime_reason not in notes:
+        notes.append(log.downtime_reason)
+    if log.fuel:
+        notes.append("Fuel stop")
     for event in route_task_events or []:
         notes.append(f"{event.kind_label} {event.label}: {event.status}")
     return [note for note in notes if note]
@@ -2291,7 +2304,7 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
                 "load_in": inbound,
                 "load_out": outbound,
                 "miles_since": _sheet_miles(miles_since),
-                "fuel": _sheet_miles(log.fuel_mileage) if log.fuel and log.fuel_mileage is not None else "",
+                "fuel": "",  # real per-stop fuel amounts (gallons) are not captured today; odometer goes to mileage
                 "notes": _sheet_stop_notes(
                     log,
                     route,
@@ -2354,13 +2367,16 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
     start_mileage = getattr(first_pretrip, "start_mileage", None)
     last_odometer = getattr(last_posttrip, "end_mileage", None) or (previous_mileage if previous_mileage != start_mileage else None)
     miles_by_stop = "; ".join(f"Stop {row['stop_no']}: {row['miles_since']}" for row in timeline_rows if row["miles_since"])
+    # Odometer readings logged at fuel stops are MILEAGE facts, not fuel amounts.
+    fuel_stop_odometer = "; ".join(f"Stop {event['stop'] or '?'} {event['plant']}: {event['mileage']}" for event in fuel_events)
     show_miles_col = any(row["miles_since"] for row in timeline_rows)
-    has_mileage = show_miles_col or total_miles is not None or start_mileage is not None or last_odometer is not None
+    has_mileage = show_miles_col or total_miles is not None or start_mileage is not None or last_odometer is not None or bool(fuel_stop_odometer)
 
-    fuel_by_stop = "; ".join(f"Stop {event['stop'] or '?'} {event['plant']}: {event['mileage']}" for event in fuel_events)
     fuel_purchases = "; ".join(_fuel_record_label(record) for record in fuel_records)
+    # Fuel means real fuel (gallons/levels). The per-stop Fuel column only shows
+    # when an actual fuel amount was captured per stop (odometer never qualifies).
     show_fuel_col = any(row["fuel"] for row in timeline_rows)
-    has_fuel = show_fuel_col or has_fuel_amount or bool(fuel_records) or bool(fuel_events)
+    has_fuel = show_fuel_col or has_fuel_amount or bool(fuel_records)
 
     status_label = _sheet_route_status_label(route_context, logs)
     summary = route_sheet_data.get("summary") or {}
@@ -2429,10 +2445,10 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
             ("Last recorded odometer", _sheet_miles(last_odometer)),
             ("Total route miles", _sheet_miles(total_miles)),
             ("Miles by stop", miles_by_stop),
+            ("Fuel-stop odometer", fuel_stop_odometer),
         ], show=has_mileage),
         _sheet_card("Fuel Summary", [
             ("Starting fuel", _sheet_clean(getattr(first_pretrip, "start_fuel_level", None))),
-            ("Fuel records by stop", fuel_by_stop),
             ("Fuel purchases", fuel_purchases),
             ("Last / remaining fuel", _sheet_clean(getattr(last_posttrip, "end_fuel_level", None))),
             ("Estimated fuel used", f"{total_fuel:g} gal" if has_fuel_amount else ""),
