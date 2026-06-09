@@ -3083,7 +3083,7 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
     y -= 14
     mileage = f"{summary['total_miles']} miles" if summary["total_miles"] is not None else ("Pending posttrip" if logs else "Not started")
     pdf.text(44, y, f"Total Stops: {summary['total_stops']}    Open Stops: {summary['open_stops']}", size=8)
-    pdf.text(320, y, f"Mileage: {mileage}    Total Wait: {summary['total_wait_minutes']} min", size=8)
+    pdf.text(320, y, f"Mileage: {mileage}    Total Wait: {_sheet_minutes(summary['total_wait_minutes'] or 0)}", size=8)
     y -= 20
     pdf.text(36, y, "1. STOP TIMELINE", size=11, bold=True)
     y -= 12

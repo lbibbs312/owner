@@ -58,6 +58,18 @@ def wait_minutes_for_log(log, now=None):
     return None
 
 
+def format_duration_minutes(minutes):
+    """Render a minute count as '45 min', '1 hr 30 min', or '2 hr'."""
+    try:
+        minutes = int(minutes)
+    except (TypeError, ValueError):
+        return ""
+    if minutes < 60:
+        return f"{minutes} min"
+    hours, remainder = divmod(minutes, 60)
+    return f"{hours} hr {remainder} min" if remainder else f"{hours} hr"
+
+
 def dock_time_review_label(minutes):
     if minutes is None:
         return ""
@@ -69,7 +81,7 @@ def dock_time_review_label(minutes):
         return "Extended wait — manager review required"
     if minutes >= 120:
         return "Long wait — needs review"
-    return f"Dock time: {minutes} min"
+    return f"Dock time: {format_duration_minutes(minutes)}"
 
 
 def wait_label_for_log(log, now=None):

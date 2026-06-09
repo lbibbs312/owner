@@ -160,7 +160,7 @@
       <div><span>Total Stops:</span><strong>{{ summary.total_stops }}</strong></div>
       <div><span>Open Stops:</span><strong>{{ summary.open_stops }}</strong></div>
       <div><span>Mileage:</span><strong>{% if summary.total_miles is not none %}{{ summary.total_miles }} miles{% elif logs %}Pending posttrip{% else %}Not started{% endif %}</strong></div>
-      <div><span>Total Wait:</span><strong>{{ summary.total_wait_minutes }} min</strong></div>
+      <div><span>Total Wait:</span><strong>{{ summary.total_wait_minutes|duration_minutes }}</strong></div>
       <div><span>Route Status:</span><strong>{% if route_context and route_context.route_status == 'completed' %}Route completed and awaiting final review{% elif route_context and route_context.route_status == 'finalized' %}Route finalized{% elif logs %}Route open and not finalized{% else %}No route recorded{% endif %}</strong></div>
     </div>
 
