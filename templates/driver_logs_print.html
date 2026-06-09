@@ -222,6 +222,7 @@
         {% endfor %}
       </div>
     {% endif %}
+    {% if sheet.hours and sheet.hours.disclaimer %}<!-- {{ sheet.hours.disclaimer }} -->{% endif %}
 
     <h2 class="section-title">Signatures</h2>
     <div class="signature-grid">

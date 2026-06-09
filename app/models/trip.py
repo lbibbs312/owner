@@ -120,6 +120,28 @@ class ShiftRecord(db.Model):
     week_ending = db.Column(db.Date, nullable=True)
     driver_signature = db.Column(db.Text, nullable=True)
     signature_timestamp = db.Column(db.DateTime, nullable=True)
+    # Hours Check mode: None/"short_haul" (default short-haul/local) or "hos_companion".
+    # This is a driver-entered HOS *companion*, not a certified ELD.
+    hos_mode = db.Column(db.String(20), nullable=True)
 
     user = db.relationship("User", backref="shift_records")
     pretrip = db.relationship("PreTrip", backref="shift_record")
+
+
+class RouteBreak(db.Model):
+    """A driver-tapped break event (Start Break / End Break) for the Hours Check layer.
+
+    Stores only what the driver actually captured; an open break has end_time=None.
+    Not an ELD record — these are driver-entered route events.
+    """
+
+    __tablename__ = "route_break"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    break_date = db.Column(db.Date, nullable=True)
+    break_type = db.Column(db.String(40), nullable=True)
+    start_time = db.Column(db.DateTime, nullable=False)
+    end_time = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship("User", backref="route_breaks")

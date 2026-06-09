@@ -27,6 +27,7 @@ from app.forms.plant_transfer import PlantTransferForm
 from app.forms.shift import EndOfDayForm
 from app.forms.trip import PostTripForm, PreTripForm
 from app.forms.user import ProfileForm
+from app.services import hos as hos_service
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
 from app.services.accident_packets import (
@@ -106,6 +107,7 @@ from app.models import (
     PostTrip,
     ProofMediaFile,
     PreTrip,
+    RouteBreak,
     ShiftRecord,
     Task,
     User,
@@ -2080,6 +2082,23 @@ def _sheet_elapsed_minutes(start_dt, end_dt):
     return max(0, int((end_dt - start_dt).total_seconds() // 60))
 
 
+def _route_drive_minutes(logs):
+    """Total drive time from depart->next-arrive segments (driver-entered events)."""
+    logs = list(logs or [])
+    total = 0
+    captured = False
+    for depart_log, arrive_log in zip(logs, logs[1:]):
+        if not depart_log.depart_time or not arrive_log.arrive_time:
+            continue
+        depart_dt = _local_dt_for_hhmm(depart_log.date, depart_log.depart_time)
+        arrive_dt = _arrival_local_dt_for_log(arrive_log)
+        minutes = _sheet_elapsed_minutes(depart_dt, arrive_dt)
+        if minutes is not None:
+            total += minutes
+            captured = True
+    return total if captured else None
+
+
 def _sheet_route_minutes(logs, shift_record=None, *, now=None):
     local_tz = pytz.timezone("America/Detroit")
     now_local = now or datetime.now(local_tz)
@@ -2387,6 +2406,23 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
         if _sheet_real(value)
     ]
 
+    drive_minutes = _route_drive_minutes(logs)
+    route_breaks = _route_breaks_for_driver_date(getattr(driver, "id", None), route_date)
+    hours = hos_service.build_hours_summary(
+        mode=getattr(shift_record, "hos_mode", None),
+        shift_start=getattr(shift_record, "start_time", None),
+        release_time=getattr(last_posttrip, "created_at", None) or getattr(shift_record, "end_time", None),
+        on_duty_minutes=route_minutes,
+        drive_minutes=drive_minutes,
+        wait_minutes=total_wait_minutes,
+        first_departure=_sheet_first_departure_label(logs),
+        last_arrival=_sheet_last_arrival_label(logs),
+        report_start_label=service_start,
+        release_label=posttrip_release,
+        breaks=route_breaks,
+        now=now,
+    )
+
     cards = [card for card in [
         _sheet_card("Mileage Summary", [
             ("Starting odometer", _sheet_miles(start_mileage)),
@@ -2406,10 +2442,14 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
             ("First departure", _sheet_first_departure_label(logs)),
             ("Last arrival", _sheet_last_arrival_label(logs)),
             ("Total on-duty", _sheet_minutes(route_minutes)),
+            ("Total drive time", hos_service.format_minutes(drive_minutes)),
             ("Total wait / dock time", _sheet_minutes(total_wait_minutes)),
             ("Total service time", _sheet_minutes(service_minutes)),
             ("Posttrip / release time", posttrip_release),
         ]),
+        _sheet_card("Breaks", [(f"Break {i}", line) for i, line in enumerate(hours["breaks"], 1)]),
+        _sheet_card("Short-Haul Check", hours["short_haul"]),
+        _sheet_card("HOS Companion", hours["companion"]),
         _sheet_card("Vehicle / Maintenance", [
             ("Truck", truck),
             ("Trailer", trailer),
@@ -2452,6 +2492,7 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
         "summary_tiles": summary_tiles,
         "timeline_rows": timeline_rows,
         "cards": cards,
+        "hours": hours,
     }
 
 
@@ -6601,6 +6642,81 @@ def mobile_ryder_service():
     )
     flash("Ryder service status saved.", "success")
     return redirect(url_for("driver.new_driving_log" if next_target == "new_log" else "driver.mobile_dashboard"))
+
+
+def _route_breaks_for_driver_date(driver_id, route_date):
+    if not driver_id or not route_date:
+        return []
+    return (
+        RouteBreak.query.filter_by(user_id=driver_id, break_date=route_date)
+        .order_by(RouteBreak.start_time.asc(), RouteBreak.id.asc())
+        .all()
+    )
+
+
+def _open_route_break(driver_id):
+    if not driver_id:
+        return None
+    return (
+        RouteBreak.query.filter_by(user_id=driver_id, end_time=None)
+        .order_by(RouteBreak.start_time.desc(), RouteBreak.id.desc())
+        .first()
+    )
+
+
+@bp.route("/mobile/break/start", methods=["POST"])
+@login_required
+def mobile_break_start():
+    if current_user.role == "management":
+        return redirect(url_for("manager.manager_dashboard"))
+    existing = _open_route_break(current_user.id)
+    if existing:
+        flash("A break is already in progress.", "info")
+        return redirect(url_for("driver.mobile_dashboard"))
+    break_type = (request.form.get("break_type") or "").strip() or "Break"
+    if break_type not in {*hos_service.BREAK_TYPES, "Break"}:
+        break_type = "Break"
+    now_local, _ = _now_local_and_utc()
+    db.session.add(RouteBreak(
+        user_id=current_user.id,
+        break_date=now_local.date(),
+        break_type=break_type,
+        start_time=datetime.utcnow(),
+    ))
+    db.session.commit()
+    flash(f"{break_type} break started.", "success")
+    return redirect(url_for("driver.mobile_dashboard"))
+
+
+@bp.route("/mobile/break/end", methods=["POST"])
+@login_required
+def mobile_break_end():
+    if current_user.role == "management":
+        return redirect(url_for("manager.manager_dashboard"))
+    open_break = _open_route_break(current_user.id)
+    if not open_break:
+        flash("No break is in progress.", "info")
+        return redirect(url_for("driver.mobile_dashboard"))
+    open_break.end_time = datetime.utcnow()
+    db.session.commit()
+    flash("Break ended.", "success")
+    return redirect(url_for("driver.mobile_dashboard"))
+
+
+@bp.route("/mobile/hours-mode", methods=["POST"])
+@login_required
+def mobile_hours_mode():
+    if current_user.role == "management":
+        return redirect(url_for("manager.manager_dashboard"))
+    mode = hos_service.normalize_mode((request.form.get("hos_mode") or "").strip())
+    shift = _open_shift_for_driver(current_user.id)
+    if shift:
+        shift.hos_mode = mode
+        db.session.commit()
+        flash("Hours Check mode updated.", "success")
+    else:
+        flash("Start a shift (pretrip) before changing the Hours Check mode.", "info")
+    return redirect(url_for("driver.mobile_dashboard"))
 
 
 @bp.route("/dashboard", methods=["GET"])

@@ -7,7 +7,7 @@ resolve regardless of which model is imported first.
 """
 from app.models.user import User
 from app.models.task import Task
-from app.models.trip import PreTrip, PostTrip, ShiftRecord
+from app.models.trip import PreTrip, PostTrip, ShiftRecord, RouteBreak
 from app.models.log import DriverLog, DriverLogPhoto
 from app.models.messaging import ChatMessage, Announcement, DirectMessage
 from app.models.knowledge import KnowledgeBaseEntry
@@ -65,6 +65,7 @@ __all__ = [
     "PreTrip",
     "PostTrip",
     "ShiftRecord",
+    "RouteBreak",
     "DriverLog",
     "DriverLogPhoto",
     "ChatMessage",

@@ -10081,3 +10081,85 @@ def test_manager_review_resolve_requires_pending_request_newer_than_latest_resol
             event_type="manager_review_resolved",
             stop_id=stale_log_id,
         ).count() == 2
+
+
+def test_hours_check_breaks_and_short_haul_summary(client, app):
+    from datetime import date
+
+    with app.app_context():
+        create_user("hos_driver", "hos@example.com", "driver", first_name="Lamar")
+
+    login(client, "hos_driver")
+
+    # Start Break stores an open break event with the chosen type.
+    start = client.post("/mobile/break/start", data={"break_type": "Lunch"})
+    assert start.status_code == 302
+    with app.app_context():
+        from app.models import RouteBreak
+
+        brk = RouteBreak.query.one()
+        assert brk.break_type == "Lunch"
+        assert brk.start_time is not None
+        assert brk.end_time is None
+
+    # End Break closes the same event.
+    end = client.post("/mobile/break/end", data={})
+    assert end.status_code == 302
+    with app.app_context():
+        from app.models import RouteBreak
+
+        assert RouteBreak.query.one().end_time is not None
+
+    # A driving log so the sheet has a route to summarize.
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, User
+
+        driver = User.query.filter_by(username="hos_driver").one()
+        db.session.add(DriverLog(
+            driver_id=driver.id, date=date.today(), plant_name="RE",
+            load_size="Empty", arrive_time="08:00", depart_time="09:00", dock_wait_minutes=20,
+        ))
+        db.session.commit()
+
+    print_page = client.get("/driver_logs_print")
+    assert print_page.status_code == 200
+    # Short-haul is the default mode; HOS companion card stays hidden unless enabled.
+    assert b"<h3>Short-Haul Check</h3>" in print_page.data
+    assert b"<h3>HOS Companion</h3>" not in print_page.data
+    # The captured break prints; nothing announces missing optional data.
+    assert b"Lunch" in print_page.data
+    assert b"Not recorded" not in print_page.data
+    assert b"Unknown" not in print_page.data
+    # Internal-only disclaimer is present as a comment, not user-facing text.
+    assert b"is not a certified ELD" in print_page.data
+
+
+def test_hours_companion_section_appears_only_when_enabled(client, app):
+    from datetime import date, datetime, timedelta
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, PreTrip, ShiftRecord, User
+
+        create_user("hos_companion_driver", "hosc@example.com", "driver", first_name="Pat")
+        driver = User.query.filter_by(username="hos_companion_driver").one()
+        pretrip = PreTrip(user_id=driver.id, pretrip_date=date.today(), truck_number="MD-1")
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add(ShiftRecord(
+            user_id=driver.id, pretrip_id=pretrip.id,
+            start_time=datetime.utcnow() - timedelta(hours=6), hos_mode="hos_companion",
+        ))
+        db.session.add(DriverLog(
+            driver_id=driver.id, date=date.today(), plant_name="RE",
+            load_size="Empty", arrive_time="08:00", depart_time="09:00", dock_wait_minutes=10,
+        ))
+        db.session.commit()
+
+    login(client, "hos_companion_driver")
+    print_page = client.get("/driver_logs_print")
+    assert print_page.status_code == 200
+    assert b"<h3>HOS Companion</h3>" in print_page.data
+    assert b"<h3>Short-Haul Check</h3>" not in print_page.data
+    assert b"Not recorded" not in print_page.data
