@@ -15,6 +15,9 @@ class User(db.Model, UserMixin):
     # generic commodity + weight DVIR flow. Off by default so existing drivers
     # keep the plant-transfer flow unchanged.
     day_driver = db.Column(db.Boolean, default=False)
+    # Day-driver route classification (drives the Hours Check display, not an ELD):
+    # "local_short_haul" (default), "general_freight" (owner-operator), "company_shuttle".
+    route_type = db.Column(db.String(30), nullable=True)
     first_name = db.Column(db.String(64), nullable=True)
     last_name = db.Column(db.String(64), nullable=True)
     employee_id = db.Column(db.String(32), nullable=True)
@@ -49,6 +52,10 @@ class User(db.Model, UserMixin):
     @property
     def is_day_driver(self):
         return bool(self.day_driver)
+
+    @property
+    def day_driver_route_type(self):
+        return self.route_type or "local_short_haul"
 
     @property
     def division_label(self):

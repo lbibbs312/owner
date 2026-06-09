@@ -14,6 +14,7 @@ NOT_AN_ELD = "MoveDefense HOS Companion uses driver-entered route events and is 
 
 SHORT_HAUL = "short_haul"
 HOS_COMPANION = "hos_companion"
+HOURS_ONLY = "hours_only"  # show captured time facts only (no short-haul/companion check)
 
 WINDOW_14H_MIN = 14 * 60
 DRIVE_LIMIT_11H_MIN = 11 * 60
@@ -25,7 +26,11 @@ BREAK_TYPES = ["30-minute", "Lunch", "Off-duty", "On-duty not driving"]
 
 
 def normalize_mode(value):
-    return HOS_COMPANION if value == HOS_COMPANION else SHORT_HAUL
+    if value == HOS_COMPANION:
+        return HOS_COMPANION
+    if value == HOURS_ONLY:
+        return HOURS_ONLY
+    return SHORT_HAUL
 
 
 def format_minutes(minutes):

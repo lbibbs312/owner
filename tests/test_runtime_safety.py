@@ -169,10 +169,18 @@ def test_deploy_db_bootstraps_empty_database_and_stamps_head(monkeypatch):
     assert result.exit_code == 0, result.output
     assert "Database schema ready" in result.output
     with app.app_context():
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+
         tables = set(inspect(db.engine).get_table_names())
         assert "user" in tables
         assert "driver_log" in tables
-        assert db.session.execute(text("SELECT version_num FROM alembic_version")).scalar() == "5f60718293a4"
+        # Bootstrapping stamps the latest migration head (read it dynamically so new
+        # migrations don't require touching this test).
+        alembic_cfg = Config()
+        alembic_cfg.set_main_option("script_location", "migrations")
+        expected_head = ScriptDirectory.from_config(alembic_cfg).get_current_head()
+        assert db.session.execute(text("SELECT version_num FROM alembic_version")).scalar() == expected_head
 
     response = app.test_client().get("/readyz")
     assert response.status_code == 200

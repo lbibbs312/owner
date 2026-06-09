@@ -56,6 +56,12 @@
       <div><small class="text-muted">Switches arrive/depart questions to commodity + weight for one-day route drivers.</small></div>
     </div>
 
+    <div class="mb-3">
+      {{ profile_form.route_type.label(class="form-label") }}
+      {{ profile_form.route_type(class="form-select", id="routeTypeSelect") }}
+      <small class="text-muted">Local / Short-Haul shows the Short-Haul Check; General Freight / Owner-Operator shows hours only unless HOS Companion is enabled.</small>
+    </div>
+
     <!-- Optional password change -->
     <div class="mb-3">
       {{ profile_form.new_password.label }}:

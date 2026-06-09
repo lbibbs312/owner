@@ -2424,8 +2424,18 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
 
     drive_minutes = _route_drive_minutes(logs)
     route_breaks = _route_breaks_for_driver_date(getattr(driver, "id", None), route_date)
+    # Hours Check display follows the day-driver route type unless HOS Companion is
+    # explicitly enabled: General Freight / owner-operator shows hours facts only.
+    driver_route_type = getattr(driver, "day_driver_route_type", None) or "local_short_haul"
+    shift_hos_mode = getattr(shift_record, "hos_mode", None)
+    if shift_hos_mode == hos_service.HOS_COMPANION:
+        effective_hos_mode = hos_service.HOS_COMPANION
+    elif driver_route_type == "general_freight":
+        effective_hos_mode = hos_service.HOURS_ONLY
+    else:
+        effective_hos_mode = hos_service.SHORT_HAUL
     hours = hos_service.build_hours_summary(
-        mode=getattr(shift_record, "hos_mode", None),
+        mode=effective_hos_mode,
         shift_start=getattr(shift_record, "start_time", None),
         release_time=getattr(last_posttrip, "created_at", None) or getattr(shift_record, "end_time", None),
         on_duty_minutes=route_minutes,
@@ -4232,9 +4242,14 @@ def new_driving_log():
         if pending_ryder_event:
             flash("Close the Ryder status before entering the next stop.", "warning")
             return _render_new_driving_log(form, current_load, route_context=route_context, return_to_mobile=return_to_mobile)
-        if not form.plant_name.data:
+        is_day_driver = getattr(current_user, "is_day_driver", False)
+        if not form.plant_name.data and not is_day_driver:
             flash("Please select the plant you arrived at.", "danger")
             return _render_new_driving_log(form, current_load, route_context=route_context, return_to_mobile=return_to_mobile)
+        if is_day_driver and not form.plant_name.data:
+            # Day drivers describe stops by freight, not a Lacks plant; keep a clean
+            # user-facing stop label from the commodity (or a generic fallback).
+            form.plant_name.data = (form.commodity.data or "").strip() or "Day Route"
         open_stop = _open_stop_for_driver(current_user.id, local_date)
         if open_stop:
             flash(f"Close the open stop at {_plant_label(open_stop.plant_name)} before creating the next stop.", "warning")
@@ -4346,6 +4361,8 @@ def add_stop():
         return redirect(_driver_logs_url_for_date(log_date))
 
     if form.validate_on_submit():
+        if getattr(current_user, "is_day_driver", False) and not form.plant_name.data:
+            form.plant_name.data = (form.commodity.data or "").strip() or "Day Route"
         if not form.plant_name.data:
             flash("Please select the plant.", "danger")
             return render_template("add_stop.html", form=form, source_log=source_log, from_log_id=from_log_id_raw)
@@ -6752,6 +6769,7 @@ def profile():
         current_user.employee_id = form.employee_id.data
         current_user.department = form.department.data
         current_user.day_driver = bool(form.day_driver.data)
+        current_user.route_type = (form.route_type.data or "").strip() or None
         current_user.email = form.email.data
         if form.new_password.data:
             current_user.set_password(form.new_password.data)

@@ -4843,6 +4843,13 @@
 
     <div class="wide-body">
     <main>
+      {% if current_user.is_day_driver %}
+        {% set dd_rt = current_user.day_driver_route_type %}
+        <div class="dd-freight-banner" style="margin:8px 12px;padding:7px 12px;border-radius:9px;background:rgba(91,157,255,.12);border:1px solid rgba(91,157,255,.28);color:#dbe7ff;font-weight:700;font-size:12.5px;line-height:1.3;">
+          Day-Driver Freight Workspace &middot; logging by commodity &amp; weight (no plant/part)
+          <span style="opacity:.85;font-weight:600;"> &middot; {% if dd_rt == 'general_freight' %}General Freight / Owner-Operator{% elif dd_rt == 'company_shuttle' %}Company Shuttle{% else %}Local / Short-Haul{% endif %}</span>
+        </div>
+      {% endif %}
       {% set cta = route_cta if route_cta is defined and route_cta else {} %}
       {% set primary = cta.primary_cta if cta.primary_cta is defined else none %}
       {% set secondary = cta.secondary_cta if cta.secondary_cta is defined else none %}

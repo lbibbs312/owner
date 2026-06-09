@@ -10163,3 +10163,92 @@ def test_hours_companion_section_appears_only_when_enabled(client, app):
     assert b"<h3>HOS Companion</h3>" in print_page.data
     assert b"<h3>Short-Haul Check</h3>" not in print_page.data
     assert b"Not recorded" not in print_page.data
+
+
+def test_day_driver_profile_toggle_and_workspace_language(client, app):
+    with app.app_context():
+        create_user("dd_profile", "ddp@example.com", "driver", first_name="Dale")
+
+    login(client, "dd_profile")
+    resp = client.post("/profile", data={
+        "username": "dd_profile", "email": "ddp@example.com",
+        "first_name": "Dale", "day_driver": "y", "route_type": "general_freight",
+    }, follow_redirects=True)
+    assert resp.status_code == 200
+    with app.app_context():
+        from app.models import User
+        u = User.query.filter_by(username="dd_profile").one()
+        assert u.day_driver is True
+        assert u.route_type == "general_freight"
+        assert u.day_driver_route_type == "general_freight"
+
+    # New-stop form: commodity/weight replace the Lacks plant/part questions.
+    new_log = client.get("/new_driving_log")
+    assert new_log.status_code == 200
+    assert b'name="commodity"' in new_log.data
+    assert b'name="weight"' in new_log.data
+    assert b'id="arrivalPlant"' not in new_log.data
+    assert b'id="hotPartsCheck"' not in new_log.data
+
+    # Mobile workspace switches to freight/commodity language for day drivers.
+    mobile = client.get("/mobile")
+    assert mobile.status_code == 200
+    assert b"commodity" in mobile.data
+    assert b"General Freight" in mobile.data
+
+
+def test_day_driver_can_log_stop_without_plant_and_carries_load_forward(client, app):
+    with app.app_context():
+        from app.models import User
+        create_user("dd_freight", "ddf@example.com", "driver", first_name="Frank")
+        u = User.query.filter_by(username="dd_freight").one()
+        u.day_driver = True
+        u.route_type = "general_freight"
+        from app.extensions import db
+        db.session.commit()
+
+    login(client, "dd_freight")
+    # No plant selected — owner-operator logs commodity + weight only.
+    created = client.post("/new_driving_log", data={"commodity": "Steel coils", "weight": "42000"}, follow_redirects=False)
+    assert created.status_code in (302, 303)
+    with app.app_context():
+        from app.models import DriverLog
+        log = DriverLog.query.filter_by(commodity="Steel coils").one()
+        assert log.weight == "42000"
+        assert log.plant_name  # defaulted to a clean stop label, never blank
+
+    # The onboard load carries forward to the next stop's form.
+    next_form = client.get("/new_driving_log")
+    assert b"Steel coils" in next_form.data
+
+    # Printout reads as a day-driver package of captured facts only.
+    print_page = client.get("/driver_logs_print")
+    assert print_page.status_code == 200
+    assert b"Steel coils" in print_page.data
+    assert b"Not recorded" not in print_page.data
+    assert b"Truck not set" not in print_page.data
+    # General Freight shows hours facts only — no Short-Haul or HOS Companion card.
+    assert b"<h3>Short-Haul Check</h3>" not in print_page.data
+    assert b"<h3>HOS Companion</h3>" not in print_page.data
+
+
+def test_day_driver_local_route_shows_short_haul_check(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, User
+        create_user("dd_local", "ddl@example.com", "driver", first_name="Lou")
+        u = User.query.filter_by(username="dd_local").one()
+        u.day_driver = True
+        u.route_type = "local_short_haul"
+        db.session.add(DriverLog(driver_id=u.id, date=date.today(), plant_name="Day Route",
+                                 load_size="Empty", commodity="Pallets", weight="1000",
+                                 arrive_time="08:00", depart_time="09:00", dock_wait_minutes=10))
+        db.session.commit()
+
+    login(client, "dd_local")
+    print_page = client.get("/driver_logs_print")
+    assert print_page.status_code == 200
+    assert b"<h3>Short-Haul Check</h3>" in print_page.data
+    assert b"Not recorded" not in print_page.data

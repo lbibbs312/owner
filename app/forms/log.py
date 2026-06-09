@@ -53,7 +53,8 @@ class DriverLogForm(FlaskForm):
     plant_name = SelectField(
         "Plant Name",
         choices=PLANT_CHOICES,
-        validators=[DataRequired()],
+        validators=[Optional()],
+        validate_choice=False,
     )
     load_size = SelectField(
         "Arrived With",

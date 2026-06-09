@@ -63,12 +63,8 @@
     <input type="hidden" name="load_size" value="{{ active_load }}" data-no-autosave="true">
     <input type="hidden" name="secondary_load" value="{{ active_secondary }}" data-no-autosave="true">
 
-    <div class="mb-3">
-      <label class="form-label" for="arrivalPlant">{{ 'Start location' if not has_today_logs else form.plant_name.label.text }}</label>
-      {{ form.plant_name(class="form-select", id="arrivalPlant") }}
-    </div>
-
     {% if current_user.is_day_driver %}
+    {# Day-driver workspace: describe the load by commodity + weight, not a Lacks plant/part. #}
     <div class="row g-3 mb-3">
       <div class="col-md-7">
         {{ form.commodity.label(class="form-label") }}
@@ -79,7 +75,11 @@
         {{ form.weight(class="form-control", placeholder="e.g. 42000") }}
       </div>
     </div>
-    {% endif %}
+    {% else %}
+    <div class="mb-3">
+      <label class="form-label" for="arrivalPlant">{{ 'Start location' if not has_today_logs else form.plant_name.label.text }}</label>
+      {{ form.plant_name(class="form-select", id="arrivalPlant") }}
+    </div>
 
     <div class="mb-3 form-check">
       {{ form.hot_parts(class="form-check-input", id="hotPartsCheck") }}
@@ -89,6 +89,7 @@
       {{ form.part_number.label(class="form-label") }}
       {{ form.part_number(class="form-control", placeholder="Part number from dispatch or shipper") }}
     </div>
+    {% endif %}
 
     <div class="d-flex flex-wrap gap-3 mb-3">
       <div class="form-check">{{ form.maintenance(class="form-check-input", id="maintenanceCheck") }} {{ form.maintenance.label(class="form-check-label") }}</div>
