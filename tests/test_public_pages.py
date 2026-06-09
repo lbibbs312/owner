@@ -373,3 +373,38 @@ def test_contact_page_is_public_and_production_ready(client):
     assert "bibbstechnology@gmail.com" in text
     assert 'href="mailto:bibbstechnology@gmail.com"' in body
     assert "placeholder" not in text.lower()
+
+
+def test_daily_route_pass_checkout_creates_payment_session(client, app, monkeypatch):
+    """The Daily Route Pass is now wired in config and creates a one-time payment session."""
+    created = {}
+
+    class FakeSession:
+        @staticmethod
+        def create(**params):
+            created.update(params)
+            return {"url": "https://checkout.stripe.test/daily-route-pass"}
+
+    fake_stripe = SimpleNamespace(
+        api_key=None,
+        api_version=None,
+        checkout=SimpleNamespace(Session=FakeSession),
+    )
+    monkeypatch.setitem(sys.modules, "stripe", fake_stripe)
+    app.config.update(
+        PUBLIC_BASE_URL="https://movedefense.test",
+        STRIPE_SECRET_KEY="sk_test_configured",
+        STRIPE_PRICE_DAILY_ROUTE_PASS="price_daily_route_pass",
+    )
+
+    from app.services.stripe_checkout import configured_billing_plan_keys
+
+    # Regression: the price env was missing from config so this plan could never configure.
+    assert "daily-route-pass" in configured_billing_plan_keys(app.config)
+
+    response = client.post("/billing/checkout/daily-route-pass")
+    assert response.status_code == 303
+    assert response.headers["Location"] == "https://checkout.stripe.test/daily-route-pass"
+    assert created["mode"] == "payment"
+    assert created["line_items"] == [{"price": "price_daily_route_pass", "quantity": 1}]
+    assert created["metadata"]["billing_plan"] == "daily-route-pass"

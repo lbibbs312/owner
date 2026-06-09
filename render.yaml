@@ -34,6 +34,17 @@ services:
         sync: false
       - key: SQLALCHEMY_DATABASE_URI
         sync: false
+      # Stripe checkout — set the VALUES in the Render dashboard (never commit secrets).
+      # STRIPE_SECRET_KEY is your sk_live_/sk_test_ (or restricted) key; the price IDs
+      # come from `flask sync-stripe-catalog`.
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PRICE_DAILY_ROUTE_PASS
+        sync: false
+      - key: STRIPE_PRICE_ROUTE_PASS_EXTRA_EXPORT
+        sync: false
+      - key: STRIPE_PRICE_ROUTE_PASS_EXPORT_PACK
+        sync: false
       - key: DRIVER_LOG_PHOTO_UPLOAD_FOLDER
         value: /var/data/movedefense_uploads/driver_log_photos
       - key: DAMAGE_UPLOAD_FOLDER
