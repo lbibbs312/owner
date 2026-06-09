@@ -1400,6 +1400,9 @@ def _document_attachment_response(*, pdf_bytes, filename, target_type, target_id
     response = make_response(pdf_bytes)
     response.headers["Content-Type"] = "application/pdf"
     response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    # Always regenerate — never serve a stale cached PDF (e.g. after a deploy).
+    response.headers["Cache-Control"] = "no-store, max-age=0, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
     record_activity(
         user_id=current_user.id,
         category="download",
