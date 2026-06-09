@@ -327,7 +327,7 @@ class SimplePdf:
             return draw_h
         return 0.0
 
-    def table(self, x, y, col_widths, row_height, headers, rows, font_size=8, header_gray=0.9):
+    def table(self, x, y, col_widths, row_height, headers, rows, font_size=8, header_gray=0.9, max_lines=2):
         total_width = sum(col_widths)
         self.fill_rect(x, y - row_height, total_width, row_height, header_gray)
         self.rect(x, y - row_height, total_width, row_height)
@@ -344,7 +344,12 @@ class SimplePdf:
             for idx, width in enumerate(col_widths):
                 self.line(cx, y, cx, y - row_height)
                 value = row[idx] if idx < len(row) else ""
-                self.multiline_text(cx + 3, y - 11, value, max(6, int(width / 4.6)), size=font_size, leading=9, max_lines=2)
+                if isinstance(value, (list, tuple)):
+                    # Pre-split lines (e.g. stacked Arrive/Depart/Wait); drawn as-is.
+                    for line_idx, line in enumerate(value[:max_lines]):
+                        self.text(cx + 3, y - 11 - line_idx * 9, line, size=font_size)
+                else:
+                    self.multiline_text(cx + 3, y - 11, value, max(6, int(width / 4.6)), size=font_size, leading=9, max_lines=max_lines)
                 cx += width
             self.line(cx, y, cx, y - row_height)
             y -= row_height

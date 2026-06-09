@@ -3087,35 +3087,45 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
     y -= 20
     pdf.text(36, y, "1. STOP TIMELINE", size=11, bold=True)
     y -= 12
-    snapshot_rows = {row.get("log_id"): row for row in (route_context.rows if route_context else [])}
+    route_task_events = _task_route_events_for_logs(logs)
+    shift_record = _shift_record_for_driver_date(getattr(driver, "id", None), the_date) if driver else None
+    log_sheet = _driver_log_sheet_model(
+        driver,
+        the_date,
+        logs,
+        pretrips,
+        routes,
+        route_context,
+        support,
+        route_task_events,
+        shift_record,
+    )
     rows = []
-    for idx, log in enumerate(logs, start=1):
-        route = routes.get(log.id, {})
-        snapshot = snapshot_rows.get(log.id, {})
-        status = snapshot.get("note") or route.get("action") or ("Open" if not log.depart_time else "Complete")
-        wait_label = "" if snapshot.get("status") == "Finalized" and not log.depart_time else wait_label_for_log(log)
-        plant_label = snapshot.get("plant") or route.get("plant") or log.plant_name
-        if not log.depart_time and getattr(route_context, "route_status", None) == "finalized":
-            notes = f"Route End: {plant_label}"
-        elif not log.depart_time:
-            notes = "Current stop; departure pending"
-        else:
-            notes = "Shift start" if idx == 1 else "Stop complete"
-        part_note = (("Hot part " if log.hot_parts else "") + (log.part_number or "")).strip()
-        if part_note:
-            notes = f"{notes}; {part_note}"
+    for row in log_sheet["timeline_rows"]:
+        time_wait = [f"Arrive: {row['arrive'] or '--'}", f"Depart: {row['depart'] or '--'}"]
+        if row["wait"]:
+            time_wait.append(row["wait"])
+        load_flow = [f"IN: {row['load_in'] or '--'}", f"OUT: {row['load_out'] or '--'}"]
         rows.append([
-            str(idx),
-            plant_label,
-            _arrival_utc_to_local_hhmm(log.arrive_time) or "--",
-            _format_hhmm_12h(log.depart_time) or "--",
-            wait_label or "--",
-            snapshot.get("cargo_in") or route.get("arrive_cargo_desc") or route.get("arrive_desc") or load_display(log.load_size),
-            "Pending" if not log.depart_time else (snapshot.get("cargo_out") or route.get("depart_cargo_desc") or "--"),
-            notes if not snapshot else f"{notes}; {status}",
+            str(row["stop_no"]),
+            row["location"] or "--",
+            time_wait,
+            load_flow,
+            row["miles_since"] or "--",
+            row["fuel"] or "--",
+            "; ".join(row["notes"]) if row["notes"] else "--",
         ])
     if rows:
-        y = pdf.table(36, y, [22, 82, 42, 42, 84, 88, 88, 76], 24, ["#", "Location", "Arrive", "Depart", "Wait", "In Truck", "Out Truck", "Notes"], rows, font_size=6)
+        y = pdf.table(
+            36,
+            y,
+            [26, 78, 92, 96, 58, 64, 110],
+            32,
+            ["Stop #", "Location / Stop", "Time / Wait", "Load Flow", "Miles Since Last Stop", "Fuel Used / Fuel Recorded", "Notes"],
+            rows,
+            font_size=6,
+            max_lines=3,
+        )
     else:
         pdf.text(44, y, "No stops for selected date.", size=8)
         y -= 18
