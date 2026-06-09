@@ -3192,6 +3192,88 @@ def _draw_signature_pdf_block(pdf, driver_signature=None, signature_timestamp=No
     pdf.text(330, 52, "Manager review signature", size=8)
 
 
+MD_PDF_BLUE = (31, 78, 163)
+MD_PDF_INK = (26, 34, 48)
+MD_PDF_MUTED = (91, 102, 117)
+MD_PDF_WHITE = (255, 255, 255)
+
+
+def _draw_branded_log_sheet_header(pdf, log_sheet, meta, the_date, *, page_label=None):
+    """Branded DRIVER LOG SHEET header — matches the HTML print layout, only real facts."""
+    logo_path = os.path.join(current_app.static_folder or "", "brand", "movedefense_stripe_brand_icon_200x200.png")
+    if os.path.exists(logo_path):
+        pdf.fill_rect(36, 726, 26, 26, rgb=(13, 19, 32))
+        pdf.image_file(logo_path, 37, 727, 24, 24)
+    pdf.text(70, 742, "MoveDefense", size=12, bold=True, color=MD_PDF_INK)
+    pdf.text(36, 714, "DRIVER", size=7, bold=True, color=MD_PDF_MUTED)
+    pdf.text(36, 700, (log_sheet.get("driver_name") or "").upper(), size=15, bold=True)
+    date_label = log_sheet.get("route_date_label") or (the_date.strftime("%b %d, %Y") if hasattr(the_date, "strftime") else "")
+    route_label = log_sheet.get("route_label") or ""
+    pdf.text(36, 688, (f"{route_label} \xb7 {date_label}" if route_label else date_label), size=8, bold=True, color=MD_PDF_MUTED)
+    clean_no = f"RS-{the_date.strftime('%Y-%m-%d')}" if hasattr(the_date, "strftime") else (meta.get("document_no") or "")
+    rx = 400
+    pdf.text(rx, 742, f"Route Sheet No: {clean_no}", size=8, bold=True)
+    pdf.text(rx, 730, f"Generated: {meta.get('generated_at', '')}", size=8)
+    pdf.text(rx, 718, f"Page: {page_label or meta.get('page', '1 of 1')}", size=8)
+    truck = log_sheet.get("truck")
+    trailer = log_sheet.get("trailer")
+    if truck:
+        pdf.text(rx, 706, f"Truck / Trailer: {truck}" + (f" / {trailer}" if trailer else ""), size=8)
+    elif trailer:
+        pdf.text(rx, 706, f"Trailer: {trailer}", size=8)
+    pdf.fill_rect(36, 682, 540, 2, rgb=MD_PDF_BLUE)
+    pdf.text(36, 666, log_sheet.get("title") or "DRIVER LOG SHEET", size=15, bold=True, color=MD_PDF_INK)
+    return 648
+
+
+def _draw_log_sheet_tiles(pdf, tiles, y):
+    if not tiles:
+        return y
+    pdf.text(36, y, "ROUTE SUMMARY", size=9, bold=True, color=MD_PDF_BLUE)
+    y -= 14
+    tile_w, tile_h, per_row = 180, 26, 3
+    for index, tile in enumerate(tiles):
+        col, row = index % per_row, index // per_row
+        tx = 36 + col * tile_w
+        ty = y - row * (tile_h + 5)
+        pdf.rect(tx, ty - tile_h, tile_w - 8, tile_h)
+        pdf.fill_rect(tx, ty - tile_h, 3, tile_h, rgb=MD_PDF_BLUE)
+        pdf.text(tx + 9, ty - 9, (tile.get("label") or "").upper(), size=5.5, bold=True, color=MD_PDF_MUTED)
+        pdf.multiline_text(tx + 9, ty - 19, tile.get("value") or "", max(6, int((tile_w - 18) / 4.0)), size=8.5, bold=True, leading=9, max_lines=1)
+    rows_used = (len(tiles) + per_row - 1) // per_row
+    return y - rows_used * (tile_h + 5) - 8
+
+
+def _draw_log_sheet_cards(pdf, cards, y):
+    if not cards:
+        return y
+    pdf.text(36, y, "DRIVER LOG SUMMARY", size=9, bold=True, color=MD_PDF_BLUE)
+    y -= 14
+    col_w, gap = 264, 12
+    cols_x = [36, 36 + col_w + gap]
+    index = 0
+    while index < len(cards):
+        pair = cards[index:index + 2]
+        row_h = max(20 + len(card["items"]) * 9 for card in pair)
+        if y - row_h < 150:
+            pdf.add_page()
+            y = 748
+        for col, card in enumerate(pair):
+            cx = cols_x[col]
+            ch = 18 + len(card["items"]) * 9
+            pdf.rect(cx, y - ch, col_w, ch)
+            pdf.fill_rect(cx, y - 3, col_w, 3, rgb=MD_PDF_BLUE)
+            pdf.text(cx + 7, y - 13, (card.get("title") or "").upper(), size=7, bold=True, color=MD_PDF_INK)
+            iy = y - 24
+            for label, value in card["items"]:
+                pdf.text(cx + 7, iy, str(label), size=6, bold=True, color=MD_PDF_MUTED)
+                pdf.multiline_text(cx + 108, iy, str(value), max(6, int((col_w - 114) / 3.2)), size=6, leading=8, max_lines=1)
+                iy -= 9
+        y -= row_h + 8
+        index += 2
+    return y
+
+
 def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, signature_timestamp=None, route_context=None):
     route_context = route_context or build_route_context(driver_id=getattr(logs[0], "driver_id", None), route_date=getattr(logs[0], "date", None)) if logs else None
     routes = (route_context.log_routes if route_context else _driver_log_route_context(logs))
@@ -3200,23 +3282,7 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
     meta = _route_document_meta(the_date, driver, logs, pretrips)
     support = _route_sheet_supporting_data(getattr(driver, "id", None), the_date, logs, routes, route_context)
     summary = support["summary"]
-    pdf = SimplePdf("Driver Route Sheet", LETTER)
-    _draw_route_sheet_pdf_header(
-        pdf,
-        meta,
-        driver=driver.display_name if driver else None,
-        truck=truck,
-        date_value=the_date,
-    )
-    y = 674
-    pdf.text(36, y, "ROUTE SUMMARY", size=11, bold=True)
-    y -= 14
-    mileage = f"{summary['total_miles']} miles" if summary["total_miles"] is not None else ("Pending posttrip" if logs else "Not started")
-    pdf.text(44, y, f"Total Stops: {summary['total_stops']}    Open Stops: {summary['open_stops']}", size=8)
-    pdf.text(320, y, f"Mileage: {mileage}    Total Wait: {_sheet_minutes(summary['total_wait_minutes'] or 0)}", size=8)
-    y -= 20
-    pdf.text(36, y, "1. STOP TIMELINE", size=11, bold=True)
-    y -= 12
+    pdf = SimplePdf("Driver Log Sheet", LETTER)
     route_task_events = _task_route_events_for_logs(logs)
     shift_record = _shift_record_for_driver_date(getattr(driver, "id", None), the_date) if driver else None
     log_sheet = _driver_log_sheet_model(
@@ -3230,6 +3296,11 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
         route_task_events,
         shift_record,
     )
+    # Same branded layout and view model as the HTML Print Document.
+    y = _draw_branded_log_sheet_header(pdf, log_sheet, meta, the_date)
+    y = _draw_log_sheet_tiles(pdf, log_sheet["summary_tiles"], y)
+    pdf.text(36, y, "1. STOP TIMELINE", size=9, bold=True, color=MD_PDF_BLUE)
+    y -= 12
     show_miles = log_sheet["show_miles_col"]
     show_fuel = log_sheet["show_fuel_col"]
     headers = ["Stop #", "Location / Stop", "Time / Wait", "Load Flow"]
@@ -3256,43 +3327,22 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
         cells.append("; ".join(row["notes"]) if row["notes"] else "")
         rows.append(cells)
     if rows:
-        y = pdf.table(36, y, widths, 32, headers, rows, font_size=6, max_lines=3)
+        y = pdf.table(36, y, widths, 32, headers, rows, font_size=6, max_lines=3, header_rgb=MD_PDF_BLUE, header_color=MD_PDF_WHITE)
     else:
         pdf.text(44, y, "No stops for selected date.", size=8)
         y -= 18
-    if support["parts_carried"] and y > 170:
-        y -= 14
-        pdf.text(36, y, "LOAD AND PART REFERENCES", size=10, bold=True)
-        y -= 12
-        pdf.multiline_text(44, y, ", ".join(support["parts_carried"]), width_chars=96, size=8, leading=10, max_lines=3)
-        y -= 22
-    if support["damage_report_details"] and y > 170:
-        y -= 8
-        pdf.text(36, y, "DAMAGE AND INCIDENTS", size=10, bold=True)
-        y -= 12
-        pdf.multiline_text(44, y, "; ".join(support["damage_report_details"]), width_chars=96, size=8, leading=10, max_lines=3)
-        y -= 22
-    if support["exception_notes"] and y > 170:
-        y -= 8
-        pdf.text(36, y, "EXCEPTIONS", size=10, bold=True)
-        y -= 12
-        pdf.multiline_text(44, y, "; ".join(support["exception_notes"]), width_chars=96, size=8, leading=10, max_lines=3)
-        y -= 22
-    y = max(y - 18, 136)
-    pdf.text(36, y, "SIGNATURES", size=11, bold=True)
+    # Lower branded summary cards (damage/notes/documents now live inside these,
+    # so no separate placeholder sections are drawn).
+    y = _draw_log_sheet_cards(pdf, log_sheet["cards"], y)
+    y = max(y - 14, 136)
+    pdf.text(36, y, "SIGNATURES", size=10, bold=True, color=MD_PDF_BLUE)
     _draw_signature_pdf_block(pdf, driver_signature, signature_timestamp)
+    pdf.text(150, 22, "Thank you for driving safe and delivering excellence.", size=7, color=MD_PDF_MUTED)
 
     def _start_document_page():
         pdf.add_page()
-        _draw_route_sheet_pdf_header(
-            pdf,
-            meta,
-            driver=driver.display_name if driver else None,
-            truck=truck,
-            date_value=the_date,
-            page_label="Documents",
-        )
-        return 674
+        _draw_branded_log_sheet_header(pdf, log_sheet, meta, the_date, page_label="Documents")
+        return 648
 
     render_document_appendix(
         pdf,

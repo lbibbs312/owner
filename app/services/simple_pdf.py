@@ -251,8 +251,12 @@ class SimplePdf:
     def rect(self, x, y, w, h, width=0.5):
         self.current.append(f"{width:.2f} w {x:.2f} {y:.2f} {w:.2f} {h:.2f} re S")
 
-    def fill_rect(self, x, y, w, h, gray=0.9):
-        self.current.append(f"q {gray:.3f} g {x:.2f} {y:.2f} {w:.2f} {h:.2f} re f Q")
+    def fill_rect(self, x, y, w, h, gray=0.9, rgb=None):
+        if rgb is not None:
+            r, g, b = (c / 255.0 if c > 1 else c for c in rgb)
+            self.current.append(f"q {r:.3f} {g:.3f} {b:.3f} rg {x:.2f} {y:.2f} {w:.2f} {h:.2f} re f Q")
+        else:
+            self.current.append(f"q {gray:.3f} g {x:.2f} {y:.2f} {w:.2f} {h:.2f} re f Q")
 
 
     def image_png_data_url(self, data_url, x, y, w, h):
@@ -327,14 +331,17 @@ class SimplePdf:
             return draw_h
         return 0.0
 
-    def table(self, x, y, col_widths, row_height, headers, rows, font_size=8, header_gray=0.9, max_lines=2):
+    def table(self, x, y, col_widths, row_height, headers, rows, font_size=8, header_gray=0.9, max_lines=2, header_rgb=None, header_color=None):
         total_width = sum(col_widths)
-        self.fill_rect(x, y - row_height, total_width, row_height, header_gray)
+        if header_rgb is not None:
+            self.fill_rect(x, y - row_height, total_width, row_height, rgb=header_rgb)
+        else:
+            self.fill_rect(x, y - row_height, total_width, row_height, header_gray)
         self.rect(x, y - row_height, total_width, row_height)
         cx = x
         for idx, width in enumerate(col_widths):
             self.line(cx, y, cx, y - row_height)
-            self.text(cx + 3, y - row_height + 5, headers[idx], size=font_size, bold=True)
+            self.text(cx + 3, y - row_height + 5, headers[idx], size=font_size, bold=True, color=header_color)
             cx += width
         self.line(cx, y, cx, y - row_height)
         y -= row_height
