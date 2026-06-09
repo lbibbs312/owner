@@ -89,7 +89,11 @@ BANNED_PRINT_PHRASES = (
 
 
 def assert_official_record_output(data):
-    assert b"Document No:" in data or b"Route Sheet No:" in data
+    assert (
+        b"Document No:" in data
+        or b"Route Sheet No:" in data
+        or b"Driver Log No:" in data
+    )
     assert b"Generated:" in data
     for phrase in BANNED_PRINT_PHRASES:
         assert phrase not in data
@@ -2900,6 +2904,68 @@ def test_mobile_dashboard_repairs_pretrip_saved_under_utc_tomorrow(client, app, 
         assert repaired.pretrip_date == date(2026, 6, 4)
 
 
+def _make_closed_pretrip(driver_id, truck, pretrip_date, start_mileage):
+    """Persist a PreTrip with a completed PostTrip (a closed past route)."""
+    from app.extensions import db
+    from app.models import PostTrip, PreTrip
+
+    pretrip = PreTrip(
+        user_id=driver_id,
+        truck_number=truck,
+        pretrip_date=pretrip_date,
+        start_mileage=start_mileage,
+    )
+    db.session.add(pretrip)
+    db.session.flush()
+    db.session.add(PostTrip(pretrip_id=pretrip.id, end_mileage=start_mileage + 100))
+    db.session.commit()
+    return pretrip.id
+
+
+def test_closed_routes_on_other_trucks_stay_in_inspection_list(client, app, monkeypatch):
+    """Closed routes on a different truck must remain reachable from the driver
+    inspection list, both before and after the 2026-06-05 feature cutover.
+
+    Regression: scoping the inspection list to the "current" truck dropped every
+    closed, non-today truck so older PreTrip/PostTrip records disappeared even
+    though they persisted in the database.
+    """
+    from datetime import date
+
+    from app.blueprints.driver import routes as driver_routes
+
+    monkeypatch.setattr(driver_routes, "_today_local_date", lambda: date(2026, 6, 9))
+
+    with app.app_context():
+        driver = create_user("multi_truck_driver", "multi-truck@example.com", "driver")
+        before_id = _make_closed_pretrip(driver.id, "ST4", date(2026, 6, 4), 379000)
+        after_id = _make_closed_pretrip(driver.id, "BT7", date(2026, 6, 6), 412000)
+
+        # The inspection list (include_closed) must offer BOTH trucks, no dupes.
+        choices = driver_routes._driver_inspection_truck_choices(driver.id, include_closed=True)
+        truck_numbers = sorted(choice["truck_number"] for choice in choices)
+        assert truck_numbers == ["BT7", "ST4"]
+        assert len(truck_numbers) == len(set(truck_numbers))
+        # Cross-driver auth / maintenance-history stay scoped to the current
+        # truck: with no today-or-open route, the gated default collapses to one.
+        gated = driver_routes._driver_inspection_truck_choices(driver.id)
+        assert len(gated) == 1
+
+        # Both records still persist and resolve by id.
+        from app.models import PreTrip
+
+        assert PreTrip.query.get(before_id).truck_number == "ST4"
+        assert PreTrip.query.get(after_id).truck_number == "BT7"
+
+    login(client, "multi_truck_driver")
+    page = client.get("/list_pretrips")
+    body = page.get_data(as_text=True)
+    assert page.status_code == 200
+    # Both trucks appear in the rendered inspection page (selector), not just one.
+    assert "ST4" in body
+    assert "BT7" in body
+
+
 def test_posttrip_ends_unlinked_manual_shift_timer(client, app):
     from datetime import date, datetime, timedelta
 
@@ -4797,10 +4863,10 @@ def test_depart_second_stop_can_be_regular_load_and_finalized_route_shows_canoni
     )
     assert finalized.status_code == 200
     assert b"Trim DC Load + Helios Load" in finalized.data
-    assert b"Loaded Trim DC Load." in finalized.data
-    assert b"Loaded Helios Load." in finalized.data
+    assert b"Picked up Trim DC Load." in finalized.data
+    assert b"Picked up Helios Load." in finalized.data
     assert b"Delivered Helios Load." in finalized.data
-    assert b"Continuing with Trim DC Load." in finalized.data
+    assert b"Continued with Trim DC Load onboard." in finalized.data
     assert b"First stop after departure" not in finalized.data
     assert b"Route finalized" in finalized.data
 
@@ -5734,7 +5800,10 @@ def test_end_of_day_can_finalize_without_signature_when_capture_fails(client, ap
 
     print_page = client.get("/driver_logs_print")
     assert print_page.status_code == 200
-    assert b"Not yet signed" in print_page.data
+    # Capture failed, so the sheet renders the unsigned signature block without
+    # the old "Not yet signed" placeholder (only-captured-facts printout).
+    assert b"Driver Signature" in print_page.data
+    assert b"Not yet signed" not in print_page.data
 
 
 def test_end_of_day_recovers_signature_from_autosave_draft(client, app):
@@ -9249,7 +9318,13 @@ def test_driver_inspections_page_is_scoped_to_current_truck(client, app):
     assert f"/pretrip_printable/{prior_same_truck_id}".encode() in page.data
     assert b"Open PostTrip" in page.data
     assert f"/pretrip_printable/{prior_same_truck_id}#posttrip-closeout".encode() in page.data
-    assert b"ST5" not in page.data
+    # The driver's own truck from a prior day stays reachable through the truck
+    # switcher so closed PreTrip/PostTrip records never disappear; the body still
+    # defaults to the current truck (ST4).
+    assert b"inspection-truck-tab" in page.data
+    assert b"Truck ST5" in page.data
+    # A different driver's record on that truck is not surfaced in the default
+    # ST4 view.
     assert b"Other truck issue should not show" not in page.data
 
     same_truck_posttrip = client.get(f"/do_posttrip/{prior_same_truck_id}")

@@ -2187,35 +2187,53 @@ def _sheet_note_is_noise(line):
         return True
     if low.startswith("dock time"):
         return True
-    if low.endswith(": pickup") or low.endswith(": delivery"):
+    if low.endswith(": pickup") or low.endswith(": delivery") or low.endswith(": shift start"):
         return True
     return False
 
 
-def _sheet_stop_notes(log, route, issue, route_task_events, row_state, plant_name, *, index, route_context):
-    # Notes carry only meaningful exceptions/details — the routine flow narrative
-    # ("Stop complete", "Dock time", "Picked up load", "Departed empty", plant
-    # pickup/delivery labels) already lives in the Time / Wait and Load Flow cells.
+def _sheet_polish_note(line, plant_name):
+    """Turn a raw stop-summary line into a polished, human note (or None to drop it)."""
+    text = (line or "").strip()
+    if not text:
+        return None
+    low = text.lower().rstrip(".")
+    # Drop plant-prefixed system narration ("Raleigh East: Shift start.", "PPL: Pickup.").
+    if plant_name and low.startswith(plant_name.strip().lower() + ":"):
+        return None
+    if _sheet_note_is_noise(text):
+        return None
+    if low.startswith("loaded "):
+        return "Picked up " + text[len("Loaded "):]
+    if low.startswith("continuing with "):
+        return f"Continued with {text[len('Continuing with '):].rstrip('.')} onboard."
+    return text
+
+
+def _sheet_stop_notes(log, route, issue, route_task_events, row_state, plant_name, *, index, is_last=False, route_context=None):
+    # Notes carry only meaningful, polished facts. The routine flow narrative
+    # (dock time, plant pickup/delivery labels, "Stop complete") lives in the
+    # Time / Wait and Load Flow columns and is dropped/deduplicated here.
     notes = []
+    finalized = getattr(route_context, "route_status", None) == "finalized"
     if not log.depart_time:
-        if getattr(route_context, "route_status", None) == "finalized":
-            notes.append(f"Route End: {plant_name}")
-        else:
-            notes.append("Current stop: departure pending")
+        notes.append(f"Route End: {plant_name}" if finalized else "Current stop: departure pending")
     elif index == 1:
-        notes.append("Shift start")
+        notes.append("Shift start.")
     for line in (route or {}).get("summary_lines") or []:
-        if _sheet_note_is_noise(line) or line in notes:
-            continue
-        notes.append(line)
+        polished = _sheet_polish_note(line, plant_name)
+        if polished and polished not in notes:
+            notes.append(polished)
     if (route or {}).get("unload_blocked"):
         notes.append(f"Not unloaded: {(route or {}).get('unload_reason') or 'reason not recorded'}")
     if (route or {}).get("secondary_drop_blocked"):
         notes.append(f"Second stop not unloaded: {(route or {}).get('secondary_drop_reason') or 'reason not recorded'}")
     if (route or {}).get("deviation_reason"):
         notes.append(f"Deviation: {(route or {}).get('deviation_reason')}")
-    if log.no_pickup and "No pickup" not in notes:
-        notes.append("No pickup")
+    if log.no_pickup:
+        no_pickup_note = "No pickup at origin." if index == 1 else "No pickup."
+        if no_pickup_note not in notes:
+            notes.append(no_pickup_note)
     if log.hot_parts or log.part_number:
         notes.append((("Hot part " if log.hot_parts else "") + (log.part_number or "")).strip())
     if log.maintenance or (issue or {}).get("truck"):
@@ -2224,10 +2242,12 @@ def _sheet_stop_notes(log, route, issue, route_task_events, row_state, plant_nam
         notes.append(f"Route issue: {(issue or {}).get('route')}")
     if log.downtime_reason and log.downtime_reason not in notes:
         notes.append(log.downtime_reason)
-    if log.fuel:
-        notes.append("Fuel stop")
+    if log.fuel and "Fuel stop." not in notes:
+        notes.append("Fuel stop.")
     for event in route_task_events or []:
         notes.append(f"{event.kind_label} {event.label}: {event.status}")
+    if is_last and log.depart_time and finalized and "Route completed." not in notes:
+        notes.append("Route completed.")
     return [note for note in notes if note]
 
 
@@ -2316,6 +2336,7 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
                     row_state,
                     plant_name,
                     index=index,
+                    is_last=index == len(logs),
                     route_context=route_context,
                 ),
             }
@@ -2377,7 +2398,7 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
     last_odometer = getattr(last_posttrip, "end_mileage", None) or (previous_mileage if previous_mileage != start_mileage else None)
     miles_by_stop = "; ".join(f"Stop {row['stop_no']}: {row['miles_since']}" for row in timeline_rows if row["miles_since"])
     # Odometer readings logged at fuel stops are MILEAGE facts, not fuel amounts.
-    fuel_stop_odometer = "; ".join(f"Stop {event['stop'] or '?'} {event['plant']}: {event['mileage']}" for event in fuel_events)
+    fuel_stop_odometer = "; ".join(f"{event['plant']}: {event['mileage']}" for event in fuel_events)
     show_miles_col = any(row["miles_since"] for row in timeline_rows)
     has_mileage = show_miles_col or total_miles is not None or start_mileage is not None or last_odometer is not None or bool(fuel_stop_odometer)
 
@@ -2464,7 +2485,7 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
             ("Last recorded odometer", _sheet_miles(last_odometer)),
             ("Total route miles", _sheet_miles(total_miles)),
             ("Miles by stop", miles_by_stop),
-            ("Fuel-stop odometer", fuel_stop_odometer),
+            ("Odometer recorded at", fuel_stop_odometer),
         ], show=has_mileage),
         _sheet_card("Fuel Summary", [
             ("Starting fuel", _sheet_clean(getattr(first_pretrip, "start_fuel_level", None))),
@@ -2805,7 +2826,7 @@ def _truck_pretrips_for_number(truck_number, limit=30):
     return query.all()
 
 
-def _driver_inspection_truck_choices(driver_id):
+def _driver_inspection_truck_choices(driver_id, *, include_closed=False):
     today_local_date = _today_local_date()
     driver_pretrips = (
         _active_pretrips_query()
@@ -2835,16 +2856,21 @@ def _driver_inspection_truck_choices(driver_id):
         else:
             choices[key]["has_open"] = choices[key]["has_open"] or not bool(pretrip.posttrip)
 
+    # include_closed (the driver's own inspection list) offers every truck the
+    # driver has recently inspected so closed, past-day PreTrip/PostTrip records
+    # stay reachable. Other callers -- cross-driver view authorization and the
+    # standalone maintenance-history page -- stay scoped to the truck the driver
+    # is currently on (today-dated or still-open) so they don't widen access.
     for pretrip in driver_pretrips:
-        if pretrip.pretrip_date == today_local_date or not pretrip.posttrip:
+        if include_closed or pretrip.pretrip_date == today_local_date or not pretrip.posttrip:
             add_choice(pretrip)
     if not choices and driver_pretrips:
         add_choice(driver_pretrips[0])
     return list(choices.values())
 
 
-def _driver_selected_inspection_truck(driver_id, requested_truck_number=None):
-    truck_choices = _driver_inspection_truck_choices(driver_id)
+def _driver_selected_inspection_truck(driver_id, requested_truck_number=None, *, include_closed=False):
+    truck_choices = _driver_inspection_truck_choices(driver_id, include_closed=include_closed)
     selected_truck = None
     requested_truck_number = _normalize_truck_number(requested_truck_number)
     if requested_truck_number:
@@ -3187,18 +3213,14 @@ def _draw_signature_pdf_block(pdf, driver_signature=None, signature_timestamp=No
     pdf.text(44, 112, "Driver Signature", size=9, bold=True)
     pdf.text(330, 112, "Manager and Reviewer Signature", size=9, bold=True)
 
+    if driver_signature and not pdf.image_png_data_url(driver_signature, 44, 64, 190, 38):
+        pdf.text(44, 80, "Driver e-signature captured", size=10, bold=True)
+    pdf.line(44, 58, 252, 58)
     if driver_signature:
-        image_drawn = pdf.image_png_data_url(driver_signature, 44, 62, 190, 38)
-        if not image_drawn:
-            pdf.text(44, 80, "Driver e-signature captured", size=10, bold=True)
-        pdf.line(44, 58, 252, 58)
-        pdf.text(44, 44, _signature_timestamp_label(signature_timestamp), size=8)
-    else:
-        pdf.line(44, 74, 252, 74)
-        pdf.text(44, 52, "Not yet signed", size=8)
-
-    pdf.line(330, 74, 552, 74)
-    pdf.text(330, 52, "Manager review signature", size=8)
+        pdf.text(44, 46, _signature_timestamp_label(signature_timestamp), size=7)
+    pdf.text(186, 46, "Date: __________", size=7)
+    pdf.line(330, 58, 552, 58)
+    pdf.text(470, 46, "Date: __________", size=7)
 
 
 MD_PDF_BLUE = (31, 78, 163)
@@ -3219,17 +3241,18 @@ def _draw_branded_log_sheet_header(pdf, log_sheet, meta, the_date, *, page_label
     date_label = log_sheet.get("route_date_label") or (the_date.strftime("%b %d, %Y") if hasattr(the_date, "strftime") else "")
     route_label = log_sheet.get("route_label") or ""
     pdf.text(36, 688, (f"{route_label} \xb7 {date_label}" if route_label else date_label), size=8, bold=True, color=MD_PDF_MUTED)
-    clean_no = f"RS-{the_date.strftime('%Y-%m-%d')}" if hasattr(the_date, "strftime") else (meta.get("document_no") or "")
+    clean_no = f"LOG-{the_date.strftime('%Y-%m-%d')}" if hasattr(the_date, "strftime") else (meta.get("document_no") or "")
     rx = 400
-    pdf.text(rx, 742, f"Route Sheet No: {clean_no}", size=8, bold=True)
+    pdf.text(rx, 742, f"Driver Log No: {clean_no}", size=8, bold=True)
     pdf.text(rx, 730, f"Generated: {meta.get('generated_at', '')}", size=8)
-    pdf.text(rx, 718, f"Page: {page_label or meta.get('page', '1 of 1')}", size=8)
     truck = log_sheet.get("truck")
     trailer = log_sheet.get("trailer")
     if truck:
-        pdf.text(rx, 706, f"Truck / Trailer: {truck}" + (f" / {trailer}" if trailer else ""), size=8)
+        pdf.text(rx, 718, f"Truck / Trailer: {truck}" + (f" / {trailer}" if trailer else ""), size=8)
     elif trailer:
-        pdf.text(rx, 706, f"Trailer: {trailer}", size=8)
+        pdf.text(rx, 718, f"Trailer: {trailer}", size=8)
+    if page_label:
+        pdf.text(rx, 706, f"Page: {page_label}", size=8)
     pdf.fill_rect(36, 682, 540, 2, rgb=MD_PDF_BLUE)
     pdf.text(36, 666, log_sheet.get("title") or "DRIVER LOG SHEET", size=15, bold=True, color=MD_PDF_INK)
     return 648
@@ -3476,6 +3499,7 @@ def list_pretrips():
         selected_truck, inspection_trucks = _driver_selected_inspection_truck(
             current_user.id,
             request.args.get("truck_number"),
+            include_closed=True,
         )
         selected_truck_number = selected_truck["truck_number"] if selected_truck else ""
         current_pretrip = selected_truck["latest_pretrip"] if selected_truck else None

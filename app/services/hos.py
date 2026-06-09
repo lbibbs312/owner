@@ -82,8 +82,11 @@ def short_haul_check(*, on_duty_minutes, returned_to_terminal, within_150_air_mi
     air_mile = _yes_no_unknown(within_150_air_mile)
     if air_mile:
         items.append(("Within 150 air-mile radius", air_mile))
-    items.append(("Release time captured", "Yes" if release_captured else "No"))
-    items.append(("Time record complete", "Yes" if time_record_complete else "No"))
+    # Only assert these when there's a real captured release — never as filler.
+    if release_captured:
+        items.append(("Release time captured", "Yes"))
+    if time_record_complete:
+        items.append(("Time record complete", "Yes"))
     return items
 
 

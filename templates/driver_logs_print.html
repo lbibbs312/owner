@@ -127,7 +127,7 @@
   {% set sheet = log_sheet|default({}) %}
   {% set print_driver_name = sheet.driver_name or (current_user.display_name if current_user else '') %}
   {% set route_date_label = sheet.route_date_label or (the_date.strftime('%b %d, %Y') if the_date else '') %}
-  {% set clean_route_no = ('RS-' ~ sheet.route_date.strftime('%Y-%m-%d')) if sheet.route_date else (('RS-' ~ the_date.strftime('%Y-%m-%d')) if the_date else (document_meta.document_no or '')) %}
+  {% set clean_route_no = ('LOG-' ~ sheet.route_date.strftime('%Y-%m-%d')) if sheet.route_date else (('LOG-' ~ the_date.strftime('%Y-%m-%d')) if the_date else (document_meta.document_no or '')) %}
   {# ELD hours-of-service tiles only appear when that data is actually captured (none yet), per print-only-real-data rule. #}
   <div class="print-controls no-print">
     <button class="print-btn" type="button" data-print-document>Print Document</button>
@@ -147,9 +147,8 @@
         <div class="driver-route-meta">{% if sheet.route_label %}{{ sheet.route_label }} &middot; {% endif %}{{ route_date_label }}</div>
       </div>
       <div class="document-meta">
-        <div class="row"><span class="k">Route Sheet No:</span><span class="v mono">{{ clean_route_no }}</span></div>
+        <div class="row"><span class="k">Driver Log No:</span><span class="v mono">{{ clean_route_no }}</span></div>
         <div class="row"><span class="k">Generated:</span><span class="v">{{ document_meta.generated_at }}</span></div>
-        <div class="row"><span class="k">Page:</span><span class="v">{{ document_meta.page }}</span></div>
         {% if sheet.truck %}<div class="row"><span class="k">Truck / Trailer:</span><span class="v">{{ sheet.truck }}{% if sheet.trailer %} / {{ sheet.trailer }}{% endif %}</span></div>
         {% elif sheet.trailer %}<div class="row"><span class="k">Trailer:</span><span class="v">{{ sheet.trailer }}</span></div>{% endif %}
       </div>
@@ -229,7 +228,7 @@
         <div class="sig-label">Driver Signature</div>
         <div class="sig-line">{% if driver_signature %}<img src="{{ driver_signature }}" alt="Driver signature">{% endif %}</div>
         <div class="sig-foot">
-          <span>{% if signature_timestamp %}Signed {{ signature_timestamp|to_detroit_datetime }}{% elif driver_signature %}Timestamp unavailable{% else %}Not yet signed{% endif %}</span>
+          <span>{% if signature_timestamp %}Signed {{ signature_timestamp|to_detroit_datetime }}{% endif %}</span>
           <span>Date: ____________</span>
         </div>
       </div>
