@@ -3001,6 +3001,36 @@ def test_driver_bottom_nav_shows_fuel_not_transfer(client, app):
     assert client.get("/plant_transfers").status_code == 200
 
 
+def test_driver_quick_log_entry_point_and_break_toggle(client, app):
+    """Shared Quick Log offers Break/Fuel/Service/Inspection wired to existing
+    flows, and Break toggles the HOS break start/end."""
+    with app.app_context():
+        create_user("ql_driver", "ql-driver@example.com", "driver")
+    login(client, "ql_driver")
+
+    body = client.get("/mobile").get_data(as_text=True)
+    assert "md-quick-log" in body
+    for label in ("Break", "Fuel", "Service", "Inspection"):
+        assert f"<span>{label}</span>" in body
+    # Each quick-log action points at an existing flow (no new tables/routes).
+    assert "report_type=fuel" in body          # Fuel -> existing fuel capture
+    assert "report_type=truck_issue" in body   # Service -> maintenance capture
+    assert "/new_pretrip" in body              # Inspection -> DVIR
+    assert "/mobile/break/start" in body       # Break -> HOS break start
+
+    # Break toggles: starting shows the on-break state and an end action.
+    assert client.post("/mobile/break/start").status_code == 302
+    on_break = client.get("/mobile").get_data(as_text=True)
+    assert "On break" in on_break
+    assert "<span>End Break</span>" in on_break
+    assert "/mobile/break/end" in on_break
+    # Ending the break returns to the start state.
+    assert client.post("/mobile/break/end").status_code == 302
+    after = client.get("/mobile").get_data(as_text=True)
+    assert "On break" not in after
+    assert "<span>Break</span>" in after
+
+
 def test_posttrip_ends_unlinked_manual_shift_timer(client, app):
     from datetime import date, datetime, timedelta
 
@@ -6922,14 +6952,14 @@ def test_driver_mobile_pages_share_single_five_tab_bottom_nav(client, app):
 
     expected_items = [
         "<strong>HM</strong><span>Home</span>",
-        "<strong>PT</strong><span>Transfer</span>",
         "<strong>DL</strong><span>Logs</span>",
+        "<strong>FL</strong><span>Fuel</span>",
         "<strong>RP</strong><span>Reports</span>",
         "<strong>IN</strong><span>Inspections</span>",
     ]
     pages = [
         ("/mobile", "Home"),
-        ("/plant_transfers", "Transfer"),
+        ("/new_driving_log?report_type=fuel&next=mobile", "Fuel"),
         ("/driver_logs", "Logs"),
         ("/reports", "Reports"),
         ("/damage_reports", "Reports"),
