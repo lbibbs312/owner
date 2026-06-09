@@ -3,7 +3,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Driver Route Sheet</title>
+  <title>Driver Log Sheet</title>
   <style>
     @page { size: Letter portrait; margin: 0.35in; }
     * { box-sizing: border-box; }
@@ -32,7 +32,7 @@
       padding-bottom: 0.09in;
       margin-bottom: 0.08in;
     }
-    .driver-kicker { font-size: 8pt; font-weight: 900; text-transform: uppercase; }
+    .driver-kicker { font-size: 8pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; color: #b8860b; }
     .driver-name { margin: 1px 0; font-size: 15pt; font-weight: 900; text-transform: uppercase; line-height: 1; }
     .driver-route-meta { font-size: 8.2pt; font-weight: 700; color: #333; }
     .document-title { margin: 0 0 0.1in; font-size: 15pt; font-weight: 900; text-transform: uppercase; line-height: 1; }
@@ -60,14 +60,45 @@
     th, td { border: 1px solid #222; padding: 4px 5px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
     th { background: #f1f1f1; font-weight: 900; text-transform: uppercase; font-size: 7.2pt; }
     .timeline th:nth-child(1), .timeline td:nth-child(1) { width: 5%; text-align: center; }
-    .timeline th:nth-child(2), .timeline td:nth-child(2) { width: 19%; }
-    .timeline th:nth-child(3), .timeline td:nth-child(3), .timeline th:nth-child(4), .timeline td:nth-child(4) { width: 10%; white-space: nowrap; }
-    .timeline th:nth-child(5), .timeline td:nth-child(5) { width: 9%; white-space: nowrap; }
-    .timeline th:nth-child(6), .timeline td:nth-child(6), .timeline th:nth-child(7), .timeline td:nth-child(7) { width: 17%; }
-    .timeline th:nth-child(8), .timeline td:nth-child(8) { width: 22%; }
+    .timeline th:nth-child(2), .timeline td:nth-child(2) { width: 16%; }
+    .timeline th:nth-child(3), .timeline td:nth-child(3) { width: 14%; }
+    .timeline th:nth-child(4), .timeline td:nth-child(4) { width: 17%; }
+    .timeline th:nth-child(5), .timeline td:nth-child(5) { width: 9%; }
+    .timeline th:nth-child(6), .timeline td:nth-child(6) { width: 11%; }
+    .timeline th:nth-child(7), .timeline td:nth-child(7) { width: 28%; }
+    .cell-stack > div { line-height: 1.3; }
+    .cell-stack .cell-label { font-weight: 900; color: #444; }
     .notes-list, .simple-list { margin: 0; padding-left: 0.16in; }
     .notes-list li, .simple-list li { margin: 0 0 2px; }
     .optional-grid { display: grid; gap: 0.04in; }
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.1in;
+      margin: 0.02in 0 0.06in;
+    }
+    .summary-card {
+      border: 1px solid #222;
+      border-top: 3px solid #b8860b;
+      padding: 0.07in 0.09in 0.08in;
+    }
+    .summary-card h3 {
+      margin: 0 0 0.05in;
+      padding-bottom: 0.03in;
+      border-bottom: 1px solid #ccc;
+      font-size: 8.4pt;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .summary-card dl {
+      margin: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1.25in) minmax(0, 1fr);
+      gap: 2px 0.08in;
+      font-size: 8pt;
+    }
+    .summary-card dt { font-weight: 700; color: #333; }
+    .summary-card dd { margin: 0; }
     .signature-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -84,17 +115,22 @@
       body { padding: 0; }
       .no-print, .screen-only, .print-controls, .helper-text, .form-hint, .button-row, nav, header.app-nav, .print-btn, .email-btn { display: none !important; }
       th { background: #eee !important; }
+      .summary-cards { break-inside: avoid; }
+      .summary-card { break-inside: avoid; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
 </head>
 <body>
 <div class="print-page">
-  {% set document_meta = document_meta|default({'title': 'DRIVER ROUTE SHEET', 'document_no': 'ROUTE-' ~ the_date, 'generated_at': '', 'page': '1 of 1'}) %}
-  {% set print_driver_name = print_driver.display_name if print_driver is defined and print_driver else current_user.display_name %}
-  {% set route_truck = pretrips[0].truck_number if pretrips else '' %}
-  {% set route_date_label = the_date.strftime('%b %d, %Y') if the_date else '' %}
+  {% set document_meta = document_meta|default({'title': 'DRIVER LOG SHEET', 'document_no': 'LOG-' ~ the_date, 'generated_at': '', 'page': '1 of 1'}) %}
+  {% set sheet = log_sheet|default({}) %}
+  {% set print_driver_name = sheet.driver_name or (print_driver.display_name if print_driver is defined and print_driver else current_user.display_name) %}
+  {% set route_truck = sheet.truck or (pretrips[0].truck_number if pretrips else '') %}
+  {% set route_date_label = sheet.route_date_label or (the_date.strftime('%b %d, %Y') if the_date else '') %}
   {% set summary = route_sheet_summary|default({'total_stops': logs|length if logs else 0, 'open_stops': 0, 'total_miles': none, 'total_wait_minutes': 0}) %}
+  {# ELD hours-of-service fields (ELD Hours Left / Reset Time / Cycle) are hidden by default. #}
+  {% set show_eld_hos = show_eld_hos|default(false) %}
   <div class="print-controls no-print">
     <button class="print-btn" type="button" data-print-document>Print Document</button>
     <a class="email-btn" href="{{ attachment_url or url_for('driver.driver_logs_attachment', date=the_date.isoformat()) }}" data-save-pdf>Save PDF</a>
@@ -117,7 +153,7 @@
       </div>
     </header>
 
-    <h1 class="document-title">DRIVER ROUTE SHEET</h1>
+    <h1 class="document-title">{{ sheet.title or 'DRIVER LOG SHEET' }}</h1>
 
     <h2 class="section-title">ROUTE SUMMARY</h2>
     <div class="route-summary">
@@ -128,63 +164,42 @@
       <div><span>Route Status:</span><strong>{% if route_context and route_context.route_status == 'completed' %}Route completed and awaiting final review{% elif route_context and route_context.route_status == 'finalized' %}Route finalized{% elif logs %}Route open and not finalized{% else %}No route recorded{% endif %}</strong></div>
     </div>
 
-    {% if logs %}
+    {% if sheet.timeline_rows %}
       <h2 class="section-title">1. STOP TIMELINE</h2>
       <table class="timeline">
         <thead>
           <tr>
-            <th>#</th>
-            <th>Location</th>
-            <th>Arrive</th>
-            <th>Depart</th>
-            <th>Wait</th>
-            <th>In Truck</th>
-            <th>Out Truck</th>
+            <th>Stop #</th>
+            <th>Location / Stop</th>
+            <th>Time / Wait</th>
+            <th>Load Flow</th>
+            <th>Miles Since Last Stop</th>
+            <th>Fuel Used / Fuel Recorded</th>
             <th>Notes</th>
           </tr>
         </thead>
         <tbody>
-          {% for log in logs %}
-            {% set route = (log_routes or {}).get(log.id) %}
-            {% set row_state = route_context.rows[loop.index0] if route_context and route_context.rows and loop.index0 < (route_context.rows|length) else none %}
-            {% set plant_name = route.plant if route else log.plant_name %}
-            {% set wait_label = wait_label_for_log(log) %}
-            {% set inbound = row_state.cargo_in if row_state else (route.arrive_cargo_desc if route else log.load_size) %}
-            {% set outbound = row_state.cargo_out if row_state else (route.depart_cargo_desc if route and route.depart_cargo_desc is not none else '') %}
-            {% set issue = (log_issue_details or {}).get(log.id, {}) %}
+          {% for row in sheet.timeline_rows %}
             <tr>
-              <td>{{ loop.index }}</td>
-              <td><strong>{{ plant_name }}</strong></td>
-              <td>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</td>
-              <td>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</td>
-              <td>{{ wait_label or '--' }}</td>
-              <td>{{ inbound or '--' }}</td>
-              <td>{% if log.depart_time %}{{ outbound or '--' }}{% else %}Pending{% endif %}</td>
+              <td>{{ row.stop_no }}</td>
+              <td><strong>{{ row.location or '--' }}</strong></td>
+              <td class="cell-stack">
+                <div><span class="cell-label">Arrive:</span> {{ row.arrive or '--' }}</div>
+                <div><span class="cell-label">Depart:</span> {{ row.depart or '--' }}</div>
+                {% if row.wait %}<div>{{ row.wait }}</div>{% endif %}
+              </td>
+              <td class="cell-stack">
+                <div><span class="cell-label">IN:</span> {{ row.load_in or '--' }}</div>
+                <div><span class="cell-label">OUT:</span> {{ row.load_out or '--' }}</div>
+              </td>
+              <td>{{ row.miles_since or '--' }}</td>
+              <td>{{ row.fuel or '--' }}</td>
               <td>
-                <ul class="notes-list">
-                  {% if not log.depart_time %}
-                    <li>{% if route_context and route_context.route_status == 'finalized' %}Route End: {{ plant_name }}{% else %}Current stop; departure pending{% endif %}</li>
-                  {% elif loop.first %}
-                    <li>Shift start</li>
-                  {% else %}
-                    <li>Stop complete</li>
-                  {% endif %}
-                  {% if route and route.summary_lines %}
-                    {% for line in route.summary_lines %}
-                      <li>{{ line }}</li>
-                    {% endfor %}
-                  {% endif %}
-                  {% if route and route.deviation_reason %}
-                    <li>Deviation: {{ route.deviation_reason }}</li>
-                  {% endif %}
-                  {% if log.no_pickup %}<li>No pickup</li>{% endif %}
-                  {% if log.hot_parts or log.part_number %}<li>{% if log.hot_parts %}Hot part {% endif %}{{ log.part_number or '' }}</li>{% endif %}
-                  {% if log.maintenance or issue.truck %}<li>Truck issue: {{ issue.truck or 'Maintenance marked' }}</li>{% endif %}
-                  {% if issue.route %}<li>Route issue: {{ issue.route }}</li>{% endif %}
-                  {% for event in (route_task_events or {}).get(log.id, []) %}
-                    <li>{{ event.kind_label }} {{ event.label }}: {{ event.status }}</li>
-                  {% endfor %}
-                </ul>
+                {% if row.notes %}
+                  <ul class="notes-list">
+                    {% for note in row.notes %}<li>{{ note }}</li>{% endfor %}
+                  </ul>
+                {% else %}--{% endif %}
               </td>
             </tr>
           {% endfor %}
@@ -192,6 +207,32 @@
       </table>
     {% else %}
       <p>No stops for selected date.</p>
+    {% endif %}
+
+    {% if sheet.cards %}
+      <h2 class="section-title">DRIVER LOG SUMMARY</h2>
+      <div class="summary-cards">
+        {% for card in sheet.cards %}
+          <div class="summary-card">
+            <h3>{{ card.title }}</h3>
+            <dl>
+              {% for label, value in card['items'] %}
+                <dt>{{ label }}</dt><dd>{{ value }}</dd>
+              {% endfor %}
+            </dl>
+          </div>
+        {% endfor %}
+        {% if show_eld_hos %}
+          <div class="summary-card eld-hos">
+            <h3>ELD Hours (HOS)</h3>
+            <dl>
+              <dt>ELD Hours Left</dt><dd>{{ sheet.eld_hours_left or 'Not recorded' }}</dd>
+              <dt>Reset Time</dt><dd>{{ sheet.eld_reset_time or 'Not recorded' }}</dd>
+              <dt>Cycle</dt><dd>{{ sheet.eld_cycle or 'Not recorded' }}</dd>
+            </dl>
+          </div>
+        {% endif %}
+      </div>
     {% endif %}
 
     {% set section_no = namespace(value=2) %}
@@ -229,7 +270,7 @@
       </ul>
     {% endif %}
 
-    <h2 class="section-title">{{ section_no.value }}. SIGNATURES</h2>
+    <h2 class="section-title">SIGNATURES</h2>
     <div class="signature-grid">
       <div>
         <div class="sig-label">Driver Signature</div>

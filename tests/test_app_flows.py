@@ -95,14 +95,23 @@ def assert_official_record_output(data):
         assert phrase not in data
 
 
-def assert_driver_route_sheet_output(data):
+def assert_driver_route_sheet_output(data, *, html=False):
     assert_official_record_output(data)
     lowered = data.lower()
     assert b"audit" not in lowered
     assert b"movedefense" not in lowered
     assert b"Transit Cargo" not in data
-    assert b"In Truck" in data
-    assert b"Out Truck" in data
+    if html:
+        # The HTML driver log sheet uses the combined columns, not the legacy
+        # In Truck / Out Truck split that the PDF still renders.
+        assert b"DRIVER LOG SHEET" in data
+        assert b"Time / Wait" in data
+        assert b"Load Flow" in data
+        assert b"In Truck" not in data
+        assert b"Out Truck" not in data
+    else:
+        assert b"In Truck" in data
+        assert b"Out Truck" in data
     assert b"Manager and Reviewer Signature" in data
     assert b"Manager / Auditor" not in data
 
@@ -1622,11 +1631,11 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
     assert b"15 min" in page.data
     assert b"Raleigh East" in page.data
     assert b"Kraft Plater Load" in page.data
-    assert b"In Truck" in page.data
-    assert b"Out Truck" in page.data
+    assert b"Load Flow" in page.data
+    assert b"Miles Since Last Stop" in page.data
     assert b"Wait time:</strong> Wait 15 min" not in page.data
     assert b"Movement segment" not in page.data
-    assert_driver_route_sheet_output(page.data)
+    assert_driver_route_sheet_output(page.data, html=True)
     assert b"Plant Legend" not in page.data
     assert b"PPL = PPL" not in page.data
 
@@ -4184,7 +4193,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert b"Photo proof review" not in driver_print.data
     assert b" UTC" not in driver_print.data
     assert b"Timing status pending" not in driver_print.data
-    assert_driver_route_sheet_output(driver_print.data)
+    assert_driver_route_sheet_output(driver_print.data, html=True)
 
     with app.app_context():
         from app.models import DriverLogPhoto
@@ -5296,7 +5305,7 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
 
     print_response = client.get("/driver_logs_print")
     assert print_response.status_code == 200
-    assert b"DRIVER ROUTE SHEET" in print_response.data
+    assert b"DRIVER LOG SHEET" in print_response.data
     assert b"5:45pm" in print_response.data
     assert b"Dock time: 12 min" in print_response.data
     assert b"17:45" not in print_response.data
@@ -5307,7 +5316,7 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
     assert b"SIGNATURES" in print_response.data
     assert b"Leg #" not in print_response.data
     assert b"9. Signatures" not in print_response.data
-    assert_driver_route_sheet_output(print_response.data)
+    assert_driver_route_sheet_output(print_response.data, html=True)
 
     eod_print = client.get("/end_of_day_print")
     assert eod_print.status_code == 200
@@ -5564,7 +5573,7 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     pdf_response = client.get(f"/driver_logs_print/attachment?date={selected_date.isoformat()}")
     assert pdf_response.status_code == 200
     assert pdf_response.headers["Content-Type"] == "application/pdf"
-    assert b"DRIVER ROUTE SHEET" in pdf_response.data
+    assert b"DRIVER LOG SHEET" in pdf_response.data
     assert_driver_route_sheet_output(pdf_response.data)
     assert b"1. STOP TIMELINE" in pdf_response.data
     assert b"Location" in pdf_response.data
@@ -7680,7 +7689,7 @@ def test_mobile_dashboard_does_not_finish_route_with_open_stop(client, app):
     assert route_sheet.status_code == 200
     assert b"25 miles" in route_sheet.data
     assert b"Route open and not finalized" in route_sheet.data
-    assert b"Current stop; departure pending" in route_sheet.data
+    assert b"Current stop: departure pending" in route_sheet.data
 
 
 def test_shift_get_routes_do_not_mutate_shift_state(client, app):
