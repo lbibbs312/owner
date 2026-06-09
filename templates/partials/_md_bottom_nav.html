@@ -1,7 +1,9 @@
 {#
-  MoveDefense driver bottom nav. This is the single source of truth for the
-  authenticated driver mobile shell; page templates may set md_nav_active, and
-  this partial infers it from request.endpoint when they do not.
+  MoveDefense driver bottom action bar. The ONLY bottom nav for the authenticated
+  driver mobile shell. Home navigates back to the route workspace; Break / Fuel /
+  Service / Inspection are direct event-logging actions (no separate Quick Log
+  row). Page templates may set md_nav_active; otherwise it's inferred from the
+  endpoint. open_break is injected by the driver blueprint context processor.
 #}
 {% if current_user.is_authenticated and current_user.role != 'management' %}
 {% set md_nav_active = md_nav_active|default('', true) %}
@@ -9,12 +11,10 @@
 {% if not md_nav_active %}
   {% if endpoint == 'driver.new_driving_log' and request.args.get('report_type') == 'fuel' %}
     {% set md_nav_active = 'fuel' %}
-  {% elif endpoint == 'driver.driver_reports' or 'damage_report' in endpoint or 'accident_incident' in endpoint or 'ifta_worksheet' in endpoint %}
-    {% set md_nav_active = 'reports' %}
+  {% elif endpoint == 'driver.new_driving_log' and request.args.get('report_type') == 'truck_issue' %}
+    {% set md_nav_active = 'service' %}
   {% elif 'pretrip' in endpoint or 'posttrip' in endpoint or 'truck_maintenance' in endpoint %}
     {% set md_nav_active = 'pretrip' %}
-  {% elif 'driver_log' in endpoint or endpoint in ['driver.driver_logs', 'driver.new_driving_log', 'driver.add_stop', 'driver.mobile_history', 'driver.mobile_day_report', 'driver.end_of_day_summary'] %}
-    {% set md_nav_active = 'logs' %}
   {% elif endpoint in ['driver.mobile_dashboard', 'driver.profile'] %}
     {% set md_nav_active = 'home' %}
   {% endif %}
@@ -73,6 +73,18 @@
     border-color:rgba(91,157,255,.5);
     box-shadow:0 0 14px rgba(47,109,240,.4), 0 0 22px rgba(255,178,36,.12);
   }
+  /* Break is a POST action, not a link: render its form/button as a nav cell. */
+  .md-driver-bottom-nav form { display:contents; }
+  .md-driver-bottom-nav button.md-nav-link {
+    -webkit-appearance:none; appearance:none; background:transparent; border:0;
+    padding:0; margin:0; width:100%; cursor:pointer;
+  }
+  .md-driver-bottom-nav .md-nav-link.on { color:#ffd27a; }
+  .md-driver-bottom-nav .md-nav-link.on strong {
+    background:rgba(255,178,36,.2);
+    border-color:rgba(255,178,36,.5);
+    box-shadow:0 0 14px rgba(255,178,36,.4);
+  }
   @media (min-width:768px) {
     body.md-has-bottom-nav #pageContent,
     body.md-shell.md-has-bottom-nav #pageContent {
@@ -86,11 +98,19 @@
     .md-driver-bottom-nav { display:none !important; }
   }
 </style>
-<nav class="md-driver-bottom-nav" aria-label="Driver mobile navigation">
+<nav class="md-driver-bottom-nav" aria-label="Driver mobile actions">
   <a class="md-nav-link {% if md_nav_active == 'home' %}active{% endif %}" href="{{ url_for('driver.mobile_dashboard') }}"><strong>HM</strong><span>Home</span></a>
-  <a class="md-nav-link {% if md_nav_active == 'logs' %}active{% endif %}" href="{{ url_for('driver.driver_logs') }}"><strong>DL</strong><span>Logs</span></a>
+  {% if open_break %}
+  <form method="post" action="{{ url_for('driver.mobile_break_end') }}">
+    <button type="submit" class="md-nav-link on" aria-label="End break"><strong>BR</strong><span>End Break</span></button>
+  </form>
+  {% else %}
+  <form method="post" action="{{ url_for('driver.mobile_break_start') }}">
+    <button type="submit" class="md-nav-link" aria-label="Start break"><strong>BR</strong><span>Break</span></button>
+  </form>
+  {% endif %}
   <a class="md-nav-link {% if md_nav_active == 'fuel' %}active{% endif %}" href="{{ url_for('driver.new_driving_log', report_type='fuel', next='mobile') }}"><strong>FL</strong><span>Fuel</span></a>
-  <a class="md-nav-link {% if md_nav_active in ['reports', 'damage'] %}active{% endif %}" href="{{ url_for('driver.driver_reports') }}"><strong>RP</strong><span>Reports</span></a>
-  <a class="md-nav-link {% if md_nav_active == 'pretrip' %}active{% endif %}" href="{{ url_for('driver.list_pretrips') }}"><strong>IN</strong><span>Inspections</span></a>
+  <a class="md-nav-link {% if md_nav_active == 'service' %}active{% endif %}" href="{{ url_for('driver.new_driving_log', report_type='truck_issue', next='mobile') }}"><strong>SV</strong><span>Service</span></a>
+  <a class="md-nav-link {% if md_nav_active == 'pretrip' %}active{% endif %}" href="{{ url_for('driver.new_pretrip') }}"><strong>IN</strong><span>Inspection</span></a>
 </nav>
 {% endif %}

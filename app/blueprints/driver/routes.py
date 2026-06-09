@@ -6498,7 +6498,6 @@ def mobile_dashboard():
     today_local_date = now_local.date()
     _repair_today_pretrip_dates(current_user.id, today_local_date)
     open_shift = _open_shift_for_driver(current_user.id)
-    open_break = _open_route_break(current_user.id)
     requested_route_date = _requested_mobile_route_date()
     route_date = requested_route_date or _dashboard_route_date_for_driver(current_user.id, today_local_date, open_shift=open_shift)
     if route_date == today_local_date:
@@ -6688,7 +6687,6 @@ def mobile_dashboard():
         latest_transfer=latest_transfer,
         recent_ryder_events=recent_ryder_events,
         open_shift=open_shift,
-        open_break=open_break,
         shift_elapsed=shift_elapsed,
         today_local_date=today_local_date,
         route_date=route_date,
@@ -6784,6 +6782,18 @@ def _open_route_break(driver_id):
         .order_by(RouteBreak.start_time.desc(), RouteBreak.id.desc())
         .first()
     )
+
+
+@bp.context_processor
+def _inject_open_break():
+    """Expose the driver's open break to every driver template so the bottom-nav
+    Break action shows start/end state consistently across pages."""
+    try:
+        if current_user.is_authenticated and getattr(current_user, "role", None) != "management":
+            return {"open_break": _open_route_break(current_user.id)}
+    except Exception:  # pragma: no cover - never block a render on this
+        pass
+    return {"open_break": None}
 
 
 @bp.route("/mobile/break/start", methods=["POST"])
