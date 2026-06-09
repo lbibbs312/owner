@@ -3003,15 +3003,19 @@ def test_driver_bottom_nav_shows_fuel_not_transfer(client, app):
 
 def test_driver_quick_log_entry_point_and_break_toggle(client, app):
     """Shared Quick Log offers Break/Fuel/Service/Inspection wired to existing
-    flows, and Break toggles the HOS break start/end."""
+    flows, and Break toggles the HOS break start/end. It renders as verb-labeled
+    action buttons, not a second copy of the bottom nav."""
     with app.app_context():
         create_user("ql_driver", "ql-driver@example.com", "driver")
     login(client, "ql_driver")
 
     body = client.get("/mobile").get_data(as_text=True)
     assert "md-quick-log" in body
-    for label in ("Break", "Fuel", "Service", "Inspection"):
-        assert f"<span>{label}</span>" in body
+    # Verb-labeled action buttons (not the nav's pill labels), so it does not
+    # read as a duplicate bottom nav.
+    for label in ("Start Break", "Log Fuel", "Log Service", "New Inspection"):
+        assert label in body
+    assert "md-ql-btn" in body and "md-ql-tile" not in body
     # Each quick-log action points at an existing flow (no new tables/routes).
     assert "report_type=fuel" in body          # Fuel -> existing fuel capture
     assert "report_type=truck_issue" in body   # Service -> maintenance capture
@@ -3022,13 +3026,14 @@ def test_driver_quick_log_entry_point_and_break_toggle(client, app):
     assert client.post("/mobile/break/start").status_code == 302
     on_break = client.get("/mobile").get_data(as_text=True)
     assert "On break" in on_break
-    assert "<span>End Break</span>" in on_break
+    assert "End Break" in on_break
+    assert "Start Break" not in on_break
     assert "/mobile/break/end" in on_break
     # Ending the break returns to the start state.
     assert client.post("/mobile/break/end").status_code == 302
     after = client.get("/mobile").get_data(as_text=True)
     assert "On break" not in after
-    assert "<span>Break</span>" in after
+    assert "Start Break" in after
 
 
 def test_posttrip_ends_unlinked_manual_shift_timer(client, app):

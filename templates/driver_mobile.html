@@ -4925,21 +4925,24 @@
       </section>
       {% endif %}
 
-      {# ---- Quick Log: shared entry point for driver event types ---- #}
+      {# ---- Quick Log: shared entry point for driver event types ----
+         Styled as action buttons (verb labels, 2x2), deliberately NOT the
+         circular pill/2-letter style of the bottom nav so it doesn't read as a
+         second nav bar even though Fuel/Inspection also live in the nav. #}
       <style>
-        .md-quick-log .md-ql-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-top:4px; }
+        .md-quick-log .md-ql-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:9px; margin-top:6px; }
         .md-quick-log form { margin:0; }
-        .md-quick-log .md-ql-tile { width:100%; display:grid; place-items:center; gap:6px; padding:14px 6px; border-radius:14px;
-          background:rgba(255,255,255,.04); border:1px solid var(--md-line, #22324a); color:var(--md-text, #e6edf6);
-          font-family:var(--md-display, 'Archivo', system-ui, sans-serif); font-size:.66rem; font-weight:800;
-          text-transform:uppercase; letter-spacing:.05em; text-decoration:none; cursor:pointer; }
-        .md-quick-log .md-ql-tile strong { width:34px; height:34px; border-radius:999px; display:grid; place-items:center;
-          font-size:.74rem; background:rgba(47,109,240,.16); border:1px solid rgba(91,157,255,.4); color:var(--md-blue-bright, #5b9dff); }
-        .md-quick-log .md-ql-tile:active { transform:translateY(1px); }
-        .md-quick-log .md-ql-tile.on { border-color:rgba(255,178,36,.6); background:rgba(255,178,36,.12); }
-        .md-quick-log .md-ql-tile.on strong { background:rgba(255,178,36,.2); border-color:rgba(255,178,36,.5); color:#ffd27a; }
+        .md-quick-log .md-ql-btn { width:100%; box-sizing:border-box; display:flex; align-items:center; gap:9px;
+          padding:14px 14px; border-radius:11px; background:rgba(255,255,255,.035);
+          border:1px solid var(--md-line, #22324a); color:var(--md-text, #e6edf6);
+          font-family:var(--md-display, 'Archivo', system-ui, sans-serif); font-size:.92rem; font-weight:700;
+          letter-spacing:.005em; text-decoration:none; cursor:pointer; text-align:left; }
+        .md-quick-log .md-ql-btn::before { content:""; width:7px; height:7px; border-radius:2px; flex:none;
+          background:var(--md-blue-bright, #5b9dff); box-shadow:0 0 8px rgba(91,157,255,.5); }
+        .md-quick-log .md-ql-btn:active { transform:translateY(1px); }
+        .md-quick-log .md-ql-btn.on { border-color:rgba(255,178,36,.55); background:rgba(255,178,36,.1); color:#ffe2a6; }
+        .md-quick-log .md-ql-btn.on::before { background:#ffd27a; box-shadow:0 0 8px rgba(255,178,36,.55); }
         .md-quick-log .md-ql-onbreak { color:#ffd27a; }
-        @media (max-width:520px) { .md-quick-log .md-ql-grid { grid-template-columns:repeat(2, 1fr); } }
       </style>
       <section class="card md-quick-log" aria-label="Quick log">
         <div class="section-head">
@@ -4949,16 +4952,16 @@
         <div class="md-ql-grid">
           {% if open_break %}
           <form method="post" action="{{ url_for('driver.mobile_break_end') }}">
-            <button type="submit" class="md-ql-tile on"><strong>BR</strong><span>End Break</span></button>
+            <button type="submit" class="md-ql-btn on">End Break</button>
           </form>
           {% else %}
           <form method="post" action="{{ url_for('driver.mobile_break_start') }}">
-            <button type="submit" class="md-ql-tile"><strong>BR</strong><span>Break</span></button>
+            <button type="submit" class="md-ql-btn">Start Break</button>
           </form>
           {% endif %}
-          <a class="md-ql-tile" href="{{ url_for('driver.new_driving_log', report_type='fuel', next='mobile') }}"><strong>FL</strong><span>Fuel</span></a>
-          <a class="md-ql-tile" href="{{ url_for('driver.new_driving_log', report_type='truck_issue', next='mobile') }}"><strong>SV</strong><span>Service</span></a>
-          <a class="md-ql-tile" href="{{ url_for('driver.new_pretrip') }}"><strong>IN</strong><span>Inspection</span></a>
+          <a class="md-ql-btn" href="{{ url_for('driver.new_driving_log', report_type='fuel', next='mobile') }}">Log Fuel</a>
+          <a class="md-ql-btn" href="{{ url_for('driver.new_driving_log', report_type='truck_issue', next='mobile') }}">Log Service</a>
+          <a class="md-ql-btn" href="{{ url_for('driver.new_pretrip') }}">New Inspection</a>
         </div>
       </section>
 
