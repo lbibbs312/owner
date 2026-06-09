@@ -2339,7 +2339,13 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
         for note in row["notes"]
         if note.startswith("Not unloaded") or note.startswith("Second stop not unloaded")
     ]
-    route_history = [f"{row['location']}: IN {row['load_in']} / OUT {row['load_out']}" for row in timeline_rows]
+    # Compact location chain (the per-stop IN/OUT detail already lives in the
+    # timeline's Load Flow column); collapse immediate repeats so it stays one line.
+    route_history = []
+    for row in timeline_rows:
+        location = row["location"]
+        if location and (not route_history or route_history[-1] != location):
+            route_history.append(location)
 
     issue_lines = []
     issue_lines.extend(route_sheet_data.get("exception_notes") or [])
@@ -2390,7 +2396,7 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
     not_unloaded = "; ".join(unload_blocked)
     problem_events = "; ".join(issue_lines)
     docs_photos = "; ".join(document_lines)
-    route_history_text = "; ".join(route_history)
+    route_history_text = " > ".join(route_history)
     maintenance_text = "; ".join(maintenance_notes)
     pickup_stop = next((row["location"] for row in timeline_rows if row["load_out"] not in {"", "Empty", "Pending"}), "")
     delivery_stop = next((row["location"] for row in timeline_rows if any("Delivered" in note or "Unloaded" in note for note in row["notes"])), "")
