@@ -9,6 +9,7 @@
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; width: 100%; min-height: 100%; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #111; background: #fff; }
+    :root { --md-blue: #1f4ea3; --md-blue-soft: #eaf0fb; --md-ink: #1a2230; --md-muted: #5b6675; --md-line: #d4dae6; }
     .print-page, .official-print-document { width: 100%; margin: 0; padding: 0; }
     .print-controls { margin-bottom: 0.12in; }
     .print-btn, .email-btn {
@@ -22,296 +23,236 @@
       line-height: 1.1;
       cursor: pointer;
     }
-    .print-btn { background: #0d6efd; }
+    .print-btn { background: var(--md-blue); }
     .email-btn { background: #198754; }
+    .print-feedback { margin: 0.35rem 0 0.65rem; font-weight: 700; color: #334155; min-height: 1.25rem; }
+
     .document-header {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 2.7in;
+      grid-template-columns: minmax(0, 1fr) 2.9in;
       gap: 0.2in;
-      border-bottom: 2px solid #111;
-      padding-bottom: 0.09in;
+      border-bottom: 2px solid var(--md-blue);
+      padding-bottom: 0.1in;
       margin-bottom: 0.08in;
     }
-    .driver-kicker { font-size: 8pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; color: #b8860b; }
+    .brand-lockup { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+    .brand-lockup svg { width: 22px; height: 22px; color: var(--md-blue); }
+    .brand-word { font-size: 12.5pt; font-weight: 900; letter-spacing: -0.01em; color: var(--md-ink); }
+    .brand-word .accent { color: var(--md-blue); }
+    .driver-kicker { font-size: 8pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; color: var(--md-muted); }
     .driver-name { margin: 1px 0; font-size: 15pt; font-weight: 900; text-transform: uppercase; line-height: 1; }
-    .driver-route-meta { font-size: 8.2pt; font-weight: 700; color: #333; }
-    .document-title { margin: 0 0 0.1in; font-size: 15pt; font-weight: 900; text-transform: uppercase; line-height: 1; }
-    .header-detail, .document-meta { font-size: 8pt; line-height: 1.35; }
-    .document-meta { text-align: right; }
-    .document-number { font-weight: 900; }
+    .driver-route-meta { font-size: 8.4pt; font-weight: 700; color: var(--md-muted); }
+    .document-meta { font-size: 8pt; line-height: 1.5; }
+    .document-meta .row { display: grid; grid-template-columns: 0.95in minmax(0, 1fr); gap: 0.08in; }
+    .document-meta .k { color: var(--md-muted); font-weight: 700; }
+    .document-meta .v { font-weight: 700; text-align: right; }
+    .document-meta .v.mono { font-weight: 900; }
+    .document-meta .spacer { height: 5px; }
+
+    .document-title { margin: 0.04in 0 0.12in; font-size: 17pt; font-weight: 900; text-transform: uppercase; letter-spacing: -0.01em; line-height: 1; color: var(--md-ink); }
     .section-title {
-      margin: 0.14in 0 0.05in;
-      padding-bottom: 0.03in;
-      border-bottom: 1.5px solid #111;
-      font-size: 10pt;
+      margin: 0.16in 0 0.06in;
+      font-size: 9pt;
       font-weight: 900;
       text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--md-blue);
     }
-    .route-summary {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.03in 0.22in;
-      margin: 0 0 0.1in;
-      font-size: 8.6pt;
-    }
-    .route-summary div { display: flex; gap: 0.06in; }
-    .route-summary span { min-width: 0.82in; font-weight: 900; }
-    table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 0.06in; }
-    th, td { border: 1px solid #222; padding: 4px 5px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
-    th { background: #f1f1f1; font-weight: 900; text-transform: uppercase; font-size: 7.2pt; }
-    .timeline th:nth-child(1), .timeline td:nth-child(1) { width: 5%; text-align: center; }
-    .timeline th:nth-child(2), .timeline td:nth-child(2) { width: 16%; }
-    .timeline th:nth-child(3), .timeline td:nth-child(3) { width: 14%; }
-    .timeline th:nth-child(4), .timeline td:nth-child(4) { width: 17%; }
-    .timeline th:nth-child(5), .timeline td:nth-child(5) { width: 9%; }
-    .timeline th:nth-child(6), .timeline td:nth-child(6) { width: 11%; }
-    .timeline th:nth-child(7), .timeline td:nth-child(7) { width: 28%; }
+
+    .rs-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.08in; }
+    .rs-tile { display: flex; align-items: center; gap: 7px; border: 1px solid var(--md-line); border-radius: 4px; padding: 7px 9px; background: #fff; }
+    .rs-tile .rs-icon { flex: 0 0 auto; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; color: var(--md-blue); }
+    .rs-tile .rs-icon svg { width: 18px; height: 18px; }
+    .rs-tile .rs-label { font-size: 6.6pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--md-muted); }
+    .rs-tile .rs-value { font-size: 9.5pt; font-weight: 900; color: var(--md-ink); line-height: 1.15; }
+
+    table.timeline { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 0.04in; }
+    table.timeline th, table.timeline td { border: 1px solid var(--md-line); padding: 4px 5px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+    table.timeline thead th { background: var(--md-blue); color: #fff; font-weight: 800; text-transform: uppercase; font-size: 6.6pt; letter-spacing: 0.03em; border-color: var(--md-blue); }
+    table.timeline tbody tr:nth-child(even) td { background: #f7f9fd; }
+    .col-stop { width: 5%; text-align: center; }
+    .col-loc { width: 15%; }
+    .col-time { width: 14%; }
+    .col-load { width: 16%; }
+    .col-miles { width: 9%; }
+    .col-fuel { width: 10%; }
+    .col-notes { width: auto; }
+    td.col-stop { font-weight: 900; color: var(--md-blue); }
     .cell-stack > div { line-height: 1.3; }
-    .cell-stack .cell-label { font-weight: 900; color: #444; }
-    .notes-list, .simple-list { margin: 0; padding-left: 0.16in; }
-    .notes-list li, .simple-list li { margin: 0 0 2px; }
-    .optional-grid { display: grid; gap: 0.04in; }
-    .summary-cards {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.1in;
-      margin: 0.02in 0 0.06in;
-    }
-    .summary-card {
-      border: 1px solid #222;
-      border-top: 3px solid #b8860b;
-      padding: 0.07in 0.09in 0.08in;
-    }
-    .summary-card h3 {
-      margin: 0 0 0.05in;
-      padding-bottom: 0.03in;
-      border-bottom: 1px solid #ccc;
-      font-size: 8.4pt;
-      font-weight: 900;
-      text-transform: uppercase;
-    }
-    .summary-card dl {
-      margin: 0;
-      display: grid;
-      grid-template-columns: minmax(0, 1.25in) minmax(0, 1fr);
-      gap: 2px 0.08in;
-      font-size: 8pt;
-    }
-    .summary-card dt { font-weight: 700; color: #333; }
-    .summary-card dd { margin: 0; }
-    .signature-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.45in;
-      margin-top: 0.22in;
-    }
-    .sig-label { font-size: 7.5pt; font-weight: 900; text-transform: uppercase; color: #333; }
-    .sig-line { border-bottom: 1.5px solid #111; min-height: 0.46in; display: flex; align-items: flex-end; padding-bottom: 3px; }
+    .cell-stack .cell-label { font-weight: 800; color: var(--md-muted); }
+    .notes-list { margin: 0; padding-left: 0.15in; }
+    .notes-list li { margin: 0 0 2px; }
+
+    .summary-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.1in; margin-top: 0.04in; }
+    .summary-card { border: 1px solid var(--md-line); border-top: 3px solid var(--md-blue); border-radius: 4px; padding: 0.08in 0.1in 0.09in; }
+    .summary-card h3 { margin: 0 0 0.05in; padding-bottom: 0.03in; border-bottom: 1px solid var(--md-line); font-size: 8pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.03em; color: var(--md-ink); }
+    .summary-card dl { margin: 0; display: grid; grid-template-columns: minmax(0, 1.15in) minmax(0, 1fr); gap: 2px 0.1in; font-size: 8pt; }
+    .summary-card dt { font-weight: 700; color: var(--md-muted); }
+    .summary-card dd { margin: 0; color: var(--md-ink); }
+
+    .signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5in; margin-top: 0.2in; }
+    .sig-label { font-size: 7.5pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; color: var(--md-muted); }
+    .sig-line { border-bottom: 1.5px solid #111; min-height: 0.44in; display: flex; align-items: flex-end; padding-bottom: 3px; }
     .sig-line img { max-height: 0.4in; max-width: 100%; }
-    .sig-ts { min-height: 0.14in; margin-top: 3px; font-size: 7pt; color: #555; }
-    .print-feedback { margin: 0.35rem 0 0.65rem; font-weight: 700; color: #334155; min-height: 1.25rem; }
+    .sig-foot { display: flex; justify-content: space-between; gap: 0.2in; margin-top: 3px; font-size: 7pt; color: var(--md-muted); }
+    .doc-footer { margin-top: 0.22in; padding-top: 0.07in; border-top: 1px solid var(--md-blue); text-align: center; font-size: 7.6pt; font-style: italic; color: var(--md-muted); }
+
     @media screen { body { padding: 1rem; } }
     @media print {
       body { padding: 0; }
-      .no-print, .screen-only, .print-controls, .helper-text, .form-hint, .button-row, nav, header.app-nav, .print-btn, .email-btn { display: none !important; }
-      th { background: #eee !important; }
-      .summary-cards { break-inside: avoid; }
-      .summary-card { break-inside: avoid; }
+      .no-print, .print-controls, .print-btn, .email-btn { display: none !important; }
+      .summary-cards, .summary-card, .rs-tile, table.timeline tr { break-inside: avoid; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
 </head>
 <body>
+{% macro tile_icon(kind) %}
+{%- set p = {
+  'stops': '<path d="M12 2C8.1 2 5 5.1 5 9c0 5 7 13 7 13s7-8 7-13c0-3.9-3.1-7-7-7z"/><circle cx="12" cy="9" r="2.3"/>',
+  'open': '<path d="M5 21V3M5 4h11l-2 4 2 4H5"/>',
+  'status': '<path d="M5 18.5h9a3 3 0 0 0 0-6H8a3 3 0 0 1 0-6h6"/><circle cx="5" cy="18.5" r="1.6"/><circle cx="19" cy="5.5" r="1.6"/>',
+  'hours': '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/>',
+  'wait': '<path d="M9 2h6M8.5 22h7M7 22c0-4 3-5 5-7 2 2 5 3 5 7M17 2c0 4-3 5-5 7-2-2-5-3-5-7"/>',
+  'miles': '<path d="M7.5 21 9.5 3M16.5 21 14.5 3M12 6v2M12 11v2M12 16v2"/>',
+  'avg_miles': '<path d="M4 19h16M6.5 15.5l3.5-4 3 2 4.5-6"/>',
+  'fuel': '<path d="M4 21V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v16M3 21h10M12 9h3.5L18 11.5V17a2 2 0 0 0 2 2 2 2 0 0 0 2-2v-7"/>',
+  'avg_fuel': '<path d="M12 3s6.5 7 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 10 12 3 12 3z"/>'
+} %}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">{{ p.get(kind, '<circle cx="12" cy="12" r="8.5"/>')|safe }}</svg>
+{%- endmacro %}
 <div class="print-page">
   {% set document_meta = document_meta|default({'title': 'DRIVER LOG SHEET', 'document_no': 'LOG-' ~ the_date, 'generated_at': '', 'page': '1 of 1'}) %}
   {% set sheet = log_sheet|default({}) %}
-  {% set print_driver_name = sheet.driver_name or (print_driver.display_name if print_driver is defined and print_driver else current_user.display_name) %}
-  {% set route_truck = sheet.truck or (pretrips[0].truck_number if pretrips else '') %}
+  {% set print_driver_name = sheet.driver_name or (current_user.display_name if current_user else '') %}
   {% set route_date_label = sheet.route_date_label or (the_date.strftime('%b %d, %Y') if the_date else '') %}
-  {% set summary = route_sheet_summary|default({'total_stops': logs|length if logs else 0, 'open_stops': 0, 'total_miles': none, 'total_wait_minutes': 0}) %}
-  {# ELD hours-of-service fields (ELD Hours Left / Reset Time / Cycle) are hidden by default. #}
-  {% set show_eld_hos = show_eld_hos|default(false) %}
+  {# ELD hours-of-service tiles only appear when that data is actually captured (none yet), per print-only-real-data rule. #}
   <div class="print-controls no-print">
     <button class="print-btn" type="button" data-print-document>Print Document</button>
     <a class="email-btn" href="{{ attachment_url or url_for('driver.driver_logs_attachment', date=the_date.isoformat()) }}" data-save-pdf>Save PDF</a>
-    {% if csv_url is defined %}<a class="email-btn" href="{{ csv_url }}">CSV Export</a>{% endif %}
-    {% if sheets_url is defined %}<a class="email-btn" href="{{ sheets_url }}">Sheets Export</a>{% endif %}
   </div>
   <div class="print-feedback no-print" data-print-feedback aria-live="polite"></div>
 
   <main class="official-print-document">
     <header class="document-header">
       <div>
-        <div class="driver-kicker">DRIVER</div>
+        <div class="brand-lockup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3z"/><path d="m8.5 12 2.5 2.5L16 9"/></svg>
+          <span class="brand-word">Move<span class="accent">Defense</span></span>
+        </div>
+        <div class="driver-kicker">Driver</div>
         <div class="driver-name">{{ print_driver_name|upper }}</div>
-        <div class="driver-route-meta">{{ route_truck or 'Truck not set' }} &middot; {{ route_date_label }}</div>
+        <div class="driver-route-meta">{% if sheet.route_label %}{{ sheet.route_label }} &middot; {% endif %}{{ route_date_label }}</div>
       </div>
       <div class="document-meta">
-        <div class="document-number">Route Sheet No: {{ document_meta.document_no }}</div>
-        <div class="generated-at">Generated: {{ document_meta.generated_at }}</div>
-        <div class="page-number">Page: {{ document_meta.page }}</div>
+        <div class="row"><span class="k">Route Sheet No:</span><span class="v mono">{{ document_meta.document_no }}</span></div>
+        <div class="row"><span class="k">Generated:</span><span class="v">{{ document_meta.generated_at }}</span></div>
+        <div class="row"><span class="k">Page:</span><span class="v">{{ document_meta.page }}</span></div>
+        {% if sheet.truck or sheet.trailer or sheet.route_id %}<div class="spacer"></div>{% endif %}
+        {% if sheet.truck %}<div class="row"><span class="k">Truck / Trailer:</span><span class="v">{{ sheet.truck }}{% if sheet.trailer %} / {{ sheet.trailer }}{% endif %}</span></div>
+        {% elif sheet.trailer %}<div class="row"><span class="k">Trailer:</span><span class="v">{{ sheet.trailer }}</span></div>{% endif %}
+        {% if sheet.route_id %}<div class="row"><span class="k">Route ID:</span><span class="v">{{ sheet.route_id }}</span></div>{% endif %}
       </div>
     </header>
 
     <h1 class="document-title">{{ sheet.title or 'DRIVER LOG SHEET' }}</h1>
 
-    <h2 class="section-title">ROUTE SUMMARY</h2>
-    <div class="route-summary">
-      <div><span>Total Stops:</span><strong>{{ summary.total_stops }}</strong></div>
-      <div><span>Open Stops:</span><strong>{{ summary.open_stops }}</strong></div>
-      <div><span>Mileage:</span><strong>{% if summary.total_miles is not none %}{{ summary.total_miles }} miles{% elif logs %}Pending posttrip{% else %}Not started{% endif %}</strong></div>
-      <div><span>Total Wait:</span><strong>{{ summary.total_wait_minutes|duration_minutes }}</strong></div>
-      <div><span>Route Status:</span><strong>{% if route_context and route_context.route_status == 'completed' %}Route completed and awaiting final review{% elif route_context and route_context.route_status == 'finalized' %}Route finalized{% elif logs %}Route open and not finalized{% else %}No route recorded{% endif %}</strong></div>
-    </div>
+    {% if sheet.summary_tiles %}
+      <h2 class="section-title">Route Summary</h2>
+      <div class="rs-grid">
+        {% for tile in sheet.summary_tiles %}
+          <div class="rs-tile">
+            <span class="rs-icon">{{ tile_icon(tile.icon) }}</span>
+            <div class="rs-meta"><div class="rs-label">{{ tile.label }}</div><div class="rs-value">{{ tile.value }}</div></div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
 
     {% if sheet.timeline_rows %}
-      <h2 class="section-title">1. STOP TIMELINE</h2>
+      <h2 class="section-title">Stop Timeline</h2>
       <table class="timeline">
         <thead>
           <tr>
-            <th>Stop #</th>
-            <th>Location / Stop</th>
-            <th>Time / Wait</th>
-            <th>Load Flow</th>
-            <th>Miles Since Last Stop</th>
-            <th>Fuel Used / Fuel Recorded</th>
-            <th>Notes</th>
+            <th class="col-stop">Stop #</th>
+            <th class="col-loc">Location / Stop</th>
+            <th class="col-time">Time / Wait</th>
+            <th class="col-load">Load Flow</th>
+            {% if sheet.show_miles_col %}<th class="col-miles">Miles Since Last Stop</th>{% endif %}
+            {% if sheet.show_fuel_col %}<th class="col-fuel">Fuel Used / Recorded</th>{% endif %}
+            <th class="col-notes">Notes</th>
           </tr>
         </thead>
         <tbody>
           {% for row in sheet.timeline_rows %}
             <tr>
-              <td>{{ row.stop_no }}</td>
-              <td><strong>{{ row.location or '--' }}</strong></td>
-              <td class="cell-stack">
+              <td class="col-stop">{{ row.stop_no }}</td>
+              <td class="col-loc"><strong>{{ row.location }}</strong></td>
+              <td class="col-time cell-stack">
                 <div><span class="cell-label">Arrive:</span> {{ row.arrive or '--' }}</div>
                 <div><span class="cell-label">Depart:</span> {{ row.depart or '--' }}</div>
                 {% if row.wait %}<div>{{ row.wait }}</div>{% endif %}
               </td>
-              <td class="cell-stack">
-                <div><span class="cell-label">IN:</span> {{ row.load_in or '--' }}</div>
-                <div><span class="cell-label">OUT:</span> {{ row.load_out or '--' }}</div>
+              <td class="col-load cell-stack">
+                <div><span class="cell-label">In:</span> {{ row.load_in or '--' }}</div>
+                <div><span class="cell-label">Out:</span> {{ row.load_out or '--' }}</div>
               </td>
-              <td>{{ row.miles_since or '--' }}</td>
-              <td>{{ row.fuel or '--' }}</td>
-              <td>
+              {% if sheet.show_miles_col %}<td class="col-miles">{{ row.miles_since }}</td>{% endif %}
+              {% if sheet.show_fuel_col %}<td class="col-fuel">{{ row.fuel }}</td>{% endif %}
+              <td class="col-notes">
                 {% if row.notes %}
-                  <ul class="notes-list">
-                    {% for note in row.notes %}<li>{{ note }}</li>{% endfor %}
-                  </ul>
-                {% else %}--{% endif %}
+                  <ul class="notes-list">{% for note in row.notes %}<li>{{ note }}</li>{% endfor %}</ul>
+                {% endif %}
               </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
-    {% else %}
-      <p>No stops for selected date.</p>
     {% endif %}
 
     {% if sheet.cards %}
-      <h2 class="section-title">DRIVER LOG SUMMARY</h2>
+      <h2 class="section-title">Driver Log Summary</h2>
       <div class="summary-cards">
         {% for card in sheet.cards %}
           <div class="summary-card">
             <h3>{{ card.title }}</h3>
-            <dl>
-              {% for label, value in card['items'] %}
-                <dt>{{ label }}</dt><dd>{{ value }}</dd>
-              {% endfor %}
-            </dl>
+            <dl>{% for label, value in card['items'] %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>
           </div>
-        {% endfor %}
-        {% if show_eld_hos %}
-          <div class="summary-card eld-hos">
-            <h3>ELD Hours (HOS)</h3>
-            <dl>
-              <dt>ELD Hours Left</dt><dd>{{ sheet.eld_hours_left or 'Not recorded' }}</dd>
-              <dt>Reset Time</dt><dd>{{ sheet.eld_reset_time or 'Not recorded' }}</dd>
-              <dt>Cycle</dt><dd>{{ sheet.eld_cycle or 'Not recorded' }}</dd>
-            </dl>
-          </div>
-        {% endif %}
-      </div>
-    {% endif %}
-
-    {% set section_no = namespace(value=2) %}
-    {% if parts_carried %}
-      <h2 class="section-title">{{ section_no.value }}. LOAD AND PART REFERENCES</h2>
-      {% set section_no.value = section_no.value + 1 %}
-      <ul class="simple-list">
-        {% for part in parts_carried %}<li>{{ part }}</li>{% endfor %}
-      </ul>
-    {% endif %}
-
-    {% if route_documents %}
-      <h2 class="section-title">{{ section_no.value }}. DOCUMENTS ATTACHED</h2>
-      {% set section_no.value = section_no.value + 1 %}
-      <div class="optional-grid">
-        {% for doc in route_documents %}
-          <div><strong>{{ doc.doc_label }}</strong> - {{ doc.owner_label }} - {{ doc.uploaded_label }}{% if doc.note %} - {{ doc.note }}{% endif %}</div>
         {% endfor %}
       </div>
     {% endif %}
 
-    {% if damage_report_details %}
-      <h2 class="section-title">{{ section_no.value }}. DAMAGE AND INCIDENTS</h2>
-      {% set section_no.value = section_no.value + 1 %}
-      <ul class="simple-list">
-        {% for detail in damage_report_details %}<li>{{ detail }}</li>{% endfor %}
-      </ul>
-    {% endif %}
-
-    {% if exception_notes %}
-      <h2 class="section-title">{{ section_no.value }}. EXCEPTIONS</h2>
-      {% set section_no.value = section_no.value + 1 %}
-      <ul class="simple-list">
-        {% for note in exception_notes %}<li>{{ note }}</li>{% endfor %}
-      </ul>
-    {% endif %}
-
-    <h2 class="section-title">SIGNATURES</h2>
+    <h2 class="section-title">Signatures</h2>
     <div class="signature-grid">
       <div>
         <div class="sig-label">Driver Signature</div>
-        <div class="sig-line">
-          {% if driver_signature %}
-            <img src="{{ driver_signature }}" alt="Driver signature">
-          {% endif %}
-        </div>
-        <div class="sig-ts">
-          {% if signature_timestamp %}
-            Signed {{ signature_timestamp|to_detroit_datetime }}
-          {% elif driver_signature %}
-            Timestamp unavailable
-          {% else %}
-            Not yet signed
-          {% endif %}
+        <div class="sig-line">{% if driver_signature %}<img src="{{ driver_signature }}" alt="Driver signature">{% endif %}</div>
+        <div class="sig-foot">
+          <span>{% if signature_timestamp %}Signed {{ signature_timestamp|to_detroit_datetime }}{% elif driver_signature %}Timestamp unavailable{% else %}Not yet signed{% endif %}</span>
+          <span>Date: ____________</span>
         </div>
       </div>
       <div>
         <div class="sig-label">Manager and Reviewer Signature</div>
         <div class="sig-line"></div>
-        <div class="sig-ts">&nbsp;</div>
+        <div class="sig-foot"><span>&nbsp;</span><span>Date: ____________</span></div>
       </div>
     </div>
+
+    <div class="doc-footer">Thank you for driving safe and delivering excellence.</div>
   </main>
 </div>
 {% if request.args.get('autoprint') %}
 <script>
   window.addEventListener("load", function () {
-    window.setTimeout(function () {
-      window.print();
-    }, 150);
+    window.setTimeout(function () { window.print(); }, 150);
   });
 </script>
 {% endif %}
 <script>
   (function () {
     var feedback = document.querySelector("[data-print-feedback]");
-    function showFeedback(message) {
-      if (feedback) feedback.textContent = message;
-    }
+    function showFeedback(message) { if (feedback) feedback.textContent = message; }
     var printButton = document.querySelector("[data-print-document]");
     if (printButton) {
       printButton.addEventListener("click", function () {

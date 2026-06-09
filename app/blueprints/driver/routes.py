@@ -2101,10 +2101,41 @@ def _sheet_route_status_label(route_context, logs):
     if status == "finalized":
         return "Route finalized"
     if status == "completed":
-        return "Route completed"
+        return "Route completed and awaiting final review"
     if logs:
-        return "Route open"
+        return "Route open and not finalized"
     return "No route recorded"
+
+
+# Values that mean "we have nothing real to print here" — the log sheet omits
+# these entirely rather than showing placeholder filler.
+_SHEET_PLACEHOLDERS = {
+    "",
+    "not recorded",
+    "none recorded",
+    "not started",
+    "no issues recorded",
+    "none",
+    "pending",
+    "pending posttrip",
+    "--",
+    "—",
+}
+
+
+def _sheet_real(value):
+    """True when a value is a captured fact worth printing (not placeholder filler)."""
+    if value is None:
+        return False
+    return str(value).strip().lower() not in _SHEET_PLACEHOLDERS
+
+
+def _sheet_card(title, items, *, show=True):
+    """Build a card containing only items with real values; return None if empty."""
+    if not show:
+        return None
+    real_items = [(label, value) for label, value in items if _sheet_real(value)]
+    return {"title": title, "items": real_items} if real_items else None
 
 
 def _sheet_load_label(value):
@@ -2301,94 +2332,126 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
         if "Truck issue" in item or "Maintenance" in item:
             maintenance_notes.append(item)
 
+    start_mileage = getattr(first_pretrip, "start_mileage", None)
+    last_odometer = getattr(last_posttrip, "end_mileage", None) or (previous_mileage if previous_mileage != start_mileage else None)
+    miles_by_stop = "; ".join(f"Stop {row['stop_no']}: {row['miles_since']}" for row in timeline_rows if row["miles_since"])
+    show_miles_col = any(row["miles_since"] for row in timeline_rows)
+    has_mileage = show_miles_col or total_miles is not None or start_mileage is not None or last_odometer is not None
+
+    fuel_by_stop = "; ".join(f"Stop {event['stop'] or '?'} {event['plant']}: {event['mileage']}" for event in fuel_events)
+    fuel_purchases = "; ".join(_fuel_record_label(record) for record in fuel_records)
+    show_fuel_col = any(row["fuel"] for row in timeline_rows)
+    has_fuel = show_fuel_col or has_fuel_amount or bool(fuel_records) or bool(fuel_events)
+
+    status_label = _sheet_route_status_label(route_context, logs)
+    summary = route_sheet_data.get("summary") or {}
+    total_stops = summary.get("total_stops", len(logs))
+    open_stops = summary.get("open_stops", 0)
+
+    weights = "; ".join(sorted({log.weight for log in logs if log.weight}))
+    commodity = "; ".join(load_labels)
+    damage_text = "; ".join(route_sheet_data.get("damage_report_details") or [])
+    delay_reasons = "; ".join(log.downtime_reason for log in logs if log.downtime_reason)
+    not_unloaded = "; ".join(unload_blocked)
+    problem_events = "; ".join(issue_lines)
+    docs_photos = "; ".join(document_lines)
+    route_history_text = "; ".join(route_history)
+    maintenance_text = "; ".join(maintenance_notes)
+    pickup_stop = next((row["location"] for row in timeline_rows if row["load_out"] not in {"", "Empty", "Pending"}), "")
+    delivery_stop = next((row["location"] for row in timeline_rows if any("Delivered" in note or "Unloaded" in note for note in row["notes"])), "")
+    if unload_blocked:
+        unloaded_status = "; ".join(unload_blocked)
+    elif current_load and current_load != "Empty":
+        unloaded_status = "In truck"
+    else:
+        unloaded_status = ""
+    service_start = _sheet_datetime_label(getattr(shift_record, "start_time", None)) or (_arrival_utc_to_local_hhmm(logs[0].arrive_time) if logs else "")
+    posttrip_release = _sheet_datetime_label(getattr(last_posttrip, "created_at", None)) if last_posttrip else ""
+
+    raw_tiles = [
+        ("stops", "Total Stops", str(total_stops)),
+        ("open", "Open Stops", str(open_stops)),
+        ("status", "Route Status", status_label),
+        ("hours", "Total Service Hours", _sheet_minutes(route_minutes)),
+        ("wait", "Total Wait Time", _sheet_minutes(total_wait_minutes)),
+    ]
+    if has_mileage:
+        raw_tiles.append(("miles", "Total Miles", _sheet_miles(total_miles)))
+        raw_tiles.append(("avg_miles", "Avg Mi / Stop", _sheet_miles(avg_miles) if avg_miles is not None else ""))
+    if has_fuel:
+        raw_tiles.append(("fuel", "Total Fuel Used", f"{total_fuel:g} gal" if has_fuel_amount else ""))
+        raw_tiles.append(("avg_fuel", "Avg Fuel / Stop", f"{avg_fuel:g} gal" if avg_fuel is not None else ""))
+    summary_tiles = [
+        {"icon": icon, "label": label, "value": value}
+        for icon, label, value in raw_tiles
+        if _sheet_real(value)
+    ]
+
+    cards = [card for card in [
+        _sheet_card("Mileage Summary", [
+            ("Starting odometer", _sheet_miles(start_mileage)),
+            ("Last recorded odometer", _sheet_miles(last_odometer)),
+            ("Total route miles", _sheet_miles(total_miles)),
+            ("Miles by stop", miles_by_stop),
+        ], show=has_mileage),
+        _sheet_card("Fuel Summary", [
+            ("Starting fuel", _sheet_clean(getattr(first_pretrip, "start_fuel_level", None))),
+            ("Fuel records by stop", fuel_by_stop),
+            ("Fuel purchases", fuel_purchases),
+            ("Last / remaining fuel", _sheet_clean(getattr(last_posttrip, "end_fuel_level", None))),
+            ("Estimated fuel used", f"{total_fuel:g} gal" if has_fuel_amount else ""),
+        ], show=has_fuel),
+        _sheet_card("Duty / Hours", [
+            ("Shift start / report time", service_start),
+            ("First departure", _sheet_first_departure_label(logs)),
+            ("Last arrival", _sheet_last_arrival_label(logs)),
+            ("Total on-duty", _sheet_minutes(route_minutes)),
+            ("Total wait / dock time", _sheet_minutes(total_wait_minutes)),
+            ("Total service time", _sheet_minutes(service_minutes)),
+            ("Posttrip / release time", posttrip_release),
+        ]),
+        _sheet_card("Vehicle / Maintenance", [
+            ("Truck", truck),
+            ("Trailer", trailer),
+            ("Pretrip status", "Completed" if first_pretrip else ""),
+            ("Posttrip status", "Completed" if last_posttrip else ""),
+            ("Maintenance notes", maintenance_text),
+        ]),
+        _sheet_card("What Was Hauled / Load", [
+            ("Current load", current_load),
+            ("Commodity", commodity),
+            ("Weight", weights),
+            ("Pickup stop", pickup_stop),
+            ("Delivery / unload stop", delivery_stop),
+            ("Unloaded status", unloaded_status),
+            ("Damage / shortage / rejection", damage_text),
+            ("Route history", route_history_text),
+        ]),
+        _sheet_card("Notes / Events", [
+            ("Delay reasons", delay_reasons),
+            ("Not unloaded reasons", not_unloaded),
+            ("Damage / problem events", problem_events),
+            ("Photos / documents", docs_photos),
+        ]),
+    ] if card]
+
     return {
         "title": "DRIVER LOG SHEET",
         "driver_name": getattr(driver, "display_name", None) or "",
         "route_date": route_date,
         "route_date_label": route_date.strftime("%b %d, %Y") if route_date else "",
-        "route_label": "Daily Driver",
+        "route_label": getattr(route_context, "route_label", "") or "",
         "truck": truck,
         "trailer": trailer,
         "route_id": getattr(route_context, "route_id", "") or "",
-        "summary_tiles": [
-            {"label": "Total stops", "value": str((route_sheet_data.get("summary") or {}).get("total_stops", len(logs)))},
-            {"label": "Open stops", "value": str((route_sheet_data.get("summary") or {}).get("open_stops", 0))},
-            {"label": "Route status", "value": _sheet_route_status_label(route_context, logs)},
-            {"label": "Total service / on-duty", "value": _sheet_minutes(route_minutes) or "Not recorded"},
-            {"label": "Total wait time", "value": _sheet_minutes(total_wait_minutes) or "0 min"},
-            {"label": "Total miles", "value": _sheet_miles(total_miles) or "Not recorded"},
-            {"label": "Avg miles / stop", "value": _sheet_miles(avg_miles) if avg_miles is not None else "Not recorded"},
-            {"label": "Total fuel recorded", "value": f"{total_fuel:g} gal" if has_fuel_amount else ("Fuel stops recorded" if fuel_events else "Not recorded")},
-            {"label": "Avg fuel / stop", "value": f"{avg_fuel:g} gal" if avg_fuel is not None else "Not recorded"},
-            {"label": "Current route time", "value": _sheet_minutes(route_minutes) if route_minutes is not None and getattr(route_context, "route_status", None) == "active" else "Not recorded"},
-        ],
+        "route_status": status_label,
+        "has_mileage": has_mileage,
+        "has_fuel": has_fuel,
+        "show_miles_col": show_miles_col,
+        "show_fuel_col": show_fuel_col,
+        "summary_tiles": summary_tiles,
         "timeline_rows": timeline_rows,
-        "cards": [
-            {
-                "title": "Mileage Summary",
-                "items": [
-                    ("Starting odometer", _sheet_miles(getattr(first_pretrip, "start_mileage", None)) or "Not recorded"),
-                    ("Last recorded odometer", _sheet_miles(getattr(last_posttrip, "end_mileage", None) or (previous_mileage if previous_mileage != getattr(first_pretrip, "start_mileage", None) else None)) or "Not recorded"),
-                    ("Total route miles", _sheet_miles(total_miles) or "Not recorded"),
-                    ("Miles by stop", "; ".join(f"Stop {row['stop_no']}: {row['miles_since']}" for row in timeline_rows if row["miles_since"]) or "Not recorded"),
-                ],
-            },
-            {
-                "title": "Fuel Summary",
-                "items": [
-                    ("Starting fuel", _sheet_not_recorded(getattr(first_pretrip, "start_fuel_level", None))),
-                    ("Fuel records by stop", "; ".join(f"Stop {event['stop'] or '?'} {event['plant']}: {event['mileage']}" for event in fuel_events) or "Not recorded"),
-                    ("Fuel purchases", "; ".join(_fuel_record_label(record) for record in fuel_records) or "Not recorded"),
-                    ("Last fuel / remaining fuel", _sheet_not_recorded(getattr(last_posttrip, "end_fuel_level", None))),
-                    ("Estimated fuel used", f"{total_fuel:g} gal" if has_fuel_amount else "Not recorded"),
-                ],
-            },
-            {
-                "title": "Hours / Route Summary",
-                "items": [
-                    ("Shift start / report time", _sheet_datetime_label(getattr(shift_record, "start_time", None)) or (_arrival_utc_to_local_hhmm(logs[0].arrive_time) if logs else "Not recorded")),
-                    ("First departure", _sheet_first_departure_label(logs) or "Not recorded"),
-                    ("Last arrival", _sheet_last_arrival_label(logs) or "Not recorded"),
-                    ("Current route time / total on-duty", _sheet_minutes(route_minutes) or "Not recorded"),
-                    ("Total wait / dock time", _sheet_minutes(total_wait_minutes) or "0 min"),
-                    ("Total service time", _sheet_minutes(service_minutes) or "Not recorded"),
-                    ("Posttrip / release time", _sheet_datetime_label(getattr(last_posttrip, "created_at", None)) if last_posttrip else "Not recorded"),
-                ],
-            },
-            {
-                "title": "Vehicle / Maintenance",
-                "items": [
-                    ("Truck", _sheet_not_recorded(truck)),
-                    ("Trailer", _sheet_not_recorded(trailer)),
-                    ("Pretrip status", "Completed" if first_pretrip else "Not recorded"),
-                    ("Posttrip status", "Completed" if last_posttrip else "Not recorded"),
-                    ("Defects noted", "; ".join(maintenance_notes) if maintenance_notes else "None recorded"),
-                    ("Maintenance notes", "; ".join(maintenance_notes) if maintenance_notes else "None recorded"),
-                ],
-            },
-            {
-                "title": "What Was Hauled / Load Summary",
-                "items": [
-                    ("Current load", current_load or "Empty"),
-                    ("Commodity / load labels", "; ".join(load_labels) or "Not recorded"),
-                    ("Weight", "; ".join(sorted({log.weight for log in logs if log.weight})) or "Not recorded"),
-                    ("Pickup stop", next((row["location"] for row in timeline_rows if row["load_out"] not in {"", "Empty", "Pending"}), "Not recorded")),
-                    ("Delivery / unload stop", next((row["location"] for row in timeline_rows if any("Delivered" in note or "Unloaded" in note for note in row["notes"])), "Not recorded")),
-                    ("Unloaded status", "; ".join(unload_blocked) if unload_blocked else ("Unloaded / empty" if (current_load or "Empty") == "Empty" and load_labels else "In truck" if current_load else "Not recorded")),
-                    ("Damage / shortage / rejection notes", "; ".join(route_sheet_data.get("damage_report_details") or []) or "None recorded"),
-                    ("Route history", "; ".join(route_history) or "Not recorded"),
-                ],
-            },
-            {
-                "title": "Notes / Events",
-                "items": [
-                    ("Delay reasons", "; ".join(log.downtime_reason for log in logs if log.downtime_reason) or "None recorded"),
-                    ("Not unloaded reasons", "; ".join(unload_blocked) or "None recorded"),
-                    ("Damage / shortage / problem events", "; ".join(issue_lines) if issue_lines else "No issues recorded"),
-                    ("Photos / documents attached", "; ".join(document_lines) if document_lines else "None recorded"),
-                ],
-            },
-        ],
+        "cards": cards,
     }
 
 
@@ -3100,32 +3163,33 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
         route_task_events,
         shift_record,
     )
+    show_miles = log_sheet["show_miles_col"]
+    show_fuel = log_sheet["show_fuel_col"]
+    headers = ["Stop #", "Location / Stop", "Time / Wait", "Load Flow"]
+    widths = [26, 80, 96, 100]
+    if show_miles:
+        headers.append("Miles Since Last Stop")
+        widths.append(60)
+    if show_fuel:
+        headers.append("Fuel Used / Recorded")
+        widths.append(66)
+    headers.append("Notes")
+    widths.append(524 - sum(widths))
     rows = []
     for row in log_sheet["timeline_rows"]:
         time_wait = [f"Arrive: {row['arrive'] or '--'}", f"Depart: {row['depart'] or '--'}"]
         if row["wait"]:
             time_wait.append(row["wait"])
         load_flow = [f"IN: {row['load_in'] or '--'}", f"OUT: {row['load_out'] or '--'}"]
-        rows.append([
-            str(row["stop_no"]),
-            row["location"] or "--",
-            time_wait,
-            load_flow,
-            row["miles_since"] or "--",
-            row["fuel"] or "--",
-            "; ".join(row["notes"]) if row["notes"] else "--",
-        ])
+        cells = [str(row["stop_no"]), row["location"] or "--", time_wait, load_flow]
+        if show_miles:
+            cells.append(row["miles_since"])
+        if show_fuel:
+            cells.append(row["fuel"])
+        cells.append("; ".join(row["notes"]) if row["notes"] else "")
+        rows.append(cells)
     if rows:
-        y = pdf.table(
-            36,
-            y,
-            [26, 78, 92, 96, 58, 64, 110],
-            32,
-            ["Stop #", "Location / Stop", "Time / Wait", "Load Flow", "Miles Since Last Stop", "Fuel Used / Fuel Recorded", "Notes"],
-            rows,
-            font_size=6,
-            max_lines=3,
-        )
+        y = pdf.table(36, y, widths, 32, headers, rows, font_size=6, max_lines=3)
     else:
         pdf.text(44, y, "No stops for selected date.", size=8)
         y -= 18

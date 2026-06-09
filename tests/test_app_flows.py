@@ -99,7 +99,6 @@ def assert_driver_route_sheet_output(data):
     assert_official_record_output(data)
     lowered = data.lower()
     assert b"audit" not in lowered
-    assert b"movedefense" not in lowered
     assert b"Transit Cargo" not in data
     # Both the HTML log sheet and the PDF now use the combined DRIVER LOG SHEET
     # columns (Time / Wait, Load Flow), not the legacy In Truck / Out Truck split.
@@ -1617,18 +1616,18 @@ def test_driver_route_print_summarizes_report_types_and_pending_mileage(client, 
     login(client, "print_driver")
     page = client.get("/driver_logs_print")
     assert page.status_code == 200
-    assert b"Mileage:" in page.data
-    assert b"Pending posttrip" in page.data
-    assert b"DAMAGE AND INCIDENTS" in page.data
+    # Pending mileage: no odometer captured, so the Miles column and Mileage card are hidden, not "Pending posttrip" filler.
+    assert b"Miles Since Last Stop" not in page.data
+    assert b"Mileage Summary" not in page.data
+    assert b"Pending posttrip" not in page.data
+    # Damage/incident facts still surface (now inside the log summary cards, not a standalone section).
     assert b"Incident - Other" in page.data
     assert b"Damage - RE" in page.data
     assert b"Timing status pending" not in page.data
-    assert b"Total Wait:" in page.data
     assert b"15 min" in page.data
     assert b"Raleigh East" in page.data
     assert b"Kraft Plater Load" in page.data
     assert b"Load Flow" in page.data
-    assert b"Miles Since Last Stop" in page.data
     assert b"Wait time:</strong> Wait 15 min" not in page.data
     assert b"Movement segment" not in page.data
     assert_driver_route_sheet_output(page.data)
@@ -4181,9 +4180,9 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert b'data-save-pdf' in driver_print.data
     assert b"Print dialog opened." in driver_print.data
     assert b"Preparing PDF..." in driver_print.data
-    assert b"DOCUMENTS ATTACHED" in driver_print.data
     assert b"Plant Legend" not in driver_print.data
-    assert b"SIGNATURES" in driver_print.data
+    assert b"Signatures" in driver_print.data
+    # Attached photos/documents now surface inside the Notes / Events log summary card.
     assert b"Loaded seal photo from gallery" in driver_print.data
     assert b"Departing load proof from gallery" in driver_print.data
     assert b"Photo proof review" not in driver_print.data
@@ -5305,11 +5304,11 @@ def test_driver_logs_prints_and_eod_create_activity_history(client, app):
     assert b"5:45pm" in print_response.data
     assert b"Dock time: 12 min" in print_response.data
     assert b"17:45" not in print_response.data
-    assert b"1. STOP TIMELINE" in print_response.data
+    assert b"Stop Timeline" in print_response.data
     assert b"Location" in print_response.data
     assert b"Stop / Movement" not in print_response.data
     assert b"Plant Legend" not in print_response.data
-    assert b"SIGNATURES" in print_response.data
+    assert b"Signatures" in print_response.data
     assert b"Leg #" not in print_response.data
     assert b"9. Signatures" not in print_response.data
     assert_driver_route_sheet_output(print_response.data)
@@ -7683,7 +7682,7 @@ def test_mobile_dashboard_does_not_finish_route_with_open_stop(client, app):
 
     route_sheet = client.get(f"/driver_logs_print?date={today.isoformat()}")
     assert route_sheet.status_code == 200
-    assert b"25 miles" in route_sheet.data
+    assert b"25 mi" in route_sheet.data
     assert b"Route open and not finalized" in route_sheet.data
     assert b"Current stop: departure pending" in route_sheet.data
 
