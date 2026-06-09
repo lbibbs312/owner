@@ -35,8 +35,9 @@
       padding-bottom: 0.1in;
       margin-bottom: 0.08in;
     }
-    .brand-lockup { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-    .brand-lockup svg { width: 22px; height: 22px; color: var(--md-blue); }
+    .brand-lockup { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+    .brand-mark { display: inline-flex; width: 30px; height: 30px; border-radius: 6px; background: #0d1320; align-items: center; justify-content: center; overflow: hidden; }
+    .brand-mark img { width: 30px; height: 30px; object-fit: contain; display: block; }
     .brand-word { font-size: 12.5pt; font-weight: 900; letter-spacing: -0.01em; color: var(--md-ink); }
     .brand-word .accent { color: var(--md-blue); }
     .driver-kicker { font-size: 8pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; color: var(--md-muted); }
@@ -137,7 +138,7 @@
     <header class="document-header">
       <div>
         <div class="brand-lockup">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3z"/><path d="m8.5 12 2.5 2.5L16 9"/></svg>
+          <span class="brand-mark"><img src="{{ url_for('static', filename='brand/movedefense_stripe_brand_icon_200x200.png') }}" alt="MoveDefense"></span>
           <span class="brand-word">Move<span class="accent">Defense</span></span>
         </div>
         <div class="driver-kicker">Driver</div>
