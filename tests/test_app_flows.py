@@ -2966,6 +2966,41 @@ def test_closed_routes_on_other_trucks_stay_in_inspection_list(client, app, monk
     assert "BT7" in body
 
 
+def test_driver_bottom_nav_shows_fuel_not_transfer(client, app):
+    """Driver bottom nav is Home/Logs/Fuel/Reports/Inspections. Fuel opens the
+    existing fuel-stop capture (fuel flag pre-checked); plant transfer stays a
+    backend route reachable from Route Packet/context, not a bottom-nav item.
+    """
+    import re
+
+    with app.app_context():
+        create_user("nav_driver", "nav-driver@example.com", "driver")
+    login(client, "nav_driver")
+
+    home = client.get("/mobile")
+    body = home.get_data(as_text=True)
+    assert home.status_code == 200
+    assert "md-driver-bottom-nav" in body
+    # Fuel replaced Transfer, in the requested order.
+    assert "<span>Fuel</span>" in body
+    assert "<span>Transfer</span>" not in body
+    order = [label for label in ("Home", "Logs", "Fuel", "Reports", "Inspections")
+             if f"<span>{label}</span>" in body]
+    assert order == ["Home", "Logs", "Fuel", "Reports", "Inspections"]
+    assert "report_type=fuel" in body
+
+    # No dead buttons: every nav destination resolves, and Fuel pre-checks fuel.
+    fuel_page = client.get("/new_driving_log?report_type=fuel&next=mobile")
+    assert fuel_page.status_code == 200
+    fuel_tag = re.search(r'<input[^>]*id="fuelCheck"[^>]*>', fuel_page.get_data(as_text=True))
+    assert fuel_tag and "checked" in fuel_tag.group(0)
+    assert client.get("/driver_logs").status_code == 200
+    assert client.get("/reports").status_code == 200
+    assert client.get("/list_pretrips").status_code == 200
+    # Plant transfer backend stays intact (just not in the bottom nav).
+    assert client.get("/plant_transfers").status_code == 200
+
+
 def test_posttrip_ends_unlinked_manual_shift_timer(client, app):
     from datetime import date, datetime, timedelta
 

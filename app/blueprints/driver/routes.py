@@ -4407,6 +4407,10 @@ def new_driving_log():
         form.maintenance.data = True
     elif request.args.get("report_type") == "route_note":
         form.meeting.data = True
+    elif request.args.get("report_type") == "fuel":
+        # Quick-log "Fuel": open the existing per-stop fuel capture with the
+        # fuel flag pre-checked so the driver just confirms the stop + odometer.
+        form.fuel.data = True
     return _render_new_driving_log(form, current_load, route_context=route_context, return_to_mobile=return_to_mobile)
 
 
