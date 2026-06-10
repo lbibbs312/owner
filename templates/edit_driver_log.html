@@ -46,6 +46,7 @@
       {{ form.load_size.label }}
       {{ form.load_size(class="form-select") }}
     </div>
+    {% if log.depart_time %}
     <div class="mb-3">
       {{ form.departure_destination.label(class="form-label") }}
       {{ form.departure_destination(class="form-select") }}
@@ -60,6 +61,13 @@
       {{ form.secondary_departure_type.label(class="form-label") }}
       {{ form.secondary_departure_type(class="form-select") }}
     </div>
+    {% else %}
+    <div class="alert alert-info border mb-3">
+      This stop is still open. To record a pickup and what you're carrying out, use
+      <strong>Depart &amp; Load</strong> from the route board — that's where you choose where the load is going.
+      Editing here only corrects what you <em>arrived</em> with.
+    </div>
+    {% endif %}
     <div class="mb-3 form-check">
       {{ form.hot_parts(class="form-check-input", id="hotPartsCheck") }}
       {{ form.hot_parts.label(class="form-check-label") }}

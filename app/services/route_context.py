@@ -297,11 +297,14 @@ def build_route_cta_context(
             allowed_actions = ["confirm_cargo"]
             route_message = f"Confirm what you picked up at {plant}." if plant else "Confirm cargo for this stop."
         elif stop_cargo == "empty":
-            # At a stop with no load onboard — leaving empty (state G).
-            next_action = "Record departure empty"
-            primary = _route_cta("Record Departure Empty", "record_departure")
+            # Arrived empty — but the driver may still pick up here. Use a neutral
+            # depart label that leads into the "did you get loaded?" flow instead
+            # of presuming they leave empty (which sent drivers to Edit by
+            # mistake when they actually had a pickup).
+            next_action = "Depart & Load"
+            primary = _route_cta("Depart & Load", "record_departure")
             allowed_actions = ["record_departure", "add_damage", "add_note"]
-            route_message = f"Left {plant} empty — record departure." if plant else "Record departure (no load picked up)."
+            route_message = f"Record your departure from {plant} — note any pickup." if plant else "Record your departure — note any pickup."
         else:
             allowed_actions = ["record_departure", "add_damage", "add_note"]
             stop_cargo_dict = getattr(route_context, "current_cargo", None)
@@ -386,9 +389,10 @@ def build_route_cta_context(
             allowed_actions = ["start_shift", "route_history"]
             route_message = "No active route yet. Start your route with the PreTrip."
 
-    # In transit with cargo onboard: name the destination (state D) or prompt to
-    # add it (state E) instead of a generic "Add Stop", so the driver always has
-    # a continue-route action and never sees a status-style label.
+    # In transit with cargo onboard: prompt to start unloading (state D) or to
+    # add a destination when it's unknown (state E), instead of a generic "Add
+    # Stop". The label stays "Start Unloading" (no single destination named) so
+    # it doesn't get confusing when the truck is loaded for several drops.
     current_cargo = getattr(route_context, "current_cargo", None)
     in_transit_destination = (
         current_cargo.get("destination_label") if isinstance(current_cargo, dict) else None
@@ -399,10 +403,9 @@ def build_route_cta_context(
     )
     if primary and primary.get("action") == "add_stop" and cargo_onboard:
         if in_transit_destination:
-            next_action = f"Press when at {in_transit_destination}"
-            primary = _route_cta(
-                f"Press when at {in_transit_destination} to start unloading", "add_stop"
-            )
+            next_action = "Start Unloading"
+            primary = _route_cta("Start Unloading", "add_stop")
+            route_message = "Press when you reach your drop-off to start unloading."
         else:
             next_action = "Add Destination Stop"
             primary = _route_cta("Add Destination Stop", "add_stop")

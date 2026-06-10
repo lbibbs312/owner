@@ -3357,6 +3357,36 @@ def test_depart_missing_driver_log_redirects_instead_of_error(client, app):
     assert response.headers["Location"].endswith("/driver_logs")
 
 
+def test_open_stop_edit_hides_departure_fields_and_directs_to_depart_and_load(client, app):
+    """Editing an OPEN stop must not show the 'Departed With' field — it was
+    silently ignored there (saved but nothing changed). Drivers record a pickup
+    via Depart & Load, which is what the open-stop edit page now points to. A
+    departed stop still exposes the departure field."""
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("open_edit_driver", "open-edit@example.com", "driver")
+        today = date.today()
+        open_stop = DriverLog(driver_id=driver.id, date=today, plant_name="Paint Central",
+                              load_size="Empty", arrive_time=f"{today.isoformat()} 09:00:00", depart_time=None)
+        departed_stop = DriverLog(driver_id=driver.id, date=today, plant_name="RE", load_size="Empty",
+                                  depart_load_size="Empty", arrive_time=f"{today.isoformat()} 08:00:00", depart_time="08:05")
+        db.session.add_all([open_stop, departed_stop])
+        db.session.commit()
+        open_id, departed_id = open_stop.id, departed_stop.id
+
+    login(client, "open_edit_driver")
+    open_edit = client.get(f"/edit_driver_log/{open_id}").get_data(as_text=True)
+    assert 'name="departure_destination"' not in open_edit
+    assert "Depart" in open_edit and "Load" in open_edit  # guidance to Depart & Load
+    # A departed stop still lets you correct the departure load.
+    departed_edit = client.get(f"/edit_driver_log/{departed_id}").get_data(as_text=True)
+    assert 'name="departure_destination"' in departed_edit
+
+
 def test_edit_driver_log_rejects_impossible_depart_to_next_arrival(client, app):
     from datetime import date
 
@@ -7629,7 +7659,7 @@ def test_mobile_dashboard_active_between_stops_prioritizes_add_stop_over_posttri
     assert b"PostTrip Due" not in page.data
     assert b'<a class="md-flow-primary-cta add-stop-action"' in page.data
     # In transit with cargo: destination-named continuation (D) or add-destination (E).
-    assert b"to start unloading" in page.data or b"Add Destination Stop" in page.data
+    assert b"Start Unloading" in page.data or b"Add Destination Stop" in page.data
     assert b"Finalize Route" not in page.data
     assert b'<div class="md-flow-top-actions"' not in page.data
     assert b"md-flow-action-tab" not in page.data
@@ -8335,7 +8365,7 @@ def test_loaded_quick_depart_keeps_cargo_in_transit_until_add_next_stop(client, 
     mobile = client.get("/mobile")
     body = mobile.get_data(as_text=True)
     assert mobile.status_code == 200
-    assert "to start unloading" in body or "Add Destination Stop" in body
+    assert "Start Unloading" in body or "Add Destination Stop" in body
     assert 'class="md-flow-primary-cta add-stop-action"' in body
     assert 'href="/new_driving_log?next=mobile' in body
     assert 'expected_destination=RE' in body
@@ -8611,7 +8641,7 @@ def test_mobile_quick_depart_shows_add_next_stop_and_creates_second_stop(client,
     body = mobile.get_data(as_text=True)
 
     assert mobile.status_code == 200
-    assert "to start unloading" in body or "Add Destination Stop" in body
+    assert "Start Unloading" in body or "Add Destination Stop" in body
     assert body.count('class="md-flow-primary-cta add-stop-action"') == 1
     assert 'href="/new_driving_log?next=mobile' in body
     assert 'expected_destination=RE' in body
@@ -8767,7 +8797,7 @@ def test_loaded_quick_depart_preserves_secondary_cargo_until_next_stop(client, a
         assert snapshot.current_cargo["secondary_value"] == "Raleigh West Hot Part"
 
     mobile = client.get("/mobile")
-    assert b"to start unloading" in mobile.data or b"Add Destination Stop" in mobile.data
+    assert b"Start Unloading" in mobile.data or b"Add Destination Stop" in mobile.data
     assert b"Depart and Load" not in mobile.data
 
     add_stop_form = client.get("/new_driving_log?next=mobile&expected_destination=RE")
@@ -8855,7 +8885,7 @@ def test_helios_quick_depart_with_second_stop_uses_mobile_add_next_stop(client, 
     mobile = client.get("/mobile")
     body = mobile.get_data(as_text=True)
     assert mobile.status_code == 200
-    assert "to start unloading" in body or "Add Destination Stop" in body
+    assert "Start Unloading" in body or "Add Destination Stop" in body
     assert 'href="/new_driving_log?next=mobile' in body
     assert "expected_destination=Trim+DC" in body or "expected_destination=Trim%20DC" in body
     assert "Depart and Load" not in body
@@ -8945,7 +8975,7 @@ def test_quick_depart_service_stop_continues_to_add_next_stop_without_truck_issu
     body = mobile.get_data(as_text=True)
     assert mobile.status_code == 200
     assert 'class="md-flow-primary-cta add-stop-action"' in body
-    assert "to start unloading" in body or "Add Destination Stop" in body
+    assert "Start Unloading" in body or "Add Destination Stop" in body
     assert 'href="/new_driving_log?next=mobile' in body
     assert 'expected_destination=RE' in body
     assert 'class="md-flow-primary-cta add-stop-action" href="/new_driving_log?report_type=truck_issue"' not in body

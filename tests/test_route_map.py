@@ -1358,7 +1358,7 @@ def test_pickup_label_graduates_to_delivered_after_drop_completes(app):
     assert pickup["board_flow"]["deliver_state"] == "delivered"
 
 
-def test_in_transit_cta_names_known_destination(app):
+def test_in_transit_cta_says_start_unloading(app):
     """A known in-transit destination names it on the add-stop continuation CTA."""
     from types import SimpleNamespace
     from app.services.route_context import build_route_cta_context
@@ -1382,7 +1382,7 @@ def test_in_transit_cta_names_known_destination(app):
         today_local_date=date.today(),
     )
 
-    assert cta["primary_cta"]["label"] == "Press when at Raleigh East to start unloading"
+    assert cta["primary_cta"]["label"] == "Start Unloading"
     assert cta["primary_cta"]["action"] == "add_stop"
 
 
@@ -1439,7 +1439,7 @@ def test_departed_loaded_route_stays_active_until_next_stop(app):
         today_local_date=date.today(),
     )
 
-    assert cta["primary_cta"]["label"] == "Press when at Raleigh East to start unloading"
+    assert cta["primary_cta"]["label"] == "Start Unloading"
     assert cta["primary_cta"]["action"] == "add_stop"
     assert cta["show_attach_document_button"] is False
 
@@ -1563,13 +1563,13 @@ def test_cta_open_stop_shows_record_departure():
     assert cta["primary_cta"]["action"] == "record_departure"
 
 
-def test_cta_departed_with_known_destination_names_it():
+def test_cta_departed_with_known_destination_says_start_unloading():
     from types import SimpleNamespace
     departed = SimpleNamespace(id=1, depart_time="08:20")
     cta = _cta_for(current_stop=departed, rows=[{"log_id": 1}], all_departed=True,
                    route_status="active", route_is_active=True, has_active_shift=True,
                    current_cargo={"value": "Raleigh East Load", "destination_label": "Raleigh East"})
-    assert cta["primary_cta"]["label"] == "Press when at Raleigh East to start unloading"
+    assert cta["primary_cta"]["label"] == "Start Unloading"
     assert cta["primary_cta"]["action"] == "add_stop"
     assert "Arrived at" not in cta["primary_cta"]["label"]  # action verb, not a status
 
