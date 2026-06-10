@@ -67,7 +67,9 @@
         <label>Fuel location <input type="text" name="seller_name" placeholder="Station, Ryder, yard, or fuel stop"></label>
         <label>City <input type="text" name="fuel_city"></label>
         <label>State or province <input type="text" name="state_or_province"></label>
-        <label>Gallons or liters <input type="number" name="gallons_or_liters" step="any" inputmode="decimal"></label>
+        <label>Gallons or liters <input type="number" name="gallons_or_liters" step="any" inputmode="decimal" data-fuel-gallons></label>
+        <label>Price per gallon or liter <input type="number" name="price_per_gallon_or_liter" step="any" inputmode="decimal" data-fuel-ppg placeholder="e.g. 3.89"></label>
+        <label>Total amount <input type="number" name="total_sale_amount" step="any" inputmode="decimal" data-fuel-total placeholder="Auto: gallons × price"></label>
         <label>Fuel type <input type="text" name="fuel_type" placeholder="Diesel, gas, DEF, other"></label>
         <label>Odometer now <input type="number" name="ending_odometer" step="any" inputmode="decimal" value="{{ ctx.current_mileage or '' }}"></label>
         <label>Receipt photo <input type="file" name="receipt_photo" accept="image/*,.pdf"></label>
@@ -114,6 +116,24 @@
     </div>
   </form>
 </main>
+
+<script>
+  (function(){
+    var gallons = document.querySelector('[data-fuel-gallons]');
+    var ppg = document.querySelector('[data-fuel-ppg]');
+    var total = document.querySelector('[data-fuel-total]');
+    if (!gallons || !ppg || !total) return;
+    var totalEdited = false;
+    total.addEventListener('input', function(){ totalEdited = true; });
+    function recalc(){
+      if (totalEdited) return;  // don't clobber a manually entered total
+      var g = parseFloat(gallons.value), p = parseFloat(ppg.value);
+      if (isFinite(g) && isFinite(p)) total.value = (g * p).toFixed(2);
+    }
+    gallons.addEventListener('input', recalc);
+    ppg.addEventListener('input', recalc);
+  })();
+</script>
 
 {% set md_nav_active = 'fuel' %}
 {% include 'partials/_md_bottom_nav.html' %}
