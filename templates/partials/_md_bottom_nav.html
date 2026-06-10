@@ -12,6 +12,8 @@
 {% if not md_nav_active %}
   {% if endpoint in ['driver.new_ifta_worksheet', 'driver.view_ifta_worksheet', 'driver.ifta_worksheet_packet'] %}
     {% set md_nav_active = 'fuel' %}
+  {% elif endpoint == 'driver.mobile_breaks' %}
+    {% set md_nav_active = 'break' %}
   {% elif endpoint == 'driver.mobile_dashboard' and request.args.get('flow') == 'maintenance' %}
     {% set md_nav_active = 'service' %}
   {% elif endpoint == 'driver.new_driving_log' and request.args.get('report_type') == 'truck_issue' %}
@@ -124,13 +126,9 @@
 <nav class="md-driver-bottom-nav" aria-label="Driver mobile actions">
   <a class="md-nav-link {% if md_nav_active == 'home' %}active{% endif %}" href="{{ url_for('driver.mobile_dashboard') }}"><strong>HM</strong><span>Home</span></a>
   {% if open_break %}
-  <form method="post" action="{{ url_for('driver.mobile_break_end') }}">
-    <button type="submit" class="md-nav-link on" aria-label="End break" data-break-timer data-break-seconds="{{ open_break_elapsed_seconds|default(0, true) }}"><strong>BR</strong><span>End Break</span><small class="md-nav-timer" data-break-timer-label>{{ open_break_elapsed_label|default('00:00', true) }}</small></button>
-  </form>
+  <a class="md-nav-link on {% if md_nav_active == 'break' %}active{% endif %}" href="{{ url_for('driver.mobile_breaks') }}" aria-label="Open break log" data-break-timer data-break-seconds="{{ open_break_elapsed_seconds|default(0, true) }}"><strong>BR</strong><span>On Break</span><small class="md-nav-timer" data-break-timer-label>{{ open_break_elapsed_label|default('00:00', true) }}</small></a>
   {% else %}
-  <form method="post" action="{{ url_for('driver.mobile_break_start') }}">
-    <button type="submit" class="md-nav-link" aria-label="Start break"><strong>BR</strong><span>Start Break</span></button>
-  </form>
+  <a class="md-nav-link {% if md_nav_active == 'break' %}active{% endif %}" href="{{ url_for('driver.mobile_breaks') }}"><strong>BR</strong><span>Breaks</span></a>
   {% endif %}
   <a class="md-nav-link {% if md_nav_active == 'fuel' %}active{% endif %}" href="{{ url_for('driver.new_ifta_worksheet') }}"><strong>FL</strong><span>Fuel</span></a>
   <a class="md-nav-link {% if md_nav_active == 'service' %}active{% endif %}" href="{{ url_for('driver.mobile_dashboard', flow='maintenance') }}"><strong>SV</strong><span>Service</span></a>

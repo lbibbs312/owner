@@ -526,6 +526,47 @@ def test_open_stop_without_departure_is_actionable_needs_departure(app):
     assert ctx["cta_pulse"]["key"] == "depart"
 
 
+def test_finalized_arrival_only_last_stop_renders_as_route_end(app):
+    from app.extensions import db
+    from app.models import ActivityEvent
+    from app.services.route_map import build_driver_route_map_context
+
+    route_date = date.today()
+    driver = _user("arrival_only_route_end_driver")
+    log = _driver_log(
+        driver,
+        date=route_date,
+        plant_name="RE",
+        load_size="Raleigh East Load",
+        depart_time=None,
+    )
+    db.session.add(
+        ActivityEvent(
+            user_id=driver.id,
+            category="eod",
+            action="finalized",
+            title="End of day finalized",
+            details=f"Reviewed 1 driver log(s), 0 pretrip(s), and 0 plant transfer(s) for {route_date}.",
+            target_type="end_of_day",
+        )
+    )
+    db.session.commit()
+
+    ctx = build_driver_route_map_context(driver=driver, date=route_date)
+    stop = ctx["stops"][0]
+
+    assert stop["stop_id"] == log.id
+    assert stop["status"] == "completed"
+    assert stop["badge"]["label"] == "ROUTE END"
+    assert stop["board_badge"]["label"] == "ROUTE END"
+    assert stop["board_detail"] == "Raleigh East · route end"
+    assert stop["board_flow"]["text"] == "Raleigh East · route end"
+    assert stop["issues"] == []
+    assert stop["next_action"] == "No action needed"
+    assert "needs departure" not in stop["board_flow"]["text"]
+    assert "Record departure" not in [action["label"] for action in stop["actions"]]
+
+
 def test_earlier_open_stop_gets_actionable_missing_departure_issue(app):
     from app.services.route_map import build_driver_route_map_context
 

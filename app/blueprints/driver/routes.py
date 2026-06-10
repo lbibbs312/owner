@@ -749,15 +749,13 @@ def _route_can_finish_after_closed_stops(route_context, route_date, today_local_
     return bool(getattr(route_context, "rows", None))
 
 
-def _route_can_end_at_current_stop(route_context, active_pretrip, route_date, today_local_date):
+def _route_can_end_at_current_stop(route_context, route_date, today_local_date):
     current_stop = getattr(route_context, "current_stop", None)
     if not current_stop or getattr(current_stop, "depart_time", None):
         return False
     if not route_date or not today_local_date or route_date != today_local_date:
         return False
     if getattr(route_context, "route_finalized", False):
-        return False
-    if not active_pretrip or not active_pretrip.posttrip:
         return False
     logs = [row.get("log") for row in (getattr(route_context, "rows", None) or []) if row.get("log")]
     if not logs or logs[-1].id != current_stop.id:
@@ -772,6 +770,23 @@ def _route_has_completed_posttrip(route_context, active_pretrip):
 
 
 def _apply_route_end_cta(route_cta, route_context, active_pretrip, route_date, today_local_date):
+    posttrip_complete = _route_has_completed_posttrip(route_context, active_pretrip)
+    if posttrip_complete and _route_can_end_at_current_stop(route_context, route_date, today_local_date):
+        patched = dict(route_cta or {})
+        route_message = "Use the current stop as the route end. No departure will be created."
+        patched.update(
+            {
+                "route_display_mode": "route_end_ready",
+                "next_action": "End Route Here",
+                "primary_cta": {"label": "End Route Here", "action": "end_route", "style": "primary"},
+                "secondary_cta": {"label": "View Route Sheet", "action": "view_route", "style": "ghost"},
+                "allowed_actions": ["end_route", "view_route", "print_route", "attach_document"],
+                "route_state_message": route_message,
+                "show_finalize_button": True,
+                "show_posttrip_button": False,
+            }
+        )
+        return patched
     if _route_can_finish_after_closed_stops(route_context, route_date, today_local_date):
         patched = dict(route_cta or {})
         proof_missing = bool(patched.get("proof_missing"))
@@ -5431,14 +5446,19 @@ def mobile_end_route():
         today_local_date,
         today_local_date,
     )
-    if can_finish_closed_route and not _route_has_completed_posttrip(route_context, active_pretrip):
+    can_end_current_stop = _route_can_end_at_current_stop(
+        route_context,
+        today_local_date,
+        today_local_date,
+    )
+    if (can_finish_closed_route or can_end_current_stop) and not _route_has_completed_posttrip(route_context, active_pretrip):
         if not active_pretrip:
             flash("Complete PostTrip before finishing the route.", "warning")
             return redirect(url_for("driver.mobile_dashboard"))
         flash("Complete PostTrip before finishing the route.", "warning")
         return redirect(url_for("driver.do_posttrip", pretrip_id=active_pretrip.id))
 
-    if not can_finish_closed_route:
+    if not can_finish_closed_route and not can_end_current_stop:
         flash("Complete PostTrip first, or record departure if this stop continues the route.", "warning")
         return redirect(url_for("driver.mobile_dashboard"))
 
@@ -6774,6 +6794,43 @@ def _route_breaks_for_driver_date(driver_id, route_date):
     )
 
 
+def _break_redirect_target():
+    return url_for("driver.mobile_breaks") if request.form.get("next") == "breaks" else url_for("driver.mobile_dashboard")
+
+
+def _break_elapsed_seconds(brk, *, now_utc=None):
+    if not brk or not getattr(brk, "start_time", None):
+        return 0
+    now_utc = now_utc or datetime.utcnow()
+    start_time = brk.start_time
+    end_time = getattr(brk, "end_time", None) or now_utc
+    if start_time.tzinfo is not None:
+        start_time = start_time.astimezone(pytz.utc).replace(tzinfo=None)
+    if end_time.tzinfo is not None:
+        end_time = end_time.astimezone(pytz.utc).replace(tzinfo=None)
+    return max(0, int((end_time - start_time).total_seconds()))
+
+
+def _break_detail_rows(breaks, *, now_utc=None):
+    now_utc = now_utc or datetime.utcnow()
+    rows = []
+    total_seconds = 0
+    for brk in breaks or []:
+        elapsed_seconds = _break_elapsed_seconds(brk, now_utc=now_utc)
+        total_seconds += elapsed_seconds
+        rows.append(
+            {
+                "break": brk,
+                "kind": (getattr(brk, "break_type", None) or "Break").strip(),
+                "elapsed_seconds": elapsed_seconds,
+                "elapsed_label": _format_duration(elapsed_seconds),
+                "duration_label": hos_service.format_minutes(elapsed_seconds // 60) or "Under 1 min",
+                "is_open": not bool(getattr(brk, "end_time", None)),
+            }
+        )
+    return rows, total_seconds
+
+
 def _open_route_break(driver_id):
     if not driver_id:
         return None
@@ -6807,6 +6864,28 @@ def _inject_open_break():
     return {"open_break": None, "open_break_elapsed_seconds": 0, "open_break_elapsed_label": "00:00"}
 
 
+@bp.route("/mobile/breaks")
+@login_required
+def mobile_breaks():
+    if current_user.role == "management":
+        return redirect(url_for("manager.manager_dashboard"))
+    now_local, _ = _now_local_and_utc()
+    open_shift = _open_shift_for_driver(current_user.id)
+    route_date = _active_route_date_for_driver(current_user.id, now_local.date(), open_shift=open_shift)
+    breaks = _route_breaks_for_driver_date(current_user.id, route_date)
+    open_break = _open_route_break(current_user.id)
+    rows, total_seconds = _break_detail_rows(breaks)
+    return render_template(
+        "mobile_breaks.html",
+        break_rows=rows,
+        break_total_label=hos_service.format_minutes(total_seconds // 60) or "0 min",
+        break_total_clock=_format_duration(total_seconds),
+        break_types=hos_service.BREAK_TYPES,
+        open_break=open_break,
+        route_date=route_date,
+    )
+
+
 @bp.route("/mobile/break/start", methods=["POST"])
 @login_required
 def mobile_break_start():
@@ -6815,7 +6894,7 @@ def mobile_break_start():
     existing = _open_route_break(current_user.id)
     if existing:
         flash("A break is already in progress.", "info")
-        return redirect(url_for("driver.mobile_dashboard"))
+        return redirect(_break_redirect_target())
     break_type = (request.form.get("break_type") or "").strip() or "Break"
     if break_type not in {*hos_service.BREAK_TYPES, "Break"}:
         break_type = "Break"
@@ -6828,7 +6907,7 @@ def mobile_break_start():
     ))
     db.session.commit()
     flash(f"{break_type} break started.", "success")
-    return redirect(url_for("driver.mobile_dashboard"))
+    return redirect(_break_redirect_target())
 
 
 @bp.route("/mobile/break/end", methods=["POST"])
@@ -6839,11 +6918,11 @@ def mobile_break_end():
     open_break = _open_route_break(current_user.id)
     if not open_break:
         flash("No break is in progress.", "info")
-        return redirect(url_for("driver.mobile_dashboard"))
+        return redirect(_break_redirect_target())
     open_break.end_time = datetime.utcnow()
     db.session.commit()
     flash("Break ended.", "success")
-    return redirect(url_for("driver.mobile_dashboard"))
+    return redirect(_break_redirect_target())
 
 
 @bp.route("/mobile/hours-mode", methods=["POST"])

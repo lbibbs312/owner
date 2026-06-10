@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% block content %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+
+<style>
+  .break-log-shell {
+    width:min(760px, 100%);
+    margin:0 auto;
+    padding:18px 14px 28px;
+    display:grid;
+    gap:14px;
+  }
+  .break-log-head {
+    display:grid;
+    gap:5px;
+  }
+  .break-log-head p {
+    margin:0;
+    color:var(--md-amber);
+    font-family:var(--md-mono);
+    font-size:.72rem;
+    font-weight:950;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+  }
+  .break-log-head h1 {
+    margin:0;
+    color:var(--md-text);
+    font-family:var(--md-display);
+    font-size:clamp(2rem, 7vw, 3.2rem);
+    font-weight:950;
+    letter-spacing:0;
+    line-height:.95;
+    text-transform:uppercase;
+  }
+  .break-status-card,
+  .break-start-card,
+  .break-row,
+  .break-empty {
+    border:1px solid rgba(91,157,255,.22);
+    border-radius:8px;
+    background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(10,17,28,.96));
+    color:var(--md-text);
+    box-shadow:0 18px 40px rgba(0,0,0,.28), inset 0 1px 0 rgba(91,157,255,.08);
+  }
+  .break-status-card {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:12px;
+    align-items:center;
+    padding:14px;
+  }
+  .break-status-text {
+    min-width:0;
+    display:grid;
+    gap:4px;
+  }
+  .break-status-text span,
+  .break-row span,
+  .break-field label {
+    color:var(--md-muted);
+    font-family:var(--md-mono);
+    font-size:.66rem;
+    font-weight:950;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+  }
+  .break-status-text strong {
+    color:var(--md-text);
+    font-family:var(--md-display);
+    font-size:1.05rem;
+    font-weight:950;
+  }
+  .break-clock {
+    min-width:86px;
+    text-align:right;
+    color:#fff2c5;
+    font-family:var(--md-mono);
+    font-size:1.25rem;
+    font-weight:950;
+    font-variant-numeric:tabular-nums;
+  }
+  .break-action-form {
+    margin:0;
+  }
+  .break-action-form button,
+  .break-start-card button {
+    width:100%;
+    min-height:44px;
+    border:0;
+    border-radius:8px;
+    background:#ffb224;
+    color:#101827;
+    font-family:var(--md-display);
+    font-weight:950;
+    text-transform:uppercase;
+  }
+  .break-start-card {
+    display:grid;
+    gap:12px;
+    padding:14px;
+  }
+  .break-field {
+    display:grid;
+    gap:6px;
+  }
+  .break-field select {
+    width:100%;
+    min-height:44px;
+    border:1px solid rgba(91,157,255,.24);
+    border-radius:8px;
+    background:rgba(5,13,23,.82);
+    color:var(--md-text);
+    padding:9px 10px;
+    font:inherit;
+  }
+  .break-field option {
+    background:#07111f;
+    color:#f8fafc;
+  }
+  .break-list {
+    display:grid;
+    gap:10px;
+  }
+  .break-section-title {
+    margin:6px 0 -2px;
+    color:var(--md-text);
+    font-family:var(--md-display);
+    font-size:1rem;
+    font-weight:950;
+  }
+  .break-row {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:12px;
+    align-items:center;
+    padding:13px 14px;
+  }
+  .break-row strong {
+    display:block;
+    margin-top:3px;
+    color:var(--md-text);
+    font-size:.94rem;
+  }
+  .break-row small {
+    display:block;
+    margin-top:4px;
+    color:var(--md-muted);
+    font-size:.76rem;
+    line-height:1.35;
+  }
+  .break-row-duration {
+    color:#fff2c5;
+    font-family:var(--md-mono);
+    font-size:.9rem;
+    font-weight:950;
+    text-align:right;
+    white-space:nowrap;
+  }
+  .break-empty {
+    padding:14px;
+    color:var(--md-muted);
+    font-weight:750;
+  }
+  @media (max-width:520px) {
+    .break-status-card,
+    .break-row {
+      grid-template-columns:1fr;
+    }
+    .break-clock,
+    .break-row-duration {
+      text-align:left;
+    }
+  }
+</style>
+
+<main class="break-log-shell responsive-workspace">
+  <header class="break-log-head">
+    <p>{{ route_date.strftime('%b %d, %Y') if route_date else 'Today' }}</p>
+    <h1>Break Log</h1>
+  </header>
+
+  {% if open_break %}
+    <section class="break-status-card" aria-label="Current break">
+      <div class="break-status-text">
+        <span>Current Break</span>
+        <strong>{{ open_break.break_type or 'Break' }}</strong>
+      </div>
+      <div class="break-clock" data-break-detail-timer data-break-seconds="{{ open_break_elapsed_seconds|default(0, true) }}">{{ open_break_elapsed_label|default('00:00', true) }}</div>
+      <form class="break-action-form" method="post" action="{{ url_for('driver.mobile_break_end') }}">
+        <input type="hidden" name="next" value="breaks">
+        <button type="submit">End Break</button>
+      </form>
+    </section>
+  {% else %}
+    <form class="break-start-card" method="post" action="{{ url_for('driver.mobile_break_start') }}">
+      <input type="hidden" name="next" value="breaks">
+      <div class="break-field">
+        <label for="breakType">Break Type</label>
+        <select id="breakType" name="break_type">
+          <option value="Break">Break</option>
+          {% for item in break_types %}
+            <option value="{{ item }}">{{ item }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit">Start Break</button>
+    </form>
+  {% endif %}
+
+  <section class="break-status-card" aria-label="Break total">
+    <div class="break-status-text">
+      <span>Total Today</span>
+      <strong>{{ break_total_label }}</strong>
+    </div>
+    <div class="break-clock">{{ break_total_clock }}</div>
+  </section>
+
+  <section class="break-list" aria-label="Break details">
+    <h2 class="break-section-title">Break Details</h2>
+    {% if break_rows %}
+      {% for row in break_rows %}
+        <article class="break-row">
+          <div>
+            <span>{{ 'Open' if row.is_open else 'Closed' }}</span>
+            <strong>{{ row.kind }}</strong>
+            <small>
+              Start {{ row.break.start_time|to_detroit_datetime }}
+              {% if row.break.end_time %} &middot; End {{ row.break.end_time|to_detroit_datetime }}{% endif %}
+            </small>
+          </div>
+          <div class="break-row-duration">{{ row.duration_label }}</div>
+        </article>
+      {% endfor %}
+    {% else %}
+      <div class="break-empty">No breaks recorded for this route date.</div>
+    {% endif %}
+  </section>
+</main>
+
+{% set md_nav_active = 'break' %}
+{% include 'partials/_md_bottom_nav.html' %}
+<script>
+  (function(){
+    function formatElapsed(totalSeconds) {
+      var seconds = Math.max(0, Math.floor(totalSeconds || 0));
+      var hours = Math.floor(seconds / 3600);
+      var minutes = Math.floor((seconds % 3600) / 60);
+      var remainder = seconds % 60;
+      if (hours) return String(hours) + ':' + String(minutes).padStart(2, '0') + ':' + String(remainder).padStart(2, '0');
+      return String(minutes) + ':' + String(remainder).padStart(2, '0');
+    }
+    var timer = document.querySelector('[data-break-detail-timer]');
+    if (!timer) return;
+    var startSeconds = parseInt(timer.getAttribute('data-break-seconds') || '0', 10);
+    if (!Number.isFinite(startSeconds)) startSeconds = 0;
+    var startedAt = Date.now();
+    function refresh() {
+      timer.textContent = formatElapsed(startSeconds + Math.floor((Date.now() - startedAt) / 1000));
+    }
+    refresh();
+    window.setInterval(refresh, 1000);
+  })();
+</script>
+{% endblock %}

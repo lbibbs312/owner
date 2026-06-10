@@ -216,6 +216,8 @@ def _stop_board_badge(log, *, movement, issues=(), evidence=None, flags=(), note
         return _board_badge_display("LEFT EMPTY", pill_tone="recorded")
     if code == "empty_return":
         return _board_badge_display("CLOSED", pill_tone="recorded")
+    if code == "route_end":
+        return _board_badge_display("ROUTE END", pill_tone="recorded", row_tone="completed", severity="ok")
     if code == "loaded":
         return _board_badge_display("IN TRANSIT", pill_tone="open", row_tone="completed", severity="info")
     if code == "in_transit":
@@ -1087,6 +1089,12 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
         departed_with = row.get("cargo_out") or log.depart_load_size or NOT_TRACKED
         wait_label = f"{wait_minutes} min" if wait_minutes is not None else NOT_TRACKED
         departed = bool(log.depart_time)
+        final_arrival = bool(
+            getattr(route_context, "route_finalized", False)
+            and not departed
+            and row.get("status") == "Finalized"
+            and sequence == len(route_rows)
+        )
         # --- Real drop / proof / destination evidence (not flag relabeling) ---
         dropped_loads = [load_display(it) for it in (row.get("cargo_removed") or ()) if not is_empty_load(it)]
         added_loads = [load_display(it) for it in (row.get("cargo_added") or ()) if not is_empty_load(it)]
@@ -1108,6 +1116,17 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             is_empty_return=is_empty_return,
             route_pretrip=route_pretrip,
         )
+        if final_arrival:
+            movement = {
+                "code": "route_end",
+                "label": "ROUTE END",
+                "pill_tone": "recorded",
+                "row_tone": "completed",
+                "severity": "ok",
+                "summary": f"{label} · Route end",
+                "ledger_title": f"{label} · Route end",
+                "ledger_meta": f"Arrived {_board_cargo_label(arrived_with)} · Route ended here",
+            }
         scan_events_for_stop = scan_events_by_log.get(log.id, [])
         review_scan_statuses = {"unexpected", "missing", "missed_drop", "needs_review", "pending_part"}
         valid_scan_count = len([
@@ -1188,7 +1207,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             unconfirmed_drop=unconfirmed_only,
             destination_mismatch=mismatch,
             missing_proof=missing_proof,
-            needs_departure=not departed and log.id == current_stop_id,
+            needs_departure=not departed and not final_arrival and log.id == current_stop_id,
             review_requested=log.id in review_requested_ids,
             evidence=stop_evidence,
             extra_codes=("count_short",) if short_scan_count else (),
@@ -1223,6 +1242,11 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             linked_move=linked_move,
             issue_severity=issue_severity,
         )
+        if final_arrival:
+            status = "completed"
+            stop_issues = []
+            has_issue = False
+            issue_severity = "ok"
         stop_badge = board_badge(
             stop_issues,
             ok_label=movement["label"],
@@ -1237,7 +1261,7 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             evidence=stop_evidence,
             flags=flags,
             notes=f"{row.get('note') or ''} {getattr(log, 'downtime_reason', '') or ''}",
-            departed=departed,
+            departed=departed or final_arrival,
         )
         added_load_keys = {
             _norm_key(load_display(load))
@@ -1250,36 +1274,44 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             and added_load_keys.issubset(future_removed_by_log_id.get(log.id, set()))
         ):
             board_status_badge = _board_badge_display("DELIVERED", pill_tone="delivery", row_tone="delivery", severity="ok")
+        stop_actions = _stop_actions(log, linked_move=linked_move, role=role)
+        if final_arrival:
+            stop_actions = [action for action in stop_actions if action.get("label") == "Open stop"]
+        board_detail = _board_stop_detail(
+            log,
+            label,
+            arrived_with,
+            departed_with,
+            wait_label=wait_label,
+            route_pretrip=route_pretrip,
+            sequence=sequence,
+            is_empty_return=is_empty_return,
+        )
+        board_flow = _board_flow_summary(
+            log,
+            label,
+            arrived_with,
+            departed_with,
+            route_pretrip=route_pretrip,
+            sequence=sequence,
+            is_empty_return=is_empty_return,
+            wait_minutes=wait_minutes,
+            pickup_label=drop_pickup_label,
+            delivery_label=label if dropped_loads else "",
+            dropped_loads=dropped_loads,
+            delivered=board_status_badge["label"] == "DELIVERED",
+        )
+        if final_arrival:
+            board_detail = f"{label} · route end"
+            board_flow = {"mode": "plain", "text": f"{label} · route end"}
         stops.append({
             "stop_id": log.id,
             "sequence": sequence,
             "plant_name": label,
             "short_code": _short_code(log.plant_name or label),
             "board_code": _board_stop_code(log, sequence),
-            "board_detail": _board_stop_detail(
-                log,
-                label,
-                arrived_with,
-                departed_with,
-                wait_label=wait_label,
-                route_pretrip=route_pretrip,
-                sequence=sequence,
-                is_empty_return=is_empty_return,
-            ),
-            "board_flow": _board_flow_summary(
-                log,
-                label,
-                arrived_with,
-                departed_with,
-                route_pretrip=route_pretrip,
-                sequence=sequence,
-                is_empty_return=is_empty_return,
-                wait_minutes=wait_minutes,
-                pickup_label=drop_pickup_label,
-                delivery_label=label if dropped_loads else "",
-                dropped_loads=dropped_loads,
-                delivered=board_status_badge["label"] == "DELIVERED",
-            ),
+            "board_detail": board_detail,
+            "board_flow": board_flow,
             "movement_code": movement["code"],
             "movement_label": movement["label"],
             "movement_summary": movement["summary"],
@@ -1314,10 +1346,10 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             "badge": stop_badge,
             "board_badge": board_status_badge,
             "notes": row.get("note") or "",
-            "next_action": _stop_next_action(log, status=status, cargo=cargo, linked_move=linked_move, issues=stop_issues),
+            "next_action": "No action needed" if final_arrival else _stop_next_action(log, status=status, cargo=cargo, linked_move=linked_move, issues=stop_issues),
             "view_url": _stop_audit_url(log, role=role)
             or _safe_url("manager.view_driver_log" if role == "manager" else "driver.view_driver_log", log_id=log.id),
-            "actions": _stop_actions(log, linked_move=linked_move, role=role),
+            "actions": stop_actions,
         })
         for added in added_loads:
             pending_pickup_by_cargo[_norm_key(added)] = label

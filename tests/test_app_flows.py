@@ -2979,9 +2979,9 @@ def test_driver_mobile_bottom_action_bar(client, app):
     assert body.count('<nav class="md-driver-bottom-nav"') == 1
     assert "md-quick-log" not in body
     # The five action items, in order.
-    order = [label for label in ("Home", "Start Break", "Fuel", "Service", "Inspections")
+    order = [label for label in ("Home", "Breaks", "Fuel", "Service", "Inspections")
              if f"<span>{label}</span>" in body]
-    assert order == ["Home", "Start Break", "Fuel", "Service", "Inspections"]
+    assert order == ["Home", "Breaks", "Fuel", "Service", "Inspections"]
     # Transfer / Logs / Reports are not bottom-bar items.
     assert "<span>Transfer</span>" not in body
     assert "<strong>DL</strong>" not in body
@@ -2989,6 +2989,8 @@ def test_driver_mobile_bottom_action_bar(client, app):
 
     # Bottom actions now land on distinct operational surfaces.
     assert "/ifta-worksheet/new" in body
+    assert "/mobile/breaks" in body
+    assert "/mobile/break/start" not in body
     assert "/mobile?flow=maintenance" in body
     assert "/list_pretrips" in body
     fuel_page = client.get("/ifta-worksheet/new")
@@ -3010,8 +3012,7 @@ def test_driver_mobile_bottom_action_bar(client, app):
 
 
 def test_driver_bottom_nav_break_toggles(client, app):
-    """The bottom-bar Break button starts/ends the HOS break directly (no Quick
-    Log, no submenu), and the on-break state shows on every page."""
+    """The bottom-bar Break tab opens a confirmation/detail page, not a direct POST."""
     with app.app_context():
         create_user("brk_driver", "brk-driver@example.com", "driver")
     login(client, "brk_driver")
@@ -3019,28 +3020,46 @@ def test_driver_bottom_nav_break_toggles(client, app):
     body = client.get("/mobile").get_data(as_text=True)
     assert "md-quick-log" not in body            # no separate quick-log area
     assert body.count('<nav class="md-driver-bottom-nav"') == 1
-    assert "<span>Start Break</span>" in body
-    assert "/mobile/break/start" in body          # Break posts directly
+    assert "<span>Breaks</span>" in body
+    assert 'href="/mobile/breaks"' in body
+    assert "/mobile/break/start" not in body
 
-    # Start the break from the bar -> the item flips to End Break with a timer.
-    assert client.post("/mobile/break/start").status_code == 302
+    breaks_page = client.get("/mobile/breaks").get_data(as_text=True)
+    assert "<h1>Break Log</h1>" in breaks_page
+    assert "Start Break" in breaks_page
+    assert "Break Details" in breaks_page
+    assert "No breaks recorded for this route date." in breaks_page
+
+    # Starting a break is explicit from the Break Log page.
+    start = client.post("/mobile/break/start", data={"next": "breaks"})
+    assert start.status_code == 302
+    assert start.headers["Location"].endswith("/mobile/breaks")
     on_break = client.get("/mobile").get_data(as_text=True)
-    assert "<span>End Break</span>" in on_break
+    assert "<span>On Break</span>" in on_break
     assert "data-break-timer" in on_break
     assert "data-break-seconds" in on_break
     assert "md-nav-link on" in on_break
-    assert "/mobile/break/end" in on_break
-    assert "<span>Start Break</span>" not in on_break
+    assert 'href="/mobile/breaks"' in on_break
+    assert "/mobile/break/end" not in on_break
+    assert "<span>Breaks</span>" not in on_break
+
+    open_break_page = client.get("/mobile/breaks").get_data(as_text=True)
+    assert "Current Break" in open_break_page
+    assert "End Break" in open_break_page
+    assert "data-break-detail-timer" in open_break_page
+    assert "Open" in open_break_page
     # State is consistent on other driver pages (context processor), still one bar.
     pretrip = client.get("/new_pretrip").get_data(as_text=True)
-    assert "<span>End Break</span>" in pretrip
+    assert "<span>On Break</span>" in pretrip
     assert "data-break-timer" in pretrip
     assert pretrip.count('<nav class="md-driver-bottom-nav"') == 1
     # End the break -> back to Break.
-    assert client.post("/mobile/break/end").status_code == 302
+    end = client.post("/mobile/break/end", data={"next": "breaks"})
+    assert end.status_code == 302
+    assert end.headers["Location"].endswith("/mobile/breaks")
     after = client.get("/mobile").get_data(as_text=True)
-    assert "<span>Start Break</span>" in after
-    assert "<span>End Break</span>" not in after
+    assert "<span>Breaks</span>" in after
+    assert "<span>On Break</span>" not in after
 
 
 def test_posttrip_ends_unlinked_manual_shift_timer(client, app):
@@ -6964,13 +6983,14 @@ def test_driver_mobile_pages_share_single_five_tab_bottom_nav(client, app):
 
     expected_items = [
         "<strong>HM</strong><span>Home</span>",
-        "<strong>BR</strong><span>Start Break</span>",
+        "<strong>BR</strong><span>Breaks</span>",
         "<strong>FL</strong><span>Fuel</span>",
         "<strong>SV</strong><span>Service</span>",
         "<strong>IN</strong><span>Inspections</span>",
     ]
     pages = [
         ("/mobile", "Home"),
+        ("/mobile/breaks", "Breaks"),
         ("/ifta-worksheet/new", "Fuel"),
         ("/mobile?flow=maintenance", "Service"),
         ("/list_pretrips", "Inspections"),
@@ -6996,7 +7016,10 @@ def test_driver_mobile_pages_share_single_five_tab_bottom_nav(client, app):
         assert 'href="/mobile?flow=maintenance"' in nav
         assert "report_type=fuel" not in nav
         assert "report_type=truck_issue" not in nav
-        assert "/mobile/break/start" in nav or "/mobile/break/end" in nav
+        # Break opens the deliberate Break Log screen; start/end happen there.
+        assert 'href="/mobile/breaks"' in nav
+        assert "/mobile/break/start" not in nav
+        assert "/mobile/break/end" not in nav
         # Logs and Reports are no longer in the bottom bar.
         assert "<strong>DL</strong>" not in nav
         assert "<strong>RP</strong>" not in nav
@@ -7748,7 +7771,7 @@ def test_mobile_dashboard_allows_finalize_after_posttrip_complete(client, app):
     assert b"Route open and not finalized" not in route_sheet.data
 
 
-def test_mobile_dashboard_does_not_finish_route_with_open_stop(client, app):
+def test_mobile_dashboard_allows_route_end_at_current_final_stop(client, app):
     from datetime import date, datetime, timedelta
 
     today = date.today()
@@ -7784,10 +7807,10 @@ def test_mobile_dashboard_does_not_finish_route_with_open_stop(client, app):
     login(client, "final_stop_closeout_driver")
     page = client.get("/mobile")
     assert page.status_code == 200
-    assert b"Finish Route" not in page.data
-    assert b'action="/mobile/end-route" method="POST"' not in page.data
+    assert b"End Route Here" in page.data
+    assert b"Use the current stop as the route end" in page.data
+    assert b'action="/mobile/end-route" method="POST"' in page.data
     assert b"PostTrip Due" not in page.data
-    assert b"Depart Quick Flow" in page.data
 
     get_response = client.get("/mobile/end-route", follow_redirects=False)
     assert get_response.status_code == 302
@@ -7813,31 +7836,35 @@ def test_mobile_dashboard_does_not_finish_route_with_open_stop(client, app):
 
     with app.app_context():
         from app.models import ActivityEvent, DriverLog, ShiftRecord
-        from app.services.driver_wait import active_driver_wait_status
         from app.services.route_context import build_route_context
 
         saved_log = DriverLog.query.get(log_id)
         assert saved_log.depart_time is None
         assert saved_log.dock_wait_minutes is None
-        assert ShiftRecord.query.filter_by(user_id=driver_id, end_time=None).count() == 1
+        assert ShiftRecord.query.filter_by(user_id=driver_id, end_time=None).count() == 0
         assert ActivityEvent.query.filter_by(
             user_id=driver_id,
             category="eod",
             action="finalized",
             target_type="end_of_day",
-        ).count() == 0
-        assert active_driver_wait_status(driver_id, now=datetime.now()) is not None
+        ).count() == 1
         snapshot = build_route_context(driver_id=driver_id, route_date=today)
-        assert snapshot.route_status == "active"
-        assert snapshot.current_stop.id == log_id
-        assert snapshot.current_stop_status == "current"
-        assert snapshot.rows[-1]["status"] == "Current"
+        assert snapshot.route_status == "finalized"
+        assert snapshot.current_stop is None
+        assert snapshot.current_stop_status == "finalized"
+        assert snapshot.rows[-1]["status"] == "Finalized"
+        assert snapshot.rows[-1]["note"] == "Route finalized at final stop."
+
+    finalized_page = client.get("/mobile").get_data(as_text=True)
+    assert "ROUTE END" in finalized_page
+    assert "route end" in finalized_page.lower()
+    assert "needs departure" not in finalized_page.lower()
 
     route_sheet = client.get(f"/driver_logs_print?date={today.isoformat()}")
     assert route_sheet.status_code == 200
     assert b"25 mi" in route_sheet.data
-    assert b"Route open and not finalized" in route_sheet.data
-    assert b"Current stop: departure pending" in route_sheet.data
+    assert b"Route finalized" in route_sheet.data
+    assert b"Route open and not finalized" not in route_sheet.data
 
 
 def test_shift_get_routes_do_not_mutate_shift_state(client, app):
@@ -9967,6 +9994,7 @@ def test_current_open_stop_wording_parity_across_rendered_surfaces(client, app):
     mobile = client.get("/mobile")
     assert mobile.status_code == 200
     assert b"Record Departure" in mobile.data
+    assert b"End Route Here" in mobile.data
     assert b"Final Location" not in mobile.data
     assert b"forecast" not in mobile.data.lower()
     client.get("/logout")

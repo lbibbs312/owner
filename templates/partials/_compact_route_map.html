@@ -63,6 +63,9 @@
         <form action="{{ url_for('driver.request_manager_review', log_id=log_id) }}" method="POST"><button class="route-detail-link danger" type="submit">Send to manager review</button></form>
       {% elif primary_code == 'needs_departure' %}
         <a class="route-detail-link" href="{{ depart_url or url_for('driver.view_driver_log', log_id=log_id) }}">Record departure</a>
+        <form action="{{ url_for('driver.mobile_end_route') }}" method="POST">
+          <button class="route-detail-link" type="submit">End Route Here</button>
+        </form>
         <form action="{{ url_for('driver.record_driver_log_photo', log_id=log_id) }}" method="POST" enctype="multipart/form-data">
           <input type="hidden" name="source" value="proof">
           <input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}">
