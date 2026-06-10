@@ -211,7 +211,9 @@ def _stop_board_badge(log, *, movement, issues=(), evidence=None, flags=(), note
     transfer_count = int(evidence.get("transfer_count") or 0)
 
     if code == "route_start":
-        return _board_badge_display("STARTED", pill_tone="open", row_tone="completed", severity="info")
+        # Departed the start empty — heading out to the first pickup. "EN ROUTE"
+        # (recorded tone) reads as a closed departure, not an in-progress stop.
+        return _board_badge_display("EN ROUTE", pill_tone="recorded", row_tone="completed", severity="ok")
     if code == "no_pickup":
         return _board_badge_display("LEFT EMPTY", pill_tone="recorded")
     if code == "empty_return":

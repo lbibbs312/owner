@@ -12,7 +12,7 @@ from app.models import ActivityEvent, DamageReport, DriverLog, DriverLogPhoto, L
 from app.services.cargo_state import cargo_state_for_log
 from app.services.cargo_reconciliation_service import reconcile_cargo
 from app.services.driver_wait import wait_label_for_log
-from app.services.load_state import build_driver_log_route_context, current_load_after_logs, route_problem_reason, stop_role_details, truck_issue_reason
+from app.services.load_state import build_driver_log_route_context, current_load_after_logs, is_empty_load, route_problem_reason, stop_role_details, truck_issue_reason
 from app.services.next_load_prediction import build_next_load_prediction
 from app.services.plant_addresses import plant_label
 from app.services.plant_time import route_stop_forecasts
@@ -224,6 +224,19 @@ def _route_cta(label, action, style="primary"):
     return {"label": label, "action": action, "style": style}
 
 
+def _route_moved_cargo(rows):
+    """True if any stop on the route actually carried freight (arrived or
+    departed with a non-empty load). A route of only empty route-starts has not
+    moved cargo, so it should not look like a finished route."""
+    for row in rows or []:
+        log = row.get("log") if isinstance(row, dict) else None
+        if not log:
+            continue
+        if not is_empty_load(getattr(log, "load_size", None)) or not is_empty_load(getattr(log, "depart_load_size", None)):
+            return True
+    return False
+
+
 def build_route_cta_context(
     route_context,
     driver_log=None,
@@ -319,6 +332,17 @@ def build_route_cta_context(
                 show_finalize = True
                 allowed_actions = ["finalize_route", "print_route", "view_route"]
                 route_message = "All stops closed and PostTrip complete. Sign and submit to finalize."
+            elif not _route_moved_cargo(rows):
+                # All "stops" so far are just an empty route-start — the driver
+                # pulled out of the yard empty to go pick up. Don't dead-end into
+                # End Shift; keep the route continuable (Add Stop), with End Shift
+                # only as a deliberate secondary in case they really are done.
+                display_mode = "active_route"
+                next_action = "Add Stop"
+                primary = _route_cta("Add Stop", "add_stop")
+                secondary = _route_cta("End Shift", "end_route", "ghost")
+                allowed_actions = ["add_stop", "end_route", "print_route", "view_route"]
+                route_message = "Left empty to start the route. Add your next stop."
             else:
                 # All stops are closed but the shift is not ended. The next action
                 # is End Shift; PostTrip becomes required INSIDE that flow, never

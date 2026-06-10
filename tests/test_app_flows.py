@@ -6757,7 +6757,7 @@ def test_mobile_dashboard_focuses_latest_stop_when_no_current_stop(client, app):
         not in workspace
     )
     assert b"Transfer sheet needed" in workspace
-    assert b"STARTED" in workspace
+    assert b"EN ROUTE" in workspace
     assert b"LOADED" in workspace
     assert b"DROPPED" in workspace
     assert b'data-detail-template="desktop-route-packet-transfer-sheet"' in workspace
@@ -7491,14 +7491,15 @@ def test_mobile_dashboard_shows_posttrip_due_after_route_close_not_as_board_row(
 
         driver = create_user("posttrip_due_driver", "posttrip-due@example.com", "driver")
         db.session.add(PreTrip(user_id=driver.id, pretrip_date=today, truck_number="ST4", start_mileage=379000))
+        # A real closed route: delivered a load (arrived with cargo, departed
+        # empty), so this is an actual route close -> End Shift, not an empty start.
         db.session.add(
             DriverLog(
                 driver_id=driver.id,
                 date=today,
                 plant_name="RE",
-                load_size="Empty",
+                load_size="Trim DC Load",
                 depart_load_size="Empty",
-                no_pickup=True,
                 arrive_time=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
                 depart_time="08:20",
             )

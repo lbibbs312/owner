@@ -200,7 +200,7 @@ def test_first_empty_stop_is_route_start_without_issue(app):
 
     assert stop["movement_code"] == "route_start"
     assert stop["badge"]["label"] == "ROUTE START"
-    assert stop["board_badge"]["label"] == "STARTED"
+    assert stop["board_badge"]["label"] == "EN ROUTE"
     assert stop["board_detail"] == "Paint Central · route start · arrived empty"
     assert "empty return" not in stop["board_detail"].lower()
     assert stop["issues"] == []
@@ -1591,18 +1591,39 @@ def test_cta_does_not_show_posttrip_right_after_route_start():
     assert (cta["primary_cta"]["action"] or "") != "posttrip"
 
 
+def _cargo_row(load="Trim DC Load"):
+    """A row whose log actually moved freight, so the route reads as real work."""
+    from types import SimpleNamespace
+    return {"log": SimpleNamespace(load_size=load, depart_load_size=load)}
+
+
 def test_cta_posttrip_only_during_end_shift_and_finalize():
-    # All stops closed, PostTrip missing -> End Shift (NOT PostTrip Due).
-    end_shift = _cta_for(rows=[{"log_id": 1}], all_departed=True, route_status="completed",
+    # A REAL route (cargo moved), all stops closed, PostTrip missing -> End Shift
+    # (NOT PostTrip Due).
+    end_shift = _cta_for(rows=[_cargo_row()], all_departed=True, route_status="completed",
                          route_is_active=False, posttrip_status=None, pending_posttrip=True)
     assert end_shift["next_action"] == "End Shift"
     assert end_shift["primary_cta"]["action"] == "end_route"
     assert "PostTrip" not in end_shift["next_action"]
     # PostTrip complete -> Sign & Submit Route.
-    ready = _cta_for(rows=[{"log_id": 1}], all_departed=True, route_status="completed",
+    ready = _cta_for(rows=[_cargo_row()], all_departed=True, route_status="completed",
                      route_is_active=False, posttrip_status="complete")
     assert ready["primary_cta"]["label"] == "Sign & Submit Route"
     assert ready["primary_cta"]["action"] == "finalize_route"
+
+
+def test_cta_empty_route_start_continues_instead_of_end_shift():
+    """An empty route-start departure (no freight moved) must not dead-end into
+    End Shift — the CTA stays Add Stop so the driver can continue to their first
+    pickup, with End Shift only as a deliberate secondary."""
+    from types import SimpleNamespace
+    empty_start = {"log": SimpleNamespace(load_size="Empty", depart_load_size="Empty")}
+    cta = _cta_for(rows=[empty_start], all_departed=True, route_status="completed",
+                   route_is_active=False, posttrip_status=None)
+    assert cta["primary_cta"]["label"] == "Add Stop"
+    assert cta["primary_cta"]["action"] == "add_stop"
+    assert cta["secondary_cta"]["action"] == "end_route"   # still finishable on purpose
+    assert cta["next_action"] != "End Shift"
 
 
 def test_cta_finalized_route_has_no_mutating_action():
