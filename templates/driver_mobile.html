@@ -4835,6 +4835,24 @@
       <div class="driver-state {% if not open_shift %}muted{% endif %}">
         {% if open_shift %}On Duty{% else %}Off Duty{% endif %} · {{ current_user.display_name }}{% if current_user.department %} · {{ current_user.department }}{% endif %}
       </div>
+      <style>
+        .dd-mode-toggle-form { margin:6px 12px 0; }
+        .dd-mode-toggle { display:inline-flex; align-items:center; gap:8px; padding:6px 12px; border-radius:999px;
+          background:rgba(255,255,255,.03); border:1px solid var(--md-line, #22324a); color:var(--md-muted, #8a99b3);
+          font-family:var(--md-mono, monospace); font-size:.64rem; font-weight:800; letter-spacing:.06em;
+          text-transform:uppercase; cursor:pointer; }
+        .dd-mode-toggle .dd-mode-dot { width:7px; height:7px; border-radius:999px; background:var(--md-muted, #8a99b3); }
+        .dd-mode-toggle.on { color:#dbe7ff; border-color:rgba(91,157,255,.5); background:rgba(91,157,255,.12);
+          box-shadow:0 0 14px rgba(91,157,255,.2); }
+        .dd-mode-toggle.on .dd-mode-dot { background:#5b9dff; box-shadow:0 0 8px rgba(91,157,255,.6); }
+        .dd-mode-toggle:active { transform:translateY(1px); }
+      </style>
+      <form method="post" action="{{ url_for('driver.toggle_day_driver') }}" class="dd-mode-toggle-form">
+        <button type="submit" class="dd-mode-toggle {% if current_user.is_day_driver %}on{% endif %}"
+                aria-label="Toggle day-driver freight workspace">
+          <span class="dd-mode-dot"></span>Freight mode (day-driver) · {{ 'On' if current_user.is_day_driver else 'Off' }}
+        </button>
+      </form>
       {# The green board CTA already carries the record-departure action when a
          stop is open. Mute the banner's duplicate button down to a timer-only
          chip in that state; other surfaces (base/day report/history) keep it. #}

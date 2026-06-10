@@ -10392,6 +10392,37 @@ def test_day_driver_profile_toggle_and_workspace_language(client, app):
     assert b"General Freight" in mobile.data
 
 
+def test_day_driver_dashboard_quick_toggle(client, app):
+    """The dashboard exposes a one-tap day-driver toggle so the mode is testable
+    without digging into Profile."""
+    with app.app_context():
+        create_user("dd_toggle", "ddt@example.com", "driver")
+    login(client, "dd_toggle")
+
+    home = client.get("/mobile").get_data(as_text=True)
+    assert "dd-mode-toggle" in home
+    assert "Freight mode (day-driver) · Off" in home
+
+    # One tap turns it on (defaulting the route type) and the freight banner shows.
+    resp = client.post("/mobile/toggle-day-driver", follow_redirects=False)
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/mobile")
+    with app.app_context():
+        from app.models import User
+        u = User.query.filter_by(username="dd_toggle").one()
+        assert u.day_driver is True
+        assert u.route_type == "local_short_haul"
+    on = client.get("/mobile").get_data(as_text=True)
+    assert "dd-mode-toggle on" in on
+    assert "Day-Driver Freight Workspace" in on
+
+    # Tapping again turns it back off.
+    client.post("/mobile/toggle-day-driver")
+    with app.app_context():
+        from app.models import User
+        assert User.query.filter_by(username="dd_toggle").one().day_driver is False
+
+
 def test_day_driver_can_log_stop_without_plant_and_carries_load_forward(client, app):
     with app.app_context():
         from app.models import User

@@ -6864,6 +6864,25 @@ def _inject_open_break():
     return {"open_break": None, "open_break_elapsed_seconds": 0, "open_break_elapsed_label": "00:00"}
 
 
+@bp.route("/mobile/toggle-day-driver", methods=["POST"])
+@login_required
+def toggle_day_driver():
+    """One-tap switch between the standard plant/part workspace and the
+    day-driver freight workspace (commodity + weight) from the dashboard, so the
+    mode is testable without digging into Profile."""
+    if current_user.role == "management":
+        return redirect(url_for("manager.manager_dashboard"))
+    current_user.day_driver = not bool(current_user.day_driver)
+    if current_user.day_driver and not (current_user.route_type or "").strip():
+        current_user.route_type = "local_short_haul"
+    db.session.commit()
+    if current_user.day_driver:
+        flash("Day-Driver freight workspace ON — logging by commodity & weight.", "success")
+    else:
+        flash("Day-Driver workspace OFF — standard plant/part logging.", "info")
+    return redirect(url_for("driver.mobile_dashboard"))
+
+
 @bp.route("/mobile/breaks")
 @login_required
 def mobile_breaks():
