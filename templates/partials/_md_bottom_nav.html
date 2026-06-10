@@ -1,24 +1,30 @@
 {#
   MoveDefense driver bottom action bar. The ONLY bottom nav for the authenticated
-  driver mobile shell. Home navigates back to the route workspace; Break / Fuel /
-  Service / Inspection are direct event-logging actions (no separate Quick Log
-  row). Page templates may set md_nav_active; otherwise it's inferred from the
+  driver mobile shell. Home returns to the route workspace; Break is a direct
+  HOS action with live elapsed state; Fuel / Service / Inspections open their
+  own operational surfaces instead of reusing one generic log form. Page
+  templates may set md_nav_active; otherwise it's inferred from the
   endpoint. open_break is injected by the driver blueprint context processor.
 #}
 {% if current_user.is_authenticated and current_user.role != 'management' %}
 {% set md_nav_active = md_nav_active|default('', true) %}
 {% set endpoint = request.endpoint|default('', true) %}
 {% if not md_nav_active %}
-  {% if endpoint == 'driver.new_driving_log' and request.args.get('report_type') == 'fuel' %}
+  {% if endpoint in ['driver.new_ifta_worksheet', 'driver.view_ifta_worksheet', 'driver.ifta_worksheet_packet'] %}
     {% set md_nav_active = 'fuel' %}
+  {% elif endpoint == 'driver.mobile_dashboard' and request.args.get('flow') == 'maintenance' %}
+    {% set md_nav_active = 'service' %}
   {% elif endpoint == 'driver.new_driving_log' and request.args.get('report_type') == 'truck_issue' %}
     {% set md_nav_active = 'service' %}
-  {% elif 'pretrip' in endpoint or 'posttrip' in endpoint or 'truck_maintenance' in endpoint %}
-    {% set md_nav_active = 'pretrip' %}
+  {% elif endpoint == 'driver.truck_maintenance_history' %}
+    {% set md_nav_active = 'service' %}
+  {% elif 'pretrip' in endpoint or 'posttrip' in endpoint %}
+    {% set md_nav_active = 'inspections' %}
   {% elif endpoint in ['driver.mobile_dashboard', 'driver.profile'] %}
     {% set md_nav_active = 'home' %}
   {% endif %}
 {% endif %}
+{% set inspections_active = md_nav_active in ['pretrip', 'inspections'] %}
 <script>document.body.classList.add('md-has-bottom-nav');</script>
 <style>
   body.md-has-bottom-nav #pageContent,
@@ -65,6 +71,23 @@
     border:1px solid var(--md-line, #22324a);
     color:inherit;
   }
+  .md-driver-bottom-nav .md-nav-link span {
+    display:block;
+    max-width:100%;
+    text-align:center;
+    line-height:1.05;
+    white-space:normal;
+  }
+  .md-driver-bottom-nav .md-nav-link .md-nav-timer {
+    display:block;
+    min-height:.72rem;
+    color:#fff2c5;
+    font-family:var(--md-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-size:.56rem;
+    font-weight:950;
+    letter-spacing:.02em;
+    line-height:1;
+  }
   .md-driver-bottom-nav .md-nav-link.active {
     color:var(--md-blue-bright, #5b9dff);
   }
@@ -102,15 +125,39 @@
   <a class="md-nav-link {% if md_nav_active == 'home' %}active{% endif %}" href="{{ url_for('driver.mobile_dashboard') }}"><strong>HM</strong><span>Home</span></a>
   {% if open_break %}
   <form method="post" action="{{ url_for('driver.mobile_break_end') }}">
-    <button type="submit" class="md-nav-link on" aria-label="End break"><strong>BR</strong><span>End Break</span></button>
+    <button type="submit" class="md-nav-link on" aria-label="End break" data-break-timer data-break-seconds="{{ open_break_elapsed_seconds|default(0, true) }}"><strong>BR</strong><span>End Break</span><small class="md-nav-timer" data-break-timer-label>{{ open_break_elapsed_label|default('00:00', true) }}</small></button>
   </form>
   {% else %}
   <form method="post" action="{{ url_for('driver.mobile_break_start') }}">
-    <button type="submit" class="md-nav-link" aria-label="Start break"><strong>BR</strong><span>Break</span></button>
+    <button type="submit" class="md-nav-link" aria-label="Start break"><strong>BR</strong><span>Start Break</span></button>
   </form>
   {% endif %}
-  <a class="md-nav-link {% if md_nav_active == 'fuel' %}active{% endif %}" href="{{ url_for('driver.new_driving_log', report_type='fuel', next='mobile') }}"><strong>FL</strong><span>Fuel</span></a>
-  <a class="md-nav-link {% if md_nav_active == 'service' %}active{% endif %}" href="{{ url_for('driver.new_driving_log', report_type='truck_issue', next='mobile') }}"><strong>SV</strong><span>Service</span></a>
-  <a class="md-nav-link {% if md_nav_active == 'pretrip' %}active{% endif %}" href="{{ url_for('driver.new_pretrip') }}"><strong>IN</strong><span>Inspection</span></a>
+  <a class="md-nav-link {% if md_nav_active == 'fuel' %}active{% endif %}" href="{{ url_for('driver.new_ifta_worksheet') }}"><strong>FL</strong><span>Fuel</span></a>
+  <a class="md-nav-link {% if md_nav_active == 'service' %}active{% endif %}" href="{{ url_for('driver.mobile_dashboard', flow='maintenance') }}"><strong>SV</strong><span>Service</span></a>
+  <a class="md-nav-link {% if inspections_active %}active{% endif %}" href="{{ url_for('driver.list_pretrips') }}"><strong>IN</strong><span>Inspections</span></a>
 </nav>
+<script>
+  (function(){
+    function formatBreakElapsed(totalSeconds) {
+      var seconds = Math.max(0, Math.floor(totalSeconds || 0));
+      var hours = Math.floor(seconds / 3600);
+      var minutes = Math.floor((seconds % 3600) / 60);
+      var remainder = seconds % 60;
+      if (hours) return String(hours) + ':' + String(minutes).padStart(2, '0') + ':' + String(remainder).padStart(2, '0');
+      return String(minutes) + ':' + String(remainder).padStart(2, '0');
+    }
+    document.querySelectorAll('[data-break-timer]').forEach(function(timer){
+      var label = timer.querySelector('[data-break-timer-label]');
+      if (!label) return;
+      var startSeconds = parseInt(timer.getAttribute('data-break-seconds') || '0', 10);
+      if (!Number.isFinite(startSeconds)) startSeconds = 0;
+      var startedAt = Date.now();
+      function refreshBreakTimer() {
+        label.textContent = formatBreakElapsed(startSeconds + Math.floor((Date.now() - startedAt) / 1000));
+      }
+      refreshBreakTimer();
+      window.setInterval(refreshBreakTimer, 1000);
+    });
+  })();
+</script>
 {% endif %}

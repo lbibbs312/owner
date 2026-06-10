@@ -5167,7 +5167,7 @@
     </div>{# end wide-body #}
   </div>
 
-  {% set md_nav_active = 'home' %}
+  {% set md_nav_active = 'service' if request.args.get('flow') == 'maintenance' else 'home' %}
   {% include 'partials/_md_bottom_nav.html' %}
 
 <script>
@@ -5708,9 +5708,9 @@
       } catch (error) {
         if (window.console && console.warn) console.warn('Route quick-action request parse failed', error);
       }
-      if (requested !== 'depart') return;
+      if (requested !== 'depart' && requested !== 'maintenance') return;
       var board = document.querySelector('[data-route-map-shell].md-flow-board');
-      var trigger = board ? board.querySelector('[data-flow-open-panel="depart"]') : null;
+      var trigger = board ? board.querySelector('[data-flow-open-panel="' + requested + '"]') : null;
       if (trigger) trigger.click();
     }
 

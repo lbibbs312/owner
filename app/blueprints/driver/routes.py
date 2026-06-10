@@ -6790,10 +6790,21 @@ def _inject_open_break():
     Break action shows start/end state consistently across pages."""
     try:
         if current_user.is_authenticated and getattr(current_user, "role", None) != "management":
-            return {"open_break": _open_route_break(current_user.id)}
+            open_break = _open_route_break(current_user.id)
+            elapsed_seconds = 0
+            if open_break and getattr(open_break, "start_time", None):
+                start_time = open_break.start_time
+                if start_time.tzinfo is not None:
+                    start_time = start_time.astimezone(pytz.utc).replace(tzinfo=None)
+                elapsed_seconds = max(0, int((datetime.utcnow() - start_time).total_seconds()))
+            return {
+                "open_break": open_break,
+                "open_break_elapsed_seconds": elapsed_seconds,
+                "open_break_elapsed_label": _format_duration(elapsed_seconds),
+            }
     except Exception:  # pragma: no cover - never block a render on this
         pass
-    return {"open_break": None}
+    return {"open_break": None, "open_break_elapsed_seconds": 0, "open_break_elapsed_label": "00:00"}
 
 
 @bp.route("/mobile/break/start", methods=["POST"])

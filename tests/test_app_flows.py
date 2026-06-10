@@ -2967,11 +2967,7 @@ def test_closed_routes_on_other_trucks_stay_in_inspection_list(client, app, monk
 
 
 def test_driver_mobile_bottom_action_bar(client, app):
-    """Driver mobile has ONE bottom action bar: Home/Break/Fuel/Service/Inspection,
-    with no separate Quick Log row. Fuel/Service/Inspection open their forms
-    directly (no submenu); plant transfer stays a backend route, not a bar item."""
-    import re
-
+    """Driver mobile has ONE bottom action bar with distinct workflow targets."""
     with app.app_context():
         create_user("nav_driver", "nav-driver@example.com", "driver")
     login(client, "nav_driver")
@@ -2983,21 +2979,29 @@ def test_driver_mobile_bottom_action_bar(client, app):
     assert body.count('<nav class="md-driver-bottom-nav"') == 1
     assert "md-quick-log" not in body
     # The five action items, in order.
-    order = [label for label in ("Home", "Break", "Fuel", "Service", "Inspection")
+    order = [label for label in ("Home", "Start Break", "Fuel", "Service", "Inspections")
              if f"<span>{label}</span>" in body]
-    assert order == ["Home", "Break", "Fuel", "Service", "Inspection"]
+    assert order == ["Home", "Start Break", "Fuel", "Service", "Inspections"]
     # Transfer / Logs / Reports are not bottom-bar items.
     assert "<span>Transfer</span>" not in body
     assert "<strong>DL</strong>" not in body
     assert "<strong>RP</strong>" not in body
 
-    # No dead buttons / no submenus: each action opens its form directly.
-    fuel_page = client.get("/new_driving_log?report_type=fuel&next=mobile")
+    # Bottom actions now land on distinct operational surfaces.
+    assert "/ifta-worksheet/new" in body
+    assert "/mobile?flow=maintenance" in body
+    assert "/list_pretrips" in body
+    fuel_page = client.get("/ifta-worksheet/new")
     assert fuel_page.status_code == 200
-    fuel_tag = re.search(r'<input[^>]*id="fuelCheck"[^>]*>', fuel_page.get_data(as_text=True))
-    assert fuel_tag and "checked" in fuel_tag.group(0)           # Fuel form, fuel pre-checked
-    assert client.get("/new_driving_log?report_type=truck_issue&next=mobile").status_code == 200
-    assert client.get("/new_pretrip").status_code == 200         # Inspection form
+    assert "Fuel Records" in fuel_page.get_data(as_text=True)
+    service_page = client.get("/mobile?flow=maintenance")
+    assert service_page.status_code == 200
+    service_body = service_page.get_data(as_text=True)
+    assert 'data-flow-open-panel="maintenance"' in service_body
+    assert "Ryder Service" in service_body
+    inspections_page = client.get("/list_pretrips")
+    assert inspections_page.status_code == 200
+    assert "Truck Inspections" in inspections_page.get_data(as_text=True)
 
     # Logout stays in the top header.
     assert "logout" in body.lower()
@@ -3015,24 +3019,27 @@ def test_driver_bottom_nav_break_toggles(client, app):
     body = client.get("/mobile").get_data(as_text=True)
     assert "md-quick-log" not in body            # no separate quick-log area
     assert body.count('<nav class="md-driver-bottom-nav"') == 1
-    assert "<span>Break</span>" in body
+    assert "<span>Start Break</span>" in body
     assert "/mobile/break/start" in body          # Break posts directly
 
-    # Start the break from the bar -> the item flips to End Break (amber/on).
+    # Start the break from the bar -> the item flips to End Break with a timer.
     assert client.post("/mobile/break/start").status_code == 302
     on_break = client.get("/mobile").get_data(as_text=True)
     assert "<span>End Break</span>" in on_break
+    assert "data-break-timer" in on_break
+    assert "data-break-seconds" in on_break
     assert "md-nav-link on" in on_break
     assert "/mobile/break/end" in on_break
-    assert "<span>Break</span>" not in on_break
+    assert "<span>Start Break</span>" not in on_break
     # State is consistent on other driver pages (context processor), still one bar.
     pretrip = client.get("/new_pretrip").get_data(as_text=True)
     assert "<span>End Break</span>" in pretrip
+    assert "data-break-timer" in pretrip
     assert pretrip.count('<nav class="md-driver-bottom-nav"') == 1
     # End the break -> back to Break.
     assert client.post("/mobile/break/end").status_code == 302
     after = client.get("/mobile").get_data(as_text=True)
-    assert "<span>Break</span>" in after
+    assert "<span>Start Break</span>" in after
     assert "<span>End Break</span>" not in after
 
 
@@ -6957,16 +6964,17 @@ def test_driver_mobile_pages_share_single_five_tab_bottom_nav(client, app):
 
     expected_items = [
         "<strong>HM</strong><span>Home</span>",
-        "<strong>BR</strong><span>Break</span>",
+        "<strong>BR</strong><span>Start Break</span>",
         "<strong>FL</strong><span>Fuel</span>",
         "<strong>SV</strong><span>Service</span>",
-        "<strong>IN</strong><span>Inspection</span>",
+        "<strong>IN</strong><span>Inspections</span>",
     ]
     pages = [
         ("/mobile", "Home"),
-        ("/new_driving_log?report_type=fuel&next=mobile", "Fuel"),
-        ("/new_driving_log?report_type=truck_issue&next=mobile", "Service"),
-        ("/new_pretrip", "Inspection"),
+        ("/ifta-worksheet/new", "Fuel"),
+        ("/mobile?flow=maintenance", "Service"),
+        ("/list_pretrips", "Inspections"),
+        ("/new_pretrip", "Inspections"),
         ("/profile", "Home"),
     ]
 
@@ -6982,10 +6990,12 @@ def test_driver_mobile_pages_share_single_five_tab_bottom_nav(client, app):
         nav = body[nav_start:nav_end]
         positions = [nav.index(item) for item in expected_items]
         assert positions == sorted(positions)
-        # Actions open their forms directly (no submenu); Break is a POST button.
-        assert 'href="/new_pretrip"' in nav
-        assert "report_type=fuel" in nav
-        assert "report_type=truck_issue" in nav
+        # Actions land on distinct workflow surfaces; Break is a POST button.
+        assert 'href="/list_pretrips"' in nav
+        assert 'href="/ifta-worksheet/new"' in nav
+        assert 'href="/mobile?flow=maintenance"' in nav
+        assert "report_type=fuel" not in nav
+        assert "report_type=truck_issue" not in nav
         assert "/mobile/break/start" in nav or "/mobile/break/end" in nav
         # Logs and Reports are no longer in the bottom bar.
         assert "<strong>DL</strong>" not in nav
