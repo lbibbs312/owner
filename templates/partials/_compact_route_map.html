@@ -291,28 +291,28 @@
       <form action="{{ end_route_url }}" method="POST" style="margin:0">
       <button class="md-flow-primary-cta" type="submit" style="width:100%; cursor:pointer">
         <span>Required driver action</span>
-        <strong>Finalize Route</strong>
+        <strong>{{ primary_cta.label if primary_cta else 'End Shift' }}</strong>
         <small>{{ cta.route_state_message or 'Close this route' }}</small>
       </button>
       </form>
     </div>
-  {% elif posttrip_url and (primary_action == 'posttrip' or pending_pt) %}
+  {% elif posttrip_url and primary_action == 'posttrip' %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta" href="{{ posttrip_url }}" data-flow-open-url="{{ posttrip_url }}">
         <span>Required driver action</span>
-        <strong>PostTrip Due</strong>
-        <small>Finish inspection and end shift</small>
+        <strong>{{ primary_cta.label if primary_cta else 'Complete PostTrip' }}</strong>
+        <small>{{ cta.route_state_message or 'Complete PostTrip to finish' }}</small>
       </a>
     </div>
   {% elif not route_finalized_for_cta and depart_url and primary_stop %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow" data-flow-panel-kicker="DEPART QUICK FLOW">
         <span>Required driver action</span>
-        <strong>Depart and Load</strong>
+        <strong>{{ primary_cta.label if primary_cta else 'Record Departure' }}</strong>
         <small>{{ primary_stop.plant_name }} &middot; record departure</small>
       </a>
     </div>
-  {% elif not route_finalized_for_cta and add_stop_url and (primary_action == 'add_stop' or not (rm and rm.stops) or show_between_loads_add_stop) %}
+  {% elif not route_finalized_for_cta and add_stop_url and (primary_action == 'add_stop' or (not (rm and rm.stops) and primary_action != 'start_shift') or show_between_loads_add_stop) %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta add-stop-action" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}" data-flow-panel-title="Add Stop">
         <span>Required driver action</span>
@@ -320,7 +320,7 @@
         <small>Continue route</small>
       </a>
     </div>
-  {% elif primary_cta and primary_action in ['attach_document', 'finalize_route', 'print_route', 'view_route', 'route_history'] and urls.get(primary_action) %}
+  {% elif primary_cta and primary_action in ['attach_document', 'finalize_route', 'print_route', 'view_route', 'route_history', 'start_shift'] and urls.get(primary_action) %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta" href="{{ urls.get(primary_action) }}" data-flow-open-url="{{ urls.get(primary_action) }}" data-flow-panel-title="{{ primary_cta.label }}">
         <span>Required driver action</span>

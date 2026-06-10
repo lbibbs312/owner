@@ -1317,8 +1317,8 @@ def test_pickup_label_graduates_to_delivered_after_drop_completes(app):
     assert pickup["board_flow"]["deliver_state"] == "delivered"
 
 
-def test_in_transit_cta_uses_add_next_stop_action(app):
-    """A known in-transit destination keeps one add-stop continuation CTA."""
+def test_in_transit_cta_names_known_destination(app):
+    """A known in-transit destination names it on the add-stop continuation CTA."""
     from types import SimpleNamespace
     from app.services.route_context import build_route_cta_context
 
@@ -1330,7 +1330,7 @@ def test_in_transit_cta_uses_add_next_stop_action(app):
         route_finalized=False,
         all_departed=True,
         posttrip_status=None,
-        current_cargo={"destination_label": "Raleigh East", "destination": "RE"},
+        current_cargo={"destination_label": "Raleigh East", "destination": "RE", "value": "Raleigh East Load"},
     )
 
     cta = build_route_cta_context(
@@ -1341,7 +1341,7 @@ def test_in_transit_cta_uses_add_next_stop_action(app):
         today_local_date=date.today(),
     )
 
-    assert cta["primary_cta"]["label"] == "Add Next Stop"
+    assert cta["primary_cta"]["label"] == "Press when at Raleigh East to start unloading"
     assert cta["primary_cta"]["action"] == "add_stop"
 
 
@@ -1398,7 +1398,7 @@ def test_departed_loaded_route_stays_active_until_next_stop(app):
         today_local_date=date.today(),
     )
 
-    assert cta["primary_cta"]["label"] == "Add Next Stop"
+    assert cta["primary_cta"]["label"] == "Press when at Raleigh East to start unloading"
     assert cta["primary_cta"]["action"] == "add_stop"
     assert cta["show_attach_document_button"] is False
 
@@ -1470,3 +1470,143 @@ def test_active_wait_banner_mutes_depart_button_when_board_cta_owns_it(app):
     assert ">Depart and Load<" not in muted
     assert "driver-active-wait-action" in shown
     assert ">Depart and Load<" in shown
+
+
+# ---------------------------------------------------------------------------
+# State-driven main route CTA: the large green /mobile CTA must show the single
+# next route-lifecycle action from route state, name the destination when known,
+# never surface PostTrip until End Shift / finalization, and never mutate a
+# finalized route.
+# ---------------------------------------------------------------------------
+from app.services.route_context import build_route_cta_context as _build_route_cta
+
+_CTA_TODAY = date.today()
+
+
+def _cta_for(**rc_attrs):
+    from types import SimpleNamespace
+    build_kwargs = {"route_date": _CTA_TODAY, "today_local_date": _CTA_TODAY}
+    for key in ("proof_missing", "has_active_shift", "route_is_active", "route_date",
+                "today_local_date", "has_last_route", "selected_date_forced", "pending_posttrip"):
+        if key in rc_attrs:
+            build_kwargs[key] = rc_attrs.pop(key)
+    defaults = dict(rows=[], current_stop=None, route_status=None, route_finalized=False,
+                    all_departed=False, posttrip_status=None, current_cargo=None, next_stop_context={})
+    defaults.update(rc_attrs)
+    return _build_route_cta(SimpleNamespace(**defaults), **build_kwargs)
+
+
+def _cta_open_stop(plant="Helios", load_size="Trim DC Load"):
+    from types import SimpleNamespace
+    return SimpleNamespace(id=1, depart_time=None, plant_name=plant, load_size=load_size,
+                           depart_load_size=None, no_pickup=False)
+
+
+def test_cta_new_route_shows_start_route():
+    cta = _cta_for(has_active_shift=False, route_is_active=False)
+    assert cta["next_action"] in ("Start Route", "Complete PreTrip")
+    assert cta["primary_cta"]["action"] == "start_shift"
+
+
+def test_cta_active_route_no_stop_shows_add_stop():
+    cta = _cta_for(has_active_shift=True, route_is_active=True)
+    assert cta["primary_cta"]["label"] == "Add Stop"
+    assert cta["primary_cta"]["action"] == "add_stop"
+
+
+def test_cta_open_stop_shows_record_departure():
+    cta = _cta_for(current_stop=_cta_open_stop(), rows=[{"log_id": 1}], route_status="active",
+                   route_is_active=True, has_active_shift=True,
+                   current_cargo={"value": "Trim DC Load", "destination_label": "Other Plant"})
+    assert cta["primary_cta"]["label"] == "Record Departure"
+    assert cta["primary_cta"]["action"] == "record_departure"
+
+
+def test_cta_departed_with_known_destination_names_it():
+    from types import SimpleNamespace
+    departed = SimpleNamespace(id=1, depart_time="08:20")
+    cta = _cta_for(current_stop=departed, rows=[{"log_id": 1}], all_departed=True,
+                   route_status="active", route_is_active=True, has_active_shift=True,
+                   current_cargo={"value": "Raleigh East Load", "destination_label": "Raleigh East"})
+    assert cta["primary_cta"]["label"] == "Press when at Raleigh East to start unloading"
+    assert cta["primary_cta"]["action"] == "add_stop"
+    assert "Arrived at" not in cta["primary_cta"]["label"]  # action verb, not a status
+
+
+def test_cta_departed_with_unknown_destination_adds_destination_stop():
+    from types import SimpleNamespace
+    departed = SimpleNamespace(id=1, depart_time="08:20")
+    cta = _cta_for(current_stop=departed, rows=[{"log_id": 1}], all_departed=True,
+                   route_status="active", route_is_active=True, has_active_shift=True,
+                   current_cargo={"value": "Mystery Load", "destination_label": None})
+    assert cta["primary_cta"]["label"] == "Add Destination Stop"
+    assert cta["primary_cta"]["action"] == "add_stop"
+
+
+def test_cta_does_not_show_posttrip_right_after_route_start():
+    cta = _cta_for(current_stop=_cta_open_stop(), rows=[{"log_id": 1}], route_status="active",
+                   route_is_active=True, has_active_shift=True, pending_posttrip=False)
+    assert "PostTrip" not in cta["next_action"]
+    assert (cta["primary_cta"]["action"] or "") != "posttrip"
+
+
+def test_cta_posttrip_only_during_end_shift_and_finalize():
+    # All stops closed, PostTrip missing -> End Shift (NOT PostTrip Due).
+    end_shift = _cta_for(rows=[{"log_id": 1}], all_departed=True, route_status="completed",
+                         route_is_active=False, posttrip_status=None, pending_posttrip=True)
+    assert end_shift["next_action"] == "End Shift"
+    assert end_shift["primary_cta"]["action"] == "end_route"
+    assert "PostTrip" not in end_shift["next_action"]
+    # PostTrip complete -> Sign & Submit Route.
+    ready = _cta_for(rows=[{"log_id": 1}], all_departed=True, route_status="completed",
+                     route_is_active=False, posttrip_status="complete")
+    assert ready["primary_cta"]["label"] == "Sign & Submit Route"
+    assert ready["primary_cta"]["action"] == "finalize_route"
+
+
+def test_cta_finalized_route_has_no_mutating_action():
+    cta = _cta_for(rows=[{"log_id": 1}], route_finalized=True, route_status="finalized")
+    mutating = {"add_stop", "record_departure", "confirm_cargo", "attach_document",
+                "posttrip", "end_route", "finalize_route"}
+    assert cta["primary_cta"]["action"] in {"view_route", "print_route"}
+    assert cta["primary_cta"]["action"] not in mutating
+    assert not (set(cta["allowed_actions"]) & mutating)
+
+
+def test_cta_continue_action_returns_to_mobile(app):
+    """Rule 9: the continue-route (add stop) action returns to /mobile."""
+    from app.blueprints.driver.routes import _route_cta_urls
+    with app.test_request_context():
+        urls = _route_cta_urls(_CTA_TODAY)
+    assert "next=mobile" in urls["add_stop"]
+
+
+def test_no_route_cta_action_silently_fails(app):
+    """Rule 10: every state's primary CTA action resolves to a real URL."""
+    from types import SimpleNamespace
+    from app.blueprints.driver.routes import _route_cta_urls
+    open_stop = _cta_open_stop()
+    departed = SimpleNamespace(id=1, depart_time="08:20")
+    fake_pretrip = SimpleNamespace(id=7, posttrip=None)
+    states = [
+        _cta_for(has_active_shift=False, route_is_active=False),
+        _cta_for(has_active_shift=True, route_is_active=True),
+        _cta_for(current_stop=open_stop, rows=[{"log_id": 1}], route_status="active",
+                 route_is_active=True, has_active_shift=True,
+                 current_cargo={"value": "Trim DC Load", "destination_label": "Other"}),
+        _cta_for(current_stop=departed, rows=[{"log_id": 1}], all_departed=True, route_status="active",
+                 route_is_active=True, has_active_shift=True,
+                 current_cargo={"value": "Raleigh East Load", "destination_label": "Raleigh East"}),
+        _cta_for(rows=[{"log_id": 1}], all_departed=True, route_status="completed",
+                 route_is_active=False, posttrip_status=None, pending_posttrip=True),
+        _cta_for(rows=[{"log_id": 1}], all_departed=True, route_status="completed",
+                 route_is_active=False, posttrip_status="complete"),
+        _cta_for(rows=[{"log_id": 1}], route_finalized=True, route_status="finalized"),
+    ]
+    with app.test_request_context():
+        urls = _route_cta_urls(_CTA_TODAY, current_stop=open_stop, active_pretrip=fake_pretrip,
+                               pending_posttrip=True)
+    for cta in states:
+        action = cta["primary_cta"]["action"]
+        assert action in urls, f"CTA action {action!r} is unwired (silent fail)"
+        assert urls[action]

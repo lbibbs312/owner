@@ -261,62 +261,72 @@ def build_route_cta_context(
     show_start_shift = False
     show_posttrip = bool(pending_posttrip and not route_finalized)
 
-    if route_finalized and pending_posttrip:
+    if route_finalized:
+        # Finalized routes are immutable (rule I/7): no add/edit/proof/departure
+        # CTA — only view/print. Server-side mutation guards still apply.
         display_mode = "finalized_route"
-        next_action = "No driver action"
-        primary = _route_cta("Print Route", "print_route")
+        next_action = "Route Finalized"
+        primary = _route_cta("View Route Packet", "view_route")
         secondary = _route_cta("Print Route", "print_route", "ghost") if has_route_history else None
-        route_message = "Route is finalized. PostTrip is pending for manager review."
+        if pending_posttrip:
+            route_message = "Route is finalized. PostTrip is pending for manager review."
+        else:
+            route_message = "Route is finalized."
         proof_message = "Document proof is missing." if proof_missing else proof_message
-        allowed_actions = ["print_route", "view_route", "route_history"]
-    elif route_finalized and not proof_missing:
-        display_mode = "finalized_route"
-        next_action = "No action needed"
-        primary = _route_cta("Print Route", "print_route")
-        secondary = _route_cta("Route History", "route_history", "ghost")
-        route_message = "Route is finalized."
-        allowed_actions = ["print_route", "route_history", "view_route"]
-    elif route_finalized and proof_missing:
-        display_mode = "finalized_route"
-        next_action = "Attach document"
-        primary = _route_cta("Attach Document", "attach_document")
-        secondary = _route_cta("Print Route", "print_route", "ghost")
-        route_message = "Route is finalized."
-        proof_message = "Document proof is missing."
-        show_attach = True
-        allowed_actions = ["attach_document", "print_route", "view_route", "route_history"]
+        allowed_actions = ["view_route", "print_route", "route_history"]
     elif current_stop is not None and not getattr(current_stop, "depart_time", None):
         display_mode = "active_stop"
-        if cargo_state_for_log(current_stop)["state"] == "unknown":
+        stop_cargo = cargo_state_for_log(current_stop)["state"]
+        plant = (getattr(current_stop, "plant_name", "") or "").strip()
+        if stop_cargo == "unknown":
             next_action = "Confirm cargo"
             primary = _route_cta("Confirm Cargo", "confirm_cargo")
             allowed_actions = ["confirm_cargo"]
-        else:
-            next_action = "Record departure"
-            primary = _route_cta("Record Departure", "record_departure")
+            route_message = f"Confirm what you picked up at {plant}." if plant else "Confirm cargo for this stop."
+        elif stop_cargo == "empty":
+            # At a stop with no load onboard — leaving empty (state G).
+            next_action = "Record departure empty"
+            primary = _route_cta("Record Departure Empty", "record_departure")
             allowed_actions = ["record_departure", "add_damage", "add_note"]
+            route_message = f"Left {plant} empty — record departure." if plant else "Record departure (no load picked up)."
+        else:
+            allowed_actions = ["record_departure", "add_damage", "add_note"]
+            stop_cargo_dict = getattr(route_context, "current_cargo", None)
+            dest_label = stop_cargo_dict.get("destination_label") if isinstance(stop_cargo_dict, dict) else None
+            at_destination = bool(
+                stop_cargo in ("onboard", "short", "damaged")
+                and dest_label and plant
+                and dest_label.strip().lower() == plant.strip().lower()
+            )
+            if at_destination:
+                # Arrived at this cargo's destination with it onboard — unload (F).
+                next_action = "Start unloading"
+                primary = _route_cta(f"Start Unloading at {plant}", "record_departure")
+                route_message = f"Arrived at {plant} with cargo — start unloading."
+            else:
+                # Open stop, generic departure (state C).
+                next_action = "Record departure"
+                primary = _route_cta("Record Departure", "record_departure")
+                route_message = f"Record departure from {plant}." if plant else "Current stop is open."
         secondary = _route_cta("Add Damage", "add_damage", "ghost")
-        route_message = "Current stop is open."
     elif all_departed and has_route_history and not route_finalized and not route_is_active:
         if is_today and not selected_date_forced:
             display_mode = "completed_route"
             secondary = _route_cta("Print Draft", "print_route", "ghost")
-            if pending_posttrip:
-                next_action = "PostTrip Due"
-                primary = _route_cta("PostTrip Due", "posttrip")
-                allowed_actions = ["posttrip", "print_route", "view_route"]
-                route_message = "All recorded stops are closed. Complete PostTrip before finalizing."
-            elif posttrip_complete:
-                next_action = "Finalize Route"
-                primary = _route_cta("Finalize Route", "finalize_route")
+            if posttrip_complete:
+                next_action = "Sign & Submit Route"
+                primary = _route_cta("Sign & Submit Route", "finalize_route")
                 show_finalize = True
                 allowed_actions = ["finalize_route", "print_route", "view_route"]
-                route_message = "All recorded stops and PostTrip are complete."
+                route_message = "All stops closed and PostTrip complete. Sign and submit to finalize."
             else:
-                next_action = "PostTrip required"
-                primary = _route_cta("Print Draft", "print_route")
-                allowed_actions = ["print_route", "view_route"]
-                route_message = "All recorded stops are closed. PostTrip is required before finalizing."
+                # All stops are closed but the shift is not ended. The next action
+                # is End Shift; PostTrip becomes required INSIDE that flow, never
+                # surfaced as the CTA right after the route (rules 4 & 5).
+                next_action = "End Shift"
+                primary = _route_cta("End Shift", "end_route")
+                allowed_actions = ["end_route", "print_route", "view_route"]
+                route_message = "All stops are closed. End your shift to finish the route."
         else:
             display_mode = "read_only_history" if selected_date_forced else "last_route"
             next_action = "Start new shift or View last route"
@@ -344,34 +354,43 @@ def build_route_cta_context(
             allowed_actions = ["add_stop", "route_history"]
             route_message = "Shift is active. Add the next stop."
         else:
-            next_action = "Start shift"
-            primary = _route_cta("Start Shift", "start_shift")
+            next_action = "Start Route"
+            primary = _route_cta("Start Route", "start_shift")
             secondary = _route_cta("View Last Route", "route_history", "ghost")
             show_start_shift = True
             show_print = False
             allowed_actions = ["start_shift", "route_history"]
-            route_message = "No active route for this date."
+            route_message = "No active route yet. Start your route with the PreTrip."
 
-    # In-transit cargo still continues through the add-stop route guard; keep
-    # the label generic enough that it does not look like a duplicate arrival.
+    # In transit with cargo onboard: name the destination (state D) or prompt to
+    # add it (state E) instead of a generic "Add Stop", so the driver always has
+    # a continue-route action and never sees a status-style label.
     current_cargo = getattr(route_context, "current_cargo", None)
     in_transit_destination = (
         current_cargo.get("destination_label") if isinstance(current_cargo, dict) else None
     )
-    if (
-        in_transit_destination
-        and primary
-        and primary.get("action") == "add_stop"
-        and primary.get("label") == "Add Stop"
-    ):
-        primary = _route_cta("Add Next Stop", "add_stop")
-        next_action = "Add Next Stop"
+    cargo_value = current_cargo.get("value") if isinstance(current_cargo, dict) else None
+    cargo_onboard = bool(in_transit_destination) or bool(
+        cargo_value and str(cargo_value).strip().lower() != "empty"
+    )
+    if primary and primary.get("action") == "add_stop" and cargo_onboard:
+        if in_transit_destination:
+            next_action = f"Press when at {in_transit_destination}"
+            primary = _route_cta(
+                f"Press when at {in_transit_destination} to start unloading", "add_stop"
+            )
+        else:
+            next_action = "Add Destination Stop"
+            primary = _route_cta("Add Destination Stop", "add_stop")
 
     if (
         proof_missing
         and not route_finalized
-        and next_action not in {"Confirm cargo", "Record departure", "Finalize Route"}
-        and not (primary and primary.get("action") == "add_stop")
+        and not (
+            primary
+            and primary.get("action")
+            in {"confirm_cargo", "record_departure", "finalize_route", "end_route", "add_stop"}
+        )
     ):
         display_mode = "proof_needed"
         next_action = "Attach document"

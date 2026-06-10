@@ -7329,9 +7329,11 @@ def test_mobile_dashboard_finalized_route_with_proof_hides_finalize(client, app)
     page = client.get("/mobile")
 
     assert page.status_code == 200
-    assert b"No action needed" in page.data
-    assert b"Print Route" in page.data
+    # Finalized route: non-mutating CTA only (rule I).
+    assert b"View Route Packet" in page.data
     assert b"Finalize Route" not in page.data
+    assert b"Record Departure" not in page.data
+    assert b"Add Stop" not in page.data
     assert b"Proof Needed" not in page.data
 
 
@@ -7389,7 +7391,7 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "driver-active-wait-action" in body
     assert "animation:activeStopWaitBreath 4.6s ease-in-out infinite" in body
     assert "@keyframes activeStopWaitBreath" in body
-    assert "Depart and Load" in body
+    assert "Record Departure" in body
     assert "md-flow-primary-cta" in body
     assert "Required driver action" in body
     assert "record departure" in body
@@ -7470,8 +7472,10 @@ def test_mobile_dashboard_shows_posttrip_due_after_route_close_not_as_board_row(
     body = page.get_data(as_text=True)
 
     assert page.status_code == 200
-    assert b"PostTrip Due" in page.data
-    assert b"Finish inspection and end shift" in page.data
+    # All stops closed, PostTrip missing: the CTA is End Shift, NOT PostTrip Due.
+    # PostTrip becomes required inside the End Shift flow (rules 4 & 5).
+    assert b"End Shift" in page.data
+    assert b"PostTrip Due" not in page.data
     assert b"Finalize Route" not in page.data
     assert b"Ready To Finalize" not in page.data
     assert "POSTTRIP NEEDED" not in body
@@ -7506,11 +7510,15 @@ def test_mobile_dashboard_does_not_show_finalize_after_closed_delivery_without_p
     page = client.get("/mobile")
 
     assert page.status_code == 200
+    # The CTA is End Shift (which uses the end-route form), but it must NOT
+    # finalize without a PostTrip...
+    assert b"End Shift" in page.data
     assert b"Finalize Route" not in page.data
-    assert b'action="/mobile/end-route" method="POST"' not in page.data
+    assert b"Sign & Submit Route" not in page.data
 
     response = client.post("/mobile/end-route", follow_redirects=True)
 
+    # ...instead it routes the driver to complete the PostTrip first.
     assert response.status_code == 200
     assert b"Complete PostTrip before finishing the route." in response.data
     with app.app_context():
@@ -7581,7 +7589,8 @@ def test_mobile_dashboard_active_between_stops_prioritizes_add_stop_over_posttri
     assert page.status_code == 200
     assert b"PostTrip Due" not in page.data
     assert b'<a class="md-flow-primary-cta add-stop-action"' in page.data
-    assert b"<strong>Add Next Stop</strong>" in page.data
+    # In transit with cargo: destination-named continuation (D) or add-destination (E).
+    assert b"to start unloading" in page.data or b"Add Destination Stop" in page.data
     assert b"Finalize Route" not in page.data
     assert b'<div class="md-flow-top-actions"' not in page.data
     assert b"md-flow-action-tab" not in page.data
@@ -8087,8 +8096,8 @@ def test_mobile_dashboard_registers_completed_posttrip_with_duplicate_open_pretr
     assert page.status_code == 200
     assert "PostTrip Due" not in body
     assert "Complete posttrip" not in body
-    assert "No action needed" in body
-    assert "Print Route" in body
+    # Finalized route: non-mutating view CTA (rule I).
+    assert "View Route Packet" in body
     assert "379,050" in body
 
 
@@ -8283,7 +8292,7 @@ def test_loaded_quick_depart_keeps_cargo_in_transit_until_add_next_stop(client, 
     mobile = client.get("/mobile")
     body = mobile.get_data(as_text=True)
     assert mobile.status_code == 200
-    assert "Add Next Stop" in body
+    assert "to start unloading" in body or "Add Destination Stop" in body
     assert 'class="md-flow-primary-cta add-stop-action"' in body
     assert 'href="/new_driving_log?next=mobile' in body
     assert 'expected_destination=RE' in body
@@ -8559,7 +8568,7 @@ def test_mobile_quick_depart_shows_add_next_stop_and_creates_second_stop(client,
     body = mobile.get_data(as_text=True)
 
     assert mobile.status_code == 200
-    assert "Add Next Stop" in body
+    assert "to start unloading" in body or "Add Destination Stop" in body
     assert body.count('class="md-flow-primary-cta add-stop-action"') == 1
     assert 'href="/new_driving_log?next=mobile' in body
     assert 'expected_destination=RE' in body
@@ -8596,7 +8605,9 @@ def test_mobile_quick_depart_shows_add_next_stop_and_creates_second_stop(client,
 
     refreshed = client.get("/mobile")
     assert refreshed.status_code == 200
-    assert b"Depart and Load" in refreshed.data
+    # Open stop with cargo: record-departure CTA (C) or start-unloading at the
+    # destination (F).
+    assert b"Record Departure" in refreshed.data or b"Start Unloading" in refreshed.data
     assert refreshed.get_data(as_text=True).count('data-flow-panel-title="Depart Quick Flow"') == 1
 
 
@@ -8713,7 +8724,7 @@ def test_loaded_quick_depart_preserves_secondary_cargo_until_next_stop(client, a
         assert snapshot.current_cargo["secondary_value"] == "Raleigh West Hot Part"
 
     mobile = client.get("/mobile")
-    assert b"<strong>Add Next Stop</strong>" in mobile.data
+    assert b"to start unloading" in mobile.data or b"Add Destination Stop" in mobile.data
     assert b"Depart and Load" not in mobile.data
 
     add_stop_form = client.get("/new_driving_log?next=mobile&expected_destination=RE")
@@ -8801,7 +8812,7 @@ def test_helios_quick_depart_with_second_stop_uses_mobile_add_next_stop(client, 
     mobile = client.get("/mobile")
     body = mobile.get_data(as_text=True)
     assert mobile.status_code == 200
-    assert "<strong>Add Next Stop</strong>" in body
+    assert "to start unloading" in body or "Add Destination Stop" in body
     assert 'href="/new_driving_log?next=mobile' in body
     assert "expected_destination=Trim+DC" in body or "expected_destination=Trim%20DC" in body
     assert "Depart and Load" not in body
@@ -8891,7 +8902,7 @@ def test_quick_depart_service_stop_continues_to_add_next_stop_without_truck_issu
     body = mobile.get_data(as_text=True)
     assert mobile.status_code == 200
     assert 'class="md-flow-primary-cta add-stop-action"' in body
-    assert "<strong>Add Next Stop</strong>" in body
+    assert "to start unloading" in body or "Add Destination Stop" in body
     assert 'href="/new_driving_log?next=mobile' in body
     assert 'expected_destination=RE' in body
     assert 'class="md-flow-primary-cta add-stop-action" href="/new_driving_log?report_type=truck_issue"' not in body

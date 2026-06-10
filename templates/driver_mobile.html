@@ -4809,9 +4809,9 @@
       <div class="driver-state {% if not open_shift %}muted{% endif %}">
         {% if open_shift %}On Duty{% else %}Off Duty{% endif %} · {{ current_user.display_name }}{% if current_user.department %} · {{ current_user.department }}{% endif %}
       </div>
-      {# The green board CTA already carries "Depart and Load" when a stop is open.
-         Mute the banner's duplicate button down to a timer-only chip in that
-         state; other surfaces (base/day report/history) keep the button. #}
+      {# The green board CTA already carries the record-departure action when a
+         stop is open. Mute the banner's duplicate button down to a timer-only
+         chip in that state; other surfaces (base/day report/history) keep it. #}
       {% set active_wait_show_action = not (route_cta is defined and route_cta and route_cta.primary_cta and route_cta.primary_cta.action == 'record_departure') %}
       {% include "_driver_active_wait_banner.html" %}
     </header>
