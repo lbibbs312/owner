@@ -289,7 +289,17 @@
   </div>
 
   {% if map_mode != 'route_replay' %}
-  {% if not route_finalized_for_cta and end_route_url and primary_action == 'end_route' %}
+  {% if open_break %}
+    <div class="md-flow-primary-cta-wrap" aria-label="On break">
+      <form action="{{ url_for('driver.mobile_break_end') }}" method="POST" style="margin:0">
+      <button class="md-flow-primary-cta on-break" type="submit" style="width:100%; cursor:pointer" data-break-timer data-break-seconds="{{ open_break_elapsed_seconds|default(0, true) }}">
+        <span>On break</span>
+        <strong data-break-timer-label>{{ open_break_elapsed_label|default('00:00', true) }}</strong>
+        <small>Tap to end break</small>
+      </button>
+      </form>
+    </div>
+  {% elif not route_finalized_for_cta and end_route_url and primary_action == 'end_route' %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <form action="{{ end_route_url }}" method="POST" style="margin:0">
       <button class="md-flow-primary-cta" type="submit" style="width:100%; cursor:pointer">

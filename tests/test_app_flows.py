@@ -3035,13 +3035,18 @@ def test_driver_bottom_nav_break_toggles(client, app):
     assert start.status_code == 302
     assert start.headers["Location"].endswith("/mobile/breaks")
     on_break = client.get("/mobile").get_data(as_text=True)
+    # Nav button shows the on-break state (glow) but NO timer text anymore.
     assert "<span>On Break</span>" in on_break
-    assert "data-break-timer" in on_break
-    assert "data-break-seconds" in on_break
     assert "md-nav-link on" in on_break
     assert 'href="/mobile/breaks"' in on_break
-    assert "/mobile/break/end" not in on_break
     assert "<span>Breaks</span>" not in on_break
+    # The big CTA takes over with the live timer + one-tap end-break, so a driver
+    # can't forget they're on break.
+    assert "md-flow-primary-cta on-break" in on_break
+    assert "data-break-timer" in on_break
+    assert "data-break-seconds" in on_break
+    assert "Tap to end break" in on_break
+    assert "/mobile/break/end" in on_break
 
     open_break_page = client.get("/mobile/breaks").get_data(as_text=True)
     assert "Current Break" in open_break_page

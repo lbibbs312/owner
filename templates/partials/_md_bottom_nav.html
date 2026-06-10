@@ -126,7 +126,7 @@
 <nav class="md-driver-bottom-nav" aria-label="Driver mobile actions">
   <a class="md-nav-link {% if md_nav_active == 'home' %}active{% endif %}" href="{{ url_for('driver.mobile_dashboard') }}"><strong>HM</strong><span>Home</span></a>
   {% if open_break %}
-  <a class="md-nav-link on {% if md_nav_active == 'break' %}active{% endif %}" href="{{ url_for('driver.mobile_breaks') }}" aria-label="Open break log" data-break-timer data-break-seconds="{{ open_break_elapsed_seconds|default(0, true) }}"><strong>BR</strong><span>On Break</span><small class="md-nav-timer" data-break-timer-label>{{ open_break_elapsed_label|default('00:00', true) }}</small></a>
+  <a class="md-nav-link on {% if md_nav_active == 'break' %}active{% endif %}" href="{{ url_for('driver.mobile_breaks') }}" aria-label="On break — open break log"><strong>BR</strong><span>On Break</span></a>
   {% else %}
   <a class="md-nav-link {% if md_nav_active == 'break' %}active{% endif %}" href="{{ url_for('driver.mobile_breaks') }}"><strong>BR</strong><span>Breaks</span></a>
   {% endif %}

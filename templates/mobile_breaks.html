@@ -88,14 +88,19 @@
   .break-start-card button {
     width:100%;
     min-height:44px;
-    border:0;
+    border:1px solid rgba(255,178,36,.55);
     border-radius:8px;
-    background:#ffb224;
-    color:#101827;
+    background:linear-gradient(180deg, rgba(255,178,36,.18), rgba(255,150,20,.10)), rgba(26,19,6,.72);
+    color:#ffe2a6;
     font-family:var(--md-display);
     font-weight:950;
     text-transform:uppercase;
+    letter-spacing:.04em;
+    box-shadow:inset 0 0 0 1px rgba(255,178,36,.12), 0 0 18px rgba(255,178,36,.22);
+    cursor:pointer;
   }
+  .break-action-form button:active,
+  .break-start-card button:active { transform:translateY(1px); }
   .break-start-card {
     display:grid;
     gap:12px;
