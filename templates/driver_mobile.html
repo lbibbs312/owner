@@ -1987,8 +1987,10 @@
     .md-flow-work-card {
       position: relative;
       z-index: 1;
-      width: min(440px, calc(100vw - 24px));
-      max-height: min(76vh, 700px);
+      width: min(720px, calc(100vw - 16px));
+      max-height: calc(100dvh - var(--nav-height) - 26px);
+      height: auto;
+      min-height: 62dvh;
       overflow: hidden;
       border: 1px solid rgba(111,174,255,.68);
       border-radius: 14px;
@@ -4888,11 +4890,6 @@
     <div class="wide-body">
     <main>
       {% if current_user.is_day_driver %}
-        {% set dd_rt = current_user.day_driver_route_type %}
-        <div class="dd-freight-banner" style="margin:8px 12px;padding:7px 12px;border-radius:9px;background:rgba(91,157,255,.12);border:1px solid rgba(91,157,255,.28);color:#dbe7ff;font-weight:700;font-size:12.5px;line-height:1.3;">
-          Day-Driver Freight Workspace &middot; logging by commodity &amp; weight (no plant/part)
-          <span style="opacity:.85;font-weight:600;"> &middot; {% if dd_rt == 'general_freight' %}General Freight / Owner-Operator{% elif dd_rt == 'company_shuttle' %}Company Shuttle{% else %}Local / Short-Haul{% endif %}</span>
-        </div>
         {% if duty_card %}
         <section style="margin:8px 12px;padding:12px;border-radius:9px;background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(10,17,28,.96));border:1px solid rgba(91,157,255,.22);box-shadow:0 18px 40px rgba(0,0,0,.28);">
           <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:9px;">
@@ -5427,8 +5424,15 @@
         if (!panel) return;
         panel.hidden = false;
         board.classList.add('is-interacting');
-        if (panelTitle) panelTitle.textContent = title || 'Route quick action';
-        if (panelKicker) panelKicker.textContent = kicker || 'QUICK ACTION MODAL';
+        var titleText = title || 'Route quick action';
+        var kickerText = kicker || 'QUICK ACTION MODAL';
+        // Don't say the same thing twice ("SERVICE" over "Service").
+        if (kickerText.toLowerCase() === titleText.toLowerCase()) kickerText = '';
+        if (panelTitle) panelTitle.textContent = titleText;
+        if (panelKicker) {
+          panelKicker.textContent = kickerText;
+          panelKicker.style.display = kickerText ? '' : 'none';
+        }
       }
 
       function showContextFor(row) {
@@ -5498,6 +5502,9 @@
               value = fieldValue('got_loaded') === 'yes' ? selectedSelectLabel('secondary_destination') : '';
             }
             node.textContent = value ? value.toUpperCase() : (key === 'secondary_destination' ? 'NONE' : '--');
+            if (key === 'secondary_destination' && node.parentElement) {
+              node.parentElement.hidden = !value;
+            }
           });
         }
 

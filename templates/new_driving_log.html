@@ -3,6 +3,21 @@
 {% if current_user.role != 'management' %}
 <script>document.body.classList.add('md-shell');</script>
 {% include 'partials/_md_shell.html' %}
+<style>
+  /* House button physics: transparent fill + outer glow, never solid. */
+  body.md-shell .btn-primary {
+    background: rgba(91,157,255,.14);
+    border: 1px solid rgba(91,157,255,.55);
+    box-shadow: 0 0 18px rgba(91,157,255,.32);
+    color: #eaf2ff;
+    font-weight: 900;
+  }
+  body.md-shell .btn-primary:hover, body.md-shell .btn-primary:focus {
+    background: rgba(91,157,255,.22);
+    border-color: rgba(125,180,255,.7);
+    color: #fff;
+  }
+</style>
 {% endif %}
 
 <div class="container">

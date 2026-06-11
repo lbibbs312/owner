@@ -427,17 +427,23 @@
               <span class="depart-step-kicker">destination</span>
               <h4>Where are you going next?</h4>
               <label for="departDestination">Primary destination</label>
+              {% set seen_labels = [] %}
               <select id="departDestination" data-depart-select="destination">
                 <option value="">Select destination</option>
                 {% for code, label in PLANT_LABELS.items() %}
+                  {% if label not in seen_labels %}{% set _ = seen_labels.append(label) %}
                   <option value="{{ code }}">{{ label }}</option>
+                  {% endif %}
                 {% endfor %}
               </select>
               <label for="departSecondaryDestination">Optional second stop</label>
+              {% set seen_labels_2 = [] %}
               <select id="departSecondaryDestination" data-depart-select="secondary_destination">
                 <option value="">None or not applicable</option>
                 {% for code, label in PLANT_LABELS.items() %}
+                  {% if label not in seen_labels_2 %}{% set _ = seen_labels_2.append(label) %}
                   <option value="{{ code }}">{{ label }}</option>
+                  {% endif %}
                 {% endfor %}
               </select>
               <div class="depart-secondary-type" data-depart-secondary-type hidden>
@@ -480,7 +486,7 @@
                 <button type="button" data-depart-prev="3">Back</button>
                 <button class="depart-submit" type="submit">Record Departure</button>
               </div>
-              <a class="md-flow-panel-link ghost" href="{{ url_for('driver.driver_logs') }}">Open DL</a>
+              <a class="md-flow-panel-link ghost" href="{{ url_for('driver.driver_logs') }}">Open Driver Log</a>
             </section>
           </form>
         {% else %}

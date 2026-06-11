@@ -52,11 +52,11 @@
       <h2>Known context</h2>
       <div class="context-grid">
         <div class="context-pill"><span>Driver</span><strong>{{ current_user.display_name }}</strong></div>
-        <div class="context-pill"><span>Truck</span><strong>{{ ctx.truck or 'Blank' }}</strong></div>
-        <div class="context-pill"><span>Trailer</span><strong>{{ ctx.trailer or 'Blank' }}</strong></div>
-        <div class="context-pill"><span>Route date</span><strong>{{ ctx.route_date_value or 'Blank' }}</strong></div>
-        <div class="context-pill"><span>Period</span><strong>{{ ctx.reporting_period_quarter or 'Blank' }} {{ ctx.reporting_year or '' }}</strong></div>
-        <div class="context-pill"><span>Last mileage</span><strong>{% if ctx.current_mileage %}{{ "{:,}".format(ctx.current_mileage) }} mi{% else %}Blank{% endif %}</strong></div>
+        {% if ctx.truck %}<div class="context-pill"><span>Truck</span><strong>{{ ctx.truck }}</strong></div>{% endif %}
+        {% if ctx.trailer %}<div class="context-pill"><span>Trailer</span><strong>{{ ctx.trailer }}</strong></div>{% endif %}
+        {% if ctx.route_date_value %}<div class="context-pill"><span>Route date</span><strong>{{ ctx.route_date_value }}</strong></div>{% endif %}
+        {% if ctx.reporting_period_quarter %}<div class="context-pill"><span>Period</span><strong>{{ ctx.reporting_period_quarter }} {{ ctx.reporting_year or '' }}</strong></div>{% endif %}
+        {% if ctx.current_mileage %}<div class="context-pill"><span>Last mileage</span><strong>{{ "{:,}".format(ctx.current_mileage) }} mi</strong></div>{% endif %}
       </div>
     </section>
 
