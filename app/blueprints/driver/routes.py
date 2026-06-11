@@ -43,6 +43,7 @@ from app.services.file_integrity import sha256_file
 from app.services.ifta_worksheets import build_ifta_packet, create_ifta_worksheet_from_form, ifta_receipt_path
 from app.services.packet_classification import PacketClassification, classify_damage_report, packet_label_for_report
 from app.services.report_context import build_report_context
+from app.services.autolog import remember_place
 from app.services.document_numbers import (
     document_meta,
     eod_document_number,
@@ -102,6 +103,7 @@ from app.models import (
     DamageReport,
     HotMove,
     PartScanEvent,
+    PlaceMemory,
     DriverLog,
     DriverLogPhoto,
     DraftEntry,
@@ -118,7 +120,7 @@ from app.models import (
 
 
 PLANT_TRANSFER_LINE_COUNT = 20
-DRIVER_LOG_AUDIT_FIELDS = ["plant_name", "load_size", "depart_load_size", "secondary_load", "downtime_reason", "part_number", "hot_parts", "arrive_time", "depart_time", "dock_wait_minutes", "maintenance", "fuel", "fuel_mileage", "meeting"]
+DRIVER_LOG_AUDIT_FIELDS = ["plant_name", "load_size", "depart_load_size", "secondary_load", "downtime_reason", "part_number", "hot_parts", "arrive_time", "depart_time", "dock_wait_minutes", "maintenance", "fuel", "fuel_mileage", "meeting", "location_address", "gps_latitude", "gps_longitude", "gps_accuracy_m"]
 PLANT_TRANSFER_AUDIT_FIELDS = ["transfer_number", "transfer_date", "ship_to", "ship_from", "trailer_number", "driver_name", "driver_initials", "transfer_time", "loaded_by"]
 DAMAGE_REPORT_AUDIT_FIELDS = [
     "reported_by_id",
@@ -161,6 +163,10 @@ def _append_driver_log_flow_event(log, event_type, *, notes=None, payload=None, 
             "secondary_load": log.secondary_load,
             "commodity": log.commodity,
             "weight": log.weight,
+            "location_address": getattr(log, "location_address", None),
+            "gps_latitude": getattr(log, "gps_latitude", None),
+            "gps_longitude": getattr(log, "gps_longitude", None),
+            "gps_accuracy_m": getattr(log, "gps_accuracy_m", None),
             "no_pickup": bool(log.no_pickup),
             **(payload or {}),
         },
@@ -1119,6 +1125,21 @@ def _apply_log_part_fields(log, form):
 
 def _form_mileage_value(form):
     return form.fuel_mileage.data if (form.fuel.data or form.maintenance.data) else None
+
+
+def _optional_float_from_form(name, *, minimum=None, maximum=None):
+    raw = (request.form.get(name) or "").strip()
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    if minimum is not None and value < minimum:
+        return None
+    if maximum is not None and value > maximum:
+        return None
+    return value
 
 
 def _local_dt_for_hhmm(log_date, hhmm):
@@ -2785,7 +2806,26 @@ def _freight_stop_memory(driver_id, limit=40):
         .limit(limit)
         .all()
     )
-    locations, commodities, weight_map = [], [], {}
+    learned_places = (
+        PlaceMemory.query.filter_by(user_id=driver_id)
+        .order_by(PlaceMemory.last_visited_at.desc(), PlaceMemory.id.desc())
+        .limit(limit)
+        .all()
+    )
+    locations, commodities, weight_map, places = [], [], {}, []
+    for place in learned_places:
+        label = (place.label or "").strip()
+        if label and label not in locations:
+            locations.append(label)
+        if label and place.center_latitude is not None and place.center_longitude is not None:
+            places.append(
+                {
+                    "label": label,
+                    "lat": place.center_latitude,
+                    "lng": place.center_longitude,
+                    "radius_m": place.radius_m or 150,
+                }
+            )
     for log in rows:
         place = (log.plant_name or "").strip()
         if place and place != "Day Route" and place not in locations:
@@ -2799,6 +2839,7 @@ def _freight_stop_memory(driver_id, limit=40):
                 weight_map[commodity.lower()] = weight
     return {
         "locations": locations[:8],
+        "places": places[:20],
         "commodities": commodities[:5],
         "weight_map": weight_map,
     }
@@ -4420,12 +4461,14 @@ def new_driving_log():
         if not form.plant_name.data and not is_day_driver:
             flash("Please select the plant you arrived at.", "danger")
             return _render_new_driving_log(form, current_load, route_context=route_context, return_to_mobile=return_to_mobile)
+        stop_name = (form.location.data or "").strip()
+        stop_address = (form.location_address.data or "").strip()
         if is_day_driver and not form.plant_name.data:
             # Day drivers describe stops by where they are (free-text location),
-            # falling back to the commodity so old habits still produce a label.
-            location_text = (form.location.data or "").strip()
+            # falling back to the address/commodity so old habits still produce a label.
             form.plant_name.data = (
-                location_text[:120]
+                stop_name[:120]
+                or stop_address[:120]
                 or (form.commodity.data or "").strip()[:120]
                 or "Day Route"
             )
@@ -4442,6 +4485,9 @@ def new_driving_log():
 
         carried_commodity = (form.commodity.data or "").strip() or None
         carried_weight = (form.weight.data or "").strip() or None
+        gps_latitude = _optional_float_from_form("gps_latitude", minimum=-90, maximum=90) if is_day_driver else None
+        gps_longitude = _optional_float_from_form("gps_longitude", minimum=-180, maximum=180) if is_day_driver else None
+        gps_accuracy_m = _optional_float_from_form("gps_accuracy_m", minimum=0, maximum=50000) if is_day_driver else None
         if is_day_driver and not carried_commodity:
             # Cargo is described once, at the pickup's departure. If the latest
             # closed stop left loaded, that load is what's arriving here.
@@ -4466,6 +4512,10 @@ def new_driving_log():
             secondary_load=arrival_secondary_load,
             commodity=carried_commodity,
             weight=carried_weight,
+            location_address=stop_address[:255] if is_day_driver and stop_address else None,
+            gps_latitude=gps_latitude,
+            gps_longitude=gps_longitude,
+            gps_accuracy_m=gps_accuracy_m,
             downtime_reason=_compose_downtime_reason([], _form_truck_issue_text(form), form.maintenance.data),
             part_number=_form_hot_part_number(form),
             hot_parts=bool(form.hot_parts.data),
@@ -4479,6 +4529,21 @@ def new_driving_log():
         try:
             db.session.add(newlog)
             db.session.flush()
+            if (
+                is_day_driver
+                and gps_latitude is not None
+                and gps_longitude is not None
+                and (newlog.plant_name or "").strip()
+            ):
+                remember_place(
+                    current_user.id,
+                    newlog.plant_name,
+                    gps_latitude,
+                    gps_longitude,
+                    place_type="unknown",
+                    usual_load=carried_commodity or (None if is_empty_load(arrival_load) else arrival_load),
+                    now=now_utc,
+                )
             _append_driver_log_flow_event(
                 newlog,
                 "ARRIVED_DESTINATION",

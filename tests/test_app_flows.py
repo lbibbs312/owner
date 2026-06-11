@@ -10488,6 +10488,55 @@ def test_day_driver_can_log_stop_without_plant_and_carries_load_forward(client, 
     assert b"<h3>HOS Companion</h3>" not in print_page.data
 
 
+def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, app):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import User
+
+        create_user("dd_gps_place", "dd-gps@example.com", "driver", first_name="Gina")
+        user = User.query.filter_by(username="dd_gps_place").one()
+        user.day_driver = True
+        user.route_type = "general_freight"
+        db.session.commit()
+        driver_id = user.id
+
+    login(client, "dd_gps_place")
+    page = client.get("/new_driving_log")
+    body = page.get_data(as_text=True)
+    assert 'name="location_address"' in body
+    assert "Place / customer name" in body
+
+    created = client.post(
+        "/new_driving_log",
+        data={
+            "location_address": "5711 Kraft Ave SE, Grand Rapids, MI 49512",
+            "location": "Kraft Dock 4",
+            "gps_latitude": "42.858001",
+            "gps_longitude": "-85.532002",
+            "gps_accuracy_m": "18.7",
+        },
+        follow_redirects=False,
+    )
+    assert created.status_code in (302, 303)
+
+    with app.app_context():
+        from app.models import DriverLog, PlaceMemory
+
+        log = DriverLog.query.filter_by(driver_id=driver_id).one()
+        assert log.plant_name == "Kraft Dock 4"
+        assert log.location_address == "5711 Kraft Ave SE, Grand Rapids, MI 49512"
+        assert log.gps_latitude == pytest.approx(42.858001)
+        assert log.gps_longitude == pytest.approx(-85.532002)
+        assert log.gps_accuracy_m == pytest.approx(18.7)
+        place = PlaceMemory.query.filter_by(user_id=driver_id).one()
+        assert place.label == "Kraft Dock 4"
+        assert place.center_latitude == pytest.approx(42.858001)
+        assert place.center_longitude == pytest.approx(-85.532002)
+
+    next_form = client.get("/new_driving_log").get_data(as_text=True)
+    assert '<option value="Kraft Dock 4">' in next_form
+
+
 def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(client, app):
     from datetime import date
 

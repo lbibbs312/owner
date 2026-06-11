@@ -82,58 +82,149 @@
     {# Freight stop: where you are (memory + GPS) and what you're hauling. #}
     {% set fm = freight_memory or {'locations': [], 'commodities': [], 'weight_map': {}} %}
     <div class="mb-3">
-      {{ form.location.label(class="form-label") }}
+      {{ form.location_address.label(class="form-label") }}
       <div class="d-flex gap-2 align-items-stretch">
-        {{ form.location(class="form-control", placeholder="Customer, dock, yard, truck stop, or city", list="locationMemory", autocomplete="off") }}
+        {{ form.location_address(class="form-control", placeholder="Street address, road, city, state", autocomplete="off") }}
         <button type="button" id="gpsFillBtn" class="btn btn-primary d-flex align-items-center" style="min-width:52px;justify-content:center;" aria-label="Use my GPS location" title="Use my GPS location">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
         </button>
       </div>
+      <input type="hidden" name="gps_latitude" id="gps_latitude" data-no-autosave="true">
+      <input type="hidden" name="gps_longitude" id="gps_longitude" data-no-autosave="true">
+      <input type="hidden" name="gps_accuracy_m" id="gps_accuracy_m" data-no-autosave="true">
+      <div class="form-text" id="gpsStatus" style="min-height:1.1em;"></div>
+    </div>
+    <div class="mb-3">
+      {{ form.location.label(class="form-label") }}
+      {{ form.location(class="form-control", placeholder="Customer, warehouse, dock, yard, truck stop", list="locationMemory", autocomplete="off") }}
       <datalist id="locationMemory">
         {% for place in fm.locations %}<option value="{{ place }}"></option>{% endfor %}
       </datalist>
-      <div class="form-text" id="gpsStatus" style="min-height:1.1em;"></div>
+      <div class="form-text">Correct this name once and it will be remembered for later stops.</div>
     </div>
     {# Cargo is captured ONCE — at departure ("Leaving loaded?"). Arriving only asks where you are. #}
     <script>
       (function () {
         var gpsBtn = document.getElementById('gpsFillBtn');
         var gpsStatus = document.getElementById('gpsStatus');
-        var locInput = document.getElementById('location');
+        var addressInput = document.getElementById('location_address');
+        var nameInput = document.getElementById('location');
+        var latInput = document.getElementById('gps_latitude');
+        var lonInput = document.getElementById('gps_longitude');
+        var accuracyInput = document.getElementById('gps_accuracy_m');
+        var placeMemory = {{ (fm.places or [])|tojson }};
+
+        function clean(value) {
+          return (value || '').toString().trim();
+        }
+
+        function uniqueParts(parts) {
+          var seen = {};
+          return parts.map(clean).filter(function (value) {
+            var key = value.toLowerCase();
+            if (!value || seen[key]) return false;
+            seen[key] = true;
+            return true;
+          });
+        }
+
+        function buildAddress(data, address, placeName) {
+          var street = uniqueParts([address.house_number, address.road]).join(' ');
+          var city = clean(address.city || address.town || address.village || address.hamlet || address.municipality || address.county);
+          var parts = uniqueParts([street || address.road, city, address.state, address.postcode]);
+          if (parts.length) return parts.join(', ');
+          var display = uniqueParts((data.display_name || '').split(','));
+          if (placeName && display.length && display[0].toLowerCase() === placeName.toLowerCase()) {
+            display.shift();
+          }
+          return display.slice(0, 5).join(', ');
+        }
+
+        function usefulPlaceName(value, address, data) {
+          var name = clean(value);
+          if (!name) return '';
+          var city = clean(address.city || address.town || address.village || address.hamlet || address.municipality || address.county).toLowerCase();
+          var broadType = clean(data.type).toLowerCase();
+          var lowered = name.toLowerCase();
+          var broadTypes = { administrative: true, city: true, town: true, village: true, county: true, state: true, aerodrome: true };
+          if (broadTypes[broadType]) return '';
+          if (lowered === clean(address.road).toLowerCase() || lowered === city || lowered === clean(address.state).toLowerCase() || lowered === clean(address.country).toLowerCase()) return '';
+          if (/\b(international airport|airport|county|township|city of)\b/.test(lowered)) return '';
+          return name;
+        }
+
+        function distanceMeters(lat1, lon1, lat2, lon2) {
+          var r = 6371000;
+          var toRad = Math.PI / 180;
+          var dLat = (lat2 - lat1) * toRad;
+          var dLon = (lon2 - lon1) * toRad;
+          var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        function rememberedPlace(lat, lon, accuracy) {
+          var best = null;
+          placeMemory.forEach(function (place) {
+            var pLat = Number(place.lat);
+            var pLon = Number(place.lng);
+            if (!place.label || Number.isNaN(pLat) || Number.isNaN(pLon)) return;
+            var distance = distanceMeters(lat, lon, pLat, pLon);
+            var radius = Math.max(Number(place.radius_m) || 150, (accuracy || 0) + 40);
+            if (distance <= radius && (!best || distance < best.distance)) {
+              best = { label: place.label, distance: distance };
+            }
+          });
+          return best;
+        }
 
         function fillFromGps(auto) {
           if (!navigator.geolocation) {
             if (!auto) gpsStatus.textContent = 'GPS not available in this browser.';
             return;
           }
-          gpsStatus.textContent = 'Getting location…';
+          gpsStatus.textContent = 'Getting location...';
           navigator.geolocation.getCurrentPosition(function (pos) {
             var lat = pos.coords.latitude.toFixed(6), lon = pos.coords.longitude.toFixed(6);
-            fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + lat + '&lon=' + lon, { headers: { 'Accept': 'application/json' } })
+            var accuracy = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : null;
+            var savedPlace = rememberedPlace(Number(lat), Number(lon), accuracy || 0);
+            if (latInput) latInput.value = lat;
+            if (lonInput) lonInput.value = lon;
+            if (accuracyInput) accuracyInput.value = pos.coords.accuracy || '';
+            if (savedPlace && !nameInput.value.trim()) nameInput.value = savedPlace.label;
+            fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=18&lat=' + lat + '&lon=' + lon, { headers: { 'Accept': 'application/json' } })
               .then(function (r) { return r.json(); })
               .then(function (data) {
-                // Don't stomp anything the driver typed while we looked it up.
-                if (auto && locInput.value.trim()) { gpsStatus.textContent = ''; return; }
                 var a = data.address || {};
-                var name = data.name || a.amenity || a.shop || a.building || '';
-                var parts = [name, a.road, a.city || a.town || a.village, a.state]
-                  .filter(function (x, i, arr) { return x && arr.indexOf(x) === i; });
-                locInput.value = parts.join(', ') || (lat + ', ' + lon);
-                gpsStatus.textContent = 'From GPS — edit if it named the wrong place.';
+                var nameCandidates = [data.name, a.company, a.industrial, a.commercial, a.warehouse, a.office, a.shop, a.amenity, a.building];
+                var placeName = '';
+                for (var i = 0; i < nameCandidates.length; i += 1) {
+                  placeName = usefulPlaceName(nameCandidates[i], a, data);
+                  if (placeName) break;
+                }
+                var gpsAddress = buildAddress(data, a, placeName) || (lat + ', ' + lon);
+                if (!(auto && addressInput.value.trim())) addressInput.value = gpsAddress;
+                if (placeName && !nameInput.value.trim()) nameInput.value = placeName;
+                gpsStatus.textContent = accuracy
+                  ? 'GPS address set (+/-' + accuracy + ' m). ' + (savedPlace ? 'Saved place name matched.' : 'Correct the place name if needed.')
+                  : 'GPS address set. ' + (savedPlace ? 'Saved place name matched.' : 'Correct the place name if needed.');
               })
               .catch(function () {
-                if (!(auto && locInput.value.trim())) locInput.value = lat + ', ' + lon;
-                gpsStatus.textContent = '';
+                if (!(auto && addressInput.value.trim())) addressInput.value = lat + ', ' + lon;
+                gpsStatus.textContent = accuracy
+                  ? 'GPS coordinates set (+/-' + accuracy + ' m). Type the address/name if needed.'
+                  : 'GPS coordinates set. Type the address/name if needed.';
               });
           }, function () {
-            gpsStatus.textContent = auto ? '' : 'Could not get GPS — type the location.';
+            gpsStatus.textContent = auto ? '' : 'Could not get GPS - type the address.';
           }, { enableHighAccuracy: true, timeout: 10000 });
         }
 
         if (gpsBtn) gpsBtn.addEventListener('click', function () { fillFromGps(false); });
         // A driver entering a location is standing at it: ask GPS right away
         // and prefill, leaving the field editable.
-        if (locInput && !locInput.value.trim()) fillFromGps(true);
+        if (addressInput && !addressInput.value.trim()) fillFromGps(true);
       })();
     </script>
     {% else %}
