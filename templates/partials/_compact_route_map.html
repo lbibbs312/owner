@@ -442,8 +442,8 @@
                     <input id="frWeight" type="text" name="weight" inputmode="numeric" value="" placeholder="e.g. 42000">
                   </div>
                   <div>
-                    <label for="frDest">Where to next?</label>
-                    <input id="frDest" type="text" name="destination_text" list="frDestMemory" autocomplete="off" placeholder="Customer or city">
+                    <label for="frDest">Destination</label>
+                    <input id="frDest" type="text" name="destination_text" list="frDestMemory" autocomplete="off" placeholder="Business name or address">
                     <datalist id="frDestMemory">
                       {% for place in fm.locations %}<option value="{{ place }}"></option>{% endfor %}
                     </datalist>
@@ -482,9 +482,18 @@
               var form = document.querySelector('form.freight-depart');
               if (!form) return;
               var weightMap = {{ (freight_memory.weight_map if freight_memory else {})|tojson }};
+              var recents = {{ (freight_memory.commodities if freight_memory else [])|tojson }};
               var choice = form.querySelector('#frCommodityChoice');
               var otherInput = form.querySelector('#frCommodity');
               var weight = form.querySelector('#frWeight');
+              // Memory prefill: most drivers haul what they hauled last time —
+              // arrive prefilled so the dropdown is only for changing it.
+              if (choice && recents.length && !otherInput.value.trim()) {
+                choice.value = recents[0];
+                otherInput.value = recents[0];
+                var lastWeight = weightMap[recents[0].toLowerCase()];
+                if (weight && lastWeight && !weight.value.trim()) weight.value = lastWeight;
+              }
               if (choice) choice.addEventListener('change', function () {
                 if (choice.value === '__other') {
                   otherInput.hidden = false;

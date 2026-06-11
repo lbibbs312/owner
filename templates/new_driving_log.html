@@ -33,7 +33,7 @@
     {% endif %}
   </div>
   {% if not has_today_logs %}
-    <div class="alert alert-info border fw-semibold">First stop is your start location. Cargo leaving that location is recorded on Depart and Load.</div>
+    <div class="alert alert-info border fw-semibold">First stop is your start location. Cargo leaving that location is recorded at Record Departure.</div>
   {% endif %}
 
   {% if pending_ryder_event %}
@@ -100,24 +100,40 @@
         var gpsBtn = document.getElementById('gpsFillBtn');
         var gpsStatus = document.getElementById('gpsStatus');
         var locInput = document.getElementById('location');
-        if (gpsBtn) gpsBtn.addEventListener('click', function () {
-          if (!navigator.geolocation) { gpsStatus.textContent = 'GPS not available in this browser.'; return; }
+
+        function fillFromGps(auto) {
+          if (!navigator.geolocation) {
+            if (!auto) gpsStatus.textContent = 'GPS not available in this browser.';
+            return;
+          }
           gpsStatus.textContent = 'Getting location…';
           navigator.geolocation.getCurrentPosition(function (pos) {
             var lat = pos.coords.latitude.toFixed(6), lon = pos.coords.longitude.toFixed(6);
             fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + lat + '&lon=' + lon, { headers: { 'Accept': 'application/json' } })
               .then(function (r) { return r.json(); })
               .then(function (data) {
+                // Don't stomp anything the driver typed while we looked it up.
+                if (auto && locInput.value.trim()) { gpsStatus.textContent = ''; return; }
                 var a = data.address || {};
                 var name = data.name || a.amenity || a.shop || a.building || '';
                 var parts = [name, a.road, a.city || a.town || a.village, a.state]
                   .filter(function (x, i, arr) { return x && arr.indexOf(x) === i; });
                 locInput.value = parts.join(', ') || (lat + ', ' + lon);
-                gpsStatus.textContent = '';
+                gpsStatus.textContent = 'From GPS — edit if it named the wrong place.';
               })
-              .catch(function () { locInput.value = lat + ', ' + lon; gpsStatus.textContent = ''; });
-          }, function () { gpsStatus.textContent = 'Could not get GPS — type the location.'; }, { enableHighAccuracy: true, timeout: 10000 });
-        });
+              .catch(function () {
+                if (!(auto && locInput.value.trim())) locInput.value = lat + ', ' + lon;
+                gpsStatus.textContent = '';
+              });
+          }, function () {
+            gpsStatus.textContent = auto ? '' : 'Could not get GPS — type the location.';
+          }, { enableHighAccuracy: true, timeout: 10000 });
+        }
+
+        if (gpsBtn) gpsBtn.addEventListener('click', function () { fillFromGps(false); });
+        // A driver entering a location is standing at it: ask GPS right away
+        // and prefill, leaving the field editable.
+        if (locInput && !locInput.value.trim()) fillFromGps(true);
       })();
     </script>
     {% else %}

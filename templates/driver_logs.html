@@ -1159,7 +1159,7 @@
                 <div class="md-row-fact"><span>Driver</span><strong>{{ log.driver.display_name }}{% if log.driver.employee_id %} · ID {{ log.driver.employee_id }}{% endif %}{% if log.driver.department %} · {{ log.driver.department }}{% endif %}</strong></div>
                 <div class="md-row-fact"><span>Stop #</span><strong>{{ stop_sequence }} of {{ log_count }}</strong></div>
                 <div class="md-row-fact"><span>Route</span><strong>{{ route_line or 'Route not confirmed' }}</strong></div>
-                <div class="md-row-fact"><span>Move</span><strong>{% if first_issue and first_issue.code != 'needs_departure' %}{{ first_issue.label }} · {{ first_issue.reason }}{% elif not log.depart_time %}Open stop · record departure/load before continuing route{% elif stop_vm and stop_vm.movement_summary %}{{ stop_vm.movement_summary }}{% elif route %}{{ route.action }} · {{ route.state }}{% else %}Logged stop{% endif %}{% if route and route.next_stop %} · Following {{ route.next_stop }}{% endif %}</strong></div>
+                <div class="md-row-fact"><span>Move</span><strong>{% if first_issue and first_issue.code != 'needs_departure' %}{{ first_issue.label }} · {{ first_issue.reason }}{% elif not log.depart_time %}Open stop · record departure before continuing route{% elif stop_vm and stop_vm.movement_summary %}{{ stop_vm.movement_summary }}{% elif route %}{{ route.action }} · {{ route.state }}{% else %}Logged stop{% endif %}{% if route and route.next_stop %} · Following {{ route.next_stop }}{% endif %}</strong></div>
                 <div class="md-row-fact"><span>Arrive</span><strong>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</strong></div>
                 <div class="md-row-fact"><span>Depart</span><strong>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</strong></div>
                 <div class="md-row-fact"><span>In</span><strong>{{ arrive_label }}</strong></div>
@@ -1424,7 +1424,7 @@
                   </a>
                   {% if not log.depart_time %}
                     {% set depart_href = url_for('driver.mobile_dashboard', flow='depart') if active_driver_wait is defined and active_driver_wait and active_driver_wait.log_id == log.id else url_for('driver.depart_driver_log', log_id=log.id) %}
-                    <a href="{{ depart_href }}" class="btn btn-sm btn-success hover-btn">Depart and Load</a>
+                    <a href="{{ depart_href }}" class="btn btn-sm btn-success hover-btn">Record Departure</a>
                   {% endif %}
                   {% if can_delete_log %}
                     {% if log.hot_parts or log.part_number %}
