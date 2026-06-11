@@ -66,6 +66,7 @@ from app.services.load_state import (
     current_load_after_logs,
     destination_from_load,
     destination_load_value,
+    is_empty_load,
     is_service_stop,
     is_load_for_plant,
     load_display,
@@ -4425,6 +4426,22 @@ def new_driving_log():
     form.secondary_load.data = current_secondary_value
     if getattr(current_user, "is_day_driver", False):
         _prefill_day_driver_cargo(form, current_user.id, local_date)
+        if not form.location.data and not _open_stop_for_driver(current_user.id, local_date):
+            # In transit: arriving means landing at the destination typed on the
+            # last loaded departure, so offer it as the stop location.
+            last_loaded = (
+                DriverLog.query.filter(
+                    DriverLog.driver_id == current_user.id,
+                    DriverLog.date == local_date,
+                    DriverLog.deleted_at.is_(None),
+                    DriverLog.depart_time.isnot(None),
+                    DriverLog.destination.isnot(None),
+                )
+                .order_by(DriverLog.id.desc())
+                .first()
+            )
+            if last_loaded and not is_empty_load(last_loaded.depart_load_size):
+                form.location.data = last_loaded.destination
     if request.args.get("report_type") == "truck_issue":
         form.maintenance.data = True
     elif request.args.get("report_type") == "route_note":

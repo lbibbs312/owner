@@ -12,7 +12,7 @@ from app.models import ActivityEvent, DamageReport, DriverLog, DriverLogPhoto, L
 from app.services.cargo_state import cargo_state_for_log
 from app.services.cargo_reconciliation_service import reconcile_cargo
 from app.services.driver_wait import wait_label_for_log
-from app.services.load_state import build_driver_log_route_context, current_load_after_logs, is_empty_load, route_problem_reason, stop_role_details, truck_issue_reason
+from app.services.load_state import build_driver_log_route_context, current_load_after_logs, destination_from_load, is_empty_load, load_display, route_problem_reason, stop_role_details, truck_issue_reason
 from app.services.next_load_prediction import build_next_load_prediction
 from app.services.plant_addresses import plant_label
 from app.services.plant_time import route_stop_forecasts
@@ -237,6 +237,25 @@ def _route_moved_cargo(rows):
     return False
 
 
+def _in_transit_after_last_departure(rows):
+    """(cargo_label, destination_label) when the latest closed stop departed
+    loaded. The driver is still carrying freight toward somewhere, so the route
+    is not finishable yet — the next action is arriving, not ending the shift."""
+    for row in reversed(rows or []):
+        log = row.get("log") if isinstance(row, dict) else None
+        if not log or not getattr(log, "depart_time", None):
+            continue
+        if is_empty_load(getattr(log, "depart_load_size", None)):
+            return "", ""
+        cargo = load_display(getattr(log, "depart_load_size", ""))
+        destination = str(getattr(log, "destination", "") or "").strip()
+        if not destination:
+            code = destination_from_load(getattr(log, "depart_load_size", ""))
+            destination = plant_label(code) if code else ""
+        return cargo, destination
+    return "", ""
+
+
 def build_route_cta_context(
     route_context,
     driver_log=None,
@@ -347,13 +366,32 @@ def build_route_cta_context(
                 allowed_actions = ["add_stop", "end_route", "print_route", "view_route"]
                 route_message = "Left empty to start the route. Add your next stop."
             else:
-                # All stops are closed but the shift is not ended. The next action
-                # is End Shift; PostTrip becomes required INSIDE that flow, never
-                # surfaced as the CTA right after the route (rules 4 & 5).
-                next_action = "End Shift"
-                primary = _route_cta("End Shift", "end_route")
-                allowed_actions = ["end_route", "print_route", "view_route"]
-                route_message = "All stops are closed. End your shift to finish the route."
+                in_transit_cargo, in_transit_destination = _in_transit_after_last_departure(rows)
+                if in_transit_cargo:
+                    # The last departure left LOADED: the driver is in transit,
+                    # not done. Ending the shift now would orphan the load, so
+                    # the required action is arriving at the destination.
+                    display_mode = "active_route"
+                    arrive_label = (
+                        f"Arrive at {in_transit_destination}" if in_transit_destination else "Record Arrival"
+                    )
+                    next_action = arrive_label
+                    primary = _route_cta(arrive_label, "add_stop")
+                    secondary = _route_cta("End Shift", "end_route", "ghost")
+                    allowed_actions = ["add_stop", "end_route", "print_route", "view_route"]
+                    route_message = (
+                        f"In transit with {in_transit_cargo}"
+                        + (f" to {in_transit_destination}" if in_transit_destination else "")
+                        + ". Record your arrival when you get there."
+                    )
+                else:
+                    # All stops are closed but the shift is not ended. The next action
+                    # is End Shift; PostTrip becomes required INSIDE that flow, never
+                    # surfaced as the CTA right after the route (rules 4 & 5).
+                    next_action = "End Shift"
+                    primary = _route_cta("End Shift", "end_route")
+                    allowed_actions = ["end_route", "print_route", "view_route"]
+                    route_message = "All stops are closed. End your shift to finish the route."
         else:
             display_mode = "read_only_history" if selected_date_forced else "last_route"
             next_action = "Start new shift or View last route"
