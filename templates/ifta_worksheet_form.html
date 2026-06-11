@@ -48,17 +48,10 @@
     <input type="hidden" name="beginning_odometer" value="{{ ctx.start_mileage or '' }}">
     <input type="hidden" name="total_trip_distance" value="{{ ctx.total_route_miles or '' }}">
 
-    <section class="fuel-section">
-      <h2>Known context</h2>
-      <div class="context-grid">
-        <div class="context-pill"><span>Driver</span><strong>{{ current_user.display_name }}</strong></div>
-        {% if ctx.truck %}<div class="context-pill"><span>Truck</span><strong>{{ ctx.truck }}</strong></div>{% endif %}
-        {% if ctx.trailer %}<div class="context-pill"><span>Trailer</span><strong>{{ ctx.trailer }}</strong></div>{% endif %}
-        {% if ctx.route_date_value %}<div class="context-pill"><span>Route date</span><strong>{{ ctx.route_date_value }}</strong></div>{% endif %}
-        {% if ctx.reporting_period_quarter %}<div class="context-pill"><span>Period</span><strong>{{ ctx.reporting_period_quarter }} {{ ctx.reporting_year or '' }}</strong></div>{% endif %}
-        {% if ctx.current_mileage %}<div class="context-pill"><span>Last mileage</span><strong>{{ "{:,}".format(ctx.current_mileage) }} mi</strong></div>{% endif %}
-      </div>
-    </section>
+    {# Context is information, not an action — one quiet line, no cards. #}
+    <p style="margin:0 0 14px;color:#8fa3bf;font-size:.85rem;font-weight:600;line-height:1.5;">
+      {{ current_user.display_name }}{% if ctx.truck %} &middot; Truck {{ ctx.truck }}{% endif %}{% if ctx.trailer %} &middot; Trailer {{ ctx.trailer }}{% endif %}{% if ctx.route_date_value %} &middot; {{ ctx.route_date_value }}{% endif %}{% if ctx.reporting_period_quarter %} &middot; {{ ctx.reporting_period_quarter }} {{ ctx.reporting_year or '' }}{% endif %}{% if ctx.current_mileage %} &middot; Last odometer {{ "{:,}".format(ctx.current_mileage) }} mi{% endif %}
+    </p>
 
     <section class="fuel-section">
       <h2>Fuel details</h2>

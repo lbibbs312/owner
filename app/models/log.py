@@ -26,7 +26,10 @@ class DriverLog(db.Model):
     # and carried forward to the next open stop like load_size/secondary_load.
     commodity = db.Column(db.String(120), nullable=True)
     weight = db.Column(db.String(40), nullable=True)
-    plant_name = db.Column(db.String(20), nullable=False)
+    # Freight (day-driver) departure: free-text "where to next" — a customer,
+    # city, or dock rather than a plant code. Fleet flow leaves this null.
+    destination = db.Column(db.String(120), nullable=True)
+    plant_name = db.Column(db.String(120), nullable=False)
     maintenance = db.Column(db.Boolean, default=False)
     fuel = db.Column(db.Boolean, default=False)
     fuel_mileage = db.Column(db.Integer, nullable=True)

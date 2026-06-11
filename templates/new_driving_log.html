@@ -79,7 +79,11 @@
     <input type="hidden" name="secondary_load" value="{{ active_secondary }}" data-no-autosave="true">
 
     {% if current_user.is_day_driver %}
-    {# Day-driver workspace: describe the load by commodity + weight, not a Lacks plant/part. #}
+    {# Day-driver workspace: where you are + what you're hauling. No plant/part. #}
+    <div class="mb-3">
+      {{ form.location.label(class="form-label") }}
+      {{ form.location(class="form-control", placeholder="Customer, dock, yard, truck stop, or city") }}
+    </div>
     <div class="row g-3 mb-3">
       <div class="col-md-7">
         {{ form.commodity.label(class="form-label") }}

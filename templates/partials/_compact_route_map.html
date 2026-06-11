@@ -377,6 +377,107 @@
           {% set requires_secondary_drop_check = primary_stop.requires_secondary_drop_check if primary_stop.requires_secondary_drop_check is defined else false %}
           {% set requires_drop_check = requires_unload_check or requires_secondary_drop_check %}
           {% set start_depart_step = 0 if is_service_depart or requires_drop_check else 1 %}
+          {% if current_user.is_day_driver %}
+          {# Freight depart: one window. Follow-ups appear only when an answer needs them. #}
+          {% set stop_label = primary_stop.plant_label if primary_stop.plant_label is defined and primary_stop.plant_label else (primary_stop.board_code or 'this stop') %}
+          {% set arrived_cargo = primary_stop.arrived_with if primary_stop.arrived_with is defined else '' %}
+          {% set freight_needs_unload = requires_unload_check or (arrived_cargo and arrived_cargo not in ['Empty', '--', '']) %}
+          <form class="depart-wizard freight-depart" method="POST" action="{{ depart_url }}">
+            {% if depart_form is defined and depart_form %}{{ depart_form.hidden_tag() }}{% endif %}
+            <input type="hidden" name="next" value="mobile">
+            <input type="hidden" name="source" value="live_flow">
+            <input type="hidden" name="secondary_dropped_on_departure" value="yes">
+            <input type="hidden" name="secondary_unload_reason" value="">
+            <input type="hidden" name="secondary_destination" value="">
+            <input type="hidden" name="secondary_load_type" value="load">
+            <section class="depart-step is-active">
+              <span class="depart-step-kicker">{{ depart_code }} &middot; record departure</span>
+              <h4>Departing {{ stop_label }}</h4>
+
+              {% if freight_needs_unload %}
+              <div class="freight-q">
+                <span class="freight-label">Unloaded here?</span>
+                <div class="freight-toggle">
+                  <input type="radio" id="frUnloadYes" name="unloaded_on_departure" value="yes" required>
+                  <label for="frUnloadYes">Yes</label>
+                  <input type="radio" id="frUnloadNo" name="unloaded_on_departure" value="no">
+                  <label for="frUnloadNo">No</label>
+                </div>
+                <div class="freight-followup" data-freight-unload-reason hidden>
+                  <label for="frUnloadWhy">Why not?</label>
+                  <input id="frUnloadWhy" type="text" name="unload_reason" placeholder="Short reason">
+                </div>
+              </div>
+              {% else %}
+              <input type="hidden" name="unloaded_on_departure" value="yes">
+              <input type="hidden" name="unload_reason" value="">
+              {% endif %}
+
+              <div class="freight-q">
+                <span class="freight-label">Leaving loaded?</span>
+                <div class="freight-toggle">
+                  <input type="radio" id="frLoadYes" name="got_loaded" value="yes" required>
+                  <label for="frLoadYes">Yes</label>
+                  <input type="radio" id="frLoadNo" name="got_loaded" value="no">
+                  <label for="frLoadNo">No</label>
+                </div>
+              </div>
+
+              <div class="freight-followup" data-freight-load-details hidden>
+                <label for="frCommodity">Hauling</label>
+                <input id="frCommodity" type="text" name="commodity" value="{{ primary_stop.commodity if primary_stop.commodity is defined and primary_stop.commodity else '' }}" placeholder="Commodity">
+                <div class="freight-two">
+                  <div>
+                    <label for="frWeight">Weight (lbs)</label>
+                    <input id="frWeight" type="text" name="weight" value="{{ primary_stop.weight if primary_stop.weight is defined and primary_stop.weight else '' }}" placeholder="e.g. 42000">
+                  </div>
+                  <div>
+                    <label for="frDest">Where to next?</label>
+                    <input id="frDest" type="text" name="destination_text" placeholder="Customer or city">
+                  </div>
+                </div>
+              </div>
+
+              <div class="freight-followup">
+                <label for="frNote">Note (only if something needs review)</label>
+                <input id="frNote" type="text" name="cargo_override_reason" placeholder="Optional">
+              </div>
+
+              <div class="depart-step-actions">
+                <button class="depart-submit" type="submit">Record Departure</button>
+              </div>
+              <a class="md-flow-panel-link ghost" href="{{ url_for('driver.driver_logs') }}">Open Driver Log</a>
+            </section>
+          </form>
+          <style>
+            .freight-depart .freight-q { display:grid; gap:8px; margin:12px 0; }
+            .freight-depart .freight-label { color:#8fa3bf; font-size:.68rem; font-weight:950; letter-spacing:.07em; text-transform:uppercase; }
+            .freight-depart .freight-toggle { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+            .freight-depart .freight-toggle input[type="radio"] { position:absolute; opacity:0; pointer-events:none; }
+            .freight-depart .freight-toggle label { display:flex; align-items:center; justify-content:center; min-height:52px; border:1px solid rgba(91,157,255,.3); border-radius:9px; background:rgba(10,17,28,.95); color:#dbe7ff; font-weight:950; cursor:pointer; }
+            .freight-depart .freight-toggle input:checked + label { border-color:rgba(255,212,121,.6); background:rgba(58,46,18,.95); color:#ffd479; box-shadow:0 0 14px rgba(255,212,121,.22); }
+            .freight-depart .freight-followup { display:grid; gap:8px; margin:10px 0; }
+            .freight-depart .freight-two { display:grid; grid-template-columns:1fr 1.4fr; gap:10px; }
+            .freight-depart input[type="text"] { width:100%; border:1px solid rgba(91,157,255,.28); border-radius:8px; background:rgba(10,17,28,.96); color:#dbe7ff; padding:12px; font-size:1rem; }
+            .freight-depart .freight-followup label { color:#8fa3bf; font-size:.7rem; font-weight:800; }
+          </style>
+          <script>
+            (function () {
+              var form = document.querySelector('form.freight-depart');
+              if (!form) return;
+              function sync() {
+                var loaded = form.querySelector('input[name="got_loaded"]:checked');
+                var details = form.querySelector('[data-freight-load-details]');
+                if (details) details.hidden = !(loaded && loaded.value === 'yes');
+                var unloaded = form.querySelector('input[name="unloaded_on_departure"]:checked');
+                var reason = form.querySelector('[data-freight-unload-reason]');
+                if (reason) reason.hidden = !(unloaded && unloaded.value === 'no');
+              }
+              form.addEventListener('change', sync);
+              sync();
+            })();
+          </script>
+          {% else %}
           <form class="depart-wizard" method="POST" action="{{ depart_url }}" data-depart-wizard data-depart-start-step="{{ start_depart_step }}">
             {% if depart_form is defined and depart_form %}{{ depart_form.hidden_tag() }}{% endif %}
             <input type="hidden" name="next" value="mobile">
@@ -489,6 +590,7 @@
               <a class="md-flow-panel-link ghost" href="{{ url_for('driver.driver_logs') }}">Open Driver Log</a>
             </section>
           </form>
+          {% endif %}
         {% else %}
           <div class="depart-empty">
             <h4>No open stop</h4>

@@ -92,6 +92,7 @@ class DriverLogForm(FlaskForm):
     )
     secondary_unload_reason = TextAreaField("Why?", validators=[Optional()])
     secondary_load = StringField("Second Stop Cargo", validators=[Optional()])
+    location = StringField("Location (this stop)", validators=[Optional()])
     commodity = StringField("Commodity (what are you hauling?)", validators=[Optional()])
     weight = StringField("Weight (lbs)", validators=[Optional()])
     fuel_mileage = IntegerField("Odometer at Fuel or Truck Issue", validators=[Optional()])

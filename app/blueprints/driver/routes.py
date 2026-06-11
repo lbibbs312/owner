@@ -4347,9 +4347,14 @@ def new_driving_log():
             flash("Please select the plant you arrived at.", "danger")
             return _render_new_driving_log(form, current_load, route_context=route_context, return_to_mobile=return_to_mobile)
         if is_day_driver and not form.plant_name.data:
-            # Day drivers describe stops by freight, not a Lacks plant; keep a clean
-            # user-facing stop label from the commodity (or a generic fallback).
-            form.plant_name.data = (form.commodity.data or "").strip() or "Day Route"
+            # Day drivers describe stops by where they are (free-text location),
+            # falling back to the commodity so old habits still produce a label.
+            location_text = (form.location.data or "").strip()
+            form.plant_name.data = (
+                location_text[:120]
+                or (form.commodity.data or "").strip()[:120]
+                or "Day Route"
+            )
         open_stop = _open_stop_for_driver(current_user.id, local_date)
         if open_stop:
             flash(f"Close the open stop at {_plant_label(open_stop.plant_name)} before creating the next stop.", "warning")
@@ -5022,8 +5027,13 @@ def depart_driver_log(log_id):
             if form.destination.data:
                 departure_load = destination_load_value(form.destination.data)
             elif getattr(current_user, "is_day_driver", False):
-                # Day drivers describe the load by commodity/weight, not a plant destination.
-                departure_load = "Loaded"
+                # Freight: the truck carries a commodity, not a plant load. The
+                # free-text destination is stored on the log at save time below.
+                departure_load = (
+                    (form.commodity.data or "").strip()
+                    or (log.commodity or "").strip()
+                    or "Loaded"
+                )[:80]
             else:
                 return quick_depart_error("Please select where the primary load is going.")
         elif form.got_loaded.data == "no":
@@ -5081,6 +5091,8 @@ def depart_driver_log(log_id):
             log.dock_wait_minutes = _auto_wait_minutes_for_departure(log, now_local)
             log.depart_load_size = departure_load
             log.secondary_load = secondary_load or None
+            if getattr(current_user, "is_day_driver", False):
+                log.destination = (request.form.get("destination_text") or "").strip()[:120] or None
             # Day-driver: capture commodity + weight when a load is picked up here;
             # clear it when the truck leaves empty so nothing lingers onboard.
             if form.got_loaded.data == "yes":
@@ -5116,7 +5128,13 @@ def depart_driver_log(log_id):
             return quick_depart_error("Departure could not be saved. Try again.", 500)
         _emit_driver_log_updated(log, "departed")
         success_message = f"Departed {log.plant_name} with {cargo_display(log.depart_load_size, log.secondary_load)}."
-        if quick_depart and form.got_loaded.data == "yes" and not form.secondary_destination.data:
+        if getattr(current_user, "is_day_driver", False):
+            if log.destination:
+                success_message = (
+                    f"Departed {log.plant_name} with "
+                    f"{cargo_display(log.depart_load_size, log.secondary_load)}, headed to {log.destination}."
+                )
+        elif quick_depart and form.got_loaded.data == "yes" and not form.secondary_destination.data:
             success_message = f"{success_message} No second stop selected."
         return quick_depart_success(success_message)
 
