@@ -10505,6 +10505,9 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     body = page.get_data(as_text=True)
     assert 'name="location_address"' in body
     assert "Place / customer name" in body
+    assert "Nearby GPS matches" in body
+    assert "/gps/place-candidates" in body
+    assert "nominatim.openstreetmap.org" not in body
 
     created = client.post(
         "/new_driving_log",
@@ -10535,6 +10538,45 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
 
     next_form = client.get("/new_driving_log").get_data(as_text=True)
     assert '<option value="Kraft Dock 4">' in next_form
+
+
+def test_day_driver_gps_place_candidates_endpoint_returns_google_places(client, app, monkeypatch):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import User
+
+        create_user("dd_gps_candidates", "dd-gps-candidates@example.com", "driver")
+        user = User.query.filter_by(username="dd_gps_candidates").one()
+        user.day_driver = True
+        user.route_type = "general_freight"
+        db.session.commit()
+
+    def fake_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
+        assert lat == pytest.approx(42.900426)
+        assert lng == pytest.approx(-85.530662)
+        assert accuracy_m == pytest.approx(8)
+        assert hint == "Raleigh east"
+        return {
+            "ok": True,
+            "places": [
+                {
+                    "name": "Plastic-Plate Inc",
+                    "address": "3500 Raleigh Dr SE, Kentwood, MI 49512",
+                    "distance_m": 15,
+                    "source": "google",
+                }
+            ],
+            "fallback_address": "",
+        }
+
+    monkeypatch.setattr("app.blueprints.driver.routes.nearby_place_candidates", fake_candidates)
+    login(client, "dd_gps_candidates")
+    response = client.get("/gps/place-candidates?lat=42.900426&lng=-85.530662&accuracy=8&hint=Raleigh+east")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["ok"] is True
+    assert payload["places"][0]["name"] == "Plastic-Plate Inc"
+    assert payload["places"][0]["address"] == "3500 Raleigh Dr SE, Kentwood, MI 49512"
 
 
 def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(client, app):

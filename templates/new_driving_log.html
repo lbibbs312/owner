@@ -81,11 +81,12 @@
     {% if current_user.is_day_driver %}
     {# Freight stop: where you are (memory + GPS) and what you're hauling. #}
     {% set fm = freight_memory or {'locations': [], 'commodities': [], 'weight_map': {}} %}
+    {% set gps_place_hint = (next_stop_context.destination_label if next_stop_context and next_stop_context.destination_label else active_destination) %}
     <div class="mb-3">
       {{ form.location_address.label(class="form-label") }}
       <div class="d-flex gap-2 align-items-stretch">
         {{ form.location_address(class="form-control", placeholder="Street address, road, city, state", autocomplete="off") }}
-        <button type="button" id="gpsFillBtn" class="btn btn-primary d-flex align-items-center" style="min-width:52px;justify-content:center;" aria-label="Use my GPS location" title="Use my GPS location">
+        <button type="button" id="gpsFillBtn" class="btn btn-primary d-flex align-items-center" style="min-width:52px;justify-content:center;" aria-label="Use my GPS location" title="Use my GPS location" data-gps-places-url="{{ url_for('driver.gps_place_candidates') }}" data-gps-place-hint="{{ gps_place_hint }}">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
         </button>
       </div>
@@ -93,6 +94,11 @@
       <input type="hidden" name="gps_longitude" id="gps_longitude" data-no-autosave="true">
       <input type="hidden" name="gps_accuracy_m" id="gps_accuracy_m" data-no-autosave="true">
       <div class="form-text" id="gpsStatus" style="min-height:1.1em;"></div>
+      <div class="mt-2" id="gpsPlaceChoices" hidden>
+        <label for="gpsPlaceSelect" class="form-label mb-1">Nearby GPS matches</label>
+        <select id="gpsPlaceSelect" class="form-select"></select>
+        <div class="form-text">Pick the actual dock or customer if the first match is not right.</div>
+      </div>
     </div>
     <div class="mb-3">
       {{ form.location.label(class="form-label") }}
@@ -112,45 +118,15 @@
         var latInput = document.getElementById('gps_latitude');
         var lonInput = document.getElementById('gps_longitude');
         var accuracyInput = document.getElementById('gps_accuracy_m');
+        var placeChoices = document.getElementById('gpsPlaceChoices');
+        var placeSelect = document.getElementById('gpsPlaceSelect');
+        var gpsPlacesUrl = gpsBtn ? gpsBtn.getAttribute('data-gps-places-url') : '';
+        var gpsPlaceHint = gpsBtn ? clean(gpsBtn.getAttribute('data-gps-place-hint')) : '';
         var placeMemory = {{ (fm.places or [])|tojson }};
+        var currentCandidates = [];
 
         function clean(value) {
           return (value || '').toString().trim();
-        }
-
-        function uniqueParts(parts) {
-          var seen = {};
-          return parts.map(clean).filter(function (value) {
-            var key = value.toLowerCase();
-            if (!value || seen[key]) return false;
-            seen[key] = true;
-            return true;
-          });
-        }
-
-        function buildAddress(data, address, placeName) {
-          var street = uniqueParts([address.house_number, address.road]).join(' ');
-          var city = clean(address.city || address.town || address.village || address.hamlet || address.municipality || address.county);
-          var parts = uniqueParts([street || address.road, city, address.state, address.postcode]);
-          if (parts.length) return parts.join(', ');
-          var display = uniqueParts((data.display_name || '').split(','));
-          if (placeName && display.length && display[0].toLowerCase() === placeName.toLowerCase()) {
-            display.shift();
-          }
-          return display.slice(0, 5).join(', ');
-        }
-
-        function usefulPlaceName(value, address, data) {
-          var name = clean(value);
-          if (!name) return '';
-          var city = clean(address.city || address.town || address.village || address.hamlet || address.municipality || address.county).toLowerCase();
-          var broadType = clean(data.type).toLowerCase();
-          var lowered = name.toLowerCase();
-          var broadTypes = { administrative: true, city: true, town: true, village: true, county: true, state: true, aerodrome: true };
-          if (broadTypes[broadType]) return '';
-          if (lowered === clean(address.road).toLowerCase() || lowered === city || lowered === clean(address.state).toLowerCase() || lowered === clean(address.country).toLowerCase()) return '';
-          if (/\b(international airport|airport|county|township|city of)\b/.test(lowered)) return '';
-          return name;
         }
 
         function distanceMeters(lat1, lon1, lat2, lon2) {
@@ -164,19 +140,97 @@
           return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
 
-        function rememberedPlace(lat, lon, accuracy) {
-          var best = null;
+        function rememberedPlaces(lat, lon, accuracy) {
+          var matches = [];
           placeMemory.forEach(function (place) {
             var pLat = Number(place.lat);
             var pLon = Number(place.lng);
             if (!place.label || Number.isNaN(pLat) || Number.isNaN(pLon)) return;
             var distance = distanceMeters(lat, lon, pLat, pLon);
             var radius = Math.max(Number(place.radius_m) || 150, (accuracy || 0) + 40);
-            if (distance <= radius && (!best || distance < best.distance)) {
-              best = { label: place.label, distance: distance };
+            if (distance <= radius) {
+              matches.push({ name: place.label, address: '', distance_m: Math.round(distance), source: 'saved' });
             }
           });
-          return best;
+          matches.sort(function (a, b) { return a.distance_m - b.distance_m; });
+          return matches.slice(0, 3);
+        }
+
+        function candidateLabel(candidate) {
+          var pieces = [];
+          if (candidate.name) pieces.push(candidate.name);
+          if (candidate.address) pieces.push(candidate.address);
+          var label = pieces.join(' - ');
+          if (candidate.distance_m || candidate.distance_m === 0) label += ' (' + candidate.distance_m + ' m)';
+          if (candidate.source === 'saved') label += ' saved';
+          return label || 'Nearby place';
+        }
+
+        function applyCandidate(candidate, force) {
+          if (!candidate) return;
+          if (candidate.address && (force || !addressInput.value.trim())) {
+            addressInput.value = candidate.address;
+          }
+          if (candidate.name && (force || !nameInput.value.trim())) {
+            nameInput.value = candidate.name;
+          }
+        }
+
+        function renderCandidates(candidates) {
+          currentCandidates = candidates || [];
+          if (!placeChoices || !placeSelect || !currentCandidates.length) {
+            if (placeChoices) placeChoices.hidden = true;
+            return;
+          }
+          placeSelect.innerHTML = '';
+          currentCandidates.forEach(function (candidate, index) {
+            var option = document.createElement('option');
+            option.value = String(index);
+            option.textContent = candidateLabel(candidate);
+            placeSelect.appendChild(option);
+          });
+          placeChoices.hidden = false;
+        }
+
+        function mergeCandidates(googlePlaces, savedPlaces) {
+          var seen = {};
+          var merged = [];
+          function add(candidate) {
+            var key = clean(candidate.name).toLowerCase() + '|' + clean(candidate.address).toLowerCase();
+            if (!candidate.name || seen[key]) return;
+            seen[key] = true;
+            merged.push(candidate);
+          }
+          (googlePlaces || []).forEach(add);
+          (savedPlaces || []).forEach(add);
+          return merged;
+        }
+
+        function bestPosition(success, failure) {
+          var options = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 };
+          if (!navigator.geolocation.watchPosition) {
+            navigator.geolocation.getCurrentPosition(success, failure, options);
+            return;
+          }
+          var best = null;
+          var watchId = null;
+          var done = false;
+          function finish(err) {
+            if (done) return;
+            done = true;
+            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+            if (best) success(best);
+            else failure(err || {});
+          }
+          watchId = navigator.geolocation.watchPosition(function (pos) {
+            if (!best || (pos.coords.accuracy || 999999) < (best.coords.accuracy || 999999)) {
+              best = pos;
+            }
+            if (pos.coords.accuracy && pos.coords.accuracy <= 12) finish();
+          }, function (err) {
+            finish(err);
+          }, options);
+          window.setTimeout(function () { finish(); }, 6500);
         }
 
         function fillFromGps(auto) {
@@ -184,43 +238,59 @@
             if (!auto) gpsStatus.textContent = 'GPS not available in this browser.';
             return;
           }
-          gpsStatus.textContent = 'Getting location...';
-          navigator.geolocation.getCurrentPosition(function (pos) {
+          gpsStatus.textContent = 'Getting precise location...';
+          bestPosition(function (pos) {
             var lat = pos.coords.latitude.toFixed(6), lon = pos.coords.longitude.toFixed(6);
             var accuracy = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : null;
-            var savedPlace = rememberedPlace(Number(lat), Number(lon), accuracy || 0);
+            var savedPlaces = rememberedPlaces(Number(lat), Number(lon), accuracy || 0);
             if (latInput) latInput.value = lat;
             if (lonInput) lonInput.value = lon;
             if (accuracyInput) accuracyInput.value = pos.coords.accuracy || '';
-            if (savedPlace && !nameInput.value.trim()) nameInput.value = savedPlace.label;
-            fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=18&lat=' + lat + '&lon=' + lon, { headers: { 'Accept': 'application/json' } })
+            var params = new URLSearchParams({ lat: lat, lng: lon });
+            if (accuracy !== null) params.set('accuracy', String(accuracy));
+            if (gpsPlaceHint) params.set('hint', gpsPlaceHint);
+            fetch(gpsPlacesUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
               .then(function (r) { return r.json(); })
               .then(function (data) {
-                var a = data.address || {};
-                var nameCandidates = [data.name, a.company, a.industrial, a.commercial, a.warehouse, a.office, a.shop, a.amenity, a.building];
-                var placeName = '';
-                for (var i = 0; i < nameCandidates.length; i += 1) {
-                  placeName = usefulPlaceName(nameCandidates[i], a, data);
-                  if (placeName) break;
+                var googlePlaces = data.places || [];
+                var candidates = mergeCandidates(googlePlaces, savedPlaces);
+                renderCandidates(candidates);
+                if (googlePlaces.length) {
+                  applyCandidate(googlePlaces[0], !auto);
+                  gpsStatus.textContent = accuracy
+                    ? 'GPS places found (+/-' + accuracy + ' m). Pick the exact dock if needed.'
+                    : 'GPS places found. Pick the exact dock if needed.';
+                  return;
                 }
-                var gpsAddress = buildAddress(data, a, placeName) || (lat + ', ' + lon);
-                if (!(auto && addressInput.value.trim())) addressInput.value = gpsAddress;
-                if (placeName && !nameInput.value.trim()) nameInput.value = placeName;
+                if (candidates.length) {
+                  gpsStatus.textContent = accuracy
+                    ? 'GPS set (+/-' + accuracy + ' m). Saved places are listed only as hints.'
+                    : 'GPS set. Saved places are listed only as hints.';
+                  return;
+                }
+                if (data.fallback_address && (!auto || !addressInput.value.trim())) {
+                  addressInput.value = data.fallback_address;
+                }
                 gpsStatus.textContent = accuracy
-                  ? 'GPS address set (+/-' + accuracy + ' m). ' + (savedPlace ? 'Saved place name matched.' : 'Correct the place name if needed.')
-                  : 'GPS address set. ' + (savedPlace ? 'Saved place name matched.' : 'Correct the place name if needed.');
+                  ? 'GPS set (+/-' + accuracy + ' m). Type the place name if needed.'
+                  : 'GPS set. Type the place name if needed.';
               })
               .catch(function () {
-                if (!(auto && addressInput.value.trim())) addressInput.value = lat + ', ' + lon;
+                renderCandidates(savedPlaces);
                 gpsStatus.textContent = accuracy
-                  ? 'GPS coordinates set (+/-' + accuracy + ' m). Type the address/name if needed.'
-                  : 'GPS coordinates set. Type the address/name if needed.';
+                  ? 'GPS coordinates set (+/-' + accuracy + ' m). Type or pick the place.'
+                  : 'GPS coordinates set. Type or pick the place.';
               });
           }, function () {
             gpsStatus.textContent = auto ? '' : 'Could not get GPS - type the address.';
-          }, { enableHighAccuracy: true, timeout: 10000 });
+          });
         }
 
+        if (placeSelect) {
+          placeSelect.addEventListener('change', function () {
+            applyCandidate(currentCandidates[Number(placeSelect.value)], true);
+          });
+        }
         if (gpsBtn) gpsBtn.addEventListener('click', function () { fillFromGps(false); });
         // A driver entering a location is standing at it: ask GPS right away
         // and prefill, leaving the field editable.

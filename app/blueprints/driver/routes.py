@@ -44,6 +44,7 @@ from app.services.ifta_worksheets import build_ifta_packet, create_ifta_workshee
 from app.services.packet_classification import PacketClassification, classify_damage_report, packet_label_for_report
 from app.services.report_context import build_report_context
 from app.services.autolog import remember_place
+from app.services.google_places import nearby_place_candidates
 from app.services.document_numbers import (
     document_meta,
     eod_document_number,
@@ -2855,6 +2856,42 @@ def _freight_departure_label(commodity, weight="", destination="", *, fallback="
     if destination:
         label = f"{label} -> {destination}"
     return label[:limit]
+
+
+def _bounded_float_arg(name, *, minimum, maximum):
+    raw_value = (request.args.get(name) or "").strip()
+    try:
+        value = float(raw_value)
+    except ValueError:
+        return None
+    if value < minimum or value > maximum:
+        return None
+    return value
+
+
+@bp.route("/gps/place-candidates")
+@login_required
+@_driver_route_guard("driver.mobile_dashboard", "the driver GPS place lookup")
+def gps_place_candidates():
+    if not getattr(current_user, "is_day_driver", False):
+        return jsonify({"ok": False, "error": "day_driver_required", "places": []}), 403
+    lat = _bounded_float_arg("lat", minimum=-90, maximum=90)
+    lng = _bounded_float_arg("lng", minimum=-180, maximum=180)
+    accuracy = _bounded_float_arg("accuracy", minimum=0, maximum=50000)
+    if lat is None or lng is None:
+        return jsonify({"ok": False, "error": "bad_coordinates", "places": []}), 400
+    hint = (request.args.get("hint") or "").strip()[:80]
+    try:
+        payload = nearby_place_candidates(lat, lng, accuracy_m=accuracy, hint=hint)
+    except Exception:
+        current_app.logger.exception(
+            "Google place lookup failed for user_id=%s lat=%s lng=%s",
+            current_user.id,
+            lat,
+            lng,
+        )
+        payload = {"ok": False, "error": "lookup_failed", "places": []}
+    return jsonify(payload)
 
 
 def _render_new_driving_log(form, current_load, *, route_context=None, return_to_mobile=False):
