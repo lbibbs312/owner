@@ -10508,6 +10508,8 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     assert "Nearby GPS matches" in body
     assert "/gps/place-candidates" in body
     assert "nominatim.openstreetmap.org" not in body
+    assert "Google Places key is missing on the server. Saved places only." in body
+    assert "Google Places is blocked for this server key. Saved places only." in body
 
     created = client.post(
         "/new_driving_log",

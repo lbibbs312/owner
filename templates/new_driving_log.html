@@ -192,6 +192,14 @@
           placeChoices.hidden = false;
         }
 
+        function googleErrorMessage(data) {
+          if (!data || data.ok !== false) return '';
+          if (data.error === 'not_configured') return 'Google Places key is missing on the server. Saved places only.';
+          if (data.error === 'REQUEST_DENIED' || data.error === 'PERMISSION_DENIED') return 'Google Places is blocked for this server key. Saved places only.';
+          if (data.message) return 'Google Places: ' + data.message;
+          return 'Google Places did not return places. Saved places only.';
+        }
+
         function mergeCandidates(googlePlaces, savedPlaces) {
           var seen = {};
           var merged = [];
@@ -254,6 +262,7 @@
               .then(function (data) {
                 var googlePlaces = data.places || [];
                 var candidates = mergeCandidates(googlePlaces, savedPlaces);
+                var googleError = googleErrorMessage(data);
                 renderCandidates(candidates);
                 if (googlePlaces.length) {
                   applyCandidate(googlePlaces[0], !auto);
@@ -263,17 +272,19 @@
                   return;
                 }
                 if (candidates.length) {
-                  gpsStatus.textContent = accuracy
-                    ? 'GPS set (+/-' + accuracy + ' m). Saved places are listed only as hints.'
-                    : 'GPS set. Saved places are listed only as hints.';
+                  gpsStatus.textContent = googleError || (
+                    accuracy
+                      ? 'GPS set (+/-' + accuracy + ' m). Saved places are listed only as hints.'
+                      : 'GPS set. Saved places are listed only as hints.'
+                  );
                   return;
                 }
                 if (data.fallback_address && (!auto || !addressInput.value.trim())) {
                   addressInput.value = data.fallback_address;
                 }
-                gpsStatus.textContent = accuracy
+                gpsStatus.textContent = googleError || (accuracy
                   ? 'GPS set (+/-' + accuracy + ' m). Type the place name if needed.'
-                  : 'GPS set. Type the place name if needed.';
+                  : 'GPS set. Type the place name if needed.');
               })
               .catch(function () {
                 renderCandidates(savedPlaces);
