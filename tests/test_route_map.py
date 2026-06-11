@@ -1439,7 +1439,45 @@ def test_departed_loaded_route_stays_active_until_next_stop(app):
         today_local_date=date.today(),
     )
 
-    assert cta["primary_cta"]["label"] == "Start Unloading"
+    assert cta["primary_cta"]["label"] == "Arrive at Raleigh East"
+    assert cta["primary_cta"]["action"] == "add_stop"
+    assert cta["show_attach_document_button"] is False
+
+
+def test_day_driver_freight_departure_keeps_route_active_until_arrival(app):
+    from app.services.route_context import build_route_context, build_route_cta_context
+
+    driver = _user("freight_in_transit_driver")
+    _driver_log(
+        driver,
+        plant_name="Shipper Dock",
+        depart_time="08:20",
+        load_size="Empty",
+        depart_load_size="Auto parts (42000 lbs) -> Meijer DC",
+        secondary_load="Pallets (12000 lbs) -> Kraft Dock 4",
+        commodity="Auto parts",
+        weight="42000",
+        destination="Meijer DC",
+    )
+
+    snapshot = build_route_context(driver_id=driver.id, route_date=date.today())
+    assert snapshot.route_status == "active"
+    assert snapshot.current_stop is None
+    assert snapshot.current_cargo["cargo_display"] == "Auto parts (42000 lbs) + Pallets (12000 lbs)"
+    assert snapshot.current_cargo["destination_label"] == "Meijer DC"
+    assert snapshot.current_cargo["secondary_destination_label"] == "Kraft Dock 4"
+    assert snapshot.next_stop_context["destination"] == "Meijer DC"
+
+    cta = build_route_cta_context(
+        snapshot,
+        proof_missing=True,
+        route_is_active=snapshot.route_status == "active",
+        has_active_shift=True,
+        route_date=date.today(),
+        today_local_date=date.today(),
+    )
+
+    assert cta["primary_cta"]["label"] == "Arrive at Meijer DC / Kraft Dock 4"
     assert cta["primary_cta"]["action"] == "add_stop"
     assert cta["show_attach_document_button"] is False
 

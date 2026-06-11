@@ -8365,7 +8365,7 @@ def test_loaded_quick_depart_keeps_cargo_in_transit_until_add_next_stop(client, 
     mobile = client.get("/mobile")
     body = mobile.get_data(as_text=True)
     assert mobile.status_code == 200
-    assert "Start Unloading" in body or "Add Destination Stop" in body
+    assert "Arrive at Raleigh East" in body
     assert 'class="md-flow-primary-cta add-stop-action"' in body
     assert 'href="/new_driving_log?next=mobile' in body
     assert 'expected_destination=RE' in body
@@ -8797,7 +8797,7 @@ def test_loaded_quick_depart_preserves_secondary_cargo_until_next_stop(client, a
         assert snapshot.current_cargo["secondary_value"] == "Raleigh West Hot Part"
 
     mobile = client.get("/mobile")
-    assert b"Start Unloading" in mobile.data or b"Add Destination Stop" in mobile.data
+    assert b"Arrive at Raleigh East" in mobile.data
     assert b"Depart and Load" not in mobile.data
 
     add_stop_form = client.get("/new_driving_log?next=mobile&expected_destination=RE")
@@ -8885,7 +8885,7 @@ def test_helios_quick_depart_with_second_stop_uses_mobile_add_next_stop(client, 
     mobile = client.get("/mobile")
     body = mobile.get_data(as_text=True)
     assert mobile.status_code == 200
-    assert "Start Unloading" in body or "Add Destination Stop" in body
+    assert "Arrive at Trim DC" in body
     assert 'href="/new_driving_log?next=mobile' in body
     assert "expected_destination=Trim+DC" in body or "expected_destination=Trim%20DC" in body
     assert "Depart and Load" not in body
@@ -10486,6 +10486,78 @@ def test_day_driver_can_log_stop_without_plant_and_carries_load_forward(client, 
     # General Freight shows hours facts only — no Short-Haul or HOS Companion card.
     assert b"<h3>Short-Haul Check</h3>" not in print_page.data
     assert b"<h3>HOS Companion</h3>" not in print_page.data
+
+
+def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(client, app):
+    from datetime import date
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, User
+
+        driver = create_user("dd_second_load", "dd-second@example.com", "driver")
+        user = User.query.filter_by(username="dd_second_load").one()
+        user.day_driver = True
+        user.route_type = "general_freight"
+        active = DriverLog(
+            driver_id=driver.id,
+            date=today,
+            plant_name="Shipper Dock",
+            load_size="Empty",
+            arrive_time="00:01",
+        )
+        db.session.add(active)
+        db.session.commit()
+        active_id = active.id
+        driver_id = driver.id
+
+    login(client, "dd_second_load")
+    response = client.post(
+        f"/driver_logs/{active_id}/depart",
+        data={
+            "next": "mobile",
+            "source": "live_flow",
+            "unloaded_on_departure": "yes",
+            "secondary_dropped_on_departure": "yes",
+            "got_loaded": "yes",
+            "commodity": "Auto parts",
+            "weight": "42000",
+            "destination_text": "Meijer DC",
+            "secondary_commodity": "Pallets",
+            "secondary_weight": "12000",
+            "secondary_destination_text": "Kraft Dock 4",
+        },
+        headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
+    with app.app_context():
+        from app.models import DriverLog
+        from app.services.route_context import build_route_context
+
+        saved = DriverLog.query.get(active_id)
+        assert saved.depart_time
+        assert saved.depart_load_size == "Auto parts (42000 lbs) -> Meijer DC"
+        assert saved.secondary_load == "Pallets (12000 lbs) -> Kraft Dock 4"
+        assert saved.destination == "Meijer DC"
+        snapshot = build_route_context(driver_id=driver_id, route_date=today)
+        assert snapshot.route_status == "active"
+        assert snapshot.current_cargo["cargo_display"] == "Auto parts (42000 lbs) + Pallets (12000 lbs)"
+        assert snapshot.next_stop_context["destination"] == "Meijer DC"
+
+    mobile = client.get("/mobile")
+    body = mobile.get_data(as_text=True)
+    assert "Arrive at Meijer DC / Kraft Dock 4" in body
+    assert 'href="/new_driving_log?next=mobile' in body
+
+    add_stop_form = client.get("/new_driving_log?next=mobile&expected_destination=Meijer%20DC")
+    add_stop_body = add_stop_form.get_data(as_text=True)
+    assert add_stop_form.status_code == 200
+    assert 'value="Meijer DC"' in add_stop_body
+    assert 'name="load_size" value="Auto parts (42000 lbs)"' in add_stop_body
+    assert 'name="secondary_load" value="Pallets (12000 lbs)"' in add_stop_body
 
 
 def test_day_driver_local_route_shows_short_haul_check(client, app):

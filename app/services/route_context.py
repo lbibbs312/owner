@@ -245,15 +245,88 @@ def _in_transit_after_last_departure(rows):
         log = row.get("log") if isinstance(row, dict) else None
         if not log or not getattr(log, "depart_time", None):
             continue
-        if is_empty_load(getattr(log, "depart_load_size", None)):
+        cargo, destination = _departed_freight_snapshot(log)
+        if not cargo:
             return "", ""
-        cargo = load_display(getattr(log, "depart_load_size", ""))
-        destination = str(getattr(log, "destination", "") or "").strip()
-        if not destination:
-            code = destination_from_load(getattr(log, "depart_load_size", ""))
-            destination = plant_label(code) if code else ""
         return cargo, destination
     return "", ""
+
+
+def _split_freight_destination(value):
+    text = load_display(value)
+    if " -> " not in text:
+        return text, ""
+    cargo, destination = text.rsplit(" -> ", 1)
+    return cargo.strip(), destination.strip()
+
+
+def _departed_freight_snapshot(log):
+    """Return cargo/destination text for plant loads and free-text freight."""
+    cargo_parts = []
+    destinations = []
+
+    primary_raw = getattr(log, "depart_load_size", None)
+    if not is_empty_load(primary_raw):
+        primary_label, inline_destination = _split_freight_destination(primary_raw)
+        if primary_label:
+            cargo_parts.append(primary_label)
+        destination = str(getattr(log, "destination", "") or "").strip() or inline_destination
+        if not destination:
+            code = destination_from_load(primary_raw)
+            destination = plant_label(code) if code else ""
+        if destination:
+            destinations.append(destination)
+
+    secondary_raw = getattr(log, "secondary_load", None)
+    if not is_empty_load(secondary_raw):
+        secondary_label, inline_destination = _split_freight_destination(secondary_raw)
+        if secondary_label:
+            cargo_parts.append(secondary_label)
+        destination = inline_destination
+        if not destination:
+            code = destination_from_load(secondary_raw)
+            destination = plant_label(code) if code else ""
+        if destination:
+            destinations.append(destination)
+
+    unique_destinations = list(dict.fromkeys(destinations))
+    return " + ".join(cargo_parts), " / ".join(unique_destinations)
+
+
+def _current_cargo_with_freight(logs, current_cargo):
+    """Augment plant-derived cargo state with free-text day-driver freight."""
+    cargo = dict(current_cargo or {})
+    cargo_value = cargo.get("cargo_display") or cargo.get("value")
+    if cargo.get("destination") or cargo.get("secondary_destination") or not is_empty_load(cargo_value):
+        return cargo
+
+    for log in reversed(logs or []):
+        if not getattr(log, "depart_time", None):
+            continue
+        cargo_label, destination_label = _departed_freight_snapshot(log)
+        if not cargo_label:
+            return cargo
+
+        primary_label, primary_inline_destination = _split_freight_destination(getattr(log, "depart_load_size", None))
+        secondary_label, secondary_destination = _split_freight_destination(getattr(log, "secondary_load", None))
+        primary_destination = str(getattr(log, "destination", "") or "").strip() or primary_inline_destination
+
+        cargo.update(
+            {
+                "value": primary_label or cargo_label,
+                "cargo_display": cargo_label,
+                "destination": primary_destination,
+                "destination_label": primary_destination,
+                "secondary_value": secondary_label,
+                "secondary_destination": secondary_destination,
+                "secondary_destination_label": secondary_destination,
+            }
+        )
+        if not cargo.get("destination") and destination_label:
+            cargo["destination"] = destination_label
+            cargo["destination_label"] = destination_label
+        return cargo
+    return cargo
 
 
 def build_route_cta_context(
@@ -402,12 +475,30 @@ def build_route_cta_context(
             route_message = "Showing a completed route."
     elif has_route_history or has_last_route:
         display_mode = "active_route" if route_is_active else ("read_only_history" if selected_date_forced else "last_route")
-        next_action = "Start new shift or View last route" if not route_is_active else "Complete route"
-        primary = _route_cta("Start New Shift", "start_shift") if not route_is_active else _route_cta("Add Stop", "add_stop")
-        secondary = _route_cta("View Last Route", "view_route", "ghost")
-        show_start_shift = not route_is_active
-        allowed_actions = ["start_shift", "view_route", "print_route", "route_history"] if not route_is_active else ["add_stop", "view_route"]
-        route_message = "Showing route history." if not route_is_active else "Route is active."
+        in_transit_cargo, in_transit_destination = ("", "")
+        if route_is_active and all_departed:
+            in_transit_cargo, in_transit_destination = _in_transit_after_last_departure(rows)
+        if in_transit_cargo:
+            # Mid-shift, every stop closed, and the last departure left LOADED:
+            # the next act is arriving at the destination, not a generic Add Stop.
+            arrive_label = f"Arrive at {in_transit_destination}" if in_transit_destination else "Record Arrival"
+            next_action = arrive_label
+            primary = _route_cta(arrive_label, "add_stop")
+            secondary = _route_cta("View Last Route", "view_route", "ghost")
+            show_start_shift = False
+            allowed_actions = ["add_stop", "view_route"]
+            route_message = (
+                f"In transit with {in_transit_cargo}"
+                + (f" to {in_transit_destination}" if in_transit_destination else "")
+                + ". Record your arrival when you get there."
+            )
+        else:
+            next_action = "Start new shift or View last route" if not route_is_active else "Complete route"
+            primary = _route_cta("Start New Shift", "start_shift") if not route_is_active else _route_cta("Add Stop", "add_stop")
+            secondary = _route_cta("View Last Route", "view_route", "ghost")
+            show_start_shift = not route_is_active
+            allowed_actions = ["start_shift", "view_route", "print_route", "route_history"] if not route_is_active else ["add_stop", "view_route"]
+            route_message = "Showing route history." if not route_is_active else "Route is active."
     else:
         display_mode = "no_active_shift" if not has_active_shift else "active_route"
         if has_active_shift or route_is_active:
@@ -439,7 +530,8 @@ def build_route_cta_context(
     cargo_onboard = bool(in_transit_destination) or bool(
         cargo_value and str(cargo_value).strip().lower() != "empty"
     )
-    if primary and primary.get("action") == "add_stop" and cargo_onboard:
+    arrival_cta_already_named = str(next_action or "").lower().startswith(("arrive", "record arrival"))
+    if primary and primary.get("action") == "add_stop" and cargo_onboard and not arrival_cta_already_named:
         if in_transit_destination:
             next_action = "Start Unloading"
             primary = _route_cta("Start Unloading", "add_stop")
@@ -692,11 +784,17 @@ def build_route_context(*, route_id=None, session_id=None, shift_id=None, stop_i
         }
         rows.append(row)
 
-    current_cargo = current_load_after_logs(logs)
+    current_cargo = _current_cargo_with_freight(logs, current_load_after_logs(logs))
+    cargo_value = (
+        (current_cargo.get("cargo_display") or current_cargo.get("value"))
+        if isinstance(current_cargo, dict)
+        else ""
+    )
     in_transit_cargo = bool(
         (
             current_cargo.get("destination")
             or current_cargo.get("secondary_destination")
+            or not is_empty_load(cargo_value)
         )
         if isinstance(current_cargo, dict)
         else False

@@ -754,11 +754,13 @@ def _route_has_in_transit_cargo(route_context):
     current_cargo = getattr(route_context, "current_cargo", None)
     if not isinstance(current_cargo, dict):
         return False
+    cargo_value = current_cargo.get("cargo_display") or current_cargo.get("value")
     return bool(
         current_cargo.get("destination")
         or current_cargo.get("destination_label")
         or current_cargo.get("secondary_destination")
         or current_cargo.get("secondary_destination_label")
+        or not is_empty_load(cargo_value)
     )
 
 
@@ -2802,6 +2804,18 @@ def _freight_stop_memory(driver_id, limit=40):
     }
 
 
+def _freight_departure_label(commodity, weight="", destination="", *, fallback="Loaded", limit=80):
+    commodity = (commodity or "").strip() or fallback
+    weight = (weight or "").strip()
+    destination = (destination or "").strip()
+    label = commodity
+    if weight:
+        label = f"{label} ({weight} lbs)"
+    if destination:
+        label = f"{label} -> {destination}"
+    return label[:limit]
+
+
 def _render_new_driving_log(form, current_load, *, route_context=None, return_to_mobile=False):
     route_date = getattr(route_context, "route_date", None) or _today_local_date()
     has_today_logs = bool(getattr(route_context, "rows", None)) if route_context else (
@@ -4497,7 +4511,9 @@ def new_driving_log():
         (request.args.get("expected_destination") or "").strip()
         or ((route_context.next_stop_context or {}).get("destination") or "")
     )
-    if expected_destination and not form.plant_name.data:
+    if expected_destination and getattr(current_user, "is_day_driver", False) and not form.location.data:
+        form.location.data = _plant_label(expected_destination)
+    elif expected_destination and not form.plant_name.data:
         ensure_legacy_plant_choice(form.plant_name, expected_destination)
         form.plant_name.data = expected_destination
     form.load_size.data = current_load_value if current_load_value != "Empty" else "Empty"
@@ -5089,9 +5105,18 @@ def depart_driver_log(log_id):
         )
 
     if form.validate_on_submit():
+        is_day_driver = getattr(current_user, "is_day_driver", False)
+        primary_destination_text = (request.form.get("destination_text") or "").strip()[:120]
+        posted_primary_commodity = (form.commodity.data or "").strip()
+        posted_primary_weight = (form.weight.data or "").strip()
+        primary_commodity = posted_primary_commodity or (log.commodity or "").strip()
+        primary_weight = posted_primary_weight or (log.weight or "").strip()
+        secondary_commodity = (request.form.get("secondary_commodity") or "").strip()[:120]
+        secondary_weight = (request.form.get("secondary_weight") or "").strip()[:40]
+        secondary_destination_text = (request.form.get("secondary_destination_text") or "").strip()[:120]
         primary_unloaded = None
         primary_unload_reason = None
-        day_driver_carrying = getattr(current_user, "is_day_driver", False) and (
+        day_driver_carrying = is_day_driver and (
             bool(log.commodity) or not is_empty_load(getattr(log, "load_size", None))
         )
         if not service_stop and (route.get("arrived_at_primary_destination") or day_driver_carrying):
@@ -5117,20 +5142,26 @@ def depart_driver_log(log_id):
         after_unload_primary = route.get("after_arrival_primary") or "Empty"
         if primary_unloaded == "yes":
             after_unload_primary = "Empty"
+            if not posted_primary_commodity:
+                primary_commodity = ""
+            if not posted_primary_weight:
+                primary_weight = ""
 
         if service_stop:
             departure_load = route.get("after_arrival_primary") or load_display(log.load_size) or "Empty"
         elif form.got_loaded.data == "yes":
             if form.destination.data:
                 departure_load = destination_load_value(form.destination.data)
-            elif getattr(current_user, "is_day_driver", False):
+            elif is_day_driver:
                 # Freight: the truck carries a commodity, not a plant load. The
                 # free-text destination is stored on the log at save time below.
-                departure_load = (
-                    (form.commodity.data or "").strip()
-                    or (log.commodity or "").strip()
-                    or "Loaded"
-                )[:80]
+                if not primary_commodity and not primary_destination_text:
+                    return quick_depart_error("Enter the load or destination before departing loaded.")
+                departure_load = _freight_departure_label(
+                    primary_commodity,
+                    primary_weight,
+                    primary_destination_text,
+                )
             else:
                 return quick_depart_error("Please select where the primary load is going.")
         elif form.got_loaded.data == "no":
@@ -5144,6 +5175,13 @@ def depart_driver_log(log_id):
                 secondary_load = None
             if form.secondary_destination.data:
                 secondary_load = secondary_load_value(form.secondary_destination.data, form.secondary_load_type.data)
+            if is_day_driver and (secondary_commodity or secondary_weight or secondary_destination_text):
+                secondary_load = _freight_departure_label(
+                    secondary_commodity,
+                    secondary_weight,
+                    secondary_destination_text,
+                    fallback="Second load",
+                )
 
         unresolved_scan = (
             PartScanEvent.query
@@ -5188,13 +5226,13 @@ def depart_driver_log(log_id):
             log.dock_wait_minutes = _auto_wait_minutes_for_departure(log, now_local)
             log.depart_load_size = departure_load
             log.secondary_load = secondary_load or None
-            if getattr(current_user, "is_day_driver", False):
-                log.destination = (request.form.get("destination_text") or "").strip()[:120] or None
+            if is_day_driver:
+                log.destination = primary_destination_text or secondary_destination_text or None
             # Day-driver: capture commodity + weight when a load is picked up here;
             # clear it when the truck leaves empty so nothing lingers onboard.
             if form.got_loaded.data == "yes":
-                log.commodity = (form.commodity.data or "").strip() or log.commodity
-                log.weight = (form.weight.data or "").strip() or log.weight
+                log.commodity = primary_commodity or ("Loaded" if is_day_driver else log.commodity)
+                log.weight = primary_weight or log.weight
             elif primary_unloaded == "yes" or (departure_load == "Empty" and not (secondary_load or None)):
                 log.commodity = None
                 log.weight = None

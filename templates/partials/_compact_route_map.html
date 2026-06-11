@@ -449,6 +449,21 @@
                     </datalist>
                   </div>
                 </div>
+                <button type="button" class="freight-note-toggle" data-freight-second-toggle>+ Add second load</button>
+                <div class="freight-followup" data-freight-second hidden>
+                  <label for="frCommodity2">Second load</label>
+                  <input id="frCommodity2" type="text" name="secondary_commodity" placeholder="Commodity">
+                  <div class="freight-two">
+                    <div>
+                      <label for="frWeight2">Weight (lbs)</label>
+                      <input id="frWeight2" type="text" name="secondary_weight" inputmode="numeric" placeholder="e.g. 12000">
+                    </div>
+                    <div>
+                      <label for="frDest2">Destination</label>
+                      <input id="frDest2" type="text" name="secondary_destination_text" list="frDestMemory" autocomplete="off" placeholder="Business name or address">
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <button type="button" class="freight-note-toggle" data-freight-note-toggle>+ Add note</button>
@@ -512,6 +527,14 @@
                 note.hidden = false;
                 noteToggle.hidden = true;
                 note.querySelector('input').focus();
+              });
+              var secondToggle = form.querySelector('[data-freight-second-toggle]');
+              if (secondToggle) secondToggle.addEventListener('click', function () {
+                var second = form.querySelector('[data-freight-second]');
+                second.hidden = false;
+                secondToggle.hidden = true;
+                var firstInput = second.querySelector('input');
+                if (firstInput) firstInput.focus();
               });
               function sync() {
                 var loaded = form.querySelector('input[name="got_loaded"]:checked');
