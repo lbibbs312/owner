@@ -436,7 +436,31 @@ def _current_driver_load(driver_id, route_date=None, *, route_context=None):
     route_context = route_context or build_route_context(driver_id=driver_id, route_date=route_date)
     if route_context.route_finalized and not route_still_active:
         return current_load_after_logs([])
-    return route_context.current_cargo
+    cargo = route_context.current_cargo
+    # Freight loads are freeform strings the plant-destination tracker can't
+    # parse, so it reports Empty mid-haul. For day drivers the truth is simple:
+    # the truck carries whatever the latest closed stop departed with.
+    if (
+        getattr(current_user, "is_day_driver", False)
+        and getattr(current_user, "id", None) == driver_id
+        and (not cargo or is_empty_load((cargo or {}).get("value")))
+    ):
+        last = (
+            _active_driver_logs_query()
+            .filter(DriverLog.driver_id == driver_id, DriverLog.depart_time.isnot(None))
+            .order_by(DriverLog.id.desc())
+            .first()
+        )
+        if last and not is_empty_load(last.depart_load_size):
+            cargo = dict(cargo or {})
+            label = (last.commodity or last.depart_load_size or "").strip()
+            if last.weight:
+                label = f"{label} · {last.weight} lbs"
+            cargo["value"] = last.depart_load_size
+            cargo["cargo_display"] = label
+            if last.destination:
+                cargo["destination"] = last.destination
+    return cargo
 
 
 def _sync_next_open_stop_arrival_cargo(log):
@@ -2749,6 +2773,35 @@ def _ryder_followup_context(user_id):
     }
 
 
+def _freight_stop_memory(driver_id, limit=40):
+    """The driver's own recent locations, commodities, and commodity->weight
+    pairs, so the freight stop form remembers instead of re-asking."""
+    rows = (
+        _active_driver_logs_query()
+        .filter_by(driver_id=driver_id)
+        .order_by(DriverLog.id.desc())
+        .limit(limit)
+        .all()
+    )
+    locations, commodities, weight_map = [], [], {}
+    for log in rows:
+        place = (log.plant_name or "").strip()
+        if place and place != "Day Route" and place not in locations:
+            locations.append(place)
+        commodity = (log.commodity or "").strip()
+        if commodity:
+            if commodity not in commodities:
+                commodities.append(commodity)
+            weight = (log.weight or "").strip()
+            if weight and commodity.lower() not in weight_map:
+                weight_map[commodity.lower()] = weight
+    return {
+        "locations": locations[:8],
+        "commodities": commodities[:5],
+        "weight_map": weight_map,
+    }
+
+
 def _render_new_driving_log(form, current_load, *, route_context=None, return_to_mobile=False):
     route_date = getattr(route_context, "route_date", None) or _today_local_date()
     has_today_logs = bool(getattr(route_context, "rows", None)) if route_context else (
@@ -2756,6 +2809,11 @@ def _render_new_driving_log(form, current_load, *, route_context=None, return_to
         .filter_by(driver_id=current_user.id, date=route_date)
         .first()
         is not None
+    )
+    freight_memory = (
+        _freight_stop_memory(current_user.id)
+        if getattr(current_user, "is_day_driver", False)
+        else None
     )
     return render_template(
         "new_driving_log.html",
@@ -2765,6 +2823,7 @@ def _render_new_driving_log(form, current_load, *, route_context=None, return_to
         route_context=route_context,
         next_stop_context=getattr(route_context, "next_stop_context", None),
         return_to_mobile=return_to_mobile,
+        freight_memory=freight_memory,
         **_ryder_followup_context(current_user.id),
     )
 
@@ -4367,13 +4426,32 @@ def new_driving_log():
         now_utc = datetime.utcnow()
         arrive_time_str = now_utc.strftime("%Y-%m-%d %H:%M:%S")
 
+        carried_commodity = (form.commodity.data or "").strip() or None
+        carried_weight = (form.weight.data or "").strip() or None
+        if is_day_driver and not carried_commodity:
+            # Cargo is described once, at the pickup's departure. If the latest
+            # closed stop left loaded, that load is what's arriving here.
+            prev_departed = (
+                _active_driver_logs_query()
+                .filter(
+                    DriverLog.driver_id == current_user.id,
+                    DriverLog.depart_time.isnot(None),
+                )
+                .order_by(DriverLog.id.desc())
+                .first()
+            )
+            if prev_departed and not is_empty_load(prev_departed.depart_load_size):
+                carried_commodity = prev_departed.commodity
+                carried_weight = prev_departed.weight
+                if is_empty_load(arrival_load):
+                    arrival_load = prev_departed.depart_load_size
         newlog = DriverLog(
             driver_id=current_user.id,
             plant_name=form.plant_name.data,
             load_size=arrival_load,
             secondary_load=arrival_secondary_load,
-            commodity=(form.commodity.data or "").strip() or None,
-            weight=(form.weight.data or "").strip() or None,
+            commodity=carried_commodity,
+            weight=carried_weight,
             downtime_reason=_compose_downtime_reason([], _form_truck_issue_text(form), form.maintenance.data),
             part_number=_form_hot_part_number(form),
             hot_parts=bool(form.hot_parts.data),
@@ -5013,7 +5091,9 @@ def depart_driver_log(log_id):
     if form.validate_on_submit():
         primary_unloaded = None
         primary_unload_reason = None
-        day_driver_carrying = getattr(current_user, "is_day_driver", False) and bool(log.commodity)
+        day_driver_carrying = getattr(current_user, "is_day_driver", False) and (
+            bool(log.commodity) or not is_empty_load(getattr(log, "load_size", None))
+        )
         if not service_stop and (route.get("arrived_at_primary_destination") or day_driver_carrying):
             primary_unloaded = form.unloaded_on_departure.data
             if primary_unloaded not in {"yes", "no"}:
@@ -6541,6 +6621,11 @@ def _mobile_route_map_fragment_context(route_date=None):
         "truck_issue_choices": TRUCK_ISSUE_CHOICES,
         "recent_ryder_events": recent_ryder_events,
         "depart_form": DepartForm(),
+        "freight_memory": (
+            _freight_stop_memory(current_user.id)
+            if getattr(current_user, "is_day_driver", False)
+            else None
+        ),
         **ryder_context,
     }
 

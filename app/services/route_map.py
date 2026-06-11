@@ -1095,6 +1095,13 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
         sequence = row.get("index") or len(stops) + 1
         arrived_with = row.get("cargo_in") or log.load_size or NOT_TRACKED
         departed_with = row.get("cargo_out") or log.depart_load_size or NOT_TRACKED
+        # The expected-cargo chain is plant-based and reads freight (freeform)
+        # loads as Empty. The stop's stored values are the captured truth —
+        # trust them whenever the chain claims Empty but the log disagrees.
+        if is_empty_load(arrived_with) and not is_empty_load(log.load_size):
+            arrived_with = log.load_size
+        if is_empty_load(departed_with) and not is_empty_load(log.depart_load_size):
+            departed_with = log.depart_load_size
         wait_label = f"{wait_minutes} min" if wait_minutes is not None else NOT_TRACKED
         departed = bool(log.depart_time)
         final_arrival = bool(

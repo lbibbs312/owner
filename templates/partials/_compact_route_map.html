@@ -379,7 +379,7 @@
           {% set start_depart_step = 0 if is_service_depart or requires_drop_check else 1 %}
           {% if current_user.is_day_driver %}
           {# Freight depart: one window. Follow-ups appear only when an answer needs them. #}
-          {% set stop_label = primary_stop.plant_label if primary_stop.plant_label is defined and primary_stop.plant_label else (primary_stop.board_code or 'this stop') %}
+          {% set stop_label = primary_stop.plant_label if primary_stop.plant_label is defined and primary_stop.plant_label else (primary_stop.plant if primary_stop.plant is defined and primary_stop.plant else (primary_stop.board_code or 'this stop')) %}
           {% set arrived_cargo = primary_stop.arrived_with if primary_stop.arrived_with is defined else '' %}
           {% set freight_needs_unload = requires_unload_check or (arrived_cargo and arrived_cargo not in ['Empty', '--', '']) %}
           <form class="depart-wizard freight-depart" method="POST" action="{{ depart_url }}">
@@ -423,22 +423,36 @@
                 </div>
               </div>
 
+              {% set fm = freight_memory or {'locations': [], 'commodities': [], 'weight_map': {}} %}
               <div class="freight-followup" data-freight-load-details hidden>
-                <label for="frCommodity">Hauling</label>
-                <input id="frCommodity" type="text" name="commodity" value="{{ primary_stop.commodity if primary_stop.commodity is defined and primary_stop.commodity else '' }}" placeholder="Commodity">
+                <label for="frCommodityChoice">Hauling</label>
+                <select id="frCommodityChoice">
+                  <option value="">Choose commodity</option>
+                  {% for item in fm.commodities %}<option value="{{ item }}">{{ item }} &middot; recent</option>{% endfor %}
+                  <option value="Pallets">Pallets</option>
+                  <option value="Refrigerated food">Refrigerated food</option>
+                  <option value="Mixed cargo">Mixed cargo</option>
+                  <option value="Auto parts">Auto parts</option>
+                  <option value="__other">Other&hellip;</option>
+                </select>
+                <input id="frCommodity" type="text" name="commodity" value="" placeholder="Type the commodity" hidden>
                 <div class="freight-two">
                   <div>
                     <label for="frWeight">Weight (lbs)</label>
-                    <input id="frWeight" type="text" name="weight" value="{{ primary_stop.weight if primary_stop.weight is defined and primary_stop.weight else '' }}" placeholder="e.g. 42000">
+                    <input id="frWeight" type="text" name="weight" inputmode="numeric" value="" placeholder="e.g. 42000">
                   </div>
                   <div>
                     <label for="frDest">Where to next?</label>
-                    <input id="frDest" type="text" name="destination_text" placeholder="Customer or city">
+                    <input id="frDest" type="text" name="destination_text" list="frDestMemory" autocomplete="off" placeholder="Customer or city">
+                    <datalist id="frDestMemory">
+                      {% for place in fm.locations %}<option value="{{ place }}"></option>{% endfor %}
+                    </datalist>
                   </div>
                 </div>
               </div>
 
-              <div class="freight-followup">
+              <button type="button" class="freight-note-toggle" data-freight-note-toggle>+ Add note</button>
+              <div class="freight-followup" data-freight-note hidden>
                 <label for="frNote">Note (only if something needs review)</label>
                 <input id="frNote" type="text" name="cargo_override_reason" placeholder="Optional">
               </div>
@@ -456,15 +470,40 @@
             .freight-depart .freight-toggle input[type="radio"] { position:absolute; opacity:0; pointer-events:none; }
             .freight-depart .freight-toggle label { display:flex; align-items:center; justify-content:center; min-height:52px; border:1px solid rgba(91,157,255,.3); border-radius:9px; background:rgba(10,17,28,.95); color:#dbe7ff; font-weight:950; cursor:pointer; }
             .freight-depart .freight-toggle input:checked + label { border-color:rgba(255,212,121,.6); background:rgba(58,46,18,.95); color:#ffd479; box-shadow:0 0 14px rgba(255,212,121,.22); }
+            .freight-depart [hidden] { display:none !important; }
             .freight-depart .freight-followup { display:grid; gap:8px; margin:10px 0; }
             .freight-depart .freight-two { display:grid; grid-template-columns:1fr 1.4fr; gap:10px; }
-            .freight-depart input[type="text"] { width:100%; border:1px solid rgba(91,157,255,.28); border-radius:8px; background:rgba(10,17,28,.96); color:#dbe7ff; padding:12px; font-size:1rem; }
+            .freight-depart input[type="text"], .freight-depart select { width:100%; border:1px solid rgba(91,157,255,.28); border-radius:8px; background:rgba(10,17,28,.96); color:#dbe7ff; padding:12px; font-size:1rem; }
             .freight-depart .freight-followup label { color:#8fa3bf; font-size:.7rem; font-weight:800; }
+            .freight-note-toggle { background:none; border:0; color:#7fb2ff; font-weight:800; font-size:.85rem; padding:6px 0; cursor:pointer; text-align:left; }
           </style>
           <script>
             (function () {
               var form = document.querySelector('form.freight-depart');
               if (!form) return;
+              var weightMap = {{ (freight_memory.weight_map if freight_memory else {})|tojson }};
+              var choice = form.querySelector('#frCommodityChoice');
+              var otherInput = form.querySelector('#frCommodity');
+              var weight = form.querySelector('#frWeight');
+              if (choice) choice.addEventListener('change', function () {
+                if (choice.value === '__other') {
+                  otherInput.hidden = false;
+                  otherInput.value = '';
+                  otherInput.focus();
+                } else {
+                  otherInput.hidden = true;
+                  otherInput.value = choice.value;
+                  var remembered = weightMap[(choice.value || '').toLowerCase()];
+                  if (weight && remembered && !weight.value.trim()) weight.value = remembered;
+                }
+              });
+              var noteToggle = form.querySelector('[data-freight-note-toggle]');
+              if (noteToggle) noteToggle.addEventListener('click', function () {
+                var note = form.querySelector('[data-freight-note]');
+                note.hidden = false;
+                noteToggle.hidden = true;
+                note.querySelector('input').focus();
+              });
               function sync() {
                 var loaded = form.querySelector('input[name="got_loaded"]:checked');
                 var details = form.querySelector('[data-freight-load-details]');

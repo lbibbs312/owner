@@ -79,21 +79,47 @@
     <input type="hidden" name="secondary_load" value="{{ active_secondary }}" data-no-autosave="true">
 
     {% if current_user.is_day_driver %}
-    {# Day-driver workspace: where you are + what you're hauling. No plant/part. #}
+    {# Freight stop: where you are (memory + GPS) and what you're hauling. #}
+    {% set fm = freight_memory or {'locations': [], 'commodities': [], 'weight_map': {}} %}
     <div class="mb-3">
       {{ form.location.label(class="form-label") }}
-      {{ form.location(class="form-control", placeholder="Customer, dock, yard, truck stop, or city") }}
-    </div>
-    <div class="row g-3 mb-3">
-      <div class="col-md-7">
-        {{ form.commodity.label(class="form-label") }}
-        {{ form.commodity(class="form-control", placeholder="What are you hauling in? (auto-fills from last stop)") }}
+      <div class="d-flex gap-2 align-items-stretch">
+        {{ form.location(class="form-control", placeholder="Customer, dock, yard, truck stop, or city", list="locationMemory", autocomplete="off") }}
+        <button type="button" id="gpsFillBtn" class="btn btn-primary d-flex align-items-center" style="min-width:52px;justify-content:center;" aria-label="Use my GPS location" title="Use my GPS location">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+        </button>
       </div>
-      <div class="col-md-5">
-        {{ form.weight.label(class="form-label") }}
-        {{ form.weight(class="form-control", placeholder="e.g. 42000") }}
-      </div>
+      <datalist id="locationMemory">
+        {% for place in fm.locations %}<option value="{{ place }}"></option>{% endfor %}
+      </datalist>
+      <div class="form-text" id="gpsStatus" style="min-height:1.1em;"></div>
     </div>
+    {# Cargo is captured ONCE — at departure ("Leaving loaded?"). Arriving only asks where you are. #}
+    <script>
+      (function () {
+        var gpsBtn = document.getElementById('gpsFillBtn');
+        var gpsStatus = document.getElementById('gpsStatus');
+        var locInput = document.getElementById('location');
+        if (gpsBtn) gpsBtn.addEventListener('click', function () {
+          if (!navigator.geolocation) { gpsStatus.textContent = 'GPS not available in this browser.'; return; }
+          gpsStatus.textContent = 'Getting location…';
+          navigator.geolocation.getCurrentPosition(function (pos) {
+            var lat = pos.coords.latitude.toFixed(6), lon = pos.coords.longitude.toFixed(6);
+            fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + lat + '&lon=' + lon, { headers: { 'Accept': 'application/json' } })
+              .then(function (r) { return r.json(); })
+              .then(function (data) {
+                var a = data.address || {};
+                var name = data.name || a.amenity || a.shop || a.building || '';
+                var parts = [name, a.road, a.city || a.town || a.village, a.state]
+                  .filter(function (x, i, arr) { return x && arr.indexOf(x) === i; });
+                locInput.value = parts.join(', ') || (lat + ', ' + lon);
+                gpsStatus.textContent = '';
+              })
+              .catch(function () { locInput.value = lat + ', ' + lon; gpsStatus.textContent = ''; });
+          }, function () { gpsStatus.textContent = 'Could not get GPS — type the location.'; }, { enableHighAccuracy: true, timeout: 10000 });
+        });
+      })();
+    </script>
     {% else %}
     <div class="mb-3">
       <label class="form-label" for="arrivalPlant">{{ 'Start location' if not has_today_logs else form.plant_name.label.text }}</label>
@@ -110,6 +136,13 @@
     </div>
     {% endif %}
 
+    {% if current_user.is_day_driver %}
+    {# Freight: truck-issue and meeting capture live behind Service / the bottom bar, not on every stop. #}
+    <div class="d-flex flex-wrap gap-3 mb-3">
+      <div class="form-check">{{ form.fuel(class="form-check-input", id="fuelCheck") }} {{ form.fuel.label(class="form-check-label") }}</div>
+      <div class="w-100 d-none" id="fuelMileagePanel">{{ form.fuel_mileage.label(class="form-label") }}{{ form.fuel_mileage(class="form-control", placeholder="Current odometer reading") }}</div>
+    </div>
+    {% else %}
     <div class="d-flex flex-wrap gap-3 mb-3">
       <div class="form-check">{{ form.maintenance(class="form-check-input", id="maintenanceCheck") }} {{ form.maintenance.label(class="form-check-label") }}</div>
       <div class="w-100 conditional-panel" id="truckIssuePanel">
@@ -122,6 +155,7 @@
       <div class="w-100 d-none" id="fuelMileagePanel">{{ form.fuel_mileage.label(class="form-label") }}{{ form.fuel_mileage(class="form-control", placeholder="Current odometer reading") }}</div>
       <div class="form-check">{{ form.meeting(class="form-check-input") }} {{ form.meeting.label(class="form-check-label") }}</div>
     </div>
+    {% endif %}
 
     {{ form.submit(class="btn btn-primary", value=("Start Route" if not has_today_logs else "Record Stop")) }}
   </form>
