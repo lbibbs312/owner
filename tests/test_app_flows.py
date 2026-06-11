@@ -7659,7 +7659,7 @@ def test_mobile_dashboard_active_between_stops_prioritizes_add_stop_over_posttri
     assert b"PostTrip Due" not in page.data
     assert b'<a class="md-flow-primary-cta add-stop-action"' in page.data
     # In transit with cargo: destination-named continuation (D) or add-destination (E).
-    assert b"Start Unloading" in page.data or b"Add Destination Stop" in page.data
+    assert b"Arrive at Raleigh West" in page.data or b"Add Destination Stop" in page.data
     assert b"Finalize Route" not in page.data
     assert b'<div class="md-flow-top-actions"' not in page.data
     assert b"md-flow-action-tab" not in page.data
@@ -8641,7 +8641,7 @@ def test_mobile_quick_depart_shows_add_next_stop_and_creates_second_stop(client,
     body = mobile.get_data(as_text=True)
 
     assert mobile.status_code == 200
-    assert "Start Unloading" in body or "Add Destination Stop" in body
+    assert "Arrive at Raleigh East" in body or "Add Destination Stop" in body
     assert body.count('class="md-flow-primary-cta add-stop-action"') == 1
     assert 'href="/new_driving_log?next=mobile' in body
     assert 'expected_destination=RE' in body
@@ -8678,9 +8678,9 @@ def test_mobile_quick_depart_shows_add_next_stop_and_creates_second_stop(client,
 
     refreshed = client.get("/mobile")
     assert refreshed.status_code == 200
-    # Open stop with cargo: record-departure CTA (C) or start-unloading at the
-    # destination (F).
-    assert b"Record Departure" in refreshed.data or b"Start Unloading" in refreshed.data
+    # Open stop with cargo still opens the departure flow, including unload status.
+    assert b"Record Departure" in refreshed.data
+    assert b"Start Unloading" not in refreshed.data
     assert refreshed.get_data(as_text=True).count('data-flow-panel-title="Depart Quick Flow"') == 1
 
 
@@ -8975,7 +8975,7 @@ def test_quick_depart_service_stop_continues_to_add_next_stop_without_truck_issu
     body = mobile.get_data(as_text=True)
     assert mobile.status_code == 200
     assert 'class="md-flow-primary-cta add-stop-action"' in body
-    assert "Start Unloading" in body or "Add Destination Stop" in body
+    assert "Arrive at Raleigh East" in body or "Add Destination Stop" in body
     assert 'href="/new_driving_log?next=mobile' in body
     assert 'expected_destination=RE' in body
     assert 'class="md-flow-primary-cta add-stop-action" href="/new_driving_log?report_type=truck_issue"' not in body
@@ -10510,6 +10510,8 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     assert "nominatim.openstreetmap.org" not in body
     assert "Google Places key is missing on the server. Saved places only." in body
     assert "Google Places is blocked for this server key. Saved places only." in body
+    assert "No Google places found here - type the address and name" in body
+    assert "Google places could not be reached - type the address and name" in body
 
     created = client.post(
         "/new_driving_log",

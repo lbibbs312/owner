@@ -182,6 +182,7 @@
             if (placeChoices) placeChoices.hidden = true;
             return;
           }
+          placeSelect.disabled = false;
           placeSelect.innerHTML = '';
           currentCandidates.forEach(function (candidate, index) {
             var option = document.createElement('option');
@@ -189,6 +190,18 @@
             option.textContent = candidateLabel(candidate);
             placeSelect.appendChild(option);
           });
+          placeChoices.hidden = false;
+        }
+
+        function renderPlaceNotice(message) {
+          currentCandidates = [];
+          if (!placeChoices || !placeSelect) return;
+          placeSelect.innerHTML = '';
+          var option = document.createElement('option');
+          option.value = '';
+          option.textContent = message || 'No GPS place matches returned';
+          placeSelect.appendChild(option);
+          placeSelect.disabled = true;
           placeChoices.hidden = false;
         }
 
@@ -244,6 +257,7 @@
         function fillFromGps(auto) {
           if (!navigator.geolocation) {
             if (!auto) gpsStatus.textContent = 'GPS not available in this browser.';
+            if (!auto) renderPlaceNotice('GPS is not available in this browser');
             return;
           }
           gpsStatus.textContent = 'Getting precise location...';
@@ -257,6 +271,11 @@
             var params = new URLSearchParams({ lat: lat, lng: lon });
             if (accuracy !== null) params.set('accuracy', String(accuracy));
             if (gpsPlaceHint) params.set('hint', gpsPlaceHint);
+            if (!gpsPlacesUrl) {
+              renderPlaceNotice('GPS lookup is not available on this page');
+              gpsStatus.textContent = 'GPS lookup is not available on this page.';
+              return;
+            }
             fetch(gpsPlacesUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
               .then(function (r) { return r.json(); })
               .then(function (data) {
@@ -279,8 +298,16 @@
                   );
                   return;
                 }
+                if (googleError) {
+                  renderPlaceNotice(googleError);
+                  gpsStatus.textContent = googleError;
+                  return;
+                }
                 if (data.fallback_address && (!auto || !addressInput.value.trim())) {
                   addressInput.value = data.fallback_address;
+                }
+                if (!data.fallback_address) {
+                  renderPlaceNotice('No Google places found here - type the address and name');
                 }
                 gpsStatus.textContent = googleError || (accuracy
                   ? 'GPS set (+/-' + accuracy + ' m). Type the place name if needed.'
@@ -288,17 +315,20 @@
               })
               .catch(function () {
                 renderCandidates(savedPlaces);
+                if (!savedPlaces.length) renderPlaceNotice('Google places could not be reached - type the address and name');
                 gpsStatus.textContent = accuracy
                   ? 'GPS coordinates set (+/-' + accuracy + ' m). Type or pick the place.'
                   : 'GPS coordinates set. Type or pick the place.';
               });
           }, function () {
             gpsStatus.textContent = auto ? '' : 'Could not get GPS - type the address.';
+            if (!auto) renderPlaceNotice('Could not get GPS - type the address and name');
           });
         }
 
         if (placeSelect) {
           placeSelect.addEventListener('change', function () {
+            if (placeSelect.disabled) return;
             applyCandidate(currentCandidates[Number(placeSelect.value)], true);
           });
         }

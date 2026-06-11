@@ -1358,7 +1358,7 @@ def test_pickup_label_graduates_to_delivered_after_drop_completes(app):
     assert pickup["board_flow"]["deliver_state"] == "delivered"
 
 
-def test_in_transit_cta_says_start_unloading(app):
+def test_in_transit_cta_says_arrive_at_destination(app):
     """A known in-transit destination names it on the add-stop continuation CTA."""
     from types import SimpleNamespace
     from app.services.route_context import build_route_cta_context
@@ -1382,7 +1382,7 @@ def test_in_transit_cta_says_start_unloading(app):
         today_local_date=date.today(),
     )
 
-    assert cta["primary_cta"]["label"] == "Start Unloading"
+    assert cta["primary_cta"]["label"] == "Arrive at Raleigh East"
     assert cta["primary_cta"]["action"] == "add_stop"
 
 
@@ -1601,15 +1601,29 @@ def test_cta_open_stop_shows_record_departure():
     assert cta["primary_cta"]["action"] == "record_departure"
 
 
-def test_cta_departed_with_known_destination_says_start_unloading():
+def test_cta_departed_with_known_destination_says_arrive_at_destination():
     from types import SimpleNamespace
     departed = SimpleNamespace(id=1, depart_time="08:20")
     cta = _cta_for(current_stop=departed, rows=[{"log_id": 1}], all_departed=True,
                    route_status="active", route_is_active=True, has_active_shift=True,
                    current_cargo={"value": "Raleigh East Load", "destination_label": "Raleigh East"})
-    assert cta["primary_cta"]["label"] == "Start Unloading"
+    assert cta["primary_cta"]["label"] == "Arrive at Raleigh East"
     assert cta["primary_cta"]["action"] == "add_stop"
-    assert "Arrived at" not in cta["primary_cta"]["label"]  # action verb, not a status
+    assert "Start Unloading" not in cta["primary_cta"]["label"]
+
+
+def test_cta_open_destination_stop_labels_departure_flow():
+    current = _cta_open_stop(plant="Raleigh East", load_size="Raleigh East Load")
+    cta = _cta_for(
+        current_stop=current,
+        rows=[{"log_id": 1}],
+        route_status="active",
+        route_is_active=True,
+        has_active_shift=True,
+        current_cargo={"value": "Raleigh East Load", "destination_label": "Raleigh East"},
+    )
+    assert cta["primary_cta"]["label"] == "Record Departure at Raleigh East"
+    assert cta["primary_cta"]["action"] == "record_departure"
 
 
 def test_cta_departed_with_unknown_destination_adds_destination_stop():

@@ -407,10 +407,11 @@ def build_route_cta_context(
                 and dest_label.strip().lower() == plant.strip().lower()
             )
             if at_destination:
-                # Arrived at this cargo's destination with it onboard — unload (F).
-                next_action = "Start unloading"
-                primary = _route_cta(f"Start Unloading at {plant}", "record_departure")
-                route_message = f"Arrived at {plant} with cargo — start unloading."
+                # The next screen is still the departure flow: it asks whether
+                # the cargo was unloaded, then records leaving this stop.
+                next_action = "Record Departure"
+                primary = _route_cta(f"Record Departure at {plant}", "record_departure")
+                route_message = f"Arrived at {plant} with cargo — record unload status and departure."
             else:
                 # Open stop, generic departure (state C).
                 next_action = "Record departure"
@@ -518,10 +519,9 @@ def build_route_cta_context(
             allowed_actions = ["start_shift", "route_history"]
             route_message = "No active route yet. Start your route with the PreTrip."
 
-    # In transit with cargo onboard: prompt to start unloading (state D) or to
+    # In transit with cargo onboard: prompt to record arrival (state D) or to
     # add a destination when it's unknown (state E), instead of a generic "Add
-    # Stop". The label stays "Start Unloading" (no single destination named) so
-    # it doesn't get confusing when the truck is loaded for several drops.
+    # Stop".
     current_cargo = getattr(route_context, "current_cargo", None)
     in_transit_destination = (
         current_cargo.get("destination_label") if isinstance(current_cargo, dict) else None
@@ -533,9 +533,9 @@ def build_route_cta_context(
     arrival_cta_already_named = str(next_action or "").lower().startswith(("arrive", "record arrival"))
     if primary and primary.get("action") == "add_stop" and cargo_onboard and not arrival_cta_already_named:
         if in_transit_destination:
-            next_action = "Start Unloading"
-            primary = _route_cta("Start Unloading", "add_stop")
-            route_message = "Press when you reach your drop-off to start unloading."
+            next_action = f"Arrive at {in_transit_destination}"
+            primary = _route_cta(next_action, "add_stop")
+            route_message = "Press when you reach your drop-off to record arrival."
         else:
             next_action = "Add Destination Stop"
             primary = _route_cta("Add Destination Stop", "add_stop")
