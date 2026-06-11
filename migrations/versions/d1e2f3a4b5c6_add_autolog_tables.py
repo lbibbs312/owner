@@ -101,7 +101,7 @@ def upgrade():
             sa.Column("place_memory_id", sa.Integer(), sa.ForeignKey("autolog_place_memory.id"), nullable=True),
             sa.Column("likely_place_label", sa.String(length=120), nullable=True),
             sa.Column("status", sa.String(length=20), nullable=False, server_default="open"),
-            sa.Column("needs_review", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+            sa.Column("needs_review", sa.Boolean(), nullable=False, server_default=sa.true()),
             sa.Column("created_at", sa.DateTime(), nullable=True),
         )
 
@@ -170,7 +170,7 @@ def upgrade():
             sa.Column("client_event_id", sa.String(length=80), nullable=False),
             sa.Column("event_type", sa.String(length=40), nullable=False),
             sa.Column("payload_json", sa.JSON(), nullable=True),
-            sa.Column("applied", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+            sa.Column("applied", sa.Boolean(), nullable=False, server_default=sa.false()),
             sa.Column("received_at", sa.DateTime(), nullable=True),
             sa.UniqueConstraint("user_id", "client_event_id", name="uq_autolog_sync_client_event"),
         )
