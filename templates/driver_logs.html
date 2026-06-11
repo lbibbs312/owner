@@ -1229,7 +1229,7 @@
               {% endif %}
 
               <div class="md-row-actions">
-                <a href="{{ url_for(log_view_endpoint, log_id=log.id) if current_user.role == 'management' else url_for('driver.driver_logs_print', date=log.date.isoformat()) }}" class="md-row-action"><span class="md-btn-icon">O</span> View</a>
+                <a href="{{ url_for(log_view_endpoint, log_id=log.id) if current_user.role == 'management' else url_for('driver.driver_logs_print', date=log.date.isoformat()) }}" class="md-row-action">View</a>
                 {% if can_manage_log %}
                   <details class="md-row-more-actions">
                     <summary class="md-row-action">Stop actions</summary>
@@ -1254,7 +1254,7 @@
           </details>
         {% endfor %}
         </div>
-        <div class="md-ledger-ticker md-flow-ticker" aria-hidden="true"><span>{{ dispatch_ticker_text }}</span><span>{{ dispatch_ticker_text }}</span></div>
+        {% if not current_user.is_day_driver %}<div class="md-ledger-ticker md-flow-ticker" aria-hidden="true"><span>{{ dispatch_ticker_text }}</span></div>{% endif %}
       </div>
     {% else %}
     <div class="table-responsive">

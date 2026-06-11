@@ -368,7 +368,11 @@ def _compact_cargo_label(value):
         return "--"
     if is_empty_load(text):
         return "Empty"
-    return "Parts"
+    if destination_from_load(value):
+        # Plant-bound fleet load: the cargo itself is parts.
+        return "Parts"
+    # Freight/freeform cargo (a commodity) is its own label.
+    return text
 
 
 def _cargo_destination_label(value):
@@ -423,6 +427,8 @@ def _board_flow_summary(
     delivery_label = _clean(delivery_label)
     arrived_destination = _cargo_destination_label(arrived_with)
     departed_destination = _cargo_destination_label(departed_with) if closed else ""
+    # Freight departures carry a free-text destination on the log itself.
+    freight_destination = _clean(getattr(log, "destination", ""))
 
     # A pickup/carry leg names where cargo is *headed*, not where it was dropped.
     # Only call it "delivered" once the row's drop is actually complete.
@@ -444,7 +450,7 @@ def _board_flow_summary(
         return _with_route_pair(
             {"mode": "action", "plant": label, "action": "Picked up", "cargo": departed},
             pickup=label,
-            deliver=delivery_label or departed_destination or UNKNOWN_DESTINATION_LABEL,
+            deliver=delivery_label or departed_destination or freight_destination or UNKNOWN_DESTINATION_LABEL,
             deliver_state=transit_state,
         )
     if arrived != "Empty" and departed == "Empty":
@@ -465,13 +471,13 @@ def _board_flow_summary(
         return _with_route_pair(
             {"mode": "action", "plant": label, "action": "Carrying", "cargo": arrived},
             pickup=pickup_label or UNKNOWN_PICKUP_SOURCE_LABEL,
-            deliver=delivery_label or departed_destination or arrived_destination or UNKNOWN_DESTINATION_LABEL,
+            deliver=delivery_label or departed_destination or arrived_destination or freight_destination or UNKNOWN_DESTINATION_LABEL,
             deliver_state=transit_state,
         )
     return _with_route_pair(
         {"mode": "change", "plant": label, "from": arrived, "to": departed},
         pickup=pickup_label or (label if departed != "Empty" else UNKNOWN_PICKUP_SOURCE_LABEL),
-        deliver=delivery_label or departed_destination or arrived_destination or UNKNOWN_DESTINATION_LABEL,
+        deliver=delivery_label or departed_destination or arrived_destination or freight_destination or UNKNOWN_DESTINATION_LABEL,
         deliver_state=transit_state,
     )
 
@@ -1413,10 +1419,14 @@ def _part_labels(log, *extra_parts):
     return labels
 
 
-def _delivery_destination(load_label, fallback_plant):
+def _delivery_destination(load_label, fallback_plant, log=None):
     destination = destination_from_load(load_label)
     if destination:
         return plant_label(destination), destination
+    # Freight: the driver typed where this load is going at departure.
+    freight_destination = _clean(getattr(log, "destination", "")) if log is not None else ""
+    if freight_destination:
+        return freight_destination, _norm_key(f"freight:{freight_destination}")
     return UNKNOWN_DESTINATION_LABEL, "destination-needs-confirmation"
 
 
@@ -1559,7 +1569,7 @@ def _build_delivery_narratives(route_context):
 
         for cargo_label in removed:
             cargo_key = _norm_key(cargo_label)
-            destination_label, destination_key = _delivery_destination(cargo_label, plant_label_text)
+            destination_label, destination_key = _delivery_destination(cargo_label, plant_label_text, log)
             pickup = pending_by_cargo.pop(cargo_key, None)
             if pickup and pending_by_destination.get(destination_key) is pickup:
                 pending_by_destination.pop(destination_key, None)
@@ -1593,7 +1603,7 @@ def _build_delivery_narratives(route_context):
             _add_narrative_detail(groups, key, group, detail)
 
         for cargo_label in added:
-            destination_label, destination_key = _delivery_destination(cargo_label, plant_label_text)
+            destination_label, destination_key = _delivery_destination(cargo_label, plant_label_text, log)
             info = _pickup_info(log, row, route, cargo_label)
             pending_by_cargo[_norm_key(cargo_label)] = info
             pending_by_destination[destination_key] = info

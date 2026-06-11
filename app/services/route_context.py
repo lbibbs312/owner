@@ -297,12 +297,12 @@ def build_route_cta_context(
             allowed_actions = ["confirm_cargo"]
             route_message = f"Confirm what you picked up at {plant}." if plant else "Confirm cargo for this stop."
         elif stop_cargo == "empty":
-            # Arrived empty — but the driver may still pick up here. Use a neutral
-            # depart label that leads into the "did you get loaded?" flow instead
-            # of presuming they leave empty (which sent drivers to Edit by
-            # mistake when they actually had a pickup).
-            next_action = "Depart & Load"
-            primary = _route_cta("Depart & Load", "record_departure")
+            # Arrived empty — but the driver may still pick up here. "Record
+            # Departure" describes the act honestly (loading happens before you
+            # leave; the depart flow just asks whether it did) instead of
+            # implying depart and load are simultaneous.
+            next_action = "Record Departure"
+            primary = _route_cta("Record Departure", "record_departure")
             allowed_actions = ["record_departure", "add_damage", "add_note"]
             route_message = f"Record your departure from {plant} — note any pickup." if plant else "Record your departure — note any pickup."
         else:

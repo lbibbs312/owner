@@ -778,7 +778,7 @@
       </div>
     </div>
 
-	    {% if show_dispatch_ticker %}
+	    {% if show_dispatch_ticker and not current_user.is_day_driver %}
 	    <div class="md-flow-ticker" aria-hidden="true">
 	      <div class="md-flow-ticker-track">
 	        <span>{{ dispatch_ticker_text }}</span>
@@ -859,7 +859,7 @@
         {{ rm.map_empty_message if rm and rm.map_empty_message else 'No route stops logged for this date.' }}
       {% endif %}
     </div>
-	    {% if show_dispatch_ticker %}
+	    {% if show_dispatch_ticker and not current_user.is_day_driver %}
 	    <div class="md-flow-ticker" aria-hidden="true">
 	      <div class="md-flow-ticker-track">
 	        <span>{{ dispatch_ticker_text }}</span>
