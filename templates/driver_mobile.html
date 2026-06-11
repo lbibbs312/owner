@@ -4893,6 +4893,29 @@
           Day-Driver Freight Workspace &middot; logging by commodity &amp; weight (no plant/part)
           <span style="opacity:.85;font-weight:600;"> &middot; {% if dd_rt == 'general_freight' %}General Freight / Owner-Operator{% elif dd_rt == 'company_shuttle' %}Company Shuttle{% else %}Local / Short-Haul{% endif %}</span>
         </div>
+        {% if duty_card %}
+        <section style="margin:8px 12px;padding:12px;border-radius:9px;background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(10,17,28,.96));border:1px solid rgba(91,157,255,.22);box-shadow:0 18px 40px rgba(0,0,0,.28);">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:9px;">
+            <span style="color:#8fa3bf;font-size:11px;font-weight:950;letter-spacing:.08em;text-transform:uppercase;">Duty Status &middot; Daily Log</span>
+            <a href="{{ url_for('driver.daily_log') }}" style="color:#7fb2ff;font-size:12.5px;font-weight:800;text-decoration:none;">Today's Log &rarr;</a>
+          </div>
+          <div style="color:#dbe7ff;font-weight:900;font-size:15px;margin-bottom:10px;">
+            {{ duty_card.label }}
+            <span style="color:#8fa3bf;font-weight:600;font-size:12px;">since {{ duty_card.since.strftime('%I:%M %p')|lower }}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4, minmax(0,1fr));gap:8px;">
+            {% for s, short in [('off','OFF'), ('sb','SB'), ('d','D'), ('on','ON')] %}
+            <form method="POST" action="{{ url_for('driver.duty_status') }}" style="margin:0;">
+              <input type="hidden" name="status" value="{{ s }}">
+              <input type="hidden" name="next" value="mobile">
+              <button type="submit" style="width:100%;padding:12px 4px;border-radius:8px;font-weight:950;font-size:14px;cursor:pointer;
+                {% if duty_card.status == s %}border:1px solid rgba(255,212,121,.6);background:rgba(58,46,18,.95);color:#ffd479;
+                {% else %}border:1px solid rgba(91,157,255,.28);background:rgba(10,17,28,.95);color:#dbe7ff;{% endif %}">{{ short }}</button>
+            </form>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
       {% endif %}
       {% set cta = route_cta if route_cta is defined and route_cta else {} %}
       {% set primary = cta.primary_cta if cta.primary_cta is defined else none %}

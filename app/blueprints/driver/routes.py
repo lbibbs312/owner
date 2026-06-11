@@ -27,6 +27,8 @@ from app.forms.plant_transfer import PlantTransferForm
 from app.forms.shift import EndOfDayForm
 from app.forms.trip import PostTripForm, PreTripForm
 from app.forms.user import ProfileForm
+from app.models.duty import DutyStatusEvent
+from app.services import duty_log as duty_log_service
 from app.services import hos as hos_service
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
@@ -6854,14 +6856,18 @@ def _inject_open_break():
                 if start_time.tzinfo is not None:
                     start_time = start_time.astimezone(pytz.utc).replace(tzinfo=None)
                 elapsed_seconds = max(0, int((datetime.utcnow() - start_time).total_seconds()))
+            duty_card = None
+            if getattr(current_user, "is_day_driver", False):
+                duty_card = duty_log_service.current_status(current_user.id)
             return {
                 "open_break": open_break,
                 "open_break_elapsed_seconds": elapsed_seconds,
                 "open_break_elapsed_label": _format_duration(elapsed_seconds),
+                "duty_card": duty_card,
             }
     except Exception:  # pragma: no cover - never block a render on this
         pass
-    return {"open_break": None, "open_break_elapsed_seconds": 0, "open_break_elapsed_label": "00:00"}
+    return {"open_break": None, "open_break_elapsed_seconds": 0, "open_break_elapsed_label": "00:00", "duty_card": None}
 
 
 @bp.route("/mobile/toggle-day-driver", methods=["POST"])
@@ -7350,3 +7356,284 @@ def complete_task(task_id):
 @login_required
 def show_map():
     return redirect(url_for("driver.mobile_dashboard"))
+
+
+# --- Driver's Daily Log (day-driver / solo freight workspace) ---------------
+# The classic OFF/SB/D/ON record-of-duty-status grid, generated from captured
+# events and exportable like the other branded print documents. Gated to
+# day-driver mode so the fleet flow is untouched. Not a certified ELD.
+
+
+def _daily_log_guard():
+    if current_user.role == "management":
+        flash("The Daily Log is a driver workspace.", "warning")
+        return redirect(url_for("manager.manager_dashboard"))
+    if not current_user.is_day_driver:
+        flash("Turn on Day Driver mode to use the Daily Log.", "info")
+        return redirect(url_for("driver.mobile_dashboard"))
+    return None
+
+
+def _daily_log_document_meta(day, driver, page="1 of 1"):
+    return document_meta(
+        "DRIVER'S DAILY LOG", f"DDL-{day.strftime('%Y%m%d')}-D{driver.id}", page=page
+    )
+
+
+def _daily_log_view_model(day, *, theme="paper"):
+    now_local = datetime.now(pytz.timezone("America/Detroit"))
+    segments, events = duty_log_service.day_segments(current_user.id, day, now_local=now_local)
+    totals = duty_log_service.totals_minutes(segments)
+    recap = duty_log_service.recap(current_user.id, day, now_local=now_local)
+    pretrips = _active_pretrips_query().filter_by(user_id=current_user.id, pretrip_date=day).all()
+    truck = _truck_from_pretrips(pretrips)
+    odo_start = next((p.start_mileage for p in pretrips if p.start_mileage), None)
+    odo_end = None
+    miles = None
+    for pretrip in pretrips:
+        posttrip = PostTrip.query.filter_by(pretrip_id=pretrip.id).order_by(PostTrip.id.desc()).first()
+        if posttrip:
+            odo_end = posttrip.end_mileage or odo_end
+            miles = posttrip.miles_driven or miles
+    if miles is None and odo_start and odo_end and odo_end > odo_start:
+        miles = odo_end - odo_start
+    return {
+        "day": day,
+        "segments": segments,
+        "events": events,
+        "totals": totals,
+        "totals_fmt": {k: duty_log_service.fmt_hm(v) for k, v in totals.items()},
+        "recap": recap,
+        "grid_svg": duty_log_service.grid_svg(segments, day=day, now_local=now_local, theme=theme),
+        "truck": truck,
+        "odo_start": odo_start,
+        "odo_end": odo_end,
+        "miles": miles,
+        "manual_count": sum(1 for e in events if e["source"] == "manual"),
+        "status_labels": duty_log_service.STATUS_LABELS,
+        "status_short": duty_log_service.STATUS_SHORT,
+        "not_an_eld": duty_log_service.NOT_AN_ELD,
+        "fmt_hm": duty_log_service.fmt_hm,
+        "is_today": day == _today_local_date(),
+    }
+
+
+@bp.route("/daily_log")
+@login_required
+def daily_log():
+    guard = _daily_log_guard()
+    if guard:
+        return guard
+    day = _selected_log_date_from_request()
+    view = _daily_log_view_model(day, theme="dark")
+    today = _today_local_date()
+    prev_day = day - timedelta(days=1)
+    next_day = day + timedelta(days=1) if day < today else None
+    return render_template(
+        "daily_log.html",
+        view=view,
+        the_date=day,
+        prev_url=url_for("driver.daily_log", date=prev_day.isoformat()),
+        next_url=url_for("driver.daily_log", date=next_day.isoformat()) if next_day else None,
+        today_url=url_for("driver.daily_log"),
+        duty_now=duty_log_service.current_status(current_user.id),
+    )
+
+
+@bp.route("/duty/status", methods=["GET", "POST"])
+@login_required
+def duty_status():
+    guard = _daily_log_guard()
+    if guard:
+        return guard
+    if request.method == "POST":
+        status = (request.form.get("status") or "").strip().lower()
+        if status not in DutyStatusEvent.STATUSES:
+            flash("Pick a duty status.", "warning")
+            return redirect(url_for("driver.duty_status"))
+        location = (request.form.get("location") or "").strip()[:160] or None
+        note = (request.form.get("note") or "").strip()[:200] or None
+        db.session.add(
+            DutyStatusEvent(
+                user_id=current_user.id,
+                status=status,
+                at=datetime.utcnow(),
+                location=location,
+                note=note,
+            )
+        )
+        db.session.commit()
+        label = duty_log_service.STATUS_LABELS.get(status, status)
+        record_activity(
+            user_id=current_user.id,
+            category="hos",
+            action="duty_status_set",
+            title=f"Duty status: {label}",
+            details=location or "",
+            target_type="duty_status_event",
+        )
+        flash(f"Duty status set to {label}.", "success")
+        if request.form.get("next") == "mobile":
+            return redirect(url_for("driver.mobile_dashboard"))
+        return redirect(url_for("driver.daily_log"))
+    last_located = (
+        DutyStatusEvent.query.filter(
+            DutyStatusEvent.user_id == current_user.id, DutyStatusEvent.location.isnot(None)
+        )
+        .order_by(DutyStatusEvent.at.desc())
+        .first()
+    )
+    return render_template(
+        "duty_status_form.html",
+        duty_now=duty_log_service.current_status(current_user.id),
+        status_labels=duty_log_service.STATUS_LABELS,
+        status_short=duty_log_service.STATUS_SHORT,
+        last_location=last_located.location if last_located else "",
+        not_an_eld=duty_log_service.NOT_AN_ELD,
+    )
+
+
+@bp.route("/daily_log/print")
+@login_required
+def daily_log_print():
+    guard = _daily_log_guard()
+    if guard:
+        return guard
+    day = _selected_log_date_from_request()
+    view = _daily_log_view_model(day)
+    shift_record = _shift_record_for_driver_date(current_user.id, day, require_signature=True)
+    record_activity(
+        user_id=current_user.id,
+        category="print",
+        action="daily_log_printed",
+        title="Daily log printed",
+        details=f"Record of duty status for {day}.",
+        target_type="duty_status_event",
+    )
+    return render_template(
+        "daily_log_print.html",
+        view=view,
+        the_date=day,
+        document_meta=_daily_log_document_meta(day, current_user),
+        driver_signature=shift_record.driver_signature if shift_record else None,
+        signature_timestamp=shift_record.signature_timestamp if shift_record else None,
+        attachment_url=url_for("driver.daily_log_attachment", date=day.isoformat()),
+    )
+
+
+def _build_daily_log_pdf(day, driver, view, driver_signature=None):
+    pdf = SimplePdf("Driver's Daily Log", LETTER)
+    width, height = LETTER
+    x = 36
+    y = height - 40
+    pdf.text(x, y, "DRIVER'S DAILY LOG", size=15, bold=True, color=MD_PDF_BLUE)
+    pdf.brand_signature(y=y)
+    y -= 14
+    pdf.text(x, y, f"{driver.display_name}  -  {day.strftime('%A, %B %d, %Y')}", size=10, bold=True)
+    meta = _daily_log_document_meta(day, driver)
+    pdf.text(width - 200, y, f"{meta['document_no']}", size=8)
+    y -= 12
+    facts = []
+    if view["truck"]:
+        facts.append(f"Truck {view['truck']}")
+    if view["odo_start"]:
+        facts.append(f"Odometer start {view['odo_start']:,}")
+    if view["odo_end"]:
+        facts.append(f"end {view['odo_end']:,}")
+    if view["miles"]:
+        facts.append(f"{view['miles']:,} miles")
+    facts.append("USA Property 70 hour / 8 day")
+    pdf.text(x, y, "  -  ".join(facts), size=8)
+    y -= 10
+    pdf.line(x, y, width - x, y, width=1.2)
+    y -= 14
+
+    pdf.text(x, y, "RECORD OF DUTY STATUS", size=9, bold=True, color=MD_PDF_BLUE)
+    y -= 8
+    y = duty_log_service.draw_grid_pdf(pdf, x, y, width - 2 * x, view["segments"], day=day)
+
+    events = view["events"]
+    if events:
+        pdf.text(x, y, "DUTY EVENTS", size=9, bold=True, color=MD_PDF_BLUE)
+        y -= 14
+        rows = []
+        for ev in events[:14]:
+            rows.append(
+                [
+                    ev["at"].strftime("%I:%M %p").lstrip("0"),
+                    ev["status_short"],
+                    ev["label"],
+                    ev["location"] or "",
+                    ev["note"] or "",
+                ]
+            )
+        y = pdf.table(
+            x,
+            y,
+            [56, 32, 110, 160, 182],
+            18,
+            ["Time", "Status", "Event", "Location / Stop", "Note"],
+            rows,
+            font_size=7.5,
+            header_rgb=MD_PDF_BLUE,
+            header_color=(255, 255, 255),
+        )
+        if len(events) > 14:
+            y -= 10
+            pdf.text(x, y, f"+ {len(events) - 14} more events on the full log page.", size=7)
+        y -= 16
+
+    recap = view["recap"]
+    if recap["has_data"]:
+        fmt = duty_log_service.fmt_hm
+        pdf.text(x, y, "RECAP - 70 HOUR / 8 DAY", size=9, bold=True, color=MD_PDF_BLUE)
+        y -= 12
+        recap_line = "   ".join(f"{row['date'].strftime('%m/%d')}: {row['label']}" for row in recap["rows"])
+        pdf.text(x, y, recap_line, size=7.5)
+        y -= 11
+        pdf.text(
+            x,
+            y,
+            f"Worked today {fmt(recap['worked_today'])}   -   8-day total {fmt(recap['total_8day'])}"
+            f"   -   Hours available {fmt(recap['available'])}",
+            size=8,
+            bold=True,
+        )
+        y -= 18
+
+    pdf.text(
+        x,
+        y,
+        "I hereby certify that my data entries and my record of duty status for this day are true and correct.",
+        size=8,
+    )
+    y -= 30
+    if driver_signature and not pdf.image_png_data_url(driver_signature, x, y - 4, 120, 28):
+        pass
+    pdf.line(x, y - 6, x + 220, y - 6, width=0.8)
+    pdf.text(x, y - 16, "Driver Signature", size=7)
+    pdf.text(x + 260, y - 16, "Date: ____________", size=7)
+    pdf.text(x, 30, duty_log_service.NOT_AN_ELD, size=6.6, color=(120, 128, 140))
+    return pdf.build()
+
+
+@bp.route("/daily_log/attachment")
+@login_required
+def daily_log_attachment():
+    guard = _daily_log_guard()
+    if guard:
+        return guard
+    day = _selected_log_date_from_request()
+    view = _daily_log_view_model(day)
+    shift_record = _shift_record_for_driver_date(current_user.id, day, require_signature=True)
+    return _document_attachment_response(
+        pdf_bytes=_build_daily_log_pdf(
+            day,
+            current_user,
+            view,
+            driver_signature=shift_record.driver_signature if shift_record else None,
+        ),
+        filename=f"daily-log-{day}.pdf",
+        target_type="duty_status_event",
+        title="Daily Log PDF downloaded",
+    )

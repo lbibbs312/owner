@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+
+<style>
+  .duty-shell {
+    width:min(640px, 100%);
+    margin:0 auto;
+    padding:18px 14px 28px;
+    display:grid;
+    gap:14px;
+  }
+  .duty-head { display:grid; gap:5px; }
+  .duty-head p {
+    margin:0;
+    color:var(--md-amber);
+    font-family:var(--md-mono);
+    font-size:.72rem;
+    font-weight:950;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+  }
+  .duty-head h1 {
+    margin:0;
+    color:var(--md-text);
+    font-family:var(--md-display);
+    font-size:clamp(1.9rem, 7vw, 3rem);
+    font-weight:950;
+    line-height:.95;
+    text-transform:uppercase;
+  }
+  .duty-now { color:var(--md-muted); font-size:.85rem; }
+  .duty-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .duty-grid input[type="radio"] { position:absolute; opacity:0; pointer-events:none; }
+  .duty-opt {
+    display:grid;
+    gap:4px;
+    align-content:center;
+    justify-items:center;
+    min-height:86px;
+    border:1px solid rgba(91,157,255,.28);
+    border-radius:10px;
+    background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(10,17,28,.96));
+    color:var(--md-text);
+    cursor:pointer;
+    text-align:center;
+    padding:12px 8px;
+  }
+  .duty-opt strong { font-family:var(--md-display); font-size:1.5rem; font-weight:950; }
+  .duty-opt span {
+    color:var(--md-muted);
+    font-family:var(--md-mono);
+    font-size:.64rem;
+    font-weight:950;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+  }
+  .duty-grid input[type="radio"]:checked + .duty-opt {
+    border-color:#ffd479;
+    background:linear-gradient(180deg, rgba(58,46,18,.96), rgba(34,27,12,.96));
+    box-shadow:0 0 0 1px rgba(255,212,121,.45), 0 16px 34px rgba(0,0,0,.3);
+  }
+  .duty-grid input[type="radio"]:checked + .duty-opt strong { color:#ffd479; }
+  .duty-field { display:grid; gap:6px; }
+  .duty-field label {
+    color:var(--md-muted);
+    font-family:var(--md-mono);
+    font-size:.66rem;
+    font-weight:950;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+  }
+  .duty-field input, .duty-field textarea {
+    width:100%;
+    border:1px solid rgba(91,157,255,.28);
+    border-radius:8px;
+    background:rgba(10,17,28,.96);
+    color:var(--md-text);
+    padding:12px;
+    font-size:1rem;
+  }
+  .duty-save {
+    width:100%;
+    border:0;
+    border-radius:10px;
+    background:#2f7df6;
+    color:#fff;
+    font-size:1.05rem;
+    font-weight:950;
+    padding:15px;
+    cursor:pointer;
+  }
+  .duty-cancel { text-align:center; }
+  .duty-cancel a { color:var(--md-muted); font-size:.85rem; }
+  .duty-foot { color:var(--md-muted); font-size:.72rem; line-height:1.45; }
+</style>
+
+<div class="duty-shell">
+  <header class="duty-head">
+    <p>Hours Check</p>
+    <h1>Change Duty Status</h1>
+    <p class="duty-now">Currently <strong>{{ duty_now.label }}</strong> since {{ duty_now.since.strftime('%I:%M %p')|lower }}</p>
+  </header>
+
+  <form method="POST" action="{{ url_for('driver.duty_status') }}">
+    <div class="duty-shell" style="padding:0;">
+      <div class="duty-grid">
+        {% for s in ['off', 'sb', 'd', 'on'] %}
+          <input type="radio" id="duty-{{ s }}" name="status" value="{{ s }}" {% if duty_now.status == s %}checked{% endif %}>
+          <label class="duty-opt" for="duty-{{ s }}">
+            <strong>{{ status_short[s] }}</strong>
+            <span>{{ status_labels[s] }}</span>
+          </label>
+        {% endfor %}
+      </div>
+
+      <div class="duty-field">
+        <label for="duty-location">Location</label>
+        <input id="duty-location" name="location" type="text" value="{{ last_location }}" placeholder="City, ST or stop name" autocomplete="off">
+      </div>
+
+      <div class="duty-field">
+        <label for="duty-note">Note</label>
+        <textarea id="duty-note" name="note" rows="2" placeholder="Optional remark for the log"></textarea>
+      </div>
+
+      <button class="duty-save" type="submit">Save</button>
+      <div class="duty-cancel"><a href="{{ url_for('driver.daily_log') }}">Back to Daily Log</a></div>
+    </div>
+  </form>
+
+  <p class="duty-foot">{{ not_an_eld }}</p>
+</div>
+
+{% include 'partials/_md_bottom_nav.html' %}
+{% endblock %}

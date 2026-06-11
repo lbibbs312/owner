@@ -28,6 +28,7 @@ from app.models.autolog import (
     SyncOutbox,
 )
 from app.models.draft import DraftEntry
+from app.models.duty import DutyStatusEvent
 from app.models.dispatch_capture import DispatchCapture
 from app.models.followup import OperationalFollowUp
 from app.models.flow import (

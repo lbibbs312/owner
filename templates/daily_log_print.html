@@ -1,0 +1,225 @@
+<!-- templates/daily_log_print.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Driver's Daily Log</title>
+  <style>
+    @page { size: Letter portrait; margin: 0.35in; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; width: 100%; min-height: 100%; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #111; background: #fff; }
+    :root { --md-blue: #1f4ea3; --md-blue-soft: #eaf0fb; --md-ink: #1a2230; --md-muted: #5b6675; --md-line: #d4dae6; }
+    .print-page { width: 100%; margin: 0; padding: 0; }
+    .print-controls { margin-bottom: 0.12in; }
+    .print-btn, .email-btn {
+      display: inline-block;
+      margin: 0 0.05in 0.12in 0;
+      padding: 8px 14px;
+      border: 0;
+      color: #fff;
+      text-decoration: none;
+      font-size: 10pt;
+      line-height: 1.1;
+      cursor: pointer;
+    }
+    .print-btn { background: var(--md-blue); }
+    .email-btn { background: #198754; }
+
+    .document-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 2.9in;
+      gap: 0.2in;
+      border-bottom: 2px solid var(--md-blue);
+      padding-bottom: 0.1in;
+      margin-bottom: 0.08in;
+    }
+    .brand-lockup { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+    .brand-mark { display: inline-flex; width: 30px; height: 30px; border-radius: 6px; background: #0d1320; align-items: center; justify-content: center; overflow: hidden; }
+    .brand-mark img { width: 30px; height: 30px; object-fit: contain; display: block; }
+    .brand-word { font-size: 12.5pt; font-weight: 900; letter-spacing: -0.01em; color: var(--md-ink); }
+    .brand-word .accent { color: var(--md-blue); }
+    .driver-kicker { font-size: 8pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; color: var(--md-muted); }
+    .driver-name { margin: 1px 0; font-size: 15pt; font-weight: 900; text-transform: uppercase; line-height: 1; }
+    .driver-route-meta { font-size: 8.4pt; font-weight: 700; color: var(--md-muted); }
+    .document-meta { font-size: 8pt; line-height: 1.5; }
+    .document-meta .row { display: grid; grid-template-columns: 1.05in minmax(0, 1fr); gap: 0.06in; align-items: baseline; }
+    .document-meta .k { color: var(--md-muted); font-weight: 700; white-space: nowrap; }
+    .document-meta .v { font-weight: 700; text-align: right; }
+    .document-meta .v.mono { font-weight: 900; }
+
+    .document-title { margin: 0.04in 0 0.1in; font-size: 17pt; font-weight: 900; text-transform: uppercase; letter-spacing: -0.01em; line-height: 1; color: var(--md-ink); }
+    .section-title {
+      margin: 0.16in 0 0.06in;
+      font-size: 9pt;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--md-blue);
+    }
+
+    .fact-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.08in; }
+    .fact-tile { border: 1px solid var(--md-line); border-radius: 4px; padding: 6px 9px; }
+    .fact-tile .f-label { font-size: 6.6pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--md-muted); }
+    .fact-tile .f-value { font-size: 9.5pt; font-weight: 900; color: var(--md-ink); line-height: 1.2; }
+
+    .duty-grid-wrap { border: 1px solid var(--md-line); border-radius: 4px; padding: 0.07in 0.07in 0.03in; }
+    .duty-grid-wrap svg { display: block; width: 100%; height: auto; }
+
+    table.timeline { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 0.04in; }
+    table.timeline th, table.timeline td { border: 1px solid var(--md-line); padding: 4px 5px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+    table.timeline thead th { background: var(--md-blue); color: #fff; font-weight: 800; text-transform: uppercase; font-size: 6.6pt; letter-spacing: 0.03em; border-color: var(--md-blue); }
+    table.timeline tbody tr:nth-child(even) td { background: #f7f9fd; }
+    .col-time { width: 11%; }
+    .col-status { width: 8%; text-align: center; }
+    .col-event { width: 22%; }
+    .col-loc { width: 28%; }
+    .col-note { width: auto; }
+    td.col-status { font-weight: 900; color: var(--md-blue); text-align: center; }
+
+    .recap-card { border: 1px solid var(--md-line); border-top: 3px solid var(--md-blue); border-radius: 4px; padding: 0.08in 0.1in 0.09in; width: 3.4in; }
+    .recap-card h3 { margin: 0 0 0.05in; padding-bottom: 0.03in; border-bottom: 1px solid var(--md-line); font-size: 8pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.03em; color: var(--md-ink); }
+    .recap-card dl { margin: 0; display: grid; grid-template-columns: minmax(0, 1.4in) minmax(0, 1fr); gap: 2px 0.1in; font-size: 8pt; }
+    .recap-card dt { font-weight: 700; color: var(--md-muted); }
+    .recap-card dd { margin: 0; color: var(--md-ink); text-align: right; font-weight: 700; }
+    .recap-card dd.major { font-weight: 900; color: var(--md-blue); }
+
+    .cert-line { margin: 0.16in 0 0.06in; font-size: 8.4pt; font-weight: 700; }
+    .signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5in; margin-top: 0.12in; }
+    .sig-label { font-size: 7.5pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; color: var(--md-muted); }
+    .sig-line { border-bottom: 1.5px solid #111; min-height: 0.44in; display: flex; align-items: flex-end; padding-bottom: 3px; }
+    .sig-line img { max-height: 0.4in; max-width: 100%; }
+    .sig-foot { display: flex; justify-content: space-between; gap: 0.2in; margin-top: 3px; font-size: 7pt; color: var(--md-muted); }
+    .doc-footer { margin-top: 0.22in; padding-top: 0.07in; border-top: 1px solid var(--md-blue); text-align: center; font-size: 7.2pt; font-style: italic; color: var(--md-muted); }
+
+    @media screen { body { padding: 1rem; } }
+    @media print {
+      body { padding: 0; }
+      .no-print, .print-controls { display: none !important; }
+      .duty-grid-wrap, .recap-card, table.timeline tr { break-inside: avoid; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+<div class="print-page">
+  <div class="print-controls no-print">
+    <button class="print-btn" type="button" data-print-document>Print Document</button>
+    <a class="email-btn" href="{{ attachment_url }}">Download PDF</a>
+  </div>
+
+  <main class="official-print-document">
+    <header class="document-header">
+      <div>
+        <div class="brand-lockup">
+          <span class="brand-mark"><img src="{{ url_for('static', filename='brand/movedefense_stripe_brand_icon_200x200.png') }}" alt="MoveDefense"></span>
+          <span class="brand-word">Move<span class="accent">Defense</span></span>
+        </div>
+        <div class="driver-kicker">Driver</div>
+        <div class="driver-name">{{ current_user.display_name|upper }}</div>
+        <div class="driver-route-meta">{{ the_date.strftime('%A, %B %d, %Y') }} &middot; USA Property 70 hour / 8 day</div>
+      </div>
+      <div class="document-meta">
+        <div class="row"><span class="k">Daily Log No:</span><span class="v mono">{{ document_meta.document_no }}</span></div>
+        <div class="row"><span class="k">Log Date:</span><span class="v">{{ the_date.strftime('%Y-%m-%d') }}</span></div>
+        {% if document_meta.generated_at %}<div class="row"><span class="k">Generated:</span><span class="v">{{ document_meta.generated_at }}</span></div>{% endif %}
+        <div class="row"><span class="k">Page:</span><span class="v">{{ document_meta.page }}</span></div>
+      </div>
+    </header>
+
+    <h1 class="document-title">Driver's Daily Log</h1>
+
+    {% set facts = [] %}
+    {% if view.truck %}{% set _ = facts.append(('Truck', view.truck)) %}{% endif %}
+    {% if view.odo_start %}{% set _ = facts.append(('Odometer Start', '{:,}'.format(view.odo_start))) %}{% endif %}
+    {% if view.odo_end %}{% set _ = facts.append(('Odometer End', '{:,}'.format(view.odo_end))) %}{% endif %}
+    {% if view.miles %}{% set _ = facts.append(('Total Distance', '{:,} mi'.format(view.miles))) %}{% endif %}
+    {% if facts %}
+      <div class="fact-grid">
+        {% for label, value in facts %}
+          <div class="fact-tile"><div class="f-label">{{ label }}</div><div class="f-value">{{ value }}</div></div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <h2 class="section-title">Record of Duty Status</h2>
+    <div class="duty-grid-wrap">{{ view.grid_svg }}</div>
+
+    {% if view.events %}
+      <h2 class="section-title">Duty Events</h2>
+      <table class="timeline">
+        <thead>
+          <tr>
+            <th class="col-time">Time</th>
+            <th class="col-status">Status</th>
+            <th class="col-event">Event</th>
+            <th class="col-loc">Location / Stop</th>
+            <th class="col-note">Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ev in view.events %}
+          <tr>
+            <td class="col-time">{{ ev.at.strftime('%I:%M %p')|lower }}</td>
+            <td class="col-status">{{ ev.status_short }}</td>
+            <td class="col-event">{{ ev.label }}{% if ev.source != 'manual' %} <span style="color:var(--md-muted);">(auto)</span>{% endif %}</td>
+            <td class="col-loc">{{ ev.location or '' }}</td>
+            <td class="col-note">{{ ev.note or '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
+    {% if view.recap.has_data %}
+      <h2 class="section-title">Recap &mdash; 70 Hour / 8 Day</h2>
+      <div class="recap-card">
+        <h3>On-Duty Hours</h3>
+        <dl>
+          {% for row in view.recap.rows %}
+            <dt>{{ row.date.strftime('%m/%d') }}</dt><dd>{{ row.label }}</dd>
+          {% endfor %}
+          <dt>Worked today</dt><dd>{{ view.fmt_hm(view.recap.worked_today) }}</dd>
+          <dt>8-day total</dt><dd>{{ view.fmt_hm(view.recap.total_8day) }}</dd>
+          <dt>Hours available</dt><dd class="major">{{ view.fmt_hm(view.recap.available) }}</dd>
+        </dl>
+      </div>
+    {% endif %}
+
+    <p class="cert-line">I hereby certify that my data entries and my record of duty status for this day are true and correct.</p>
+    <div class="signature-grid">
+      <div>
+        <div class="sig-label">Driver Signature</div>
+        <div class="sig-line">{% if driver_signature %}<img src="{{ driver_signature }}" alt="Driver signature">{% endif %}</div>
+        <div class="sig-foot">
+          <span>{% if signature_timestamp %}Signed {{ signature_timestamp|to_detroit_datetime }}{% endif %}</span>
+          <span>Date: ____________</span>
+        </div>
+      </div>
+      <div>
+        <div class="sig-label">Reviewer Signature</div>
+        <div class="sig-line"></div>
+        <div class="sig-foot"><span>&nbsp;</span><span>Date: ____________</span></div>
+      </div>
+    </div>
+
+    <div class="doc-footer">{{ view.not_an_eld }}</div>
+  </main>
+</div>
+{% if request.args.get('autoprint') %}
+<script>
+  window.addEventListener("load", function () {
+    window.setTimeout(function () { window.print(); }, 150);
+  });
+</script>
+{% endif %}
+<script>
+  (function () {
+    var printButton = document.querySelector("[data-print-document]");
+    if (printButton) {
+      printButton.addEventListener("click", function () { window.print(); });
+    }
+  })();
+</script>
+</body>
+</html>

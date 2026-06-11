@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block content %}
+<script>document.body.classList.add('md-shell');</script>
+{% include 'partials/_md_shell.html' %}
+
+<style>
+  .dlog-shell {
+    width:min(820px, 100%);
+    margin:0 auto;
+    padding:18px 14px 28px;
+    display:grid;
+    gap:14px;
+  }
+  .dlog-head { display:grid; gap:5px; }
+  .dlog-head p {
+    margin:0;
+    color:var(--md-amber);
+    font-family:var(--md-mono);
+    font-size:.72rem;
+    font-weight:950;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+  }
+  .dlog-head h1 {
+    margin:0;
+    color:var(--md-text);
+    font-family:var(--md-display);
+    font-size:clamp(1.7rem, 6.4vw, 2.8rem);
+    font-weight:950;
+    line-height:.95;
+    text-transform:uppercase;
+  }
+  .dlog-datenav { display:flex; gap:8px; flex-wrap:wrap; }
+  .dlog-datenav a {
+    border:1px solid rgba(91,157,255,.3);
+    border-radius:999px;
+    padding:7px 14px;
+    color:var(--md-text);
+    font-family:var(--md-mono);
+    font-size:.72rem;
+    font-weight:950;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    text-decoration:none;
+    background:rgba(15,26,41,.9);
+  }
+  .dlog-card {
+    border:1px solid rgba(91,157,255,.22);
+    border-radius:8px;
+    background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(10,17,28,.96));
+    color:var(--md-text);
+    box-shadow:0 18px 40px rgba(0,0,0,.28), inset 0 1px 0 rgba(91,157,255,.08);
+    padding:14px;
+    display:grid;
+    gap:10px;
+  }
+  .dlog-card .k {
+    color:var(--md-muted);
+    font-family:var(--md-mono);
+    font-size:.66rem;
+    font-weight:950;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+  }
+  .dlog-now { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .dlog-now strong {
+    font-family:var(--md-display);
+    font-size:1.25rem;
+    font-weight:950;
+    text-transform:uppercase;
+  }
+  .dlog-now .since { color:var(--md-muted); font-size:.82rem; }
+  .dlog-change {
+    display:inline-block;
+    border-radius:8px;
+    padding:11px 16px;
+    background:#2f7df6;
+    color:#fff;
+    font-weight:900;
+    text-decoration:none;
+    font-size:.95rem;
+  }
+  .dlog-gridcard {
+    background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(10,17,28,.96));
+    border:1px solid rgba(91,157,255,.28);
+    border-radius:8px;
+    padding:12px 10px 8px;
+    box-shadow:0 18px 40px rgba(0,0,0,.28), inset 0 1px 0 rgba(91,157,255,.08);
+  }
+  .dlog-gridcard svg { display:block; width:100%; height:auto; }
+  .dlog-totals { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px; }
+  .dlog-total {
+    border:1px solid rgba(91,157,255,.22);
+    border-radius:8px;
+    background:rgba(15,26,41,.92);
+    padding:9px 6px;
+    text-align:center;
+    display:grid;
+    gap:3px;
+  }
+  .dlog-total span {
+    color:var(--md-muted);
+    font-family:var(--md-mono);
+    font-size:.6rem;
+    font-weight:950;
+    letter-spacing:.06em;
+  }
+  .dlog-total strong { font-family:var(--md-mono); font-size:.98rem; font-weight:950; color:var(--md-text); }
+  .dlog-event {
+    display:grid;
+    grid-template-columns:54px minmax(0,1fr) auto;
+    gap:10px;
+    align-items:center;
+    border:1px solid rgba(91,157,255,.18);
+    border-radius:8px;
+    background:rgba(15,26,41,.92);
+    padding:10px 12px;
+  }
+  .dlog-badge {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:44px; height:44px;
+    border-radius:999px;
+    font-family:var(--md-mono);
+    font-weight:950;
+    font-size:.86rem;
+    color:#0a111c;
+    background:#9fb8dd;
+  }
+  .dlog-badge.d { background:#69d58c; }
+  .dlog-badge.on { background:#7fb2ff; }
+  .dlog-badge.sb { background:#c9a6ff; }
+  .dlog-badge.off { background:#aeb9c9; }
+  .dlog-event .what { display:grid; gap:2px; min-width:0; }
+  .dlog-event .what strong { font-size:.95rem; }
+  .dlog-event .what span { color:var(--md-muted); font-size:.78rem; overflow-wrap:anywhere; }
+  .dlog-event time { color:var(--md-text); font-family:var(--md-mono); font-weight:950; font-size:.85rem; }
+  .dlog-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .dlog-actions a {
+    display:flex; align-items:center; justify-content:center;
+    border-radius:8px; padding:13px 10px;
+    font-weight:900; text-decoration:none; font-size:.95rem;
+  }
+  .dlog-actions .print { background:#2f7df6; color:#fff; }
+  .dlog-actions .pdf { background:rgba(91,157,255,.14); color:var(--md-text); border:1px solid rgba(91,157,255,.32); }
+  .dlog-recap { display:grid; gap:8px; }
+  .dlog-recap-row { display:flex; justify-content:space-between; font-family:var(--md-mono); font-size:.8rem; }
+  .dlog-recap-row.major strong { color:#ffd479; }
+  .dlog-foot { color:var(--md-muted); font-size:.72rem; line-height:1.45; }
+  .dlog-empty { color:var(--md-muted); font-size:.85rem; }
+</style>
+
+<div class="dlog-shell">
+  <header class="dlog-head">
+    <p>Record of Duty Status</p>
+    <h1>{{ view.day.strftime('%a %b %d') }}</h1>
+  </header>
+
+  <nav class="dlog-datenav" aria-label="Log date">
+    <a href="{{ prev_url }}">&larr; Prev</a>
+    {% if not view.is_today %}<a href="{{ today_url }}">Today</a>{% endif %}
+    {% if next_url %}<a href="{{ next_url }}">Next &rarr;</a>{% endif %}
+  </nav>
+
+  {% if view.is_today %}
+  <section class="dlog-card">
+    <span class="k">Current Status</span>
+    <div class="dlog-now">
+      <div>
+        <strong>{{ duty_now.label }}</strong>
+        <div class="since">since {{ duty_now.since.strftime('%I:%M %p')|lower }}</div>
+      </div>
+      <a class="dlog-change" href="{{ url_for('driver.duty_status') }}">Change Status</a>
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="dlog-gridcard">{{ view.grid_svg }}</div>
+
+  <div class="dlog-totals">
+    {% for s in ['off', 'sb', 'd', 'on'] %}
+      <div class="dlog-total"><span>{{ view.status_short[s] }}</span><strong>{{ view.totals_fmt[s] }}</strong></div>
+    {% endfor %}
+    <div class="dlog-total"><span>TOTAL</span><strong>{{ view.totals_fmt['total'] }}</strong></div>
+  </div>
+
+  <div class="dlog-actions">
+    <a class="print" href="{{ url_for('driver.daily_log_print', date=view.day.isoformat()) }}">Print Document</a>
+    <a class="pdf" href="{{ url_for('driver.daily_log_attachment', date=view.day.isoformat()) }}">Download PDF</a>
+  </div>
+
+  <section class="dlog-card">
+    <span class="k">Duty Events</span>
+    {% if view.events %}
+      {% for ev in view.events %}
+        <div class="dlog-event">
+          <span class="dlog-badge {{ ev.status }}">{{ ev.status_short }}</span>
+          <div class="what">
+            <strong>{{ ev.label }}</strong>
+            {% if ev.location %}<span>{{ ev.location }}</span>{% endif %}
+            {% if ev.note %}<span>{{ ev.note }}</span>{% endif %}
+            {% if ev.source != 'manual' %}<span>auto &middot; from route capture</span>{% endif %}
+          </div>
+          <time>{{ ev.at.strftime('%I:%M %p')|lower }}</time>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="dlog-empty">No duty events captured this day. The line stays on {{ view.status_labels[view.segments[0].status] if view.segments else 'Off Duty' }}.</p>
+    {% endif %}
+  </section>
+
+  {% if view.recap.has_data %}
+  <section class="dlog-card">
+    <span class="k">Recap &mdash; 70 hour / 8 day</span>
+    <div class="dlog-recap">
+      {% for row in view.recap.rows %}
+        <div class="dlog-recap-row"><span>{{ row.date.strftime('%m/%d') }}</span><strong>{{ row.label }}</strong></div>
+      {% endfor %}
+      <div class="dlog-recap-row"><span>Worked today</span><strong>{{ view.fmt_hm(view.recap.worked_today) }}</strong></div>
+      <div class="dlog-recap-row"><span>8-day total</span><strong>{{ view.fmt_hm(view.recap.total_8day) }}</strong></div>
+      <div class="dlog-recap-row major"><span>Hours available</span><strong>{{ view.fmt_hm(view.recap.available) }}</strong></div>
+    </div>
+  </section>
+  {% endif %}
+
+  <p class="dlog-foot">{{ view.not_an_eld }}</p>
+</div>
+
+{% include 'partials/_md_bottom_nav.html' %}
+{% endblock %}
