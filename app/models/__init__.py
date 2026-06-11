@@ -15,6 +15,18 @@ from app.models.activity import ActivityEvent
 from app.models.audit import AuditEvent
 from app.models.case import CaseEvent, ExceptionEvent, FollowupCase
 from app.models.damage import DamagePhoto, DamageReport
+from app.models.autolog import (
+    AutoLogSession,
+    CandidateAction,
+    CandidateStop,
+    ConfirmedStop,
+    DriverMemory,
+    MotionSegment,
+    PlaceMemory,
+    RawLocationPoint,
+    RouteReviewQueue,
+    SyncOutbox,
+)
 from app.models.draft import DraftEntry
 from app.models.dispatch_capture import DispatchCapture
 from app.models.followup import OperationalFollowUp
