@@ -74,8 +74,10 @@
     display:inline-block;
     border-radius:8px;
     padding:11px 16px;
-    background:#2f7df6;
-    color:#fff;
+    background:rgba(91,157,255,.12);
+    border:1px solid rgba(91,157,255,.5);
+    box-shadow:0 0 16px rgba(91,157,255,.3);
+    color:#eaf2ff;
     font-weight:900;
     text-decoration:none;
     font-size:.95rem;
@@ -142,12 +144,11 @@
     border-radius:8px; padding:13px 10px;
     font-weight:900; text-decoration:none; font-size:.95rem;
   }
-  .dlog-actions .print { background:#2f7df6; color:#fff; }
-  .dlog-actions .pdf { background:rgba(91,157,255,.14); color:var(--md-text); border:1px solid rgba(91,157,255,.32); }
+  .dlog-actions .print { background:rgba(91,157,255,.16); color:#eaf2ff; border:1px solid rgba(91,157,255,.55); box-shadow:0 0 18px rgba(91,157,255,.32); }
+  .dlog-actions .pdf { background:rgba(91,157,255,.08); color:var(--md-text); border:1px solid rgba(91,157,255,.32); box-shadow:0 0 12px rgba(91,157,255,.16); }
   .dlog-recap { display:grid; gap:8px; }
   .dlog-recap-row { display:flex; justify-content:space-between; font-family:var(--md-mono); font-size:.8rem; }
   .dlog-recap-row.major strong { color:#ffd479; }
-  .dlog-foot { color:var(--md-muted); font-size:.72rem; line-height:1.45; }
   .dlog-empty { color:var(--md-muted); font-size:.85rem; }
 </style>
 
@@ -179,10 +180,10 @@
   <div class="dlog-gridcard">{{ view.grid_svg }}</div>
 
   <div class="dlog-totals">
-    {% for s in ['off', 'sb', 'd', 'on'] %}
-      <div class="dlog-total"><span>{{ view.status_short[s] }}</span><strong>{{ view.totals_fmt[s] }}</strong></div>
+    {% for s, word in [('off', 'Off Duty'), ('sb', 'Sleeper'), ('d', 'Driving'), ('on', 'On Duty')] %}
+      <div class="dlog-total"><span>{{ word }}</span><strong>{{ view.totals_fmt[s] }}</strong></div>
     {% endfor %}
-    <div class="dlog-total"><span>TOTAL</span><strong>{{ view.totals_fmt['total'] }}</strong></div>
+    <div class="dlog-total"><span>Total</span><strong>{{ view.totals_fmt['total'] }}</strong></div>
   </div>
 
   <div class="dlog-actions">
@@ -224,7 +225,6 @@
   </section>
   {% endif %}
 
-  <p class="dlog-foot">{{ view.not_an_eld }}</p>
 </div>
 
 {% include 'partials/_md_bottom_nav.html' %}

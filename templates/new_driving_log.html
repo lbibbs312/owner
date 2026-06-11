@@ -23,33 +23,33 @@
 
   {% if pending_ryder_event %}
   <div class="alert alert-danger border fw-semibold" role="alert">
-    Ryder follow-up required before the next stop. {{ pending_ryder_truck or 'Truck' }} has been headed to Ryder for {{ pending_ryder_elapsed }}.
+    Service follow-up required before the next stop. {{ pending_ryder_truck or 'Truck' }} has been at the shop for {{ pending_ryder_elapsed }}.
   </div>
   <div class="modal fade" id="ryderFollowupModal" tabindex="-1" aria-labelledby="ryderFollowupTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <form method="POST" action="{{ url_for('driver.mobile_ryder_service') }}" data-autosave="true" data-autosave-key="ryder-followup-popup">
           <div class="modal-header">
-            <h5 class="modal-title" id="ryderFollowupTitle">Ryder Follow-Up Required</h5>
+            <h5 class="modal-title" id="ryderFollowupTitle">Service Follow-Up Required</h5>
           </div>
           <div class="modal-body">
             <input type="hidden" name="next" value="new_log">
             <input type="hidden" name="truck_number" value="{{ pending_ryder_truck }}">
             <input type="hidden" name="issue" value="{{ pending_ryder_issue }}">
-            <p class="mb-2"><strong>{{ pending_ryder_truck or 'Truck' }}</strong> went to Ryder for <strong>{{ pending_ryder_issue or 'a truck issue' }}</strong>.</p>
-            <p class="text-muted mb-3">Ryder timer: {{ pending_ryder_elapsed }}</p>
+            <p class="mb-2"><strong>{{ pending_ryder_truck or 'Truck' }}</strong> went to the shop for <strong>{{ pending_ryder_issue or 'a truck issue' }}</strong>.</p>
+            <p class="text-muted mb-3">Service timer: {{ pending_ryder_elapsed }}</p>
             <label class="form-label" for="ryderOutcomePopup">What happened?</label>
             <select class="form-select mb-3" id="ryderOutcomePopup" name="outcome" required>
               <option value="">Choose outcome</option>
-              <option value="fixed">Fixed at Ryder</option>
-              <option value="left">Ryder kept it</option>
+              <option value="fixed">Fixed at shop</option>
+              <option value="left">Shop kept it</option>
               <option value="rental">Got rental truck</option>
             </select>
             <label class="form-label" for="ryderNotesPopup">Notes</label>
-            <textarea class="form-control" id="ryderNotesPopup" name="notes" rows="3" placeholder="Rental number, what Ryder fixed, or why it stayed there"></textarea>
+            <textarea class="form-control" id="ryderNotesPopup" name="notes" rows="3" placeholder="Rental number, what the shop fixed, or why it stayed there"></textarea>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-primary" type="submit">Save Ryder Status</button>
+            <button class="btn btn-primary" type="submit">Save Service Note</button>
           </div>
         </form>
       </div>
@@ -96,7 +96,7 @@
       <div class="w-100 conditional-panel" id="truckIssuePanel">
         <div class="row g-3">
           <div class="col-md-5">{{ form.truck_issue.label(class="form-label") }}{{ form.truck_issue(class="form-select") }}</div>
-          <div class="col-md-7">{{ form.truck_issue_notes.label(class="form-label") }}{{ form.truck_issue_notes(class="form-control", rows="2", placeholder="CEL came on, leaking air, overheating, flat tire, Ryder or tow details") }}</div>
+          <div class="col-md-7">{{ form.truck_issue_notes.label(class="form-label") }}{{ form.truck_issue_notes(class="form-control", rows="2", placeholder="CEL came on, leaking air, overheating, flat tire, tow or rental details") }}</div>
         </div>
       </div>
       <div class="form-check">{{ form.fuel(class="form-check-input", id="fuelCheck") }} {{ form.fuel.label(class="form-check-label") }}</div>

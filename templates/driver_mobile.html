@@ -1650,10 +1650,10 @@
     .move-defense-mobile .button.blue,
     .move-defense-mobile button.blue,
     .move-defense-mobile .ryder-submit {
-      background: #3478f6;
-      color: #fff;
-      border-color: rgba(125,168,255,.45);
-      box-shadow: 0 14px 30px rgba(52,120,246,.2);
+      background: rgba(91,157,255,.12);
+      color: #dbe7ff;
+      border: 1px solid rgba(91,157,255,.45);
+      box-shadow: 0 0 16px rgba(91,157,255,.28), 0 14px 30px rgba(0,0,0,.22);
     }
     .move-defense-mobile .button.ghost,
     .move-defense-mobile button.ghost,
@@ -4904,13 +4904,13 @@
             <span style="color:#8fa3bf;font-weight:600;font-size:12px;">since {{ duty_card.since.strftime('%I:%M %p')|lower }}</span>
           </div>
           <div style="display:grid;grid-template-columns:repeat(4, minmax(0,1fr));gap:8px;">
-            {% for s, short in [('off','OFF'), ('sb','SB'), ('d','D'), ('on','ON')] %}
+            {% for s, short, word in [('off','OFF','Off Duty'), ('sb','SB','Sleeper'), ('d','D','Driving'), ('on','ON','On Duty')] %}
             <form method="POST" action="{{ url_for('driver.duty_status') }}" style="margin:0;">
               <input type="hidden" name="status" value="{{ s }}">
               <input type="hidden" name="next" value="mobile">
-              <button type="submit" style="width:100%;padding:12px 4px;border-radius:8px;font-weight:950;font-size:14px;cursor:pointer;
-                {% if duty_card.status == s %}border:1px solid rgba(255,212,121,.6);background:rgba(58,46,18,.95);color:#ffd479;
-                {% else %}border:1px solid rgba(91,157,255,.28);background:rgba(10,17,28,.95);color:#dbe7ff;{% endif %}">{{ short }}</button>
+              <button type="submit" style="width:100%;padding:10px 2px;border-radius:8px;font-weight:950;font-size:14px;cursor:pointer;line-height:1.2;
+                {% if duty_card.status == s %}border:1px solid rgba(255,212,121,.6);background:rgba(58,46,18,.95);color:#ffd479;box-shadow:0 0 14px rgba(255,212,121,.22);
+                {% else %}border:1px solid rgba(91,157,255,.28);background:rgba(10,17,28,.95);color:#dbe7ff;box-shadow:0 0 10px rgba(91,157,255,.14);{% endif %}">{{ short }}<span style="display:block;font-size:9.5px;font-weight:700;opacity:.75;letter-spacing:.02em;">{{ word }}</span></button>
             </form>
             {% endfor %}
           </div>

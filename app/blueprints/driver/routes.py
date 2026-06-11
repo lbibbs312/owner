@@ -236,9 +236,9 @@ def _draw_route_sheet_pdf_header(pdf, meta, *, driver=None, truck=None, date_val
     pdf.text(36, 694, "DRIVER LOG SHEET", size=12, bold=True)
 
 RYDER_OUTCOME_LABELS = {
-    "headed": "Headed to Ryder",
-    "fixed": "Fixed at Ryder",
-    "left": "Left at Ryder",
+    "headed": "Headed to shop",
+    "fixed": "Fixed at shop",
+    "left": "Shop kept it",
     "rental": "Rental picked up",
 }
 
@@ -4340,7 +4340,7 @@ def new_driving_log():
 
     if form.validate_on_submit():
         if pending_ryder_event:
-            flash("Close the Ryder status before entering the next stop.", "warning")
+            flash("Close the open service status before entering the next stop.", "warning")
             return _render_new_driving_log(form, current_load, route_context=route_context, return_to_mobile=return_to_mobile)
         is_day_driver = getattr(current_user, "is_day_driver", False)
         if not form.plant_name.data and not is_day_driver:
@@ -6765,12 +6765,12 @@ def mobile_ryder_service():
     issue = TRUCK_ISSUE_LABELS.get(issue_code, issue_code).strip()
 
     if not issue or outcome not in RYDER_OUTCOME_LABELS:
-        flash("Choose what is wrong with the truck and the Ryder status.", "warning")
+        flash("Choose what is wrong with the truck and the service status.", "warning")
         return redirect(url_for("driver.new_driving_log" if next_target == "new_log" else "driver.mobile_dashboard"))
 
     details = f"Truck: {truck_number}; Issue: {issue}; Outcome: {RYDER_OUTCOME_LABELS[outcome]}"
     if pending_ryder_event and outcome in RYDER_CLOSING_ACTIONS:
-        details = f"{details}; Ryder time: {_format_duration((datetime.utcnow() - pending_ryder_event.created_at).total_seconds())}"
+        details = f"{details}; Service time: {_format_duration((datetime.utcnow() - pending_ryder_event.created_at).total_seconds())}"
     if notes:
         details = f"{details}; Notes: {notes}"
     record_activity(
@@ -6782,7 +6782,7 @@ def mobile_ryder_service():
         target_type="ryder_service",
         target_id=pending_ryder_event.id if pending_ryder_event and outcome in RYDER_CLOSING_ACTIONS else None,
     )
-    flash("Ryder service status saved.", "success")
+    flash("Service note saved.", "success")
     return redirect(url_for("driver.new_driving_log" if next_target == "new_log" else "driver.mobile_dashboard"))
 
 

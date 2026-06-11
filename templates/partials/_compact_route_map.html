@@ -346,8 +346,8 @@
 
   {% if pending_ryder %}
     <div class="md-flow-alert">
-      <strong>Ryder timer running: {{ pending_ryder_elapsed if pending_ryder_elapsed is defined else '' }}</strong>
-      <span>{{ pending_ryder_truck if pending_ryder_truck is defined and pending_ryder_truck else 'Truck' }} headed to Ryder for {{ pending_ryder_issue if pending_ryder_issue is defined and pending_ryder_issue else 'a truck issue' }}.</span>
+      <strong>Service timer running: {{ pending_ryder_elapsed if pending_ryder_elapsed is defined else '' }}</strong>
+      <span>{{ pending_ryder_truck if pending_ryder_truck is defined and pending_ryder_truck else 'Truck' }} headed to the shop for {{ pending_ryder_issue if pending_ryder_issue is defined and pending_ryder_issue else 'a truck issue' }}.</span>
     </div>
   {% endif %}
 
@@ -407,7 +407,7 @@
                 {% endif %}
               </div>
               {% if is_service_depart %}
-                <p class="depart-hint">Cargo questions stay skipped for fuel, Ryder, maintenance, and meeting stops.</p>
+                <p class="depart-hint">Cargo questions stay skipped for fuel, service, maintenance, and meeting stops.</p>
               {% endif %}
               <div class="depart-reason" data-depart-reason="unload" hidden>
                 <label for="departUnloadReason">Why not?</label>
@@ -494,11 +494,11 @@
     <div class="md-flow-inline-panel" data-flow-inline-panel="maintenance" hidden>
       <div class="inline-maintenance-grid">
         <section>
-          <h4>Ryder Service</h4>
+          <h4>Truck Service</h4>
           {% if pending_ryder %}
             <div class="ryder-entry active">
-              <strong>Ryder timer running: {{ pending_ryder_elapsed if pending_ryder_elapsed is defined else '' }}</strong>
-              <span>{{ pending_ryder_truck if pending_ryder_truck is defined and pending_ryder_truck else 'Truck' }} headed to Ryder for {{ pending_ryder_issue if pending_ryder_issue is defined and pending_ryder_issue else 'a truck issue' }}. Close this before the next stop.</span>
+              <strong>Service timer running: {{ pending_ryder_elapsed if pending_ryder_elapsed is defined else '' }}</strong>
+              <span>{{ pending_ryder_truck if pending_ryder_truck is defined and pending_ryder_truck else 'Truck' }} headed to the shop for {{ pending_ryder_issue if pending_ryder_issue is defined and pending_ryder_issue else 'a truck issue' }}. Close this before the next stop.</span>
             </div>
           {% endif %}
           <form class="ryder-form" method="POST" action="{{ url_for('driver.mobile_ryder_service') }}" data-autosave="true" data-autosave-key="mobile-ryder-service">
@@ -520,18 +520,18 @@
                 <label for="liveFlowRyderOutcome">Status</label>
                 <select id="liveFlowRyderOutcome" class="ryder-select" name="outcome" required>
                   <option value="">Choose status</option>
-                  <option value="headed">Headed to Ryder</option>
-                  <option value="fixed">Fixed at Ryder</option>
-                  <option value="left">Ryder kept it</option>
+                  <option value="headed">Headed to shop</option>
+                  <option value="fixed">Fixed at shop</option>
+                  <option value="left">Shop kept it</option>
                   <option value="rental">Got rental truck</option>
                 </select>
               </div>
             </div>
             <div class="ryder-field">
               <label for="liveFlowRyderNotes">Notes</label>
-              <textarea id="liveFlowRyderNotes" class="ryder-textarea" name="notes" placeholder="CEL code, leak location, rental number, tow info, or what Ryder said"></textarea>
+              <textarea id="liveFlowRyderNotes" class="ryder-textarea" name="notes" placeholder="CEL code, leak location, rental number, tow info, or what the shop said"></textarea>
             </div>
-            <button class="ryder-submit" type="submit">Save Ryder Status</button>
+            <button class="ryder-submit" type="submit">Save Service Note</button>
           </form>
           <div class="ryder-history">
             {% for event in ryder_events %}
@@ -541,8 +541,8 @@
               </div>
             {% else %}
               <div class="ryder-entry">
-                <strong>No Ryder notes today</strong>
-                <span>Use Headed to Ryder to start the timer, then close it as fixed, kept by Ryder, or rental.</span>
+                <strong>No service notes today</strong>
+                <span>Use Headed to shop to start the timer, then close it as fixed, kept, or rental.</span>
               </div>
             {% endfor %}
           </div>
@@ -746,7 +746,6 @@
   {% else %}
     <div class="compact-empty {% if is_empty_today_route %}start-day-empty{% endif %}" role="status">
       {% if is_empty_today_route %}
-        <strong>Start Day</strong>
         <span>{{ rm.map_empty_message if rm and rm.map_empty_message else 'No stops logged yet today. Start day by recording the first stop.' }}</span>
       {% else %}
         {{ rm.map_empty_message if rm and rm.map_empty_message else 'No route stops logged for this date.' }}

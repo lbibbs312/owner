@@ -82,10 +82,11 @@
   }
   .duty-save {
     width:100%;
-    border:0;
+    border:1px solid rgba(91,157,255,.55);
     border-radius:10px;
-    background:#2f7df6;
-    color:#fff;
+    background:rgba(91,157,255,.14);
+    box-shadow:0 0 18px rgba(91,157,255,.32);
+    color:#eaf2ff;
     font-size:1.05rem;
     font-weight:950;
     padding:15px;
@@ -93,7 +94,6 @@
   }
   .duty-cancel { text-align:center; }
   .duty-cancel a { color:var(--md-muted); font-size:.85rem; }
-  .duty-foot { color:var(--md-muted); font-size:.72rem; line-height:1.45; }
 </style>
 
 <div class="duty-shell">
@@ -130,7 +130,6 @@
     </div>
   </form>
 
-  <p class="duty-foot">{{ not_an_eld }}</p>
 </div>
 
 {% include 'partials/_md_bottom_nav.html' %}
