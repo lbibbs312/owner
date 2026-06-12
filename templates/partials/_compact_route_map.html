@@ -285,6 +285,9 @@
     <div class="md-flow-head-status">
       <span class="flow-status status-{{ route_status_tone }}">{{ route_status_label }}</span>
       <time data-md-flow-clock>--:--:--</time>
+      {% if urls.get('print_route') %}
+      <a href="{{ urls.get('print_route') }}" style="color:#7fb2ff;font-size:12px;font-weight:800;text-decoration:none;">Route Sheet &rarr;</a>
+      {% endif %}
     </div>
   </div>
 

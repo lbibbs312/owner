@@ -123,13 +123,22 @@ def day_events(user_id, day):
         ShiftRecord.start_time < end_utc,
         or_(ShiftRecord.end_time.is_(None), ShiftRecord.end_time >= start_utc),
     ).all()
+    shift_spans = []
     for shift in shifts:
         shift_start = _to_local(shift.start_time)
+        shift_end = _to_local(shift.end_time)
+        if shift_start:
+            shift_spans.append((shift_start, shift_end))
         if shift_start and start_local <= shift_start < end_local:
             events.append(_event(shift_start, "on", "Shift start"))
-        shift_end = _to_local(shift.end_time)
         if shift_end and start_local <= shift_end < end_local:
             events.append(_event(shift_end, "off", "Shift end"))
+
+    def _on_shift(at_local):
+        return any(
+            span_start <= at_local and (span_end is None or at_local < span_end)
+            for span_start, span_end in shift_spans
+        )
 
     breaks = RouteBreak.query.filter(
         RouteBreak.user_id == user_id,
@@ -139,13 +148,27 @@ def day_events(user_id, day):
         ),
     ).all()
     for brk in breaks:
-        brk_status = "on" if (brk.break_type or "") == "On-duty not driving" else "off"
+        on_duty_break = (brk.break_type or "") == "On-duty not driving"
         brk_start = _to_local(brk.start_time)
         if brk_start and start_local <= brk_start < end_local:
-            events.append(_event(brk_start, brk_status, f"{brk.break_type or 'Break'} break"))
+            # An on-duty break only holds the ON line while a shift is open;
+            # a break tapped off-shift is just more off-duty time.
+            brk_status = "on" if (on_duty_break and _on_shift(brk_start)) else "off"
+            kind = (brk.break_type or "").strip()
+            events.append(
+                _event(
+                    brk_start,
+                    brk_status,
+                    "Break started",
+                    note=kind if kind and kind != "Break" else None,
+                    source="break",
+                )
+            )
         brk_end = _to_local(brk.end_time)
         if brk_end and start_local <= brk_end < end_local:
-            events.append(_event(brk_end, "on", "Break ended"))
+            events.append(
+                _event(brk_end, "on" if _on_shift(brk_end) else "off", "Break ended", source="break")
+            )
 
     stops = DriverLog.query.filter(
         DriverLog.driver_id == user_id,
@@ -162,7 +185,53 @@ def day_events(user_id, day):
             events.append(_event(depart, "d", "Departed", location=place))
 
     events.sort(key=lambda e: e["at"])
-    return events
+    # Paper-log resolution: the printed log sheet does all of its math on
+    # HH:MM capture times, so the duty log must too — otherwise seconds-level
+    # leg sums drift minutes below the sheet's drive/on-duty totals.
+    for ev in events:
+        ev["at"] = ev["at"].replace(second=0, microsecond=0)
+    # A burst of switcher taps inside one minute is one decision: keep the last.
+    deduped = []
+    for ev in events:
+        if (
+            deduped
+            and ev["source"] == "manual"
+            and deduped[-1]["source"] == "manual"
+            and deduped[-1]["at"] == ev["at"]
+        ):
+            deduped[-1] = ev
+            continue
+        deduped.append(ev)
+    # Manual taps that land on the status already in effect change nothing;
+    # keep route captures (arrive/depart) regardless since they carry place/time.
+    status = carry_in_status(user_id, day)
+    cleaned = []
+    for ev in deduped:
+        if ev["source"] == "manual" and ev["status"] == status:
+            continue
+        if ev["source"] == "break" and status == "d":
+            # Route capture outranks the companion layer: between a depart and
+            # the next arrive the line stays D, so the grid's drive total always
+            # matches the log sheet's depart->arrive math. The break still
+            # prints as an event row.
+            ev["status"] = "d"
+            ev["status_short"] = STATUS_SHORT["d"]
+        status = ev["status"]
+        cleaned.append(ev)
+    # A depart with no arrival before shift end is the closeout tap at the
+    # final stop, not a drive leg — the sheet's depart->arrive sums have no
+    # leg there, so the line holds ON until release instead of D.
+    pending_depart = None
+    for ev in cleaned:
+        if ev["label"] == "Departed":
+            pending_depart = ev
+        elif ev["label"] == "Arrived":
+            pending_depart = None
+        elif ev["label"] == "Shift end" and pending_depart is not None:
+            pending_depart["status"] = "on"
+            pending_depart["status_short"] = STATUS_SHORT["on"]
+            pending_depart = None
+    return cleaned
 
 
 def carry_in_status(user_id, day):
@@ -426,7 +495,9 @@ def draw_grid_pdf(pdf, x, top_y, width, segments, *, day):
 
     for idx, label in enumerate(GRID_HOUR_LABELS):
         lx = x0 + (idx / 24.0) * grid_w
-        pdf.text(lx - 2, grid_top + 3, label, size=5.6, bold=label in ("M", "N"))
+        # Center on the hour line (Helvetica digits run ~0.56em wide).
+        pdf.text(lx - len(label) * 1.6, grid_top + 3, label, size=5.6, bold=label in ("M", "N"))
+    pdf.text(x0 + grid_w + 6, grid_top + 3, "TOTAL HRS", size=5.2, bold=True)
 
     pdf.rect(x0, grid_top - grid_h, grid_w, grid_h, width=1.1)
     for row in range(1, 4):
@@ -464,4 +535,6 @@ def draw_grid_pdf(pdf, x, top_y, width, segments, *, day):
             pdf.line(sx, sy, ex, sy, width=1.6)
             prev_y = sy
 
-    return grid_top - grid_h - 18
+    # Leave room for the day-total under the totals column so the next
+    # section heading never collides with it.
+    return grid_top - grid_h - 28

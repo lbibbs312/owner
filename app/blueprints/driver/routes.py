@@ -579,6 +579,12 @@ def _end_open_shifts_for_driver(driver_id, ended_at=None):
     open_shifts = _open_shifts_for_driver(driver_id)
     for shift in open_shifts:
         _close_shift_record(shift, ended_at)
+    # Ending the shift also ends any break the driver forgot to close —
+    # otherwise it keeps "running" on the board and prints as "in progress"
+    # on documents generated after release.
+    open_breaks = RouteBreak.query.filter_by(user_id=driver_id, end_time=None).all()
+    for brk in open_breaks:
+        brk.end_time = max(brk.start_time or ended_at, ended_at)
     return open_shifts
 
 
@@ -7168,6 +7174,21 @@ def _inject_open_break():
     try:
         if current_user.is_authenticated and getattr(current_user, "role", None) != "management":
             open_break = _open_route_break(current_user.id)
+            if open_break and not _open_shift_for_driver(current_user.id):
+                # Self-heal stale data: a break can't outlive its shift. Stamp it
+                # closed at shift end (zero-length if tapped after release).
+                last_ended = (
+                    ShiftRecord.query.filter(
+                        ShiftRecord.user_id == current_user.id,
+                        ShiftRecord.end_time.isnot(None),
+                    )
+                    .order_by(ShiftRecord.end_time.desc())
+                    .first()
+                )
+                stamp = last_ended.end_time if last_ended else open_break.start_time
+                open_break.end_time = max(open_break.start_time or stamp, stamp or datetime.utcnow())
+                db.session.commit()
+                open_break = None
             elapsed_seconds = 0
             if open_break and getattr(open_break, "start_time", None):
                 start_time = open_break.start_time
@@ -7237,6 +7258,9 @@ def mobile_break_start():
     existing = _open_route_break(current_user.id)
     if existing:
         flash("A break is already in progress.", "info")
+        return redirect(_break_redirect_target())
+    if not _open_shift_for_driver(current_user.id):
+        flash("You're off shift — breaks are tracked while a shift is open.", "info")
         return redirect(_break_redirect_target())
     break_type = (request.form.get("break_type") or "").strip() or "Break"
     if break_type not in {*hos_service.BREAK_TYPES, "Break"}:
@@ -7843,28 +7867,38 @@ def _build_daily_log_pdf(day, driver, view, driver_signature=None):
     pdf = SimplePdf("Driver's Daily Log", LETTER)
     width, height = LETTER
     x = 36
-    y = height - 40
-    pdf.text(x, y, "DRIVER'S DAILY LOG", size=15, bold=True, color=MD_PDF_BLUE)
-    pdf.brand_signature(y=y)
-    y -= 14
-    pdf.text(x, y, f"{driver.display_name}  -  {day.strftime('%A, %B %d, %Y')}", size=10, bold=True)
     meta = _daily_log_document_meta(day, driver)
-    pdf.text(width - 200, y, f"{meta['document_no']}", size=8)
-    y -= 12
-    facts = []
+
+    def _page_footer():
+        pdf.text(x, 30, duty_log_service.NOT_AN_ELD, size=6.6, color=(120, 128, 140))
+
+    # Branded header — same layout family as the Driver Log Sheet.
+    logo_path = os.path.join(current_app.static_folder or "", "brand", "movedefense_stripe_brand_icon_200x200.png")
+    if os.path.exists(logo_path):
+        pdf.fill_rect(36, 726, 26, 26, rgb=(13, 19, 32))
+        pdf.image_file(logo_path, 37, 727, 24, 24)
+    pdf.text(70, 742, "MoveDefense", size=12, bold=True, color=MD_PDF_INK)
+    pdf.text(36, 714, "DRIVER", size=7, bold=True, color=MD_PDF_MUTED)
+    pdf.text(36, 700, (driver.display_name or "").upper(), size=15, bold=True)
+    pdf.text(36, 688, day.strftime("%A, %B %d, %Y"), size=8, bold=True, color=MD_PDF_MUTED)
+    rx = 400
+    pdf.text(rx, 742, f"Log No: {meta['document_no']}", size=8, bold=True)
+    pdf.text(rx, 730, f"Generated: {meta.get('generated_at') or ''}", size=8)
+    vehicle_facts = []
     if view["truck"]:
-        facts.append(f"Truck {view['truck']}")
-    if view["odo_start"]:
-        facts.append(f"Odometer start {view['odo_start']:,}")
-    if view["odo_end"]:
-        facts.append(f"end {view['odo_end']:,}")
+        vehicle_facts.append(f"Truck {view['truck']}")
+    if view["odo_start"] and view["odo_end"]:
+        vehicle_facts.append(f"Odometer {view['odo_start']:,} - {view['odo_end']:,}")
+    elif view["odo_start"]:
+        vehicle_facts.append(f"Odometer start {view['odo_start']:,}")
     if view["miles"]:
-        facts.append(f"{view['miles']:,} miles")
-    facts.append("USA Property 70 hour / 8 day")
-    pdf.text(x, y, "  -  ".join(facts), size=8)
-    y -= 10
-    pdf.line(x, y, width - x, y, width=1.2)
-    y -= 14
+        vehicle_facts.append(f"{view['miles']:,} miles")
+    if vehicle_facts:
+        pdf.text(rx, 718, "  \xb7  ".join(vehicle_facts), size=8)
+    pdf.text(rx, 706, "USA Property 70 hour / 8 day", size=8, color=MD_PDF_MUTED)
+    pdf.fill_rect(36, 682, 540, 2, rgb=MD_PDF_BLUE)
+    pdf.text(36, 666, "DRIVER'S DAILY LOG", size=15, bold=True, color=MD_PDF_INK)
+    y = 648
 
     pdf.text(x, y, "RECORD OF DUTY STATUS", size=9, bold=True, color=MD_PDF_BLUE)
     y -= 8
@@ -7874,32 +7908,46 @@ def _build_daily_log_pdf(day, driver, view, driver_signature=None):
     if events:
         pdf.text(x, y, "DUTY EVENTS", size=9, bold=True, color=MD_PDF_BLUE)
         y -= 14
-        rows = []
-        for ev in events[:14]:
-            rows.append(
-                [
-                    ev["at"].strftime("%I:%M %p").lstrip("0"),
-                    ev["status_short"],
-                    ev["label"],
-                    ev["location"] or "",
-                    ev["note"] or "",
-                ]
+        rows = [
+            [
+                ev["at"].strftime("%I:%M %p").lstrip("0"),
+                ev["status_short"],
+                ev["label"],
+                ev["location"] or "",
+                ev["note"] or "",
+            ]
+            for ev in events
+        ]
+        # Every captured event prints; the table flows onto continuation pages.
+        while rows:
+            capacity = int((y - 70) // 18) - 1
+            if capacity < 3:
+                _page_footer()
+                pdf.add_page()
+                y = height - 50
+                pdf.text(x, y, "DUTY EVENTS (CONTINUED)", size=9, bold=True, color=MD_PDF_BLUE)
+                y -= 14
+                capacity = int((y - 70) // 18) - 1
+            chunk = rows[:capacity]
+            rows = rows[capacity:]
+            y = pdf.table(
+                x,
+                y,
+                [56, 32, 110, 160, 182],
+                18,
+                ["Time", "Status", "Event", "Location / Stop", "Note"],
+                chunk,
+                font_size=7.5,
+                header_rgb=MD_PDF_BLUE,
+                header_color=(255, 255, 255),
             )
-        y = pdf.table(
-            x,
-            y,
-            [56, 32, 110, 160, 182],
-            18,
-            ["Time", "Status", "Event", "Location / Stop", "Note"],
-            rows,
-            font_size=7.5,
-            header_rgb=MD_PDF_BLUE,
-            header_color=(255, 255, 255),
-        )
-        if len(events) > 14:
-            y -= 10
-            pdf.text(x, y, f"+ {len(events) - 14} more events on the full log page.", size=7)
         y -= 16
+
+    # Keep the recap + certification + signature together on one page.
+    if y < 170:
+        _page_footer()
+        pdf.add_page()
+        y = height - 50
 
     recap = view["recap"]
     if recap["has_data"]:
@@ -7931,7 +7979,7 @@ def _build_daily_log_pdf(day, driver, view, driver_signature=None):
     pdf.line(x, y - 6, x + 220, y - 6, width=0.8)
     pdf.text(x, y - 16, "Driver Signature", size=7)
     pdf.text(x + 260, y - 16, "Date: ____________", size=7)
-    pdf.text(x, 30, duty_log_service.NOT_AN_ELD, size=6.6, color=(120, 128, 140))
+    _page_footer()
     return pdf.build()
 
 
