@@ -1167,7 +1167,9 @@
                 <div class="md-row-fact"><span>Fuel and Odometer</span><strong>{% if log.fuel %}Fuel stop{% if log.fuel_mileage %} · {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}{% elif log.fuel_mileage %}{{ "{:,}".format(log.fuel_mileage) }} mi{% else %}No fuel logged{% endif %}</strong></div>
               </div>
 
-              {% if log.plant_name in PLANT_ADDRESSES %}
+              {% if log.location_address %}
+                <div class="md-row-fact"><span>Address</span><strong>{{ log.location_address }}</strong></div>
+              {% elif log.plant_name in PLANT_ADDRESSES %}
                 <div class="md-row-fact"><span>Address</span><strong>{{ PLANT_ADDRESSES[log.plant_name] }}</strong></div>
               {% endif %}
 

@@ -119,15 +119,19 @@
     var label = document.createElement('label');
     label.textContent = 'Address matches';
     var select = document.createElement('select');
-    candidates.slice(0, 5).forEach(function (cand, index) {
-      var option = document.createElement('option');
-      option.value = String(index);
-      option.textContent = addressValue(cand) || 'Nearby address';
-      select.appendChild(option);
-    });
-    select.addEventListener('change', function () {
-      applyAddress(btn, candidates[Number(select.value)], true);
-    });
+	    candidates.slice(0, 5).forEach(function (cand, index) {
+	      var option = document.createElement('option');
+	      option.value = String(index);
+	      option.textContent = addressValue(cand) || 'Nearby address';
+	      select.appendChild(option);
+	    });
+	    function useSelectedAddress() {
+	      applyAddress(btn, candidates[Number(select.value)], true);
+	    }
+	    select.addEventListener('pointerdown', useSelectedAddress);
+	    select.addEventListener('focus', useSelectedAddress);
+	    select.addEventListener('input', useSelectedAddress);
+	    select.addEventListener('change', useSelectedAddress);
     wrap.appendChild(label);
     wrap.appendChild(select);
     panel.appendChild(wrap);
@@ -142,19 +146,23 @@
     var heading = document.createElement('label');
     heading.textContent = 'Customer matches';
     var select = document.createElement('select');
-    candidates.slice(0, 6).forEach(function (cand, index) {
-      var option = document.createElement('option');
-      option.value = String(index);
+	    candidates.slice(0, 6).forEach(function (cand, index) {
+	      var option = document.createElement('option');
+	      option.value = String(index);
       var label = cand.name || cand.address || 'Nearby place';
       if (cand.name && cand.address) label += ' - ' + cand.address;
       var distance = formatDistance(cand);
       if (distance) label += ' (' + distance + ')';
-      option.textContent = label;
-      select.appendChild(option);
-    });
-    select.addEventListener('change', function () {
-      apply(btn, candidates[Number(select.value)], true);
-    });
+	      option.textContent = label;
+	      select.appendChild(option);
+	    });
+	    function useSelectedPlace() {
+	      apply(btn, candidates[Number(select.value)], true);
+	    }
+	    select.addEventListener('pointerdown', useSelectedPlace);
+	    select.addEventListener('focus', useSelectedPlace);
+	    select.addEventListener('input', useSelectedPlace);
+	    select.addEventListener('change', useSelectedPlace);
     wrap.appendChild(heading);
     wrap.appendChild(select);
     panel.appendChild(wrap);

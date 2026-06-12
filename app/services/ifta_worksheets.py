@@ -14,6 +14,7 @@ from app.services.file_integrity import sha256_file
 
 
 IFTA_REVIEW_STATUSES = ("Draft", "Needs Review", "Ready for Tax Preparer", "Closed")
+IMAGE_RECEIPT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 
 def _clean(value, default=None):
@@ -119,6 +120,7 @@ def create_ifta_worksheet_from_form(form, files, *, user, report_context=None):
         receipt_filename
         or _clean(form.get("purchase_date"))
         or _clean(form.get("seller_name"))
+        or _clean(form.get("seller_address"))
         or _clean(form.get("fuel_city"))
         or _clean(form.get("state_or_province"))
         or _clean(form.get("gallons_or_liters"))
@@ -129,10 +131,10 @@ def create_ifta_worksheet_from_form(form, files, *, user, report_context=None):
     fuel = IftaFuelRecord(
         worksheet_id=worksheet.id,
         purchase_date=_parse_date(form.get("purchase_date") or context.get("route_date_value")),
-        seller_name=_clean(form.get("seller_name")),
-        seller_address=_clean(form.get("seller_address")),
-        city=_clean(form.get("fuel_city")),
-        state_or_province=_clean(form.get("state_or_province")),
+        seller_name=_clean(form.get("seller_name")) or context.get("fuel_seller_name"),
+        seller_address=_clean(form.get("seller_address")) or context.get("fuel_seller_address"),
+        city=_clean(form.get("fuel_city")) or context.get("fuel_city"),
+        state_or_province=_clean(form.get("state_or_province")) or context.get("fuel_state"),
         gallons_or_liters=_float_or_none(form.get("gallons_or_liters")),
         fuel_type=_clean(form.get("fuel_type")),
         price_per_gallon_or_liter=_float_or_none(form.get("price_per_gallon_or_liter")),
@@ -224,11 +226,13 @@ def ifta_fuel_rows(worksheet):
     rows = []
     for index, fuel in enumerate(worksheet.fuel_records, 1):
         receipt_available = bool(ifta_receipt_path(fuel.receipt_photo))
+        receipt_ext = os.path.splitext(fuel.receipt_photo or "")[1].lower()
         rows.append(
             {
                 "number": index,
                 "fuel": fuel,
                 "receipt_available": receipt_available,
+                "receipt_is_image": receipt_available and receipt_ext in IMAGE_RECEIPT_EXTENSIONS,
                 "receipt_status": "Available" if receipt_available else "Photo not available in upload storage",
                 "receipt_hash": fuel.receipt_hash or "Not recorded",
                 "receipt_photo": fuel.receipt_photo or "Not recorded",

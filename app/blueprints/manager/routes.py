@@ -2379,7 +2379,8 @@ def review_accident_incident(report_id):
 @bp.route("/ifta-worksheet/<int:worksheet_id>")
 def view_ifta_worksheet(worksheet_id):
     worksheet = IftaWorksheet.query.get_or_404(worksheet_id)
-    return render_template("ifta_worksheet_view.html", worksheet=worksheet, manager_view=True)
+    packet = build_ifta_packet(worksheet, generated_by=current_user)
+    return render_template("ifta_worksheet_view.html", worksheet=worksheet, packet=packet, manager_view=True)
 
 
 @bp.route("/ifta-worksheet/<int:worksheet_id>/packet")

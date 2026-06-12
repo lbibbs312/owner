@@ -1,5 +1,6 @@
 import re
 from datetime import date, datetime
+from io import BytesIO
 
 import pytest
 
@@ -302,6 +303,7 @@ def test_ifta_packet_includes_support_fields_and_missing_receipt_state(client, a
             "nontaxable_distance": "0",
             "purchase_date": "2026-04-01",
             "seller_name": "Fuel Stop",
+            "seller_address": "100 Fuel Way",
             "fuel_city": "Toledo",
             "state_or_province": "OH",
             "gallons_or_liters": "30",
@@ -332,9 +334,47 @@ def test_ifta_packet_includes_support_fields_and_missing_receipt_state(client, a
     assert "120" in text
     assert "50" in text
     assert "Fuel Stop" in text
+    assert "100 Fuel Way" in text
     assert "diesel" in text
     assert "Photo not available in upload storage" in text
     assert "Missing receipt rows" in text
+
+
+def test_ifta_receipt_photo_renders_on_view_and_packet(client, app):
+    with app.app_context():
+        create_user("ifta_photo_driver", "ifta-photo@example.com", "driver", first_name="Ifta", last_name="Photo")
+
+    login(client, "ifta_photo_driver")
+    response = client.post(
+        "/ifta-worksheet/new",
+        data={
+            "purchase_date": "2026-06-12",
+            "seller_name": "Pilot Fuel",
+            "seller_address": "400 Fuel Plaza Dr",
+            "fuel_city": "Grand Rapids",
+            "state_or_province": "MI",
+            "fuel_type": "Diesel",
+            "receipt_photo": (BytesIO(b"fake jpg bytes"), "fuel-receipt.jpg"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    view = client.get(response.headers["Location"])
+    body = view.get_data(as_text=True)
+    assert "Pilot Fuel" in body
+    assert "400 Fuel Plaza Dr" in body
+    assert 'class="ifta-receipt-preview"' in body
+    assert "Open receipt" in body
+
+    packet = client.get("/ifta-worksheet/1/packet")
+    packet_body = packet.get_data(as_text=True)
+    assert "Pilot Fuel" in packet_body
+    assert "400 Fuel Plaza Dr" in packet_body
+    assert 'class="receipt-preview"' in packet_body
+    assert "ifta-receipt-1-" in packet_body
+    assert ".jpg" in packet_body
 
 
 def test_new_packet_outputs_avoid_banned_visible_terms(client, app):

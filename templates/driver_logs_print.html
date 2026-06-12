@@ -70,8 +70,9 @@
     table.timeline { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 0.04in; }
     table.timeline th, table.timeline td { border: 1px solid var(--md-line); padding: 4px 5px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
     table.timeline thead th { background: var(--md-blue); color: #fff; font-weight: 800; text-transform: uppercase; font-size: 6.6pt; letter-spacing: 0.03em; border-color: var(--md-blue); }
-    table.timeline tbody tr:nth-child(even) td { background: #f7f9fd; }
-    .col-stop { width: 5%; text-align: center; }
+	    table.timeline tbody tr:nth-child(even) td { background: #f7f9fd; }
+	    .cell-muted { margin-top: 2px; color: var(--md-muted); font-size: 7.2pt; font-weight: 700; line-height: 1.25; }
+	    .col-stop { width: 5%; text-align: center; }
     .col-loc { width: 15%; }
     .col-time { width: 14%; }
     .col-load { width: 16%; }
@@ -186,7 +187,16 @@
           {% for row in sheet.timeline_rows %}
             <tr>
               <td class="col-stop">{{ row.stop_no }}</td>
-              <td class="col-loc"><strong>{{ row.location }}</strong></td>
+              <td class="col-loc">
+                {% if row.location_lines %}
+                  <strong>{{ row.location_lines[0] }}</strong>
+                  {% if row.location_lines|length > 1 %}
+                    <div class="cell-muted">{{ row.location_lines[1] }}</div>
+                  {% endif %}
+                {% else %}
+                  <strong>{{ row.location }}</strong>
+                {% endif %}
+              </td>
               <td class="col-time cell-stack">
                 <div><span class="cell-label">Arrive:</span> {{ row.arrive or '--' }}</div>
                 <div><span class="cell-label">Depart:</span> {{ row.depart or '--' }}</div>

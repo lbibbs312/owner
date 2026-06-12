@@ -10535,6 +10535,8 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     assert "Google places could not be reached - type the address and name" in body
     assert "m away" in body
     assert "Nearby customer names are suggestions only" in body
+    assert "customerChoiceTouched" in body
+    assert "applySelectedCustomer(customerChoiceTouched)" in body
 
     created = client.post(
         "/new_driving_log",
@@ -10550,7 +10552,9 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     assert created.status_code in (302, 303)
 
     with app.app_context():
-        from app.models import DriverLog, PlaceMemory
+        from datetime import date
+        from app.models import DriverLog, PlaceMemory, User
+        from app.services.route_map import build_driver_route_map_context
 
         log = DriverLog.query.filter_by(driver_id=driver_id).one()
         assert log.plant_name == "Customer Dock 4"
@@ -10562,9 +10566,17 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
         assert place.label == "Customer Dock 4"
         assert place.center_latitude == pytest.approx(42.858001)
         assert place.center_longitude == pytest.approx(-85.532002)
+        route_map = build_driver_route_map_context(driver=User.query.get(driver_id), date=date.today())
+        stop = route_map["stops"][0]
+        assert stop["plant_name"] == "Customer Dock 4"
+        assert stop["location_address"] == "2200 Customer Dock Dr, Industrial City, MI 49512"
+        assert stop["location_display"] == "Customer Dock 4 · 2200 Customer Dock Dr, Industrial City, MI 49512"
 
     next_form = client.get("/new_driving_log").get_data(as_text=True)
     assert '<option value="Customer Dock 4">' in next_form
+    print_page = client.get("/driver_logs_print").get_data(as_text=True)
+    assert "Customer Dock 4" in print_page
+    assert "2200 Customer Dock Dr, Industrial City, MI 49512" in print_page
 
 
 def test_day_driver_gps_place_candidates_endpoint_returns_google_places(client, app, monkeypatch):

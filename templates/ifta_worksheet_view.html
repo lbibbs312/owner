@@ -15,9 +15,16 @@
   .ifta-field { padding:12px 14px; border-bottom:1px solid #f1f5f9; }
   .ifta-field span { display:block; color:#64748b; font-size:.7rem; text-transform:uppercase; font-weight:900; }
   .ifta-field strong { display:block; color:#0f172a; font-weight:900; }
-  .review-form { padding:14px; display:grid; gap:10px; }
-  .review-form textarea, .review-form input, .review-form select { width:100%; padding:9px 10px; border:1px solid #cbd5e1; border-radius:8px; }
-  @media (max-width:760px) { .ifta-grid { grid-template-columns:1fr 1fr; } }
+	  .review-form { padding:14px; display:grid; gap:10px; }
+	  .review-form textarea, .review-form input, .review-form select { width:100%; padding:9px 10px; border:1px solid #cbd5e1; border-radius:8px; }
+	  .ifta-records { display:grid; gap:12px; padding:14px; }
+	  .ifta-fuel-record { display:grid; grid-template-columns:minmax(0,1fr) minmax(180px,260px); gap:12px; padding-bottom:12px; border-bottom:1px solid #e2e8f0; }
+	  .ifta-fuel-record:last-child { border-bottom:0; padding-bottom:0; }
+	  .ifta-fuel-record strong { display:block; color:#0f172a; font-weight:950; overflow-wrap:anywhere; }
+	  .ifta-fuel-record span { display:block; margin-top:3px; color:#475569; font-size:.86rem; line-height:1.35; overflow-wrap:anywhere; }
+	  .ifta-receipt-preview { display:block; width:100%; max-height:240px; object-fit:contain; border:1px solid #cbd5e1; border-radius:8px; background:#fff; }
+	  .ifta-receipt-link { display:inline-block; margin-top:6px; overflow-wrap:anywhere; font-weight:900; }
+	  @media (max-width:760px) { .ifta-grid { grid-template-columns:1fr 1fr; } .ifta-fuel-record { grid-template-columns:1fr; } }
   @media (max-width:520px) { .ifta-grid { grid-template-columns:1fr; } }
 </style>
 
@@ -49,9 +56,45 @@
       <div class="ifta-field"><span>Carrier</span><strong>{{ worksheet.carrier_name or 'Not recorded' }}</strong></div>
       <div class="ifta-field"><span>Review status</span><strong>{{ worksheet.review_status }}</strong></div>
     </div>
-  </section>
+	  </section>
 
-  {% if manager_view|default(false) %}
+	  <section class="ifta-panel">
+	    <h2>Fuel Records</h2>
+	    <div class="ifta-records">
+	      {% for row in packet.fuel_rows %}
+	        {% set fuel = row.fuel %}
+	        <article class="ifta-fuel-record">
+	          <div>
+	            <strong>{{ fuel.seller_name or 'Fuel stop' }}</strong>
+	            {% if fuel.seller_address %}<span>{{ fuel.seller_address }}</span>{% endif %}
+	            {% if fuel.city or fuel.state_or_province %}<span>{{ [fuel.city, fuel.state_or_province]|select|join(', ') }}</span>{% endif %}
+	            <span>
+	              {{ fuel.purchase_date or 'Date not recorded' }}
+	              {% if fuel.gallons_or_liters is not none %} &middot; {{ "{:g}".format(fuel.gallons_or_liters) }} gal{% endif %}
+	              {% if fuel.fuel_type %} &middot; {{ fuel.fuel_type }}{% endif %}
+	              {% if fuel.total_sale_amount is not none %} &middot; ${{ "%.2f"|format(fuel.total_sale_amount) }}{% endif %}
+	            </span>
+	            <span>Receipt hash: {{ row.receipt_hash }}</span>
+	          </div>
+	          <div>
+	            {% if row.receipt_available %}
+	              {% set receipt_url = url_for('driver.ifta_receipt', fuel_id=fuel.id) %}
+	              {% if row.receipt_is_image %}
+	                <img class="ifta-receipt-preview" src="{{ receipt_url }}" alt="Fuel receipt row {{ row.number }}">
+	              {% endif %}
+	              <a class="ifta-receipt-link" href="{{ receipt_url }}">Open receipt</a>
+	            {% else %}
+	              <span>{{ row.receipt_status }}</span>
+	            {% endif %}
+	          </div>
+	        </article>
+	      {% else %}
+	        <div class="ifta-field"><strong>No fuel records saved yet.</strong></div>
+	      {% endfor %}
+	    </div>
+	  </section>
+
+	  {% if manager_view|default(false) %}
     <section class="ifta-panel">
       <h2>Manager Review</h2>
       <form class="review-form" method="POST" action="{{ url_for('manager.review_ifta_worksheet', worksheet_id=worksheet.id) }}">

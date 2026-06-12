@@ -8,6 +8,7 @@ PRs of PR-5c.
 from datetime import datetime, date, timedelta
 from functools import wraps
 import os
+import re
 from uuid import uuid4
 
 import pytz
@@ -2096,6 +2097,28 @@ def _sheet_clean(value):
     return str(value or "").strip()
 
 
+def _sheet_location_key(value):
+    return re.sub(r"[^a-z0-9]+", "", _sheet_clean(value).lower())
+
+
+def _sheet_same_location(left, right):
+    return bool(left and right and _sheet_location_key(left) == _sheet_location_key(right))
+
+
+def _sheet_stop_location_lines(log, plant_name):
+    label = _sheet_clean(plant_name) or _plant_label(getattr(log, "plant_name", None))
+    address = _sheet_clean(getattr(log, "location_address", None))
+    if not label and address:
+        return [address]
+    if address and not _sheet_same_location(label, address):
+        return [label, address]
+    return [label or "Stop"]
+
+
+def _sheet_stop_location_display(log, plant_name):
+    return " · ".join(_sheet_stop_location_lines(log, plant_name))
+
+
 def _sheet_blank(value):
     text = _sheet_clean(value)
     return text if text else ""
@@ -2403,6 +2426,8 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
         route = (log_routes or {}).get(log.id, {})
         row_state = row_states.get(log.id, {})
         plant_name = row_state.get("plant") or route.get("plant") or _plant_label(log.plant_name)
+        location_lines = _sheet_stop_location_lines(log, plant_name)
+        location_display = " · ".join(location_lines)
         inbound = _sheet_cargo_label(log, route, row_state, "in")
         outbound = _sheet_cargo_label(log, route, row_state, "out")
         miles_since = None
@@ -2413,7 +2438,9 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
         timeline_rows.append(
             {
                 "stop_no": index,
-                "location": plant_name,
+                "location": location_display,
+                "location_lines": location_lines,
+                "location_address": _sheet_clean(getattr(log, "location_address", None)),
                 "arrive": _arrival_utc_to_local_hhmm(log.arrive_time),
                 "depart": _format_hhmm_12h(log.depart_time) if log.depart_time else "Pending",
                 "wait": wait_label_for_log(log) or "",
@@ -3594,7 +3621,7 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
         if row["wait"]:
             time_wait.append(row["wait"])
         load_flow = [f"IN: {row['load_in'] or '--'}", f"OUT: {row['load_out'] or '--'}"]
-        cells = [str(row["stop_no"]), row["location"] or "--", time_wait, load_flow]
+        cells = [str(row["stop_no"]), row.get("location_lines") or row["location"] or "--", time_wait, load_flow]
         if show_miles:
             cells.append(row["miles_since"])
         if show_fuel:
@@ -6483,7 +6510,8 @@ def view_ifta_worksheet(worksheet_id):
     worksheet = IftaWorksheet.query.get_or_404(worksheet_id)
     if not _driver_can_view_ifta(worksheet):
         abort(403)
-    return render_template("ifta_worksheet_view.html", worksheet=worksheet, manager_view=False)
+    packet = build_ifta_packet(worksheet, generated_by=current_user)
+    return render_template("ifta_worksheet_view.html", worksheet=worksheet, packet=packet, manager_view=False)
 
 
 @bp.route("/ifta-worksheet/<int:worksheet_id>/packet")

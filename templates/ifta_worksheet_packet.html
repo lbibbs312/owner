@@ -18,8 +18,10 @@
   .packet-field strong { display:block; font-weight:900; }
   .open-list { margin:8px 0 0; padding-left:18px; }
   table { width:100%; border-collapse:collapse; margin-top:8px; }
-  th, td { border:1px solid #d1d5db; padding:6px; font-size:.78rem; text-align:left; vertical-align:top; }
-  th { background:#f3f4f6; }
+	  th, td { border:1px solid #d1d5db; padding:6px; font-size:.78rem; text-align:left; vertical-align:top; }
+	  th { background:#f3f4f6; }
+	  .receipt-preview { display:block; width:100%; max-width:520px; max-height:520px; object-fit:contain; margin-bottom:6px; border:1px solid #d1d5db; background:#fff; }
+	  .receipt-file-link { overflow-wrap:anywhere; }
   @media (max-width:700px) { .packet-brand { grid-template-columns:1fr; } .packet-meta { text-align:left; white-space:normal; } }
   @media print { .packet-actions, nav, header.app-nav, .navbar { display:none !important; } .packet-doc { max-width:none; padding:0; } .packet-page { border:0; margin:0; min-height:100vh; } .packet-page:last-child { page-break-after:auto; break-after:auto; } }
 </style>
@@ -95,7 +97,16 @@
         <tr>
           <td>{{ row.purchase_date or 'Not recorded' }}</td>
           <td>{{ row.seller_name or 'Not recorded' }}</td>
-          <td>{{ row.city or 'Not recorded' }}, {{ row.state_or_province or 'Not recorded' }}</td>
+	          <td>
+	            {% if row.seller_address %}
+	              {{ row.seller_address }}
+	              {% if row.city or row.state_or_province %}<br>{{ [row.city, row.state_or_province]|select|join(', ') }}{% endif %}
+	            {% elif row.city or row.state_or_province %}
+	              {{ [row.city, row.state_or_province]|select|join(', ') }}
+	            {% else %}
+	              Not recorded
+	            {% endif %}
+	          </td>
           <td>{{ row.gallons_or_liters if row.gallons_or_liters is not none else 'Not recorded' }}</td>
           <td>{{ row.fuel_type or 'Not recorded' }}</td>
           <td>{{ row.tax_paid or 'unknown' }}</td>
@@ -110,15 +121,19 @@
     <div class="packet-brand"><div class="packet-brand-title"><h2>Receipt Photos and File Hashes</h2></div><div class="packet-meta">Accurate Page 5 of 5</div></div>
     <table>
       <tr><th>Fuel row</th><th>Receipt photo</th><th>Receipt hash</th><th>File status</th></tr>
-      {% for row in packet.fuel_rows %}
-        <tr>
-          <td>{{ row.number }}</td>
-          <td>
-            {% if row.receipt_available %}
-              <a href="{{ url_for('driver.ifta_receipt', fuel_id=row.fuel.id) }}">{{ row.receipt_photo }}</a>
-            {% else %}
-              Photo not available in upload storage
-            {% endif %}
+	      {% for row in packet.fuel_rows %}
+	        <tr>
+	          <td>{{ row.number }}</td>
+	          <td>
+	            {% if row.receipt_available %}
+	              {% set receipt_url = url_for('driver.ifta_receipt', fuel_id=row.fuel.id) %}
+	              {% if row.receipt_is_image %}
+	                <img class="receipt-preview" src="{{ receipt_url }}" alt="Fuel receipt row {{ row.number }}">
+	              {% endif %}
+	              <a class="receipt-file-link" href="{{ receipt_url }}">{{ row.receipt_photo }}</a>
+	            {% else %}
+	              Photo not available in upload storage
+	            {% endif %}
           </td>
           <td>{{ row.receipt_hash }}</td>
           <td>{{ row.receipt_status }}</td>

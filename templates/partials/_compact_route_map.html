@@ -325,7 +325,7 @@
       <a class="md-flow-primary-cta" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow" data-flow-panel-kicker="DEPART QUICK FLOW">
         <span>Required driver action</span>
         <strong>{{ primary_cta.label if primary_cta else 'Record Departure' }}</strong>
-        <small>{{ primary_stop.plant_name }} &middot; record departure</small>
+        <small>{{ primary_stop.location_display if primary_stop.location_display is defined and primary_stop.location_display else primary_stop.plant_name }} &middot; record departure</small>
       </a>
     </div>
   {% elif not route_finalized_for_cta and add_stop_url and (primary_action == 'add_stop' or (not (rm and rm.stops) and primary_action != 'start_shift') or show_between_loads_add_stop) %}
@@ -382,7 +382,7 @@
           {% set start_depart_step = 0 if is_service_depart or requires_drop_check else 1 %}
           {% if current_user.is_day_driver %}
           {# Freight depart: one window. Follow-ups appear only when an answer needs them. #}
-          {% set stop_label = primary_stop.plant_label if primary_stop.plant_label is defined and primary_stop.plant_label else (primary_stop.plant if primary_stop.plant is defined and primary_stop.plant else (primary_stop.board_code or 'this stop')) %}
+          {% set stop_label = primary_stop.plant_label if primary_stop.plant_label is defined and primary_stop.plant_label else (primary_stop.plant if primary_stop.plant is defined and primary_stop.plant else (primary_stop.plant_name if primary_stop.plant_name is defined and primary_stop.plant_name else (primary_stop.location_display if primary_stop.location_display is defined and primary_stop.location_display else (primary_stop.board_code or 'this stop')))) %}
           {% set arrived_cargo = primary_stop.arrived_with if primary_stop.arrived_with is defined else '' %}
           {% set freight_needs_unload = requires_unload_check or (arrived_cargo and arrived_cargo not in ['Empty', '--', '']) %}
           <form class="depart-wizard freight-depart" method="POST" action="{{ depart_url }}" data-destination-lookup-url="{{ url_for('driver.gps_destination_lookup') }}">
@@ -1026,14 +1026,14 @@
             <button class="md-flow-row tone-{{ stop_badge.row_tone }}{% if stop.status == 'completed' and stop_badge.row_tone != 'active' %} is-completed-stop{% endif %}" type="button"
                     data-flow-row
                     data-detail-template="route-stop-{{ stop.stop_id }}"
-                    data-title="Stop {{ stop.sequence }} - {{ stop.plant_name }}"
+                    data-title="Stop {{ stop.sequence }} - {{ stop.location_display if stop.location_display is defined and stop.location_display else stop.plant_name }}"
                     data-sheet-url="{{ route_sheet_url or stop.view_url or '#' }}"
                     data-flow-full-url="{{ stop.view_url or route_sheet_url or '#' }}"
 	                    data-depart-url="{{ depart_url if primary_stop and stop.stop_id == primary_stop.stop_id else '#' }}"
 	                    data-proof-url="{{ stop.view_url or route_sheet_url or '#' }}"
 	                    data-damage-url="{{ damage_url or '#' }}"
 	                    data-document-url="{{ document_url or '#' }}">
-	              <span class="flow-detail">{{ board_flow_text(stop.board_flow, stop.board_detail or (stop.plant_name ~ ' · ' ~ stop.arrived_with ~ ' → ' ~ stop.departed_with), stop.wait_minutes) }}</span>
+	              <span class="flow-detail">{{ board_flow_text(stop.board_flow, stop.board_detail or ((stop.location_display if stop.location_display is defined and stop.location_display else stop.plant_name) ~ ' · ' ~ stop.arrived_with ~ ' → ' ~ stop.departed_with), stop.wait_minutes) }}</span>
 	              <span class="flow-status status-{{ stop_badge.pill_tone }}">{{ stop_badge.short }}</span>
 	            </button>
 	          {% endfor %}

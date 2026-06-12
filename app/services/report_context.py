@@ -99,6 +99,22 @@ def _mileage_context(logs, pretrip):
     }
 
 
+def _city_state_from_address(address):
+    parts = [part.strip() for part in (address or "").split(",") if part.strip()]
+    if len(parts) < 2:
+        return "", ""
+    tail = parts[-1]
+    if tail.lower() in {"usa", "united states"} and len(parts) >= 3:
+        tail = parts[-2]
+        city = parts[-3] if len(parts) >= 4 else ""
+    else:
+        city = parts[-2] if len(parts) >= 3 else ""
+    state = tail.split()[0].upper() if tail else ""
+    if len(state) != 2:
+        state = ""
+    return city, state
+
+
 def build_report_context(
     *,
     user,
@@ -144,8 +160,11 @@ def build_report_context(
     trailer = getattr(pretrip, "trailer_number", None)
     plant_code = getattr(stop, "plant_name", None)
     plant_name = plant_label(plant_code) if plant_code else None
-    address = PLANT_ADDRESSES.get(plant_code) if plant_code else None
+    address = getattr(stop, "location_address", None) or (PLANT_ADDRESSES.get(plant_code) if plant_code else None)
     active_wait = wait_label_for_log(stop) if stop and not getattr(stop, "depart_time", None) else None
+    fuel_seller_name = plant_name if selected_report_type == "fuel_odo_ifta" and getattr(stop, "fuel", False) else ""
+    fuel_seller_address = address if fuel_seller_name else ""
+    fuel_city, fuel_state = _city_state_from_address(fuel_seller_address)
 
     return {
         "selected_report_type": selected_report_type,
@@ -166,6 +185,10 @@ def build_report_context(
         "exact_location_text": address,
         "city": "",
         "state": "",
+        "fuel_seller_name": fuel_seller_name,
+        "fuel_seller_address": fuel_seller_address,
+        "fuel_city": fuel_city,
+        "fuel_state": fuel_state,
         "incident_datetime_value": local_now.strftime("%Y-%m-%dT%H:%M"),
         "reported_datetime_value": local_now.strftime("%Y-%m-%dT%H:%M"),
         "reporting_period_quarter": _quarter_for(report_date),

@@ -116,6 +116,7 @@
     {# Cargo is captured ONCE — at departure ("Leaving loaded?"). Arriving only asks where you are. #}
     <script>
       (function () {
+        var form = document.getElementById('arrivalForm');
         var gpsBtn = document.getElementById('gpsFillBtn');
         var gpsStatus = document.getElementById('gpsStatus');
         var addressInput = document.getElementById('location_address');
@@ -132,6 +133,7 @@
         var placeMemory = {{ (fm.places or [])|tojson }};
         var currentAddresses = [];
         var currentCandidates = [];
+        var customerChoiceTouched = false;
 
         function clean(value) {
           return (value || '').toString().trim();
@@ -204,6 +206,21 @@
           }
           if (candidate.name && (forceName || !nameInput.value.trim())) {
             nameInput.value = candidate.name;
+          }
+        }
+
+        function selectedCandidate() {
+          if (!placeSelect || placeSelect.disabled) return null;
+          var index = Number(placeSelect.value);
+          if (Number.isNaN(index)) return null;
+          return currentCandidates[index] || null;
+        }
+
+        function applySelectedCustomer(force) {
+          var candidate = selectedCandidate();
+          if (!candidate) return;
+          if (force || isTrustedCandidate(candidate)) {
+            applyCandidate(candidate, true, false);
           }
         }
 
@@ -387,9 +404,28 @@
           });
         }
         if (placeSelect) {
+          placeSelect.addEventListener('pointerdown', function () {
+            customerChoiceTouched = true;
+          });
+          placeSelect.addEventListener('focus', function () {
+            customerChoiceTouched = true;
+          });
           placeSelect.addEventListener('change', function () {
             if (placeSelect.disabled) return;
-            applyCandidate(currentCandidates[Number(placeSelect.value)], true, false);
+            customerChoiceTouched = true;
+            applySelectedCustomer(true);
+          });
+          placeSelect.addEventListener('input', function () {
+            if (placeSelect.disabled) return;
+            customerChoiceTouched = true;
+            applySelectedCustomer(true);
+          });
+        }
+        if (form) {
+          form.addEventListener('submit', function () {
+            if (nameInput && !nameInput.value.trim()) {
+              applySelectedCustomer(customerChoiceTouched);
+            }
           });
         }
         if (gpsBtn) gpsBtn.addEventListener('click', function () { fillFromGps(false); });
