@@ -18,10 +18,13 @@ BUSINESS_TYPES = {
     "car_repair",
     "car_wash",
     "convenience_store",
+    "corporate_office",
     "establishment",
     "gas_station",
     "hardware_store",
+    "industrial",
     "local_government_office",
+    "manufacturer",
     "moving_company",
     "parking",
     "point_of_interest",
@@ -29,17 +32,36 @@ BUSINESS_TYPES = {
     "premise",
     "storage",
     "store",
+    "warehouse",
 }
 LOW_VALUE_TYPES = {
+    "administrative_area_level_1",
+    "administrative_area_level_2",
     "atm",
     "bus_station",
+    "country",
     "finance",
     "intersection",
     "locality",
+    "neighborhood",
     "political",
+    "postal_code",
     "route",
     "street_address",
+    "sublocality",
+    "sublocality_level_1",
     "transit_station",
+}
+DESTINATION_GEOGRAPHY_TYPES = {
+    "administrative_area_level_1",
+    "administrative_area_level_2",
+    "country",
+    "locality",
+    "neighborhood",
+    "political",
+    "postal_code",
+    "sublocality",
+    "sublocality_level_1",
 }
 PREMISE_GEOCODE_TYPES = {"premise", "subpremise", "street_address"}
 DEFAULT_PLACE_RADIUS_M = 90
@@ -150,10 +172,21 @@ def _name_looks_like_address(name, address):
     return bool(re.match(r"^\d+\s+\w+", name))
 
 
+def _has_street_number(address):
+    return bool(re.search(r"\b\d{1,6}\s+\S+", _clean(address)))
+
+
 def _destination_place(result):
     name = _place_name(result)
     address = _format_address(result.get("formattedAddress") or result.get("shortFormattedAddress"))
-    if not name and not address:
+    if not address:
+        return None
+    types = set(result.get("types") or [])
+    has_street = _has_street_number(address) or "street_address" in types or "premise" in types
+    is_business = bool(types & BUSINESS_TYPES)
+    if types & DESTINATION_GEOGRAPHY_TYPES and not has_street and not is_business:
+        return None
+    if not is_business and not has_street:
         return None
     if _name_looks_like_address(name, address):
         name = ""

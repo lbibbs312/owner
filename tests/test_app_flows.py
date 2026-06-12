@@ -10641,6 +10641,17 @@ def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(cli
         user = User.query.filter_by(username="dd_second_load").one()
         user.day_driver = True
         user.route_type = "general_freight"
+        previous = DriverLog(
+            driver_id=driver.id,
+            date=today,
+            plant_name="Previous Shipper",
+            load_size="Empty",
+            depart_load_size="Pallets -> Recent Receiver",
+            destination="Recent Receiver",
+            destination_address="1200 Recent Receiver Rd, Industrial City, MI 49512",
+            arrive_time="00:00",
+            depart_time="00:00",
+        )
         active = DriverLog(
             driver_id=driver.id,
             date=today,
@@ -10648,7 +10659,7 @@ def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(cli
             load_size="Empty",
             arrive_time="00:01",
         )
-        db.session.add(active)
+        db.session.add_all([previous, active])
         db.session.commit()
         active_id = active.id
         driver_id = driver.id
@@ -10660,7 +10671,11 @@ def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(cli
     assert 'name="destination_address"' in depart_screen
     assert 'name="destination_text"' in depart_screen
     assert "data-destination-suggestions" in depart_screen
+    assert depart_screen.count('class="freight-destination-recents" data-destination-recents hidden') == 2
     assert "freight-destination-option" in depart_screen
+    assert "freight-destination-recent" in depart_screen
+    assert "Recent Receiver" in depart_screen
+    assert "1200 Recent Receiver Rd, Industrial City, MI 49512" in depart_screen
     assert "/gps/destination-lookup" in depart_screen
 
     response = client.post(

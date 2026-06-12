@@ -2814,11 +2814,32 @@ def _freight_stop_memory(driver_id, limit=40):
         .limit(limit)
         .all()
     )
-    locations, commodities, weight_map, places = [], [], {}, []
+    locations, destinations, commodities, weight_map, places = [], [], [], {}, []
+
+    def add_location(label):
+        label = (label or "").strip()
+        if label and label != "Day Route" and label not in locations:
+            locations.append(label)
+
+    def add_destination(name="", address=""):
+        name = (name or "").strip()
+        address = (address or "").strip()
+        if not name and not address:
+            return
+        key = (name.lower(), address.lower())
+        if key not in {(item["name"].lower(), item["address"].lower()) for item in destinations}:
+            destinations.append({"name": name, "address": address})
+        add_location(name or address)
+
+    def secondary_destination_label(value):
+        value = (value or "").strip()
+        if " -> " not in value:
+            return ""
+        return value.rsplit(" -> ", 1)[1].strip()
+
     for place in learned_places:
         label = (place.label or "").strip()
-        if label and label not in locations:
-            locations.append(label)
+        add_destination(label)
         if label and place.center_latitude is not None and place.center_longitude is not None:
             places.append(
                 {
@@ -2829,9 +2850,9 @@ def _freight_stop_memory(driver_id, limit=40):
                 }
             )
     for log in rows:
-        place = (log.plant_name or "").strip()
-        if place and place != "Day Route" and place not in locations:
-            locations.append(place)
+        add_destination(getattr(log, "destination", None), getattr(log, "destination_address", None))
+        add_destination(secondary_destination_label(getattr(log, "secondary_load", None)))
+        add_location(log.plant_name)
         commodity = (log.commodity or "").strip()
         if commodity:
             if commodity not in commodities:
@@ -2841,6 +2862,7 @@ def _freight_stop_memory(driver_id, limit=40):
                 weight_map[commodity.lower()] = weight
     return {
         "locations": locations[:8],
+        "destinations": destinations[:8],
         "places": places[:20],
         "commodities": commodities[:5],
         "weight_map": weight_map,
@@ -7021,6 +7043,11 @@ def mobile_dashboard():
         truck_maintenance_history=truck_maintenance_history,
         truck_issue_choices=TRUCK_ISSUE_CHOICES,
         depart_form=DepartForm(),
+        freight_memory=(
+            _freight_stop_memory(current_user.id)
+            if getattr(current_user, "is_day_driver", False)
+            else None
+        ),
         **ryder_context,
     )
 

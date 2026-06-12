@@ -423,7 +423,7 @@
                 </div>
               </div>
 
-              {% set fm = freight_memory or {'locations': [], 'commodities': [], 'weight_map': {}} %}
+              {% set fm = freight_memory or {'locations': [], 'destinations': [], 'commodities': [], 'weight_map': {}} %}
               <div class="freight-followup" data-freight-load-details hidden>
                 <label for="frCommodityChoice">Hauling</label>
                 <select id="frCommodityChoice">
@@ -451,6 +451,7 @@
                         <label for="frDestName">Destination business name</label>
                         <input id="frDestName" type="text" name="destination_text" list="frDestMemory" autocomplete="off" placeholder="Auto-filled, correct if needed" data-destination-name>
                       </div>
+                      <div class="freight-destination-recents" data-destination-recents hidden></div>
                       <div class="freight-destination-suggestions" data-destination-suggestions hidden></div>
                     </div>
                     <datalist id="frDestMemory">
@@ -477,6 +478,7 @@
                           <label for="frDestName2">Destination business name</label>
                           <input id="frDestName2" type="text" name="secondary_destination_text" list="frDestMemory" autocomplete="off" placeholder="Auto-filled, correct if needed" data-destination-name>
                         </div>
+                        <div class="freight-destination-recents" data-destination-recents hidden></div>
                         <div class="freight-destination-suggestions" data-destination-suggestions hidden></div>
                       </div>
                     </div>
@@ -507,12 +509,15 @@
             .freight-depart .freight-followup { display:grid; gap:8px; margin:10px 0; }
             .freight-depart .freight-two { display:grid; grid-template-columns:1fr 1.4fr; gap:10px; }
             .freight-depart .freight-destination-stack { display:grid; gap:8px; }
+            .freight-depart .freight-destination-recents { display:grid; gap:6px; }
+            .freight-depart .freight-destination-recents[hidden] { display:none !important; }
             .freight-depart .freight-destination-suggestions { display:grid; gap:6px; }
             .freight-depart .freight-destination-suggestions[hidden] { display:none !important; }
-            .freight-depart .freight-destination-option { display:grid; gap:2px; width:100%; border:1px solid rgba(91,157,255,.28); border-radius:8px; background:rgba(12,23,38,.98); color:#dbe7ff; padding:10px 12px; text-align:left; cursor:pointer; }
-            .freight-depart .freight-destination-option:focus, .freight-depart .freight-destination-option:hover { border-color:rgba(255,212,121,.62); outline:none; }
-            .freight-depart .freight-destination-option strong { font-size:.9rem; line-height:1.25; }
-            .freight-depart .freight-destination-option span { color:#9db2d0; font-size:.78rem; line-height:1.25; }
+            .freight-depart .freight-destination-option, .freight-depart .freight-destination-recent { display:grid; gap:2px; width:100%; border:1px solid rgba(91,157,255,.28); border-radius:8px; background:rgba(12,23,38,.98); color:#dbe7ff; padding:10px 12px; text-align:left; cursor:pointer; }
+            .freight-depart .freight-destination-recent { border-color:rgba(127,178,255,.22); background:rgba(10,17,28,.82); }
+            .freight-depart .freight-destination-option:focus, .freight-depart .freight-destination-option:hover, .freight-depart .freight-destination-recent:focus, .freight-depart .freight-destination-recent:hover { border-color:rgba(255,212,121,.62); outline:none; }
+            .freight-depart .freight-destination-option strong, .freight-depart .freight-destination-recent strong { font-size:.9rem; line-height:1.25; }
+            .freight-depart .freight-destination-option span, .freight-depart .freight-destination-recent span { color:#9db2d0; font-size:.78rem; line-height:1.25; }
             .freight-depart input[type="text"], .freight-depart select { width:100%; border:1px solid rgba(91,157,255,.28); border-radius:8px; background:rgba(10,17,28,.96); color:#dbe7ff; padding:12px; font-size:1rem; }
             .freight-depart .freight-followup label { color:#8fa3bf; font-size:.7rem; font-weight:800; }
             .freight-note-toggle { background:none; border:0; color:#7fb2ff; font-weight:800; font-size:.85rem; padding:6px 0; cursor:pointer; text-align:left; }
@@ -523,6 +528,8 @@
               if (!form) return;
               var weightMap = {{ (freight_memory.weight_map if freight_memory else {})|tojson }};
               var recents = {{ (freight_memory.commodities if freight_memory else [])|tojson }};
+              var recentDestinations = {{ (freight_memory.destinations if freight_memory else [])|tojson }};
+              var recentLocationLabels = {{ (freight_memory.locations if freight_memory else [])|tojson }};
               var choice = form.querySelector('#frCommodityChoice');
               var otherInput = form.querySelector('#frCommodity');
               var weight = form.querySelector('#frWeight');
@@ -552,7 +559,34 @@
                 box.hidden = true;
                 box.replaceChildren();
               }
-              function renderDestinationSuggestions(box, places, onPick) {
+              function destinationKey(place) {
+                return ((place && place.name) || '').trim().toLowerCase() + '|' + ((place && place.address) || '').trim().toLowerCase();
+              }
+              function destinationLooksLikeAddress(value) {
+                return /^\d+\s+\S+/.test((value || '').trim());
+              }
+              var recentDestinationList = [];
+              var recentDestinationSeen = {};
+              (Array.isArray(recentDestinations) ? recentDestinations : []).forEach(function (place) {
+                var normalized = {
+                  name: ((place && place.name) || '').trim(),
+                  address: ((place && place.address) || '').trim()
+                };
+                var key = destinationKey(normalized);
+                if (key !== '|' && !recentDestinationSeen[key]) {
+                  recentDestinationSeen[key] = true;
+                  recentDestinationList.push(normalized);
+                }
+              });
+              (Array.isArray(recentLocationLabels) ? recentLocationLabels : []).forEach(function (label) {
+                var normalized = { name: (label || '').trim(), address: '' };
+                var key = destinationKey(normalized);
+                if (normalized.name && !recentDestinationSeen[key]) {
+                  recentDestinationSeen[key] = true;
+                  recentDestinationList.push(normalized);
+                }
+              });
+              function renderDestinationList(box, places, onPick, className) {
                 if (!box) return;
                 box.replaceChildren();
                 (places || []).slice(0, 5).forEach(function (place) {
@@ -561,7 +595,7 @@
                   if (!address && !name) return;
                   var option = document.createElement('button');
                   option.type = 'button';
-                  option.className = 'freight-destination-option';
+                  option.className = className || 'freight-destination-option';
                   var title = document.createElement('strong');
                   title.textContent = name || address;
                   option.appendChild(title);
@@ -575,22 +609,46 @@
                 });
                 box.hidden = !box.children.length;
               }
+              function renderDestinationSuggestions(box, places, onPick) {
+                renderDestinationList(box, places, onPick, 'freight-destination-option');
+              }
+              function renderDestinationRecents(box, filterText, onPick) {
+                var tokens = (filterText || '').toLowerCase().split(/\s+/).filter(function (token) { return token.length >= 2; });
+                var places = recentDestinationList.filter(function (place) {
+                  if (!tokens.length) return true;
+                  var haystack = ((place.name || '') + ' ' + (place.address || '')).toLowerCase();
+                  return tokens.every(function (token) { return haystack.indexOf(token) !== -1; });
+                }).slice(0, 4);
+                renderDestinationList(box, places, onPick, 'freight-destination-recent');
+              }
               function wireDestinationLookup(addressInput) {
                 if (!addressInput || !destinationLookupUrl) return;
                 var targetSelector = addressInput.getAttribute('data-destination-name-target') || '';
                 var nameInput = targetSelector ? form.querySelector(targetSelector) : null;
                 var stack = addressInput.closest('.freight-destination-stack');
                 var suggestions = stack ? stack.querySelector('[data-destination-suggestions]') : null;
+                var recentsBox = stack ? stack.querySelector('[data-destination-recents]') : null;
                 var nameWasEdited = false;
                 var pendingTimer = null;
                 var requestId = 0;
                 function pickPlace(place) {
-                  if (place.address) addressInput.value = place.address;
-                  if (nameInput && place.name) {
+                  var name = (place.name || '').trim();
+                  var address = (place.address || '').trim();
+                  if (address) {
+                    addressInput.value = address;
+                  } else if (destinationLooksLikeAddress(name)) {
+                    addressInput.value = name;
+                  }
+                  if (nameInput && name && name !== address && !destinationLooksLikeAddress(name)) {
                     nameInput.value = place.name;
                     nameWasEdited = false;
                   }
                   hideDestinationSuggestions(suggestions);
+                  hideDestinationSuggestions(recentsBox);
+                }
+                function showRecentDestinations(sourceInput) {
+                  var filter = (sourceInput && sourceInput.value ? sourceInput.value : '').trim();
+                  renderDestinationRecents(recentsBox, filter, pickPlace);
                 }
                 function requestLookup(sourceInput) {
                   var sourceValue = sourceInput.value.trim();
@@ -601,6 +659,7 @@
                   if (!query) query = sourceValue;
                   var activeRequest = ++requestId;
                   window.clearTimeout(pendingTimer);
+                  renderDestinationRecents(recentsBox, sourceValue, pickPlace);
                   if (query.length < 4) {
                     hideDestinationSuggestions(suggestions);
                     return;
@@ -623,16 +682,23 @@
                           }
                         }
                         renderDestinationSuggestions(suggestions, places, pickPlace);
+                        if (places.length) {
+                          hideDestinationSuggestions(recentsBox);
+                        } else {
+                          renderDestinationRecents(recentsBox, sourceValue || query, pickPlace);
+                        }
                       })
                       .catch(function () { hideDestinationSuggestions(suggestions); });
                   }, 550);
                 }
                 if (nameInput) {
+                  nameInput.addEventListener('focus', function () { showRecentDestinations(nameInput); });
                   nameInput.addEventListener('input', function () {
                     nameWasEdited = true;
                     requestLookup(nameInput);
                   });
                 }
+                addressInput.addEventListener('focus', function () { showRecentDestinations(addressInput); });
                 addressInput.addEventListener('input', function () { requestLookup(addressInput); });
               }
               form.querySelectorAll('[data-destination-address]').forEach(wireDestinationLookup);

@@ -119,6 +119,12 @@ def test_destination_lookup_returns_business_name_and_address(monkeypatch, flask
             {
                 "places": [
                     {
+                        "id": "destination-locality",
+                        "displayName": {"text": "Raleigh"},
+                        "formattedAddress": "Raleigh, NC, USA",
+                        "types": ["locality", "political"],
+                    },
+                    {
                         "id": "destination-customer",
                         "displayName": {"text": "Receiver Warehouse"},
                         "formattedAddress": "1100 Receiver Ave, Industrial City, MI 49512, USA",
@@ -146,4 +152,5 @@ def test_destination_lookup_returns_business_name_and_address(monkeypatch, flask
     assert payload["place"]["name"] == "Receiver Warehouse"
     assert payload["place"]["address"] == "1100 Receiver Ave, Industrial City, MI 49512"
     assert [place["name"] for place in payload["places"]] == ["Receiver Warehouse", "Receiver Annex"]
+    assert "Raleigh" not in [place["name"] for place in payload["places"]]
     assert payload["places"][1]["address"] == "1110 Receiver Ave, Industrial City, MI 49512"
