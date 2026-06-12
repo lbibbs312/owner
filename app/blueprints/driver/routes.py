@@ -2880,7 +2880,11 @@ def _freight_departure_label(commodity, weight="", destination="", *, fallback="
     weight = (weight or "").strip()
     destination = (destination or "").strip()
     label = commodity
-    if weight:
+    try:
+        numeric_weight = float(weight.replace(",", "")) if weight else None
+    except ValueError:
+        numeric_weight = None
+    if weight and numeric_weight != 0:
         label = f"{label} ({weight} lbs)"
     if destination:
         label = f"{label} -> {destination}"
@@ -6405,6 +6409,18 @@ def new_ifta_worksheet():
         driver_log_id=request.values.get("driver_log_id", type=int),
         stop_id=request.values.get("stop_id", type=int),
     )
+    recent_fuel_records = (
+        IftaFuelRecord.query.join(IftaWorksheet, IftaFuelRecord.worksheet_id == IftaWorksheet.id)
+        .filter(
+            or_(
+                IftaWorksheet.driver_id == current_user.id,
+                IftaWorksheet.created_by_id == current_user.id,
+            )
+        )
+        .order_by(IftaFuelRecord.purchase_date.desc(), IftaFuelRecord.id.desc())
+        .limit(6)
+        .all()
+    )
     if request.method == "POST":
         worksheet = create_ifta_worksheet_from_form(
             request.form,
@@ -6430,6 +6446,7 @@ def new_ifta_worksheet():
         worksheet=None,
         manager_view=False,
         report_context=report_context,
+        recent_fuel_records=recent_fuel_records,
     )
 
 

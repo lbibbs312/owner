@@ -7055,6 +7055,15 @@ def test_driver_mobile_pages_share_single_five_tab_bottom_nav(client, app):
         assert 'href="/mobile/breaks"' in nav
         assert "/mobile/break/start" not in nav
         assert "/mobile/break/end" not in nav
+        if path == "/mobile/breaks":
+            assert "Start a break" in body
+            assert 'value="Off-duty"' in body
+            assert 'value="Sleeper berth"' in body
+            assert "On-Duty Wait" in body
+        if path == "/mobile?flow=maintenance":
+            assert "No active service" in body
+            assert "Add service note" in body
+            assert "data-ryder-form-wrap hidden" in body
         # Logs and Reports are no longer in the bottom bar.
         assert "<strong>DL</strong>" not in nav
         assert "<strong>RP</strong>" not in nav
@@ -9445,6 +9454,9 @@ def test_driver_inspections_page_is_scoped_to_current_truck(client, app):
     page = client.get("/list_pretrips")
     assert page.status_code == 200
     assert b"Truck Inspections" in page.data
+    assert b"Current action" in page.data
+    assert b"PostTrip Due" in page.data
+    assert b"Complete PostTrip" in page.data
     assert b"Truck ST4" in page.data
     assert b"PreTrips and PostTrips" in page.data
     assert b"Fuel and Maintenance" in page.data
@@ -10627,6 +10639,14 @@ def test_day_driver_destination_lookup_endpoint_returns_business_name(client, ap
     assert payload["place"]["address"] == "1100 Receiver Ave, Industrial City, MI 49512"
     assert [place["name"] for place in payload["places"]] == ["Receiver Warehouse", "Receiver Annex"]
     assert payload["places"][1]["address"] == "1110 Receiver Ave, Industrial City, MI 49512"
+
+
+def test_freight_departure_label_drops_zero_weight():
+    from app.blueprints.driver.routes import _freight_departure_label
+
+    assert _freight_departure_label("Pallets", "0", "Receiver") == "Pallets -> Receiver"
+    assert _freight_departure_label("Pallets", "0.0", "Receiver") == "Pallets -> Receiver"
+    assert _freight_departure_label("Pallets", "12000", "Receiver") == "Pallets (12000 lbs) -> Receiver"
 
 
 def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(client, app):

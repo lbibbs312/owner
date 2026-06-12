@@ -9,6 +9,14 @@
   .fuel-form .lead { margin:0 0 18px; color:var(--md-muted, #64748b); font-weight:750; line-height:1.45; }
   .fuel-section { border:1px solid rgba(91,157,255,.22); border-radius:8px; padding:14px; margin-bottom:14px; background:rgba(8,14,24,.88); box-shadow:inset 0 1px 0 rgba(91,157,255,.06); }
   .fuel-section h2 { margin:0 0 12px; color:var(--md-amber, #c9972b); font-family:var(--md-mono); font-size:.76rem; font-weight:950; letter-spacing:.08em; text-transform:uppercase; }
+  .fuel-record-list { display:grid; gap:8px; margin-bottom:14px; }
+  .fuel-record-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; padding:10px 12px; border:1px solid rgba(91,157,255,.18); border-radius:8px; background:rgba(255,255,255,.03); }
+  .fuel-record-row strong { display:block; color:var(--md-text); font-size:.92rem; overflow-wrap:anywhere; }
+  .fuel-record-row span { display:block; margin-top:2px; color:var(--md-muted); font-family:var(--md-mono); font-size:.68rem; font-weight:800; line-height:1.35; }
+  .fuel-record-row a { display:inline-flex; align-items:center; justify-content:center; min-height:34px; padding:0 10px; border:1px solid rgba(91,157,255,.32); border-radius:8px; color:#dbeafe; text-decoration:none; font-weight:900; white-space:nowrap; }
+  .fuel-type-chips { display:flex; flex-wrap:wrap; gap:7px; margin-top:6px; }
+  .fuel-type-chips button { min-height:32px; border:1px solid rgba(91,157,255,.3); border-radius:999px; background:rgba(91,157,255,.1); color:#dbeafe; padding:0 11px; font:inherit; font-size:.78rem; font-weight:900; cursor:pointer; }
+  .fuel-type-chips button:active { transform:translateY(1px); }
   .context-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
   .context-pill { border:1px solid rgba(148,163,184,.18); border-radius:8px; padding:9px 10px; background:rgba(255,255,255,.035); min-width:0; }
   .context-pill span { display:block; color:var(--md-muted); font-family:var(--md-mono); font-size:.58rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
@@ -29,12 +37,42 @@
   .field-grid option { background:#07111f; color:#f8fafc; }
   .field-grid textarea { min-height:96px; resize:vertical; }
   .actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
-  @media (max-width:800px) { .context-grid, .field-grid { grid-template-columns:1fr; } }
+  @media (max-width:800px) {
+    .context-grid, .field-grid, .fuel-record-row { grid-template-columns:1fr; }
+    .fuel-record-row a { width:100%; }
+  }
 </style>
 
 <main class="fuel-form responsive-workspace">
   <h1>Fuel Records</h1>
   <p class="lead">Save fuel, receipt, odometer, and route notes. MoveDefense can use these records for an IFTA support worksheet later.</p>
+  {% set recent_fuel_records = recent_fuel_records|default([]) %}
+  {% if recent_fuel_records %}
+    <section class="fuel-section" aria-label="Recent fuel records">
+      <h2>Recent records</h2>
+      <div class="fuel-record-list">
+        {% for record in recent_fuel_records %}
+          <div class="fuel-record-row">
+            <div>
+              <strong>{{ record.seller_name or 'Fuel stop' }}</strong>
+              <span>
+                {{ record.purchase_date or 'Date not set' }}
+                {% if record.city or record.state_or_province %} &middot; {{ [record.city, record.state_or_province]|select|join(', ') }}{% endif %}
+                {% if record.gallons_or_liters is not none %} &middot; {{ "{:g}".format(record.gallons_or_liters) }} gal{% endif %}
+                {% if record.total_sale_amount is not none %} &middot; ${{ "%.2f"|format(record.total_sale_amount) }}{% endif %}
+                {% if record.fuel_type %} &middot; {{ record.fuel_type }}{% endif %}
+              </span>
+            </div>
+            {% if record.receipt_photo %}
+              <a href="{{ url_for('driver.ifta_receipt', fuel_id=record.id) }}">Receipt</a>
+            {% else %}
+              <span>No receipt</span>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
   <form method="POST" action="{{ url_for('driver.new_ifta_worksheet') }}" enctype="multipart/form-data">
     <input type="hidden" name="reporting_period_quarter" value="{{ ctx.reporting_period_quarter or '' }}">
     <input type="hidden" name="reporting_year" value="{{ ctx.reporting_year or '' }}">
@@ -69,7 +107,14 @@
         <label>Gallons or liters <input type="number" name="gallons_or_liters" step="any" inputmode="decimal" data-fuel-gallons></label>
         <label>Price per gallon or liter <input type="number" name="price_per_gallon_or_liter" step="any" inputmode="decimal" data-fuel-ppg placeholder="e.g. 3.89"></label>
         <label>Total amount <input type="number" name="total_sale_amount" step="any" inputmode="decimal" data-fuel-total placeholder="Auto: gallons × price"></label>
-        <label>Fuel type <input type="text" name="fuel_type" placeholder="Diesel, gas, DEF, other"></label>
+        <label>Fuel type
+          <input type="text" name="fuel_type" id="fuel-type" placeholder="Diesel, gas, DEF, other">
+          <span class="fuel-type-chips" aria-label="Fuel type presets">
+            <button type="button" data-fuel-type="Diesel">Diesel</button>
+            <button type="button" data-fuel-type="Gas">Gas</button>
+            <button type="button" data-fuel-type="DEF">DEF</button>
+          </span>
+        </label>
         <label>Odometer now <input type="number" name="ending_odometer" step="any" inputmode="decimal" value="{{ ctx.current_mileage or '' }}"></label>
         <label>Receipt photo <input type="file" name="receipt_photo" accept="image/*,.pdf"></label>
         <label>Note <textarea name="trip_notes" placeholder="Low fuel note, receipt issue, route mileage note, or other context."></textarea></label>
@@ -131,6 +176,16 @@
     }
     gallons.addEventListener('input', recalc);
     ppg.addEventListener('input', recalc);
+  })();
+  (function(){
+    var input = document.getElementById('fuel-type');
+    if (!input) return;
+    document.querySelectorAll('[data-fuel-type]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        input.value = button.getAttribute('data-fuel-type') || '';
+        input.focus();
+      });
+    });
   })();
 </script>
 

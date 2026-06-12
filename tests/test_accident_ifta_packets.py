@@ -87,6 +87,9 @@ def test_driver_packet_entry_pages_use_clear_labels_and_neutral_defaults(client,
     fuel_body = fuel.get_data(as_text=True)
     assert "<h1>Fuel Records</h1>" in fuel_body
     assert "Save Fuel Record" in fuel_body
+    assert "Recent records" not in fuel_body
+    assert 'data-fuel-type="Diesel"' in fuel_body
+    assert 'data-fuel-type="DEF"' in fuel_body
     assert "IFTA license number" not in fuel_body
     assert "Base jurisdiction" not in fuel_body
     assert 'name="tax_paid"' not in fuel_body
@@ -97,6 +100,41 @@ def test_driver_packet_entry_pages_use_clear_labels_and_neutral_defaults(client,
     damage_body = damage.get_data(as_text=True)
     assert "Physical Damage" in damage_body
     assert "Save Physical Damage" in damage_body
+
+
+def test_fuel_page_shows_recent_records_first_with_receipt_button(client, app):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import IftaFuelRecord, IftaWorksheet
+
+        driver = create_user("fuel_recent_driver", "fuel-recent@example.com", "driver")
+        worksheet = IftaWorksheet(driver_id=driver.id, created_by_id=driver.id, truck="T-100")
+        db.session.add(worksheet)
+        db.session.flush()
+        db.session.add(
+            IftaFuelRecord(
+                worksheet_id=worksheet.id,
+                purchase_date=date(2026, 6, 12),
+                seller_name="Route Fuel Stop",
+                city="Industrial City",
+                state_or_province="MI",
+                gallons_or_liters=41.5,
+                fuel_type="Diesel",
+                total_sale_amount=151.23,
+                receipt_photo="receipt.jpg",
+            )
+        )
+        db.session.commit()
+
+    login(client, "fuel_recent_driver")
+    response = client.get("/ifta-worksheet/new")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert body.index("Recent records") < body.index("Fuel details")
+    assert "Route Fuel Stop" in body
+    assert "41.5 gal" in body
+    assert "$151.23" in body
+    assert 'href="/ifta-worksheet/receipt/' in body
 
 
 def test_report_forms_prefill_known_route_context_and_hide_admin_fields(client, app):

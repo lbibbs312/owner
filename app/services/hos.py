@@ -22,7 +22,7 @@ DRIVE_BREAK_8H_MIN = 8 * 60
 CYCLE_60H_MIN = 60 * 60
 CYCLE_70H_MIN = 70 * 60
 
-BREAK_TYPES = ["30-minute", "Lunch", "Off-duty", "On-duty not driving"]
+BREAK_TYPES = ["30-minute", "Lunch", "Off-duty", "Sleeper berth", "On-duty not driving"]
 
 
 def normalize_mode(value):

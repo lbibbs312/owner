@@ -151,12 +151,12 @@ def test_same_minute_events_keep_physical_order(app):
         raise AssertionError(f"missing {label} {hh}:{mm} {location}")
 
     # Same stop, same minute: Arrived sorts before Departed (zero-min dock).
-    assert index_of("Arrived", 18, 59, "Paint central") < index_of("Departed", 18, 59, "Paint central")
-    assert index_of("Arrived", 21, 14, "Raleigh east") < index_of("Departed", 21, 14, "Raleigh east")
+    assert index_of("Arrived", 18, 59, "Paint Central") < index_of("Departed", 18, 59, "Paint Central")
+    assert index_of("Arrived", 21, 14, "Raleigh East") < index_of("Departed", 21, 14, "Raleigh East")
     # An arrival stored with seconds still sorts after the prior stop's depart
     # and before its own departure.
-    assert index_of("Departed", 14, 42, "Raleigh east") < index_of("Arrived", 14, 51, "Ppl")
-    assert index_of("Arrived", 13, 51, "Hellos dock 13") < index_of("Departed", 14, 24, "Hellos dock 13")
+    assert index_of("Departed", 14, 42, "Raleigh East") < index_of("Arrived", 14, 51, "PPL")
+    assert index_of("Arrived", 13, 51, "Hellos Dock 13") < index_of("Departed", 14, 24, "Hellos Dock 13")
     # No event precedes the shift start; none follows the shift end.
     labels = [ev["label"] for ev in events]
     assert labels[0] == "Shift start"
@@ -173,6 +173,7 @@ def test_break_open_at_release_is_auto_closed_and_grid_stays_correct(app):
     _, events = dl.day_segments(user.id, DAY, now_local=_local(22, 49))
     ended = [ev for ev in events if ev["label"] == "Break ended"]
     assert ended and ended[0]["status"] == "off"
+    assert ended[0]["note"] == "Auto-ended at release"
     # Break ended never sorts after Shift end in its minute.
     labels = [ev["label"] for ev in events]
     assert labels.index("Break ended") < labels.index("Shift end")
@@ -234,6 +235,9 @@ def test_pdf_certification_gates_on_completion(app):
     pdf = build(released, _local(22, 49))
     assert b"I hereby certify" in pdf
     assert b"LOG IN PROGRESS" not in pdf
+    assert b"Location / Stop" in pdf
+    assert b"Note" in pdf
+    assert b"Final stop closeout" in pdf
 
     open_user = _seed_day(release=False, tag="b")
     pdf = build(open_user, _local(21, 0))

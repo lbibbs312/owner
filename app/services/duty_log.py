@@ -97,13 +97,36 @@ def _event(at_local, status, label, *, location=None, note=None, source="route",
     }
 
 
+_PLACE_SMALL_WORDS = {"and", "of", "the", "at", "on", "in", "for", "to", "a", "an", "by"}
+
+
+def normalize_place_label(value):
+    """Steady display casing for driver-typed place names: 'raleigh east' ->
+    'Raleigh East', 'Ppl' -> 'PPL'. Deliberate all-caps tokens are kept."""
+    value = " ".join((value or "").split())
+    if not value:
+        return value
+    words = []
+    for index, word in enumerate(value.split(" ")):
+        lower = word.lower()
+        if word.isupper() and len(word) > 1:
+            words.append(word)
+        elif len(word) <= 3 and word.isalpha() and not any(ch in lower for ch in "aeiouy"):
+            words.append(word.upper())
+        elif index and lower in _PLACE_SMALL_WORDS:
+            words.append(lower)
+        else:
+            words.append(word[:1].upper() + word[1:])
+    return " ".join(words)
+
+
 def _stop_place(log):
     plant = (log.plant_name or "").strip()
     if plant:
-        return plant
+        return normalize_place_label(plant)
     commodity = (log.commodity or "").strip()
     if commodity:
-        return commodity
+        return normalize_place_label(commodity)
     return "Stop"
 
 
@@ -163,14 +186,19 @@ def day_events(user_id, day):
             RouteBreak.start_time.between(start_utc, end_utc),
         ),
     ).all()
+    shift_end_locals = {end for _, end in shift_spans if end is not None}
     for brk in breaks:
-        on_duty_break = (brk.break_type or "") == "On-duty not driving"
+        kind = (brk.break_type or "").strip()
         brk_start = _to_local(brk.start_time)
         if brk_start and start_local <= brk_start < end_local:
-            # An on-duty break only holds the ON line while a shift is open;
-            # a break tapped off-shift is just more off-duty time.
-            brk_status = "on" if (on_duty_break and _on_shift(brk_start)) else "off"
-            kind = (brk.break_type or "").strip()
+            # An on-duty wait only holds the ON line while a shift is open;
+            # a sleeper break drops to SB; everything else is off-duty time.
+            if kind == "On-duty not driving" and _on_shift(brk_start):
+                brk_status = "on"
+            elif "sleeper" in kind.lower():
+                brk_status = "sb"
+            else:
+                brk_status = "off"
             events.append(
                 _event(
                     brk_start,
@@ -188,6 +216,7 @@ def day_events(user_id, day):
                     brk_end,
                     "on" if _on_shift(brk_end) else "off",
                     "Break ended",
+                    note="Auto-ended at release" if brk_end in shift_end_locals else None,
                     source="break",
                     rank=RANK_BREAK,
                 )
@@ -248,6 +277,7 @@ def day_events(user_id, day):
         elif ev["label"] == "Shift end" and pending_depart is not None:
             pending_depart["status"] = "on"
             pending_depart["status_short"] = STATUS_SHORT["on"]
+            pending_depart["note"] = pending_depart["note"] or "Final stop closeout"
             pending_depart = None
     # Manual taps that land on the status already in effect change nothing;
     # keep route captures (arrive/depart) regardless since they carry place/time.

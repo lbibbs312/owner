@@ -863,39 +863,47 @@
               <strong>Service timer running: {{ pending_ryder_elapsed if pending_ryder_elapsed is defined else '' }}</strong>
               <span>{{ pending_ryder_truck if pending_ryder_truck is defined and pending_ryder_truck else 'Truck' }} headed to the shop for {{ pending_ryder_issue if pending_ryder_issue is defined and pending_ryder_issue else 'a truck issue' }}. Close this before the next stop.</span>
             </div>
+          {% else %}
+            <div class="ryder-service-status">
+              <strong>No active service</strong>
+              <span>Use service only when the truck is headed to shop, fixed, kept, or swapped to a rental.</span>
+            </div>
           {% endif %}
-          <form class="ryder-form" method="POST" action="{{ url_for('driver.mobile_ryder_service') }}" data-autosave="true" data-autosave-key="mobile-ryder-service">
-            <input type="hidden" name="next" value="mobile">
-            <div class="ryder-grid">
-              <div class="ryder-field">
-                <label for="liveFlowRyderTruck">Truck</label>
-                <input id="liveFlowRyderTruck" class="ryder-input" name="truck_number" value="{{ active_pt.truck_number if active_pt else '' }}" placeholder="Truck number">
+          <button type="button" class="ryder-form-toggle" data-ryder-form-toggle {% if pending_ryder %}hidden{% endif %}>Add service note</button>
+          <div data-ryder-form-wrap {% if not pending_ryder %}hidden{% endif %}>
+            <form class="ryder-form" method="POST" action="{{ url_for('driver.mobile_ryder_service') }}" data-autosave="true" data-autosave-key="mobile-ryder-service">
+              <input type="hidden" name="next" value="mobile">
+              <div class="ryder-grid">
+                <div class="ryder-field">
+                  <label for="liveFlowRyderTruck">Truck</label>
+                  <input id="liveFlowRyderTruck" class="ryder-input" name="truck_number" value="{{ active_pt.truck_number if active_pt else '' }}" placeholder="Truck number">
+                </div>
+                <div class="ryder-field">
+                  <label for="liveFlowRyderIssue">Problem</label>
+                  <select id="liveFlowRyderIssue" class="ryder-select" name="issue" required>
+                    {% for value, label in ryder_choices %}
+                      <option value="{{ value }}" {% if pending_ryder_issue is defined and pending_ryder_issue == label %}selected{% endif %}>{{ 'Choose problem' if not value else label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="ryder-field">
+                  <label for="liveFlowRyderOutcome">Status</label>
+                  <select id="liveFlowRyderOutcome" class="ryder-select" name="outcome" required>
+                    <option value="">Choose status</option>
+                    <option value="headed">Headed to shop</option>
+                    <option value="fixed">Fixed at shop</option>
+                    <option value="left">Shop kept it</option>
+                    <option value="rental">Got rental truck</option>
+                  </select>
+                </div>
               </div>
               <div class="ryder-field">
-                <label for="liveFlowRyderIssue">Problem</label>
-                <select id="liveFlowRyderIssue" class="ryder-select" name="issue" required>
-                  {% for value, label in ryder_choices %}
-                    <option value="{{ value }}" {% if pending_ryder_issue is defined and pending_ryder_issue == label %}selected{% endif %}>{{ 'Choose problem' if not value else label }}</option>
-                  {% endfor %}
-                </select>
+                <label for="liveFlowRyderNotes">Notes</label>
+                <textarea id="liveFlowRyderNotes" class="ryder-textarea" name="notes" placeholder="CEL code, leak location, rental number, tow info, or what the shop said"></textarea>
               </div>
-              <div class="ryder-field">
-                <label for="liveFlowRyderOutcome">Status</label>
-                <select id="liveFlowRyderOutcome" class="ryder-select" name="outcome" required>
-                  <option value="">Choose status</option>
-                  <option value="headed">Headed to shop</option>
-                  <option value="fixed">Fixed at shop</option>
-                  <option value="left">Shop kept it</option>
-                  <option value="rental">Got rental truck</option>
-                </select>
-              </div>
-            </div>
-            <div class="ryder-field">
-              <label for="liveFlowRyderNotes">Notes</label>
-              <textarea id="liveFlowRyderNotes" class="ryder-textarea" name="notes" placeholder="CEL code, leak location, rental number, tow info, or what the shop said"></textarea>
-            </div>
-            <button class="ryder-submit" type="submit">Save Service Note</button>
-          </form>
+              <button class="ryder-submit" type="submit">Save Service Note</button>
+            </form>
+          </div>
           <div class="ryder-history">
             {% for event in ryder_events %}
               <div class="ryder-entry">

@@ -34,6 +34,76 @@
     line-height:.95;
     text-transform:uppercase;
   }
+  .break-preset-label {
+    color:var(--md-muted);
+    font-family:var(--md-mono);
+    font-size:.66rem;
+    font-weight:950;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+  }
+  .break-preset-grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  .break-preset-grid button {
+    min-height:62px;
+    border:1px solid rgba(255,178,36,.45);
+    border-radius:10px;
+    background:rgba(26,19,6,.5);
+    color:#ffe2a6;
+    font-family:var(--md-display);
+    font-size:1rem;
+    font-weight:950;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    box-shadow:0 0 14px rgba(255,178,36,.14);
+    cursor:pointer;
+  }
+  .break-preset-grid button.wait {
+    border-color:rgba(91,157,255,.4);
+    background:rgba(10,17,28,.55);
+    color:#a9c7f5;
+    box-shadow:0 0 14px rgba(91,157,255,.14);
+  }
+  .break-preset-grid button:active { transform:translateY(1px); }
+  /* Ledger lines: information, not actions — no card chrome. */
+  .break-ledger-line {
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    margin:0;
+    padding:11px 2px;
+    border-bottom:1px solid rgba(91,157,255,.14);
+  }
+  .break-ledger-line > span { min-width:0; }
+  .break-ledger-line strong {
+    color:var(--md-text);
+    font-family:var(--md-display);
+    font-size:.94rem;
+    font-weight:900;
+  }
+  .break-ledger-line small {
+    display:block;
+    margin-top:2px;
+    color:var(--md-muted);
+    font-size:.76rem;
+    line-height:1.35;
+  }
+  .break-ledger-line.open strong { color:#ffe2a6; }
+  .break-ledger-total {
+    border-bottom:1px solid rgba(91,157,255,.22);
+  }
+  .break-ledger-total span {
+    color:var(--md-muted);
+    font-family:var(--md-mono);
+    font-size:.66rem;
+    font-weight:950;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+  }
   .break-status-card,
   .break-start-card,
   .break-row,
@@ -189,8 +259,8 @@
   {% if open_break %}
     <section class="break-status-card" aria-label="Current break">
       <div class="break-status-text">
-        <span>Current Break</span>
-        <strong>{{ open_break.break_type or 'Break' }}</strong>
+        <span>{{ 'On-Duty Wait' if open_break.break_type == 'On-duty not driving' else 'Current Break' }}</span>
+        <strong>{{ {'On-duty not driving': 'On-Duty Wait', 'Off-duty': 'Off Duty', 'Sleeper berth': 'Sleeper'}.get(open_break.break_type, open_break.break_type or 'Break') }}</strong>
       </div>
       <div class="break-clock" data-break-detail-timer data-break-seconds="{{ open_break_elapsed_seconds|default(0, true) }}">{{ open_break_elapsed_label|default('00:00', true) }}</div>
       <form class="break-action-form" method="post" action="{{ url_for('driver.mobile_break_end') }}">
@@ -199,47 +269,52 @@
       </form>
     </section>
   {% else %}
-    <form class="break-start-card" method="post" action="{{ url_for('driver.mobile_break_start') }}">
+    {# One-tap presets — each button starts that break type immediately. #}
+    <form class="break-start-card" method="post" action="{{ url_for('driver.mobile_break_start') }}" aria-label="Start a break">
       <input type="hidden" name="next" value="breaks">
-      <div class="break-field">
-        <label for="breakType">Break Type</label>
-        <select id="breakType" name="break_type">
-          <option value="Break">Choose break type</option>
-          {% for item in break_types %}
-            <option value="{{ item }}">{{ item }}</option>
-          {% endfor %}
-        </select>
+      <span class="break-preset-label">Start a break</span>
+      <div class="break-preset-grid">
+        <button type="submit" name="break_type" value="Off-duty">Off Duty</button>
+        <button type="submit" name="break_type" value="Sleeper berth">Sleeper</button>
+        <button type="submit" name="break_type" value="Lunch">Lunch</button>
+        <button type="submit" name="break_type" value="On-duty not driving" class="wait">On-Duty Wait</button>
       </div>
-      <button type="submit">Start Break</button>
     </form>
   {% endif %}
 
-  <section class="break-status-card" aria-label="Break total">
-    <div class="break-status-text">
-      <span>Total Today</span>
-      <strong>{{ break_total_label }}</strong>
-    </div>
-    <div class="break-clock">{{ break_total_clock }}</div>
-  </section>
+  {% set kind_labels = {'On-duty not driving': 'On-Duty Wait', 'Off-duty': 'Off Duty', 'Sleeper berth': 'Sleeper'} %}
+  <p class="break-ledger-line break-ledger-total" aria-label="Break total">
+    <span>Total today</span>
+    <strong>{{ break_total_clock }}</strong>
+  </p>
 
+  {% set wait_rows = break_rows|selectattr('kind', 'equalto', 'On-duty not driving')|list %}
+  {% set true_break_rows = break_rows|rejectattr('kind', 'equalto', 'On-duty not driving')|list %}
   <section class="break-list" aria-label="Break details">
-    <h2 class="break-section-title">Break Details</h2>
-    {% if break_rows %}
-      {% for row in break_rows %}
-        <article class="break-row">
-          <div>
-            <span>{{ 'Open' if row.is_open else 'Closed' }}</span>
-            <strong>{{ row.kind }}</strong>
-            <small>
-              Start {{ row.break.start_time|to_detroit_datetime }}
-              {% if row.break.end_time %} &middot; End {{ row.break.end_time|to_detroit_datetime }}{% endif %}
-            </small>
-          </div>
-          <div class="break-row-duration">{{ row.duration_label }}</div>
-        </article>
-      {% endfor %}
+    <h2 class="break-section-title">Breaks</h2>
+    {% for row in true_break_rows %}
+      <p class="break-ledger-line{% if row.is_open %} open{% endif %}">
+        <span>
+          <strong>{{ kind_labels.get(row.kind, row.kind) }}</strong>
+          <small>{{ row.break.start_time|to_detroit_datetime }}{% if row.break.end_time %} &ndash; {{ row.break.end_time|to_detroit_datetime }}{% else %} &middot; running{% endif %}</small>
+        </span>
+        <strong class="break-row-duration">{{ row.duration_label }}</strong>
+      </p>
     {% else %}
-      <div class="break-empty">No breaks recorded for this route date.</div>
+      <p class="break-ledger-line"><span><small>No breaks recorded for this route date.</small></span></p>
+    {% endfor %}
+
+    {% if wait_rows %}
+      <h2 class="break-section-title">On-Duty Wait</h2>
+      {% for row in wait_rows %}
+        <p class="break-ledger-line{% if row.is_open %} open{% endif %}">
+          <span>
+            <strong>On-Duty Wait</strong>
+            <small>{{ row.break.start_time|to_detroit_datetime }}{% if row.break.end_time %} &ndash; {{ row.break.end_time|to_detroit_datetime }}{% else %} &middot; running{% endif %}</small>
+          </span>
+          <strong class="break-row-duration">{{ row.duration_label }}</strong>
+        </p>
+      {% endfor %}
     {% endif %}
   </section>
 </main>

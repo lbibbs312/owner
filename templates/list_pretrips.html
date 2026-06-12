@@ -88,6 +88,44 @@
         line-height:1.4;
         text-align:center;
       }
+      .inspection-now {
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:12px;
+        padding:13px 14px;
+        border:1px solid rgba(16,185,129,.25);
+        border-radius:14px;
+        background:linear-gradient(180deg, rgba(16,185,129,.1), rgba(12,21,33,.78));
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+      }
+      .inspection-now.warn {
+        border-color:rgba(245,158,11,.4);
+        background:linear-gradient(180deg, rgba(245,158,11,.16), rgba(12,21,33,.82));
+      }
+      .inspection-now span {
+        display:block;
+        color:var(--md-muted);
+        font-family:var(--md-mono);
+        font-size:.62rem;
+        font-weight:950;
+        letter-spacing:.08em;
+        text-transform:uppercase;
+      }
+      .inspection-now strong {
+        display:block;
+        margin-top:4px;
+        color:var(--md-text);
+        font-family:var(--md-display);
+        font-size:.96rem;
+        font-weight:950;
+        line-height:1.15;
+      }
+      .inspection-now .btn {
+        flex:0 0 auto;
+        border-radius:10px;
+        font-weight:900;
+      }
       .inspection-panel { display:grid; gap:12px; }
       .inspection-panel[hidden] { display:none; }
       .inspection-truck-tab,
@@ -265,6 +303,7 @@
       @media (max-width:620px) {
         .inspection-top,
         .inspection-card-top { grid-template-columns:1fr; }
+        .inspection-now { align-items:stretch; flex-direction:column; }
         .inspection-facts { grid-template-columns:repeat(2,minmax(0,1fr)); }
       }
     </style>
@@ -276,13 +315,35 @@
           <h2 class="mt-0 md-page-title">Truck Inspections</h2>
           <p class="inspection-subline">
             {% if selected_truck_number %}
-              Truck {{ selected_truck_number }} only - PreTrips, PostTrips, fuel, mileage, and maintenance history.
+              Truck {{ selected_truck_number }} only - PreTrips, PostTrips, and open defects.
             {% else %}
               Start a PreTrip with a truck number to load the truck inspection record.
             {% endif %}
           </p>
         </div>
         <a href="{{ url_for('driver.new_pretrip') }}" class="btn btn-sm btn-primary">New PreTrip</a>
+      </div>
+
+      {# The required action first — everything else is history below it. #}
+      {% set today_pts = pretrips|default([])|selectattr('pretrip_date', 'equalto', today_local_date)|list %}
+      {% set open_pts = pretrips|default([])|rejectattr('posttrip')|list %}
+      {% set my_open_pts = open_pts|selectattr('user_id', 'equalto', current_user.id)|list %}
+      <div class="inspection-now {% if not today_pts or open_pts %}warn{% endif %}">
+        <div>
+          <span>Current action</span>
+          {% if open_pts %}
+            <strong>PostTrip Due &mdash; Truck {{ open_pts[0].truck_number or selected_truck_number }}</strong>
+          {% elif today_pts %}
+            <strong>PreTrip Complete &middot; No Open Defects</strong>
+          {% else %}
+            <strong>PreTrip Needed</strong>
+          {% endif %}
+        </div>
+        {% if my_open_pts %}
+          <a class="btn btn-sm btn-warning" href="{{ url_for('driver.do_posttrip', pretrip_id=my_open_pts[0].id) }}">Complete PostTrip</a>
+        {% elif not today_pts %}
+          <a class="btn btn-sm btn-warning" href="{{ url_for('driver.new_pretrip') }}">Start PreTrip</a>
+        {% endif %}
       </div>
 
       {% if inspection_trucks|length > 1 %}

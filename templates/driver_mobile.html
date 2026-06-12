@@ -299,6 +299,29 @@
     .ryder-entry.active { border-color: rgba(239,68,68,.45); background: rgba(239,68,68,.12); }
     .ryder-entry strong { display: block; font-size: .85rem; }
     .ryder-entry span { display:block; color: var(--muted); font-size:.74rem; line-height:1.3; margin-top:3px; }
+    .ryder-service-status {
+      display:grid;
+      gap:3px;
+      padding:10px 12px;
+      border:1px solid rgba(16,185,129,.2);
+      border-radius:12px;
+      background:rgba(16,185,129,.07);
+    }
+    .ryder-service-status strong { color:#a7f3d0; font-size:.86rem; }
+    .ryder-service-status span { color:var(--muted); font-size:.74rem; line-height:1.32; }
+    .ryder-form-toggle {
+      min-height:40px;
+      border:1px solid rgba(91,157,255,.32);
+      border-radius:10px;
+      background:rgba(47,109,240,.14);
+      color:#dbeafe;
+      font-family:var(--md-display);
+      font-weight:900;
+      text-transform:uppercase;
+      cursor:pointer;
+    }
+    .ryder-form-toggle[hidden],
+    [data-ryder-form-wrap][hidden] { display:none !important; }
 
     .maintenance-card { padding: 16px; display: grid; gap: 14px; }
     .maintenance-compact { display: grid; gap: 12px; }
@@ -5247,6 +5270,18 @@
 <script src="{{ url_for('static', filename='js/live_route_map.js') }}"></script>
 <script>
   (function () {
+    document.addEventListener('click', function (event) {
+      var button = event.target.closest('[data-ryder-form-toggle]');
+      if (!button) return;
+      var panel = button.closest('[data-flow-inline-panel]') || document;
+      var wrap = panel.querySelector('[data-ryder-form-wrap]');
+      if (!wrap) return;
+      wrap.hidden = false;
+      button.hidden = true;
+      var first = wrap.querySelector('input, select, textarea, button');
+      if (first) first.focus();
+    });
+
     var mobileDashboardPath = {{ url_for('driver.mobile_dashboard')|tojson }};
     var routeRefreshReturnPaths = [
       mobileDashboardPath,
