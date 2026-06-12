@@ -909,9 +909,9 @@ def test_add_stop_action_copy_stays_route_specific(app):
             route_cta_urls={"add_stop": "/new_driving_log", "attach_document": "/driver/transfers/new"},
     )
 
-    assert "<strong>Add Stop</strong>" in html
-    assert "<small>Continue route</small>" in html
-    assert "<strong>Add Stop</strong>\n      <span>Attach document</span>" not in html
+    assert "<strong>Log Current Stop</strong>" in html
+    assert "<small>Use when you are at the stop now</small>" in html
+    assert "<strong>Log Current Stop</strong>\n      <span>Attach document</span>" not in html
 
 
 def test_mobile_between_loads_route_keeps_add_stop_cta(app):
@@ -954,8 +954,8 @@ def test_mobile_between_loads_route_keeps_add_stop_cta(app):
         )
 
     assert '<a class="md-flow-primary-cta add-stop-action" href="/new_driving_log"' in html
-    assert "<strong>Add Stop</strong>" in html
-    assert "<small>Continue route</small>" in html
+    assert "<strong>Log Current Stop</strong>" in html
+    assert "<small>Use when you are at the stop now</small>" in html
 
 
 def test_mobile_live_flow_board_keeps_stop_sequence_and_active_glow(app):
@@ -1316,7 +1316,7 @@ def test_in_transit_pickup_reads_destination_not_delivered(app):
         html = render_template(
             "partials/_compact_route_map.html",
             route_map=ctx,
-            route_cta={"next_action": "Add Stop"},
+            route_cta={"next_action": "Log Current Stop"},
             route_cta_urls={"add_stop": "/new_driving_log"},
         )
 
@@ -1386,8 +1386,8 @@ def test_in_transit_cta_says_arrive_at_destination(app):
     assert cta["primary_cta"]["action"] == "add_stop"
 
 
-def test_idle_active_route_keeps_generic_add_stop_cta(app):
-    """With no cargo in transit, the CTA stays the generic 'Add Stop'."""
+def test_idle_active_route_keeps_generic_stop_log_cta(app):
+    """With no cargo in transit, the CTA says to log the current stop."""
     from types import SimpleNamespace
     from app.services.route_context import build_route_cta_context
 
@@ -1410,7 +1410,7 @@ def test_idle_active_route_keeps_generic_add_stop_cta(app):
         today_local_date=date.today(),
     )
 
-    assert cta["primary_cta"]["label"] == "Add Stop"
+    assert cta["primary_cta"]["label"] == "Log Current Stop"
     assert cta["primary_cta"]["action"] == "add_stop"
 
 
@@ -1589,7 +1589,7 @@ def test_cta_new_route_shows_start_route():
 
 def test_cta_active_route_no_stop_shows_add_stop():
     cta = _cta_for(has_active_shift=True, route_is_active=True)
-    assert cta["primary_cta"]["label"] == "Add Stop"
+    assert cta["primary_cta"]["label"] == "Log Current Stop"
     assert cta["primary_cta"]["action"] == "add_stop"
 
 
@@ -1626,13 +1626,13 @@ def test_cta_open_destination_stop_labels_departure_flow():
     assert cta["primary_cta"]["action"] == "record_departure"
 
 
-def test_cta_departed_with_unknown_destination_adds_destination_stop():
+def test_cta_departed_with_unknown_destination_logs_destination_stop():
     from types import SimpleNamespace
     departed = SimpleNamespace(id=1, depart_time="08:20")
     cta = _cta_for(current_stop=departed, rows=[{"log_id": 1}], all_departed=True,
                    route_status="active", route_is_active=True, has_active_shift=True,
                    current_cargo={"value": "Mystery Load", "destination_label": None})
-    assert cta["primary_cta"]["label"] == "Add Destination Stop"
+    assert cta["primary_cta"]["label"] == "Log Destination Stop"
     assert cta["primary_cta"]["action"] == "add_stop"
 
 
@@ -1666,13 +1666,13 @@ def test_cta_posttrip_only_during_end_shift_and_finalize():
 
 def test_cta_empty_route_start_continues_instead_of_end_shift():
     """An empty route-start departure (no freight moved) must not dead-end into
-    End Shift — the CTA stays Add Stop so the driver can continue to their first
+    End Shift — the CTA stays Log Current Stop so the driver can continue to their first
     pickup, with End Shift only as a deliberate secondary."""
     from types import SimpleNamespace
     empty_start = {"log": SimpleNamespace(load_size="Empty", depart_load_size="Empty")}
     cta = _cta_for(rows=[empty_start], all_departed=True, route_status="completed",
                    route_is_active=False, posttrip_status=None)
-    assert cta["primary_cta"]["label"] == "Add Stop"
+    assert cta["primary_cta"]["label"] == "Log Current Stop"
     assert cta["primary_cta"]["action"] == "add_stop"
     assert cta["secondary_cta"]["action"] == "end_route"   # still finishable on purpose
     assert cta["next_action"] != "End Shift"

@@ -65,8 +65,8 @@
 {% set current_action_lower = (current_action_text|string)|lower if current_action_text is not none else '' %}
 {% set current_action_is_document = 'document' in current_action_lower or 'paperwork' in current_action_lower or 'proof' in current_action_lower %}
 {% set action_is_depart = 'depart' in current_action_lower %}
-{% set action_is_add_stop = ('add' in current_action_lower and 'stop' in current_action_lower) or not (rm and rm.stops) %}
-{% set add_stop_label = route_cta.primary_cta.label if route_cta and route_cta.primary_cta and route_cta.primary_cta.action == 'add_stop' else 'Add Stop' %}
+{% set action_is_add_stop = ('add' in current_action_lower and 'stop' in current_action_lower) or ('log' in current_action_lower and 'stop' in current_action_lower) or not (rm and rm.stops) %}
+{% set add_stop_label = route_cta.primary_cta.label if route_cta and route_cta.primary_cta and route_cta.primary_cta.action == 'add_stop' else 'Log Current Stop' %}
 {% set route_finalized = route_context.route_finalized if route_context else false %}
 {# Accurate count of every selectable row rendered on the board. #}
 {% set obj = namespace(count=0) %}
@@ -266,7 +266,7 @@
         <section class="desk-detail-section">
           <h3>Start route capture</h3>
           <p class="desk-copy">No route stops are logged for this date. The route workspace will populate once the driver records the first stop.</p>
-          <div class="desk-action-grid"><a class="desk-action-link add-stop-cta" href="{{ cta_urls.get('add_stop') or url_for('driver.new_driving_log') }}">Add first stop</a></div>
+          <div class="desk-action-grid"><a class="desk-action-link add-stop-cta" href="{{ cta_urls.get('add_stop') or url_for('driver.new_driving_log') }}">Log first stop</a></div>
         </section>
       </div>
     </template>
@@ -636,7 +636,7 @@
           <div class="desk-section-title"><span>Route Controls</span><strong>Review</strong></div>
           <div class="desk-action-grid">
             <a class="desk-action-link primary" href="{{ url_for('driver.driver_logs', date=route_date.isoformat() if route_date else today_local_date.isoformat()) }}">View Route Sheet</a>
-            {% if cta_urls.get('add_stop') %}<a class="desk-action-link" href="{{ cta_urls.get('add_stop') }}">Add stop</a>{% endif %}
+            {% if cta_urls.get('add_stop') %}<a class="desk-action-link" href="{{ cta_urls.get('add_stop') }}">Log current stop</a>{% endif %}
           </div>
         </section>
       </div>

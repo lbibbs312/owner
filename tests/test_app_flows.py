@@ -7339,12 +7339,12 @@ def test_mobile_dashboard_defaults_to_today_when_today_is_empty(client, app):
     assert b"Live route actions are hidden" not in page.data
     assert b"START DAY" in page.data
     assert b"Today \xc2\xb7 0 stops" in page.data
-    assert b"Start Day" in page.data
+    assert b"Log Current Stop" in page.data
     assert b"No stops logged yet today. Start day by recording the first stop." in page.data
     assert b"1 stop" not in page.data
     assert b"Raleigh East" not in page.data
     assert f"/driver_logs?date={route_date.isoformat()}".encode() not in page.data
-    assert b'data-flow-panel-title="Add Stop"' in page.data
+    assert b'data-flow-panel-title="Log Current Stop"' in page.data
 
     fragment = client.get("/mobile/route-map-fragment")
     assert fragment.status_code == 200
@@ -7605,7 +7605,7 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert b"PostTrip Due" not in page.data
     assert 'data-flow-open-panel="depart"' in body
     assert "data-depart-wizard" in body
-    assert body.count('data-flow-panel-title="Add Stop"') <= 1
+    assert body.count('data-flow-panel-title="Log Current Stop"') <= 1
     assert 'name="next" value="mobile"' in body
     assert "md-flow-work-scrim" in body
     assert "Did you get unloaded?" in body
@@ -7773,7 +7773,7 @@ def test_mobile_dashboard_active_shift_without_stops_keeps_add_stop_primary(clie
     assert page.status_code == 200
     assert b"PostTrip Due" not in page.data
     assert b'<a class="md-flow-primary-cta add-stop-action"' in page.data
-    assert b"<strong>Add Stop</strong>" in page.data
+    assert b"<strong>Log Current Stop</strong>" in page.data
     assert b'<div class="md-flow-top-actions"' not in page.data
     assert b"md-flow-action-tab" not in page.data
 
@@ -7812,7 +7812,7 @@ def test_mobile_dashboard_active_between_stops_prioritizes_add_stop_over_posttri
     assert b"PostTrip Due" not in page.data
     assert b'<a class="md-flow-primary-cta add-stop-action"' in page.data
     # In transit with cargo: destination-named continuation (D) or add-destination (E).
-    assert b"Arrive at Raleigh West" in page.data or b"Add Destination Stop" in page.data
+    assert b"Arrive at Raleigh West" in page.data or b"Log Destination Stop" in page.data
     assert b"Finalize Route" not in page.data
     assert b'<div class="md-flow-top-actions"' not in page.data
     assert b"md-flow-action-tab" not in page.data
@@ -8528,7 +8528,7 @@ def test_loaded_quick_depart_keeps_cargo_in_transit_until_add_next_stop(client, 
     add_stop_form = client.get("/new_driving_log?next=mobile&expected_destination=RE")
     add_stop_body = add_stop_form.get_data(as_text=True)
     assert add_stop_form.status_code == 200
-    assert "Add Next Stop" in add_stop_body
+    assert "Log Current Stop" in add_stop_body
     assert "In truck now:" in add_stop_body
     assert "Raleigh East Load" in add_stop_body
     assert 'name="next" value="mobile"' in add_stop_body
@@ -8618,7 +8618,7 @@ def test_empty_quick_depart_keeps_route_continuation_without_phantom_stop(client
     body = mobile.get_data(as_text=True)
     assert mobile.status_code == 200
     assert 'class="md-flow-primary-cta add-stop-action"' in body
-    assert "<strong>Add Stop</strong>" in body
+    assert "<strong>Log Current Stop</strong>" in body
     assert "Depart and Load" not in body
 
 
@@ -8794,7 +8794,7 @@ def test_mobile_quick_depart_shows_add_next_stop_and_creates_second_stop(client,
     body = mobile.get_data(as_text=True)
 
     assert mobile.status_code == 200
-    assert "Arrive at Raleigh East" in body or "Add Destination Stop" in body
+    assert "Arrive at Raleigh East" in body or "Log Destination Stop" in body
     assert body.count('class="md-flow-primary-cta add-stop-action"') == 1
     assert 'href="/new_driving_log?next=mobile' in body
     assert 'expected_destination=RE' in body
@@ -8804,7 +8804,7 @@ def test_mobile_quick_depart_shows_add_next_stop_and_creates_second_stop(client,
     add_stop_form = client.get("/new_driving_log?next=mobile&expected_destination=RE")
     assert add_stop_form.status_code == 200
     assert b"Plant Name" in add_stop_form.data
-    assert b'Add Next Stop' in add_stop_form.data
+    assert b'Log Current Stop' in add_stop_form.data
 
     created = client.post(
         "/new_driving_log?next=mobile&expected_destination=RE",
@@ -9046,7 +9046,7 @@ def test_helios_quick_depart_with_second_stop_uses_mobile_add_next_stop(client, 
     add_stop_form = client.get("/new_driving_log?next=mobile&expected_destination=Trim+DC")
     add_stop_body = add_stop_form.get_data(as_text=True)
     assert add_stop_form.status_code == 200
-    assert "Add Next Stop" in add_stop_body
+    assert "Log Current Stop" in add_stop_body
     assert "Trim DC Load + Helios Load" in add_stop_body
     assert 'name="load_size" value="Trim DC Load"' in add_stop_body
     assert 'name="secondary_load" value="Helios Load"' in add_stop_body
@@ -9128,7 +9128,7 @@ def test_quick_depart_service_stop_continues_to_add_next_stop_without_truck_issu
     body = mobile.get_data(as_text=True)
     assert mobile.status_code == 200
     assert 'class="md-flow-primary-cta add-stop-action"' in body
-    assert "Arrive at Raleigh East" in body or "Add Destination Stop" in body
+    assert "Arrive at Raleigh East" in body or "Log Destination Stop" in body
     assert 'href="/new_driving_log?next=mobile' in body
     assert 'expected_destination=RE' in body
     assert 'class="md-flow-primary-cta add-stop-action" href="/new_driving_log?report_type=truck_issue"' not in body

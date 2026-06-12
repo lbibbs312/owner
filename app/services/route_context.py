@@ -443,14 +443,14 @@ def build_route_cta_context(
             elif not _route_moved_cargo(rows):
                 # All "stops" so far are just an empty route-start — the driver
                 # pulled out of the yard empty to go pick up. Don't dead-end into
-                # End Shift; keep the route continuable (Add Stop), with End Shift
+                # End Shift; keep the route continuable (Log Current Stop), with End Shift
                 # only as a deliberate secondary in case they really are done.
                 display_mode = "active_route"
-                next_action = "Add Stop"
-                primary = _route_cta("Add Stop", "add_stop")
+                next_action = "Log Current Stop"
+                primary = _route_cta("Log Current Stop", "add_stop")
                 secondary = _route_cta("End Shift", "end_route", "ghost")
                 allowed_actions = ["add_stop", "end_route", "print_route", "view_route"]
-                route_message = "Left empty to start the route. Add your next stop."
+                route_message = "Left empty to start the route. Log the stop you are at when you arrive."
             else:
                 in_transit_cargo, in_transit_destination = _in_transit_after_last_departure(rows)
                 if in_transit_cargo:
@@ -493,7 +493,7 @@ def build_route_cta_context(
             in_transit_cargo, in_transit_destination = _in_transit_after_last_departure(rows)
         if in_transit_cargo:
             # Mid-shift, every stop closed, and the last departure left LOADED:
-            # the next act is arriving at the destination, not a generic Add Stop.
+            # the next act is arriving at the destination, not a generic stop log.
             arrive_label = f"Arrive at {in_transit_destination}" if in_transit_destination else "Record Arrival"
             next_action = arrive_label
             primary = _route_cta(arrive_label, "add_stop")
@@ -506,22 +506,22 @@ def build_route_cta_context(
                 + ". Record your arrival when you get there."
             )
         else:
-            next_action = "Start new shift or View last route" if not route_is_active else "Complete route"
-            primary = _route_cta("Start New Shift", "start_shift") if not route_is_active else _route_cta("Add Stop", "add_stop")
+            next_action = "Start new shift or View last route" if not route_is_active else "Log Current Stop"
+            primary = _route_cta("Start New Shift", "start_shift") if not route_is_active else _route_cta("Log Current Stop", "add_stop")
             secondary = _route_cta("View Last Route", "view_route", "ghost")
             show_start_shift = not route_is_active
             allowed_actions = ["start_shift", "view_route", "print_route", "route_history"] if not route_is_active else ["add_stop", "view_route"]
-            route_message = "Showing route history." if not route_is_active else "Route is active."
+            route_message = "Showing route history." if not route_is_active else "Route is active. Log the stop you are physically at."
     else:
         display_mode = "no_active_shift" if not has_active_shift else "active_route"
         if has_active_shift or route_is_active:
-            next_action = "Add Stop"
-            primary = _route_cta("Add Stop", "add_stop")
+            next_action = "Log Current Stop"
+            primary = _route_cta("Log Current Stop", "add_stop")
             secondary = _route_cta("View Last Route", "route_history", "ghost")
             show_start_shift = False
             show_print = False
             allowed_actions = ["add_stop", "route_history"]
-            route_message = "Shift is active. Add the next stop."
+            route_message = "Shift is active. Log the stop you are physically at."
         else:
             next_action = "Start Route"
             primary = _route_cta("Start Route", "start_shift")
@@ -532,8 +532,7 @@ def build_route_cta_context(
             route_message = "No active route yet. Start your route with the PreTrip."
 
     # In transit with cargo onboard: prompt to record arrival (state D) or to
-    # add a destination when it's unknown (state E), instead of a generic "Add
-    # Stop".
+    # add a destination when it's unknown (state E), instead of a generic stop log.
     current_cargo = getattr(route_context, "current_cargo", None)
     in_transit_destination = (
         (
@@ -566,8 +565,8 @@ def build_route_cta_context(
             primary = _route_cta(next_action, "add_stop")
             route_message = "Press when you reach your drop-off to record arrival."
         else:
-            next_action = "Add Destination Stop"
-            primary = _route_cta("Add Destination Stop", "add_stop")
+            next_action = "Log Destination Stop"
+            primary = _route_cta("Log Destination Stop", "add_stop")
 
     if (
         proof_missing

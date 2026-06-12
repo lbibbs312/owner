@@ -5242,7 +5242,7 @@
         {% set route_locked = route_context.route_finalized if route_context else false %}
         {% if not route_locked %}
           <div class="rp-footer-grid">
-            <a href="{{ url_for('driver.new_driving_log') }}">Add Stop</a>
+            <a href="{{ url_for('driver.new_driving_log') }}">Log Stop</a>
             <a href="{{ url_for('driver.new_ifta_worksheet') }}">Fuel Records</a>
             <a href="{{ url_for('driver.new_damage_report') }}">Physical Damage</a>
           </div>
