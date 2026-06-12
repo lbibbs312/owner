@@ -10583,6 +10583,38 @@ def test_day_driver_gps_place_candidates_endpoint_returns_google_places(client, 
     assert payload["places"][0]["address"] == "1100 Current Dock Dr, Industrial City, MI 49512"
 
 
+def test_day_driver_destination_lookup_endpoint_returns_business_name(client, app, monkeypatch):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import User
+
+        create_user("dd_dest_lookup", "dd-dest-lookup@example.com", "driver")
+        user = User.query.filter_by(username="dd_dest_lookup").one()
+        user.day_driver = True
+        user.route_type = "general_freight"
+        db.session.commit()
+
+    def fake_lookup(query):
+        assert query == "1100 Receiver Ave Industrial City"
+        return {
+            "ok": True,
+            "place": {
+                "name": "Receiver Warehouse",
+                "address": "1100 Receiver Ave, Industrial City, MI 49512",
+                "source": "google",
+            },
+        }
+
+    monkeypatch.setattr("app.blueprints.driver.routes.lookup_destination_place", fake_lookup)
+    login(client, "dd_dest_lookup")
+    response = client.get("/gps/destination-lookup?query=1100+Receiver+Ave+Industrial+City")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["ok"] is True
+    assert payload["place"]["name"] == "Receiver Warehouse"
+    assert payload["place"]["address"] == "1100 Receiver Ave, Industrial City, MI 49512"
+
+
 def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(client, app):
     from datetime import date
 
@@ -10608,6 +10640,13 @@ def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(cli
         driver_id = driver.id
 
     login(client, "dd_second_load")
+    depart_screen = client.get("/mobile").get_data(as_text=True)
+    assert "Destination address" in depart_screen
+    assert "Destination business name" in depart_screen
+    assert 'name="destination_address"' in depart_screen
+    assert 'name="destination_text"' in depart_screen
+    assert "/gps/destination-lookup" in depart_screen
+
     response = client.post(
         f"/driver_logs/{active_id}/depart",
         data={
@@ -10618,9 +10657,11 @@ def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(cli
             "got_loaded": "yes",
             "commodity": "Auto parts",
             "weight": "42000",
+            "destination_address": "1100 Receiver Ave, Industrial City, MI 49512",
             "destination_text": "Primary Receiver",
             "secondary_commodity": "Pallets",
             "secondary_weight": "12000",
+            "secondary_destination_address": "2200 Secondary Ave, Industrial City, MI 49512",
             "secondary_destination_text": "Secondary Receiver",
         },
         headers={"X-Requested-With": "fetch", "Accept": "application/json"},
@@ -10637,6 +10678,7 @@ def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(cli
         assert saved.depart_load_size == "Auto parts (42000 lbs) -> Primary Receiver"
         assert saved.secondary_load == "Pallets (12000 lbs) -> Secondary Receiver"
         assert saved.destination == "Primary Receiver"
+        assert saved.destination_address == "1100 Receiver Ave, Industrial City, MI 49512"
         snapshot = build_route_context(driver_id=driver_id, route_date=today)
         assert snapshot.route_status == "active"
         assert snapshot.current_cargo["cargo_display"] == "Auto parts (42000 lbs) + Pallets (12000 lbs)"
@@ -10651,6 +10693,7 @@ def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(cli
     add_stop_body = add_stop_form.get_data(as_text=True)
     assert add_stop_form.status_code == 200
     assert 'value="Primary Receiver"' in add_stop_body
+    assert 'value="1100 Receiver Ave, Industrial City, MI 49512"' in add_stop_body
     assert 'name="load_size" value="Auto parts (42000 lbs)"' in add_stop_body
     assert 'name="secondary_load" value="Pallets (12000 lbs)"' in add_stop_body
 

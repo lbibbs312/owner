@@ -9,6 +9,7 @@ from flask import current_app
 
 
 NEARBY_URL = "https://places.googleapis.com/v1/places:searchNearby"
+TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
 GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 
 BUSINESS_TYPES = {
@@ -138,6 +139,16 @@ def _hint_score(candidate, tokens):
     return sum(1 for token in tokens if token in haystack)
 
 
+def _name_looks_like_address(name, address):
+    name = _clean(name).lower()
+    address = _clean(address).lower()
+    if not name:
+        return True
+    if address and name == address:
+        return True
+    return bool(re.match(r"^\d+\s+\w+", name))
+
+
 def _fallback_address(lat, lng, key):
     response = requests.get(
         GEOCODE_URL,
@@ -258,3 +269,65 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
         "fallback_address": fallback,
         "radius_m": radius,
     }
+
+
+def lookup_destination_place(query):
+    """Look up a typed destination address/name and return a likely place label."""
+    key = _api_key()
+    query = _clean(query)[:255]
+    if not key:
+        return {
+            "ok": False,
+            "error": "not_configured",
+            "message": "Google Maps API key is not configured.",
+            "place": None,
+        }
+    if len(query) < 6:
+        return {"ok": False, "error": "short_query", "place": None}
+
+    response = requests.post(
+        TEXT_SEARCH_URL,
+        headers={
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": key,
+            "X-Goog-FieldMask": ",".join(
+                [
+                    "places.id",
+                    "places.displayName",
+                    "places.formattedAddress",
+                    "places.shortFormattedAddress",
+                    "places.types",
+                    "places.primaryType",
+                ]
+            ),
+        },
+        json={"textQuery": query, "maxResultCount": 3},
+        timeout=6,
+    )
+    payload = response.json()
+    if response.status_code >= 400 or payload.get("error"):
+        error = payload.get("error") or {}
+        return {
+            "ok": False,
+            "error": error.get("status") or f"http_{response.status_code}",
+            "message": error.get("message") or "Google Places did not return a destination match.",
+            "place": None,
+        }
+
+    for result in payload.get("places") or []:
+        name = _place_name(result)
+        address = _format_address(result.get("formattedAddress") or result.get("shortFormattedAddress"))
+        if not name and not address:
+            continue
+        if _name_looks_like_address(name, address):
+            name = ""
+        return {
+            "ok": True,
+            "place": {
+                "place_id": result.get("id") or "",
+                "name": name,
+                "address": address,
+                "source": "google",
+            },
+        }
+    return {"ok": True, "place": None}

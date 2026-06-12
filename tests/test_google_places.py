@@ -108,3 +108,33 @@ def test_precise_gps_keeps_close_google_place(monkeypatch, flask_app):
     assert payload["places"][0]["name"] == "Current Dock Manufacturing"
     assert payload["places"][0]["distance_m"] < 20
     assert payload["fallback_address"] == ""
+
+
+def test_destination_lookup_returns_business_name_and_address(monkeypatch, flask_app):
+    post_calls = []
+
+    def fake_post(url, *, headers, json, timeout):
+        post_calls.append((url, json))
+        return FakeResponse(
+            {
+                "places": [
+                    {
+                        "id": "destination-customer",
+                        "displayName": {"text": "Receiver Warehouse"},
+                        "formattedAddress": "1100 Receiver Ave, Industrial City, MI 49512, USA",
+                        "types": ["warehouse", "point_of_interest", "establishment"],
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr(google_places.requests, "post", fake_post)
+
+    with flask_app.app_context():
+        payload = google_places.lookup_destination_place("1100 Receiver Ave Industrial City")
+
+    assert post_calls[0][0] == google_places.TEXT_SEARCH_URL
+    assert post_calls[0][1]["textQuery"] == "1100 Receiver Ave Industrial City"
+    assert payload["ok"] is True
+    assert payload["place"]["name"] == "Receiver Warehouse"
+    assert payload["place"]["address"] == "1100 Receiver Ave, Industrial City, MI 49512"

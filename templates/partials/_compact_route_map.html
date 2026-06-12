@@ -382,7 +382,7 @@
           {% set stop_label = primary_stop.plant_label if primary_stop.plant_label is defined and primary_stop.plant_label else (primary_stop.plant if primary_stop.plant is defined and primary_stop.plant else (primary_stop.board_code or 'this stop')) %}
           {% set arrived_cargo = primary_stop.arrived_with if primary_stop.arrived_with is defined else '' %}
           {% set freight_needs_unload = requires_unload_check or (arrived_cargo and arrived_cargo not in ['Empty', '--', '']) %}
-          <form class="depart-wizard freight-depart" method="POST" action="{{ depart_url }}">
+          <form class="depart-wizard freight-depart" method="POST" action="{{ depart_url }}" data-destination-lookup-url="{{ url_for('driver.gps_destination_lookup') }}">
             {% if depart_form is defined and depart_form %}{{ depart_form.hidden_tag() }}{% endif %}
             <input type="hidden" name="next" value="mobile">
             <input type="hidden" name="source" value="live_flow">
@@ -442,8 +442,16 @@
                     <input id="frWeight" type="text" name="weight" inputmode="numeric" value="" placeholder="e.g. 42000">
                   </div>
                   <div>
-                    <label for="frDest">Destination</label>
-                    <input id="frDest" type="text" name="destination_text" list="frDestMemory" autocomplete="off" placeholder="Business name or address">
+                    <div class="freight-destination-stack">
+                      <div>
+                        <label for="frDestAddress">Destination address</label>
+                        <input id="frDestAddress" type="text" name="destination_address" autocomplete="off" placeholder="Street address, city/state" data-destination-address data-destination-name-target="#frDestName">
+                      </div>
+                      <div>
+                        <label for="frDestName">Destination business name</label>
+                        <input id="frDestName" type="text" name="destination_text" list="frDestMemory" autocomplete="off" placeholder="Auto-filled, correct if needed" data-destination-name>
+                      </div>
+                    </div>
                     <datalist id="frDestMemory">
                       {% for place in fm.locations %}<option value="{{ place }}"></option>{% endfor %}
                     </datalist>
@@ -459,8 +467,16 @@
                       <input id="frWeight2" type="text" name="secondary_weight" inputmode="numeric" placeholder="e.g. 12000">
                     </div>
                     <div>
-                      <label for="frDest2">Destination</label>
-                      <input id="frDest2" type="text" name="secondary_destination_text" list="frDestMemory" autocomplete="off" placeholder="Business name or address">
+                      <div class="freight-destination-stack">
+                        <div>
+                          <label for="frDestAddress2">Destination address</label>
+                          <input id="frDestAddress2" type="text" name="secondary_destination_address" autocomplete="off" placeholder="Street address, city/state" data-destination-address data-destination-name-target="#frDestName2">
+                        </div>
+                        <div>
+                          <label for="frDestName2">Destination business name</label>
+                          <input id="frDestName2" type="text" name="secondary_destination_text" list="frDestMemory" autocomplete="off" placeholder="Auto-filled, correct if needed" data-destination-name>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -488,6 +504,7 @@
             .freight-depart [hidden] { display:none !important; }
             .freight-depart .freight-followup { display:grid; gap:8px; margin:10px 0; }
             .freight-depart .freight-two { display:grid; grid-template-columns:1fr 1.4fr; gap:10px; }
+            .freight-depart .freight-destination-stack { display:grid; gap:8px; }
             .freight-depart input[type="text"], .freight-depart select { width:100%; border:1px solid rgba(91,157,255,.28); border-radius:8px; background:rgba(10,17,28,.96); color:#dbe7ff; padding:12px; font-size:1rem; }
             .freight-depart .freight-followup label { color:#8fa3bf; font-size:.7rem; font-weight:800; }
             .freight-note-toggle { background:none; border:0; color:#7fb2ff; font-weight:800; font-size:.85rem; padding:6px 0; cursor:pointer; text-align:left; }
@@ -501,6 +518,7 @@
               var choice = form.querySelector('#frCommodityChoice');
               var otherInput = form.querySelector('#frCommodity');
               var weight = form.querySelector('#frWeight');
+              var destinationLookupUrl = form.getAttribute('data-destination-lookup-url') || '';
               // Memory prefill: most drivers haul what they hauled last time —
               // arrive prefilled so the dropdown is only for changing it.
               if (choice && recents.length && !otherInput.value.trim()) {
@@ -521,6 +539,39 @@
                   if (weight && remembered && !weight.value.trim()) weight.value = remembered;
                 }
               });
+              function wireDestinationLookup(addressInput) {
+                if (!addressInput || !destinationLookupUrl) return;
+                var targetSelector = addressInput.getAttribute('data-destination-name-target') || '';
+                var nameInput = targetSelector ? form.querySelector(targetSelector) : null;
+                var nameWasEdited = false;
+                var pendingTimer = null;
+                if (nameInput) {
+                  nameInput.addEventListener('input', function () { nameWasEdited = true; });
+                }
+                addressInput.addEventListener('input', function () {
+                  var query = addressInput.value.trim();
+                  window.clearTimeout(pendingTimer);
+                  if (query.length < 6) return;
+                  pendingTimer = window.setTimeout(function () {
+                    var params = new URLSearchParams({ query: query });
+                    fetch(destinationLookupUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
+                      .then(function (r) { return r.ok ? r.json() : null; })
+                      .then(function (data) {
+                        var place = data && data.place ? data.place : null;
+                        if (!place) return;
+                        if (place.address && !/\d/.test(query)) {
+                          addressInput.value = place.address;
+                        }
+                        if (nameInput && place.name && (!nameWasEdited || !nameInput.value.trim())) {
+                          nameInput.value = place.name;
+                          nameWasEdited = false;
+                        }
+                      })
+                      .catch(function () {});
+                  }, 550);
+                });
+              }
+              form.querySelectorAll('[data-destination-address]').forEach(wireDestinationLookup);
               var noteToggle = form.querySelector('[data-freight-note-toggle]');
               if (noteToggle) noteToggle.addEventListener('click', function () {
                 var note = form.querySelector('[data-freight-note]');

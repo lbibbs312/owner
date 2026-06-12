@@ -44,7 +44,7 @@ from app.services.ifta_worksheets import build_ifta_packet, create_ifta_workshee
 from app.services.packet_classification import PacketClassification, classify_damage_report, packet_label_for_report
 from app.services.report_context import build_report_context
 from app.services.autolog import remember_place
-from app.services.google_places import nearby_place_candidates
+from app.services.google_places import lookup_destination_place, nearby_place_candidates
 from app.services.document_numbers import (
     document_meta,
     eod_document_number,
@@ -121,7 +121,7 @@ from app.models import (
 
 
 PLANT_TRANSFER_LINE_COUNT = 20
-DRIVER_LOG_AUDIT_FIELDS = ["plant_name", "load_size", "depart_load_size", "secondary_load", "downtime_reason", "part_number", "hot_parts", "arrive_time", "depart_time", "dock_wait_minutes", "maintenance", "fuel", "fuel_mileage", "meeting", "location_address", "gps_latitude", "gps_longitude", "gps_accuracy_m"]
+DRIVER_LOG_AUDIT_FIELDS = ["plant_name", "load_size", "depart_load_size", "secondary_load", "downtime_reason", "part_number", "hot_parts", "arrive_time", "depart_time", "dock_wait_minutes", "maintenance", "fuel", "fuel_mileage", "meeting", "location_address", "destination_address", "gps_latitude", "gps_longitude", "gps_accuracy_m"]
 PLANT_TRANSFER_AUDIT_FIELDS = ["transfer_number", "transfer_date", "ship_to", "ship_from", "trailer_number", "driver_name", "driver_initials", "transfer_time", "loaded_by"]
 DAMAGE_REPORT_AUDIT_FIELDS = [
     "reported_by_id",
@@ -165,6 +165,7 @@ def _append_driver_log_flow_event(log, event_type, *, notes=None, payload=None, 
             "commodity": log.commodity,
             "weight": log.weight,
             "location_address": getattr(log, "location_address", None),
+            "destination_address": getattr(log, "destination_address", None),
             "gps_latitude": getattr(log, "gps_latitude", None),
             "gps_longitude": getattr(log, "gps_longitude", None),
             "gps_accuracy_m": getattr(log, "gps_accuracy_m", None),
@@ -2894,6 +2895,27 @@ def gps_place_candidates():
     return jsonify(payload)
 
 
+@bp.route("/gps/destination-lookup")
+@login_required
+@_driver_route_guard("driver.mobile_dashboard", "the driver destination place lookup")
+def gps_destination_lookup():
+    if not getattr(current_user, "is_day_driver", False):
+        return jsonify({"ok": False, "error": "day_driver_required", "place": None}), 403
+    query = (request.args.get("query") or "").strip()[:255]
+    if len(query) < 6:
+        return jsonify({"ok": False, "error": "short_query", "place": None}), 400
+    try:
+        payload = lookup_destination_place(query)
+    except Exception:
+        current_app.logger.exception(
+            "Google destination lookup failed for user_id=%s query_present=%s",
+            current_user.id,
+            bool(query),
+        )
+        payload = {"ok": False, "error": "lookup_failed", "place": None}
+    return jsonify(payload)
+
+
 def _render_new_driving_log(form, current_load, *, route_context=None, return_to_mobile=False):
     route_date = getattr(route_context, "route_date", None) or _today_local_date()
     has_today_logs = bool(getattr(route_context, "rows", None)) if route_context else (
@@ -4622,9 +4644,7 @@ def new_driving_log():
     form.secondary_load.data = current_secondary_value
     if getattr(current_user, "is_day_driver", False):
         _prefill_day_driver_cargo(form, current_user.id, local_date)
-        if not form.location.data and not _open_stop_for_driver(current_user.id, local_date):
-            # In transit: arriving means landing at the destination typed on the
-            # last loaded departure, so offer it as the stop location.
+        if not _open_stop_for_driver(current_user.id, local_date):
             last_loaded = (
                 DriverLog.query.filter(
                     DriverLog.driver_id == current_user.id,
@@ -4637,7 +4657,13 @@ def new_driving_log():
                 .first()
             )
             if last_loaded and not is_empty_load(last_loaded.depart_load_size):
-                form.location.data = last_loaded.destination
+                # In transit: arriving means landing at the destination typed on
+                # the last loaded departure, so offer both the saved business
+                # name and destination address.
+                if not form.location.data:
+                    form.location.data = last_loaded.destination
+                if not form.location_address.data:
+                    form.location_address.data = last_loaded.destination_address
     if request.args.get("report_type") == "truck_issue":
         form.maintenance.data = True
     elif request.args.get("report_type") == "route_note":
@@ -5208,14 +5234,18 @@ def depart_driver_log(log_id):
 
     if form.validate_on_submit():
         is_day_driver = getattr(current_user, "is_day_driver", False)
+        primary_destination_address = (request.form.get("destination_address") or "").strip()[:255]
         primary_destination_text = (request.form.get("destination_text") or "").strip()[:120]
+        primary_destination_label = primary_destination_text or primary_destination_address[:120]
         posted_primary_commodity = (form.commodity.data or "").strip()
         posted_primary_weight = (form.weight.data or "").strip()
         primary_commodity = posted_primary_commodity or (log.commodity or "").strip()
         primary_weight = posted_primary_weight or (log.weight or "").strip()
         secondary_commodity = (request.form.get("secondary_commodity") or "").strip()[:120]
         secondary_weight = (request.form.get("secondary_weight") or "").strip()[:40]
+        secondary_destination_address = (request.form.get("secondary_destination_address") or "").strip()[:255]
         secondary_destination_text = (request.form.get("secondary_destination_text") or "").strip()[:120]
+        secondary_destination_label = secondary_destination_text or secondary_destination_address[:120]
         primary_unloaded = None
         primary_unload_reason = None
         day_driver_carrying = is_day_driver and (
@@ -5257,12 +5287,12 @@ def depart_driver_log(log_id):
             elif is_day_driver:
                 # Freight: the truck carries a commodity, not a plant load. The
                 # free-text destination is stored on the log at save time below.
-                if not primary_commodity and not primary_destination_text:
+                if not primary_commodity and not primary_destination_label:
                     return quick_depart_error("Enter the load or destination before departing loaded.")
                 departure_load = _freight_departure_label(
                     primary_commodity,
                     primary_weight,
-                    primary_destination_text,
+                    primary_destination_label,
                 )
             else:
                 return quick_depart_error("Please select where the primary load is going.")
@@ -5277,11 +5307,11 @@ def depart_driver_log(log_id):
                 secondary_load = None
             if form.secondary_destination.data:
                 secondary_load = secondary_load_value(form.secondary_destination.data, form.secondary_load_type.data)
-            if is_day_driver and (secondary_commodity or secondary_weight or secondary_destination_text):
+            if is_day_driver and (secondary_commodity or secondary_weight or secondary_destination_label):
                 secondary_load = _freight_departure_label(
                     secondary_commodity,
                     secondary_weight,
-                    secondary_destination_text,
+                    secondary_destination_label,
                     fallback="Second load",
                 )
 
@@ -5329,7 +5359,8 @@ def depart_driver_log(log_id):
             log.depart_load_size = departure_load
             log.secondary_load = secondary_load or None
             if is_day_driver:
-                log.destination = primary_destination_text or secondary_destination_text or None
+                log.destination = primary_destination_label or secondary_destination_label or None
+                log.destination_address = primary_destination_address or secondary_destination_address or None
             # Day-driver: capture commodity + weight when a load is picked up here;
             # clear it when the truck leaves empty so nothing lingers onboard.
             if form.got_loaded.data == "yes":

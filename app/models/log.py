@@ -29,6 +29,7 @@ class DriverLog(db.Model):
     # Freight (day-driver) departure: free-text "where to next" — a customer,
     # city, or dock rather than a plant code. Fleet flow leaves this null.
     destination = db.Column(db.String(120), nullable=True)
+    destination_address = db.Column(db.String(255), nullable=True)
     # GPS/reverse-geocode capture for day-driver stops. ``plant_name`` remains
     # the corrected customer/place label; this stores the physical address.
     location_address = db.Column(db.String(255), nullable=True)
