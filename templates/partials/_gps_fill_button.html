@@ -22,6 +22,7 @@
   .md-gps-fill:active{box-shadow:0 0 16px rgba(91,157,255,.32);}
   .md-gps-fill[disabled]{opacity:.55;cursor:wait;}
   .md-gps-panel{margin-top:6px;font-size:.78rem;font-weight:600;color:#8fa3bf;line-height:1.4;}
+  .md-gps-panel label{display:block;margin-top:6px;color:#b8c7dd;font-size:.72rem;font-weight:900;text-transform:uppercase;}
   .md-gps-panel select{width:100%;margin-top:6px;background:rgba(10,17,28,.92);color:#dbe7ff;border:1px solid rgba(91,157,255,.3);border-radius:8px;padding:8px;font-size:.85rem;}
 </style>
 <script>
@@ -59,6 +60,23 @@
     return !!cand && cand.trusted === true;
   }
 
+  function addressValue(cand) {
+    return (cand && (cand.address || cand.formatted_address || cand.value || cand) || '').toString().trim();
+  }
+
+  function applyAddress(btn, cand, force) {
+    var address = addressValue(cand);
+    if (!address) return;
+    var d = btn.dataset;
+    setVal(d.gpsTargetAddress, address, force);
+    if (d.gpsTargetCity || d.gpsTargetState) {
+      var cs = parseCityState(address);
+      setVal(d.gpsTargetCity, cs.city, force);
+      setVal(d.gpsTargetState, cs.state, force);
+    }
+    if (!d.gpsTargetName) setVal(d.gpsTargetSingle, address, force);
+  }
+
   function apply(btn, cand, force) {
     if (!cand) return;
     var d = btn.dataset;
@@ -92,10 +110,37 @@
     line.textContent = message || '';
   }
 
+  function renderAddressChoices(panel, btn, candidates) {
+    var old = panel.querySelector('.md-gps-address-choice');
+    if (old) old.remove();
+    if (!candidates || !candidates.length) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'md-gps-address-choice';
+    var label = document.createElement('label');
+    label.textContent = 'Address matches';
+    var select = document.createElement('select');
+    candidates.slice(0, 5).forEach(function (cand, index) {
+      var option = document.createElement('option');
+      option.value = String(index);
+      option.textContent = addressValue(cand) || 'Nearby address';
+      select.appendChild(option);
+    });
+    select.addEventListener('change', function () {
+      applyAddress(btn, candidates[Number(select.value)], true);
+    });
+    wrap.appendChild(label);
+    wrap.appendChild(select);
+    panel.appendChild(wrap);
+  }
+
   function renderChoices(panel, btn, candidates) {
-    var old = panel.querySelector('select');
+    var old = panel.querySelector('.md-gps-place-choice');
     if (old) old.remove();
     if (!candidates || candidates.length < 2) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'md-gps-place-choice';
+    var heading = document.createElement('label');
+    heading.textContent = 'Customer matches';
     var select = document.createElement('select');
     candidates.slice(0, 6).forEach(function (cand, index) {
       var option = document.createElement('option');
@@ -110,7 +155,9 @@
     select.addEventListener('change', function () {
       apply(btn, candidates[Number(select.value)], true);
     });
-    panel.appendChild(select);
+    wrap.appendChild(heading);
+    wrap.appendChild(select);
+    panel.appendChild(wrap);
   }
 
   function lookupFailedMessage(data) {
@@ -141,23 +188,23 @@
         .then(function (data) {
           btn.disabled = false;
           var places = (data && data.places) || [];
+          var addresses = (data && data.address_candidates) || [];
+          if (!addresses.length && data && data.fallback_address) addresses = [{ address: data.fallback_address }];
           var best = places[0] || null;
-          if (data && data.fallback_address && (!best || !trusted(best))) {
-            apply(btn, { name: '', address: data.fallback_address }, false);
-            status(panel, 'GPS street address: ' + data.fallback_address);
+          renderAddressChoices(panel, btn, addresses);
+          if (addresses.length && (!best || !trusted(best))) {
+            applyAddress(btn, addresses[0], false);
+            status(panel, 'GPS street address: ' + addressValue(addresses[0]));
             renderChoices(panel, btn, places);
           } else if (best && trusted(best)) {
+            if (addresses.length) applyAddress(btn, addresses[0], false);
             apply(btn, best, false);
             status(panel, 'GPS: ' + (best.name || best.address) +
               (formatDistance(best) ? ' (' + formatDistance(best) + ')' : ''));
             renderChoices(panel, btn, places);
           } else if (places.length) {
-            status(panel, 'Closest place is ' + (formatDistance(best) || 'nearby') + ' - pick it only if correct.');
+            status(panel, 'No customer match was within 20 ft. Type it if needed.');
             renderChoices(panel, btn, places);
-          } else if (data && data.fallback_address) {
-            apply(btn, { name: '', address: data.fallback_address }, false);
-            status(panel, 'GPS street address: ' + data.fallback_address);
-            renderChoices(panel, btn, []);
           } else {
             status(panel, lookupFailedMessage(data));
             renderChoices(panel, btn, []);

@@ -53,6 +53,10 @@ def test_precise_gps_filters_far_google_place_and_uses_address(monkeypatch, flas
                     {
                         "types": ["street_address"],
                         "formatted_address": "1100 Current Dock Dr, Industrial City, MI 49512, USA",
+                    },
+                    {
+                        "types": ["premise"],
+                        "formatted_address": "1102 Current Dock Dr, Industrial City, MI 49512, USA",
                     }
                 ],
             }
@@ -69,9 +73,13 @@ def test_precise_gps_filters_far_google_place_and_uses_address(monkeypatch, flas
             hint="current dock",
         )
 
-    assert post_calls[0]["locationRestriction"]["circle"]["radius"] < 48
+    assert post_calls[0]["locationRestriction"]["circle"]["radius"] == 6
     assert payload["places"] == []
     assert payload["fallback_address"] == "1100 Current Dock Dr, Industrial City, MI 49512"
+    assert [item["address"] for item in payload["address_candidates"]] == [
+        "1100 Current Dock Dr, Industrial City, MI 49512",
+        "1102 Current Dock Dr, Industrial City, MI 49512",
+    ]
     assert get_calls[0]["result_type"] == "premise|subpremise|street_address"
 
 
@@ -84,7 +92,7 @@ def test_precise_gps_keeps_close_google_place(monkeypatch, flask_app):
                         "id": "close-customer-dock",
                         "displayName": {"text": "Current Dock Manufacturing"},
                         "shortFormattedAddress": "1100 Current Dock Dr, Industrial City",
-                        "location": {"latitude": 42.900936, "longitude": -85.531056},
+                        "location": {"latitude": 42.900891, "longitude": -85.531056},
                         "types": ["manufacturer", "point_of_interest", "establishment"],
                     }
                 ]
@@ -92,7 +100,17 @@ def test_precise_gps_keeps_close_google_place(monkeypatch, flask_app):
         )
 
     def fake_get(url, *, params, timeout):
-        raise AssertionError("fallback geocode should not be needed for a close place")
+        return FakeResponse(
+            {
+                "status": "OK",
+                "results": [
+                    {
+                        "types": ["street_address"],
+                        "formatted_address": "1100 Current Dock Dr, Industrial City, MI 49512, USA",
+                    }
+                ],
+            }
+        )
 
     monkeypatch.setattr(google_places.requests, "post", fake_post)
     monkeypatch.setattr(google_places.requests, "get", fake_get)
@@ -106,9 +124,10 @@ def test_precise_gps_keeps_close_google_place(monkeypatch, flask_app):
         )
 
     assert payload["places"][0]["name"] == "Current Dock Manufacturing"
-    assert payload["places"][0]["distance_m"] < 20
+    assert payload["places"][0]["distance_m"] <= 6
     assert payload["places"][0]["trusted"] is True
-    assert payload["fallback_address"] == ""
+    assert payload["fallback_address"] == "1100 Current Dock Dr, Industrial City, MI 49512"
+    assert payload["address_candidates"][0]["address"] == "1100 Current Dock Dr, Industrial City, MI 49512"
 
 
 def test_destination_lookup_returns_business_name_and_address(monkeypatch, flask_app):

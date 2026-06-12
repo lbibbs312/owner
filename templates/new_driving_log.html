@@ -94,10 +94,10 @@
       <input type="hidden" name="gps_longitude" id="gps_longitude" data-no-autosave="true">
       <input type="hidden" name="gps_accuracy_m" id="gps_accuracy_m" data-no-autosave="true">
       <div class="form-text" id="gpsStatus" style="min-height:1.1em;"></div>
-      <div class="mt-2" id="gpsPlaceChoices" hidden>
-        <label for="gpsPlaceSelect" class="form-label mb-1">Nearby GPS matches</label>
-        <select id="gpsPlaceSelect" class="form-select"></select>
-        <div class="form-text">Pick the actual dock or customer if the first match is not right.</div>
+      <div class="mt-2" id="gpsAddressChoices" hidden>
+        <label for="gpsAddressSelect" class="form-label mb-1">GPS address matches</label>
+        <select id="gpsAddressSelect" class="form-select"></select>
+        <div class="form-text">Pick the physical address closest to your dock.</div>
       </div>
     </div>
     <div class="mb-3">
@@ -106,6 +106,11 @@
       <datalist id="locationMemory">
         {% for place in fm.locations %}<option value="{{ place }}"></option>{% endfor %}
       </datalist>
+      <div class="mt-2" id="gpsPlaceChoices" hidden>
+        <label for="gpsPlaceSelect" class="form-label mb-1">Customer name matches</label>
+        <select id="gpsPlaceSelect" class="form-select"></select>
+        <div class="form-text">Only places within about 20 ft show here. Pick one or type the customer name.</div>
+      </div>
       <div class="form-text">Correct this name once and it will be remembered for later stops.</div>
     </div>
     {# Cargo is captured ONCE — at departure ("Leaving loaded?"). Arriving only asks where you are. #}
@@ -118,11 +123,14 @@
         var latInput = document.getElementById('gps_latitude');
         var lonInput = document.getElementById('gps_longitude');
         var accuracyInput = document.getElementById('gps_accuracy_m');
+        var addressChoices = document.getElementById('gpsAddressChoices');
+        var addressSelect = document.getElementById('gpsAddressSelect');
         var placeChoices = document.getElementById('gpsPlaceChoices');
         var placeSelect = document.getElementById('gpsPlaceSelect');
         var gpsPlacesUrl = gpsBtn ? gpsBtn.getAttribute('data-gps-places-url') : '';
         var gpsPlaceHint = gpsBtn ? clean(gpsBtn.getAttribute('data-gps-place-hint')) : '';
         var placeMemory = {{ (fm.places or [])|tojson }};
+        var currentAddresses = [];
         var currentCandidates = [];
 
         function clean(value) {
@@ -136,6 +144,10 @@
 
         function isTrustedCandidate(candidate) {
           return !!candidate && (candidate.source === 'saved' || candidate.trusted === true);
+        }
+
+        function addressValue(candidate) {
+          return clean(candidate && (candidate.address || candidate.formatted_address || candidate.value || candidate));
         }
 
         function distanceMeters(lat1, lon1, lat2, lon2) {
@@ -156,8 +168,8 @@
             var pLon = Number(place.lng);
             if (!place.label || Number.isNaN(pLat) || Number.isNaN(pLon)) return;
             var distance = distanceMeters(lat, lon, pLat, pLon);
-            var storedRadius = Math.min(Number(place.radius_m) || 90, 90);
-            var gpsRadius = accuracy ? Math.max(45, Math.min(90, Math.round(accuracy * 3 + 30))) : 75;
+            var storedRadius = Math.min(Number(place.radius_m) || 6, 6);
+            var gpsRadius = 6;
             var radius = Math.min(storedRadius, gpsRadius);
             if (distance <= radius) {
               matches.push({ name: place.label, address: '', distance_m: Math.round(distance), source: 'saved' });
@@ -178,14 +190,38 @@
           return label || 'Nearby place';
         }
 
-        function applyCandidate(candidate, force) {
+        function applyAddress(candidate, force) {
+          var value = addressValue(candidate);
+          if (value && (force || !addressInput.value.trim())) {
+            addressInput.value = value;
+          }
+        }
+
+        function applyCandidate(candidate, forceName, forceAddress) {
           if (!candidate) return;
-          if (candidate.address && (force || !addressInput.value.trim())) {
+          if (candidate.address && (forceAddress || !addressInput.value.trim())) {
             addressInput.value = candidate.address;
           }
-          if (candidate.name && (force || !nameInput.value.trim())) {
+          if (candidate.name && (forceName || !nameInput.value.trim())) {
             nameInput.value = candidate.name;
           }
+        }
+
+        function renderAddressChoices(addresses) {
+          currentAddresses = addresses || [];
+          if (!addressChoices || !addressSelect || !currentAddresses.length) {
+            if (addressChoices) addressChoices.hidden = true;
+            return;
+          }
+          addressSelect.disabled = false;
+          addressSelect.innerHTML = '';
+          currentAddresses.slice(0, 5).forEach(function (candidate, index) {
+            var option = document.createElement('option');
+            option.value = String(index);
+            option.textContent = addressValue(candidate) || 'Nearby address';
+            addressSelect.appendChild(option);
+          });
+          addressChoices.hidden = false;
         }
 
         function renderCandidates(candidates) {
@@ -292,27 +328,29 @@
               .then(function (r) { return r.json(); })
               .then(function (data) {
                 var googlePlaces = data.places || [];
+                var addressCandidates = data.address_candidates || [];
                 var candidates = mergeCandidates(googlePlaces, savedPlaces);
                 var googleError = googleErrorMessage(data);
                 var bestCandidate = candidates[0] || null;
                 var trustedCandidate = candidates.find(isTrustedCandidate);
-                var bestDistance = formatDistance(bestCandidate);
-                renderCandidates(candidates);
-                if (data.fallback_address && (!auto || !addressInput.value.trim())) {
-                  addressInput.value = data.fallback_address;
+                if (!addressCandidates.length && data.fallback_address) {
+                  addressCandidates = [{ address: data.fallback_address }];
                 }
+                renderAddressChoices(addressCandidates);
+                renderCandidates(candidates);
+                applyAddress(addressCandidates[0], !auto);
                 if (trustedCandidate) {
-                  applyCandidate(trustedCandidate, !auto);
+                  applyCandidate(trustedCandidate, !auto, false);
                   gpsStatus.textContent = accuracy
-                    ? 'GPS places found (+/-' + accuracy + ' m). Pick the exact dock if needed.'
-                    : 'GPS places found. Pick the exact dock if needed.';
+                    ? 'GPS set (+/-' + accuracy + ' m). Customer match is within 20 ft.'
+                    : 'GPS set. Customer match is within 20 ft.';
                   return;
                 }
                 if (googlePlaces.length || candidates.length) {
-                  var setLabel = data.fallback_address ? 'GPS address set' : 'GPS set';
+                  var setLabel = addressCandidates.length ? 'GPS address set' : 'GPS set';
                   gpsStatus.textContent = accuracy
-                    ? setLabel + ' (+/-' + accuracy + ' m). Closest place is ' + (bestDistance || 'nearby') + '; pick it only if correct.'
-                    : setLabel + '. Closest place is ' + (bestDistance || 'nearby') + '; pick it only if correct.';
+                    ? setLabel + ' (+/-' + accuracy + ' m). No customer name was close enough; type it or pick a close saved match.'
+                    : setLabel + '. No customer name was close enough; type it or pick a close saved match.';
                   return;
                 }
                 if (googleError) {
@@ -328,6 +366,7 @@
                   : 'GPS set. Type the place name if needed.');
               })
               .catch(function () {
+                renderAddressChoices([]);
                 renderCandidates(savedPlaces);
                 if (!savedPlaces.length) renderPlaceNotice('Google places could not be reached - type the address and name');
                 gpsStatus.textContent = accuracy
@@ -340,10 +379,16 @@
           });
         }
 
+        if (addressSelect) {
+          addressSelect.addEventListener('change', function () {
+            if (addressSelect.disabled) return;
+            applyAddress(currentAddresses[Number(addressSelect.value)], true);
+          });
+        }
         if (placeSelect) {
           placeSelect.addEventListener('change', function () {
             if (placeSelect.disabled) return;
-            applyCandidate(currentCandidates[Number(placeSelect.value)], true);
+            applyCandidate(currentCandidates[Number(placeSelect.value)], true, false);
           });
         }
         if (gpsBtn) gpsBtn.addEventListener('click', function () { fillFromGps(false); });

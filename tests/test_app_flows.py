@@ -10517,7 +10517,9 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     body = page.get_data(as_text=True)
     assert 'name="location_address"' in body
     assert "Place / customer name" in body
-    assert "Nearby GPS matches" in body
+    assert "GPS address matches" in body
+    assert "Customer name matches" in body
+    assert "Only places within about 20 ft show here" in body
     assert "/gps/place-candidates" in body
     assert "nominatim.openstreetmap.org" not in body
     assert "Google Places key is missing on the server. Saved places only." in body
@@ -10525,7 +10527,7 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     assert "No Google places found here - type the address and name" in body
     assert "Google places could not be reached - type the address and name" in body
     assert "m away" in body
-    assert "pick it only if correct" in body
+    assert "No customer name was close enough" in body
 
     created = client.post(
         "/new_driving_log",
@@ -10580,11 +10582,15 @@ def test_day_driver_gps_place_candidates_endpoint_returns_google_places(client, 
                 {
                     "name": "Current Dock Manufacturing",
                     "address": "1100 Current Dock Dr, Industrial City, MI 49512",
-                    "distance_m": 15,
+                    "distance_m": 5,
+                    "trusted": True,
                     "source": "google",
                 }
             ],
-            "fallback_address": "",
+            "address_candidates": [
+                {"address": "1100 Current Dock Dr, Industrial City, MI 49512", "source": "google_geocode"}
+            ],
+            "fallback_address": "1100 Current Dock Dr, Industrial City, MI 49512",
         }
 
     monkeypatch.setattr("app.blueprints.driver.routes.nearby_place_candidates", fake_candidates)
@@ -10595,6 +10601,8 @@ def test_day_driver_gps_place_candidates_endpoint_returns_google_places(client, 
     assert payload["ok"] is True
     assert payload["places"][0]["name"] == "Current Dock Manufacturing"
     assert payload["places"][0]["address"] == "1100 Current Dock Dr, Industrial City, MI 49512"
+    assert payload["places"][0]["trusted"] is True
+    assert payload["address_candidates"][0]["address"] == "1100 Current Dock Dr, Industrial City, MI 49512"
 
 
 def test_day_driver_destination_lookup_endpoint_returns_business_name(client, app, monkeypatch):

@@ -64,12 +64,10 @@ DESTINATION_GEOGRAPHY_TYPES = {
     "sublocality_level_1",
 }
 PREMISE_GEOCODE_TYPES = {"premise", "subpremise", "street_address"}
-DEFAULT_PLACE_RADIUS_M = 90
-MIN_PLACE_RADIUS_M = 25
-MAX_PLACE_RADIUS_M = 260
+DEFAULT_PLACE_RADIUS_M = 12
+CUSTOMER_PLACE_RADIUS_M = 6
+MAX_PLACE_RADIUS_M = 30
 MIN_DESTINATION_QUERY_LENGTH = 4
-DEFAULT_TRUSTED_PLACE_DISTANCE_M = 24
-MAX_TRUSTED_PLACE_DISTANCE_M = 35
 
 
 def _clean(value):
@@ -106,20 +104,14 @@ def _candidate_radius_m(accuracy_m):
     if accuracy is None or accuracy <= 0:
         return DEFAULT_PLACE_RADIUS_M
     if accuracy <= 15:
-        return max(MIN_PLACE_RADIUS_M, min(35, int(round(accuracy * 1.6 + 10))))
+        return CUSTOMER_PLACE_RADIUS_M
     if accuracy <= 50:
-        return min(MAX_PLACE_RADIUS_M, int(round(accuracy * 1.5 + 25)))
-    return min(MAX_PLACE_RADIUS_M, int(round(accuracy * 2 + 80)))
+        return min(MAX_PLACE_RADIUS_M, max(CUSTOMER_PLACE_RADIUS_M, int(round(accuracy * 0.35))))
+    return MAX_PLACE_RADIUS_M
 
 
 def _trusted_place_distance_m(accuracy_m):
-    accuracy = _float_or_none(accuracy_m)
-    if accuracy is None or accuracy <= 0:
-        return DEFAULT_TRUSTED_PLACE_DISTANCE_M
-    return min(
-        MAX_TRUSTED_PLACE_DISTANCE_M,
-        max(18, int(round((accuracy * 1.2) + 6))),
-    )
+    return CUSTOMER_PLACE_RADIUS_M
 
 
 def _place_point(result):
@@ -210,7 +202,7 @@ def _destination_place(result):
     }
 
 
-def _fallback_address(lat, lng, key):
+def _address_candidates(lat, lng, key, *, limit=5):
     response = requests.get(
         GEOCODE_URL,
         params={
@@ -223,12 +215,31 @@ def _fallback_address(lat, lng, key):
     response.raise_for_status()
     payload = response.json()
     if payload.get("status") != "OK":
-        return ""
+        return []
+    candidates = []
+    seen = set()
     for result in payload.get("results") or []:
         types = set(result.get("types") or [])
         if types & PREMISE_GEOCODE_TYPES:
-            return _format_address(result.get("formatted_address"))
-    return ""
+            address = _format_address(result.get("formatted_address"))
+            key = address.lower()
+            if address and key not in seen:
+                seen.add(key)
+                candidates.append(
+                    {
+                        "address": address,
+                        "source": "google_geocode",
+                        "types": sorted(types),
+                    }
+                )
+        if len(candidates) >= limit:
+            break
+    return candidates
+
+
+def _fallback_address(lat, lng, key):
+    candidates = _address_candidates(lat, lng, key, limit=1)
+    return candidates[0]["address"] if candidates else ""
 
 
 def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
@@ -240,6 +251,7 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
             "error": "not_configured",
             "message": "Google Maps API key is not configured.",
             "places": [],
+            "address_candidates": [],
             "fallback_address": "",
         }
 
@@ -281,6 +293,7 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
             "error": error.get("status") or f"http_{response.status_code}",
             "message": error.get("message") or "Google Places did not return nearby places.",
             "places": [],
+            "address_candidates": [],
             "fallback_address": "",
         }
 
@@ -320,8 +333,13 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
 
     tokens = _hint_tokens(hint)
     candidates.sort(key=lambda item: (-_hint_score(item, tokens), item["distance_m"], item["name"].lower()))
+    address_candidates = []
     fallback = ""
-    if not candidates or not candidates[0].get("trusted"):
+    try:
+        address_candidates = _address_candidates(lat, lng, key)
+        fallback = address_candidates[0]["address"] if address_candidates else ""
+    except requests.RequestException:
+        address_candidates = []
         try:
             fallback = _fallback_address(lat, lng, key)
         except requests.RequestException:
@@ -329,6 +347,7 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
     return {
         "ok": True,
         "places": candidates[:limit],
+        "address_candidates": address_candidates,
         "fallback_address": fallback,
         "radius_m": radius,
     }
