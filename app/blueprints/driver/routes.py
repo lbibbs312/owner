@@ -1768,6 +1768,26 @@ def _pretrip_damage_reports(pretrip):
     )
 
 
+def _pretrip_damage_evidence_counts(pretrips):
+    refs = {f"PreTrip #{pretrip.id}": pretrip.id for pretrip in pretrips or [] if getattr(pretrip, "id", None)}
+    counts = {pretrip_id: {"reports": 0, "photos": 0} for pretrip_id in refs.values()}
+    if not refs:
+        return counts
+    reports = (
+        DamageReport.query.filter(DamageReport.move_reference.in_(refs.keys()))
+        .order_by(DamageReport.created_at.asc(), DamageReport.id.asc())
+        .all()
+    )
+    for report in reports:
+        pretrip_id = refs.get(report.move_reference)
+        if not pretrip_id:
+            continue
+        counts.setdefault(pretrip_id, {"reports": 0, "photos": 0})
+        counts[pretrip_id]["reports"] += 1
+        counts[pretrip_id]["photos"] += len(report.photos or [])
+    return counts
+
+
 def _damage_photo_file_path(photo):
     if not photo:
         return None
@@ -3739,6 +3759,7 @@ def list_pretrips():
         selected_truck_number=selected_truck_number,
         inspection_trucks=inspection_trucks,
         truck_history=truck_history,
+        pretrip_damage_evidence_by_id=_pretrip_damage_evidence_counts(pretrips),
         today_local_date=_today_local_date(),
         route_finalized_by_pretrip_id={
             pretrip.id: build_route_context(driver_id=pretrip.user_id, route_date=pretrip.pretrip_date).route_finalized
@@ -3874,7 +3895,10 @@ def new_pretrip():
                 target_id=damage_report.id,
             )
 
-        flash("PreTrip saved successfully!", "success")
+        flash(
+            "PreTrip saved with damage photo attached." if damage_report else "PreTrip saved successfully!",
+            "success",
+        )
         return redirect(url_for("driver.list_pretrips"))
     elif request.method == "POST":
         current_app.logger.warning(
@@ -4081,7 +4105,10 @@ def edit_pretrip_entry(pretrip_id):
         session["reviewing_driver"] = request.form.get("reviewing_driver")
         session["reviewing_date"] = request.form.get("reviewing_date")
 
-        flash("PreTrip updated!", "success")
+        flash(
+            "PreTrip updated with damage photo attached." if damage_report else "PreTrip updated!",
+            "success",
+        )
         return redirect(url_for("driver.view_pretrip", pretrip_id=pt.id))
 
     return render_template("edit_pretrip_entry.html", form=form, pretrip=pt)

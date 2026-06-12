@@ -2676,6 +2676,7 @@ def test_pretrip_create_and_print_route(client, app):
     login(client, "driver1")
     new_page = client.get("/new_pretrip")
     assert new_page.status_code == 200
+    assert b'enctype="multipart/form-data"' in new_page.data
     assert b'capture="environment"' in new_page.data
 
     response = client.post(
@@ -2697,6 +2698,7 @@ def test_pretrip_create_and_print_route(client, app):
         follow_redirects=False,
     )
     assert response.status_code == 302
+    assert response.headers["Location"].endswith("/list_pretrips")
 
     with app.app_context():
         from app.models import ActivityEvent, DamageReport, PreTrip, ShiftRecord
@@ -2714,8 +2716,13 @@ def test_pretrip_create_and_print_route(client, app):
             target_type="pretrip", target_id=pretrip_id, action="created"
         ).count() == 1
 
+    list_page = client.get("/list_pretrips")
+    assert b"Damage Photos" in list_page.data
+    assert b"1 attached" in list_page.data
+
     edit_page = client.get(f"/edit_pretrip_entry/{pretrip_id}")
     assert edit_page.status_code == 200
+    assert b'enctype="multipart/form-data"' in edit_page.data
     assert b"Truck and Tractor #" in edit_page.data
     assert b"No Defects" in edit_page.data
     assert b'capture="environment"' in edit_page.data

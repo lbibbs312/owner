@@ -385,6 +385,9 @@
               {% set route_locked = (route_finalized_by_pretrip_id or {}).get(pt.id, false) %}
               {% set can_manage_pretrip = pt.user_id == current_user.id and not route_locked %}
               {% set can_delete_pretrip = can_manage_pretrip and pt.pretrip_date == today_local_date %}
+              {% set evidence = (pretrip_damage_evidence_by_id or {}).get(pt.id, {}) %}
+              {% set damage_photo_count = evidence.get('photos', 0) %}
+              {% set damage_report_count = evidence.get('reports', 0) %}
               <article class="inspection-card">
                 <div class="inspection-card-top">
                   <div>
@@ -403,6 +406,11 @@
                   <div class="inspection-fact"><span>End Miles</span><strong>{% if pt.posttrip and pt.posttrip.end_mileage is not none %}{{ "{:,}".format(pt.posttrip.end_mileage) }}{% else %}Pending{% endif %}</strong></div>
                   <div class="inspection-fact"><span>Start Fuel</span><strong>{{ pt.start_fuel_level or 'Not recorded' }}</strong></div>
                   <div class="inspection-fact"><span>End Fuel</span><strong>{% if pt.posttrip %}{{ pt.posttrip.end_fuel_level or 'Not recorded' }}{% else %}Pending{% endif %}</strong></div>
+                  {% if damage_photo_count %}
+                    <div class="inspection-fact"><span>Damage Photos</span><strong>{{ damage_photo_count }} attached</strong></div>
+                  {% elif damage_report_count %}
+                    <div class="inspection-fact"><span>Damage Evidence</span><strong>Report saved</strong></div>
+                  {% endif %}
                 </div>
 
                 <div class="inspection-card-actions">
@@ -516,6 +524,8 @@
         <tbody>
           {% for pt in pretrips %}
           {% set route_locked = (route_finalized_by_pretrip_id or {}).get(pt.id, false) %}
+          {% set evidence = (pretrip_damage_evidence_by_id or {}).get(pt.id, {}) %}
+          {% set damage_photo_count = evidence.get('photos', 0) %}
           <tr class="{% if not pt.posttrip %}table-danger{% endif %}">
             <td>{{ pt.id }}</td>
             <td>{{ pt.truck_number }}</td>
@@ -530,6 +540,9 @@
                   <a href="{{ url_for(pretrip_view_endpoint, pretrip_id=pt.id) }}" class="btn btn-sm btn-success">Open PostTrip</a>
                 {% else %}
                   <strong class="text-danger align-self-center">PostTrip needed</strong>
+                {% endif %}
+                {% if damage_photo_count %}
+                  <span class="badge bg-warning text-dark align-self-center">{{ damage_photo_count }} damage photo{{ 's' if damage_photo_count != 1 else '' }}</span>
                 {% endif %}
               </div>
             </td>
