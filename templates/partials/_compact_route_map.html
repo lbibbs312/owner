@@ -593,7 +593,12 @@
                   hideDestinationSuggestions(suggestions);
                 }
                 function requestLookup(sourceInput) {
-                  var query = sourceInput.value.trim();
+                  var sourceValue = sourceInput.value.trim();
+                  var addressValue = addressInput.value.trim();
+                  var nameValue = nameInput ? nameInput.value.trim() : '';
+                  var parts = sourceInput === nameInput ? [nameValue, addressValue] : [addressValue, nameValue];
+                  var query = parts.filter(Boolean).join(' ');
+                  if (!query) query = sourceValue;
                   var activeRequest = ++requestId;
                   window.clearTimeout(pendingTimer);
                   if (query.length < 4) {
@@ -609,7 +614,7 @@
                         var places = data && Array.isArray(data.places) ? data.places : [];
                         var firstPlace = places[0] || (data && data.place ? data.place : null);
                         if (sourceInput === addressInput && firstPlace) {
-                          if (firstPlace.address && !/\d/.test(query)) {
+                          if (firstPlace.address && !/\d/.test(addressValue)) {
                             addressInput.value = firstPlace.address;
                           }
                           if (nameInput && firstPlace.name && (!nameWasEdited || !nameInput.value.trim())) {
