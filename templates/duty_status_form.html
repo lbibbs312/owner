@@ -117,7 +117,11 @@
 
       <div class="duty-field">
         <label for="duty-location">Location</label>
-        <input id="duty-location" name="location" type="text" value="{{ last_location }}" placeholder="City, ST or stop name" autocomplete="off">
+        <span style="display:flex;gap:8px;align-items:stretch;">
+          <input id="duty-location" name="location" type="text" value="{{ last_location }}" placeholder="City, ST or stop name" autocomplete="off" style="flex:1;min-width:0;">
+          {% set gps_fill = {'single': '#duty-location', 'hint': 'stop'} %}
+          {% include 'partials/_gps_fill_button.html' %}
+        </span>
       </div>
 
       <div class="duty-field">

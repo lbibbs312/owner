@@ -57,9 +57,15 @@
       <h2>Fuel details</h2>
       <div class="field-grid">
         <label>Purchase date <input type="date" name="purchase_date" value="{{ ctx.route_date_value or '' }}"></label>
-        <label>Fuel location <input type="text" name="seller_name" placeholder="Station, truck stop, yard, or fuel stop"></label>
-        <label>City <input type="text" name="fuel_city"></label>
-        <label>State or province <input type="text" name="state_or_province"></label>
+        <label>Fuel location
+          <span style="display:flex;gap:8px;align-items:stretch;">
+            <input type="text" name="seller_name" id="fuel-location" placeholder="Station, truck stop, yard, or fuel stop" style="flex:1;min-width:0;">
+            {% set gps_fill = {'name': '#fuel-location', 'city': '#fuel-city', 'state': '#fuel-state', 'hint': 'fuel station truck stop'} %}
+            {% include 'partials/_gps_fill_button.html' %}
+          </span>
+        </label>
+        <label>City <input type="text" name="fuel_city" id="fuel-city"></label>
+        <label>State or province <input type="text" name="state_or_province" id="fuel-state"></label>
         <label>Gallons or liters <input type="number" name="gallons_or_liters" step="any" inputmode="decimal" data-fuel-gallons></label>
         <label>Price per gallon or liter <input type="number" name="price_per_gallon_or_liter" step="any" inputmode="decimal" data-fuel-ppg placeholder="e.g. 3.89"></label>
         <label>Total amount <input type="number" name="total_sale_amount" step="any" inputmode="decimal" data-fuel-total placeholder="Auto: gallons × price"></label>

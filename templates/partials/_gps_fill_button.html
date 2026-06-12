@@ -1,0 +1,160 @@
+{# Reusable "use my GPS" fill button for any location field.
+
+   Set `gps_fill` before including, pointing CSS selectors at the inputs to
+   fill (all optional):
+
+     {% set gps_fill = {'name': '#fuel-location', 'city': '#fuel-city',
+                        'state': '#fuel-state', 'hint': 'fuel station'} %}
+     {% include 'partials/_gps_fill_button.html' %}
+
+   Targets: name (business/place name), address, city, state, single (one
+   free-text field that takes the place name, else the street address).
+   Empty fields fill automatically; picking from the nearby list overwrites. #}
+<button type="button" class="md-gps-fill" data-gps-fill
+        data-gps-places-url="{{ url_for('driver.gps_place_candidates') }}"
+        {%- if gps_fill.get('hint') %} data-gps-hint="{{ gps_fill.get('hint') }}"{% endif %}
+        {%- for key in ('name', 'address', 'city', 'state', 'single') %}{% if gps_fill.get(key) %} data-gps-target-{{ key }}="{{ gps_fill.get(key) }}"{% endif %}{% endfor %}
+        aria-label="Use my GPS location" title="Use my GPS location">
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+</button>
+<style>
+  .md-gps-fill{flex:0 0 auto;min-width:46px;display:inline-flex;align-items:center;justify-content:center;padding:0 10px;border-radius:9px;border:1px solid rgba(91,157,255,.38);background:rgba(10,17,28,.6);color:#7fb2ff;cursor:pointer;box-shadow:0 0 10px rgba(91,157,255,.16);}
+  .md-gps-fill:active{box-shadow:0 0 16px rgba(91,157,255,.32);}
+  .md-gps-fill[disabled]{opacity:.55;cursor:wait;}
+  .md-gps-panel{margin-top:6px;font-size:.78rem;font-weight:600;color:#8fa3bf;line-height:1.4;}
+  .md-gps-panel select{width:100%;margin-top:6px;background:rgba(10,17,28,.92);color:#dbe7ff;border:1px solid rgba(91,157,255,.3);border-radius:8px;padding:8px;font-size:.85rem;}
+</style>
+<script>
+(function () {
+  if (window.__mdGpsFill) return;
+  window.__mdGpsFill = true;
+
+  function q(sel) { return sel ? document.querySelector(sel) : null; }
+
+  function setVal(sel, value, force) {
+    var el = q(sel);
+    if (!el || !value) return;
+    if (force || !el.value.trim()) el.value = value;
+  }
+
+  function parseCityState(address) {
+    var parts = (address || '').split(',').map(function (p) { return p.trim(); }).filter(Boolean);
+    if (parts.length < 2) return { city: '', state: '' };
+    var last = parts[parts.length - 1];
+    var m = last.match(/^([A-Za-z]{2})(?:\s+\d{4,10}(?:-\d+)?)?$/);
+    if (m) return { city: parts.length >= 3 ? parts[parts.length - 2] : '', state: m[1].toUpperCase() };
+    if (/^(USA|United States|Canada)$/i.test(last) && parts.length >= 3) {
+      var st = parts[parts.length - 2].match(/^([A-Za-z]{2})(?:\s+\d{4,10}(?:-\d+)?)?$/);
+      if (st) return { city: parts.length >= 4 ? parts[parts.length - 3] : '', state: st[1].toUpperCase() };
+    }
+    return { city: last, state: '' };
+  }
+
+  function apply(btn, cand, force) {
+    if (!cand) return;
+    var d = btn.dataset;
+    setVal(d.gpsTargetName, cand.name || '', force);
+    setVal(d.gpsTargetAddress, cand.address || '', force);
+    if (d.gpsTargetCity || d.gpsTargetState) {
+      var cs = parseCityState(cand.address || '');
+      setVal(d.gpsTargetCity, cs.city, force);
+      setVal(d.gpsTargetState, cs.state, force);
+    }
+    setVal(d.gpsTargetSingle, cand.name || cand.address || '', force);
+  }
+
+  function panelFor(btn) {
+    var anchor = btn.closest('label') || btn.closest('.duty-field') || btn.parentElement;
+    var next = anchor.nextElementSibling;
+    if (next && next.classList && next.classList.contains('md-gps-panel')) return next;
+    var panel = document.createElement('div');
+    panel.className = 'md-gps-panel';
+    anchor.parentNode.insertBefore(panel, anchor.nextSibling);
+    return panel;
+  }
+
+  function status(panel, message) {
+    var line = panel.querySelector('.md-gps-status');
+    if (!line) {
+      line = document.createElement('div');
+      line.className = 'md-gps-status';
+      panel.insertBefore(line, panel.firstChild);
+    }
+    line.textContent = message || '';
+  }
+
+  function renderChoices(panel, btn, candidates) {
+    var old = panel.querySelector('select');
+    if (old) old.remove();
+    if (!candidates || candidates.length < 2) return;
+    var select = document.createElement('select');
+    candidates.slice(0, 6).forEach(function (cand, index) {
+      var option = document.createElement('option');
+      option.value = String(index);
+      var label = cand.name || cand.address || 'Nearby place';
+      if (cand.name && cand.address) label += ' - ' + cand.address;
+      if (cand.distance_m || cand.distance_m === 0) label += ' (' + cand.distance_m + ' m)';
+      option.textContent = label;
+      select.appendChild(option);
+    });
+    select.addEventListener('change', function () {
+      apply(btn, candidates[Number(select.value)], true);
+    });
+    panel.appendChild(select);
+  }
+
+  function lookupFailedMessage(data) {
+    if (data && data.error === 'not_configured') return 'Place lookup is not configured - type the location in.';
+    if (data && data.message) return data.message;
+    return 'No nearby matches - type the location in.';
+  }
+
+  document.addEventListener('click', function (event) {
+    var btn = event.target.closest('[data-gps-fill]');
+    if (!btn) return;
+    var panel = panelFor(btn);
+    if (!navigator.geolocation) {
+      status(panel, 'GPS is not available on this device.');
+      return;
+    }
+    btn.disabled = true;
+    status(panel, 'Getting GPS fix...');
+    navigator.geolocation.getCurrentPosition(function (position) {
+      var lat = position.coords.latitude;
+      var lng = position.coords.longitude;
+      var accuracy = Math.round(position.coords.accuracy || 0);
+      var url = btn.dataset.gpsPlacesUrl + '?lat=' + lat + '&lng=' + lng +
+        (accuracy ? '&accuracy=' + accuracy : '') +
+        (btn.dataset.gpsHint ? '&hint=' + encodeURIComponent(btn.dataset.gpsHint) : '');
+      fetch(url, { headers: { 'Accept': 'application/json' } })
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
+          btn.disabled = false;
+          var places = (data && data.places) || [];
+          if (places.length) {
+            apply(btn, places[0], false);
+            status(panel, 'GPS: ' + (places[0].name || places[0].address) +
+              (places[0].distance_m || places[0].distance_m === 0 ? ' (' + places[0].distance_m + ' m)' : ''));
+            renderChoices(panel, btn, places);
+          } else if (data && data.fallback_address) {
+            apply(btn, { name: '', address: data.fallback_address }, false);
+            status(panel, 'GPS street address: ' + data.fallback_address);
+            renderChoices(panel, btn, []);
+          } else {
+            status(panel, lookupFailedMessage(data));
+            renderChoices(panel, btn, []);
+          }
+        })
+        .catch(function () {
+          btn.disabled = false;
+          status(panel, 'Place lookup failed - check signal and try again.');
+        });
+    }, function (error) {
+      btn.disabled = false;
+      if (error && error.code === 1) status(panel, 'GPS permission denied - allow location for this site.');
+      else if (error && error.code === 3) status(panel, 'GPS timed out - try again with a clearer view of the sky.');
+      else status(panel, 'GPS position unavailable - type the location in.');
+    }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
+  });
+})();
+</script>

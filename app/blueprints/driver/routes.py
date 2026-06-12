@@ -2902,8 +2902,8 @@ def _bounded_float_arg(name, *, minimum, maximum):
 @login_required
 @_driver_route_guard("driver.mobile_dashboard", "the driver GPS place lookup")
 def gps_place_candidates():
-    if not getattr(current_user, "is_day_driver", False):
-        return jsonify({"ok": False, "error": "day_driver_required", "places": []}), 403
+    # Every driver-facing location field (fuel, duty status, stops) offers the
+    # GPS fill button, so this is not day-driver gated — only driver gated.
     lat = _bounded_float_arg("lat", minimum=-90, maximum=90)
     lng = _bounded_float_arg("lng", minimum=-180, maximum=180)
     accuracy = _bounded_float_arg("accuracy", minimum=0, maximum=50000)
