@@ -34,7 +34,8 @@ DEPART_RADIUS_M = 90.0       # moved past this from the cluster center => left
 DWELL_THRESHOLD_S = 180      # a cluster must last this long to be a real stop
 FUEL_DWELL_MAX_S = 1200      # a short stop at a fuel place looks like fueling
 BREAK_DWELL_MIN_S = 1500     # a long dwell off a known place looks like a break
-DEFAULT_PLACE_RADIUS_M = 150.0
+DEFAULT_PLACE_RADIUS_M = 90.0
+MAX_PLACE_MATCH_RADIUS_M = 90.0
 
 
 def haversine_m(lat1, lng1, lat2, lng2):
@@ -131,7 +132,8 @@ def match_place(user_id, lat, lng):
     best, best_d = None, None
     for place in PlaceMemory.query.filter_by(user_id=user_id).all():
         d = haversine_m(lat, lng, place.center_latitude, place.center_longitude)
-        if d <= (place.radius_m or DEFAULT_PLACE_RADIUS_M) and (best_d is None or d < best_d):
+        radius = min(place.radius_m or DEFAULT_PLACE_RADIUS_M, MAX_PLACE_MATCH_RADIUS_M)
+        if d <= radius and (best_d is None or d < best_d):
             best, best_d = place, d
     return best
 

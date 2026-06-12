@@ -41,6 +41,9 @@ LOW_VALUE_TYPES = {
     "transit_station",
 }
 PREMISE_GEOCODE_TYPES = {"premise", "subpremise", "street_address"}
+DEFAULT_PLACE_RADIUS_M = 90
+MIN_PLACE_RADIUS_M = 45
+MAX_PLACE_RADIUS_M = 260
 
 
 def _clean(value):
@@ -70,6 +73,17 @@ def _float_or_none(value):
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _candidate_radius_m(accuracy_m):
+    accuracy = _float_or_none(accuracy_m)
+    if accuracy is None or accuracy <= 0:
+        return DEFAULT_PLACE_RADIUS_M
+    if accuracy <= 15:
+        return max(MIN_PLACE_RADIUS_M, int(round(accuracy * 3 + 30)))
+    if accuracy <= 50:
+        return min(MAX_PLACE_RADIUS_M, int(round(accuracy * 2 + 50)))
+    return min(MAX_PLACE_RADIUS_M, int(round(accuracy * 2 + 80)))
 
 
 def _place_point(result):
@@ -157,7 +171,7 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
             "fallback_address": "",
         }
 
-    radius = max(120, min(900, int((accuracy_m or 0) * 4 + 180)))
+    radius = _candidate_radius_m(accuracy_m)
     response = requests.post(
         NEARBY_URL,
         headers={
@@ -207,6 +221,8 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
         if point is None:
             continue
         distance = _distance_m(lat, lng, point[0], point[1])
+        if distance > radius:
+            continue
         place_id = result.get("id") or result.get("place_id") or ""
         name = _place_name(result)
         address = _format_address(result.get("shortFormattedAddress") or result.get("formattedAddress"))

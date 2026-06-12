@@ -2264,7 +2264,7 @@ def _sheet_polish_note(line, plant_name):
     if not text:
         return None
     low = text.lower().rstrip(".")
-    # Drop plant-prefixed system narration ("Raleigh East: Shift start.", "PPL: Pickup.").
+    # Drop location-prefixed system narration ("Customer Dock: Shift start.").
     if plant_name and low.startswith(plant_name.strip().lower() + ":"):
         return None
     if _sheet_note_is_noise(text):
@@ -2824,7 +2824,7 @@ def _freight_stop_memory(driver_id, limit=40):
                     "label": label,
                     "lat": place.center_latitude,
                     "lng": place.center_longitude,
-                    "radius_m": place.radius_m or 150,
+                    "radius_m": min(place.radius_m or 90, 90),
                 }
             )
     for log in rows:

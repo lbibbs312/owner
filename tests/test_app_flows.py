@@ -10516,8 +10516,8 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     created = client.post(
         "/new_driving_log",
         data={
-            "location_address": "5711 Kraft Ave SE, Grand Rapids, MI 49512",
-            "location": "Kraft Dock 4",
+            "location_address": "2200 Customer Dock Dr, Industrial City, MI 49512",
+            "location": "Customer Dock 4",
             "gps_latitude": "42.858001",
             "gps_longitude": "-85.532002",
             "gps_accuracy_m": "18.7",
@@ -10530,18 +10530,18 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
         from app.models import DriverLog, PlaceMemory
 
         log = DriverLog.query.filter_by(driver_id=driver_id).one()
-        assert log.plant_name == "Kraft Dock 4"
-        assert log.location_address == "5711 Kraft Ave SE, Grand Rapids, MI 49512"
+        assert log.plant_name == "Customer Dock 4"
+        assert log.location_address == "2200 Customer Dock Dr, Industrial City, MI 49512"
         assert log.gps_latitude == pytest.approx(42.858001)
         assert log.gps_longitude == pytest.approx(-85.532002)
         assert log.gps_accuracy_m == pytest.approx(18.7)
         place = PlaceMemory.query.filter_by(user_id=driver_id).one()
-        assert place.label == "Kraft Dock 4"
+        assert place.label == "Customer Dock 4"
         assert place.center_latitude == pytest.approx(42.858001)
         assert place.center_longitude == pytest.approx(-85.532002)
 
     next_form = client.get("/new_driving_log").get_data(as_text=True)
-    assert '<option value="Kraft Dock 4">' in next_form
+    assert '<option value="Customer Dock 4">' in next_form
 
 
 def test_day_driver_gps_place_candidates_endpoint_returns_google_places(client, app, monkeypatch):
@@ -10559,13 +10559,13 @@ def test_day_driver_gps_place_candidates_endpoint_returns_google_places(client, 
         assert lat == pytest.approx(42.900426)
         assert lng == pytest.approx(-85.530662)
         assert accuracy_m == pytest.approx(8)
-        assert hint == "Raleigh east"
+        assert hint == "current dock"
         return {
             "ok": True,
             "places": [
                 {
-                    "name": "Plastic-Plate Inc",
-                    "address": "3500 Raleigh Dr SE, Kentwood, MI 49512",
+                    "name": "Current Dock Manufacturing",
+                    "address": "1100 Current Dock Dr, Industrial City, MI 49512",
                     "distance_m": 15,
                     "source": "google",
                 }
@@ -10575,12 +10575,12 @@ def test_day_driver_gps_place_candidates_endpoint_returns_google_places(client, 
 
     monkeypatch.setattr("app.blueprints.driver.routes.nearby_place_candidates", fake_candidates)
     login(client, "dd_gps_candidates")
-    response = client.get("/gps/place-candidates?lat=42.900426&lng=-85.530662&accuracy=8&hint=Raleigh+east")
+    response = client.get("/gps/place-candidates?lat=42.900426&lng=-85.530662&accuracy=8&hint=current+dock")
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["ok"] is True
-    assert payload["places"][0]["name"] == "Plastic-Plate Inc"
-    assert payload["places"][0]["address"] == "3500 Raleigh Dr SE, Kentwood, MI 49512"
+    assert payload["places"][0]["name"] == "Current Dock Manufacturing"
+    assert payload["places"][0]["address"] == "1100 Current Dock Dr, Industrial City, MI 49512"
 
 
 def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(client, app):
@@ -10618,10 +10618,10 @@ def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(cli
             "got_loaded": "yes",
             "commodity": "Auto parts",
             "weight": "42000",
-            "destination_text": "Meijer DC",
+            "destination_text": "Primary Receiver",
             "secondary_commodity": "Pallets",
             "secondary_weight": "12000",
-            "secondary_destination_text": "Kraft Dock 4",
+            "secondary_destination_text": "Secondary Receiver",
         },
         headers={"X-Requested-With": "fetch", "Accept": "application/json"},
     )
@@ -10634,23 +10634,23 @@ def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(cli
 
         saved = DriverLog.query.get(active_id)
         assert saved.depart_time
-        assert saved.depart_load_size == "Auto parts (42000 lbs) -> Meijer DC"
-        assert saved.secondary_load == "Pallets (12000 lbs) -> Kraft Dock 4"
-        assert saved.destination == "Meijer DC"
+        assert saved.depart_load_size == "Auto parts (42000 lbs) -> Primary Receiver"
+        assert saved.secondary_load == "Pallets (12000 lbs) -> Secondary Receiver"
+        assert saved.destination == "Primary Receiver"
         snapshot = build_route_context(driver_id=driver_id, route_date=today)
         assert snapshot.route_status == "active"
         assert snapshot.current_cargo["cargo_display"] == "Auto parts (42000 lbs) + Pallets (12000 lbs)"
-        assert snapshot.next_stop_context["destination"] == "Meijer DC"
+        assert snapshot.next_stop_context["destination"] == "Primary Receiver"
 
     mobile = client.get("/mobile")
     body = mobile.get_data(as_text=True)
-    assert "Arrive at Meijer DC / Kraft Dock 4" in body
+    assert "Arrive at Primary Receiver / Secondary Receiver" in body
     assert 'href="/new_driving_log?next=mobile' in body
 
-    add_stop_form = client.get("/new_driving_log?next=mobile&expected_destination=Meijer%20DC")
+    add_stop_form = client.get("/new_driving_log?next=mobile&expected_destination=Primary%20Receiver")
     add_stop_body = add_stop_form.get_data(as_text=True)
     assert add_stop_form.status_code == 200
-    assert 'value="Meijer DC"' in add_stop_body
+    assert 'value="Primary Receiver"' in add_stop_body
     assert 'name="load_size" value="Auto parts (42000 lbs)"' in add_stop_body
     assert 'name="secondary_load" value="Pallets (12000 lbs)"' in add_stop_body
 

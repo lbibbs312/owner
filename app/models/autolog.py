@@ -187,7 +187,7 @@ class DriverMemory(db.Model):
 
 class PlaceMemory(db.Model):
     """A learned place (geofence) for a driver. Matching a candidate stop to one
-    of these is what lets the app prefill 'Likely stop: PPL' and the usual load."""
+    of these is what lets the app prefill a likely stop and the usual load."""
 
     __tablename__ = "autolog_place_memory"
 
@@ -196,7 +196,7 @@ class PlaceMemory(db.Model):
     label = db.Column(db.String(120), nullable=False)
     center_latitude = db.Column(db.Float, nullable=False)
     center_longitude = db.Column(db.Float, nullable=False)
-    radius_m = db.Column(db.Float, nullable=False, default=150.0)
+    radius_m = db.Column(db.Float, nullable=False, default=90.0)
     place_type = db.Column(db.String(20), nullable=False, default="unknown")  # pickup|delivery|fuel|service|yard|unknown
     usual_load = db.Column(db.String(120), nullable=True)
     visit_count = db.Column(db.Integer, nullable=False, default=1)
