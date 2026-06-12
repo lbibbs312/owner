@@ -64,9 +64,9 @@ DESTINATION_GEOGRAPHY_TYPES = {
     "sublocality_level_1",
 }
 PREMISE_GEOCODE_TYPES = {"premise", "subpremise", "street_address"}
-DEFAULT_PLACE_RADIUS_M = 75
+DEFAULT_PLACE_RADIUS_M = 20
 CUSTOMER_PLACE_RADIUS_M = 6
-MAX_PLACE_RADIUS_M = 110
+MAX_PLACE_RADIUS_M = 30
 MIN_DESTINATION_QUERY_LENGTH = 4
 
 
@@ -103,10 +103,12 @@ def _candidate_radius_m(accuracy_m):
     accuracy = _float_or_none(accuracy_m)
     if accuracy is None or accuracy <= 0:
         return DEFAULT_PLACE_RADIUS_M
+    if accuracy <= 8:
+        return 8
     if accuracy <= 15:
-        return 75
-    if accuracy <= 50:
-        return min(MAX_PLACE_RADIUS_M, max(75, int(round(accuracy * 2))))
+        return 12
+    if accuracy <= 30:
+        return 20
     return MAX_PLACE_RADIUS_M
 
 
@@ -268,10 +270,10 @@ def _place_dedupe_key(place):
     )
 
 
-def _businesses_at_addresses(addresses, key, *, limit=4):
+def _businesses_at_addresses(addresses, key, *, limit=5):
     matches = []
     seen = set()
-    for item in addresses[:2]:
+    for item in addresses[:5]:
         address = item.get("address") if isinstance(item, dict) else item
         address = _format_address(address)
         if not address:
@@ -458,10 +460,11 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
     }
 
 
-def lookup_destination_place(query):
+def lookup_destination_place(query, *, bias_lat=None, bias_lng=None, near=""):
     """Look up a typed destination address/name and return likely place labels."""
     key = _api_key()
     query = _clean(query)[:255]
+    near = _clean(near)[:255]
     if not key:
         return {
             "ok": False,
@@ -472,6 +475,19 @@ def lookup_destination_place(query):
         }
     if len(query) < MIN_DESTINATION_QUERY_LENGTH:
         return {"ok": False, "error": "short_query", "place": None, "places": []}
+    search_query = query
+    if near and near.lower() not in query.lower():
+        search_query = f"{query} near {near}"
+    lat = _float_or_none(bias_lat)
+    lng = _float_or_none(bias_lng)
+    request_payload = {"textQuery": search_query, "maxResultCount": 5}
+    if lat is not None and lng is not None:
+        request_payload["locationBias"] = {
+            "circle": {
+                "center": {"latitude": lat, "longitude": lng},
+                "radius": 50000,
+            }
+        }
 
     response = requests.post(
         TEXT_SEARCH_URL,
@@ -489,7 +505,7 @@ def lookup_destination_place(query):
                 ]
             ),
         },
-        json={"textQuery": query, "maxResultCount": 5},
+        json=request_payload,
         timeout=6,
     )
     payload = response.json()

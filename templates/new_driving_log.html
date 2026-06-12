@@ -86,7 +86,7 @@
       {{ form.location_address.label(class="form-label") }}
       <div class="d-flex gap-2 align-items-stretch">
         {{ form.location_address(class="form-control", placeholder="Street address, road, city, state", autocomplete="off") }}
-        <button type="button" id="gpsFillBtn" class="btn btn-primary d-flex align-items-center" style="min-width:52px;justify-content:center;" aria-label="Use my GPS location" title="Use my GPS location" data-gps-places-url="{{ url_for('driver.gps_place_candidates') }}" data-gps-place-hint="{{ gps_place_hint }}">
+        <button type="button" id="gpsFillBtn" class="btn btn-primary d-flex align-items-center" style="min-width:52px;justify-content:center;" aria-label="Use my GPS location" title="Use my GPS location" data-gps-places-url="{{ url_for('driver.gps_place_candidates') }}" data-gps-destination-url="{{ url_for('driver.gps_destination_lookup') }}" data-gps-place-hint="{{ gps_place_hint }}">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
         </button>
       </div>
@@ -129,11 +129,15 @@
         var placeChoices = document.getElementById('gpsPlaceChoices');
         var placeSelect = document.getElementById('gpsPlaceSelect');
         var gpsPlacesUrl = gpsBtn ? gpsBtn.getAttribute('data-gps-places-url') : '';
+        var destinationLookupUrl = gpsBtn ? gpsBtn.getAttribute('data-gps-destination-url') : '';
         var gpsPlaceHint = gpsBtn ? clean(gpsBtn.getAttribute('data-gps-place-hint')) : '';
         var placeMemory = {{ (fm.places or [])|tojson }};
+        var locationMemory = {{ (fm.locations or [])|tojson }};
         var currentAddresses = [];
         var currentCandidates = [];
         var customerChoiceTouched = false;
+        var customerLookupTimer = null;
+        var customerLookupId = 0;
 
         function clean(value) {
           return (value || '').toString().trim();
@@ -146,6 +150,15 @@
 
         function isTrustedCandidate(candidate) {
           return !!candidate && (candidate.source === 'saved' || candidate.trusted === true);
+        }
+
+        function candidateSourceLabel(candidate) {
+          if (!candidate) return '';
+          if (candidate.source === 'saved') return '\u23f2 Recent';
+          if (candidate.source === 'google_address') return 'Google address';
+          if (candidate.source === 'google_text') return 'Google search';
+          if (candidate.source === 'google') return candidate.address_match ? 'Google address' : 'Google nearby';
+          return '';
         }
 
         function addressValue(candidate) {
@@ -186,9 +199,10 @@
           if (candidate.name) pieces.push(candidate.name);
           if (candidate.address) pieces.push(candidate.address);
           var label = pieces.join(' - ');
+          var source = candidateSourceLabel(candidate);
+          if (source) label = source + ': ' + label;
           var distance = formatDistance(candidate);
           if (distance) label += ' (' + distance + ')';
-          if (candidate.source === 'saved') label += ' saved';
           return label || 'Nearby place';
         }
 
@@ -290,6 +304,60 @@
           (googlePlaces || []).forEach(add);
           (savedPlaces || []).forEach(add);
           return merged;
+        }
+
+        function rememberedTextPlaces(query) {
+          var tokens = clean(query).toLowerCase().split(/\s+/).filter(function (token) { return token.length >= 2; });
+          return (locationMemory || []).filter(function (label) {
+            var haystack = clean(label).toLowerCase();
+            if (!haystack) return false;
+            if (!tokens.length) return true;
+            return tokens.every(function (token) { return haystack.indexOf(token) !== -1; });
+          }).slice(0, 5).map(function (label) {
+            return { name: label, address: '', source: 'saved' };
+          });
+        }
+
+        function normalizeGooglePlaces(places, source) {
+          return (places || []).slice(0, 5).map(function (place) {
+            var copy = {};
+            Object.keys(place || {}).forEach(function (key) { copy[key] = place[key]; });
+            copy.source = source || copy.source || 'google_text';
+            return copy;
+          });
+        }
+
+        function requestCustomerLookup(forcedQuery) {
+          if (!destinationLookupUrl) return;
+          var nameValue = clean(nameInput && nameInput.value);
+          var addressValue = clean(addressInput && addressInput.value);
+          var query = clean(forcedQuery || [nameValue, addressValue].filter(Boolean).join(' '));
+          var memoryMatches = rememberedTextPlaces(nameValue || query);
+          var activeRequest = ++customerLookupId;
+          window.clearTimeout(customerLookupTimer);
+          if (memoryMatches.length) renderCandidates(memoryMatches);
+          if (query.length < 4) {
+            if (!memoryMatches.length && placeChoices) placeChoices.hidden = true;
+            return;
+          }
+          customerLookupTimer = window.setTimeout(function () {
+            var params = new URLSearchParams({ query: query });
+            if (latInput && lonInput && latInput.value && lonInput.value) {
+              params.set('lat', latInput.value);
+              params.set('lng', lonInput.value);
+            }
+            if (addressValue) params.set('near', addressValue);
+            fetch(destinationLookupUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .then(function (data) {
+                if (activeRequest !== customerLookupId) return;
+                var googlePlaces = normalizeGooglePlaces(data && Array.isArray(data.places) ? data.places : [], 'google_text');
+                renderCandidates(mergeCandidates(googlePlaces, memoryMatches).slice(0, 5));
+              })
+              .catch(function () {
+                if (memoryMatches.length) renderCandidates(memoryMatches);
+              });
+          }, 450);
         }
 
         function bestPosition(success, failure) {
@@ -400,7 +468,9 @@
         if (addressSelect) {
           addressSelect.addEventListener('change', function () {
             if (addressSelect.disabled) return;
-            applyAddress(currentAddresses[Number(addressSelect.value)], true);
+            var selectedAddress = currentAddresses[Number(addressSelect.value)];
+            applyAddress(selectedAddress, true);
+            requestCustomerLookup(addressValue(selectedAddress));
           });
         }
         if (placeSelect) {
@@ -426,6 +496,16 @@
             if (nameInput && !nameInput.value.trim()) {
               applySelectedCustomer(customerChoiceTouched);
             }
+          });
+        }
+        if (nameInput) {
+          nameInput.addEventListener('focus', function () {
+            var matches = rememberedTextPlaces(nameInput.value);
+            if (matches.length) renderCandidates(matches);
+          });
+          nameInput.addEventListener('input', function () {
+            customerChoiceTouched = true;
+            requestCustomerLookup();
           });
         }
         if (gpsBtn) gpsBtn.addEventListener('click', function () { fillFromGps(false); });

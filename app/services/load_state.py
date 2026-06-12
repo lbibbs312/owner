@@ -1,4 +1,6 @@
 from datetime import date, datetime
+import re
+
 import pytz
 
 from app.services.plant_addresses import (
@@ -119,12 +121,82 @@ def load_display(value):
 
 def normalize_cargo_value(value):
     """Return the canonical cargo label used by route-state services."""
-    return load_display(value)
+    return freight_cargo_text(load_display(value))
+
+
+FREIGHT_DESTINATION_SEPARATOR = " -> "
+_FREIGHT_MATCH_STOPWORDS = {"inc", "llc", "co", "corp", "corporation", "company", "the", "of", "and"}
+
+
+def is_freight_load(value):
+    """Freeform (day-driver) cargo the plant chain cannot resolve to a code."""
+    return bool(
+        not is_empty_load(value)
+        and not is_legacy_size_load(value)
+        and destination_from_load(value) is None
+    )
+
+
+def freight_destination_text(value):
+    """The typed '-> destination' part of a freight label, if any."""
+    text = _clean(value)
+    if FREIGHT_DESTINATION_SEPARATOR in text:
+        return text.split(FREIGHT_DESTINATION_SEPARATOR)[-1].strip()
+    return ""
+
+
+def freight_cargo_text(value):
+    """The cargo part of a freeform freight label, without its destination."""
+    text = _clean(value)
+    if FREIGHT_DESTINATION_SEPARATOR in text:
+        return text.rsplit(FREIGHT_DESTINATION_SEPARATOR, 1)[0].strip()
+    return text
+
+
+def _freight_with_prior_destination(previous, current):
+    current = _clean(current)
+    if not current:
+        return ""
+    if freight_destination_text(current):
+        return current
+    if (
+        previous
+        and freight_destination_text(previous)
+        and _norm(freight_cargo_text(previous)) == _norm(freight_cargo_text(current))
+    ):
+        return previous
+    return current
+
+
+def _match_text(value):
+    return re.sub(r"[^a-z0-9 ]+", " ", _norm(value)).strip()
+
+
+def freight_load_destined_here(load_value, *location_texts):
+    """Match a typed freight destination against a stop's name/address.
+
+    Case- and punctuation-insensitive; 'Raleigh east' matches a stop named
+    'Raleigh East' or an address containing it.
+    """
+    destination = _match_text(freight_destination_text(load_value))
+    if not destination:
+        return False
+    haystacks = [_match_text(text) for text in location_texts if _clean(text)]
+    for haystack in haystacks:
+        if haystack and (destination in haystack or haystack in destination):
+            return True
+    tokens = {token for token in destination.split() if token not in _FREIGHT_MATCH_STOPWORDS}
+    if not tokens:
+        return False
+    combined = set()
+    for haystack in haystacks:
+        combined.update(haystack.split())
+    return tokens <= combined
 
 
 def cargo_display(primary_load, secondary_load=None):
-    primary = load_display(primary_load)
-    secondary = load_display(secondary_load)
+    primary = freight_cargo_text(load_display(primary_load))
+    secondary = freight_cargo_text(load_display(secondary_load))
     parts = []
     if primary and primary != "Empty":
         parts.append(primary)
@@ -345,6 +417,10 @@ def current_load_after_logs(logs):
     current_primary_destination = None
     current_secondary_destination = None
     current_secondary_value = ""
+    # Freight (freeform) loads ride along by their typed label — the plant
+    # chain above can't see them at all.
+    freight_primary = ""
+    freight_secondary = ""
 
     for log in sorted(logs, key=_driver_log_sort_key):
         arrival_destination = destination_from_load(log.load_size)
@@ -352,6 +428,8 @@ def current_load_after_logs(logs):
             current_primary_destination = arrival_destination
         elif is_empty_load(log.load_size) and current_primary_destination is None:
             current_primary_destination = None
+        if is_freight_load(log.load_size):
+            freight_primary = _freight_with_prior_destination(freight_primary, log.load_size)
 
         plant = _plant_code(log.plant_name)
         if not log.depart_time:
@@ -360,6 +438,8 @@ def current_load_after_logs(logs):
             if open_secondary_destination:
                 current_secondary_destination = open_secondary_destination
                 current_secondary_value = load_display(open_secondary_raw)
+            elif is_freight_load(open_secondary_raw):
+                freight_secondary = _freight_with_prior_destination(freight_secondary, open_secondary_raw)
             continue
 
         service_stop = is_service_stop(log)
@@ -375,6 +455,9 @@ def current_load_after_logs(logs):
                 current_primary_destination = None
             elif depart_destination:
                 current_primary_destination = depart_destination
+            # Departure is the freight truth: a freight label rides on, anything
+            # else (Empty or a plant load) means the freight load left the truck.
+            freight_primary = _freight_with_prior_destination(freight_primary, log.depart_load_size) if is_freight_load(log.depart_load_size) else ""
 
         depart_secondary_raw = getattr(log, "secondary_load", None)
         depart_secondary_destination = destination_from_load(depart_secondary_raw)
@@ -384,8 +467,23 @@ def current_load_after_logs(logs):
         elif current_secondary_destination and current_secondary_destination == plant and not service_stop and not secondary_not_dropped(log):
             current_secondary_destination = None
             current_secondary_value = ""
+        freight_secondary = _freight_with_prior_destination(freight_secondary, depart_secondary_raw) if is_freight_load(depart_secondary_raw) else ""
 
-    return _state(current_primary_destination, current_secondary_destination, current_secondary_value)
+    state = _state(current_primary_destination, current_secondary_destination, current_secondary_value)
+    if state["value"] == "Empty" and freight_primary:
+        state["value"] = freight_cargo_text(freight_primary)
+        inline_destination = freight_destination_text(freight_primary)
+        if inline_destination:
+            state["destination"] = inline_destination
+            state["destination_label"] = inline_destination
+    if not state["secondary_value"] and freight_secondary:
+        state["secondary_value"] = freight_cargo_text(freight_secondary)
+        inline_secondary = freight_destination_text(freight_secondary)
+        if inline_secondary:
+            state["secondary_destination"] = inline_secondary
+            state["secondary_destination_label"] = inline_secondary
+    state["cargo_display"] = cargo_display(state["value"], state["secondary_value"])
+    return state
 
 
 def build_driver_log_route_context(logs):
@@ -398,6 +496,10 @@ def build_driver_log_route_context(logs):
         current_primary_destination = None
         current_secondary_destination = None
         current_secondary_value = ""  # full display string, e.g. "PPL Load" or "PPL Hot Part"
+        # Freight (freeform) loads ride along by their typed label; the plant
+        # chain above reads them as Empty.
+        freight_primary = ""
+        freight_secondary = ""
 
         sorted_logs = sorted(group_logs, key=_driver_log_sort_key)
         for index, log in enumerate(sorted_logs):
@@ -412,9 +514,18 @@ def build_driver_log_route_context(logs):
                 current_primary_destination = arrival_destination
             elif is_empty_load(log.load_size) and current_primary_destination is None:
                 current_primary_destination = None
+            if is_freight_load(log.load_size):
+                freight_primary = _freight_with_prior_destination(freight_primary, log.load_size)
+            if not completed and is_freight_load(getattr(log, "secondary_load", None)):
+                # An open stop's secondary slot holds what it arrived with.
+                freight_secondary = _freight_with_prior_destination(freight_secondary, log.secondary_load)
+            arrive_freight_primary = freight_primary
+            arrive_freight_secondary = freight_secondary
 
             arrive_primary = destination_load_value(current_primary_destination) if current_primary_destination else "Empty"
-            arrive_secondary = current_secondary_value
+            if arrive_primary == "Empty" and arrive_freight_primary:
+                arrive_primary = freight_cargo_text(arrive_freight_primary)
+            arrive_secondary = current_secondary_value or freight_cargo_text(arrive_freight_secondary)
             arrived_at_primary_destination = bool(current_primary_destination and current_primary_destination == plant)
             arrived_at_secondary_destination = bool(current_secondary_destination and current_secondary_destination == plant)
             primary_unload_blocked = arrived_at_primary_destination and completed and not service_stop and unload_not_completed(log)
@@ -426,7 +537,9 @@ def build_driver_log_route_context(logs):
             after_secondary_destination = None if secondary_dropped_on_arrival else current_secondary_destination
             after_secondary_value = "" if secondary_dropped_on_arrival else current_secondary_value
             after_primary = destination_load_value(after_primary_destination) if after_primary_destination else "Empty"
-            after_secondary = after_secondary_value
+            if after_primary == "Empty" and arrive_freight_primary:
+                after_primary = freight_cargo_text(arrive_freight_primary)
+            after_secondary = after_secondary_value or freight_cargo_text(arrive_freight_secondary)
 
             depart_size = log.depart_load_size
             if depart_size is None:
@@ -458,7 +571,7 @@ def build_driver_log_route_context(logs):
                     depart_primary = destination_load_value(next_plant)
                     next_primary_destination = next_plant
                 else:
-                    depart_primary = load_display(depart_size)
+                    depart_primary = freight_cargo_text(load_display(depart_size))
                     next_primary_destination = after_primary_destination
 
                 secondary_load_raw = getattr(log, "secondary_load", None)
@@ -471,6 +584,14 @@ def build_driver_log_route_context(logs):
                     depart_secondary = after_secondary
                     next_secondary_destination = after_secondary_destination
                     next_secondary_value = after_secondary_value
+                    if arrive_freight_secondary or is_freight_load(secondary_load_raw):
+                        # Freight second loads: the closed stop's stored value is
+                        # the departure truth — None/Empty means dropped here.
+                        depart_secondary = freight_cargo_text(secondary_load_raw) if is_freight_load(secondary_load_raw) else ""
+
+                # Departure is the freight truth for what rides to the next stop.
+                freight_primary = _freight_with_prior_destination(freight_primary, depart_size) if is_freight_load(depart_size) else ""
+                freight_secondary = _freight_with_prior_destination(freight_secondary, secondary_load_raw) if is_freight_load(secondary_load_raw) else ""
 
                 depart_cargo = cargo_display(depart_primary, depart_secondary)
                 if service_stop:

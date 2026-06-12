@@ -12,7 +12,7 @@ from app.models import ActivityEvent, DamageReport, DriverLog, DriverLogPhoto, L
 from app.services.cargo_state import cargo_state_for_log
 from app.services.cargo_reconciliation_service import reconcile_cargo
 from app.services.driver_wait import wait_label_for_log
-from app.services.load_state import build_driver_log_route_context, current_load_after_logs, destination_from_load, is_empty_load, load_display, route_problem_reason, stop_role_details, truck_issue_reason
+from app.services.load_state import build_driver_log_route_context, current_load_after_logs, destination_from_load, freight_destination_text, is_empty_load, load_display, route_problem_reason, stop_role_details, truck_issue_reason
 from app.services.next_load_prediction import build_next_load_prediction
 from app.services.plant_addresses import plant_label
 from app.services.plant_time import route_stop_forecasts
@@ -298,6 +298,18 @@ def _current_cargo_with_freight(logs, current_cargo):
     cargo = dict(current_cargo or {})
     cargo_value = cargo.get("cargo_display") or cargo.get("value")
     if cargo.get("destination") or cargo.get("secondary_destination") or not is_empty_load(cargo_value):
+        # The chain knows the cargo; for freight labels surface the typed
+        # "-> destination" so prefills and banners keep working.
+        if not cargo.get("destination"):
+            inline_destination = freight_destination_text(cargo.get("value"))
+            if inline_destination:
+                cargo["destination"] = inline_destination
+                cargo["destination_label"] = inline_destination
+        if not cargo.get("secondary_destination"):
+            inline_secondary = freight_destination_text(cargo.get("secondary_value"))
+            if inline_secondary:
+                cargo["secondary_destination"] = inline_secondary
+                cargo["secondary_destination_label"] = inline_secondary
         return cargo
 
     for log in reversed(logs or []):
@@ -524,14 +536,31 @@ def build_route_cta_context(
     # Stop".
     current_cargo = getattr(route_context, "current_cargo", None)
     in_transit_destination = (
-        current_cargo.get("destination_label") if isinstance(current_cargo, dict) else None
+        (
+            current_cargo.get("destination_label")
+            or current_cargo.get("secondary_destination_label")
+        )
+        if isinstance(current_cargo, dict)
+        else None
     )
-    cargo_value = current_cargo.get("value") if isinstance(current_cargo, dict) else None
+    cargo_value = (
+        (
+            current_cargo.get("cargo_display")
+            or current_cargo.get("value")
+            or current_cargo.get("secondary_value")
+        )
+        if isinstance(current_cargo, dict)
+        else None
+    )
     cargo_onboard = bool(in_transit_destination) or bool(
         cargo_value and str(cargo_value).strip().lower() != "empty"
     )
-    arrival_cta_already_named = str(next_action or "").lower().startswith(("arrive", "record arrival"))
-    if primary and primary.get("action") == "add_stop" and cargo_onboard and not arrival_cta_already_named:
+    next_action_text = str(next_action or "").lower()
+    arrival_cta_already_named = next_action_text.startswith(("arrive", "record arrival"))
+    arrival_cta_is_generic = next_action_text.startswith("record arrival")
+    if primary and primary.get("action") == "add_stop" and cargo_onboard and (
+        not arrival_cta_already_named or (in_transit_destination and arrival_cta_is_generic)
+    ):
         if in_transit_destination:
             next_action = f"Arrive at {in_transit_destination}"
             primary = _route_cta(next_action, "add_stop")

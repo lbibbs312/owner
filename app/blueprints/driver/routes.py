@@ -71,7 +71,10 @@ from app.services.load_state import (
     current_load_after_logs,
     destination_from_load,
     destination_load_value,
+    freight_cargo_text,
+    freight_load_destined_here,
     is_empty_load,
+    is_freight_load,
     is_service_stop,
     is_load_for_plant,
     load_display,
@@ -467,8 +470,8 @@ def _current_driver_load(driver_id, route_date=None, *, route_context=None):
             label = (last.commodity or last.depart_load_size or "").strip()
             if last.weight:
                 label = f"{label} · {last.weight} lbs"
-            cargo["value"] = last.depart_load_size
-            cargo["cargo_display"] = label
+            cargo["value"] = freight_cargo_text(last.depart_load_size)
+            cargo["cargo_display"] = freight_cargo_text(label)
             if last.destination:
                 cargo["destination"] = last.destination
     return cargo
@@ -2997,8 +3000,11 @@ def gps_destination_lookup():
     query = (request.args.get("query") or "").strip()[:255]
     if len(query) < 4:
         return jsonify({"ok": False, "error": "short_query", "place": None, "places": []}), 400
+    bias_lat = _bounded_float_arg("lat", minimum=-90, maximum=90)
+    bias_lng = _bounded_float_arg("lng", minimum=-180, maximum=180)
+    near = (request.args.get("near") or "").strip()[:255]
     try:
-        payload = lookup_destination_place(query)
+        payload = lookup_destination_place(query, bias_lat=bias_lat, bias_lng=bias_lng, near=near)
     except Exception:
         current_app.logger.exception(
             "Google destination lookup failed for user_id=%s query_present=%s",
@@ -5351,25 +5357,47 @@ def depart_driver_log(log_id):
         day_driver_carrying = is_day_driver and (
             bool(log.commodity) or not is_empty_load(getattr(log, "load_size", None))
         )
+        freight_primary_aboard = is_day_driver and is_freight_load(getattr(log, "load_size", None))
+        freight_primary_destined_here = freight_primary_aboard and freight_load_destined_here(
+            log.load_size, log.plant_name, getattr(log, "location_address", None)
+        )
         if not service_stop and (route.get("arrived_at_primary_destination") or day_driver_carrying):
             primary_unloaded = form.unloaded_on_departure.data
             if primary_unloaded not in {"yes", "no"}:
                 return quick_depart_error("Please answer whether you got unloaded.")
             if primary_unloaded == "no":
                 primary_unload_reason = (form.unload_reason.data or "").strip()
-                if not primary_unload_reason:
+                # A reason is only demanded when refusing a drop AT the load's
+                # destination; "No" elsewhere just means it rides along.
+                needs_reason = route.get("arrived_at_primary_destination") or freight_primary_destined_here
+                if not primary_unload_reason and needs_reason:
                     return quick_depart_error("Please enter why the load was not unloaded.")
 
         secondary_dropped = None
         secondary_drop_reason = None
-        if not service_stop and route.get("arrived_at_secondary_destination"):
+        freight_secondary_aboard = is_day_driver and not service_stop and is_freight_load(getattr(log, "secondary_load", None))
+        if not service_stop and (route.get("arrived_at_secondary_destination") or freight_secondary_aboard):
             secondary_dropped = form.secondary_dropped_on_departure.data
             if secondary_dropped not in {"yes", "no"}:
+                if freight_secondary_aboard:
+                    return quick_depart_error("Please answer whether you dropped off the second load.")
                 return quick_depart_error("Please answer whether you dropped off the second-stop cargo.")
             if secondary_dropped == "no":
                 secondary_drop_reason = (form.secondary_unload_reason.data or "").strip()
-                if not secondary_drop_reason:
-                    return quick_depart_error("Please enter why the second-stop cargo was not dropped off.")
+                needs_reason = route.get("arrived_at_secondary_destination") or (
+                    freight_secondary_aboard
+                    and freight_load_destined_here(log.secondary_load, log.plant_name, getattr(log, "location_address", None))
+                )
+                if not secondary_drop_reason and needs_reason:
+                    return quick_depart_error("Please enter why the second load was not dropped off.")
+
+        new_pickup_keeps_old = (
+            is_day_driver
+            and not service_stop
+            and form.got_loaded.data == "yes"
+            and primary_unloaded == "no"
+            and freight_primary_aboard
+        )
 
         after_unload_primary = route.get("after_arrival_primary") or "Empty"
         if primary_unloaded == "yes":
@@ -5387,11 +5415,15 @@ def depart_driver_log(log_id):
             elif is_day_driver:
                 # Freight: the truck carries a commodity, not a plant load. The
                 # free-text destination is stored on the log at save time below.
-                if not primary_commodity and not primary_destination_label:
+                # When the old load stays aboard, the new label comes from what
+                # was typed for the new pickup — never the kept load's details.
+                commodity_for_label = posted_primary_commodity if new_pickup_keeps_old else primary_commodity
+                weight_for_label = posted_primary_weight if new_pickup_keeps_old else primary_weight
+                if not commodity_for_label and not primary_destination_label:
                     return quick_depart_error("Enter the load or destination before departing loaded.")
                 departure_load = _freight_departure_label(
-                    primary_commodity,
-                    primary_weight,
+                    commodity_for_label,
+                    weight_for_label,
                     primary_destination_label,
                 )
             else:
@@ -5408,12 +5440,21 @@ def depart_driver_log(log_id):
             if form.secondary_destination.data:
                 secondary_load = secondary_load_value(form.secondary_destination.data, form.secondary_load_type.data)
             if is_day_driver and (secondary_commodity or secondary_weight or secondary_destination_label):
+                if secondary_load and secondary_dropped != "yes" and freight_secondary_aboard:
+                    return quick_depart_error("Two loads max - drop the second load here before adding another.")
                 secondary_load = _freight_departure_label(
                     secondary_commodity,
                     secondary_weight,
                     secondary_destination_label,
                     fallback="Second load",
                 )
+
+        if new_pickup_keeps_old:
+            # Keeping the old load while picking up a new one: the kept load
+            # moves to the second slot; the truck tracks two loads max.
+            if secondary_load:
+                return quick_depart_error("Two loads max - record a drop here before picking up another load.")
+            secondary_load = (log.load_size or "").strip()
 
         unresolved_scan = (
             PartScanEvent.query

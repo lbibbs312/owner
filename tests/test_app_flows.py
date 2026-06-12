@@ -10528,6 +10528,12 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     assert "Customer name matches" in body
     assert "Exact-address matches can fill the name" in body
     assert "/gps/place-candidates" in body
+    assert "/gps/destination-lookup" in body
+    assert "data-gps-destination-url" in body
+    assert "\\u23f2 Recent" in body
+    assert "Google address" in body
+    assert "Google search" in body
+    assert "requestCustomerLookup" in body
     assert "nominatim.openstreetmap.org" not in body
     assert "Google Places key is missing on the server. Saved places only." in body
     assert "Google Places is blocked for this server key. Saved places only." in body
@@ -10635,8 +10641,9 @@ def test_day_driver_destination_lookup_endpoint_returns_business_name(client, ap
         user.route_type = "general_freight"
         db.session.commit()
 
-    def fake_lookup(query):
+    def fake_lookup(query, **kwargs):
         assert query == "1100 Receiver Ave Industrial City"
+        assert kwargs == {"bias_lat": None, "bias_lng": None, "near": ""}
         return {
             "ok": True,
             "place": {
@@ -10668,6 +10675,55 @@ def test_day_driver_destination_lookup_endpoint_returns_business_name(client, ap
     assert payload["place"]["address"] == "1100 Receiver Ave, Industrial City, MI 49512"
     assert [place["name"] for place in payload["places"]] == ["Receiver Warehouse", "Receiver Annex"]
     assert payload["places"][1]["address"] == "1110 Receiver Ave, Industrial City, MI 49512"
+
+
+def test_day_driver_destination_lookup_endpoint_passes_local_bias(client, app, monkeypatch):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import User
+
+        create_user("dd_dest_bias", "dd-dest-bias@example.com", "driver")
+        user = User.query.filter_by(username="dd_dest_bias").one()
+        user.day_driver = True
+        user.route_type = "general_freight"
+        db.session.commit()
+
+    def fake_lookup(query, **kwargs):
+        assert query == "4365 52nd St SE"
+        assert kwargs == {
+            "bias_lat": 42.8706,
+            "bias_lng": -85.5359,
+            "near": "4365 52nd St SE, Grand Rapids, MI 49512",
+        }
+        return {
+            "ok": True,
+            "place": {
+                "name": "",
+                "address": "4365 52nd St SE, Grand Rapids, MI 49512",
+                "source": "google",
+            },
+            "places": [
+                {
+                    "name": "",
+                    "address": "4365 52nd St SE, Grand Rapids, MI 49512",
+                    "source": "google",
+                }
+            ],
+        }
+
+    monkeypatch.setattr("app.blueprints.driver.routes.lookup_destination_place", fake_lookup)
+    login(client, "dd_dest_bias")
+    response = client.get(
+        "/gps/destination-lookup"
+        "?query=4365+52nd+St+SE"
+        "&lat=42.8706"
+        "&lng=-85.5359"
+        "&near=4365+52nd+St+SE,+Grand+Rapids,+MI+49512"
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["ok"] is True
+    assert payload["place"]["address"] == "4365 52nd St SE, Grand Rapids, MI 49512"
 
 
 def test_freight_departure_label_drops_zero_weight():
@@ -10776,6 +10832,87 @@ def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(cli
     assert 'value="1100 Receiver Ave, Industrial City, MI 49512"' in add_stop_body
     assert 'name="load_size" value="Auto parts (42000 lbs)"' in add_stop_body
     assert 'name="secondary_load" value="Pallets (12000 lbs)"' in add_stop_body
+
+
+def test_day_driver_primary_drop_keeps_second_freight_load_for_next_stop(client, app):
+    from datetime import date
+
+    today = date.today()
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog, User
+
+        driver = create_user("dd_keep_second", "dd-keep-second@example.com", "driver")
+        user = User.query.filter_by(username="dd_keep_second").one()
+        user.day_driver = True
+        user.route_type = "general_freight"
+        previous = DriverLog(
+            driver_id=driver.id,
+            date=today,
+            plant_name="Shipper Dock",
+            load_size="Empty",
+            depart_load_size="Auto parts (42000 lbs) -> Primary Receiver",
+            secondary_load="Pallets (12000 lbs) -> Secondary Receiver",
+            destination="Primary Receiver",
+            destination_address="1100 Receiver Ave, Industrial City, MI 49512",
+            arrive_time="00:01",
+            depart_time="00:10",
+        )
+        active = DriverLog(
+            driver_id=driver.id,
+            date=today,
+            plant_name="Primary Receiver",
+            load_size="Auto parts (42000 lbs)",
+            secondary_load="Pallets (12000 lbs)",
+            location_address="1100 Receiver Ave, Industrial City, MI 49512",
+            arrive_time="00:35",
+        )
+        db.session.add_all([previous, active])
+        db.session.commit()
+        active_id = active.id
+        driver_id = driver.id
+
+    login(client, "dd_keep_second")
+    depart_screen = client.get("/mobile").get_data(as_text=True)
+    assert "Primary load: Auto parts (42000 lbs)" in depart_screen
+    assert "Dropped second load here?" in depart_screen
+    assert "Second load: Pallets (12000 lbs)" in depart_screen
+    assert 'name="secondary_dropped_on_departure" value="yes" required' in depart_screen
+
+    departed = client.post(
+        f"/driver_logs/{active_id}/depart",
+        data={
+            "next": "mobile",
+            "source": "live_flow",
+            "unloaded_on_departure": "yes",
+            "secondary_dropped_on_departure": "no",
+            "secondary_unload_reason": "",
+            "got_loaded": "no",
+            "destination": "",
+            "secondary_destination": "",
+            "secondary_load_type": "load",
+        },
+        headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+    )
+
+    assert departed.status_code == 200
+    assert departed.get_json()["ok"] is True
+    with app.app_context():
+        from app.models import DriverLog
+        from app.services.route_context import build_route_context
+
+        saved = DriverLog.query.get(active_id)
+        assert saved.depart_time
+        assert saved.depart_load_size == "Empty"
+        assert saved.secondary_load == "Pallets (12000 lbs)"
+        snapshot = build_route_context(driver_id=driver_id, route_date=today)
+        assert snapshot.route_status == "active"
+        assert snapshot.current_cargo["cargo_display"] == "Pallets (12000 lbs)"
+        assert snapshot.current_cargo["secondary_destination_label"] == "Secondary Receiver"
+        assert snapshot.next_stop_context["secondary_destination"] == "Secondary Receiver"
+
+    mobile = client.get("/mobile").get_data(as_text=True)
+    assert "Arrive at Secondary Receiver" in mobile
 
 
 def test_day_driver_local_route_shows_short_haul_check(client, app):

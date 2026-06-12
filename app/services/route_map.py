@@ -1349,6 +1349,8 @@ def _build_stops(route_context, *, role="driver", move_requests=None, route_pret
             "location_display": display_label,
             "location_parts": display_parts,
             "location_address": address,
+            "gps_latitude": getattr(log, "gps_latitude", None),
+            "gps_longitude": getattr(log, "gps_longitude", None),
             "short_code": _short_code(log.plant_name or label),
             "board_code": _board_stop_code(log, sequence),
             "board_detail": board_detail,

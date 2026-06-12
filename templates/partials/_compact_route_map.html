@@ -381,18 +381,24 @@
           {% set requires_drop_check = requires_unload_check or requires_secondary_drop_check %}
           {% set start_depart_step = 0 if is_service_depart or requires_drop_check else 1 %}
           {% if current_user.is_day_driver %}
-          {# Freight depart: one window. Follow-ups appear only when an answer needs them. #}
-          {% set stop_label = primary_stop.plant_label if primary_stop.plant_label is defined and primary_stop.plant_label else (primary_stop.plant if primary_stop.plant is defined and primary_stop.plant else (primary_stop.plant_name if primary_stop.plant_name is defined and primary_stop.plant_name else (primary_stop.location_display if primary_stop.location_display is defined and primary_stop.location_display else (primary_stop.board_code or 'this stop')))) %}
-          {% set arrived_cargo = primary_stop.arrived_with if primary_stop.arrived_with is defined else '' %}
-          {% set freight_needs_unload = requires_unload_check or (arrived_cargo and arrived_cargo not in ['Empty', '--', '']) %}
-          <form class="depart-wizard freight-depart" method="POST" action="{{ depart_url }}" data-destination-lookup-url="{{ url_for('driver.gps_destination_lookup') }}">
-            {% if depart_form is defined and depart_form %}{{ depart_form.hidden_tag() }}{% endif %}
-            <input type="hidden" name="next" value="mobile">
-            <input type="hidden" name="source" value="live_flow">
-            <input type="hidden" name="secondary_dropped_on_departure" value="yes">
-            <input type="hidden" name="secondary_unload_reason" value="">
-            <input type="hidden" name="secondary_destination" value="">
-            <input type="hidden" name="secondary_load_type" value="load">
+	          {# Freight depart: one window. Follow-ups appear only when an answer needs them. #}
+	          {% set stop_label = primary_stop.plant_label if primary_stop.plant_label is defined and primary_stop.plant_label else (primary_stop.plant if primary_stop.plant is defined and primary_stop.plant else (primary_stop.plant_name if primary_stop.plant_name is defined and primary_stop.plant_name else (primary_stop.location_display if primary_stop.location_display is defined and primary_stop.location_display else (primary_stop.board_code or 'this stop')))) %}
+	          {% set arrived_cargo = primary_stop.arrived_with if primary_stop.arrived_with is defined else '' %}
+	          {% set active_route_row = route_context.log_routes.get(primary_stop.stop_id) if route_context and route_context.log_routes is defined and primary_stop else {} %}
+	          {% set arrived_primary_load = active_route_row.get('arrive_desc') if active_route_row else '' %}
+	          {% set arrived_secondary_load = active_route_row.get('arrive_secondary_desc') if active_route_row else '' %}
+	          {% set freight_needs_unload = requires_unload_check or (arrived_primary_load and arrived_primary_load not in ['Empty', '--', '']) or (arrived_cargo and arrived_cargo not in ['Empty', '--', '']) %}
+	          {% set freight_needs_secondary_drop = requires_secondary_drop_check or (arrived_secondary_load and arrived_secondary_load not in ['Empty', '--', '']) %}
+	          <form class="depart-wizard freight-depart" method="POST" action="{{ depart_url }}"
+                  data-destination-lookup-url="{{ url_for('driver.gps_destination_lookup') }}"
+                  data-destination-bias-lat="{{ primary_stop.gps_latitude if primary_stop.gps_latitude is defined and primary_stop.gps_latitude is not none else '' }}"
+                  data-destination-bias-lng="{{ primary_stop.gps_longitude if primary_stop.gps_longitude is defined and primary_stop.gps_longitude is not none else '' }}"
+                  data-destination-near="{{ primary_stop.location_address if primary_stop.location_address is defined else '' }}">
+	            {% if depart_form is defined and depart_form %}{{ depart_form.hidden_tag() }}{% endif %}
+	            <input type="hidden" name="next" value="mobile">
+	            <input type="hidden" name="source" value="live_flow">
+	            <input type="hidden" name="secondary_destination" value="">
+	            <input type="hidden" name="secondary_load_type" value="load">
             <section class="depart-step is-active">
               <span class="depart-step-kicker">{{ depart_code }} &middot; record departure</span>
               <h4>Departing {{ stop_label }}</h4>
@@ -403,20 +409,45 @@
                 <div class="freight-toggle">
                   <input type="radio" id="frUnloadYes" name="unloaded_on_departure" value="yes" required>
                   <label for="frUnloadYes">Yes</label>
-                  <input type="radio" id="frUnloadNo" name="unloaded_on_departure" value="no">
-                  <label for="frUnloadNo">No</label>
-                </div>
-                <div class="freight-followup" data-freight-unload-reason hidden>
-                  <label for="frUnloadWhy">Why not?</label>
-                  <input id="frUnloadWhy" type="text" name="unload_reason" placeholder="Short reason">
-                </div>
-              </div>
+	                  <input type="radio" id="frUnloadNo" name="unloaded_on_departure" value="no">
+	                  <label for="frUnloadNo">No</label>
+	                </div>
+	                {% if arrived_primary_load and arrived_primary_load not in ['Empty', '--'] %}
+	                <span class="freight-sublabel">Primary load: {{ arrived_primary_load|replace(' -> ', ' for ') }}</span>
+	                {% endif %}
+	                <div class="freight-followup" data-freight-unload-reason hidden>
+	                  <label for="frUnloadWhy">Why not?</label>
+	                  <input id="frUnloadWhy" type="text" name="unload_reason" placeholder="Short reason">
+	                </div>
+	              </div>
               {% else %}
               <input type="hidden" name="unloaded_on_departure" value="yes">
-              <input type="hidden" name="unload_reason" value="">
-              {% endif %}
+	              <input type="hidden" name="unload_reason" value="">
+	              {% endif %}
 
-              <div class="freight-q">
+	              {% if freight_needs_secondary_drop %}
+	              <div class="freight-q">
+	                <span class="freight-label">Dropped second load here?</span>
+	                {% if arrived_secondary_load and arrived_secondary_load not in ['Empty', '--'] %}
+	                <span class="freight-sublabel">Second load: {{ arrived_secondary_load|replace(' -> ', ' for ') }}</span>
+	                {% endif %}
+	                <div class="freight-toggle">
+	                  <input type="radio" id="frSecondDropYes" name="secondary_dropped_on_departure" value="yes" required>
+	                  <label for="frSecondDropYes">Yes</label>
+	                  <input type="radio" id="frSecondDropNo" name="secondary_dropped_on_departure" value="no">
+	                  <label for="frSecondDropNo">No</label>
+	                </div>
+	                <div class="freight-followup" data-freight-secondary-reason hidden>
+	                  <label for="frSecondDropWhy">Why not?</label>
+	                  <input id="frSecondDropWhy" type="text" name="secondary_unload_reason" placeholder="Optional unless this was the destination">
+	                </div>
+	              </div>
+	              {% else %}
+	              <input type="hidden" name="secondary_dropped_on_departure" value="yes">
+	              <input type="hidden" name="secondary_unload_reason" value="">
+	              {% endif %}
+
+	              <div class="freight-q">
                 {# "Leaving loaded?" reads wrong when the truck arrived loaded — the
                    backend question (got_loaded) is "did you pick up here?". #}
                 {% if freight_needs_unload %}
@@ -547,6 +578,9 @@
               var otherInput = form.querySelector('#frCommodity');
               var weight = form.querySelector('#frWeight');
               var destinationLookupUrl = form.getAttribute('data-destination-lookup-url') || '';
+              var destinationBiasLat = form.getAttribute('data-destination-bias-lat') || '';
+              var destinationBiasLng = form.getAttribute('data-destination-bias-lng') || '';
+              var destinationNear = form.getAttribute('data-destination-near') || '';
               // Memory prefill: most drivers haul what they hauled last time —
               // arrive prefilled so the dropdown is only for changing it.
               if (choice && recents.length && !otherInput.value.trim()) {
@@ -679,6 +713,11 @@
                   }
                   pendingTimer = window.setTimeout(function () {
                     var params = new URLSearchParams({ query: query });
+                    if (destinationBiasLat && destinationBiasLng) {
+                      params.set('lat', destinationBiasLat);
+                      params.set('lng', destinationBiasLng);
+                    }
+                    if (destinationNear) params.set('near', destinationNear);
                     fetch(destinationLookupUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
                       .then(function (r) { return r.ok ? r.json() : null; })
                       .then(function (data) {
@@ -734,10 +773,13 @@
                 var loaded = form.querySelector('input[name="got_loaded"]:checked');
                 var details = form.querySelector('[data-freight-load-details]');
                 if (details) details.hidden = !(loaded && loaded.value === 'yes');
-                var unloaded = form.querySelector('input[name="unloaded_on_departure"]:checked');
-                var reason = form.querySelector('[data-freight-unload-reason]');
-                if (reason) reason.hidden = !(unloaded && unloaded.value === 'no');
-              }
+	                var unloaded = form.querySelector('input[name="unloaded_on_departure"]:checked');
+	                var reason = form.querySelector('[data-freight-unload-reason]');
+	                if (reason) reason.hidden = !(unloaded && unloaded.value === 'no');
+	                var secondaryDropped = form.querySelector('input[name="secondary_dropped_on_departure"]:checked');
+	                var secondaryReason = form.querySelector('[data-freight-secondary-reason]');
+	                if (secondaryReason) secondaryReason.hidden = !(secondaryDropped && secondaryDropped.value === 'no');
+	              }
               form.addEventListener('change', sync);
               sync();
             })();
