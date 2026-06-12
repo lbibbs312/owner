@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+import mimetypes
 import os
+import re
 from uuid import uuid4
 
 import pytz
@@ -33,8 +35,17 @@ def _parse_date(value):
 
 
 def _float_or_none(value):
+    if value in (None, ""):
+        return None
+    if isinstance(value, str):
+        # Drivers type things like "$163.80", "63.5 gal", or "1,234" — keep
+        # the number instead of silently storing NULL.
+        match = re.search(r"-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?", value)
+        if not match:
+            return None
+        value = match.group(0).replace(",", "")
     try:
-        return float(value) if value not in (None, "") else None
+        return float(value)
     except (TypeError, ValueError):
         return None
 
@@ -55,13 +66,16 @@ def _ifta_upload_path():
 
 def save_ifta_receipt(uploaded_file, worksheet_id):
     if not uploaded_file or not getattr(uploaded_file, "filename", ""):
-        return None, None
+        return None, None, None, None
     original = secure_filename(uploaded_file.filename) or "fuel-receipt"
     _, ext = os.path.splitext(original)
     filename = f"ifta-receipt-{worksheet_id}-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}-{uuid4().hex}{ext or '.bin'}"
     stored_path = os.path.join(_ifta_upload_path(), filename)
     uploaded_file.save(stored_path)
-    return filename, sha256_file(stored_path)
+    with open(stored_path, "rb") as stored:
+        data = stored.read()
+    mimetype = getattr(uploaded_file, "mimetype", None) or mimetypes.guess_type(filename)[0]
+    return filename, sha256_file(stored_path), data, mimetype
 
 
 def ifta_receipt_path(filename):
@@ -69,6 +83,16 @@ def ifta_receipt_path(filename):
         return None
     path = os.path.join(_ifta_upload_path(), filename)
     return path if os.path.isfile(path) else None
+
+
+def ifta_receipt_available(fuel):
+    # The upload folder is wiped on redeploy unless it sits on the persistent
+    # disk — the database copy is the durable source.
+    if fuel is None:
+        return False
+    if getattr(fuel, "receipt_data", None):
+        return True
+    return bool(ifta_receipt_path(fuel.receipt_photo))
 
 
 def create_ifta_worksheet_from_form(form, files, *, user, report_context=None):
@@ -115,7 +139,7 @@ def create_ifta_worksheet_from_form(form, files, *, user, report_context=None):
     )
     if any(getattr(trip, field) is not None for field in ("trip_start_date", "origin_city", "destination_city", "total_trip_distance", "jurisdiction")):
         db.session.add(trip)
-    receipt_filename, receipt_hash = save_ifta_receipt(files.get("receipt_photo"), worksheet.id)
+    receipt_filename, receipt_hash, receipt_data, receipt_mimetype = save_ifta_receipt(files.get("receipt_photo"), worksheet.id)
     fuel_driver_supplied = bool(
         receipt_filename
         or _clean(form.get("purchase_date"))
@@ -143,6 +167,8 @@ def create_ifta_worksheet_from_form(form, files, *, user, report_context=None):
         purchaser_name=_clean(form.get("purchaser_name")) or context.get("purchaser_name"),
         receipt_photo=receipt_filename,
         receipt_hash=receipt_hash,
+        receipt_data=receipt_data,
+        receipt_mimetype=receipt_mimetype,
         tax_paid=_clean(form.get("tax_paid")),
         bulk_fuel=str(form.get("bulk_fuel") or "").lower() in {"1", "yes", "true", "on"},
     )
@@ -182,7 +208,7 @@ def worksheet_summaries(worksheet):
         fuel_by_jurisdiction[jurisdiction] = fuel_by_jurisdiction.get(jurisdiction, 0) + gallons
         fuel_by_type[fuel_type] = fuel_by_type.get(fuel_type, 0) + gallons
         total_fuel += gallons
-        if not row.receipt_photo or not ifta_receipt_path(row.receipt_photo):
+        if not ifta_receipt_available(row):
             missing_receipt_rows.append(row)
 
     return {
@@ -225,14 +251,18 @@ def ifta_packet_status(worksheet):
 def ifta_fuel_rows(worksheet):
     rows = []
     for index, fuel in enumerate(worksheet.fuel_records, 1):
-        receipt_available = bool(ifta_receipt_path(fuel.receipt_photo))
+        receipt_available = ifta_receipt_available(fuel)
         receipt_ext = os.path.splitext(fuel.receipt_photo or "")[1].lower()
+        receipt_is_image = receipt_available and (
+            receipt_ext in IMAGE_RECEIPT_EXTENSIONS
+            or (getattr(fuel, "receipt_mimetype", None) or "").startswith("image/")
+        )
         rows.append(
             {
                 "number": index,
                 "fuel": fuel,
                 "receipt_available": receipt_available,
-                "receipt_is_image": receipt_available and receipt_ext in IMAGE_RECEIPT_EXTENSIONS,
+                "receipt_is_image": receipt_is_image,
                 "receipt_status": "Available" if receipt_available else "Photo not available in upload storage",
                 "receipt_hash": fuel.receipt_hash or "Not recorded",
                 "receipt_photo": fuel.receipt_photo or "Not recorded",

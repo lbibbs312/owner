@@ -46,12 +46,13 @@
 <main class="fuel-form responsive-workspace">
   <h1>Fuel Records</h1>
   <p class="lead">Save fuel, receipt, odometer, and route notes. MoveDefense can use these records for an IFTA support worksheet later.</p>
-  {% set recent_fuel_records = recent_fuel_records|default([]) %}
-  {% if recent_fuel_records %}
+  {% set recent_fuel_rows = recent_fuel_rows|default([]) %}
+  {% if recent_fuel_rows %}
     <section class="fuel-section" aria-label="Recent fuel records">
       <h2>Recent records</h2>
       <div class="fuel-record-list">
-        {% for record in recent_fuel_records %}
+        {% for row in recent_fuel_rows %}
+          {% set record = row.record %}
           <div class="fuel-record-row">
             <div>
               <strong>{{ record.seller_name or 'Fuel stop' }}</strong>
@@ -64,8 +65,10 @@
                 {% if record.fuel_type %} &middot; {{ record.fuel_type }}{% endif %}
               </span>
             </div>
-            {% if record.receipt_photo %}
+            {% if row.receipt_available %}
               <a href="{{ url_for('driver.ifta_receipt', fuel_id=record.id) }}">Receipt</a>
+            {% elif record.receipt_photo %}
+              <span>Receipt unavailable</span>
             {% else %}
               <span>No receipt</span>
             {% endif %}

@@ -171,6 +171,10 @@ class BaseConfig:
         "HOT_PART_UPLOAD_FOLDER",
         "uploads/hot_part_photos",
     )
+    IFTA_UPLOAD_FOLDER = _env_upload_folder(
+        "IFTA_UPLOAD_FOLDER",
+        "uploads/ifta_receipts",
+    )
 
 
 class DevConfig(BaseConfig):

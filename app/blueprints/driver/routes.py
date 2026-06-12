@@ -7,12 +7,14 @@ PRs of PR-5c.
 """
 from datetime import datetime, date, timedelta
 from functools import wraps
+import io
+import mimetypes
 import os
 import re
 from uuid import uuid4
 
 import pytz
-from flask import abort, current_app, flash, jsonify, make_response, redirect, render_template, request, send_from_directory, session, url_for
+from flask import abort, current_app, flash, jsonify, make_response, redirect, render_template, request, send_file, send_from_directory, session, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import and_, func, or_
 from werkzeug.datastructures import CombinedMultiDict, MultiDict
@@ -41,7 +43,7 @@ from app.services.accident_packets import (
 )
 from app.services.evidence_packet import build_damage_evidence_packet
 from app.services.file_integrity import sha256_file
-from app.services.ifta_worksheets import build_ifta_packet, create_ifta_worksheet_from_form, ifta_receipt_path
+from app.services.ifta_worksheets import build_ifta_packet, create_ifta_worksheet_from_form, ifta_receipt_available, ifta_receipt_path
 from app.services.packet_classification import PacketClassification, classify_damage_report, packet_label_for_report
 from app.services.report_context import build_report_context
 from app.services.autolog import remember_place
@@ -2076,6 +2078,10 @@ def _driver_route_audit_summary(driver_id, route_date, logs, route_map_ctx=None,
         )
     total_miles = _total_miles_for_pretrips(pretrips)
     mileage_performance = _driver_mileage_performance(driver_id, route_date, total_miles)
+    # Fuel bought through the Fuel page lives on IFTA records, not DriverLog
+    # fuel flags — the route fuel card must count both or it claims "No fuel
+    # stop" on days the driver did buy fuel.
+    fuel_purchase_records = _same_day_ifta_fuel_records(driver_id, route_date)
     return {
         "pretrip_count": len(pretrips),
         "route_pretrip": last_pretrip,
@@ -2090,6 +2096,8 @@ def _driver_route_audit_summary(driver_id, route_date, logs, route_map_ctx=None,
         "start_fuel_source": start_fuel_source,
         "end_fuel_level": (getattr(last_posttrip, "end_fuel_level", None) or "").strip() if last_posttrip else "",
         "fuel_events": fuel_events,
+        "fuel_purchase_count": len(fuel_purchase_records),
+        "fuel_purchase_labels": [_fuel_record_label(record) for record in fuel_purchase_records],
     }
 
 
@@ -2382,11 +2390,17 @@ def _same_day_ifta_fuel_records(driver_id, route_date):
 
 
 def _fuel_record_label(record):
-    amount = f"{record.gallons_or_liters:g} gal" if record.gallons_or_liters is not None else "amount not recorded"
+    # Only captured facts — never "amount not recorded" filler.
     seller = _sheet_clean(record.seller_name) or "Fuel stop"
+    parts = []
+    if record.gallons_or_liters is not None:
+        parts.append(f"{record.gallons_or_liters:g} gal")
+    if record.total_sale_amount is not None:
+        parts.append(f"${record.total_sale_amount:,.2f}")
     fuel_type = _sheet_clean(record.fuel_type)
-    suffix = f" {fuel_type}" if fuel_type else ""
-    return f"{seller}: {amount}{suffix}"
+    if fuel_type:
+        parts.append(fuel_type)
+    return f"{seller}: {' '.join(parts)}" if parts else seller
 
 
 def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, route_context, route_sheet_data, route_task_events, shift_record, *, now=None):
@@ -5385,7 +5399,7 @@ def depart_driver_log(log_id):
         elif form.got_loaded.data == "no":
             departure_load = after_unload_primary
         else:
-            return quick_depart_error("Please answer whether you got loaded.")
+            return quick_depart_error("Please answer whether you picked up a load here.")
 
         secondary_load = route.get("after_arrival_secondary") or None
         if not service_stop:
@@ -6475,6 +6489,10 @@ def new_ifta_worksheet():
         .limit(6)
         .all()
     )
+    recent_fuel_rows = [
+        {"record": record, "receipt_available": ifta_receipt_available(record)}
+        for record in recent_fuel_records
+    ]
     if request.method == "POST":
         worksheet = create_ifta_worksheet_from_form(
             request.form,
@@ -6500,7 +6518,7 @@ def new_ifta_worksheet():
         worksheet=None,
         manager_view=False,
         report_context=report_context,
-        recent_fuel_records=recent_fuel_records,
+        recent_fuel_rows=recent_fuel_rows,
     )
 
 
@@ -6536,9 +6554,20 @@ def ifta_receipt(fuel_id):
     if not _driver_can_view_ifta(fuel.worksheet):
         abort(403)
     path = ifta_receipt_path(fuel.receipt_photo)
-    if not path:
-        abort(404)
-    return send_from_directory(os.path.dirname(path), os.path.basename(path))
+    if path:
+        return send_from_directory(os.path.dirname(path), os.path.basename(path))
+    if fuel.receipt_data:
+        mimetype = (
+            fuel.receipt_mimetype
+            or mimetypes.guess_type(fuel.receipt_photo or "")[0]
+            or "application/octet-stream"
+        )
+        return send_file(
+            io.BytesIO(fuel.receipt_data),
+            mimetype=mimetype,
+            download_name=fuel.receipt_photo or f"fuel-receipt-{fuel.id}",
+        )
+    abort(404)
 
 
 @bp.route("/damage_reports/<int:report_id>/edit", methods=["GET", "POST"])

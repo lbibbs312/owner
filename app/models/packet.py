@@ -269,6 +269,10 @@ class IftaFuelRecord(db.Model):
     purchaser_name = db.Column(db.String(160), nullable=True)
     receipt_photo = db.Column(db.String(255), nullable=True)
     receipt_hash = db.Column(db.String(64), nullable=True)
+    # Durable copy of the receipt — upload folders outside the persistent disk
+    # are wiped on every Render deploy.
+    receipt_data = db.Column(db.LargeBinary, nullable=True)
+    receipt_mimetype = db.Column(db.String(100), nullable=True)
     tax_paid = db.Column(db.String(20), nullable=True)
     bulk_fuel = db.Column(db.Boolean, nullable=False, default=False)
 

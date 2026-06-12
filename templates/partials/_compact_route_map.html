@@ -417,7 +417,16 @@
               {% endif %}
 
               <div class="freight-q">
-                <span class="freight-label">Leaving loaded?</span>
+                {# "Leaving loaded?" reads wrong when the truck arrived loaded — the
+                   backend question (got_loaded) is "did you pick up here?". #}
+                {% if freight_needs_unload %}
+                <span class="freight-label">Pick up new load here?</span>
+                {% if arrived_cargo and arrived_cargo not in ['Empty', '--'] %}
+                <span class="freight-sublabel">You arrived hauling {{ arrived_cargo|replace(' -> ', ' for ') }} &mdash; answer Yes only if this stop added more.</span>
+                {% endif %}
+                {% else %}
+                <span class="freight-label">Picking up a load here?</span>
+                {% endif %}
                 <div class="freight-toggle">
                   <input type="radio" id="frLoadYes" name="got_loaded" value="yes" required>
                   <label for="frLoadYes">Yes</label>
@@ -504,6 +513,7 @@
           <style>
             .freight-depart .freight-q { display:grid; gap:8px; margin:12px 0; }
             .freight-depart .freight-label { color:#8fa3bf; font-size:.68rem; font-weight:950; letter-spacing:.07em; text-transform:uppercase; }
+            .freight-depart .freight-sublabel { color:#64748b; font-size:.74rem; font-weight:650; line-height:1.4; margin-top:-4px; overflow-wrap:anywhere; }
             .freight-depart .freight-toggle { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
             .freight-depart .freight-toggle input[type="radio"] { position:absolute; opacity:0; pointer-events:none; }
             .freight-depart .freight-toggle label { display:flex; align-items:center; justify-content:center; min-height:52px; border:1px solid rgba(91,157,255,.3); border-radius:9px; background:rgba(10,17,28,.95); color:#dbe7ff; font-weight:950; cursor:pointer; }

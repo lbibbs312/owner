@@ -23,7 +23,11 @@
   .md-gps-fill[disabled]{opacity:.55;cursor:wait;}
   .md-gps-panel{margin-top:6px;font-size:.78rem;font-weight:600;color:#8fa3bf;line-height:1.4;}
   .md-gps-panel label{display:block;margin-top:6px;color:#b8c7dd;font-size:.72rem;font-weight:900;text-transform:uppercase;}
-  .md-gps-panel select{width:100%;margin-top:6px;background:rgba(10,17,28,.92);color:#dbe7ff;border:1px solid rgba(91,157,255,.3);border-radius:8px;padding:8px;font-size:.85rem;}
+  .md-gps-options{display:grid;gap:6px;margin-top:6px;}
+  .md-gps-option{display:block;width:100%;text-align:left;padding:9px 11px;border:1px solid rgba(91,157,255,.3);border-radius:8px;background:rgba(10,17,28,.7);color:#dbe7ff;font:inherit;font-size:.84rem;font-weight:700;line-height:1.35;cursor:pointer;overflow-wrap:anywhere;}
+  .md-gps-option small{display:block;margin-top:2px;color:#8fa3bf;font-size:.72rem;font-weight:600;}
+  .md-gps-option[aria-pressed="true"]{border-color:rgba(91,157,255,.7);background:rgba(91,157,255,.16);box-shadow:0 0 10px rgba(91,157,255,.25);color:#fff;}
+  .md-gps-option:active{transform:translateY(1px);}
 </style>
 <script>
 (function () {
@@ -110,62 +114,72 @@
     line.textContent = message || '';
   }
 
-  function renderAddressChoices(panel, btn, candidates) {
-    var old = panel.querySelector('.md-gps-address-choice');
+  // Every candidate is a visible tappable row — a collapsed <select> hides
+  // the alternatives and drivers never realize there is more than one match.
+  function renderOptionList(panel, candidates, opts) {
+    var old = panel.querySelector('.' + opts.className);
     if (old) old.remove();
     if (!candidates || !candidates.length) return;
     var wrap = document.createElement('div');
-    wrap.className = 'md-gps-address-choice';
-    var label = document.createElement('label');
-    label.textContent = 'Address matches';
-    var select = document.createElement('select');
-	    candidates.slice(0, 5).forEach(function (cand, index) {
-	      var option = document.createElement('option');
-	      option.value = String(index);
-	      option.textContent = addressValue(cand) || 'Nearby address';
-	      select.appendChild(option);
-	    });
-	    function useSelectedAddress() {
-	      applyAddress(btn, candidates[Number(select.value)], true);
-	    }
-	    select.addEventListener('pointerdown', useSelectedAddress);
-	    select.addEventListener('focus', useSelectedAddress);
-	    select.addEventListener('input', useSelectedAddress);
-	    select.addEventListener('change', useSelectedAddress);
-    wrap.appendChild(label);
-    wrap.appendChild(select);
+    wrap.className = opts.className;
+    var heading = document.createElement('label');
+    heading.textContent = opts.heading + (candidates.length > 1 ? ' - tap one to use it' : '');
+    wrap.appendChild(heading);
+    var list = document.createElement('div');
+    list.className = 'md-gps-options';
+    candidates.slice(0, opts.max).forEach(function (cand, index) {
+      var option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'md-gps-option';
+      option.setAttribute('aria-pressed', opts.preselectFirst && index === 0 ? 'true' : 'false');
+      option.appendChild(document.createTextNode(opts.title(cand)));
+      var meta = opts.meta(cand);
+      if (meta) {
+        var small = document.createElement('small');
+        small.textContent = meta;
+        option.appendChild(small);
+      }
+      option.addEventListener('click', function () {
+        opts.use(cand);
+        list.querySelectorAll('.md-gps-option').forEach(function (other) {
+          other.setAttribute('aria-pressed', 'false');
+        });
+        option.setAttribute('aria-pressed', 'true');
+      });
+      list.appendChild(option);
+    });
+    wrap.appendChild(list);
     panel.appendChild(wrap);
   }
 
-  function renderChoices(panel, btn, candidates) {
-    var old = panel.querySelector('.md-gps-place-choice');
-    if (old) old.remove();
-    if (!candidates || !candidates.length) return;
-    var wrap = document.createElement('div');
-    wrap.className = 'md-gps-place-choice';
-    var heading = document.createElement('label');
-    heading.textContent = 'Customer matches';
-    var select = document.createElement('select');
-	    candidates.slice(0, 6).forEach(function (cand, index) {
-	      var option = document.createElement('option');
-	      option.value = String(index);
-      var label = cand.name || cand.address || 'Nearby place';
-      if (cand.name && cand.address) label += ' - ' + cand.address;
-      var distance = formatDistance(cand);
-      if (distance) label += ' (' + distance + ')';
-	      option.textContent = label;
-	      select.appendChild(option);
-	    });
-	    function useSelectedPlace() {
-	      apply(btn, candidates[Number(select.value)], true);
-	    }
-	    select.addEventListener('pointerdown', useSelectedPlace);
-	    select.addEventListener('focus', useSelectedPlace);
-	    select.addEventListener('input', useSelectedPlace);
-	    select.addEventListener('change', useSelectedPlace);
-    wrap.appendChild(heading);
-    wrap.appendChild(select);
-    panel.appendChild(wrap);
+  function renderAddressChoices(panel, btn, candidates, preselectFirst) {
+    renderOptionList(panel, candidates, {
+      className: 'md-gps-address-choice',
+      heading: 'Address matches',
+      max: 5,
+      preselectFirst: !!preselectFirst,
+      title: function (cand) { return addressValue(cand) || 'Nearby address'; },
+      meta: function () { return ''; },
+      use: function (cand) { applyAddress(btn, cand, true); }
+    });
+  }
+
+  function renderChoices(panel, btn, candidates, preselectFirst) {
+    renderOptionList(panel, candidates, {
+      className: 'md-gps-place-choice',
+      heading: 'Customer matches',
+      max: 6,
+      preselectFirst: !!preselectFirst,
+      title: function (cand) { return cand.name || cand.address || 'Nearby place'; },
+      meta: function (cand) {
+        var bits = [];
+        if (cand.name && cand.address) bits.push(cand.address);
+        var distance = formatDistance(cand);
+        if (distance) bits.push(distance);
+        return bits.join(' · ');
+      },
+      use: function (cand) { apply(btn, cand, true); }
+    });
   }
 
   function lookupFailedMessage(data) {
@@ -199,11 +213,12 @@
           var addresses = (data && data.address_candidates) || [];
           if (!addresses.length && data && data.fallback_address) addresses = [{ address: data.fallback_address }];
           var best = places[0] || null;
-          renderAddressChoices(panel, btn, addresses);
+          // addresses[0] is auto-filled below whenever addresses exist.
+          renderAddressChoices(panel, btn, addresses, true);
           if (addresses.length && (!best || !trusted(best))) {
             applyAddress(btn, addresses[0], false);
             status(panel, 'GPS street address: ' + addressValue(addresses[0]));
-            renderChoices(panel, btn, places);
+            renderChoices(panel, btn, places, false);
           } else if (best && trusted(best)) {
             if (addresses.length) applyAddress(btn, addresses[0], false);
             apply(btn, best, false);
@@ -211,13 +226,13 @@
               ? 'GPS: ' + (best.name || best.address) + ' at this address'
               : 'GPS: ' + (best.name || best.address) +
                 (formatDistance(best) ? ' (' + formatDistance(best) + ')' : ''));
-            renderChoices(panel, btn, places);
+            renderChoices(panel, btn, places, true);
           } else if (places.length) {
             status(panel, 'Nearby customer names are suggestions only.');
-            renderChoices(panel, btn, places);
+            renderChoices(panel, btn, places, false);
           } else {
             status(panel, lookupFailedMessage(data));
-            renderChoices(panel, btn, []);
+            renderChoices(panel, btn, [], false);
           }
         })
         .catch(function () {
