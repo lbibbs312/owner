@@ -186,6 +186,10 @@
     <div class="dlog-total"><span>Total</span><strong>{{ view.totals_fmt['total'] }}</strong></div>
   </div>
 
+  {% if not view.day_complete %}
+  <p style="margin:2px 2px 0;color:#ffd479;font-size:.74rem;font-weight:700;letter-spacing:.05em;">IN PROGRESS &mdash; totals through {{ view.as_of_label }}; the day closes at 24:00 after posttrip.</p>
+  {% endif %}
+
   <div class="dlog-actions">
     <a class="print" href="{{ url_for('driver.daily_log_print', date=view.day.isoformat()) }}">Print Document</a>
     <a class="pdf" href="{{ url_for('driver.daily_log_attachment', date=view.day.isoformat()) }}">Download PDF</a>
@@ -221,6 +225,17 @@
       <div class="dlog-recap-row"><span>Worked today</span><strong>{{ view.fmt_hm(view.recap.worked_today) }}</strong></div>
       <div class="dlog-recap-row"><span>8-day total</span><strong>{{ view.fmt_hm(view.recap.total_8day) }}</strong></div>
       <div class="dlog-recap-row major"><span>Hours available</span><strong>{{ view.fmt_hm(view.recap.available) }}</strong></div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if view.hos_check %}
+  <section class="dlog-card">
+    <span class="k">HOS &mdash; Hours Remaining</span>
+    <div class="dlog-recap">
+      {% for label, value in view.hos_check %}
+        <div class="dlog-recap-row"><span>{{ label }}</span><strong>{{ value }}</strong></div>
+      {% endfor %}
     </div>
   </section>
   {% endif %}

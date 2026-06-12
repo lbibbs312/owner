@@ -69,15 +69,31 @@ def _stop_dt_local(raw, day):
     return None
 
 
-def _event(at_local, status, label, *, location=None, note=None, source="route"):
+# Same-minute tie-break ranks. Events run at paper-log minute resolution, so
+# when several land in one minute the physical sequence decides the order:
+# shift start, then stop captures in route order (arrive before depart at the
+# same stop, depart before the next stop's arrive), then taps/breaks, and the
+# shift end always last so nothing stays "active" past it.
+RANK_SHIFT_START = 0
+RANK_STOP_BASE = 100  # stop i: arrive = base + 10*i, depart = base + 10*i + 5
+RANK_MANUAL = 10**6
+RANK_BREAK = 2 * 10**6
+RANK_SHIFT_END = 10**9
+
+
+def _event(at_local, status, label, *, location=None, note=None, source="route", rank=RANK_MANUAL):
     return {
-        "at": at_local,
+        # Paper-log resolution: the printed log sheet does all of its math on
+        # HH:MM capture times, so the duty log must too — otherwise
+        # seconds-level sums drift minutes away from the sheet's totals.
+        "at": at_local.replace(second=0, microsecond=0),
         "status": status,
         "status_short": STATUS_SHORT.get(status, status.upper()),
         "label": label,
         "location": location,
         "note": note,
         "source": source,
+        "rank": rank,
     }
 
 
@@ -130,9 +146,9 @@ def day_events(user_id, day):
         if shift_start:
             shift_spans.append((shift_start, shift_end))
         if shift_start and start_local <= shift_start < end_local:
-            events.append(_event(shift_start, "on", "Shift start"))
+            events.append(_event(shift_start, "on", "Shift start", rank=RANK_SHIFT_START))
         if shift_end and start_local <= shift_end < end_local:
-            events.append(_event(shift_end, "off", "Shift end"))
+            events.append(_event(shift_end, "off", "Shift end", rank=RANK_SHIFT_END))
 
     def _on_shift(at_local):
         return any(
@@ -162,12 +178,19 @@ def day_events(user_id, day):
                     "Break started",
                     note=kind if kind and kind != "Break" else None,
                     source="break",
+                    rank=RANK_BREAK,
                 )
             )
         brk_end = _to_local(brk.end_time)
         if brk_end and start_local <= brk_end < end_local:
             events.append(
-                _event(brk_end, "on" if _on_shift(brk_end) else "off", "Break ended", source="break")
+                _event(
+                    brk_end,
+                    "on" if _on_shift(brk_end) else "off",
+                    "Break ended",
+                    source="break",
+                    rank=RANK_BREAK,
+                )
             )
 
     stops = DriverLog.query.filter(
@@ -175,21 +198,31 @@ def day_events(user_id, day):
         DriverLog.date == day,
         DriverLog.deleted_at.is_(None),
     ).all()
-    for log in stops:
+    # Route order, not DB order: arrivals can carry seconds while departures
+    # are HH:MM, so a raw timestamp sort can put "Departed" ahead of the same
+    # stop's "Arrived". Sequence the stops first, then rank their events.
+    stops.sort(
+        key=lambda log: (
+            _stop_dt_local(log.arrive_time, day)
+            or _stop_dt_local(log.depart_time, day)
+            or start_local,
+            log.id,
+        )
+    )
+    for index, log in enumerate(stops):
         place = _stop_place(log)
         arrive = _stop_dt_local(log.arrive_time, day)
         if arrive and start_local <= arrive < end_local:
-            events.append(_event(arrive, "on", "Arrived", location=place))
+            events.append(
+                _event(arrive, "on", "Arrived", location=place, rank=RANK_STOP_BASE + index * 10)
+            )
         depart = _stop_dt_local(log.depart_time, day)
         if depart and start_local <= depart < end_local:
-            events.append(_event(depart, "d", "Departed", location=place))
+            events.append(
+                _event(depart, "d", "Departed", location=place, rank=RANK_STOP_BASE + index * 10 + 5)
+            )
 
-    events.sort(key=lambda e: e["at"])
-    # Paper-log resolution: the printed log sheet does all of its math on
-    # HH:MM capture times, so the duty log must too — otherwise seconds-level
-    # leg sums drift minutes below the sheet's drive/on-duty totals.
-    for ev in events:
-        ev["at"] = ev["at"].replace(second=0, microsecond=0)
+    events.sort(key=lambda e: (e["at"], e["rank"]))
     # A burst of switcher taps inside one minute is one decision: keep the last.
     deduped = []
     for ev in events:
@@ -202,6 +235,20 @@ def day_events(user_id, day):
             deduped[-1] = ev
             continue
         deduped.append(ev)
+    # A depart with no arrival before shift end is the closeout tap at the
+    # final stop, not a drive leg — the sheet's depart->arrive sums have no
+    # leg there, so the line holds ON until release instead of D. Runs before
+    # the status walk so later events see the corrected line.
+    pending_depart = None
+    for ev in deduped:
+        if ev["label"] == "Departed":
+            pending_depart = ev
+        elif ev["label"] == "Arrived":
+            pending_depart = None
+        elif ev["label"] == "Shift end" and pending_depart is not None:
+            pending_depart["status"] = "on"
+            pending_depart["status_short"] = STATUS_SHORT["on"]
+            pending_depart = None
     # Manual taps that land on the status already in effect change nothing;
     # keep route captures (arrive/depart) regardless since they carry place/time.
     status = carry_in_status(user_id, day)
@@ -218,19 +265,6 @@ def day_events(user_id, day):
             ev["status_short"] = STATUS_SHORT["d"]
         status = ev["status"]
         cleaned.append(ev)
-    # A depart with no arrival before shift end is the closeout tap at the
-    # final stop, not a drive leg — the sheet's depart->arrive sums have no
-    # leg there, so the line holds ON until release instead of D.
-    pending_depart = None
-    for ev in cleaned:
-        if ev["label"] == "Departed":
-            pending_depart = ev
-        elif ev["label"] == "Arrived":
-            pending_depart = None
-        elif ev["label"] == "Shift end" and pending_depart is not None:
-            pending_depart["status"] = "on"
-            pending_depart["status_short"] = STATUS_SHORT["on"]
-            pending_depart = None
     return cleaned
 
 
@@ -256,15 +290,41 @@ def carry_in_status(user_id, day):
     return "off"
 
 
+def day_complete(user_id, day, *, now_local=None):
+    """A log day is closed once it's in the past, or once the day had a shift
+    and every shift touching it is released. A closed day is certifiable: the
+    rest of the day is presumed OFF and the grid always totals 24:00."""
+    now_local = now_local or datetime.now(DETROIT_TZ)
+    start_local, end_local = _day_bounds_local(day)
+    if now_local >= end_local:
+        return True
+    if now_local < start_local:
+        return False
+    start_utc, end_utc = _day_bounds_utc_naive(day)
+    shifts = ShiftRecord.query.filter(
+        ShiftRecord.user_id == user_id,
+        ShiftRecord.start_time < end_utc,
+        or_(ShiftRecord.end_time.is_(None), ShiftRecord.end_time >= start_utc),
+    ).all()
+    if not shifts:
+        return False
+    return all(shift.end_time is not None for shift in shifts)
+
+
 def day_segments(user_id, day, *, now_local=None):
     """Contiguous (status, start, end) spans covering local midnight to midnight
-    (or to "now" for today). Returns (segments, events)."""
+    (or to "now" for a day still in progress). Returns (segments, events)."""
     now_local = now_local or datetime.now(DETROIT_TZ)
     start_local, end_local = _day_bounds_local(day)
     events = day_events(user_id, day)
     if start_local > now_local:
         return [], events
     end_bound = min(end_local, now_local) if start_local <= now_local < end_local else end_local
+    if end_bound < end_local and day_complete(user_id, day, now_local=now_local):
+        # Released day: project the closing status (OFF after shift end) to
+        # midnight so the totals column reads 24:00 no matter when the
+        # document is generated.
+        end_bound = end_local
 
     status = carry_in_status(user_id, day)
     segments = []

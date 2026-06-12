@@ -7739,6 +7739,14 @@ def _daily_log_view_model(day, *, theme="paper"):
             miles = posttrip.miles_driven or miles
     if miles is None and odo_start and odo_end and odo_end > odo_start:
         miles = odo_end - odo_start
+    day_complete = duty_log_service.day_complete(current_user.id, day, now_local=now_local)
+    hos_check = hos_service.hos_companion_check(
+        shift_start=None,
+        on_duty_minutes=totals.get("on", 0) + totals.get("d", 0),
+        drive_minutes=totals.get("d", 0),
+        now=now_local,
+        prior_7day_minutes=max(0, recap["total_8day"] - recap["worked_today"]),
+    )
     return {
         "day": day,
         "segments": segments,
@@ -7746,6 +7754,9 @@ def _daily_log_view_model(day, *, theme="paper"):
         "totals": totals,
         "totals_fmt": {k: duty_log_service.fmt_hm(v) for k, v in totals.items()},
         "recap": recap,
+        "day_complete": day_complete,
+        "hos_check": hos_check,
+        "as_of_label": now_local.strftime("%I:%M %p").lstrip("0").lower(),
         "grid_svg": duty_log_service.grid_svg(segments, day=day, now_local=now_local, theme=theme),
         "truck": truck,
         "odo_start": odo_start,
@@ -7898,6 +7909,15 @@ def _build_daily_log_pdf(day, driver, view, driver_signature=None):
     pdf.text(rx, 706, "USA Property 70 hour / 8 day", size=8, color=MD_PDF_MUTED)
     pdf.fill_rect(36, 682, 540, 2, rgb=MD_PDF_BLUE)
     pdf.text(36, 666, "DRIVER'S DAILY LOG", size=15, bold=True, color=MD_PDF_INK)
+    if not view.get("day_complete"):
+        pdf.text(
+            rx,
+            668,
+            f"LOG IN PROGRESS - through {view.get('as_of_label') or ''}",
+            size=8,
+            bold=True,
+            color=(176, 124, 16),
+        )
     y = 648
 
     pdf.text(x, y, "RECORD OF DUTY STATUS", size=9, bold=True, color=MD_PDF_BLUE)
@@ -7943,8 +7963,8 @@ def _build_daily_log_pdf(day, driver, view, driver_signature=None):
             )
         y -= 16
 
-    # Keep the recap + certification + signature together on one page.
-    if y < 170:
+    # Keep the recap + HOS check + certification together on one page.
+    if y < 210:
         _page_footer()
         pdf.add_page()
         y = height - 50
@@ -7967,18 +7987,36 @@ def _build_daily_log_pdf(day, driver, view, driver_signature=None):
         )
         y -= 18
 
-    pdf.text(
-        x,
-        y,
-        "I hereby certify that my data entries and my record of duty status for this day are true and correct.",
-        size=8,
-    )
-    y -= 30
-    if driver_signature and not pdf.image_png_data_url(driver_signature, x, y - 4, 120, 28):
-        pass
-    pdf.line(x, y - 6, x + 220, y - 6, width=0.8)
-    pdf.text(x, y - 16, "Driver Signature", size=7)
-    pdf.text(x + 260, y - 16, "Date: ____________", size=7)
+    hos_items = view.get("hos_check") or []
+    if hos_items:
+        pdf.text(x, y, "HOS CHECK - HOURS REMAINING", size=9, bold=True, color=MD_PDF_BLUE)
+        y -= 12
+        pdf.text(x, y, "   -   ".join(f"{label}: {value}" for label, value in hos_items), size=8)
+        y -= 18
+
+    # Certification is only offered on a released day whose grid totals 24:00;
+    # an in-progress log prints as a working copy instead.
+    if view.get("day_complete") and view.get("totals", {}).get("total") == 24 * 60:
+        pdf.text(
+            x,
+            y,
+            "I hereby certify that my data entries and my record of duty status for this day are true and correct.",
+            size=8,
+        )
+        y -= 30
+        if driver_signature and not pdf.image_png_data_url(driver_signature, x, y - 4, 120, 28):
+            pass
+        pdf.line(x, y - 6, x + 220, y - 6, width=0.8)
+        pdf.text(x, y - 16, "Driver Signature", size=7)
+        pdf.text(x + 260, y - 16, "Date: ____________", size=7)
+    else:
+        pdf.text(
+            x,
+            y,
+            "Log in progress - certification unlocks once the shift is released and the day totals 24:00.",
+            size=8,
+            color=MD_PDF_MUTED,
+        )
     _page_footer()
     return pdf.build()
 

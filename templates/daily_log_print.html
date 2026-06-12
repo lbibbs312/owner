@@ -128,6 +128,9 @@
     </header>
 
     <h1 class="document-title">Driver's Daily Log</h1>
+    {% if not view.day_complete %}
+      <p style="margin:0 0 8px;font-size:10px;font-weight:800;letter-spacing:.06em;color:#9a6c10;">LOG IN PROGRESS &mdash; totals through {{ view.as_of_label }}; the day closes at 24:00 after posttrip.</p>
+    {% endif %}
 
     {% set facts = [] %}
     {% if view.truck %}{% set _ = facts.append(('Truck', view.truck)) %}{% endif %}
@@ -186,6 +189,18 @@
       </div>
     {% endif %}
 
+    {% if view.hos_check %}
+      <h2 class="section-title">HOS Check &mdash; Hours Remaining</h2>
+      <div class="recap-card">
+        <dl>
+          {% for label, value in view.hos_check %}
+            <dt>{{ label }}</dt><dd>{{ value }}</dd>
+          {% endfor %}
+        </dl>
+      </div>
+    {% endif %}
+
+    {% if view.day_complete and view.totals.total == 1440 %}
     <p class="cert-line">I hereby certify that my data entries and my record of duty status for this day are true and correct.</p>
     <div class="signature-grid">
       <div>
@@ -202,6 +217,9 @@
         <div class="sig-foot"><span>&nbsp;</span><span>Date: ____________</span></div>
       </div>
     </div>
+    {% else %}
+    <p class="cert-line" style="color:#5b6675;">Log in progress &mdash; certification unlocks once the shift is released and the day totals 24:00.</p>
+    {% endif %}
 
     <div class="doc-footer">{{ view.not_an_eld }}</div>
   </main>
