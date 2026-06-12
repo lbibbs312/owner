@@ -65,9 +65,11 @@ DESTINATION_GEOGRAPHY_TYPES = {
 }
 PREMISE_GEOCODE_TYPES = {"premise", "subpremise", "street_address"}
 DEFAULT_PLACE_RADIUS_M = 90
-MIN_PLACE_RADIUS_M = 45
+MIN_PLACE_RADIUS_M = 25
 MAX_PLACE_RADIUS_M = 260
 MIN_DESTINATION_QUERY_LENGTH = 4
+DEFAULT_TRUSTED_PLACE_DISTANCE_M = 24
+MAX_TRUSTED_PLACE_DISTANCE_M = 35
 
 
 def _clean(value):
@@ -104,10 +106,20 @@ def _candidate_radius_m(accuracy_m):
     if accuracy is None or accuracy <= 0:
         return DEFAULT_PLACE_RADIUS_M
     if accuracy <= 15:
-        return max(MIN_PLACE_RADIUS_M, int(round(accuracy * 3 + 30)))
+        return max(MIN_PLACE_RADIUS_M, min(35, int(round(accuracy * 1.6 + 10))))
     if accuracy <= 50:
-        return min(MAX_PLACE_RADIUS_M, int(round(accuracy * 2 + 50)))
+        return min(MAX_PLACE_RADIUS_M, int(round(accuracy * 1.5 + 25)))
     return min(MAX_PLACE_RADIUS_M, int(round(accuracy * 2 + 80)))
+
+
+def _trusted_place_distance_m(accuracy_m):
+    accuracy = _float_or_none(accuracy_m)
+    if accuracy is None or accuracy <= 0:
+        return DEFAULT_TRUSTED_PLACE_DISTANCE_M
+    return min(
+        MAX_TRUSTED_PLACE_DISTANCE_M,
+        max(18, int(round((accuracy * 1.2) + 6))),
+    )
 
 
 def _place_point(result):
@@ -272,6 +284,7 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
             "fallback_address": "",
         }
 
+    trusted_distance = _trusted_place_distance_m(accuracy_m)
     candidates = []
     seen = set()
     for result in payload.get("places") or []:
@@ -298,6 +311,7 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
                 "name": name,
                 "address": address,
                 "distance_m": int(round(distance)),
+                "trusted": distance <= trusted_distance,
                 "lat": point[0],
                 "lng": point[1],
                 "source": "google",
@@ -307,7 +321,7 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
     tokens = _hint_tokens(hint)
     candidates.sort(key=lambda item: (-_hint_score(item, tokens), item["distance_m"], item["name"].lower()))
     fallback = ""
-    if not candidates:
+    if not candidates or not candidates[0].get("trusted"):
         try:
             fallback = _fallback_address(lat, lng, key)
         except requests.RequestException:

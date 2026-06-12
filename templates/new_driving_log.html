@@ -129,6 +129,15 @@
           return (value || '').toString().trim();
         }
 
+        function formatDistance(candidate) {
+          if (!candidate || !(candidate.distance_m || candidate.distance_m === 0)) return '';
+          return candidate.distance_m + ' m away';
+        }
+
+        function isTrustedCandidate(candidate) {
+          return !!candidate && (candidate.source === 'saved' || candidate.trusted === true);
+        }
+
         function distanceMeters(lat1, lon1, lat2, lon2) {
           var r = 6371000;
           var toRad = Math.PI / 180;
@@ -163,7 +172,8 @@
           if (candidate.name) pieces.push(candidate.name);
           if (candidate.address) pieces.push(candidate.address);
           var label = pieces.join(' - ');
-          if (candidate.distance_m || candidate.distance_m === 0) label += ' (' + candidate.distance_m + ' m)';
+          var distance = formatDistance(candidate);
+          if (distance) label += ' (' + distance + ')';
           if (candidate.source === 'saved') label += ' saved';
           return label || 'Nearby place';
         }
@@ -284,29 +294,31 @@
                 var googlePlaces = data.places || [];
                 var candidates = mergeCandidates(googlePlaces, savedPlaces);
                 var googleError = googleErrorMessage(data);
+                var bestCandidate = candidates[0] || null;
+                var trustedCandidate = candidates.find(isTrustedCandidate);
+                var bestDistance = formatDistance(bestCandidate);
                 renderCandidates(candidates);
-                if (googlePlaces.length) {
-                  applyCandidate(googlePlaces[0], !auto);
+                if (data.fallback_address && (!auto || !addressInput.value.trim())) {
+                  addressInput.value = data.fallback_address;
+                }
+                if (trustedCandidate) {
+                  applyCandidate(trustedCandidate, !auto);
                   gpsStatus.textContent = accuracy
                     ? 'GPS places found (+/-' + accuracy + ' m). Pick the exact dock if needed.'
                     : 'GPS places found. Pick the exact dock if needed.';
                   return;
                 }
-                if (candidates.length) {
-                  gpsStatus.textContent = googleError || (
-                    accuracy
-                      ? 'GPS set (+/-' + accuracy + ' m). Saved places are listed only as hints.'
-                      : 'GPS set. Saved places are listed only as hints.'
-                  );
+                if (googlePlaces.length || candidates.length) {
+                  var setLabel = data.fallback_address ? 'GPS address set' : 'GPS set';
+                  gpsStatus.textContent = accuracy
+                    ? setLabel + ' (+/-' + accuracy + ' m). Closest place is ' + (bestDistance || 'nearby') + '; pick it only if correct.'
+                    : setLabel + '. Closest place is ' + (bestDistance || 'nearby') + '; pick it only if correct.';
                   return;
                 }
                 if (googleError) {
                   renderPlaceNotice(googleError);
                   gpsStatus.textContent = googleError;
                   return;
-                }
-                if (data.fallback_address && (!auto || !addressInput.value.trim())) {
-                  addressInput.value = data.fallback_address;
                 }
                 if (!data.fallback_address) {
                   renderPlaceNotice('No Google places found here - type the address and name');

@@ -10524,6 +10524,8 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     assert "Google Places is blocked for this server key. Saved places only." in body
     assert "No Google places found here - type the address and name" in body
     assert "Google places could not be reached - type the address and name" in body
+    assert "m away" in body
+    assert "pick it only if correct" in body
 
     created = client.post(
         "/new_driving_log",

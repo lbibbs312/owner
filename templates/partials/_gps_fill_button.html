@@ -50,6 +50,15 @@
     return { city: last, state: '' };
   }
 
+  function formatDistance(cand) {
+    if (!cand || !(cand.distance_m || cand.distance_m === 0)) return '';
+    return cand.distance_m + ' m away';
+  }
+
+  function trusted(cand) {
+    return !!cand && cand.trusted === true;
+  }
+
   function apply(btn, cand, force) {
     if (!cand) return;
     var d = btn.dataset;
@@ -93,7 +102,8 @@
       option.value = String(index);
       var label = cand.name || cand.address || 'Nearby place';
       if (cand.name && cand.address) label += ' - ' + cand.address;
-      if (cand.distance_m || cand.distance_m === 0) label += ' (' + cand.distance_m + ' m)';
+      var distance = formatDistance(cand);
+      if (distance) label += ' (' + distance + ')';
       option.textContent = label;
       select.appendChild(option);
     });
@@ -131,10 +141,18 @@
         .then(function (data) {
           btn.disabled = false;
           var places = (data && data.places) || [];
-          if (places.length) {
-            apply(btn, places[0], false);
-            status(panel, 'GPS: ' + (places[0].name || places[0].address) +
-              (places[0].distance_m || places[0].distance_m === 0 ? ' (' + places[0].distance_m + ' m)' : ''));
+          var best = places[0] || null;
+          if (data && data.fallback_address && (!best || !trusted(best))) {
+            apply(btn, { name: '', address: data.fallback_address }, false);
+            status(panel, 'GPS street address: ' + data.fallback_address);
+            renderChoices(panel, btn, places);
+          } else if (best && trusted(best)) {
+            apply(btn, best, false);
+            status(panel, 'GPS: ' + (best.name || best.address) +
+              (formatDistance(best) ? ' (' + formatDistance(best) + ')' : ''));
+            renderChoices(panel, btn, places);
+          } else if (places.length) {
+            status(panel, 'Closest place is ' + (formatDistance(best) || 'nearby') + ' - pick it only if correct.');
             renderChoices(panel, btn, places);
           } else if (data && data.fallback_address) {
             apply(btn, { name: '', address: data.fallback_address }, false);

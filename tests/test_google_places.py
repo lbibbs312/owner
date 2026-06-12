@@ -37,7 +37,7 @@ def test_precise_gps_filters_far_google_place_and_uses_address(monkeypatch, flas
                         "id": "far-supplier",
                         "displayName": {"text": "Far Supplier Warehouse"},
                         "shortFormattedAddress": "900 Far Dock Rd, Industrial City",
-                        "location": {"latitude": 42.902476, "longitude": -85.531056},
+                        "location": {"latitude": 42.901278, "longitude": -85.531056},
                         "types": ["manufacturer", "point_of_interest", "establishment"],
                     }
                 ]
@@ -65,11 +65,11 @@ def test_precise_gps_filters_far_google_place_and_uses_address(monkeypatch, flas
         payload = google_places.nearby_place_candidates(
             42.900846,
             -85.531056,
-            accuracy_m=8,
+            accuracy_m=13,
             hint="current dock",
         )
 
-    assert post_calls[0]["locationRestriction"]["circle"]["radius"] <= 60
+    assert post_calls[0]["locationRestriction"]["circle"]["radius"] < 48
     assert payload["places"] == []
     assert payload["fallback_address"] == "1100 Current Dock Dr, Industrial City, MI 49512"
     assert get_calls[0]["result_type"] == "premise|subpremise|street_address"
@@ -107,6 +107,7 @@ def test_precise_gps_keeps_close_google_place(monkeypatch, flask_app):
 
     assert payload["places"][0]["name"] == "Current Dock Manufacturing"
     assert payload["places"][0]["distance_m"] < 20
+    assert payload["places"][0]["trusted"] is True
     assert payload["fallback_address"] == ""
 
 
