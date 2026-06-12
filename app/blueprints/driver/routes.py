@@ -2900,10 +2900,10 @@ def gps_place_candidates():
 @_driver_route_guard("driver.mobile_dashboard", "the driver destination place lookup")
 def gps_destination_lookup():
     if not getattr(current_user, "is_day_driver", False):
-        return jsonify({"ok": False, "error": "day_driver_required", "place": None}), 403
+        return jsonify({"ok": False, "error": "day_driver_required", "place": None, "places": []}), 403
     query = (request.args.get("query") or "").strip()[:255]
-    if len(query) < 6:
-        return jsonify({"ok": False, "error": "short_query", "place": None}), 400
+    if len(query) < 4:
+        return jsonify({"ok": False, "error": "short_query", "place": None, "places": []}), 400
     try:
         payload = lookup_destination_place(query)
     except Exception:
@@ -2912,7 +2912,7 @@ def gps_destination_lookup():
             current_user.id,
             bool(query),
         )
-        payload = {"ok": False, "error": "lookup_failed", "place": None}
+        payload = {"ok": False, "error": "lookup_failed", "place": None, "places": []}
     return jsonify(payload)
 
 

@@ -123,6 +123,12 @@ def test_destination_lookup_returns_business_name_and_address(monkeypatch, flask
                         "displayName": {"text": "Receiver Warehouse"},
                         "formattedAddress": "1100 Receiver Ave, Industrial City, MI 49512, USA",
                         "types": ["warehouse", "point_of_interest", "establishment"],
+                    },
+                    {
+                        "id": "destination-annex",
+                        "displayName": {"text": "Receiver Annex"},
+                        "formattedAddress": "1110 Receiver Ave, Industrial City, MI 49512, USA",
+                        "types": ["warehouse", "point_of_interest", "establishment"],
                     }
                 ]
             }
@@ -135,6 +141,9 @@ def test_destination_lookup_returns_business_name_and_address(monkeypatch, flask
 
     assert post_calls[0][0] == google_places.TEXT_SEARCH_URL
     assert post_calls[0][1]["textQuery"] == "1100 Receiver Ave Industrial City"
+    assert post_calls[0][1]["maxResultCount"] == 5
     assert payload["ok"] is True
     assert payload["place"]["name"] == "Receiver Warehouse"
     assert payload["place"]["address"] == "1100 Receiver Ave, Industrial City, MI 49512"
+    assert [place["name"] for place in payload["places"]] == ["Receiver Warehouse", "Receiver Annex"]
+    assert payload["places"][1]["address"] == "1110 Receiver Ave, Industrial City, MI 49512"

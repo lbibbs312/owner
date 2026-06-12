@@ -45,6 +45,7 @@ PREMISE_GEOCODE_TYPES = {"premise", "subpremise", "street_address"}
 DEFAULT_PLACE_RADIUS_M = 90
 MIN_PLACE_RADIUS_M = 45
 MAX_PLACE_RADIUS_M = 260
+MIN_DESTINATION_QUERY_LENGTH = 4
 
 
 def _clean(value):
@@ -147,6 +148,21 @@ def _name_looks_like_address(name, address):
     if address and name == address:
         return True
     return bool(re.match(r"^\d+\s+\w+", name))
+
+
+def _destination_place(result):
+    name = _place_name(result)
+    address = _format_address(result.get("formattedAddress") or result.get("shortFormattedAddress"))
+    if not name and not address:
+        return None
+    if _name_looks_like_address(name, address):
+        name = ""
+    return {
+        "place_id": result.get("id") or result.get("place_id") or "",
+        "name": name,
+        "address": address,
+        "source": "google",
+    }
 
 
 def _fallback_address(lat, lng, key):
@@ -272,7 +288,7 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
 
 
 def lookup_destination_place(query):
-    """Look up a typed destination address/name and return a likely place label."""
+    """Look up a typed destination address/name and return likely place labels."""
     key = _api_key()
     query = _clean(query)[:255]
     if not key:
@@ -281,9 +297,10 @@ def lookup_destination_place(query):
             "error": "not_configured",
             "message": "Google Maps API key is not configured.",
             "place": None,
+            "places": [],
         }
-    if len(query) < 6:
-        return {"ok": False, "error": "short_query", "place": None}
+    if len(query) < MIN_DESTINATION_QUERY_LENGTH:
+        return {"ok": False, "error": "short_query", "place": None, "places": []}
 
     response = requests.post(
         TEXT_SEARCH_URL,
@@ -301,7 +318,7 @@ def lookup_destination_place(query):
                 ]
             ),
         },
-        json={"textQuery": query, "maxResultCount": 3},
+        json={"textQuery": query, "maxResultCount": 5},
         timeout=6,
     )
     payload = response.json()
@@ -312,22 +329,18 @@ def lookup_destination_place(query):
             "error": error.get("status") or f"http_{response.status_code}",
             "message": error.get("message") or "Google Places did not return a destination match.",
             "place": None,
+            "places": [],
         }
 
+    places = []
+    seen = set()
     for result in payload.get("places") or []:
-        name = _place_name(result)
-        address = _format_address(result.get("formattedAddress") or result.get("shortFormattedAddress"))
-        if not name and not address:
+        place = _destination_place(result)
+        if not place:
             continue
-        if _name_looks_like_address(name, address):
-            name = ""
-        return {
-            "ok": True,
-            "place": {
-                "place_id": result.get("id") or "",
-                "name": name,
-                "address": address,
-                "source": "google",
-            },
-        }
-    return {"ok": True, "place": None}
+        dedupe_key = (place["name"].lower(), place["address"].lower())
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        places.append(place)
+    return {"ok": True, "place": places[0] if places else None, "places": places[:5]}

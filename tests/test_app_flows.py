@@ -10603,6 +10603,18 @@ def test_day_driver_destination_lookup_endpoint_returns_business_name(client, ap
                 "address": "1100 Receiver Ave, Industrial City, MI 49512",
                 "source": "google",
             },
+            "places": [
+                {
+                    "name": "Receiver Warehouse",
+                    "address": "1100 Receiver Ave, Industrial City, MI 49512",
+                    "source": "google",
+                },
+                {
+                    "name": "Receiver Annex",
+                    "address": "1110 Receiver Ave, Industrial City, MI 49512",
+                    "source": "google",
+                },
+            ],
         }
 
     monkeypatch.setattr("app.blueprints.driver.routes.lookup_destination_place", fake_lookup)
@@ -10613,6 +10625,8 @@ def test_day_driver_destination_lookup_endpoint_returns_business_name(client, ap
     assert payload["ok"] is True
     assert payload["place"]["name"] == "Receiver Warehouse"
     assert payload["place"]["address"] == "1100 Receiver Ave, Industrial City, MI 49512"
+    assert [place["name"] for place in payload["places"]] == ["Receiver Warehouse", "Receiver Annex"]
+    assert payload["places"][1]["address"] == "1110 Receiver Ave, Industrial City, MI 49512"
 
 
 def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(client, app):
@@ -10645,6 +10659,8 @@ def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(cli
     assert "Destination business name" in depart_screen
     assert 'name="destination_address"' in depart_screen
     assert 'name="destination_text"' in depart_screen
+    assert "data-destination-suggestions" in depart_screen
+    assert "freight-destination-option" in depart_screen
     assert "/gps/destination-lookup" in depart_screen
 
     response = client.post(
