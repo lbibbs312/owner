@@ -19,6 +19,8 @@ def app(monkeypatch, tmp_path):
         WTF_CSRF_ENABLED=False,
         DAMAGE_UPLOAD_FOLDER=str(tmp_path / "damage_uploads"),
         DRIVER_LOG_PHOTO_UPLOAD_FOLDER=str(tmp_path / "driver_log_photo_uploads"),
+        PACKET_UPLOAD_FOLDER=str(tmp_path / "packet_media"),
+        IFTA_UPLOAD_FOLDER=str(tmp_path / "ifta_receipts"),
     )
     with app.app_context():
         db.create_all()
@@ -2828,6 +2830,141 @@ def test_pretrip_create_and_print_route(client, app):
     activity = client.get("/recent_activity")
     assert b"md-shell md-standalone" in activity.data
     assert b"PreTrip printed" in activity.data
+
+
+def test_pretrip_fuel_level_photo_saves_as_inspection_evidence_not_damage(client, app):
+    from datetime import date
+
+    today_value = date.today().isoformat()
+    with app.app_context():
+        create_user("fuel_pretrip_driver", "fuel-pretrip@example.com", "driver", first_name="Fuel", last_name="Photo")
+
+    login(client, "fuel_pretrip_driver")
+    page = client.get("/new_pretrip")
+    assert page.status_code == 200
+    assert b'name="fuel_level_photo"' in page.data
+    assert b"It will not create a damage report" in page.data
+
+    response = client.post(
+        "/new_pretrip",
+        data={
+            "truck_number": "ST4",
+            "trailer_number": "TR2",
+            "pretrip_date": today_value,
+            "shift": "1st",
+            "start_mileage": "246268",
+            "start_fuel_level": "Full",
+            "truck_type": "Semi",
+            "oil_system_status": "good",
+            "tires_status": "good",
+            "gc_no_defects": "y",
+            "incab_no_defects": "y",
+            "ec_no_defects": "y",
+            "exterior_no_defects": "y",
+            "towed_no_defects": "y",
+            "fuel_level_photo": (BytesIO(b"fuel gauge photo"), "fuel-tank.jpg"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        from app.models import DamageReport, PreTrip, ProofMediaFile
+
+        pretrip = PreTrip.query.filter_by(truck_number="ST4").one()
+        assert DamageReport.query.count() == 0
+        media = ProofMediaFile.query.filter_by(owner_type="pretrip", owner_id=pretrip.id).one()
+        assert media.packet_type == "pretrip_dvir_issue"
+        assert media.category == "pretrip_fuel_level"
+        assert media.manager_note == "Fuel level proof: Full"
+        pretrip_id = pretrip.id
+
+    list_page = client.get("/list_pretrips")
+    assert b"Inspection Photos" in list_page.data
+    assert b"Damage Photos" not in list_page.data
+
+    view_page = client.get(f"/view_pretrip/{pretrip_id}", follow_redirects=True)
+    assert b"PreTrip Inspection Evidence" in view_page.data
+    assert b"PreTrip Damage Evidence" not in view_page.data
+
+    printable = client.get(f"/pretrip_printable/{pretrip_id}")
+    assert printable.status_code == 200
+    assert b"PreTrip Inspection Evidence" in printable.data
+    assert b"PreTrip Damage Evidence" not in printable.data
+
+    pdf = client.get(f"/pretrip_printable/{pretrip_id}/attachment")
+    assert pdf.status_code == 200
+    assert b"PreTrip Inspection Evidence" in pdf.data
+
+
+def test_pretrip_damage_photo_can_be_moved_to_inspection_evidence(client, app):
+    from datetime import date
+
+    today_value = date.today().isoformat()
+    with app.app_context():
+        create_user("fuel_fix_driver", "fuel-fix@example.com", "driver", first_name="Fuel", last_name="Fix")
+
+    login(client, "fuel_fix_driver")
+    response = client.post(
+        "/new_pretrip",
+        data={
+            "truck_number": "ST7",
+            "trailer_number": "TR7",
+            "pretrip_date": today_value,
+            "shift": "1st",
+            "start_mileage": "246268",
+            "start_fuel_level": "Full",
+            "truck_type": "Semi",
+            "oil_system_status": "good",
+            "tires_status": "good",
+            "gc_no_defects": "y",
+            "incab_no_defects": "y",
+            "ec_no_defects": "y",
+            "exterior_no_defects": "y",
+            "towed_no_defects": "y",
+            "damage_photo": (BytesIO(b"fuel gauge in wrong field"), "wrong-field.jpg"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        from app.models import DamageReport, PreTrip
+
+        pretrip = PreTrip.query.filter_by(truck_number="ST7").one()
+        report = DamageReport.query.one()
+        assert report.status == "open"
+        assert report.move_reference == f"PreTrip #{pretrip.id}"
+        assert len(report.photos) == 1
+        pretrip_id = pretrip.id
+        report_id = report.id
+
+    report_page = client.get(f"/damage_reports/{report_id}")
+    assert b"Move to PreTrip Evidence" in report_page.data
+    assert f"PreTrip #{pretrip_id}".encode() in report_page.data
+
+    moved = client.post(
+        f"/damage_reports/{report_id}/move-to-pretrip-evidence",
+        follow_redirects=True,
+    )
+    assert moved.status_code == 200
+    assert b"PreTrip Inspection Evidence" in moved.data
+
+    with app.app_context():
+        from app.models import DamageReport, ProofMediaFile
+
+        report = DamageReport.query.get(report_id)
+        media = ProofMediaFile.query.filter_by(owner_type="pretrip", owner_id=pretrip_id).one()
+        assert report.status == "closed"
+        assert report.resolved_at is not None
+        assert media.category == "pretrip_fuel_level"
+        assert media.manager_note.startswith(f"Moved from damage report #{report_id}:")
+        assert media.sha256_hash
+
+    report_page_after = client.get(f"/damage_reports/{report_id}")
+    assert b"Move to PreTrip Evidence" not in report_page_after.data
 
 
 def test_new_pretrip_blank_date_uses_local_route_date(client, app, monkeypatch):

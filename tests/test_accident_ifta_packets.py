@@ -123,6 +123,8 @@ def test_fuel_page_shows_recent_records_first_with_receipt_button(client, app):
                 fuel_type="Diesel",
                 total_sale_amount=151.23,
                 receipt_photo="receipt.jpg",
+                receipt_data=b"receipt image",
+                receipt_mimetype="image/jpeg",
             )
         )
         db.session.commit()
@@ -136,6 +138,15 @@ def test_fuel_page_shows_recent_records_first_with_receipt_button(client, app):
     assert "41.5 gal" in body
     assert "$151.23" in body
     assert 'href="/ifta-worksheet/receipt/' in body
+
+
+def test_blank_fuel_record_labels_use_captured_facts_not_fuel_stop(app):
+    with app.app_context():
+        from app.blueprints.driver.routes import _fuel_record_label
+        from app.models import IftaFuelRecord
+
+        assert _fuel_record_label(IftaFuelRecord(fuel_type="Diesel")) == "Diesel"
+        assert _fuel_record_label(IftaFuelRecord()) == "Fuel purchase"
 
 
 def test_report_forms_prefill_known_route_context_and_hide_admin_fields(client, app):
@@ -375,6 +386,48 @@ def test_ifta_receipt_photo_renders_on_view_and_packet(client, app):
     assert 'class="receipt-preview"' in packet_body
     assert "ifta-receipt-1-" in packet_body
     assert ".jpg" in packet_body
+
+
+def test_fuel_tank_damage_form_submission_routes_to_fuel_record_with_photo(client, app):
+    with app.app_context():
+        create_user("fuel_redirect_driver", "fuel-redirect@example.com", "driver", first_name="Fuel", last_name="Redirect")
+
+    login(client, "fuel_redirect_driver")
+    response = client.post(
+        "/damage_reports/new",
+        data={
+            "truck_number": "ST4",
+            "trailer_number": "TR2",
+            "plant_name": "Other",
+            "stage": "after",
+            "move_reference": "Ryder",
+            "description": "Leaving Ryder full fuel tank photo",
+            "photo": (BytesIO(b"fuel tank bytes"), "fuel-tank.jpg"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/ifta-worksheet/1")
+    with app.app_context():
+        from app.models import DamageReport, IftaFuelRecord, IftaWorksheet
+
+        assert DamageReport.query.count() == 0
+        worksheet = IftaWorksheet.query.one()
+        fuel = IftaFuelRecord.query.one()
+        assert worksheet.truck == "ST4"
+        assert worksheet.trailer == "TR2"
+        assert fuel.seller_name == "Ryder"
+        assert fuel.fuel_type == "Fuel level"
+        assert fuel.receipt_photo
+        assert fuel.receipt_data == b"fuel tank bytes"
+
+    view = client.get(response.headers["Location"])
+    body = view.get_data(as_text=True)
+    assert "Ryder" in body
+    assert "Fuel level" in body
+    assert 'class="ifta-receipt-preview"' in body
 
 
 def test_new_packet_outputs_avoid_banned_visible_terms(client, app):

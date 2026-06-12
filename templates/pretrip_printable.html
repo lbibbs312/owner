@@ -405,9 +405,25 @@
 
 
   {% set damage_photo_endpoint = 'manager.damage_photo' if current_user.role == 'management' else 'driver.damage_photo' %}
+  {% set inspection_media = pretrip_evidence_media|default([]) %}
+  {% if inspection_media %}
+    <div class="section-header">8. PreTrip Inspection Evidence</div>
+    <div class="remarks-block">
+      <div class="evidence-grid">
+        {% for media in inspection_media %}
+          <div class="evidence-photo">
+            <img src="{{ url_for('driver.packet_media', media_id=media.id) }}" alt="PreTrip inspection evidence {{ media.id }}">
+            <strong>Evidence #{{ media.id }}</strong><br>
+            {{ media.category|replace('_', ' ')|title }}{% if media.manager_note %} · {{ media.manager_note }}{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
   {% set evidence_reports = pretrip_damage_reports|default([]) %}
   {% if evidence_reports %}
-    <div class="section-header">8. PreTrip Damage Evidence</div>
+    <div class="section-header">{{ '9' if inspection_media else '8' }}. PreTrip Damage Evidence</div>
     <div class="remarks-block">
       {% for report in evidence_reports %}
         <strong>Report #{{ report.id }}:</strong> {{ report.description }}<br>

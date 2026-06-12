@@ -107,6 +107,11 @@
         </form>
         <details class="more-actions">
           <summary class="btn btn-outline-secondary">More Actions</summary>
+          {% if pretrip_evidence_target|default(false) %}
+            <form class="mt-2" method="POST" action="{{ url_for('driver.move_damage_report_to_pretrip_evidence', report_id=report.id) }}" onsubmit="return confirm('Move this photo to PreTrip inspection evidence and archive this damage report?');">
+              <button class="btn btn-outline-primary btn-sm" type="submit">Move to PreTrip Evidence</button>
+            </form>
+          {% endif %}
           <form class="mt-2" method="POST" action="{{ url_for('driver.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report? Evidence will remain attached.');">
             <button class="btn btn-outline-danger btn-sm" type="submit">Archive Report</button>
           </form>
@@ -117,6 +122,11 @@
 
   {% if not can_modify|default(false) and not manager_view|default(false) %}
     <div class="alert alert-secondary small">This report is locked because it was submitted or the route was finalized.</div>
+  {% endif %}
+  {% if pretrip_evidence_target|default(false) and can_modify|default(false) and not manager_view|default(false) %}
+    <div class="alert alert-warning small">
+      This report is linked to PreTrip #{{ pretrip_evidence_target.id }}. If this photo is inspection or fuel proof, move it to the PreTrip record instead of keeping it as damage.
+    </div>
   {% endif %}
 
   <header class="document-header print-only">

@@ -65,7 +65,7 @@
 	        {% set fuel = row.fuel %}
 	        <article class="ifta-fuel-record">
 	          <div>
-	            <strong>{{ fuel.seller_name or 'Fuel stop' }}</strong>
+	            <strong>{{ fuel.seller_name or fuel.fuel_type or 'Fuel purchase' }}</strong>
 	            {% if fuel.seller_address %}<span>{{ fuel.seller_address }}</span>{% endif %}
 	            {% if fuel.city or fuel.state_or_province %}<span>{{ [fuel.city, fuel.state_or_province]|select|join(', ') }}</span>{% endif %}
 	            <span>

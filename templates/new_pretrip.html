@@ -65,6 +65,11 @@
         {{ form.start_fuel_level(class="form-select") }}
       </div>
     </div>
+    <div class="mb-3">
+      {{ form.fuel_level_photo.label }}
+      {{ form.fuel_level_photo(class="form-control", accept="image/*", capture="environment") }}
+      <div class="form-text">Use this for fuel gauge, fuel tank, or normal inspection proof. It will not create a damage report.</div>
+    </div>
 
     <hr>
 
@@ -336,7 +341,7 @@
     <div class="mb-3">
       {{ form.damage_photo.label }}
       {{ form.damage_photo(class="form-control", accept="image/*", capture="environment") }}
-      <div class="form-text">Take a damage photo now or choose an existing image.</div>
+      <div class="form-text">Only use this when actual damage or a defect is being reported.</div>
     </div>
 
     <!-- 9) SUBMIT -->

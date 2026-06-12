@@ -65,6 +65,7 @@ from app.blueprints.driver.routes import (
     _build_plant_transfer_pdf,
     _build_pretrip_pdf,
     _pretrip_damage_reports,
+    _pretrip_evidence_media,
     _plant_transfer_copy_sets,
     _shift_record_for_driver_date,
     _task_route_events_for_logs,
@@ -2800,6 +2801,7 @@ def view_pretrip(pretrip_id):
         readonly=True,
         today_local_date=date.today(),
         pretrip_damage_reports=_pretrip_damage_reports(pretrip),
+        pretrip_evidence_media=_pretrip_evidence_media(pretrip),
         document_meta=_pretrip_document_meta(pretrip),
     )
 
@@ -2814,6 +2816,7 @@ def pretrip_printable(pretrip_id):
         ephemeral_date=None,
         email_mode=False,
         pretrip_damage_reports=_pretrip_damage_reports(pretrip),
+        pretrip_evidence_media=_pretrip_evidence_media(pretrip),
         document_meta=_pretrip_document_meta(pretrip),
     )
 

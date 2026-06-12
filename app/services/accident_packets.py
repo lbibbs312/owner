@@ -30,6 +30,8 @@ ACCIDENT_MEDIA_CATEGORIES = (
     "insurance_document",
     "fuel_receipt",
     "odometer_photo",
+    "pretrip_fuel_level",
+    "pretrip_inspection",
     "other",
 )
 ACCIDENT_TRIGGER_FIELDS = (

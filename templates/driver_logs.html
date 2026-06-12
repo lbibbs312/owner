@@ -1011,10 +1011,12 @@
           </a>
           <a class="md-route-audit-card" href="{{ fuel_card_href }}" aria-label="View fuel details">
             <span>Fuel</span>
-            {# A fuel stop counts whether it came from a route fuel flag or a Fuel-page purchase. #}
-            {% set fuel_stop_total = [audit.fuel_events|length, audit.fuel_purchase_count|default(0)]|max %}
-            <strong>{{ audit.start_fuel_level or 'Start not recorded' }} · {% if fuel_stop_total %}{{ fuel_stop_total }} fuel stop{{ 's' if fuel_stop_total != 1 else '' }}{% else %}No fuel stop{% endif %}</strong>
-            <small>Start: {{ audit.start_fuel_source or 'PreTrip or previous truck PostTrip needed.' }}{% if audit.fuel_purchase_labels %} · Bought: {{ audit.fuel_purchase_labels|join('; ') }}{% endif %}{% if audit.fuel_events %} · Stops: {% for fuel in audit.fuel_events %}{% if not loop.first %}; {% endif %}{% if fuel.sequence %}Stop {{ fuel.sequence }} · {% endif %}{{ fuel.plant }}{% if fuel.mileage is not none %} @ {{ "{:,}".format(fuel.mileage) }} mi{% endif %}{% endfor %}{% endif %}{% if not audit.fuel_events and not audit.fuel_purchase_labels and audit.end_fuel_level %} · End fuel {{ audit.end_fuel_level }}{% endif %}</small>
+            {% set fuel_purchase_count = audit.fuel_purchase_count|default(0) %}
+            {% set fuel_event_count = audit.fuel_events|length %}
+            {% set fuel_total = fuel_purchase_count if fuel_purchase_count else fuel_event_count %}
+            {% set fuel_word = 'record' if fuel_purchase_count else 'stop' %}
+            <strong>{{ audit.start_fuel_level or 'Start not recorded' }} · {% if fuel_total %}{{ fuel_total }} fuel {{ fuel_word }}{{ 's' if fuel_total != 1 else '' }}{% else %}No fuel record{% endif %}</strong>
+            <small>Start source: {{ audit.start_fuel_source or 'PreTrip or previous truck PostTrip needed.' }}{% if audit.fuel_purchase_labels %} · Purchases: {{ audit.fuel_purchase_labels|join('; ') }}{% endif %}{% if audit.fuel_events %} · Route fuel stops: {% for fuel in audit.fuel_events %}{% if not loop.first %}; {% endif %}{% if fuel.sequence %}Stop {{ fuel.sequence }} · {% endif %}{{ fuel.plant }}{% if fuel.mileage is not none %} @ {{ "{:,}".format(fuel.mileage) }} mi{% endif %}{% endfor %}{% endif %}{% if not audit.fuel_events and not audit.fuel_purchase_labels and audit.end_fuel_level %} · End fuel {{ audit.end_fuel_level }}{% endif %}</small>
           </a>
         </div>
 

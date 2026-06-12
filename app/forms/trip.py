@@ -36,6 +36,7 @@ class PreTripForm(FlaskForm):
     shift = SelectField("Shift", choices=[("1st", "1st"), ("2nd", "2nd"), ("3rd", "3rd")])
     start_mileage = IntegerField("Start Mileage")
     start_fuel_level = SelectField("Starting Fuel Level", choices=FUEL_LEVEL_CHOICES, default="")
+    fuel_level_photo = FileField("Fuel Level Photo")
     # Additional info
     truck_type = SelectField(
         "Truck Type",
