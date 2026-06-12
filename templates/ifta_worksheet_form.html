@@ -10,10 +10,11 @@
   .fuel-section { border:1px solid rgba(91,157,255,.22); border-radius:8px; padding:14px; margin-bottom:14px; background:rgba(8,14,24,.88); box-shadow:inset 0 1px 0 rgba(91,157,255,.06); }
   .fuel-section h2 { margin:0 0 12px; color:var(--md-amber, #c9972b); font-family:var(--md-mono); font-size:.76rem; font-weight:950; letter-spacing:.08em; text-transform:uppercase; }
   .fuel-record-list { display:grid; gap:8px; margin-bottom:14px; }
-  .fuel-record-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; padding:10px 12px; border:1px solid rgba(91,157,255,.18); border-radius:8px; background:rgba(255,255,255,.03); }
+  .fuel-record-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; padding:10px 12px; border:1px solid rgba(91,157,255,.18); border-radius:8px; background:rgba(255,255,255,.03); text-decoration:none; cursor:pointer; }
+  .fuel-record-row:active { border-color:rgba(91,157,255,.55); box-shadow:0 0 12px rgba(91,157,255,.22); }
   .fuel-record-row strong { display:block; color:var(--md-text); font-size:.92rem; overflow-wrap:anywhere; }
   .fuel-record-row span { display:block; margin-top:2px; color:var(--md-muted); font-family:var(--md-mono); font-size:.68rem; font-weight:800; line-height:1.35; }
-  .fuel-record-row a { display:inline-flex; align-items:center; justify-content:center; min-height:34px; padding:0 10px; border:1px solid rgba(91,157,255,.32); border-radius:8px; color:#dbeafe; text-decoration:none; font-weight:900; white-space:nowrap; }
+  .fuel-record-cta { display:inline-flex; align-items:center; gap:5px; margin-top:0 !important; color:#7fb2ff !important; white-space:nowrap; }
   .fuel-type-chips { display:flex; flex-wrap:wrap; gap:7px; margin-top:6px; }
   .fuel-type-chips button { min-height:32px; border:1px solid rgba(91,157,255,.3); border-radius:999px; background:rgba(91,157,255,.1); color:#dbeafe; padding:0 11px; font:inherit; font-size:.78rem; font-weight:900; cursor:pointer; }
   .fuel-type-chips button:active { transform:translateY(1px); }
@@ -39,7 +40,6 @@
   .actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
   @media (max-width:800px) {
     .context-grid, .field-grid, .fuel-record-row { grid-template-columns:1fr; }
-    .fuel-record-row a { width:100%; }
   }
 </style>
 
@@ -53,7 +53,8 @@
       <div class="fuel-record-list">
         {% for row in recent_fuel_rows %}
           {% set record = row.record %}
-          <div class="fuel-record-row">
+          {# The whole card opens the record — a card that does nothing reads as broken. #}
+          <a class="fuel-record-row" href="{{ url_for('driver.view_ifta_worksheet', worksheet_id=record.worksheet_id) }}" aria-label="Open fuel record">
             <div>
               <strong>{{ record.seller_name or 'Fuel stop' }}</strong>
               <span>
@@ -65,14 +66,11 @@
                 {% if record.fuel_type %} &middot; {{ record.fuel_type }}{% endif %}
               </span>
             </div>
-            {% if row.receipt_available %}
-              <a href="{{ url_for('driver.ifta_receipt', fuel_id=record.id) }}">Receipt</a>
-            {% elif record.receipt_photo %}
-              <span>Receipt unavailable</span>
-            {% else %}
-              <span>No receipt</span>
-            {% endif %}
-          </div>
+            <span class="fuel-record-cta">
+              {% if row.receipt_available %}Receipt saved{% elif record.receipt_photo %}Receipt unavailable{% else %}No receipt{% endif %}
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+            </span>
+          </a>
         {% endfor %}
       </div>
     </section>
