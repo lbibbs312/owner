@@ -109,7 +109,7 @@
       <div class="mt-2" id="gpsPlaceChoices" hidden>
         <label for="gpsPlaceSelect" class="form-label mb-1">Customer name matches</label>
         <select id="gpsPlaceSelect" class="form-select"></select>
-        <div class="form-text">Only places within about 20 ft show here. Pick one or type the customer name.</div>
+        <div class="form-text">Exact-address matches can fill the name. Nearby names are suggestions only.</div>
       </div>
       <div class="form-text">Correct this name once and it will be remembered for later stops.</div>
     </div>
@@ -341,16 +341,17 @@
                 applyAddress(addressCandidates[0], !auto);
                 if (trustedCandidate) {
                   applyCandidate(trustedCandidate, !auto, false);
+                  var trustMessage = trustedCandidate.address_match ? 'Customer matched from this address.' : 'Customer match is within 20 ft.';
                   gpsStatus.textContent = accuracy
-                    ? 'GPS set (+/-' + accuracy + ' m). Customer match is within 20 ft.'
-                    : 'GPS set. Customer match is within 20 ft.';
+                    ? 'GPS set (+/-' + accuracy + ' m). ' + trustMessage
+                    : 'GPS set. ' + trustMessage;
                   return;
                 }
                 if (googlePlaces.length || candidates.length) {
                   var setLabel = addressCandidates.length ? 'GPS address set' : 'GPS set';
                   gpsStatus.textContent = accuracy
-                    ? setLabel + ' (+/-' + accuracy + ' m). No customer name was close enough; type it or pick a close saved match.'
-                    : setLabel + '. No customer name was close enough; type it or pick a close saved match.';
+                    ? setLabel + ' (+/-' + accuracy + ' m). Nearby customer names are suggestions only.'
+                    : setLabel + '. Nearby customer names are suggestions only.';
                   return;
                 }
                 if (googleError) {

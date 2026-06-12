@@ -136,7 +136,7 @@
   function renderChoices(panel, btn, candidates) {
     var old = panel.querySelector('.md-gps-place-choice');
     if (old) old.remove();
-    if (!candidates || candidates.length < 2) return;
+    if (!candidates || !candidates.length) return;
     var wrap = document.createElement('div');
     wrap.className = 'md-gps-place-choice';
     var heading = document.createElement('label');
@@ -199,11 +199,13 @@
           } else if (best && trusted(best)) {
             if (addresses.length) applyAddress(btn, addresses[0], false);
             apply(btn, best, false);
-            status(panel, 'GPS: ' + (best.name || best.address) +
-              (formatDistance(best) ? ' (' + formatDistance(best) + ')' : ''));
+            status(panel, best.address_match
+              ? 'GPS: ' + (best.name || best.address) + ' at this address'
+              : 'GPS: ' + (best.name || best.address) +
+                (formatDistance(best) ? ' (' + formatDistance(best) + ')' : ''));
             renderChoices(panel, btn, places);
           } else if (places.length) {
-            status(panel, 'No customer match was within 20 ft. Type it if needed.');
+            status(panel, 'Nearby customer names are suggestions only.');
             renderChoices(panel, btn, places);
           } else {
             status(panel, lookupFailedMessage(data));

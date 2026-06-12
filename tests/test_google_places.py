@@ -29,7 +29,21 @@ def test_precise_gps_filters_far_google_place_and_uses_address(monkeypatch, flas
     get_calls = []
 
     def fake_post(url, *, headers, json, timeout):
-        post_calls.append(json)
+        post_calls.append((url, json))
+        if url == google_places.TEXT_SEARCH_URL:
+            return FakeResponse(
+                {
+                    "places": [
+                        {
+                            "id": "current-dock-address",
+                            "displayName": {"text": "Current Dock Manufacturing"},
+                            "formattedAddress": "1100 Current Dock Dr, Industrial City, MI 49512, USA",
+                            "location": {"latitude": 42.900936, "longitude": -85.531056},
+                            "types": ["manufacturer", "point_of_interest", "establishment"],
+                        }
+                    ]
+                }
+            )
         return FakeResponse(
             {
                 "places": [
@@ -73,8 +87,14 @@ def test_precise_gps_filters_far_google_place_and_uses_address(monkeypatch, flas
             hint="current dock",
         )
 
-    assert post_calls[0]["locationRestriction"]["circle"]["radius"] == 6
-    assert payload["places"] == []
+    assert post_calls[0][1]["locationRestriction"]["circle"]["radius"] == 75
+    assert post_calls[1][0] == google_places.TEXT_SEARCH_URL
+    assert post_calls[1][1]["textQuery"] == "1100 Current Dock Dr, Industrial City, MI 49512"
+    assert payload["places"][0]["name"] == "Current Dock Manufacturing"
+    assert payload["places"][0]["trusted"] is True
+    assert payload["places"][0]["address_match"] is True
+    assert payload["places"][1]["name"] == "Far Supplier Warehouse"
+    assert payload["places"][1]["trusted"] is False
     assert payload["fallback_address"] == "1100 Current Dock Dr, Industrial City, MI 49512"
     assert [item["address"] for item in payload["address_candidates"]] == [
         "1100 Current Dock Dr, Industrial City, MI 49512",
@@ -85,6 +105,8 @@ def test_precise_gps_filters_far_google_place_and_uses_address(monkeypatch, flas
 
 def test_precise_gps_keeps_close_google_place(monkeypatch, flask_app):
     def fake_post(url, *, headers, json, timeout):
+        if url == google_places.TEXT_SEARCH_URL:
+            return FakeResponse({"places": []})
         return FakeResponse(
             {
                 "places": [
@@ -123,9 +145,9 @@ def test_precise_gps_keeps_close_google_place(monkeypatch, flask_app):
             hint="current dock",
         )
 
-    assert payload["places"][0]["name"] == "Current Dock Manufacturing"
-    assert payload["places"][0]["distance_m"] <= 6
-    assert payload["places"][0]["trusted"] is True
+    close_match = next(place for place in payload["places"] if place["name"] == "Current Dock Manufacturing")
+    assert close_match["distance_m"] <= 6
+    assert close_match["trusted"] is True
     assert payload["fallback_address"] == "1100 Current Dock Dr, Industrial City, MI 49512"
     assert payload["address_candidates"][0]["address"] == "1100 Current Dock Dr, Industrial City, MI 49512"
 

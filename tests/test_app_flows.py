@@ -10519,7 +10519,7 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     assert "Place / customer name" in body
     assert "GPS address matches" in body
     assert "Customer name matches" in body
-    assert "Only places within about 20 ft show here" in body
+    assert "Exact-address matches can fill the name" in body
     assert "/gps/place-candidates" in body
     assert "nominatim.openstreetmap.org" not in body
     assert "Google Places key is missing on the server. Saved places only." in body
@@ -10527,7 +10527,7 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     assert "No Google places found here - type the address and name" in body
     assert "Google places could not be reached - type the address and name" in body
     assert "m away" in body
-    assert "No customer name was close enough" in body
+    assert "Nearby customer names are suggestions only" in body
 
     created = client.post(
         "/new_driving_log",

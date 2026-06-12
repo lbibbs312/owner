@@ -64,9 +64,9 @@ DESTINATION_GEOGRAPHY_TYPES = {
     "sublocality_level_1",
 }
 PREMISE_GEOCODE_TYPES = {"premise", "subpremise", "street_address"}
-DEFAULT_PLACE_RADIUS_M = 12
+DEFAULT_PLACE_RADIUS_M = 75
 CUSTOMER_PLACE_RADIUS_M = 6
-MAX_PLACE_RADIUS_M = 30
+MAX_PLACE_RADIUS_M = 110
 MIN_DESTINATION_QUERY_LENGTH = 4
 
 
@@ -104,9 +104,9 @@ def _candidate_radius_m(accuracy_m):
     if accuracy is None or accuracy <= 0:
         return DEFAULT_PLACE_RADIUS_M
     if accuracy <= 15:
-        return CUSTOMER_PLACE_RADIUS_M
+        return 75
     if accuracy <= 50:
-        return min(MAX_PLACE_RADIUS_M, max(CUSTOMER_PLACE_RADIUS_M, int(round(accuracy * 0.35))))
+        return min(MAX_PLACE_RADIUS_M, max(75, int(round(accuracy * 2))))
     return MAX_PLACE_RADIUS_M
 
 
@@ -242,6 +242,91 @@ def _fallback_address(lat, lng, key):
     return candidates[0]["address"] if candidates else ""
 
 
+def _address_signature(value):
+    value = _format_address(value).lower()
+    value = re.sub(r"\b(usa|united states)\b", "", value)
+    value = re.sub(r"\b\d{5}(?:-\d{4})?\b", "", value)
+    value = re.sub(r"[^a-z0-9]+", " ", value)
+    return " ".join(value.split())
+
+
+def _addresses_match(left, right):
+    left_sig = _address_signature(left)
+    right_sig = _address_signature(right)
+    if not left_sig or not right_sig:
+        return False
+    return left_sig == right_sig or left_sig in right_sig or right_sig in left_sig
+
+
+def _place_dedupe_key(place):
+    place_id = _clean(place.get("place_id") or place.get("id")).lower()
+    if place_id:
+        return f"id:{place_id}"
+    return "nameaddr:%s|%s" % (
+        _clean(place.get("name")).lower(),
+        _clean(place.get("address")).lower(),
+    )
+
+
+def _businesses_at_addresses(addresses, key, *, limit=4):
+    matches = []
+    seen = set()
+    for item in addresses[:2]:
+        address = item.get("address") if isinstance(item, dict) else item
+        address = _format_address(address)
+        if not address:
+            continue
+        response = requests.post(
+            TEXT_SEARCH_URL,
+            headers={
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": key,
+                "X-Goog-FieldMask": ",".join(
+                    [
+                        "places.id",
+                        "places.displayName",
+                        "places.formattedAddress",
+                        "places.shortFormattedAddress",
+                        "places.location",
+                        "places.types",
+                        "places.primaryType",
+                    ]
+                ),
+            },
+            json={
+                "textQuery": address,
+                "maxResultCount": limit,
+            },
+            timeout=6,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if payload.get("error"):
+            continue
+        for result in payload.get("places") or []:
+            place = _destination_place(result)
+            if not place or not place.get("name"):
+                continue
+            if not _addresses_match(address, place.get("address")):
+                continue
+            key_value = _place_dedupe_key(place)
+            if key_value in seen:
+                continue
+            seen.add(key_value)
+            place.update(
+                {
+                    "source": "google_address",
+                    "trusted": True,
+                    "address_match": True,
+                    "match_reason": "same_address",
+                }
+            )
+            matches.append(place)
+            if len(matches) >= limit:
+                return matches
+    return matches
+
+
 def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
     """Return likely business/place candidates near a raw browser GPS point."""
     key = _api_key()
@@ -314,7 +399,7 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
         address = _format_address(result.get("shortFormattedAddress") or result.get("formattedAddress"))
         if not name:
             continue
-        dedupe_key = (name.lower(), address.lower())
+        dedupe_key = _place_dedupe_key({"place_id": place_id, "name": name, "address": address})
         if dedupe_key in seen:
             continue
         seen.add(dedupe_key)
@@ -331,8 +416,6 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
             }
         )
 
-    tokens = _hint_tokens(hint)
-    candidates.sort(key=lambda item: (-_hint_score(item, tokens), item["distance_m"], item["name"].lower()))
     address_candidates = []
     fallback = ""
     try:
@@ -344,6 +427,28 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
             fallback = _fallback_address(lat, lng, key)
         except requests.RequestException:
             fallback = ""
+    address_place_matches = []
+    if address_candidates:
+        try:
+            address_place_matches = _businesses_at_addresses(address_candidates, key)
+        except requests.RequestException:
+            address_place_matches = []
+    for place in address_place_matches:
+        dedupe_key = _place_dedupe_key(place)
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        candidates.append(place)
+
+    tokens = _hint_tokens(hint)
+    candidates.sort(
+        key=lambda item: (
+            0 if item.get("address_match") else 1,
+            -_hint_score(item, tokens),
+            item.get("distance_m", 0),
+            item["name"].lower(),
+        )
+    )
     return {
         "ok": True,
         "places": candidates[:limit],
