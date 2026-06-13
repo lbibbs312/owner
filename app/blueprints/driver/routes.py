@@ -7901,8 +7901,14 @@ def mobile_dashboard():
         route_context=route_context,
     )
 
+    try:
+        daily_log_view = _daily_log_view_model(today_local_date, theme="dark")
+    except Exception:
+        daily_log_view = None
+
     return render_template(
         "driver_mobile.html",
+        daily_log_view=daily_log_view,
         route_map=route_map,
         route_map_mode=route_map_mode,
         route_cta=route_cta,

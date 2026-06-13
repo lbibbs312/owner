@@ -4921,7 +4921,7 @@
     <main>
       {% if current_user.is_day_driver %}
         {% if duty_card %}
-        <section style="margin:8px 12px;padding:12px;border-radius:9px;background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(10,17,28,.96));border:1px solid rgba(91,157,255,.22);box-shadow:0 18px 40px rgba(0,0,0,.28);">
+        <section class="duty-quickcard" style="margin:8px 12px;padding:12px;border-radius:9px;background:linear-gradient(180deg, rgba(15,26,41,.96), rgba(10,17,28,.96));border:1px solid rgba(91,157,255,.22);box-shadow:0 18px 40px rgba(0,0,0,.28);">
           <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:9px;">
             <span style="color:#8fa3bf;font-size:11px;font-weight:950;letter-spacing:.08em;text-transform:uppercase;">Duty Status &middot; Daily Log</span>
             <a href="{{ url_for('driver.daily_log') }}" style="color:#7fb2ff;font-size:12.5px;font-weight:800;text-decoration:none;">Today's Log &rarr;</a>
@@ -5028,9 +5028,89 @@
 
       </section>
 
-      {% if route_map %}
-        {% include "partials/_desktop_ops_workspace.html" %}
-      {% endif %}
+      {# ---- Widescreen driver view: big CTA · stops · HOS duty-grid log. Replaces the old desktop ops workspace (no documents/issues/packet). ---- #}
+      <style>
+        .md-desk-v3{display:none}
+        @media (min-width:640px) and (min-height:560px){
+          .board-only-shell .duty-quickcard{display:none}
+          .md-desk-v3{display:block;max-width:880px;margin:0 auto;padding:6px 0 8px}
+          .md-driver-bottom-nav.md-driver-bottom-nav{display:grid !important}
+          .driver-ops-shell.board-only-shell .wide-body{padding-bottom:118px}
+        }
+        .md-desk-v3 .md-v3-head{display:flex;justify-content:space-between;align-items:baseline;margin:2px 2px 9px}
+        .md-desk-v3 .md-v3-head .k{color:#8fa3bf;font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+        .md-desk-v3 .md-v3-head span:last-child{color:#7f93b3;font-size:12px;font-weight:700}
+        .md-v3-cta{display:flex;align-items:center;gap:18px;width:100%;text-decoration:none;margin:0 0 16px;padding:22px 24px;border-radius:16px;border:1px solid rgba(111,227,154,.4);background:linear-gradient(180deg,rgba(18,34,28,.9),rgba(10,18,24,.92));box-shadow:0 20px 50px rgba(0,0,0,.45),inset 0 0 50px rgba(111,227,154,.06)}
+        .md-v3-cta .ic{width:54px;height:54px;flex:0 0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(111,227,154,.12);border:1px solid rgba(111,227,154,.45);box-shadow:0 0 22px rgba(111,227,154,.3)}
+        .md-v3-cta .ic svg{width:24px;height:24px;color:#6fe39a;margin-left:2px}
+        .md-v3-cta .tx{display:flex;flex-direction:column;gap:3px;min-width:0}
+        .md-v3-cta .tx em{font-style:normal;font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#6fe39a}
+        .md-v3-cta .tx strong{font-size:26px;font-weight:850;letter-spacing:-.02em;color:#f3ede2;line-height:1.12}
+        .md-v3-cta .tx small{font-size:12.5px;color:#8fa3bf}
+        .md-v3-stops{margin:0 0 16px}
+        .md-v3-stop{display:flex;align-items:center;gap:13px;padding:12px 15px;border-radius:11px;margin-bottom:8px;background:rgba(15,24,38,.82);border:1px solid rgba(91,157,255,.16)}
+        .md-v3-stop.is-current{border-color:rgba(127,178,255,.5);box-shadow:0 0 18px rgba(91,157,255,.14)}
+        .md-v3-stop .num{width:30px;height:30px;flex:0 0 auto;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:#9fb6dd;background:rgba(10,17,28,.7);border:1px solid rgba(91,157,255,.22)}
+        .md-v3-stop .info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+        .md-v3-stop .info strong{font-size:14.5px;color:#e9eefb;font-weight:800}
+        .md-v3-stop .info small{font-size:11.5px;color:#8094b3;font-family:ui-monospace,Menlo,monospace}
+        .md-v3-stop .state{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#9fb6dd;white-space:nowrap}
+        .md-v3-empty{padding:18px;text-align:center;color:#7f93b3;font-size:13px;border:1px dashed rgba(91,157,255,.2);border-radius:11px}
+        .md-v3-log{padding:14px 16px;border-radius:14px;background:rgba(13,21,34,.85);border:1px solid rgba(91,157,255,.16)}
+        .md-v3-grid{margin:4px 0 10px;border-radius:10px;overflow:hidden}
+        .md-v3-grid svg{display:block;width:100%;height:auto}
+        .md-v3-hos{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+        .md-v3-hos .hos-cell{flex:1;min-width:120px;display:flex;flex-direction:column;gap:2px;padding:9px 12px;border-radius:9px;background:rgba(10,17,28,.6);border:1px solid rgba(91,157,255,.14)}
+        .md-v3-hos .hos-cell span{font-size:10.5px;color:#8094b3;font-family:ui-monospace,Menlo,monospace;text-transform:uppercase;letter-spacing:.06em}
+        .md-v3-hos .hos-cell strong{font-size:16px;color:#f3ede2;font-weight:800}
+        .md-v3-log-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:11.5px;color:#7f93b3}
+        .md-v3-log-foot a{color:#7fb2ff;text-decoration:none;font-weight:700}
+      </style>
+      <div class="md-desk-v3">
+        {% set v3_url = (cta_urls.get(primary.action) if primary and cta_urls.get(primary.action) else (cta_urls.get('add_stop') or url_for('driver.new_driving_log'))) %}
+        <a class="md-v3-cta" href="{{ v3_url }}">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
+          <span class="tx">
+            <em>{% if current_stop %}Current stop &middot; {{ current_stop.plant_name }}{% else %}Ready for dispatch{% endif %}</em>
+            <strong>{{ (primary.label if primary else none) or cta.next_action or 'Log first stop' }}</strong>
+            {% if cta.route_state_message %}<small>{{ cta.route_state_message }}</small>{% endif %}
+          </span>
+        </a>
+
+        {% set v3_stop_count = route_map.stops|length if route_map and route_map.stops else 0 %}
+        <section class="md-v3-stops">
+          <div class="md-v3-head"><span class="k">Route Stops</span><span>{{ v3_stop_count }} stop{{ 's' if v3_stop_count != 1 else '' }}</span></div>
+          {% if route_map and route_map.stops %}
+            {% for stop in route_map.stops %}
+              <div class="md-v3-stop {% if current_stop and stop.stop_id == current_stop.id %}is-current{% endif %}">
+                <span class="num">{{ stop.sequence }}</span>
+                <div class="info">
+                  <strong>{{ stop.plant_name }}</strong>
+                  <small>Arrived {{ stop.arrival_at|display_time if stop.arrival_at else '—' }} &middot; Departed {{ stop.departure_at|to_12h_format if stop.departure_at else 'pending' }}</small>
+                </div>
+                <span class="state">{{ stop.board_badge.label if stop.board_badge else (stop.status|capitalize if stop.status else 'Stop') }}</span>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="md-v3-empty">No stops logged yet — use the action above to log your first stop.</div>
+          {% endif %}
+        </section>
+
+        {% if daily_log_view and daily_log_view.grid_svg %}
+        <section class="md-v3-log">
+          <div class="md-v3-head"><span class="k">Daily Log &middot; Hours of Service</span><span>as of {{ daily_log_view.as_of_label }}</span></div>
+          <div class="md-v3-grid">{{ daily_log_view.grid_svg|safe }}</div>
+          {% if daily_log_view.hos_check %}
+          <div class="md-v3-hos">
+            {% for label, value in daily_log_view.hos_check %}
+              <div class="hos-cell"><span>{{ label }}</span><strong>{{ value }}</strong></div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <div class="md-v3-log-foot"><span>{{ daily_log_view.not_an_eld }}</span><a href="{{ url_for('driver.daily_log') }}">Full log &rarr;</a></div>
+        </section>
+        {% endif %}
+      </div>
 
 	      {% if not board_only_home and task_queue %}
       <section class="list">
