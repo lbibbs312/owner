@@ -5645,11 +5645,12 @@ def record_driver_log_photo(log_id):
             note=request.form.get("note"),
             uploaded_by_id=current_user.id,
         )
-    except ValueError:
+    except ValueError as exc:
         db.session.rollback()
+        message = str(exc) or "File was not saved. Try again."
         if _photo_upload_wants_json():
-            return jsonify({"error": "File was not saved. Try again."}), 400
-        flash("UPLOAD FAILED\nFile was not saved. Try again.", "danger")
+            return jsonify({"error": message}), 400
+        flash(f"UPLOAD FAILED\n{message}", "danger")
         return redirect(next_url)
     except Exception:
         db.session.rollback()

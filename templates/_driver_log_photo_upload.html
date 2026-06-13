@@ -8,6 +8,9 @@
   .stop-photo-type-grid label { min-height:38px; display:flex; align-items:center; justify-content:center; margin:0; border:1px solid rgba(91,157,255,.25); border-radius:8px; background:rgba(6,10,18,.46); color:#dbeafe; font-size:.72rem; font-weight:900; letter-spacing:.04em; text-transform:uppercase; cursor:pointer; }
   .stop-photo-type-grid input:checked + label { border-color:rgba(255,178,36,.58); background:rgba(255,178,36,.16); color:#fff3d2; box-shadow:0 0 18px rgba(255,178,36,.12); }
   .stop-photo-status { margin-top:4px; color:#8a99b3; font-size:.82rem; font-weight:800; min-height:1.2em; }
+  .stop-photo-status[data-tone="working"] { color:#dbeafe; }
+  .stop-photo-status[data-tone="success"] { color:#7dd3a8; }
+  .stop-photo-status[data-tone="error"] { color:#ffbbb7; }
   .stop-photo-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,260px)); gap:12px; margin-top:10px; }
   .stop-photo-card { display:block; border:1px solid rgba(91,157,255,.24); border-radius:8px; overflow:hidden; background:rgba(6,10,18,.64); color:#f6f8fb; }
   .stop-photo-card .stop-photo-image-link { display:block; color:#f6f8fb; text-decoration:none; }
@@ -20,9 +23,11 @@
   .stop-photo-panel .text-muted { color:#8a99b3!important; }
 </style>
 {% set photo_source_prefix = photo_source_prefix|default('stop') %}
+{% set stop_photo_panel_title = stop_photo_panel_title|default('Add Paperwork and Proof Photo') %}
+{% set stop_photo_panel_help = stop_photo_panel_help|default('Take a picture or upload an image of the BOL, manifest, transfer sheet, route sheet, or stop proof.') %}
 <section class="stop-photo-panel" data-stop-photo-panel data-upload-url="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}">
-  <h3 class="h6 mb-1">Add Paperwork and Proof Photo</h3>
-  <p class="text-muted small mb-2">Take a picture or upload an image of the BOL, manifest, transfer sheet, route sheet, or stop proof.</p>
+  <h3 class="h6 mb-1">{{ stop_photo_panel_title }}</h3>
+  <p class="text-muted small mb-2">{{ stop_photo_panel_help }}</p>
   <div class="stop-photo-type-grid" role="radiogroup" aria-label="Photo document type">
     <input id="stopPhotoTypeBol-{{ photo_source_prefix }}" type="radio" name="stop_photo_type_{{ photo_source_prefix }}" value="bol_manifest" data-stop-photo-type checked>
     <label for="stopPhotoTypeBol-{{ photo_source_prefix }}">BOL and Manifest</label>

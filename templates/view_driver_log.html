@@ -482,11 +482,12 @@
             {% if not log.depart_time %}
               <a class="btn btn-success" href="{{ url_for('driver.depart_driver_log', log_id=log.id) }}">Record departure</a>
             {% endif %}
-            <form action="{{ url_for('driver.record_driver_log_photo', log_id=log.id) }}" method="POST" enctype="multipart/form-data">
-              <input type="hidden" name="source" value="proof">
-              <input type="hidden" name="next" value="{{ request.full_path }}">
-              <label class="btn btn-primary mb-0" style="cursor:pointer">Attach proof<input type="file" name="photo" accept="image/*" capture="environment" style="display:none" onchange="if(this.files.length){this.form.submit();}"></label>
-            </form>
+            <div style="grid-column:1 / -1;">
+              {% set photo_source_prefix = 'issue' %}
+              {% set stop_photo_panel_title = 'Attach Stop Proof' %}
+              {% set stop_photo_panel_help = 'Take or upload the BOL, transfer sheet, route sheet, or stop proof for this review item. MoveDefense shows the upload result here.' %}
+              {% include "_driver_log_photo_upload.html" %}
+            </div>
             <form action="{{ url_for('driver.request_manager_review', log_id=log.id) }}" method="POST">
               <input type="hidden" name="reason" value="{{ primary_issue.label }}: {{ primary_issue.reason }}">
               <button class="btn btn-outline-danger" type="submit">Send to manager review</button>
@@ -555,5 +556,6 @@
     {% endif %}
   </div>
 </div>
+<script src="{{ url_for('static', filename='js/driver-log-photos.js') }}"></script>
 {% include 'partials/_md_bottom_nav.html' %}
 {% endblock %}

@@ -4567,7 +4567,7 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
         headers={"Accept": "application/json"},
     )
     assert missing_file_upload.status_code == 400
-    assert missing_file_upload.get_json()["error"] == "File was not saved. Try again."
+    assert missing_file_upload.get_json()["error"] == "Choose a photo from your gallery or camera before saving proof."
 
     paperwork_upload = client.post(
         f"/driver_logs/{log_id}/photos",
@@ -4759,6 +4759,70 @@ def test_driver_can_upload_stop_photos_from_edit_and_depart_gallery(client, app)
     assert client.get(f"/driver_logs/photos/{paperwork_photo_id}").status_code == 404
     with app.app_context():
         assert DriverLogPhoto.query.count() == 0
+
+
+def test_driver_log_issue_review_attach_proof_uses_visible_upload_panel(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverLog
+
+        driver = create_user("issue_photo_driver", "issue-photo@example.com", "driver")
+        log = DriverLog(
+            driver_id=driver.id,
+            date=date.today(),
+            plant_name="Barden plater",
+            location_address="4090 Barden St SE, Grand Rapids, MI",
+            load_size="Pallets",
+            arrive_time="2026-06-12 20:45:00",
+        )
+        db.session.add(log)
+        db.session.commit()
+        log_id = log.id
+
+    login(client, "issue_photo_driver")
+    page = client.get(f"/view_driver_log/{log_id}")
+    assert page.status_code == 200
+    assert b"Issue Review" in page.data
+    assert b"Proof found" in page.data
+    assert b"None on file" in page.data
+    assert b"Attach Stop Proof" in page.data
+    assert b"MoveDefense shows the upload result here." in page.data
+    assert b"Upload From Gallery" in page.data
+    assert b"Take New Photo" in page.data
+    assert b'data-stop-photo-input="issue_gallery"' in page.data
+    assert b'capture="environment" data-stop-photo-input="issue_camera"' in page.data
+    assert b"driver-log-photos.js" in page.data
+    assert b'onchange="if(this.files.length){this.form.submit();}"' not in page.data
+
+    missing_upload = client.post(
+        f"/driver_logs/{log_id}/photos",
+        data={"document_type": "proof_photo", "source": "issue_gallery"},
+        headers={"Accept": "application/json"},
+    )
+    assert missing_upload.status_code == 400
+    assert missing_upload.get_json()["error"] == "Choose a photo from your gallery or camera before saving proof."
+
+    proof_upload = client.post(
+        f"/driver_logs/{log_id}/photos",
+        data={
+            "document_type": "proof_photo",
+            "source": "issue_gallery",
+            "photo": (BytesIO(b"issue-proof-photo"), "issue-proof.jpg"),
+        },
+        headers={"Accept": "application/json"},
+    )
+    assert proof_upload.status_code == 200
+    proof_photo = proof_upload.get_json()["photo"]
+    assert proof_photo["source"] == "Proof Photo Issue Gallery"
+    assert proof_photo["note"] == "Proof photo"
+    assert client.get(proof_photo["url"]).data == b"issue-proof-photo"
+
+    refreshed = client.get(f"/view_driver_log/{log_id}")
+    assert refreshed.status_code == 200
+    assert b"Proof photo" in refreshed.data
+    assert b"Remove Photo" in refreshed.data
 
 
 def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_review(client, app):

@@ -29,23 +29,38 @@
     const list = panel.querySelector('[data-stop-photo-list]');
     const noteInput = panel.querySelector('[data-stop-photo-note]');
 
+    function setStatus(message, tone) {
+      if (!status) return;
+      status.textContent = message || '';
+      status.dataset.tone = tone || '';
+    }
+
     function selectedType() {
       const checked = panel.querySelector('[data-stop-photo-type]:checked');
       return checked ? checked.value : 'bol_manifest';
     }
 
     async function uploadFile(file, source) {
+      if (!uploadUrl) {
+        setStatus('Upload is not available on this screen. Refresh and try again.', 'error');
+        return;
+      }
+      if (!list) {
+        setStatus('Upload area did not load correctly. Refresh and try again.', 'error');
+        return;
+      }
       if (!file) {
-        if (status) status.textContent = 'No file selected.';
+        setStatus('No photo selected.', 'error');
         return;
       }
       const note = noteInput ? noteInput.value.trim() : '';
       const docType = selectedType();
       const formData = new FormData();
       formData.append('photo', file);
-      formData.append('source', docType + '_' + (source || 'gallery'));
+      formData.append('document_type', docType);
+      formData.append('source', source || 'gallery');
       formData.append('note', note);
-      if (status) status.textContent = 'Uploading paperwork photo...';
+      setStatus('Uploading photo...', 'working');
       const response = await fetch(uploadUrl, {
         method: 'POST',
         headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'},
@@ -53,10 +68,10 @@
       });
       const contentType = response.headers.get('content-type') || '';
       const payload = contentType.indexOf('application/json') !== -1 ? await response.json() : {};
-      if (!response.ok) throw new Error(payload.error || 'Photo upload failed.');
+      if (!response.ok) throw new Error(payload.error || 'Photo upload failed. Refresh and try again.');
       addPhotoCard(list, payload.photo);
       if (noteInput) noteInput.value = '';
-      if (status) status.textContent = 'Photo attached to this stop.';
+      setStatus('Photo attached to this stop.', 'success');
       if (window.MoveDefenseToast && typeof window.MoveDefenseToast.success === 'function') {
         window.MoveDefenseToast.success('PHOTO ATTACHED', 'Paperwork / proof saved');
       }
@@ -77,7 +92,11 @@
       button.addEventListener('click', function () {
         const source = button.dataset.source || 'gallery';
         const input = panel.querySelector('[data-stop-photo-input="' + source + '"]');
-        if (input) input.click();
+        if (input) {
+          input.click();
+        } else {
+          setStatus('Photo picker is not available. Refresh and try again.', 'error');
+        }
       });
     });
 
@@ -88,7 +107,7 @@
           await uploadFile(file, input.dataset.stopPhotoInput || 'gallery');
         } catch (err) {
           const message = err.message || 'Photo upload failed.';
-          if (status) status.textContent = message;
+          setStatus(message, 'error');
           if (window.MoveDefenseToast && typeof window.MoveDefenseToast.show === 'function') {
             window.MoveDefenseToast.show('UPLOAD FAILED', message, 'error');
           }
