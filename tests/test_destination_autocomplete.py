@@ -419,7 +419,8 @@ def test_start_route_button_disabled_until_destination_on_first_stop(client, app
     assert "function suggestionLabel" in body
     assert "input.value = resolvedName" in body
     assert "applyDestination(data.destination, s)" in body
-    assert '<button type="button" class="btn btn-sm mt-2" id="destinationChangeBtn">Change Destination</button>' in body
+    assert "if (destinationConfirmed()) clearSelection();" in body
+    assert "destinationChangeBtn" not in body
 
 
 def test_manual_destination_saved_when_google_unavailable(client, app):

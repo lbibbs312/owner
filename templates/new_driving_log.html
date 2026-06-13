@@ -169,15 +169,6 @@
       .dest-summary-list { list-style: none; padding: 0; margin: .15rem 0 0; color: #d7e3f7; }
       .dest-summary-list li { font-size: .88rem; line-height: 1.4; margin-bottom: 3px; }
       .dest-summary-empty { color: #9fb3d1; font-size: .85rem; margin-top: .15rem; }
-      #destinationSelected #destinationChangeBtn {
-        background: rgba(91,157,255,.14) !important;
-        border: 1px solid rgba(91,157,255,.5) !important;
-        box-shadow: 0 0 14px rgba(91,157,255,.24) !important;
-        color: #eaf2ff !important;
-        min-width: 148px;
-        max-width: 100%;
-        white-space: normal;
-      }
       #destinationSuggestions .list-group-item {
         background: rgba(12,19,34,.96);
         border: 1px solid rgba(91,157,255,.20);
@@ -190,8 +181,7 @@
         color: #ffffff;
       }
       #destinationSuggestions .text-muted { color: #9fb3d1 !important; }
-      #destinationSection #destinationManualBtn,
-      #destinationSection #destinationChangeBtn {
+      #destinationSection #destinationManualBtn {
         background: rgba(91,157,255,.14);
         border: 1px solid rgba(91,157,255,.5);
         box-shadow: 0 0 14px rgba(91,157,255,.25);
@@ -230,7 +220,6 @@
             <div class="dest-summary-empty" id="mapsSummaryEmpty" hidden>No Maps driver summary available yet.</div>
           </div>
           {% endif %}
-          <button type="button" class="btn btn-sm mt-2" id="destinationChangeBtn">Change Destination</button>
         </div>
       </div>
     </div>
@@ -738,7 +727,6 @@
         var selected = document.getElementById('destinationSelected');
         var goingName = document.getElementById('destinationGoingName');
         var goingAddress = document.getElementById('destinationGoingAddress');
-        var changeBtn = document.getElementById('destinationChangeBtn');
         var summaryList = document.getElementById('driverSummaryLines');
         var summaryEmpty = document.getElementById('mapsSummaryEmpty');
         var autocompleteUrl = section.getAttribute('data-autocomplete-url');
@@ -947,11 +935,6 @@
           });
         }
         if (manualBtn) manualBtn.addEventListener('click', manualConfirm);
-        if (changeBtn) changeBtn.addEventListener('click', function () {
-          clearSelection();
-          if (input) { input.value = ''; input.focus(); }
-          sessionToken = newToken();
-        });
         if (latInput) ['input', 'change'].forEach(function (ev) { latInput.addEventListener(ev, syncStartButton); });
         if (addressInput) addressInput.addEventListener('input', syncStartButton);
         if (nameInput) nameInput.addEventListener('input', syncStartButton);
