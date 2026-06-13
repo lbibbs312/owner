@@ -2796,6 +2796,8 @@ def test_pretrip_create_and_print_route(client, app):
     assert b"Fuel Level" in printable.data
     assert b"Start 1/2" in printable.data
     assert b"End 1/4" in printable.data
+    assert f'href="/pretrip_printable/{pretrip_id}?autoprint=1"'.encode() in printable.data
+    assert f'href="/pretrip_printable/{pretrip_id}/attachment"'.encode() not in printable.data
     assert b"Edit PreTrip Before Printing" in printable.data
     assert b"Document No:" in printable.data
     assert b"Generated:" in printable.data
@@ -2813,6 +2815,8 @@ def test_pretrip_create_and_print_route(client, app):
     assert pdf.status_code == 200
     assert b"Document No:" in pdf.data
     assert b"Generated:" in pdf.data
+    assert b"End: 1/4" in pdf.data
+    assert b"ending fuel 1/4" in pdf.data
     assert b"PreTrip Damage Evidence" in pdf.data
     assert b"Photo ID #" in pdf.data
 
@@ -6129,6 +6133,7 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
             pretrip_date=route_date,
             shift="1st",
             start_mileage=1000,
+            start_fuel_level="Full",
         )
         db.session.add(pretrip)
         db.session.flush()
@@ -6141,7 +6146,7 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
         )
         db.session.add_all([
             shift,
-            PostTrip(pretrip_id=pretrip.id, end_mileage=1100, miles_driven=100),
+            PostTrip(pretrip_id=pretrip.id, end_mileage=1100, miles_driven=100, end_fuel_level="1/4"),
             DriverLog(
                 driver_id=driver.id,
                 date=route_date,
@@ -6206,12 +6211,16 @@ def test_end_of_day_signature_saves_after_posttrip_and_prints_for_manager(client
     eod_print = client.get("/end_of_day_print")
     assert eod_print.status_code == 200
     assert signature.encode() in eod_print.data
+    assert b"Start Fuel: Full" in eod_print.data
+    assert b"End Fuel: 1/4" in eod_print.data
     assert b" UTC" not in eod_print.data
 
     eod_pdf = client.get("/end_of_day_print/attachment")
     assert eod_pdf.status_code == 200
     assert eod_pdf.headers["Content-Type"] == "application/pdf"
     assert b"Driver e-signature captured" in eod_pdf.data
+    assert b"Start Fuel: Full" in eod_pdf.data
+    assert b"End Fuel: 1/4" in eod_pdf.data
 
     client.get("/logout")
     login(client, "manager1")

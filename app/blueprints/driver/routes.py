@@ -922,6 +922,14 @@ def _select_route_pretrip(pretrips, *, route_context=None, open_shift=None):
     return pretrips[0]
 
 
+def _pretrips_with_route_record_first(pretrips, *, route_context=None, open_shift=None):
+    pretrips = list(pretrips or [])
+    selected = _select_route_pretrip(pretrips, route_context=route_context, open_shift=open_shift)
+    if not selected:
+        return pretrips
+    return [selected] + [pretrip for pretrip in pretrips if pretrip.id != selected.id]
+
+
 def _soft_delete_record(record):
     record.deleted_at = datetime.utcnow()
     record.deleted_by_id = current_user.id
@@ -4113,7 +4121,7 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
     return pdf.build()
 
 
-def _build_eod_pdf(the_date, logs, plant_transfers, driver_signature=None, signature_timestamp=None):
+def _build_eod_pdf(the_date, logs, plant_transfers, driver_signature=None, signature_timestamp=None, pretrips=None):
     meta = _eod_document_meta(the_date, current_user, logs)
     pdf = SimplePdf("End of Day", LETTER)
     _draw_pdf_header(pdf, "END OF DAY ROUTE RECORD", meta["document_no"], meta["generated_at"], meta["page"], driver=current_user.display_name, date_value=the_date)
@@ -4139,7 +4147,37 @@ def _build_eod_pdf(the_date, logs, plant_transfers, driver_signature=None, signa
     y -= 12
     y = pdf.table(36, y, [32, 58, 48, 48, 100, 108, 86, 68], 24, ["Stop #", "Plant", "Arrive", "Depart", "Cargo In", "Cargo Out", "Wait", "Parts"], log_rows or [["--", "No logs", "", "", "", "", "", ""]], font_size=7)
     y -= 34
-    pdf.text(36, y, "2. Plant Transfers", size=12, bold=True)
+    pretrips = list(pretrips or [])
+    route_pretrip = pretrips[0] if pretrips else None
+    route_posttrip = getattr(route_pretrip, "posttrip", None) if route_pretrip else None
+    fuel_logs = [log for log in logs if getattr(log, "fuel", False) and getattr(log, "fuel_mileage", None) is not None]
+    mileage_rows = []
+    start_mileage = getattr(route_pretrip, "start_mileage", None) if route_pretrip else None
+    start_fuel = (getattr(route_pretrip, "start_fuel_level", None) or "").strip() if route_pretrip else ""
+    end_mileage = getattr(route_posttrip, "end_mileage", None) if route_posttrip else None
+    end_fuel = (getattr(route_posttrip, "end_fuel_level", None) or "").strip() if route_posttrip else ""
+    if start_mileage is not None or start_fuel:
+        mileage_rows.append([
+            "Pre-Trip Start",
+            f"{start_mileage:,} mi" if start_mileage is not None else "--",
+            f"Start Fuel: {start_fuel}" if start_fuel else "",
+        ])
+    for fuel_log in fuel_logs:
+        note = f"+{fuel_log.fuel_mileage - start_mileage:,} from start" if start_mileage is not None else ""
+        mileage_rows.append(["Fuel Stop", f"{fuel_log.fuel_mileage:,} mi", note])
+    if route_posttrip:
+        total_note = f" - {end_mileage - start_mileage:,} total mi" if end_mileage is not None and start_mileage is not None else ""
+        mileage_rows.append([
+            "Post-Trip End",
+            f"{end_mileage:,} mi" if end_mileage is not None else "--",
+            f"End Fuel: {end_fuel or 'Not recorded'}{total_note}",
+        ])
+    if mileage_rows:
+        pdf.text(36, y, "2. Mileage and Fuel Summary", size=12, bold=True)
+        y -= 14
+        y = pdf.table(36, y, [110, 95, 220], 22, ["Checkpoint", "Odometer", "Notes"], mileage_rows, font_size=7)
+        y -= 24
+    pdf.text(36, y, "3. Plant Transfers", size=12, bold=True)
     y -= 14
     transfer_rows = []
     for idx, transfer in enumerate(plant_transfers, start=1):
@@ -6473,7 +6511,13 @@ def end_of_day_print():
     plant_transfers = _active_plant_transfers_query().filter_by(
         user_id=current_user.id, transfer_date=today_local_date
     ).all()
-    pretrips_today = _active_pretrips_query().filter_by(user_id=current_user.id, pretrip_date=today_local_date).all()
+    route_context = build_route_context(driver_id=current_user.id, route_date=today_local_date)
+    open_shift = _open_shift_for_driver(current_user.id)
+    pretrips_today = _pretrips_with_route_record_first(
+        _route_pretrips_for_driver_date(current_user.id, today_local_date),
+        route_context=route_context,
+        open_shift=open_shift,
+    )
     drivers_logs = {current_user.display_name: logs}
     drivers_plant_transfers = {current_user.display_name: plant_transfers}
     drivers_pretrips = {current_user.display_name: pretrips_today}
@@ -6513,6 +6557,13 @@ def end_of_day_attachment():
     plant_transfers = _active_plant_transfers_query().filter_by(
         user_id=current_user.id, transfer_date=today_local_date
     ).all()
+    route_context = build_route_context(driver_id=current_user.id, route_date=today_local_date)
+    open_shift = _open_shift_for_driver(current_user.id)
+    pretrips_today = _pretrips_with_route_record_first(
+        _route_pretrips_for_driver_date(current_user.id, today_local_date),
+        route_context=route_context,
+        open_shift=open_shift,
+    )
     drivers_logs = {current_user.display_name: logs}
     drivers_plant_transfers = {current_user.display_name: plant_transfers}
     signature_shift = _shift_record_for_driver_date(current_user.id, today_local_date, require_signature=True)
@@ -6523,6 +6574,7 @@ def end_of_day_attachment():
             plant_transfers,
             driver_signature=signature_shift.driver_signature if signature_shift else None,
             signature_timestamp=signature_shift.signature_timestamp if signature_shift else None,
+            pretrips=pretrips_today,
         ),
         filename=f"end-of-day-{today_local_date}.pdf",
         target_type="end_of_day",

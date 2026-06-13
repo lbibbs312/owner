@@ -218,7 +218,6 @@
 <body>
 
 {% set document_meta = document_meta|default({'title': 'DAILY VEHICLE INSPECTION REPORT', 'document_no': 'DVIR-' ~ pretrip.id, 'generated_at': '', 'page': '1 of 1'}) %}
-{% set pretrip_attachment_endpoint = 'manager.pretrip_attachment' if current_user.role == 'management' else 'driver.pretrip_attachment' %}
 {% set pretrip_view_endpoint = 'manager.view_pretrip' if current_user.role == 'management' else 'driver.view_pretrip' %}
 {% set pretrip_mark_endpoint = 'manager.mark_pretrip_printed' if current_user.role == 'management' else 'driver.mark_pretrip_printed' %}
 {% set pretrip_print_endpoint = 'manager.pretrip_printable' if current_user.role == 'management' else 'driver.pretrip_printable' %}
@@ -236,7 +235,7 @@
       <a class="edit-btn" href="{{ url_for('driver.edit_pretrip_entry', pretrip_id=pretrip.id) }}">Edit PreTrip Before Printing</a>
     {% endif %}
     <button class="print-btn" type="button" onclick="{% if can_mark_printed %}markPrintedAndPrint(){% else %}window.print(){% endif %}">Print Document</button>
-    <a class="email-btn" href="{{ url_for(pretrip_attachment_endpoint, pretrip_id=pretrip.id) }}">Save PDF</a>
+    <a class="email-btn" href="{{ url_for(pretrip_print_endpoint, pretrip_id=pretrip.id, autoprint=1) }}">Save PDF</a>
     <a class="back-btn" href="{{ back_url }}">Back to Inspections</a>
   </div>
 </div>
