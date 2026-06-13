@@ -82,6 +82,36 @@
     {# Freight stop: where you are (memory + GPS) and what you're hauling. #}
     {% set fm = freight_memory or {'locations': [], 'commodities': [], 'weight_map': {}} %}
     {% set gps_place_hint = (next_stop_context.destination_label if next_stop_context and next_stop_context.destination_label else active_destination) %}
+    <style>
+      @keyframes gpsStatusSweep {
+        from { background-position: 180% 50%; }
+        to { background-position: -80% 50%; }
+      }
+      #gpsStatus {
+        min-height:1.1em;
+        transition:color .16s ease, opacity .16s ease;
+      }
+      #gpsStatus.is-loading {
+        display:inline-block;
+        font-weight:850;
+        color:transparent;
+        background:linear-gradient(90deg, rgba(139,153,179,.45) 0%, rgba(210,224,246,.72) 35%, #fff 50%, rgba(210,224,246,.72) 65%, rgba(139,153,179,.45) 100%);
+        background-size:220% 100%;
+        -webkit-background-clip:text;
+        background-clip:text;
+        animation:gpsStatusSweep 1.05s linear infinite;
+        filter:drop-shadow(0 0 7px rgba(255,255,255,.22));
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #gpsStatus.is-loading {
+          animation:none;
+          color:#f8fbff;
+          background:none;
+          -webkit-background-clip:border-box;
+          background-clip:border-box;
+        }
+      }
+    </style>
     <div class="mb-3">
       {{ form.location_address.label(class="form-label") }}
       <div class="d-flex gap-2 align-items-stretch">
@@ -93,7 +123,7 @@
       <input type="hidden" name="gps_latitude" id="gps_latitude" data-no-autosave="true">
       <input type="hidden" name="gps_longitude" id="gps_longitude" data-no-autosave="true">
       <input type="hidden" name="gps_accuracy_m" id="gps_accuracy_m" data-no-autosave="true">
-      <div class="form-text" id="gpsStatus" style="min-height:1.1em;"></div>
+      <div class="form-text" id="gpsStatus" role="status" aria-live="polite"></div>
     </div>
     <div class="mb-3">
       {{ form.location.label(class="form-label") }}
@@ -136,6 +166,13 @@
 
         function clean(value) {
           return (value || '').toString().trim();
+        }
+
+        function setGpsStatus(message, loading) {
+          if (!gpsStatus) return;
+          gpsStatus.textContent = message || '';
+          gpsStatus.classList.toggle('is-loading', !!loading);
+          gpsStatus.setAttribute('aria-busy', loading ? 'true' : 'false');
         }
 
         function formatDistance(candidate) {
@@ -395,11 +432,11 @@
 
         function fillFromGps(auto) {
           if (!navigator.geolocation) {
-            if (!auto) gpsStatus.textContent = 'GPS not available in this browser.';
+            if (!auto) setGpsStatus('GPS not available in this browser.', false);
             if (!auto) renderPlaceNotice('GPS is not available in this browser');
             return;
           }
-          gpsStatus.textContent = 'Getting precise location...';
+          setGpsStatus('Getting precise location...', true);
           bestPosition(function (pos) {
             var lat = pos.coords.latitude.toFixed(6), lon = pos.coords.longitude.toFixed(6);
             var accuracy = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : null;
@@ -412,7 +449,7 @@
             if (gpsPlaceHint) params.set('hint', gpsPlaceHint);
             if (!gpsPlacesUrl) {
               renderPlaceNotice('GPS lookup is not available on this page');
-              gpsStatus.textContent = 'GPS lookup is not available on this page.';
+              setGpsStatus('GPS lookup is not available on this page.', false);
               return;
             }
             fetch(gpsPlacesUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
@@ -433,40 +470,40 @@
                 if (trustedCandidate) {
                   applyCandidate(trustedCandidate, !auto, false);
                   var trustMessage = trustedCandidate.address_match ? 'Customer matched from this address.' : 'Customer match is within 20 ft.';
-                  gpsStatus.textContent = accuracy
+                  setGpsStatus(accuracy
                     ? 'GPS set (+/-' + accuracy + ' m). ' + trustMessage
-                    : 'GPS set. ' + trustMessage;
+                    : 'GPS set. ' + trustMessage, false);
                   return;
                 }
                 if (googlePlaces.length || candidates.length) {
                   var setLabel = addressCandidates.length ? 'GPS address set' : 'GPS set';
-                  gpsStatus.textContent = accuracy
+                  setGpsStatus(accuracy
                     ? setLabel + ' (+/-' + accuracy + ' m). Nearby customer names are suggestions only.'
-                    : setLabel + '. Nearby customer names are suggestions only.';
+                    : setLabel + '. Nearby customer names are suggestions only.', false);
                   return;
                 }
                 if (googleError) {
                   renderPlaceNotice(googleError);
-                  gpsStatus.textContent = googleError;
+                  setGpsStatus(googleError, false);
                   return;
                 }
                 if (!data.fallback_address) {
                   renderPlaceNotice('No Google places found here - type the address and name');
                 }
-                gpsStatus.textContent = googleError || (accuracy
+                setGpsStatus(googleError || (accuracy
                   ? 'GPS set (+/-' + accuracy + ' m). Type the place name if needed.'
-                  : 'GPS set. Type the place name if needed.');
+                  : 'GPS set. Type the place name if needed.'), false);
               })
               .catch(function () {
                 renderAddressChoices([]);
                 renderCandidates(savedPlaces);
                 if (!savedPlaces.length) renderPlaceNotice('Google places could not be reached - type the address and name');
-                gpsStatus.textContent = accuracy
+                setGpsStatus(accuracy
                   ? 'GPS coordinates set (+/-' + accuracy + ' m). Type or pick the place.'
-                  : 'GPS coordinates set. Type or pick the place.';
+                  : 'GPS coordinates set. Type or pick the place.', false);
               });
           }, function () {
-            gpsStatus.textContent = auto ? '' : 'Could not get GPS - type the address.';
+            setGpsStatus(auto ? '' : 'Could not get GPS - type the address.', false);
             if (!auto) renderPlaceNotice('Could not get GPS - type the address and name');
           });
         }
