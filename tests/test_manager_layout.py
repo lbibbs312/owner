@@ -209,6 +209,40 @@ def _ifta_worksheet(driver, **kw):
     return worksheet
 
 
+def test_manager_ifta_view_uses_manager_receipt_links(client, app):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import IftaFuelRecord
+
+        manager = _user("ifta_manager", "management")
+        driver = _user("ifta_manager_driver", "driver")
+        worksheet = _ifta_worksheet(driver)
+        fuel = IftaFuelRecord(
+            worksheet_id=worksheet.id,
+            purchase_date=date(2026, 6, 12),
+            seller_name="Manager Receipt Fuel",
+            fuel_type="Diesel",
+            receipt_photo="manager-receipt.jpg",
+            receipt_data=b"receipt bytes",
+            receipt_mimetype="image/jpeg",
+        )
+        db.session.add(fuel)
+        db.session.commit()
+        worksheet_id = worksheet.id
+        fuel_id = fuel.id
+
+    _login(client, "ifta_manager")
+    response = client.get(f"/manager/ifta-worksheet/{worksheet_id}")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "Manager Receipt Fuel" in body
+    assert f'href="/manager/ifta-worksheet/receipt/{fuel_id}"' in body
+    assert f'href="/ifta-worksheet/receipt/{fuel_id}"' not in body
+
+    receipt = client.get(f"/manager/ifta-worksheet/receipt/{fuel_id}")
+    assert receipt.status_code == 200
+
+
 def _seed_large_manager_dashboard(manager):
     from app.extensions import db
     from app.models import ExceptionEvent, Task

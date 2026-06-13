@@ -23,11 +23,29 @@
 	  .ifta-fuel-record strong { display:block; color:#0f172a; font-weight:950; overflow-wrap:anywhere; }
 	  .ifta-fuel-record span { display:block; margin-top:3px; color:#475569; font-size:.86rem; line-height:1.35; overflow-wrap:anywhere; }
 	  .ifta-receipt-preview { display:block; width:100%; max-height:240px; object-fit:contain; border:1px solid #cbd5e1; border-radius:8px; background:#fff; }
-	  .ifta-receipt-link { display:inline-block; margin-top:6px; overflow-wrap:anywhere; font-weight:900; }
+	  .ifta-receipt-open { display:block; color:inherit; text-decoration:none; }
+	  .ifta-receipt-link { display:inline-flex; align-items:center; justify-content:center; width:100%; min-height:36px; margin-top:6px; border:1px solid #bfdbfe; border-radius:8px; color:#2563eb; overflow-wrap:anywhere; font-weight:900; }
+	  .ifta-receipt-missing { display:inline-flex; align-items:center; min-height:36px; color:#475569; font-weight:850; }
+  body.md-shell .ifta-view { color:var(--md-text, #e6edf7); }
+  body.md-shell .ifta-top h1 { color:var(--md-text, #f8fafc); }
+  body.md-shell .ifta-top .text-muted { color:var(--md-muted, #96a5ba) !important; }
+  body.md-shell .ifta-panel { border-color:rgba(91,157,255,.22); background:rgba(8,14,24,.9); box-shadow:inset 0 1px 0 rgba(91,157,255,.06); }
+  body.md-shell .ifta-panel h2 { border-bottom-color:rgba(91,157,255,.16); color:var(--md-amber, #f0b860); }
+  body.md-shell .ifta-field { border-bottom-color:rgba(148,163,184,.12); }
+  body.md-shell .ifta-field span,
+  body.md-shell .ifta-fuel-record span,
+  body.md-shell .ifta-receipt-missing { color:var(--md-muted, #9fb3d1); }
+  body.md-shell .ifta-field strong,
+  body.md-shell .ifta-fuel-record strong { color:var(--md-text, #f8fafc); }
+  body.md-shell .ifta-fuel-record { border-bottom-color:rgba(91,157,255,.14); }
+  body.md-shell .ifta-receipt-preview { border-color:rgba(91,157,255,.26); background:rgba(5,13,23,.92); }
+  body.md-shell .ifta-receipt-link { border-color:rgba(91,157,255,.32); background:rgba(91,157,255,.12); color:#9ec5ff; }
+  body.md-shell .ifta-receipt-open:active .ifta-receipt-link { border-color:rgba(91,157,255,.62); box-shadow:0 0 14px rgba(91,157,255,.22); }
 	  @media (max-width:760px) { .ifta-grid { grid-template-columns:1fr 1fr; } .ifta-fuel-record { grid-template-columns:1fr; } }
   @media (max-width:520px) { .ifta-grid { grid-template-columns:1fr; } }
 </style>
 
+{% set receipt_endpoint = 'manager.ifta_receipt' if manager_view|default(false) else 'driver.ifta_receipt' %}
 <main class="ifta-view responsive-workspace">
   <div class="ifta-top">
     <div>
@@ -78,13 +96,15 @@
 	          </div>
 	          <div>
 	            {% if row.receipt_available %}
-	              {% set receipt_url = url_for('driver.ifta_receipt', fuel_id=fuel.id) %}
-	              {% if row.receipt_is_image %}
-	                <img class="ifta-receipt-preview" src="{{ receipt_url }}" alt="Fuel receipt row {{ row.number }}">
-	              {% endif %}
-	              <a class="ifta-receipt-link" href="{{ receipt_url }}">Open receipt</a>
+	              {% set receipt_url = url_for(receipt_endpoint, fuel_id=fuel.id) %}
+	              <a class="ifta-receipt-open" href="{{ receipt_url }}" target="_blank" rel="noopener" aria-label="Open fuel receipt row {{ row.number }}">
+	                {% if row.receipt_is_image %}
+	                  <img class="ifta-receipt-preview" src="{{ receipt_url }}" alt="Fuel receipt row {{ row.number }}">
+	                {% endif %}
+	                <span class="ifta-receipt-link">Open receipt</span>
+	              </a>
 	            {% else %}
-	              <span>Receipt not attached</span>
+	              <span class="ifta-receipt-missing">Receipt not attached</span>
 	            {% endif %}
 	          </div>
 	        </article>

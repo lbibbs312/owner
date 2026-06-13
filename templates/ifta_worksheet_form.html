@@ -17,6 +17,7 @@
   .fuel-record-row strong { display:block; color:var(--md-text); font-size:.92rem; overflow-wrap:anywhere; }
   .fuel-record-row span { display:block; margin-top:2px; color:var(--md-muted); font-family:var(--md-mono); font-size:.68rem; font-weight:800; line-height:1.35; }
   .fuel-record-cta { display:inline-flex !important; align-items:center; gap:5px; margin-top:0 !important; color:#7fb2ff !important; white-space:nowrap; text-decoration:none; }
+  .fuel-record-cta--muted { color:#8fa3bf !important; opacity:.9; }
   .fuel-type-chips { display:flex; flex-wrap:wrap; gap:7px; margin-top:6px; }
   .fuel-type-chips button { min-height:32px; border:1px solid rgba(91,157,255,.3); border-radius:999px; background:rgba(91,157,255,.1); color:#dbeafe; padding:0 11px; font:inherit; font-size:.78rem; font-weight:900; cursor:pointer; }
   .fuel-type-chips button:active { transform:translateY(1px); }
@@ -68,14 +69,13 @@
               </span>
             </a>
             {% if row.receipt_available %}
-              <a class="fuel-record-cta" href="{{ url_for('driver.ifta_receipt', fuel_id=record.id) }}" aria-label="Open saved fuel receipt">
+              <a class="fuel-record-cta" href="{{ url_for('driver.ifta_receipt', fuel_id=record.id) }}" target="_blank" rel="noopener" aria-label="Open saved fuel receipt">
                 Receipt saved
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
               </a>
             {% else %}
-              <span class="fuel-record-cta">
-                {% if record.receipt_photo %}Receipt unavailable{% else %}No receipt{% endif %}
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+              <span class="fuel-record-cta fuel-record-cta--muted" aria-label="No saved fuel receipt">
+                {% if record.receipt_photo %}Receipt unavailable{% else %}No receipt attached{% endif %}
               </span>
             {% endif %}
           </article>

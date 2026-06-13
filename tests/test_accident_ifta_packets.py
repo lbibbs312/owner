@@ -141,6 +141,7 @@ def test_fuel_page_shows_recent_records_first_with_receipt_button(client, app):
     assert "41.5 gal" in body
     assert "$151.23" in body
     assert 'href="/ifta-worksheet/receipt/' in body
+    assert 'target="_blank"' in body
 
 
 def test_blank_fuel_record_labels_use_captured_facts_not_fuel_stop(app):
@@ -430,6 +431,8 @@ def test_ifta_receipt_photo_renders_on_view_and_packet(client, app):
     body = view.get_data(as_text=True)
     assert "Pilot Fuel" in body
     assert "400 Fuel Plaza Dr" in body
+    assert "body.md-shell .ifta-panel" in body
+    assert 'class="ifta-receipt-open"' in body
     assert 'class="ifta-receipt-preview"' in body
     assert "Open receipt" in body
 
