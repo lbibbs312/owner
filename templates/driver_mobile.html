@@ -5066,6 +5066,15 @@
         .md-v3-hos .hos-cell strong{font-size:18px;color:#f3ede2;font-weight:800}
         .md-v3-log-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:11.5px;color:#7f93b3}
         .md-v3-log-foot a{color:#7fb2ff;text-decoration:none;font-weight:700}
+        /* ----- Actual desktop ONLY (>=1000px wide AND tall). Phone and the ~600px
+           tablet are below this, so nothing about their layout changes. ----- */
+        @media (min-width:1000px) and (min-height:560px){
+          .mobile-shell.board-only-shell{max-width:min(1340px,95vw);border-radius:18px}
+          .md-desk-v3{max-width:none;padding:4px 2px 8px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);grid-template-areas:"cta log" "stops log";gap:20px;align-items:start}
+          .md-v3-cta{grid-area:cta;margin:0}
+          .md-v3-stops{grid-area:stops;margin:0}
+          .md-v3-log{grid-area:log}
+        }
       </style>
       <div class="md-desk-v3">
         {% set v3_url = (cta_urls.get(primary.action) if primary and cta_urls.get(primary.action) else (cta_urls.get('add_stop') or url_for('driver.new_driving_log'))) %}
