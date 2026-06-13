@@ -10902,6 +10902,27 @@ def test_day_driver_can_log_stop_without_plant_and_carries_load_forward(client, 
     next_form = client.get("/new_driving_log")
     assert b"Steel coils" in next_form.data
 
+    # Day-driver logging is a lightweight current-location log. Recording the
+    # next stop should auto-close the prior open stop instead of blocking with
+    # the standard plant-route "Close the open stop" guard.
+    second = client.post(
+        "/new_driving_log",
+        data={"location": "Receiver Dock", "location_address": "500 Receiver Rd", "destination_skipped": "true"},
+        follow_redirects=False,
+    )
+    assert second.status_code in (302, 303)
+    with app.app_context():
+        from app.models import DriverLog
+
+        logs = DriverLog.query.order_by(DriverLog.id).all()
+        assert len(logs) == 2
+        assert logs[0].depart_time
+        assert logs[0].depart_load_size == "Steel coils (42000 lbs)"
+        assert logs[1].plant_name == "Receiver Dock"
+        assert logs[1].load_size == "Steel coils (42000 lbs)"
+        assert logs[1].commodity == "Steel coils"
+        assert logs[1].weight == "42000"
+
     # Printout reads as a day-driver package of captured facts only.
     print_page = client.get("/driver_logs_print")
     assert print_page.status_code == 200

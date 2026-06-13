@@ -5450,16 +5450,41 @@ def new_driving_log():
                 or (form.commodity.data or "").strip()[:120]
                 or "Day Route"
             )
+        now_utc = datetime.utcnow()
+        arrive_time_str = now_utc.strftime("%Y-%m-%d %H:%M:%S")
+
+        auto_closed_stop = None
+        auto_closed_departure_load = None
         open_stop = _open_stop_for_driver(current_user.id, local_date)
         if open_stop:
-            flash(f"Close the open stop at {_plant_label(open_stop.plant_name)} before creating the next stop.", "warning")
-            return redirect(next_url)
+            if not is_day_driver:
+                flash(f"Close the open stop at {_plant_label(open_stop.plant_name)} before creating the next stop.", "warning")
+                return redirect(next_url)
+            auto_closed_departure_load = (
+                (open_stop.depart_load_size or "").strip()
+                or (
+                    _freight_departure_label(
+                        open_stop.commodity,
+                        open_stop.weight,
+                        getattr(open_stop, "destination_place_name", None) or open_stop.destination or "",
+                    )
+                    if (open_stop.commodity or "").strip()
+                    else (open_stop.load_size or current_load_value or "Empty")
+                )
+            )
+            open_stop.depart_time = now_local.strftime("%H:%M")
+            open_stop.depart_load_size = auto_closed_departure_load
+            if open_stop.dock_wait_minutes is None:
+                open_stop.dock_wait_minutes = _auto_wait_minutes_for_departure(open_stop, now_local)
+            open_stop.no_pickup = is_empty_load(auto_closed_departure_load) and not open_stop.secondary_load
+            auto_closed_stop = open_stop
+            if not is_empty_load(auto_closed_departure_load):
+                current_load_value = freight_cargo_text(auto_closed_departure_load)
+            if open_stop.secondary_load:
+                current_secondary_value = open_stop.secondary_load
 
         arrival_load = current_load_value or "Empty"
         arrival_secondary_load = current_secondary_value or None
-
-        now_utc = datetime.utcnow()
-        arrive_time_str = now_utc.strftime("%Y-%m-%d %H:%M:%S")
 
         carried_commodity = (form.commodity.data or "").strip() or None
         carried_weight = (form.weight.data or "").strip() or None
@@ -5525,6 +5550,30 @@ def new_driving_log():
             date=local_date,
         )
         try:
+            if auto_closed_stop:
+                _append_driver_log_flow_event(
+                    auto_closed_stop,
+                    "DEPARTED_ORIGIN",
+                    notes=(
+                        f"Departed {_plant_label(auto_closed_stop.plant_name)} with "
+                        f"{cargo_display(auto_closed_stop.depart_load_size, auto_closed_stop.secondary_load)}."
+                    ),
+                    payload={"driver_action": "auto_depart_on_next_stop"},
+                )
+                record_activity(
+                    user_id=current_user.id,
+                    category="log",
+                    action="departed",
+                    title="Driver log departed",
+                    details=(
+                        f"{auto_closed_stop.plant_name} auto-closed at "
+                        f"{_format_display_time(auto_closed_stop.depart_time)} while recording the next stop."
+                    ),
+                    target_type="driver_log",
+                    target_id=auto_closed_stop.id,
+                    commit=False,
+                )
+                ingest_driver_log(auto_closed_stop, commit=False)
             db.session.add(newlog)
             db.session.flush()
             if (
@@ -5565,6 +5614,8 @@ def new_driving_log():
             current_app.logger.exception("Driver arrival could not be saved for user_id=%s", current_user.id)
             flash("Arrival could not be saved. Try again.", "danger")
             return _render_new_driving_log(form, current_load, route_context=route_context, return_to_mobile=return_to_mobile)
+        if auto_closed_stop:
+            _emit_driver_log_updated(auto_closed_stop, "departed")
         _emit_driver_log_updated(newlog, "submitted")
         flash("Arrival recorded.", "success")
         return redirect(url_for("driver.mobile_dashboard") if return_to_mobile else _driver_logs_url_for_date(newlog.date))
