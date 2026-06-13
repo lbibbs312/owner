@@ -67,6 +67,8 @@ from app.blueprints.driver.routes import (
     _build_pretrip_pdf,
     _pretrip_damage_reports,
     _pretrip_evidence_media,
+    _pretrip_support_report_label,
+    _pretrip_support_reports,
     _plant_transfer_copy_sets,
     _shift_record_for_driver_date,
     _task_route_events_for_logs,
@@ -1677,7 +1679,7 @@ def _build_manager_route_review_pdf(review):
     y -= 14
     if review["cargo_review"].get("pending_scan_rows"):
         y = _pdf_new_page_if_needed(pdf, y, 145)
-        pdf.text(36, y, "Pending Scan Evidence", size=9, bold=True)
+        pdf.text(36, y, "Pending Scan Proof", size=9, bold=True)
         y -= 12
         scan_rows = [[f"#{row['id']}", row["stop"], row["context"], row["status"], row["value"]] for row in review["cargo_review"]["pending_scan_rows"][:8]]
         y = pdf.table(36, y, [55, 135, 115, 115, 120], 20, ["Scan", "Stop", "Context", "Status", "Value"], scan_rows, font_size=7)
@@ -2280,7 +2282,7 @@ def delete_damage_report(report_id):
         category="damage",
         action="archived",
         title="Damage report archived by manager",
-        details=f"Damage report #{report.id} archived for {report.plant_name}; evidence remains attached.",
+        details=f"Damage report #{report.id} archived for {report.plant_name}; photos remain attached.",
         target_type="damage_report",
         target_id=report.id,
         commit=False,
@@ -2824,6 +2826,8 @@ def view_pretrip(pretrip_id):
         today_local_date=date.today(),
         pretrip_damage_reports=_pretrip_damage_reports(pretrip),
         pretrip_evidence_media=_pretrip_evidence_media(pretrip),
+        pretrip_support_reports=_pretrip_support_reports(pretrip),
+        pretrip_support_report_label=_pretrip_support_report_label,
         document_meta=_pretrip_document_meta(pretrip),
     )
 
@@ -2839,6 +2843,8 @@ def pretrip_printable(pretrip_id):
         email_mode=False,
         pretrip_damage_reports=_pretrip_damage_reports(pretrip),
         pretrip_evidence_media=_pretrip_evidence_media(pretrip),
+        pretrip_support_reports=_pretrip_support_reports(pretrip),
+        pretrip_support_report_label=_pretrip_support_report_label,
         document_meta=_pretrip_document_meta(pretrip),
     )
 

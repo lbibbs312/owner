@@ -65,15 +65,24 @@
 
   {% set damage_photo_endpoint = 'manager.damage_photo' if current_user.role == 'management' else 'driver.damage_photo' %}
   {% set inspection_media = pretrip_evidence_media|default([]) %}
-  {% if inspection_media %}
+  {% set support_reports = pretrip_support_reports|default([]) %}
+  {% if inspection_media or support_reports %}
     <div class="border rounded p-3 mb-3">
-      <h3 class="h6 text-uppercase text-muted">PreTrip Inspection Evidence</h3>
+      <h3 class="h6 text-uppercase text-muted">PreTrip Photos / Documents</h3>
       <div class="d-flex flex-wrap gap-2">
         {% for media in inspection_media %}
           <a href="{{ url_for('driver.packet_media', media_id=media.id) }}" target="_blank" rel="noopener" class="d-inline-block border rounded p-1 bg-light">
-            <img src="{{ url_for('driver.packet_media', media_id=media.id) }}" alt="PreTrip inspection evidence {{ media.id }}" style="width:150px;height:110px;object-fit:cover;display:block;">
-            <span class="d-block small text-muted mt-1">Evidence #{{ media.id }} · {{ media.category|replace('_', ' ')|title }}</span>
+            <img src="{{ url_for('driver.packet_media', media_id=media.id) }}" alt="PreTrip inspection photo {{ media.id }}" style="width:150px;height:110px;object-fit:cover;display:block;">
+            <span class="d-block small text-muted mt-1">Photo #{{ media.id }} · {{ media.category|replace('_', ' ')|title }}</span>
           </a>
+        {% endfor %}
+        {% for report in support_reports %}
+          {% for photo in report.photos %}
+            <a href="{{ url_for(damage_photo_endpoint, photo_id=photo.id) }}" target="_blank" rel="noopener" class="d-inline-block border rounded p-1 bg-light">
+              <img src="{{ url_for(damage_photo_endpoint, photo_id=photo.id) }}" alt="PreTrip support photo {{ photo.id }}" style="width:150px;height:110px;object-fit:cover;display:block;">
+              <span class="d-block small text-muted mt-1">{{ pretrip_support_report_label(report) if pretrip_support_report_label is defined else 'PreTrip inspection photo attached.' }}</span>
+            </a>
+          {% endfor %}
         {% endfor %}
       </div>
     </div>
@@ -82,7 +91,7 @@
   {% set evidence_reports = pretrip_damage_reports|default([]) %}
   {% if evidence_reports %}
     <div class="border rounded p-3 mb-3">
-      <h3 class="h6 text-uppercase text-muted">PreTrip Damage Evidence</h3>
+      <h3 class="h6 text-uppercase text-muted">PreTrip Damage Photos</h3>
       {% for report in evidence_reports %}
         <div class="mb-3{% if not loop.last %} border-bottom pb-3{% endif %}">
           <p class="mb-1"><strong>Report #{{ report.id }}:</strong> {{ report.description }}</p>

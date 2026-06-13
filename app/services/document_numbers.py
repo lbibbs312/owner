@@ -64,7 +64,7 @@ def transfer_document_number(transfer):
 
 
 def evidence_document_number(report):
-    return f"EVIDENCE-REPORT-{_record_token(report.id)}"
+    return f"PROOF-REPORT-{_record_token(report.id)}"
 
 
 def move_request_number(move_request):

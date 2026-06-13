@@ -109,7 +109,7 @@
 
       {% if followup_cases %}
       <section class="review-panel">
-        <div class="review-panel-head"><h3>Grouped Management Cases</h3><span>Related history, not route evidence</span></div>
+        <div class="review-panel-head"><h3>Grouped Management Cases</h3><span>Related history, not route proof</span></div>
         <div class="table-responsive">
           <table class="exception-table">
             <thead><tr><th>Case</th><th>Summary</th><th>Signals</th><th>Owner</th><th>Status</th></tr></thead>
@@ -210,7 +210,7 @@
                 <span><strong>{{ report.plant_name }}</strong> {{ report.stage|title }} move</span>
                 <span class="text-muted small">{{ report.truck_number or 'Truck not set' }} - {{ report.trailer_number or 'Trailer not set' }}</span>
               </a>
-              <form method="POST" action="{{ url_for('manager.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report from active review? Evidence will remain attached.');">
+              <form method="POST" action="{{ url_for('manager.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report from active review? Photos remain attached.');">
                 <input type="hidden" name="next" value="{{ url_for('manager.review_dashboard') }}">
                 <button class="btn btn-sm btn-outline-danger" type="submit">Archive</button>
               </form>

@@ -2276,7 +2276,7 @@ def test_manager_route_review_regression_phantom_scans_excluded_but_real_scans_i
     response = client.get(f"/manager/driver-logs/route-print?driver_id={driver_id}&date={date.today().isoformat()}")
 
     assert response.status_code == 200
-    assert b"Pending Scan Evidence" in response.data
+    assert b"Pending Scan Proof" in response.data
     assert b"CUR111" in response.data
     assert b"OLD222" not in response.data
     assert b"ORP333" not in response.data
@@ -2407,7 +2407,7 @@ def test_manager_route_review_separates_route_truck_mileage_from_extra_dvir(clie
     assert b"Approval Blocked By" in response.data
     assert b"2 scans need manager confirmation" not in response.data
     assert b"pending cargo scan" not in response.data
-    assert b"Pending Scan Evidence" not in response.data
+    assert b"Pending Scan Proof" not in response.data
     assert b"Cargo status" in response.data
     assert b"No cargo mismatch was detected from driver-entered route data" in response.data
     assert b"Cargo verification source: driver route entries + scan records only" in response.data
@@ -2617,7 +2617,7 @@ def test_damage_evidence_packet_includes_timeline_hashes_related_records_and_war
     assert packet.status_code == 200
     assert b"Packet Cover Page" in packet.data
     assert b"Full Event Timeline" in packet.data
-    assert b"Photo and Media Evidence" in packet.data
+    assert b"Photos and Media" in packet.data
     assert b"Chain of Custody" in packet.data
     assert b"Related Route Records" in packet.data
     assert b"PreTrip DVIR created" in packet.data
@@ -2769,7 +2769,7 @@ def test_pretrip_create_and_print_route(client, app):
     assert manager_pretrip.status_code == 200
     assert b"Working" in manager_pretrip.data
     assert b"Blank" not in manager_pretrip.data
-    assert b"PreTrip Damage Evidence" in manager_pretrip.data
+    assert b"PreTrip Damage Photos" in manager_pretrip.data
     assert b"Scratch on bumper" in manager_pretrip.data
     assert b"/manager/damage-photos/" in manager_pretrip.data
     client.get("/logout")
@@ -2805,7 +2805,7 @@ def test_pretrip_create_and_print_route(client, app):
     assert b"Use Edit PreTrip" not in printable.data
     assert b"print on Letter paper" not in printable.data
     assert b"Driver One" in printable.data
-    assert b"PreTrip Damage Evidence" in printable.data
+    assert b"PreTrip Damage Photos" in printable.data
     assert b"Scratch on bumper" in printable.data
     assert b"/damage_reports/photos/" in printable.data
     assert "&#10003;".encode() in printable.data
@@ -2817,7 +2817,7 @@ def test_pretrip_create_and_print_route(client, app):
     assert b"Generated:" in pdf.data
     assert b"End: 1/4" in pdf.data
     assert b"ending fuel 1/4" in pdf.data
-    assert b"PreTrip Damage Evidence" in pdf.data
+    assert b"PreTrip Damage Photos" in pdf.data
     assert b"Photo ID #" in pdf.data
 
     activity = client.get("/recent_activity")
@@ -2881,7 +2881,7 @@ def test_pretrip_fuel_level_photo_saves_as_inspection_evidence_not_damage(client
         media = ProofMediaFile.query.filter_by(owner_type="pretrip", owner_id=pretrip.id).one()
         assert media.packet_type == "pretrip_dvir_issue"
         assert media.category == "pretrip_fuel_level"
-        assert media.manager_note == "Fuel level proof: Full"
+        assert media.manager_note == "Fuel level photo: Full"
         pretrip_id = pretrip.id
 
     list_page = client.get("/list_pretrips")
@@ -2889,17 +2889,17 @@ def test_pretrip_fuel_level_photo_saves_as_inspection_evidence_not_damage(client
     assert b"Damage Photos" not in list_page.data
 
     view_page = client.get(f"/view_pretrip/{pretrip_id}", follow_redirects=True)
-    assert b"PreTrip Inspection Evidence" in view_page.data
-    assert b"PreTrip Damage Evidence" not in view_page.data
+    assert b"PreTrip Photos / Documents" in view_page.data
+    assert b"PreTrip Damage Photos" not in view_page.data
 
     printable = client.get(f"/pretrip_printable/{pretrip_id}")
     assert printable.status_code == 200
-    assert b"PreTrip Inspection Evidence" in printable.data
-    assert b"PreTrip Damage Evidence" not in printable.data
+    assert b"PreTrip Photos / Documents" in printable.data
+    assert b"PreTrip Damage Photos" not in printable.data
 
     pdf = client.get(f"/pretrip_printable/{pretrip_id}/attachment")
     assert pdf.status_code == 200
-    assert b"PreTrip Inspection Evidence" in pdf.data
+    assert b"PreTrip Photos / Documents" in pdf.data
 
 
 def test_driver_log_sheet_polishes_route_flow_loads_and_pretrip_fuel_support(client, app):
@@ -2932,7 +2932,7 @@ def test_driver_log_sheet_polishes_route_flow_loads_and_pretrip_fuel_support(cli
                 uploaded_by_id=driver.id,
                 related_truck="ST4",
                 related_trailer="TR2",
-                manager_note="Fuel level proof: Full",
+                manager_note="Fuel level photo: Full",
             )
         )
         db.session.add(
@@ -3068,8 +3068,23 @@ def test_pretrip_damage_photo_can_be_moved_to_inspection_evidence(client, app):
         pretrip_id = pretrip.id
         report_id = report.id
 
+    list_page = client.get("/list_pretrips")
+    assert b"Inspection Photos" in list_page.data
+    assert b"Damage Photos" not in list_page.data
+
+    support_printable = client.get(f"/pretrip_printable/{pretrip_id}")
+    assert support_printable.status_code == 200
+    assert b"PreTrip Photos / Documents" in support_printable.data
+    assert b"Pretrip inspection photo attached." in support_printable.data
+    assert b"PreTrip Damage Photos" not in support_printable.data
+
+    support_pdf = client.get(f"/pretrip_printable/{pretrip_id}/attachment")
+    assert support_pdf.status_code == 200
+    assert b"PreTrip Photos / Documents" in support_pdf.data
+    assert b"PreTrip Damage Photos" not in support_pdf.data
+
     report_page = client.get(f"/damage_reports/{report_id}")
-    assert b"Move to PreTrip Evidence" in report_page.data
+    assert b"Move to PreTrip Photos" in report_page.data
     assert f"PreTrip #{pretrip_id}".encode() in report_page.data
 
     moved = client.post(
@@ -3077,7 +3092,7 @@ def test_pretrip_damage_photo_can_be_moved_to_inspection_evidence(client, app):
         follow_redirects=True,
     )
     assert moved.status_code == 200
-    assert b"PreTrip Inspection Evidence" in moved.data
+    assert b"PreTrip Photos / Documents" in moved.data
 
     with app.app_context():
         from app.models import DamageReport, ProofMediaFile
@@ -3091,7 +3106,7 @@ def test_pretrip_damage_photo_can_be_moved_to_inspection_evidence(client, app):
         assert media.sha256_hash
 
     report_page_after = client.get(f"/damage_reports/{report_id}")
-    assert b"Move to PreTrip Evidence" not in report_page_after.data
+    assert b"Move to PreTrip Photos" not in report_page_after.data
 
 
 def test_new_pretrip_blank_date_uses_local_route_date(client, app, monkeypatch):
@@ -4907,7 +4922,7 @@ def test_driver_can_record_auditable_part_scan_and_depart_with_pending_cargo_rev
     assert b"Manifest linked" in manager_print.data
     assert b"No" in manager_print.data
     assert b"1 scan needs manager confirmation" in manager_print.data
-    assert b"Pending Scan Evidence" in manager_print.data
+    assert b"Pending Scan Proof" in manager_print.data
     assert b"Drop Scan" in manager_print.data
     assert b"pending part" in manager_print.data
     assert b"L861" in manager_print.data

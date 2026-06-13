@@ -1779,7 +1779,7 @@ def _save_pretrip_evidence_photo(pretrip, form):
     uploaded_file = request.files.get(getattr(form.fuel_level_photo, "name", "fuel_level_photo"))
     if not uploaded_file or not uploaded_file.filename:
         return None
-    note = f"Fuel level proof: {pretrip.start_fuel_level or 'not recorded'}"
+    note = f"Fuel level photo: {pretrip.start_fuel_level or 'not recorded'}"
     return save_packet_media(
         uploaded_file,
         packet_type=PacketClassification.PRETRIP_DVIR_ISSUE.value,
@@ -1805,6 +1805,116 @@ def _pretrip_evidence_media(pretrip):
     )
 
 
+_GENERIC_PRETRIP_PHOTO_DESCRIPTIONS = {
+    "pretrip damage photo",
+    "pretrip damage photo.",
+    "pretrip photo",
+    "pretrip photo.",
+    "pretrip inspection photo",
+    "pretrip inspection photo.",
+}
+_PRETRIP_FUEL_SUPPORT_WORDS = (
+    "fuel level",
+    "fuel gauge",
+    "low fuel",
+    "fuel tank",
+    "full fuel",
+    "fuel proof",
+    "fuel photo",
+    "gauge photo",
+    "fuel-level",
+    "fuel-gauge",
+    "fuel-tank",
+)
+_PRETRIP_TRUE_DAMAGE_WORDS = (
+    "accident",
+    "bent",
+    "broken",
+    "collision",
+    "crack",
+    "cracked",
+    "damage found",
+    "damaged",
+    "dent",
+    "dented",
+    "flat tire",
+    "leak",
+    "missing",
+    "puncture",
+    "rejected",
+    "rejection",
+    "scratch",
+    "scrape",
+    "shortage",
+)
+
+
+def _pretrip_report_text(report):
+    values = [
+        getattr(report, "description", ""),
+        getattr(report, "plant_name", ""),
+        getattr(report, "stage", ""),
+        getattr(report, "move_reference", ""),
+    ]
+    for photo in getattr(report, "photos", []) or []:
+        values.extend([getattr(photo, "original_filename", ""), getattr(photo, "filename", "")])
+    return " ".join(_sheet_clean(value).lower() for value in values if value)
+
+
+def _pretrip_report_is_support_photo(report):
+    move_reference = _sheet_clean(getattr(report, "move_reference", ""))
+    if not move_reference.lower().startswith("pretrip #"):
+        return False
+    text = _pretrip_report_text(report)
+    if any(word in text for word in _PRETRIP_TRUE_DAMAGE_WORDS):
+        return False
+    if any(word in text for word in _PRETRIP_FUEL_SUPPORT_WORDS):
+        return True
+    description = _sheet_clean(getattr(report, "description", "")).lower()
+    return description in _GENERIC_PRETRIP_PHOTO_DESCRIPTIONS
+
+
+def _pretrip_support_report_label(report):
+    text = _pretrip_report_text(report)
+    if any(word in text for word in _PRETRIP_FUEL_SUPPORT_WORDS):
+        return "Pretrip fuel level photo attached."
+    return "Pretrip inspection photo attached."
+
+
+def _all_pretrip_damage_reports(pretrip):
+    if not pretrip or not getattr(pretrip, "id", None):
+        return []
+    return (
+        DamageReport.query.filter(
+            DamageReport.reported_by_id == pretrip.user_id,
+            DamageReport.move_reference == f"PreTrip #{pretrip.id}",
+        )
+        .order_by(DamageReport.created_at.asc(), DamageReport.id.asc())
+        .all()
+    )
+
+
+def _pretrip_support_reports(pretrip):
+    return [report for report in _all_pretrip_damage_reports(pretrip) if _pretrip_report_is_support_photo(report)]
+
+
+def _pretrip_support_photo_counts(pretrips):
+    refs = {f"PreTrip #{pretrip.id}": pretrip.id for pretrip in pretrips or [] if getattr(pretrip, "id", None)}
+    counts = {pretrip_id: 0 for pretrip_id in refs.values()}
+    if not refs:
+        return counts
+    reports = (
+        DamageReport.query.filter(DamageReport.move_reference.in_(refs.keys()))
+        .order_by(DamageReport.created_at.asc(), DamageReport.id.asc())
+        .all()
+    )
+    for report in reports:
+        pretrip_id = refs.get(report.move_reference)
+        if pretrip_id and _pretrip_report_is_support_photo(report):
+            counts[pretrip_id] = counts.get(pretrip_id, 0) + len(report.photos or [])
+    return counts
+
+
 def _pretrip_evidence_counts(pretrips):
     pretrip_ids = [pretrip.id for pretrip in pretrips or [] if getattr(pretrip, "id", None)]
     counts = {pretrip_id: 0 for pretrip_id in pretrip_ids}
@@ -1818,6 +1928,8 @@ def _pretrip_evidence_counts(pretrips):
     )
     for owner_id, count in rows:
         counts[owner_id] = int(count or 0)
+    for pretrip_id, count in _pretrip_support_photo_counts(pretrips).items():
+        counts[pretrip_id] = counts.get(pretrip_id, 0) + count
     return counts
 
 
@@ -1843,7 +1955,7 @@ def _copy_damage_photos_to_pretrip_evidence(report, pretrip):
         source_path = _damage_photo_file_path(photo)
         if not source_path:
             continue
-        original = secure_filename(photo.original_filename or photo.filename or "pretrip-evidence") or "pretrip-evidence"
+        original = secure_filename(photo.original_filename or photo.filename or "pretrip-photo") or "pretrip-photo"
         ext = os.path.splitext(original)[1] or os.path.splitext(photo.filename or "")[1] or ".bin"
         filename = (
             f"{PacketClassification.PRETRIP_DVIR_ISSUE.value}-pretrip-{pretrip.id}-"
@@ -1864,7 +1976,7 @@ def _copy_damage_photos_to_pretrip_evidence(report, pretrip):
             uploaded_at=photo.uploaded_at or datetime.utcnow(),
             related_truck=pretrip.truck_number,
             related_trailer=pretrip.trailer_number,
-            manager_note=f"Moved from damage report #{report.id}: {report.description or 'PreTrip inspection proof'}",
+            manager_note=f"Moved from damage report #{report.id}: {report.description or 'PreTrip inspection photo'}",
         )
         db.session.add(media)
         moved_media.append(media)
@@ -1874,16 +1986,7 @@ def _copy_damage_photos_to_pretrip_evidence(report, pretrip):
 
 
 def _pretrip_damage_reports(pretrip):
-    if not pretrip or not getattr(pretrip, "id", None):
-        return []
-    return (
-        DamageReport.query.filter(
-            DamageReport.reported_by_id == pretrip.user_id,
-            DamageReport.move_reference == f"PreTrip #{pretrip.id}",
-        )
-        .order_by(DamageReport.created_at.asc(), DamageReport.id.asc())
-        .all()
-    )
+    return [report for report in _all_pretrip_damage_reports(pretrip) if not _pretrip_report_is_support_photo(report)]
 
 
 def _pretrip_damage_evidence_counts(pretrips):
@@ -1899,6 +2002,8 @@ def _pretrip_damage_evidence_counts(pretrips):
     for report in reports:
         pretrip_id = refs.get(report.move_reference)
         if not pretrip_id:
+            continue
+        if _pretrip_report_is_support_photo(report):
             continue
         counts.setdefault(pretrip_id, {"reports": 0, "photos": 0})
         counts[pretrip_id]["reports"] += 1
@@ -2309,19 +2414,8 @@ def _sheet_pretrip_support_report_label(report):
     move_reference = _sheet_clean(getattr(report, "move_reference", ""))
     if not move_reference.lower().startswith("pretrip #"):
         return ""
-    text = " ".join(
-        _sheet_clean(value).lower()
-        for value in (
-            getattr(report, "description", ""),
-            getattr(report, "plant_name", ""),
-            getattr(report, "stage", ""),
-            move_reference,
-        )
-    )
-    fuel_level_words = ("fuel level", "fuel gauge", "low fuel", "fuel tank", "full fuel", "fuel proof")
-    damage_words = ("damage", "dent", "scratch", "scrape", "broken", "crack", "leak", "rejection", "shortage")
-    if any(word in text for word in fuel_level_words) and not any(word in text for word in damage_words):
-        return "Pretrip fuel level photo attached."
+    if _pretrip_report_is_support_photo(report):
+        return _pretrip_support_report_label(report)
     return ""
 
 
@@ -3665,7 +3759,9 @@ def _log_freight_summary(log, transfers):
 def _build_pretrip_pdf(pretrip):
     evidence_reports = _pretrip_damage_reports(pretrip)
     inspection_media = _pretrip_evidence_media(pretrip)
-    total_pages = 2 if evidence_reports or inspection_media else 1
+    support_reports = _pretrip_support_reports(pretrip)
+    has_inspection_photos = bool(inspection_media or support_reports)
+    total_pages = 2 if evidence_reports or has_inspection_photos else 1
     meta = _pretrip_document_meta(pretrip, page=f"1 of {total_pages}")
     pdf = SimplePdf("PreTrip DVIR", LETTER)
     _draw_pdf_header(
@@ -3788,13 +3884,13 @@ def _build_pretrip_pdf(pretrip):
     pdf.text(36, 92, "Driver Signature: ____________________________", size=10)
     pdf.text(335, 92, "Date: __________________", size=10)
 
-    if inspection_media or evidence_reports:
+    if has_inspection_photos or evidence_reports:
         pdf.add_page()
         meta = _pretrip_document_meta(pretrip, page=f"2 of {total_pages}")
         _draw_pdf_header(pdf, meta["title"], meta["document_no"], meta["generated_at"], meta["page"], driver=pretrip.driver.display_name if pretrip.driver else None, truck=pretrip.truck_number, date_value=pretrip.pretrip_date)
         y = 704
-        if inspection_media:
-            pdf.text(36, y, "8. PreTrip Inspection Evidence", size=14, bold=True)
+        if has_inspection_photos:
+            pdf.text(36, y, "8. PreTrip Photos / Documents", size=14, bold=True)
             y -= 20
             pdf.text(36, y, f"PreTrip #{pretrip.id} - Truck {pretrip.truck_number or ''}", size=9)
             y -= 18
@@ -3804,17 +3900,36 @@ def _build_pretrip_pdf(pretrip):
                 image_drawn = bool(media_path) and pdf.image_file(media_path, 36, image_y, 120, 80)
                 if not image_drawn:
                     pdf.rect(36, image_y, 120, 80)
-                    pdf.multiline_text(42, image_y + 48, "Evidence file exists in the record but could not render. Review in system before approval.", width_chars=28, size=7, leading=9, max_lines=4, bold=True)
-                pdf.text(170, y - 8, f"Evidence #{media.id}", size=8, bold=True)
+                    pdf.multiline_text(42, image_y + 48, "Photo file exists in the record but could not render. Review in system before approval.", width_chars=28, size=7, leading=9, max_lines=4, bold=True)
+                pdf.text(170, y - 8, f"Photo #{media.id}", size=8, bold=True)
                 pdf.text(170, y - 22, f"Type: {media.category.replace('_', ' ').title()}", size=8)
                 pdf.text(170, y - 36, f"File: {media.original_filename or media.filename}", size=8)
                 y -= 98
                 if y < 120:
                     pdf.add_page()
                     y = 748
+            for report in support_reports[:4]:
+                if y < 145:
+                    pdf.add_page()
+                    y = 748
+                pdf.text(36, y, _pretrip_support_report_label(report), size=9, bold=True)
+                y -= 14
+                for photo in (report.photos or [])[:2]:
+                    image_y = y - 80
+                    image_drawn = bool(_damage_photo_file_path(photo)) and pdf.image_file(_damage_photo_file_path(photo), 36, image_y, 120, 80)
+                    if not image_drawn:
+                        pdf.rect(36, image_y, 120, 80)
+                        pdf.multiline_text(42, image_y + 48, "Photo record exists but file failed to render. Review in system before approval.", width_chars=28, size=7, leading=9, max_lines=4, bold=True)
+                    pdf.text(170, y - 8, f"Photo ID #{photo.id}", size=8, bold=True)
+                    pdf.text(170, y - 22, f"File: {photo.original_filename or photo.filename}", size=8)
+                    pdf.text(170, y - 36, f"Uploaded: {photo.uploaded_at}", size=8)
+                    y -= 98
+                    if y < 120:
+                        pdf.add_page()
+                        y = 748
             y -= 8
         if evidence_reports:
-            pdf.text(36, y, f"{'9' if inspection_media else '8'}. PreTrip Damage Evidence", size=14, bold=True)
+            pdf.text(36, y, f"{'9' if has_inspection_photos else '8'}. PreTrip Damage Photos", size=14, bold=True)
             y -= 20
             pdf.text(36, y, f"PreTrip #{pretrip.id} - Truck {pretrip.truck_number or ''}", size=9)
             y -= 18
@@ -4424,7 +4539,7 @@ def new_pretrip():
                 user_id=current_user.id,
                 category="pretrip",
                 action="evidence_uploaded",
-                title="PreTrip fuel evidence saved",
+                title="PreTrip fuel photo saved",
                 details=f"Truck {new_pt.truck_number or 'unlisted'} fuel level photo.",
                 target_type="pretrip",
                 target_id=new_pt.id,
@@ -4432,9 +4547,9 @@ def new_pretrip():
 
         flash(
             (
-                "PreTrip saved with fuel evidence and damage photo attached."
+                "PreTrip saved with fuel photo and damage photo attached."
                 if pretrip_evidence and damage_report
-                else "PreTrip saved with fuel evidence attached."
+                else "PreTrip saved with fuel photo attached."
                 if pretrip_evidence
                 else "PreTrip saved with damage photo attached."
                 if damage_report
@@ -4538,6 +4653,8 @@ def view_pretrip(pretrip_id):
         today_local_date=_today_local_date(),
         pretrip_damage_reports=_pretrip_damage_reports(pt),
         pretrip_evidence_media=_pretrip_evidence_media(pt),
+        pretrip_support_reports=_pretrip_support_reports(pt),
+        pretrip_support_report_label=_pretrip_support_report_label,
         document_meta=_pretrip_document_meta(pt),
     )
 
@@ -4651,7 +4768,7 @@ def edit_pretrip_entry(pretrip_id):
                 user_id=current_user.id,
                 category="pretrip",
                 action="evidence_uploaded",
-                title="PreTrip fuel evidence saved",
+                title="PreTrip fuel photo saved",
                 details=f"Truck {pt.truck_number or 'unlisted'} fuel level photo.",
                 target_type="pretrip",
                 target_id=pt.id,
@@ -4662,9 +4779,9 @@ def edit_pretrip_entry(pretrip_id):
 
         flash(
             (
-                "PreTrip updated with fuel evidence and damage photo attached."
+                "PreTrip updated with fuel photo and damage photo attached."
                 if pretrip_evidence and damage_report
-                else "PreTrip updated with fuel evidence attached."
+                else "PreTrip updated with fuel photo attached."
                 if pretrip_evidence
                 else "PreTrip updated with damage photo attached."
                 if damage_report
@@ -4721,6 +4838,8 @@ def pretrip_printable(pretrip_id):
         email_mode=False,
         pretrip_damage_reports=_pretrip_damage_reports(pt),
         pretrip_evidence_media=_pretrip_evidence_media(pt),
+        pretrip_support_reports=_pretrip_support_reports(pt),
+        pretrip_support_report_label=_pretrip_support_report_label,
         route_context=route_context,
         route_summary=route_context.route_summary,
         document_meta=_pretrip_document_meta(pt),
@@ -7272,7 +7391,7 @@ def move_damage_report_to_pretrip_evidence(report_id):
     before["photos"] = [photo.filename for photo in report.photos]
     moved_media = _copy_damage_photos_to_pretrip_evidence(report, pretrip)
     if not moved_media:
-        flash("No available photo file could be moved into the PreTrip evidence record.", "warning")
+        flash("No available photo file could be moved into the PreTrip photo record.", "warning")
         return redirect(url_for("driver.view_damage_report", report_id=report.id))
 
     report.status = "closed"
@@ -7285,7 +7404,7 @@ def move_damage_report_to_pretrip_evidence(report_id):
         target_type="damage_report",
         target_id=report.id,
         action="reclassified_to_pretrip_evidence",
-        reason=f"Driver moved mistaken PreTrip damage report into PreTrip #{pretrip.id} inspection evidence.",
+        reason=f"Driver moved mistaken PreTrip damage report into PreTrip #{pretrip.id} inspection photos.",
         before_values=before,
         after_values=after,
         commit=False,
@@ -7294,7 +7413,7 @@ def move_damage_report_to_pretrip_evidence(report_id):
         user_id=current_user.id,
         category="pretrip",
         action="evidence_uploaded",
-        title="PreTrip evidence moved from damage report",
+        title="PreTrip photo moved from damage report",
         details=f"Moved {len(moved_media)} photo(s) from damage report #{report.id} to PreTrip #{pretrip.id}.",
         target_type="pretrip",
         target_id=pretrip.id,
@@ -7304,14 +7423,14 @@ def move_damage_report_to_pretrip_evidence(report_id):
         user_id=current_user.id,
         category="damage",
         action="archived",
-        title="Damage report moved to PreTrip evidence",
+        title="Damage report moved to PreTrip photos",
         details=f"Damage report #{report.id} archived after its photo was moved to PreTrip #{pretrip.id}.",
         target_type="damage_report",
         target_id=report.id,
         commit=False,
     )
     db.session.commit()
-    flash("Moved the photo to PreTrip inspection evidence and archived the mistaken damage report.", "success")
+    flash("Moved the photo to PreTrip inspection photos and archived the mistaken damage report.", "success")
     return redirect(url_for("driver.view_pretrip", pretrip_id=pretrip.id))
 
 
@@ -7346,7 +7465,7 @@ def delete_damage_report(report_id):
         category="damage",
         action="archived",
         title="Damage report archived",
-        details=f"Damage report #{report.id} archived for {report.plant_name}; evidence remains attached.",
+        details=f"Damage report #{report.id} archived for {report.plant_name}; photos remain attached.",
         target_type="damage_report",
         target_id=report.id,
         commit=False,

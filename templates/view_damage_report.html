@@ -91,7 +91,7 @@
         {% else %}
           <a class="btn btn-primary" href="{{ url_for('manager.damage_evidence_packet', report_id=report.id) }}">Proof Record</a>
         {% endif %}
-        <form method="POST" action="{{ url_for('manager.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report from active review? Evidence will remain attached.');">
+        <form method="POST" action="{{ url_for('manager.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report from active review? Photos remain attached.');">
           <input type="hidden" name="next" value="{{ url_for('manager.review_dashboard') }}">
           <button class="btn btn-outline-danger" type="submit">Archive Report</button>
         </form>
@@ -108,11 +108,11 @@
         <details class="more-actions">
           <summary class="btn btn-outline-secondary">More Actions</summary>
           {% if pretrip_evidence_target|default(false) %}
-            <form class="mt-2" method="POST" action="{{ url_for('driver.move_damage_report_to_pretrip_evidence', report_id=report.id) }}" onsubmit="return confirm('Move this photo to PreTrip inspection evidence and archive this damage report?');">
-              <button class="btn btn-outline-primary btn-sm" type="submit">Move to PreTrip Evidence</button>
+            <form class="mt-2" method="POST" action="{{ url_for('driver.move_damage_report_to_pretrip_evidence', report_id=report.id) }}" onsubmit="return confirm('Move this photo to PreTrip inspection photos and archive this damage report?');">
+              <button class="btn btn-outline-primary btn-sm" type="submit">Move to PreTrip Photos</button>
             </form>
           {% endif %}
-          <form class="mt-2" method="POST" action="{{ url_for('driver.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report? Evidence will remain attached.');">
+          <form class="mt-2" method="POST" action="{{ url_for('driver.delete_damage_report', report_id=report.id) }}" onsubmit="return confirm('Archive this damage report? Photos remain attached.');">
             <button class="btn btn-outline-danger btn-sm" type="submit">Archive Report</button>
           </form>
         </details>
@@ -131,7 +131,7 @@
 
   <header class="document-header print-only">
     <div>{% include 'partials/_md_print_signature.html' %}<h1>{{ report_title }}</h1><div><strong>Driver:</strong> {{ report.reported_by.display_name }}</div><div><strong>Date:</strong> {{ report.damage_time|to_detroit_datetime if report.damage_time else report.created_at|to_detroit_datetime }}</div></div>
-    <div><strong>Document No:</strong> EVIDENCE-REPORT-{{ "%03d"|format(report.id) }}<br><strong>Generated:</strong> {{ report.created_at|to_detroit_datetime if report.created_at else '' }}<br><strong>Page</strong> 1 of 1</div>
+    <div><strong>Document No:</strong> PROOF-REPORT-{{ "%03d"|format(report.id) }}<br><strong>Generated:</strong> {{ report.created_at|to_detroit_datetime if report.created_at else '' }}<br><strong>Page</strong> 1 of 1</div>
   </header>
 
   <section class="damage-card official-print-document">
@@ -154,7 +154,7 @@
   </section>
 
   <section class="damage-card">
-    <h2>3. Photo Evidence</h2>
+    <h2>3. Photos</h2>
     <div class="photo-grid">
       {% for photo in report.photos %}
         <article class="photo-card">
@@ -184,7 +184,7 @@
     <div class="history-list">
       <div class="history-item">Created {{ report.created_at|to_detroit_datetime if report.created_at else '' }}</div>
       {% if report.status != 'open' %}<div class="history-item">Submitted and locked for driver edits.</div>{% endif %}
-      {% if route_finalized|default(false) %}<div class="history-item">Route finalized; evidence locked.</div>{% endif %}
+      {% if route_finalized|default(false) %}<div class="history-item">Route finalized; photos locked.</div>{% endif %}
     </div>
   </section>
 </div>

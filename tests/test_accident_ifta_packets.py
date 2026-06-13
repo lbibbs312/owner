@@ -279,8 +279,8 @@ def test_accident_packet_contains_review_sections_without_driver_legal_conclusio
     assert "Manager signature not captured" in text
     assert "Needs Review" in text
     assert "Complete" not in text
-    assert body.index("Photo and Media Evidence") < body.index("Accident and Incident Details")
-    assert body.index("Photo and Media Evidence") < body.index("Appendix B")
+    assert body.index("Photos and Media") < body.index("Accident and Incident Details")
+    assert body.index("Photos and Media") < body.index("Appendix B")
 
 
 def test_ifta_packet_includes_support_fields_and_missing_receipt_state(client, app):
@@ -337,7 +337,7 @@ def test_ifta_packet_includes_support_fields_and_missing_receipt_state(client, a
     assert "IFTA Support Worksheet" in text
     assert "Fuel / Odometer / IFTA Worksheet Driver:" not in text
     assert "IFTA Support Worksheet Driver:" not in text
-    assert "Photo / Media EvidenceDVIR" not in text
+    assert "Photo / Media ProofDVIR" not in text
     assert "DVIR / PreTripCargo" not in text
     assert "IFTA Return" not in text
     assert "VIN123" in text

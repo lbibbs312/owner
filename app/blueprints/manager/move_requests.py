@@ -586,23 +586,23 @@ def link_move_request_evidence(request_id):
     if document:
         linked_labels.append(f"Document #{document.id}")
     if not linked_labels:
-        linked_labels.append("No linked evidence")
+        linked_labels.append("No linked proof")
 
     _record_move_request_activity(
         move_request,
         action="evidence_linked",
-        title="Move request evidence linked",
-        details=f"Linked evidence for {move_request.display_number}: {', '.join(linked_labels)}.",
+        title="Move request proof linked",
+        details=f"Linked proof for {move_request.display_number}: {', '.join(linked_labels)}.",
         before_values=before_values,
     )
     _append_move_request_flow_event(
         move_request,
         "PROOF_ATTACHED" if (transfer or document) else "MANAGER_REJECTED",
-        notes=f"Linked evidence for {move_request.display_number}: {', '.join(linked_labels)}.",
+        notes=f"Linked proof for {move_request.display_number}: {', '.join(linked_labels)}.",
         payload={"linked_plant_transfer_id": plant_transfer_id, "linked_document_id": linked_document_id},
     )
     db.session.commit()
-    flash("Move request evidence link updated.", "success")
+    flash("Move request proof link updated.", "success")
     return redirect(url_for("manager.move_requests"))
 
 

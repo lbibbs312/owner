@@ -138,5 +138,5 @@ def test_packet_media_page_comes_before_full_event_timeline_and_missing_file_tex
     body = response.data.decode("utf-8")
 
     assert response.status_code == 200
-    assert body.index("Photo and Media Evidence") < body.index("Full Event Timeline")
+    assert body.index("Photos and Media") < body.index("Full Event Timeline")
     assert "Photo not available in upload storage" in body

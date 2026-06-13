@@ -686,7 +686,7 @@
               {{ fact('Flag', 'Transfer sheet needed') }}
               {{ fact('Affected load', packet_transfer_load.title if packet_transfer_load else 'Recorded route load') }}
               {{ fact('Why flagged', 'A load is recorded on this route, but no transfer sheet or route transfer record is attached.') }}
-              {{ fact('Evidence found', route_transfers|length ~ ' transfer records attached') }}
+              {{ fact('Proof found', route_transfers|length ~ ' transfer records attached') }}
               {{ fact('Required action', 'Attach the transfer sheet to the Route Packet or open Documents to add it.') }}
               {{ fact('Review owner', 'Driver and manager review') }}
             </div>

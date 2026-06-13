@@ -108,7 +108,7 @@
   <div class="sheet-head">
     <div>
       <h1>Manager Route Review</h1>
-      <div class="subtitle">Review and approval copy for route corrections, evidence, and follow-up.</div>
+      <div class="subtitle">Review and approval copy for route corrections, proof, and follow-up.</div>
     </div>
     <div class="meta">
       <strong>Date:</strong> {{ the_date }}<br>
@@ -141,7 +141,7 @@
       <p>{{ route_state.current_activity.pickup_estimate }}. <span class="delay-status {{ route_state.current_activity.forecast_class }}">{{ route_state.current_activity.forecast_status }}</span></p>
       {% if manager_intelligence %}
         <div class="audit-grid">
-          {% for item in manager_intelligence %}<div class="audit-item warning"><strong>Manager Intelligence</strong><span>{{ item }}</span><small>Related history only. Not route evidence.</small></div>{% endfor %}
+          {% for item in manager_intelligence %}<div class="audit-item warning"><strong>Manager Intelligence</strong><span>{{ item }}</span><small>Related history only. Not route proof.</small></div>{% endfor %}
         </div>
       {% endif %}
       {% if next_load_prediction %}
@@ -190,7 +190,7 @@
   <div class="section">
     <h2>4. Related Management Cases</h2>
     <div class="section-body">
-      <p><strong>Related history only. These cases do not become route evidence unless a record is tied to this route, stop, driver log, driver, truck, or shift date.</strong></p>
+      <p><strong>Related history only. These cases do not become route proof unless a record is tied to this route, stop, driver log, driver, truck, or shift date.</strong></p>
       <table>
         <thead><tr><th>Case</th><th>Summary</th><th>Signals</th><th>Owner</th><th>Status</th></tr></thead>
         <tbody>
@@ -234,7 +234,7 @@
         {% endfor %}
       </div>
       {% if cargo_review.pending_scan_rows %}
-        <h3 class="h6 text-uppercase text-muted">Pending Scan Evidence</h3>
+        <h3 class="h6 text-uppercase text-muted">Pending Scan Proof</h3>
         <table>
           <thead><tr><th>Scan</th><th>Stop</th><th>Context</th><th>Status</th><th>Value</th><th>Time</th></tr></thead>
           <tbody>

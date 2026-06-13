@@ -50,7 +50,7 @@
 </style>
 
 <div class="container-fluid py-4 responsive-workspace evidence-shell">
-  {% set document_meta = document_meta|default({'title': packet.packet_title, 'document_no': 'EVIDENCE-REPORT-' ~ report.id, 'generated_at': packet.generated_at, 'page': '1 of 5'}) %}
+  {% set document_meta = document_meta|default({'title': packet.packet_title, 'document_no': 'PROOF-REPORT-' ~ report.id, 'generated_at': packet.generated_at, 'page': '1 of 5'}) %}
   <div class="evidence-toolbar print-controls no-print">
     <a class="btn btn-outline-secondary" href="{{ back_url }}">Back to Report</a>
     <div class="actions">
@@ -116,7 +116,7 @@
 
   <section class="packet-page">
     <div class="packet-section">
-      <h2>4. Photo and Media Evidence</h2>
+      <h2>4. Photos and Media</h2>
       {% for row in packet.photos %}
         <article class="photo-proof">
           {% if row.file_exists %}
