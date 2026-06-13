@@ -10,7 +10,30 @@ from flask import current_app
 
 NEARBY_URL = "https://places.googleapis.com/v1/places:searchNearby"
 TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
+AUTOCOMPLETE_URL = "https://places.googleapis.com/v1/places:autocomplete"
+PLACE_DETAILS_URL = "https://places.googleapis.com/v1/places/"
 GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+
+# Place Details field masks, layered so review/AI fields are only requested when
+# the matching feature flag is on (they cost more and need extra API enablement).
+DESTINATION_DETAILS_FIELDS = (
+    "id",
+    "displayName",
+    "formattedAddress",
+    "location",
+    "types",
+    "primaryType",
+    "businessStatus",
+    "googleMapsUri",
+    "regularOpeningHours",
+    "currentOpeningHours",
+    "parkingOptions",
+    "fuelOptions",
+)
+DESTINATION_DETAILS_REVIEW_FIELDS = ("reviews", "reviewSummary")
+DESTINATION_DETAILS_GENERATIVE_FIELDS = ("generativeSummary",)
+MIN_AUTOCOMPLETE_QUERY_LENGTH = 2
+AUTOCOMPLETE_BIAS_RADIUS_M = 50000
 
 BUSINESS_TYPES = {
     "accounting",
@@ -567,3 +590,148 @@ def lookup_destination_place(query, *, bias_lat=None, bias_lng=None, near=""):
         seen.add(dedupe_key)
         places.append(place)
     return {"ok": True, "place": places[0] if places else None, "places": places[:5]}
+
+
+def _normalize_place_id(value):
+    value = _clean(value)
+    if value.startswith("places/"):
+        return value[len("places/"):]
+    return value
+
+
+def autocomplete_destination(text, *, lat=None, lng=None, session_token="", limit=6):
+    """Google Places Autocomplete (New): live destination predictions.
+
+    Biases toward the driver's current location when GPS is known and passes a
+    session token so the follow-up Place Details call is billed as one session.
+    Returns compact suggestions only — no ratings, photos, or summaries.
+    """
+    key = _api_key()
+    text = _clean(text)[:255]
+    session_token = _clean(session_token)
+    if not key:
+        return {
+            "ok": False,
+            "error": "not_configured",
+            "message": "Google Maps API key is not configured.",
+            "suggestions": [],
+            "session_token": session_token,
+        }
+    if len(text) < MIN_AUTOCOMPLETE_QUERY_LENGTH:
+        return {"ok": False, "error": "short_query", "suggestions": [], "session_token": session_token}
+
+    payload = {"input": text}
+    if session_token:
+        payload["sessionToken"] = session_token
+    bias_lat = _float_or_none(lat)
+    bias_lng = _float_or_none(lng)
+    if bias_lat is not None and bias_lng is not None:
+        payload["locationBias"] = {
+            "circle": {
+                "center": {"latitude": bias_lat, "longitude": bias_lng},
+                "radius": AUTOCOMPLETE_BIAS_RADIUS_M,
+            }
+        }
+        # ``origin`` makes Google return distanceMeters per prediction.
+        payload["origin"] = {"latitude": bias_lat, "longitude": bias_lng}
+
+    response = requests.post(
+        AUTOCOMPLETE_URL,
+        headers={"Content-Type": "application/json", "X-Goog-Api-Key": key},
+        json=payload,
+        timeout=6,
+    )
+    data = response.json()
+    if response.status_code >= 400 or data.get("error"):
+        error = data.get("error") or {}
+        return {
+            "ok": False,
+            "error": error.get("status") or f"http_{response.status_code}",
+            "message": error.get("message") or "Google Places did not return suggestions.",
+            "suggestions": [],
+            "session_token": session_token,
+        }
+
+    suggestions = []
+    for item in data.get("suggestions") or []:
+        prediction = item.get("placePrediction") or {}
+        place_id = _normalize_place_id(prediction.get("placeId") or prediction.get("place"))
+        structured = prediction.get("structuredFormat") or {}
+        main_text = _clean((structured.get("mainText") or {}).get("text"))
+        secondary_text = _clean((structured.get("secondaryText") or {}).get("text"))
+        full_text = _clean((prediction.get("text") or {}).get("text"))
+        if not main_text:
+            main_text = full_text
+        if not place_id or not main_text:
+            continue
+        distance = prediction.get("distanceMeters")
+        suggestions.append(
+            {
+                "place_id": place_id,
+                "main_text": main_text,
+                "secondary_text": secondary_text,
+                "formatted_address": full_text,
+                "distance_meters": int(distance) if isinstance(distance, (int, float)) else None,
+                "source": "google_places",
+            }
+        )
+        if len(suggestions) >= limit:
+            break
+    return {"ok": True, "suggestions": suggestions, "session_token": session_token}
+
+
+def destination_place_details(place_id, *, session_token="", include_reviews=False, include_generative=False):
+    """Google Place Details (New) for a chosen destination.
+
+    Requests minimal fields first; review/AI fields only when their flags ask
+    for them. Returns a normalized ``place`` plus the ``raw`` payload so the
+    trucker-summary service can mine official fields without the raw Google
+    candidate list ever being persisted.
+    """
+    key = _api_key()
+    place_id = _normalize_place_id(place_id)
+    session_token = _clean(session_token)
+    if not key:
+        return {"ok": False, "error": "not_configured", "place": None, "raw": {}}
+    if not place_id:
+        return {"ok": False, "error": "missing_place_id", "place": None, "raw": {}}
+
+    fields = list(DESTINATION_DETAILS_FIELDS)
+    if include_reviews:
+        fields += list(DESTINATION_DETAILS_REVIEW_FIELDS)
+    if include_generative:
+        fields += list(DESTINATION_DETAILS_GENERATIVE_FIELDS)
+    params = {}
+    if session_token:
+        params["sessionToken"] = session_token
+    response = requests.get(
+        PLACE_DETAILS_URL + place_id,
+        headers={"X-Goog-Api-Key": key, "X-Goog-FieldMask": ",".join(fields)},
+        params=params or None,
+        timeout=6,
+    )
+    data = response.json()
+    if response.status_code >= 400 or data.get("error"):
+        error = data.get("error") or {}
+        return {
+            "ok": False,
+            "error": error.get("status") or f"http_{response.status_code}",
+            "message": error.get("message") or "Google Places did not return place details.",
+            "place": None,
+            "raw": {},
+        }
+
+    point = _place_point(data)
+    place = {
+        "place_id": data.get("id") or place_id,
+        "name": _place_name(data),
+        "address": _format_address(data.get("formattedAddress")),
+        "lat": point[0] if point else None,
+        "lng": point[1] if point else None,
+        "types": list(data.get("types") or []),
+        "primary_type": _clean(data.get("primaryType")),
+        "business_status": _clean(data.get("businessStatus")),
+        "google_maps_uri": _clean(data.get("googleMapsUri")),
+        "source": "google_places",
+    }
+    return {"ok": True, "place": place, "raw": data}

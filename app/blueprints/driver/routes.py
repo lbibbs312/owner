@@ -55,7 +55,14 @@ from app.services.packet_classification import (
 )
 from app.services.report_context import build_report_context
 from app.services.autolog import remember_place
-from app.services.google_places import lookup_destination_place, nearby_place_candidates
+from app.services.contextual_recents import filter_contextual_recents
+from app.services.google_places import (
+    autocomplete_destination,
+    destination_place_details,
+    lookup_destination_place,
+    nearby_place_candidates,
+)
+from app.services.trucker_place_summary import TruckerPlaceSummaryService
 from app.services.document_numbers import (
     document_meta,
     eod_document_number,
@@ -3358,7 +3365,7 @@ def _freight_stop_memory(driver_id, limit=40):
                 }
             )
     for log in rows:
-        destination_name = getattr(log, "destination", None)
+        destination_name = getattr(log, "destination_place_name", None) or getattr(log, "destination", None)
         destination_address = getattr(log, "destination_address", None)
         add_destination(destination_name, destination_address)
         add_location(destination_name, destination_address)
@@ -3371,9 +3378,26 @@ def _freight_stop_memory(driver_id, limit=40):
             weight = (log.weight or "").strip()
             if weight and commodity.lower() not in weight_map:
                 weight_map[commodity.lower()] = weight
+    # ``recent_places`` is the raw pool (name + address + any saved coords). The
+    # driver UI must NEVER show this directly — it is filtered into
+    # ``contextual_recent_matches`` against the live GPS/address/typed text so a
+    # stop miles away never appears. ``contextual_recent_matches`` is empty at
+    # render time (no GPS/typing yet) and is computed client-side as the driver
+    # acts; the same rules live server-side in ``filter_contextual_recents``.
+    coords_by_label = {place["label"].lower(): place for place in places}
+    recent_places = []
+    for key, recent in location_recents.items():
+        merged = {"name": recent["name"], "address": recent.get("address", "")}
+        coords = coords_by_label.get(key)
+        if coords:
+            merged["lat"] = coords["lat"]
+            merged["lng"] = coords["lng"]
+        recent_places.append(merged)
     return {
         "locations": locations[:8],
         "location_recents": list(location_recents.values())[:8],
+        "recent_places": recent_places[:12],
+        "contextual_recent_matches": [],
         "destinations": destinations[:8],
         "places": places[:20],
         "commodities": commodities[:5],
@@ -3455,6 +3479,108 @@ def gps_destination_lookup():
         )
         payload = {"ok": False, "error": "lookup_failed", "place": None, "places": []}
     return jsonify(payload)
+
+
+def _json_bounded_float(value, *, minimum, maximum):
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    if result != result or result < minimum or result > maximum:  # reject NaN/out-of-range
+        return None
+    return result
+
+
+@bp.route("/api/places/destination-autocomplete", methods=["POST"])
+@login_required
+@_driver_route_guard("driver.mobile_dashboard", "the destination autocomplete")
+def destination_autocomplete_api():
+    data = request.get_json(silent=True) or {}
+    session_token = str(data.get("session_token") or "").strip()[:128]
+    if not current_app.config.get("ENABLE_DESTINATION_AUTOCOMPLETE", True):
+        return jsonify({"ok": False, "error": "disabled", "suggestions": [], "session_token": session_token})
+    text = str(data.get("input") or "").strip()[:255]
+    lat = _json_bounded_float(data.get("lat"), minimum=-90, maximum=90)
+    lng = _json_bounded_float(data.get("lng"), minimum=-180, maximum=180)
+    try:
+        payload = autocomplete_destination(text, lat=lat, lng=lng, session_token=session_token)
+    except Exception:
+        current_app.logger.exception("Destination autocomplete failed for user_id=%s", current_user.id)
+        payload = {"ok": False, "error": "lookup_failed", "suggestions": [], "session_token": session_token}
+    return jsonify(payload)
+
+
+@bp.route("/api/places/destination-details", methods=["POST"])
+@login_required
+@_driver_route_guard("driver.mobile_dashboard", "the destination details lookup")
+def destination_details_api():
+    data = request.get_json(silent=True) or {}
+    session_token = str(data.get("session_token") or "").strip()[:128]
+    place_id = str(data.get("place_id") or "").strip()[:512]
+    if not place_id:
+        return jsonify({"ok": False, "error": "missing_place_id", "destination": None, "session_token": session_token})
+    include_reviews = bool(current_app.config.get("ENABLE_GOOGLE_REVIEW_SUMMARY", False))
+    include_generative = bool(current_app.config.get("ENABLE_GOOGLE_GENERATIVE_SUMMARY", False))
+    try:
+        details = destination_place_details(
+            place_id,
+            session_token=session_token,
+            include_reviews=include_reviews,
+            include_generative=include_generative,
+        )
+    except Exception:
+        current_app.logger.exception("Destination details failed for user_id=%s", current_user.id)
+        return jsonify({"ok": False, "error": "lookup_failed", "destination": None, "session_token": session_token})
+    if not details.get("ok") or not details.get("place"):
+        return jsonify({
+            "ok": False,
+            "error": details.get("error") or "no_result",
+            "destination": None,
+            "session_token": session_token,
+        })
+    place = details["place"]
+    raw = details.get("raw") or {}
+    destination = {
+        "place_name": place.get("name") or "",
+        "address": place.get("address") or "",
+        "lat": place.get("lat"),
+        "lng": place.get("lng"),
+        "place_id": place.get("place_id") or place_id,
+        "source": "google_places",
+        "confirmed": True,
+        "primary_type": place.get("primary_type") or "",
+        "business_status": place.get("business_status") or "",
+        "google_maps_uri": place.get("google_maps_uri") or "",
+    }
+    driver_notes = None
+    if current_app.config.get("ENABLE_TRUCKER_PLACE_SUMMARY", True):
+        summary = TruckerPlaceSummaryService(
+            enable_reviews=include_reviews,
+            enable_generative=include_generative,
+        )
+        # Build notes from official Places fields only; the raw Google payload is
+        # never returned to the client or persisted.
+        driver_notes = summary.build({
+            "place_id": destination["place_id"],
+            "place_name": destination["place_name"],
+            "formatted_address": destination["address"],
+            "types": place.get("types") or [],
+            "parkingOptions": raw.get("parkingOptions"),
+            "fuelOptions": raw.get("fuelOptions"),
+            "currentOpeningHours": raw.get("currentOpeningHours"),
+            "regularOpeningHours": raw.get("regularOpeningHours"),
+            "businessStatus": raw.get("businessStatus"),
+            "reviews": raw.get("reviews"),
+            "reviewSummary": raw.get("reviewSummary"),
+            "generativeSummary": raw.get("generativeSummary"),
+            "known_place_notes": {},
+        })
+    return jsonify({
+        "ok": True,
+        "destination": destination,
+        "driver_notes": driver_notes,
+        "session_token": session_token,
+    })
 
 
 def _render_new_driving_log(form, current_load, *, route_context=None, return_to_mobile=False):
@@ -5302,6 +5428,18 @@ def new_driving_log():
         gps_latitude = _optional_float_from_form("gps_latitude", minimum=-90, maximum=90) if is_day_driver else None
         gps_longitude = _optional_float_from_form("gps_longitude", minimum=-180, maximum=180) if is_day_driver else None
         gps_accuracy_m = _optional_float_from_form("gps_accuracy_m", minimum=0, maximum=50000) if is_day_driver else None
+        # Where this route is headed, chosen on the Start Shift Location page.
+        dest_place_name = (request.form.get("destination_place_name") or "").strip()[:200] if is_day_driver else ""
+        dest_address = (request.form.get("destination_address") or "").strip()[:255] if is_day_driver else ""
+        dest_place_id = (request.form.get("destination_place_id") or "").strip()[:255] if is_day_driver else ""
+        dest_source = (request.form.get("destination_source") or "").strip().lower()[:32] if is_day_driver else ""
+        dest_lat = _optional_float_from_form("destination_lat", minimum=-90, maximum=90) if is_day_driver else None
+        dest_lng = _optional_float_from_form("destination_lng", minimum=-180, maximum=180) if is_day_driver else None
+        dest_confirmed_raw = (request.form.get("destination_confirmed") or "").strip().lower()
+        has_destination = bool(dest_place_name or dest_address)
+        if dest_source not in {"google_places", "manual"}:
+            dest_source = "manual" if has_destination else ""
+        dest_confirmed = has_destination and dest_confirmed_raw in {"1", "true", "yes", "on"}
         if is_day_driver and not carried_commodity:
             # Cargo is described once, at the pickup's departure. If the latest
             # closed stop left loaded, that load is what's arriving here.
@@ -5330,6 +5468,13 @@ def new_driving_log():
             gps_latitude=gps_latitude,
             gps_longitude=gps_longitude,
             gps_accuracy_m=gps_accuracy_m,
+            destination_place_name=dest_place_name or None,
+            destination_address=dest_address or None,
+            destination_lat=dest_lat,
+            destination_lng=dest_lng,
+            destination_place_id=dest_place_id or None,
+            destination_source=dest_source or None,
+            destination_confirmed=bool(dest_confirmed),
             downtime_reason=_compose_downtime_reason([], _form_truck_issue_text(form), form.maintenance.data),
             part_number=_form_hot_part_number(form),
             hot_parts=bool(form.hot_parts.data),

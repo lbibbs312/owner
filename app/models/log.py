@@ -30,6 +30,15 @@ class DriverLog(db.Model):
     # city, or dock rather than a plant code. Fleet flow leaves this null.
     destination = db.Column(db.String(120), nullable=True)
     destination_address = db.Column(db.String(255), nullable=True)
+    # Where the route is headed, captured at Start Shift. ``destination`` (above)
+    # stays the legacy free-text/plant label; these hold the searched/confirmed
+    # place so the driver knows the target before starting the route.
+    destination_place_name = db.Column(db.String(200), nullable=True)
+    destination_lat = db.Column(db.Float, nullable=True)
+    destination_lng = db.Column(db.Float, nullable=True)
+    destination_place_id = db.Column(db.String(255), nullable=True)
+    destination_source = db.Column(db.String(32), nullable=True)  # google_places | manual
+    destination_confirmed = db.Column(db.Boolean, nullable=False, default=False)
     # GPS/reverse-geocode capture for day-driver stops. ``plant_name`` remains
     # the corrected customer/place label; this stores the physical address.
     location_address = db.Column(db.String(255), nullable=True)

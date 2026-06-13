@@ -1,0 +1,321 @@
+"""Destination autocomplete + details: service shape, endpoints, persistence,
+START ROUTE gating, and graceful manual fallback when Google is unavailable.
+
+Coordinates here are synthetic test fixtures (not real driver GPS).
+"""
+import pytest
+
+from app.services import google_places
+
+
+# ----- fixtures --------------------------------------------------------------
+@pytest.fixture()
+def app(monkeypatch, tmp_path):
+    monkeypatch.setenv("FLASK_ENV", "testing")
+    from app import create_app
+    from app.extensions import db
+
+    app = create_app()
+    app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+    with app.app_context():
+        db.create_all()
+        yield app
+        db.session.remove()
+        db.drop_all()
+
+
+@pytest.fixture()
+def client(app):
+    return app.test_client()
+
+
+def _make_day_driver(username="dd_dest", email=None):
+    from app.extensions import db
+    from app.models import User
+
+    user = User(username=username, email=email or f"{username}@example.com", role="driver")
+    user.set_password("password1")
+    user.day_driver = True
+    user.route_type = "general_freight"
+    db.session.add(user)
+    db.session.commit()
+    return user
+
+
+def _login(client, username="dd_dest"):
+    return client.post("/login", data={"login_name": username, "password": "password1"}, follow_redirects=False)
+
+
+class FakeResponse:
+    def __init__(self, payload, status_code=200):
+        self._payload = payload
+        self.status_code = status_code
+
+    def json(self):
+        return self._payload
+
+
+# ----- service-level (Google request shape) ----------------------------------
+def test_autocomplete_service_sends_session_token_and_origin(monkeypatch):
+    from flask import Flask
+
+    flask_app = Flask(__name__)
+    flask_app.config["GOOGLE_MAPS_API_KEY"] = "test-key"
+    calls = []
+
+    def fake_post(url, *, headers, json, timeout):
+        calls.append((url, json))
+        return FakeResponse(
+            {
+                "suggestions": [
+                    {
+                        "placePrediction": {
+                            "placeId": "place-123",
+                            "text": {"text": "Founders Brewing Co, Grand Rapids, MI"},
+                            "structuredFormat": {
+                                "mainText": {"text": "Founders Brewing Co"},
+                                "secondaryText": {"text": "Grand Rapids, MI"},
+                            },
+                            "distanceMeters": 5000,
+                        }
+                    },
+                    {"queryPrediction": {"text": {"text": "ignored"}}},
+                ]
+            }
+        )
+
+    monkeypatch.setattr(google_places.requests, "post", fake_post)
+    with flask_app.app_context():
+        result = google_places.autocomplete_destination(
+            "founders", lat=42.96, lng=-85.67, session_token="tok-1"
+        )
+
+    assert calls[0][0] == google_places.AUTOCOMPLETE_URL
+    sent = calls[0][1]
+    assert sent["input"] == "founders"
+    assert sent["sessionToken"] == "tok-1"
+    assert sent["origin"] == {"latitude": 42.96, "longitude": -85.67}
+    assert sent["locationBias"]["circle"]["center"] == {"latitude": 42.96, "longitude": -85.67}
+
+    assert result["ok"] is True
+    assert result["session_token"] == "tok-1"
+    assert result["suggestions"] == [
+        {
+            "place_id": "place-123",
+            "main_text": "Founders Brewing Co",
+            "secondary_text": "Grand Rapids, MI",
+            "formatted_address": "Founders Brewing Co, Grand Rapids, MI",
+            "distance_meters": 5000,
+            "source": "google_places",
+        }
+    ]
+
+
+def test_place_details_service_returns_minimal_fields_and_raw(monkeypatch):
+    from flask import Flask
+
+    flask_app = Flask(__name__)
+    flask_app.config["GOOGLE_MAPS_API_KEY"] = "test-key"
+    calls = []
+
+    def fake_get(url, *, headers, params, timeout):
+        calls.append((url, headers.get("X-Goog-FieldMask"), params))
+        return FakeResponse(
+            {
+                "id": "place-123",
+                "displayName": {"text": "Founders Brewing Co"},
+                "formattedAddress": "235 Grandville Ave SW, Grand Rapids, MI 49503, USA",
+                "location": {"latitude": 42.95, "longitude": -85.67},
+                "types": ["brewery", "point_of_interest"],
+                "primaryType": "brewery",
+                "businessStatus": "OPERATIONAL",
+                "googleMapsUri": "https://maps.google.com/?cid=1",
+                "parkingOptions": {"freeParkingLot": True},
+            }
+        )
+
+    monkeypatch.setattr(google_places.requests, "get", fake_get)
+    with flask_app.app_context():
+        result = google_places.destination_place_details("place-123", session_token="tok-1")
+
+    assert result["ok"] is True
+    place = result["place"]
+    assert place["name"] == "Founders Brewing Co"
+    assert place["address"] == "235 Grandville Ave SW, Grand Rapids, MI 49503"
+    assert place["lat"] == pytest.approx(42.95)
+    assert place["lng"] == pytest.approx(-85.67)
+    assert place["primary_type"] == "brewery"
+    assert result["raw"]["parkingOptions"] == {"freeParkingLot": True}
+    # Review/AI fields not requested unless enabled.
+    assert "reviews" not in calls[0][1]
+    assert calls[0][2]["sessionToken"] == "tok-1"
+
+
+# ----- endpoint-level --------------------------------------------------------
+def test_autocomplete_endpoint_returns_suggestions_with_session_token(client, app, monkeypatch):
+    with app.app_context():
+        _make_day_driver()
+    seen = {}
+
+    def fake_autocomplete(text, *, lat=None, lng=None, session_token="", limit=6):
+        seen["text"] = text
+        seen["session_token"] = session_token
+        seen["lat"] = lat
+        return {
+            "ok": True,
+            "session_token": session_token,
+            "suggestions": [
+                {"place_id": "p1", "main_text": "Warehouse " + text, "secondary_text": "City",
+                 "formatted_address": "1 Dock Rd", "distance_meters": 1200, "source": "google_places"}
+            ],
+        }
+
+    monkeypatch.setattr("app.blueprints.driver.routes.autocomplete_destination", fake_autocomplete)
+    _login(client)
+
+    first = client.post("/api/places/destination-autocomplete",
+                        json={"input": "foun", "session_token": "tok-9", "lat": 42.9, "lng": -85.5})
+    assert first.status_code == 200
+    data = first.get_json()
+    assert data["ok"] is True
+    assert seen["session_token"] == "tok-9"
+    assert data["suggestions"][0]["main_text"] == "Warehouse foun"
+
+    # Suggestions update as the input changes (test 9).
+    second = client.post("/api/places/destination-autocomplete",
+                         json={"input": "founders", "session_token": "tok-9"})
+    assert second.get_json()["suggestions"][0]["main_text"] == "Warehouse founders"
+
+
+def test_details_endpoint_populates_destination_and_driver_notes(client, app, monkeypatch):
+    with app.app_context():
+        _make_day_driver()
+
+    def fake_details(place_id, *, session_token="", include_reviews=False, include_generative=False):
+        return {
+            "ok": True,
+            "place": {
+                "place_id": place_id,
+                "name": "Founders Brewing Co",
+                "address": "235 Grandville Ave SW, Grand Rapids, MI 49503",
+                "lat": 42.95,
+                "lng": -85.67,
+                "types": ["brewery"],
+                "primary_type": "brewery",
+                "business_status": "OPERATIONAL",
+                "google_maps_uri": "https://maps.google.com/?cid=1",
+                "source": "google_places",
+            },
+            "raw": {"parkingOptions": {"freeParkingLot": True}, "currentOpeningHours": {"openNow": True}},
+        }
+
+    monkeypatch.setattr("app.blueprints.driver.routes.destination_place_details", fake_details)
+    _login(client)
+
+    response = client.post("/api/places/destination-details",
+                           json={"place_id": "place-123", "session_token": "tok-9"})
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["ok"] is True
+    dest = data["destination"]
+    assert dest["place_name"] == "Founders Brewing Co"
+    assert dest["address"] == "235 Grandville Ave SW, Grand Rapids, MI 49503"
+    assert dest["lat"] == pytest.approx(42.95)
+    assert dest["place_id"] == "place-123"
+    assert dest["source"] == "google_places"
+    assert dest["confirmed"] is True
+    # Trucker summary card filled from official parking/hours fields.
+    assert data["driver_notes"]["parking_note"] == "Free parking lot on site"
+    assert data["driver_notes"]["hours_note"] == "Open now"
+
+
+def test_details_endpoint_missing_place_id_is_graceful(client, app):
+    with app.app_context():
+        _make_day_driver()
+    _login(client)
+    response = client.post("/api/places/destination-details", json={"place_id": ""})
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is False
+
+
+# ----- persistence + gating + manual fallback --------------------------------
+def test_new_log_persists_selected_destination_fields(client, app):
+    with app.app_context():
+        _make_day_driver()
+    _login(client)
+    created = client.post(
+        "/new_driving_log",
+        data={
+            "location_address": "1916 Jefferson Ave SE, Grand Rapids, MI 49507",
+            "location": "Start Yard",
+            "destination_place_name": "Founders Brewing Co",
+            "destination_address": "235 Grandville Ave SW, Grand Rapids, MI 49503",
+            "destination_lat": "42.95",
+            "destination_lng": "-85.67",
+            "destination_place_id": "place-123",
+            "destination_source": "google_places",
+            "destination_confirmed": "true",
+        },
+        follow_redirects=False,
+    )
+    assert created.status_code in (302, 303)
+    with app.app_context():
+        from app.models import DriverLog
+
+        log = DriverLog.query.filter_by(plant_name="Start Yard").one()
+        assert log.destination_place_name == "Founders Brewing Co"
+        assert log.destination_address == "235 Grandville Ave SW, Grand Rapids, MI 49503"
+        assert log.destination_lat == pytest.approx(42.95)
+        assert log.destination_lng == pytest.approx(-85.67)
+        assert log.destination_place_id == "place-123"
+        assert log.destination_source == "google_places"
+        assert log.destination_confirmed is True
+
+
+def test_start_route_button_disabled_until_destination_on_first_stop(client, app):
+    with app.app_context():
+        _make_day_driver()
+    _login(client)
+    page = client.get("/new_driving_log")
+    body = page.get_data(as_text=True)
+    assert page.status_code == 200
+    assert 'id="destinationSection"' in body
+    assert "Enter destination address or business name" in body
+    assert 'data-gate-start="1"' in body
+    assert 'id="startRouteBtn"' in body
+    assert "disabled" in body  # Start Route is gated until destination is confirmed
+    assert "/api/places/destination-autocomplete" in body
+    assert "/api/places/destination-details" in body
+
+
+def test_manual_destination_saved_when_google_unavailable(client, app):
+    # With no usable Google key, autocomplete reports failure gracefully, but the
+    # driver can still type and confirm a manual destination.
+    app.config["GOOGLE_MAPS_API_KEY"] = ""  # force the unavailable path (no network)
+    with app.app_context():
+        _make_day_driver()
+    _login(client)
+
+    auto = client.post("/api/places/destination-autocomplete", json={"input": "anywhere", "session_token": "t"})
+    assert auto.status_code == 200
+    assert auto.get_json()["ok"] is False  # graceful, not a 500
+
+    created = client.post(
+        "/new_driving_log",
+        data={
+            "location_address": "1916 Jefferson Ave SE, Grand Rapids, MI",
+            "location": "Start Yard",
+            "destination_place_name": "Smith Family Warehouse",
+            "destination_source": "manual",
+            "destination_confirmed": "true",
+        },
+        follow_redirects=False,
+    )
+    assert created.status_code in (302, 303)
+    with app.app_context():
+        from app.models import DriverLog
+
+        log = DriverLog.query.filter_by(plant_name="Start Yard").one()
+        assert log.destination_place_name == "Smith Family Warehouse"
+        assert log.destination_source == "manual"
+        assert log.destination_confirmed is True

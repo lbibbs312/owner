@@ -155,6 +155,12 @@ class BaseConfig:
     STRIPE_PRICE_PAPER_FORM_CONVERSION = _env_str("STRIPE_PRICE_PAPER_FORM_CONVERSION")
     STRIPE_PRICE_FLEET_PACKET_SETUP = _env_str("STRIPE_PRICE_FLEET_PACKET_SETUP")
     GOOGLE_MAPS_API_KEY = _env_str("GOOGLE_MAPS_API_KEY")
+    # Destination search + trucker place summary on the Start Shift Location page.
+    # Review/AI-summary sources stay OFF by default (extra cost + API enablement).
+    ENABLE_DESTINATION_AUTOCOMPLETE = _env_bool("ENABLE_DESTINATION_AUTOCOMPLETE", True)
+    ENABLE_TRUCKER_PLACE_SUMMARY = _env_bool("ENABLE_TRUCKER_PLACE_SUMMARY", True)
+    ENABLE_GOOGLE_REVIEW_SUMMARY = _env_bool("ENABLE_GOOGLE_REVIEW_SUMMARY", False)
+    ENABLE_GOOGLE_GENERATIVE_SUMMARY = _env_bool("ENABLE_GOOGLE_GENERATIVE_SUMMARY", False)
     CANONICAL_SCHEME = _canonical_scheme()
     CANONICAL_HOST = _canonical_host()
     ENFORCE_CANONICAL_HOST = _env_bool("ENFORCE_CANONICAL_HOST", False)

@@ -138,6 +138,48 @@
       </div>
       <div class="form-text">Correct this name once and it will be remembered for later stops.</div>
     </div>
+    {% if config.ENABLE_DESTINATION_AUTOCOMPLETE %}
+    {# Where this route is headed. Required before Start Route on the first stop. #}
+    <div class="mb-3" id="destinationSection"
+         data-autocomplete-url="{{ url_for('driver.destination_autocomplete_api') }}"
+         data-details-url="{{ url_for('driver.destination_details_api') }}"
+         data-gate-start="{{ '1' if not has_today_logs else '0' }}">
+      <label class="form-label fw-bold text-uppercase" for="destinationSearch">Destination</label>
+      <input type="text" id="destinationSearch" class="form-control" placeholder="Enter destination address or business name" autocomplete="off" data-no-autosave="true">
+      <div class="form-text">Start typing the destination. Select the correct place before starting route.</div>
+      <div class="form-text" id="destinationStatus" role="status" aria-live="polite"></div>
+      <div class="list-group mt-1" id="destinationSuggestions" hidden></div>
+      <button type="button" class="btn btn-sm btn-primary mt-2" id="destinationManualBtn" hidden>Use what I typed</button>
+
+      <input type="hidden" name="destination_place_name" id="destination_place_name" data-no-autosave="true">
+      <input type="hidden" name="destination_address" id="destination_address" data-no-autosave="true">
+      <input type="hidden" name="destination_lat" id="destination_lat" data-no-autosave="true">
+      <input type="hidden" name="destination_lng" id="destination_lng" data-no-autosave="true">
+      <input type="hidden" name="destination_place_id" id="destination_place_id" data-no-autosave="true">
+      <input type="hidden" name="destination_source" id="destination_source" data-no-autosave="true">
+      <input type="hidden" name="destination_confirmed" id="destination_confirmed" value="" data-no-autosave="true">
+
+      <div class="card mt-2" id="destinationSelected" hidden>
+        <div class="card-body py-2">
+          <div class="fw-semibold">Going to: <span id="destinationGoingName"></span></div>
+          <div class="text-muted small" id="destinationGoingAddress"></div>
+          {% if config.ENABLE_TRUCKER_PLACE_SUMMARY %}
+          <div class="mt-2" id="driverNotesCard">
+            <div class="fw-bold small text-uppercase">Driver notes</div>
+            <ul class="list-unstyled small mb-0" id="driverNotesList">
+              <li>Parking: <span data-note="parking">No note yet</span></li>
+              <li>Dock/backing: <span data-note="dock">No note yet</span></li>
+              <li>Entrance: <span data-note="entrance">No note yet</span></li>
+              <li>Loading/unloading: <span data-note="loadunload">No note yet</span></li>
+              <li>Hours: <span data-note="hours">No note yet</span></li>
+            </ul>
+          </div>
+          {% endif %}
+          <button type="button" class="btn btn-sm mt-2" id="destinationChangeBtn">Change destination</button>
+        </div>
+      </div>
+    </div>
+    {% endif %}
     {# Cargo is captured ONCE — at departure ("Leaving loaded?"). Arriving only asks where you are. #}
     <script>
       (function () {
@@ -187,7 +229,7 @@
 
         function candidateSourceLabel(candidate) {
           if (!candidate) return '';
-          if (candidate.source === 'saved') return '\u23f2 Recent';
+          if (candidate.source === 'saved' || candidate.source === 'recent') return '\u23f2 Recent';
           if (candidate.source === 'google_address') return 'Google address';
           if (candidate.source === 'google_text') return 'Google search';
           if (candidate.source === 'google') return candidate.address_match ? 'Google address' : 'Google nearby';
@@ -339,37 +381,78 @@
           return merged;
         }
 
-        function recentLocationPlaces() {
-          var seen = {};
-          var places = [];
-          function add(name, address) {
-            name = clean(name);
-            address = clean(address);
-            if (!name) return;
-            var key = name.toLowerCase();
-            if (seen[key]) {
-              if (address && !seen[key].address) seen[key].address = address;
-              return;
-            }
-            var item = { name: name, address: address, source: 'saved' };
-            seen[key] = item;
-            places.push(item);
-          }
-          (locationRecents || []).forEach(function (place) {
-            add(place && place.name, place && place.address);
-          });
-          (locationMemory || []).forEach(function (label) { add(label, ''); });
-          return places;
+        function normalizeAddress(value) {
+          value = clean(value).toLowerCase();
+          value = value.replace(/\b(usa|united states)\b/g, '');
+          value = value.replace(/\b\d{5}(?:-\d{4})?\b/g, '');
+          value = value.replace(/[^a-z0-9]+/g, ' ');
+          return value.replace(/\s+/g, ' ').trim();
         }
 
-        function rememberedTextPlaces(query) {
-          var tokens = clean(query).toLowerCase().split(/\s+/).filter(function (token) { return token.length >= 2; });
-          return recentLocationPlaces().filter(function (place) {
-            var haystack = clean((place.name || '') + ' ' + (place.address || '')).toLowerCase();
-            if (!haystack) return false;
-            if (!tokens.length) return true;
-            return tokens.every(function (token) { return haystack.indexOf(token) !== -1; });
-          }).slice(0, 5);
+        function addressesMatch(left, right) {
+          var l = normalizeAddress(left);
+          var r = normalizeAddress(right);
+          if (!l || !r) return false;
+          return l === r || l.indexOf(r) !== -1 || r.indexOf(l) !== -1;
+        }
+
+        // Pool of the driver's saved recents (name + address), with any saved
+        // coordinates merged in from place memory.
+        function recentLocationPool() {
+          var byName = {};
+          var pool = [];
+          function add(name, address, lat, lng) {
+            name = clean(name);
+            if (!name) return;
+            var key = name.toLowerCase();
+            if (byName[key]) {
+              if (address && !byName[key].address) byName[key].address = clean(address);
+              if (lat != null && byName[key].lat == null) { byName[key].lat = lat; byName[key].lng = lng; }
+              return;
+            }
+            var item = { name: name, address: clean(address), lat: (lat == null ? null : lat), lng: (lng == null ? null : lng) };
+            byName[key] = item;
+            pool.push(item);
+          }
+          (locationRecents || []).forEach(function (place) { add(place && place.name, place && place.address); });
+          (placeMemory || []).forEach(function (place) {
+            var lat = Number(place.lat), lng = Number(place.lng);
+            add(place && place.label, '', isNaN(lat) ? null : lat, isNaN(lng) ? null : lng);
+          });
+          (locationMemory || []).forEach(function (label) { add(label, ''); });
+          return pool;
+        }
+
+        function asRecentCandidate(place) {
+          return { name: place.name, address: place.address || '', source: 'recent' };
+        }
+
+        // Contextual recents only: matches for the typed text, or for the
+        // resolved address / GPS point (within 250 m). Empty input with no GPS
+        // returns nothing - we never dump the global recents list into the UI.
+        function contextualRecentMatches(context) {
+          context = context || {};
+          var typed = clean(context.typed);
+          var address = clean(context.address);
+          var lat = context.lat, lng = context.lng;
+          var havePoint = (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng));
+          var pool = recentLocationPool();
+          if (typed) {
+            var tokens = typed.toLowerCase().split(/\s+/).filter(function (t) { return t.length >= 2; });
+            if (!tokens.length) return [];
+            return pool.filter(function (place) {
+              var haystack = clean((place.name || '') + ' ' + (place.address || '')).toLowerCase();
+              return haystack && tokens.every(function (t) { return haystack.indexOf(t) !== -1; });
+            }).slice(0, 5).map(asRecentCandidate);
+          }
+          if (!address && !havePoint) return [];
+          return pool.filter(function (place) {
+            if (address && addressesMatch(address, place.address)) return true;
+            if (havePoint && place.lat != null && place.lng != null) {
+              return distanceMeters(lat, lng, place.lat, place.lng) <= 250;
+            }
+            return false;
+          }).slice(0, 5).map(asRecentCandidate);
         }
 
         function normalizeGooglePlaces(places, source) {
@@ -386,7 +469,7 @@
           var nameValue = clean(nameInput && nameInput.value);
           var addressValue = clean(addressInput && addressInput.value);
           var query = clean(forcedQuery || [nameValue, addressValue].filter(Boolean).join(' '));
-          var memoryMatches = rememberedTextPlaces(nameValue || query);
+          var memoryMatches = contextualRecentMatches({ typed: nameValue || query });
           var activeRequest = ++customerLookupId;
           window.clearTimeout(customerLookupTimer);
           if (memoryMatches.length) renderCandidates(memoryMatches);
@@ -418,7 +501,8 @@
           var nameValue = clean(nameInput && nameInput.value);
           if (nameValue) return;
           var initialQuery = gpsPlaceHint || clean(addressInput && addressInput.value);
-          var memoryMatches = rememberedTextPlaces('');
+          // No name, no GPS, nothing typed yet -> show no recents (not the dump).
+          var memoryMatches = contextualRecentMatches({});
           if (memoryMatches.length) renderCandidates(memoryMatches);
           if (initialQuery) {
             requestCustomerLookup(initialQuery);
@@ -479,13 +563,18 @@
               .then(function (data) {
                 var googlePlaces = data.places || [];
                 var addressCandidates = data.address_candidates || [];
-                var candidates = mergeCandidates(googlePlaces, savedPlaces);
-                var googleError = googleErrorMessage(data);
-                var bestCandidate = candidates[0] || null;
-                var trustedCandidate = candidates.find(isTrustedCandidate);
                 if (!addressCandidates.length && data.fallback_address) {
                   addressCandidates = [{ address: data.fallback_address }];
                 }
+                // Recents near this GPS point or matching the resolved address
+                // show as suggestions (source 'recent'); only the tight saved
+                // matches stay auto-fillable.
+                var resolvedAddress = addressValue(addressCandidates[0]);
+                var contextualRecents = contextualRecentMatches({ lat: Number(lat), lng: Number(lon), address: resolvedAddress });
+                var candidates = mergeCandidates(googlePlaces, savedPlaces.concat(contextualRecents));
+                var googleError = googleErrorMessage(data);
+                var bestCandidate = candidates[0] || null;
+                var trustedCandidate = candidates.find(isTrustedCandidate);
                 renderAddressChoices(addressCandidates);
                 renderCandidates(candidates);
                 applyAddress(addressCandidates[0], !auto);
@@ -565,7 +654,7 @@
         }
         if (nameInput) {
           nameInput.addEventListener('focus', function () {
-            var matches = rememberedTextPlaces(nameInput.value);
+            var matches = contextualRecentMatches({ typed: nameInput.value });
             if (matches.length) renderCandidates(matches);
           });
           nameInput.addEventListener('input', function () {
@@ -578,6 +667,220 @@
         // and prefill, leaving the field editable.
         if (addressInput && !addressInput.value.trim()) fillFromGps(true);
         else showInitialCustomerSuggestions();
+      })();
+    </script>
+    <script>
+      // DESTINATION search: Google-style autocomplete, Place Details on select,
+      // and a short trucker "Driver notes" card. Manual entry always works if
+      // Google is unavailable.
+      (function () {
+        var section = document.getElementById('destinationSection');
+        if (!section) return;
+        var input = document.getElementById('destinationSearch');
+        var status = document.getElementById('destinationStatus');
+        var list = document.getElementById('destinationSuggestions');
+        var manualBtn = document.getElementById('destinationManualBtn');
+        var selected = document.getElementById('destinationSelected');
+        var goingName = document.getElementById('destinationGoingName');
+        var goingAddress = document.getElementById('destinationGoingAddress');
+        var changeBtn = document.getElementById('destinationChangeBtn');
+        var notesList = document.getElementById('driverNotesList');
+        var autocompleteUrl = section.getAttribute('data-autocomplete-url');
+        var detailsUrl = section.getAttribute('data-details-url');
+        var fields = {
+          place_name: document.getElementById('destination_place_name'),
+          address: document.getElementById('destination_address'),
+          lat: document.getElementById('destination_lat'),
+          lng: document.getElementById('destination_lng'),
+          place_id: document.getElementById('destination_place_id'),
+          source: document.getElementById('destination_source'),
+          confirmed: document.getElementById('destination_confirmed')
+        };
+        var startBtn = document.getElementById('startRouteBtn');
+        var requireDestination = section.getAttribute('data-gate-start') === '1';
+        var latInput = document.getElementById('gps_latitude');
+        var lonInput = document.getElementById('gps_longitude');
+        var nameInput = document.getElementById('location');
+        var addressInput = document.getElementById('location_address');
+
+        var sessionToken = newToken();
+        var debounceTimer = null;
+        var requestId = 0;
+
+        function newToken() {
+          if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+          return 'sess-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+        }
+        function clean(v) { return (v || '').toString().trim(); }
+        function setStatus(msg) { if (status) status.textContent = msg || ''; }
+
+        function locationKnown() {
+          return !!(clean(addressInput && addressInput.value) || clean(nameInput && nameInput.value) || clean(latInput && latInput.value));
+        }
+        function destinationConfirmed() {
+          return !!(fields.confirmed && clean(fields.confirmed.value) === 'true');
+        }
+        function syncStartButton() {
+          if (!startBtn || !requireDestination) return;
+          startBtn.disabled = !(locationKnown() && destinationConfirmed());
+        }
+
+        function clearSelection() {
+          Object.keys(fields).forEach(function (k) { if (fields[k]) fields[k].value = ''; });
+          if (selected) selected.hidden = true;
+          syncStartButton();
+        }
+
+        function setNote(key, value) {
+          if (!notesList) return;
+          var el = notesList.querySelector('[data-note="' + key + '"]');
+          if (el) el.textContent = (value && clean(value)) ? clean(value) : 'No note yet';
+        }
+        function renderDriverNotes(notes) {
+          if (!notesList) return;
+          notes = notes || {};
+          setNote('parking', notes.parking_note || notes.overnight_parking_note);
+          setNote('dock', notes.dock_note || notes.backing_note);
+          setNote('entrance', notes.entrance_note);
+          setNote('loadunload', notes.loading_speed_note || notes.unloading_speed_note);
+          setNote('hours', notes.hours_note);
+        }
+
+        function milesAway(meters) {
+          if (meters == null) return '';
+          var miles = meters / 1609.34;
+          if (miles < 0.1) return Math.round(meters) + ' m away';
+          return miles.toFixed(miles < 10 ? 1 : 0) + ' mi away';
+        }
+
+        function showSuggestions(items) {
+          if (!list) return;
+          list.innerHTML = '';
+          if (!items || !items.length) { list.hidden = true; return; }
+          items.forEach(function (s) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'list-group-item list-group-item-action';
+            var main = document.createElement('div');
+            main.className = 'fw-semibold';
+            main.textContent = s.main_text || s.formatted_address || 'Destination';
+            btn.appendChild(main);
+            var secondaryText = clean(s.secondary_text);
+            var distance = (typeof s.distance_meters === 'number') ? milesAway(s.distance_meters) : '';
+            if (secondaryText || distance) {
+              var sub = document.createElement('div');
+              sub.className = 'small text-muted';
+              sub.textContent = [secondaryText, distance].filter(Boolean).join(' · ');
+              btn.appendChild(sub);
+            }
+            btn.addEventListener('click', function () { selectSuggestion(s); });
+            list.appendChild(btn);
+          });
+          list.hidden = false;
+        }
+
+        function applyDestination(dest) {
+          if (fields.place_name) fields.place_name.value = dest.place_name || '';
+          if (fields.address) fields.address.value = dest.address || '';
+          if (fields.lat) fields.lat.value = (dest.lat == null ? '' : dest.lat);
+          if (fields.lng) fields.lng.value = (dest.lng == null ? '' : dest.lng);
+          if (fields.place_id) fields.place_id.value = dest.place_id || '';
+          if (fields.source) fields.source.value = dest.source || 'google_places';
+          if (fields.confirmed) fields.confirmed.value = 'true';
+          if (goingName) goingName.textContent = dest.place_name || dest.address || 'Destination';
+          if (goingAddress) goingAddress.textContent = dest.address || '';
+          if (selected) selected.hidden = false;
+          if (list) { list.hidden = true; list.innerHTML = ''; }
+          if (manualBtn) manualBtn.hidden = true;
+          syncStartButton();
+        }
+
+        function selectSuggestion(s) {
+          setStatus('Loading destination...');
+          fetch(detailsUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ place_id: s.place_id, session_token: sessionToken })
+          }).then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) {
+              if (!data || !data.ok || !data.destination) {
+                applyDestination({ place_name: s.main_text, address: s.formatted_address || s.secondary_text || '', source: 'manual' });
+                renderDriverNotes(null);
+                setStatus('');
+                sessionToken = newToken();
+                return;
+              }
+              applyDestination(data.destination);
+              renderDriverNotes(data.driver_notes);
+              setStatus('');
+              sessionToken = newToken();
+            })
+            .catch(function () {
+              applyDestination({ place_name: s.main_text, address: s.formatted_address || '', source: 'manual' });
+              setStatus('');
+              sessionToken = newToken();
+            });
+        }
+
+        function manualConfirm() {
+          var typed = clean(input && input.value);
+          if (!typed) return;
+          applyDestination({ place_name: typed, address: '', source: 'manual' });
+        }
+
+        function runAutocomplete() {
+          var text = clean(input && input.value);
+          if (text.length < 2) { showSuggestions([]); if (manualBtn) manualBtn.hidden = true; return; }
+          var id = ++requestId;
+          var body = { input: text, session_token: sessionToken };
+          if (latInput && lonInput && clean(latInput.value) && clean(lonInput.value)) {
+            body.lat = Number(latInput.value);
+            body.lng = Number(lonInput.value);
+          }
+          fetch(autocompleteUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(body)
+          }).then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) {
+              if (id !== requestId) return;
+              if (!data || data.ok === false || !data.suggestions || !data.suggestions.length) {
+                showSuggestions([]);
+                if (data && data.ok === false) {
+                  setStatus('Could not load suggestions. Type destination manually.');
+                  if (manualBtn) manualBtn.hidden = false;
+                }
+                return;
+              }
+              setStatus('');
+              if (manualBtn) manualBtn.hidden = false;
+              showSuggestions(data.suggestions);
+            })
+            .catch(function () {
+              if (id !== requestId) return;
+              showSuggestions([]);
+              setStatus('Could not load suggestions. Type destination manually.');
+              if (manualBtn) manualBtn.hidden = false;
+            });
+        }
+
+        if (input) {
+          input.addEventListener('input', function () {
+            if (destinationConfirmed()) clearSelection();
+            window.clearTimeout(debounceTimer);
+            debounceTimer = window.setTimeout(runAutocomplete, 300);
+          });
+        }
+        if (manualBtn) manualBtn.addEventListener('click', manualConfirm);
+        if (changeBtn) changeBtn.addEventListener('click', function () {
+          clearSelection();
+          if (input) { input.value = ''; input.focus(); }
+          sessionToken = newToken();
+        });
+        if (latInput) ['input', 'change'].forEach(function (ev) { latInput.addEventListener(ev, syncStartButton); });
+        if (addressInput) addressInput.addEventListener('input', syncStartButton);
+        if (nameInput) nameInput.addEventListener('input', syncStartButton);
+        syncStartButton();
       })();
     </script>
     {% else %}
@@ -617,7 +920,12 @@
     </div>
     {% endif %}
 
-    {{ form.submit(class="btn btn-primary", value=("Start Route" if not has_today_logs else "Record Stop")) }}
+    {% set gate_destination = current_user.is_day_driver and not has_today_logs and config.ENABLE_DESTINATION_AUTOCOMPLETE %}
+    {% if gate_destination %}
+    {{ form.submit(class="btn btn-primary", id="startRouteBtn", value="Start Route", disabled=True) }}
+    {% else %}
+    {{ form.submit(class="btn btn-primary", id="startRouteBtn", value=("Start Route" if not has_today_logs else "Record Stop")) }}
+    {% endif %}
   </form>
 </div>
 
