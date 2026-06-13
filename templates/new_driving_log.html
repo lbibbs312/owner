@@ -136,6 +136,18 @@
         transform:rotate(45deg);
         margin-top:-5px;
       }
+      #gpsPlaceSuggestions .list-group-item {
+        background: rgba(12,19,34,.96);
+        border: 1px solid rgba(91,157,255,.20);
+        color: #e6eefc;
+      }
+      #gpsPlaceSuggestions .list-group-item + .list-group-item { border-top: none; }
+      #gpsPlaceSuggestions .list-group-item:hover,
+      #gpsPlaceSuggestions .list-group-item:focus {
+        background: rgba(47,109,240,.30);
+        color: #ffffff;
+      }
+      #gpsPlaceSuggestions .text-muted { color: #9fb3d1 !important; }
       #gpsStatus.is-loading {
         display:inline-block;
         font-weight:850;
@@ -182,6 +194,7 @@
             <span class="gps-select-caret"></span>
           </span>
         </div>
+        <div class="list-group mt-1" id="gpsPlaceSuggestions"></div>
         <div class="form-text">These name where you are now. They do not set the next destination.</div>
       </div>
       <div class="form-text">Tap GPS to set the current address, then pick or type the place name.</div>
@@ -267,17 +280,30 @@
         border-color: rgba(255,82,71,.72);
         color: #ffffff;
       }
+      #destinationSkipBtn {
+        background: rgba(159,179,209,.10);
+        border: 1px solid rgba(159,179,209,.34);
+        color: #d7e3f7;
+      }
+      #destinationSkipBtn.is-selected {
+        border-color: rgba(111,227,154,.58);
+        color: #ffffff;
+        box-shadow: 0 0 14px rgba(43,213,118,.16);
+      }
     </style>
     <div class="mb-3" id="destinationSection"
          data-autocomplete-url="{{ url_for('driver.destination_autocomplete_api') }}"
          data-details-url="{{ url_for('driver.destination_details_api') }}"
          data-gate-start="{{ '1' if not has_today_logs else '0' }}">
-      <label class="form-label fw-bold text-uppercase" for="destinationSearch">Next destination name / location</label>
+      <label class="form-label fw-bold text-uppercase" for="destinationSearch">Next destination name / location <span class="text-muted">(optional)</span></label>
       <input type="text" id="destinationSearch" class="form-control" placeholder="Business name or address" autocomplete="off" data-no-autosave="true">
-      <div class="form-text">This is where you are going after the current location.</div>
+      <div class="form-text">Use this when you know the next stop. Leave it blank or choose no next destination when you are done or waiting on dispatch.</div>
       <div class="form-text" id="destinationStatus" role="status" aria-live="polite"></div>
       <div class="list-group mt-1" id="destinationSuggestions" hidden></div>
-      <button type="button" class="btn btn-sm btn-primary mt-2" id="destinationManualBtn" hidden>Use what I typed</button>
+      <div class="d-flex flex-wrap gap-2 mt-2">
+        <button type="button" class="btn btn-sm btn-primary" id="destinationManualBtn" hidden>Use what I typed</button>
+        <button type="button" class="btn btn-sm" id="destinationSkipBtn">No next destination</button>
+      </div>
 
       <input type="hidden" name="destination_place_name" id="destination_place_name" data-no-autosave="true">
       <input type="hidden" name="destination_address" id="destination_address" data-no-autosave="true">
@@ -286,6 +312,7 @@
       <input type="hidden" name="destination_place_id" id="destination_place_id" data-no-autosave="true">
       <input type="hidden" name="destination_source" id="destination_source" data-no-autosave="true">
       <input type="hidden" name="destination_confirmed" id="destination_confirmed" value="" data-no-autosave="true">
+      <input type="hidden" name="destination_skipped" id="destination_skipped" value="" data-no-autosave="true">
 
       <div class="card mt-2" id="destinationSelected" role="button" tabindex="0" aria-label="Confirm selected destination" hidden>
         <button type="button" id="destinationCancelBtn" aria-label="Cancel selected destination">&times;</button>
@@ -320,6 +347,7 @@
         var placeChoices = document.getElementById('gpsPlaceChoices');
         var placeSelect = document.getElementById('gpsPlaceSelect');
         var placeCount = document.getElementById('gpsPlaceCount');
+        var placeSuggestionList = document.getElementById('gpsPlaceSuggestions');
         var gpsPlacesUrl = gpsBtn ? gpsBtn.getAttribute('data-gps-places-url') : '';
         var destinationLookupUrl = gpsBtn ? gpsBtn.getAttribute('data-gps-destination-url') : '';
         var gpsPlaceHint = gpsBtn ? clean(gpsBtn.getAttribute('data-gps-place-hint')) : '';
@@ -474,6 +502,15 @@
           }
         }
 
+        function pickCustomerCandidate(index) {
+          var candidate = currentCandidates[index];
+          if (!candidate) return;
+          if (placeSelect) placeSelect.value = String(index);
+          customerChoiceTouched = true;
+          applyCandidate(candidate, true, true);
+          if (placeChoices) placeChoices.hidden = true;
+        }
+
         function renderAddressChoices(addresses) {
           currentAddresses = addresses || [];
           if (!addressChoices || !addressSelect || !currentAddresses.length) {
@@ -495,16 +532,36 @@
           currentCandidates = candidates || [];
           if (!placeChoices || !placeSelect || !currentCandidates.length) {
             if (placeChoices) placeChoices.hidden = true;
+            if (placeSuggestionList) placeSuggestionList.innerHTML = '';
             setPlaceCount(0);
             return;
           }
           placeSelect.disabled = false;
           placeSelect.innerHTML = '';
+          if (placeSuggestionList) placeSuggestionList.innerHTML = '';
           currentCandidates.forEach(function (candidate, index) {
             var option = document.createElement('option');
             option.value = String(index);
             option.textContent = candidateLabel(candidate);
             placeSelect.appendChild(option);
+            if (placeSuggestionList) {
+              var btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'list-group-item list-group-item-action';
+              var main = document.createElement('div');
+              main.className = 'fw-semibold';
+              main.textContent = candidate.name || 'Nearby place';
+              btn.appendChild(main);
+              var meta = [candidateSourceLabel(candidate), candidate.address, formatDistance(candidate)].filter(Boolean).join(' · ');
+              if (meta) {
+                var sub = document.createElement('div');
+                sub.className = 'small text-muted';
+                sub.textContent = meta;
+                btn.appendChild(sub);
+              }
+              btn.addEventListener('click', function () { pickCustomerCandidate(index); });
+              placeSuggestionList.appendChild(btn);
+            }
           });
           setPlaceCount(currentCandidates.length);
           placeChoices.hidden = false;
@@ -514,6 +571,7 @@
           currentCandidates = [];
           setPlaceCount(0);
           if (!placeChoices || !placeSelect) return;
+          if (placeSuggestionList) placeSuggestionList.innerHTML = '';
           placeSelect.innerHTML = '';
           var option = document.createElement('option');
           option.value = '';
@@ -652,7 +710,8 @@
           if (!destinationLookupUrl) return;
           var nameValue = clean(nameInput && nameInput.value);
           var addressValue = clean(addressInput && addressInput.value);
-          var query = clean(forcedQuery || [nameValue, addressValue].filter(Boolean).join(' '));
+          var typedQuery = clean(nameValue);
+          var query = clean(typedQuery || forcedQuery || addressValue);
           var memoryMatches = contextualRecentMatches({ typed: nameValue || query });
           var activeRequest = ++customerLookupId;
           window.clearTimeout(customerLookupTimer);
@@ -867,6 +926,7 @@
         var status = document.getElementById('destinationStatus');
         var list = document.getElementById('destinationSuggestions');
         var manualBtn = document.getElementById('destinationManualBtn');
+        var skipBtn = document.getElementById('destinationSkipBtn');
         var selected = document.getElementById('destinationSelected');
         var cancelBtn = document.getElementById('destinationCancelBtn');
         var goingName = document.getElementById('destinationGoingName');
@@ -882,7 +942,8 @@
           lng: document.getElementById('destination_lng'),
           place_id: document.getElementById('destination_place_id'),
           source: document.getElementById('destination_source'),
-          confirmed: document.getElementById('destination_confirmed')
+          confirmed: document.getElementById('destination_confirmed'),
+          skipped: document.getElementById('destination_skipped')
         };
         var startBtn = null;
         var routeForm = section.closest('form');
@@ -921,6 +982,9 @@
         function destinationConfirmed() {
           return !!((fields.confirmed && clean(fields.confirmed.value) === 'true') || selectedDestinationVisible());
         }
+        function destinationSkipped() {
+          return !!(fields.skipped && clean(fields.skipped.value) === 'true');
+        }
         function typedDestinationReady() {
           return clean(input && input.value).length >= 2;
         }
@@ -932,10 +996,12 @@
           var button = startRouteButton();
           if (!button || !requireDestination) return;
           repairDestinationFieldsFromCard();
-          button.disabled = !(locationKnown() && (destinationConfirmed() || typedDestinationReady()));
+          button.disabled = !(locationKnown() && (destinationConfirmed() || typedDestinationReady() || destinationSkipped()));
         }
 
         function confirmSelectedDestination() {
+          if (fields.skipped) fields.skipped.value = '';
+          if (skipBtn) skipBtn.classList.remove('is-selected');
           repairDestinationFieldsFromCard();
           if (selected) selected.classList.add('is-confirmed');
           if (list) { list.hidden = true; list.innerHTML = ''; }
@@ -946,6 +1012,7 @@
 
         function clearSelection() {
           Object.keys(fields).forEach(function (k) { if (fields[k]) fields[k].value = ''; });
+          if (skipBtn) skipBtn.classList.remove('is-selected');
           if (selected) {
             selected.hidden = true;
             selected.classList.remove('is-confirmed');
@@ -962,6 +1029,17 @@
           }
           setStatus('Destination cleared.');
           sessionToken = newToken();
+        }
+
+        function skipDestination() {
+          clearSelection();
+          if (fields.skipped) fields.skipped.value = 'true';
+          if (skipBtn) skipBtn.classList.add('is-selected');
+          if (input) input.value = '';
+          if (list) { list.hidden = true; list.innerHTML = ''; }
+          if (manualBtn) manualBtn.hidden = true;
+          setStatus('No next destination saved.');
+          syncStartButton();
         }
 
         function renderDriverSummary(summary) {
@@ -1123,6 +1201,11 @@
 
         if (input) {
           input.addEventListener('input', function () {
+            if (destinationSkipped()) {
+              if (fields.skipped) fields.skipped.value = '';
+              if (skipBtn) skipBtn.classList.remove('is-selected');
+              setStatus('');
+            }
             if (destinationConfirmed()) clearSelection();
             window.clearTimeout(debounceTimer);
             debounceTimer = window.setTimeout(runAutocomplete, 300);
@@ -1130,6 +1213,7 @@
           });
         }
         if (manualBtn) manualBtn.addEventListener('click', manualConfirm);
+        if (skipBtn) skipBtn.addEventListener('click', skipDestination);
         if (routeForm) routeForm.addEventListener('submit', ensureDestinationBeforeSubmit);
         if (selected) {
           selected.addEventListener('click', confirmSelectedDestination);

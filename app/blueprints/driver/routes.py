@@ -3616,12 +3616,13 @@ def destination_details_api():
 
 def _render_new_driving_log(form, current_load, *, route_context=None, return_to_mobile=False):
     route_date = getattr(route_context, "route_date", None) or _today_local_date()
-    has_today_logs = bool(getattr(route_context, "rows", None)) if route_context else (
+    has_logged_stop = (
         _active_driver_logs_query()
         .filter_by(driver_id=current_user.id, date=route_date)
         .first()
         is not None
     )
+    has_today_logs = bool(getattr(route_context, "rows", None)) or has_logged_stop
     freight_memory = (
         _freight_stop_memory(current_user.id)
         if getattr(current_user, "is_day_driver", False)

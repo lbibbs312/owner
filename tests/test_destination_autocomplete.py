@@ -405,11 +405,13 @@ def test_start_route_button_disabled_until_destination_on_first_stop(client, app
     assert page.status_code == 200
     assert 'id="destinationSection"' in body
     assert "Next destination name / location" in body
+    assert "(optional)" in body
     assert "Business name or address" in body
-    assert "This is where you are going after the current location." in body
+    assert "Use this when you know the next stop." in body
+    assert "No next destination" in body
     assert 'data-gate-start="1"' in body
     assert 'id="startRouteBtn"' in body
-    assert "disabled" in body  # Start Route is gated until destination is confirmed
+    assert "disabled" in body  # Start Route is gated until location plus destination or a deliberate skip
     assert "/api/places/destination-autocomplete" in body
     assert "/api/places/destination-details" in body
     assert "Maps driver summary" in body
@@ -424,15 +426,20 @@ def test_start_route_button_disabled_until_destination_on_first_stop(client, app
     assert "function repairDestinationFieldsFromCard" in body
     assert "function confirmSelectedDestination" in body
     assert "function cancelSelectedDestination" in body
+    assert "function skipDestination" in body
+    assert "function destinationSkipped" in body
     assert "function typedDestinationReady" in body
     assert "function startRouteButton" in body
     assert "function ensureDestinationBeforeSubmit" in body
-    assert "destinationConfirmed() || typedDestinationReady()" in body
+    assert "destinationConfirmed() || typedDestinationReady() || destinationSkipped()" in body
     assert "routeForm.addEventListener('submit', ensureDestinationBeforeSubmit)" in body
     assert "document.addEventListener('DOMContentLoaded', syncStartButton)" in body
     assert 'id="destinationCancelBtn"' in body
     assert 'aria-label="Cancel selected destination"' in body
+    assert 'id="destinationSkipBtn"' in body
+    assert 'id="destination_skipped"' in body
     assert "selected.addEventListener('click', confirmSelectedDestination)" in body
+    assert "skipBtn.addEventListener('click', skipDestination)" in body
     assert "if (destinationConfirmed()) clearSelection();" in body
     assert "destinationChangeBtn" not in body
 
@@ -468,3 +475,28 @@ def test_manual_destination_saved_when_google_unavailable(client, app):
         assert log.destination_place_name == "Smith Family Warehouse"
         assert log.destination_source == "manual"
         assert log.destination_confirmed is True
+
+
+def test_day_driver_can_start_route_with_no_next_destination(client, app):
+    with app.app_context():
+        _make_day_driver()
+    _login(client)
+
+    created = client.post(
+        "/new_driving_log",
+        data={
+            "location_address": "1916 Jefferson Ave SE, Grand Rapids, MI",
+            "location": "Start Yard",
+            "destination_skipped": "true",
+        },
+        follow_redirects=False,
+    )
+    assert created.status_code in (302, 303)
+    with app.app_context():
+        from app.models import DriverLog
+
+        log = DriverLog.query.filter_by(plant_name="Start Yard").one()
+        assert log.destination_place_name is None
+        assert log.destination_address is None
+        assert log.destination_source is None
+        assert log.destination_confirmed is False

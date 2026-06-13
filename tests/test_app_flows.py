@@ -10921,7 +10921,9 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     assert "Suggested current location names" in body
     assert "gps-select-caret" in body
     assert "gpsPlaceCount" in body
+    assert "gpsPlaceSuggestions" in body
     assert "setPlaceCount" in body
+    assert "pickCustomerCandidate" in body
     assert "These name where you are now" in body
     assert "Tap GPS to set the current address" in body
     assert "/gps/place-candidates" in body
@@ -10943,6 +10945,8 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     assert "notifyInputChanged" in body
     assert "applyGpsNameFallback" in body
     assert "candidateMatchesQuery" in body
+    assert "var typedQuery = clean(nameValue);" in body
+    assert "typedQuery || forcedQuery || addressValue" in body
     assert "gpsPlaceHint.toLowerCase() === 'none'" in body
     assert "customerChoiceTouched" in body
     assert "applySelectedCustomer(customerChoiceTouched)" in body
@@ -10982,6 +10986,8 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
         assert stop["location_display"] == "Customer Dock 4 · 2200 Customer Dock Dr, Industrial City, MI 49512"
 
     next_form = client.get("/new_driving_log").get_data(as_text=True)
+    assert "Log Current Stop" in next_form
+    assert "Start Shift Location" not in next_form
     assert '<option value="Customer Dock 4">' in next_form
     assert "locationRecents" in next_form
     assert "2200 Customer Dock Dr, Industrial City, MI 49512" in next_form
