@@ -51,6 +51,13 @@
     padding-bottom:calc(var(--md-nav-height) + 26px);
   }
 
+  /* Keep the driver bottom action bar consistent on desktop too, so every driver
+     page has the same nav as the dashboard (it is hidden >=768px by default). */
+  @media (min-width:1000px) {
+    .md-driver-bottom-nav.md-driver-bottom-nav { display:grid !important; }
+    body.md-shell.md-has-bottom-nav #pageContent { padding-bottom:calc(var(--md-nav-height) + 30px) !important; }
+  }
+
   /* ---- Top navbar / header (shared chrome from base.html) ---- */
   body.md-shell .navbar.bg-primary {
     background:rgba(8,13,22,.94) !important;

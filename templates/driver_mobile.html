@@ -5048,6 +5048,7 @@
         .md-v3-cta .tx em{font-style:normal;font-family:ui-monospace,Menlo,monospace;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#6fe39a}
         .md-v3-cta .tx strong{font-family:'Archivo',ui-sans-serif,system-ui,'Segoe UI',sans-serif;text-transform:uppercase;font-size:30px;font-weight:800;letter-spacing:.01em;color:#f3ede2;line-height:1.08}
         .md-v3-cta .tx small{font-size:13.5px;color:#8fa3bf}
+        .md-v3-go{display:none}
         .md-v3-stops{margin:0 0 16px}
         .md-v3-stop{display:flex;align-items:center;gap:13px;padding:12px 15px;border-radius:11px;margin-bottom:8px;background:rgba(15,24,38,.82);border:1px solid rgba(91,157,255,.16)}
         .md-v3-stop.is-current{border-color:rgba(127,178,255,.5);box-shadow:0 0 18px rgba(91,157,255,.14)}
@@ -5069,11 +5070,16 @@
         /* ----- Actual desktop ONLY (>=1000px wide AND tall). Phone and the ~600px
            tablet are below this, so nothing about their layout changes. ----- */
         @media (min-width:1000px) and (min-height:560px){
-          .mobile-shell.board-only-shell{max-width:min(1340px,95vw);border-radius:18px}
+          .mobile-shell.board-only-shell{max-width:min(1340px,95vw);border-radius:18px;min-height:auto}
           .md-desk-v3{max-width:none;padding:4px 2px 8px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);grid-template-areas:"cta log" "stops log";gap:20px;align-items:start}
-          .md-v3-cta{grid-area:cta;margin:0}
+          .md-v3-cta{grid-area:cta;margin:0;justify-content:space-between}
+          .md-v3-go{display:flex;align-items:center;font-size:44px;line-height:1;font-weight:300;color:rgba(111,227,154,.6);padding-left:18px}
           .md-v3-stops{grid-area:stops;margin:0}
           .md-v3-log{grid-area:log}
+          /* Tidy the header: group the driver/shift/truck/date instead of spreading
+             them across the full width; let the action buttons take the slack. */
+          .topbar{grid-template-columns:auto auto 1fr}
+          .topbar .desktop-header-context{grid-template-columns:repeat(4,auto)}
         }
       </style>
       <div class="md-desk-v3">
@@ -5084,6 +5090,7 @@
             <strong>{{ (primary.label if primary else none) or cta.next_action or 'Log first stop' }}</strong>
             {% if cta.route_state_message %}<small>{{ cta.route_state_message }}</small>{% endif %}
           </span>
+          <span class="md-v3-go" aria-hidden="true">&rsaquo;</span>
         </a>
 
         {% set v3_stop_count = route_map.stops|length if route_map and route_map.stops else 0 %}

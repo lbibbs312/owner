@@ -5,6 +5,7 @@
 {% set ctx = report_context or {} %}
 <style>
   .fuel-form { max-width:920px; margin:0 auto; padding:22px 14px; }
+  @media (min-width:1000px) { .fuel-form { max-width:1120px; } }
   .fuel-form h1 { margin:0 0 4px; color:var(--md-text); font-family:var(--md-display); font-size:clamp(2rem, 6vw, 3rem); font-weight:950; letter-spacing:0; line-height:.98; text-transform:uppercase; }
   .fuel-form .lead { margin:0 0 18px; color:var(--md-muted, #64748b); font-weight:750; line-height:1.45; }
   .fuel-section { border:1px solid rgba(91,157,255,.22); border-radius:8px; padding:14px; margin-bottom:14px; background:rgba(8,14,24,.88); box-shadow:inset 0 1px 0 rgba(91,157,255,.06); }
