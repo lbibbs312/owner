@@ -2388,6 +2388,8 @@
 	      max-height: inherit;
 	      overflow-y: auto;
 	      overscroll-behavior: contain;
+	      -webkit-overflow-scrolling: touch;
+	      touch-action: pan-y;
 	      scroll-behavior: smooth;
 	      padding-right: 0;
 	      scrollbar-width: none;
@@ -2680,7 +2682,7 @@
       }
       .md-flow-window {
         padding:8px;
-        max-height:min(72vh, 720px);
+        max-height:clamp(260px, 38vh, 390px);
       }
       .md-flow-row {
         padding:11px 12px;
@@ -4806,14 +4808,19 @@
     }
 
     @media (max-width: 760px) {
-      body .driver-ops-shell.board-only-shell .compact-route-map.md-flow-board,
-      body .driver-ops-shell.board-only-shell .md-flow-window,
-      body .driver-ops-shell.board-only-shell .md-flow-track {
-        max-height:none !important;
-        overflow:visible !important;
+      body .driver-ops-shell.board-only-shell .compact-route-map.md-flow-board {
+        overflow:hidden !important;
+      }
+      body .driver-ops-shell.board-only-shell .md-flow-window {
+        max-height:clamp(260px, 38vh, 390px) !important;
+        overflow:hidden !important;
       }
       body .driver-ops-shell.board-only-shell .md-flow-track {
-        overscroll-behavior:auto;
+        max-height:inherit !important;
+        overflow-y:auto !important;
+        overscroll-behavior:contain;
+        -webkit-overflow-scrolling:touch;
+        touch-action:pan-y;
       }
     }
   </style>

@@ -6042,7 +6042,7 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b"<span>Fuel</span>" in logs_page.data
     assert b"1/4" in logs_page.data
     assert b"1 stop" in logs_page.data
-    assert b"Start:" in logs_page.data
+    assert b"Start source:" in logs_page.data
     assert b"Previous PostTrip truck BT-1" in logs_page.data
     assert b"1,045 mi" in logs_page.data
     assert b"Stop <strong>1</strong>" in logs_page.data
@@ -6074,11 +6074,12 @@ def test_driver_logs_page_exposes_selected_date_print_and_pdf_actions(client, ap
     assert b'<span class="md-btn-icon">P</span>' not in action_row
     assert '<span class="md-btn-icon">↓</span>'.encode() not in action_row
     assert (
-        f'href="/driver_logs_print?date={selected_date.isoformat()}" class="md-row-action"><span class="md-btn-icon">O</span> View'.encode()
+        f'href="/driver_logs_print?date={selected_date.isoformat()}" class="md-row-action">View'.encode()
         in logs_page.data
     )
     assert b'<details class="md-row-more-actions">' in logs_page.data
-    assert b"Stop actions" in logs_page.data
+    assert b"More for This Stop" in logs_page.data
+    assert b"Stop actions" not in logs_page.data
 
     first_history_page = client.get(f"/driver_logs?date={(selected_date - timedelta(days=2)).isoformat()}")
     assert first_history_page.status_code == 200
@@ -6867,8 +6868,12 @@ def test_mobile_dashboard_renders_widescreen_ops_workspace(client, app):
     assert b"isAlertDesktopTarget" in page.data
     assert b".driver-ops-shell.board-only-shell" in page.data
     assert b"body .driver-ops-shell.board-only-shell .md-flow-window" in page.data
-    assert b"max-height:none !important" in page.data
-    assert b"overflow:visible !important" in page.data
+    assert b"max-height:clamp(260px, 38vh, 390px) !important" in page.data
+    assert b"overflow-y:auto !important" in page.data
+    assert b"-webkit-overflow-scrolling:touch" in page.data
+    assert b"touch-action:pan-y" in page.data
+    assert b"max-height:none !important" not in page.data
+    assert b"overflow:visible !important" not in page.data
 
     workspace_start = page.data.index(b'<section class="desktop-ops-workspace"')
     workspace = page.data[workspace_start: page.data.index(b"<script>", workspace_start)]
@@ -7842,6 +7847,9 @@ def test_mobile_dashboard_uses_open_shift_route_date_for_progress(client, app):
     assert "linear-gradient(180deg, rgba(47,109,240,.22)" not in body
     assert "inset 0 0 18px rgba(91,157,255,.04)" not in body
     assert ".md-flow-track::-webkit-scrollbar { display: none; width: 0; height: 0; }" in body
+    assert "max-height:clamp(260px, 38vh, 390px)" in body
+    assert "-webkit-overflow-scrolling: touch" in body
+    assert "touch-action: pan-y" in body
     assert "scrollbar-color: rgba(91,157,255,.34)" not in body
     assert "ROUTE LOGS &nbsp; PLANT TRANSFERS" not in body
     assert "&diams;" not in body

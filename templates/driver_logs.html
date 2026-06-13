@@ -1238,7 +1238,7 @@
                 <a href="{{ url_for(log_view_endpoint, log_id=log.id) if current_user.role == 'management' else url_for('driver.driver_logs_print', date=log.date.isoformat()) }}" class="md-row-action">View</a>
                 {% if can_manage_log %}
                   <details class="md-row-more-actions">
-                    <summary class="md-row-action">Stop actions</summary>
+                    <summary class="md-row-action">More for This Stop</summary>
                     <div class="md-row-actions-menu">
                       <a href="{{ url_for('driver.edit_driver_log', log_id=log.id) }}" class="md-row-action warn">Edit</a>
                       <a href="{{ url_for('driver.view_driver_log', log_id=log.id) }}" class="md-row-action">Add Proof</a>
