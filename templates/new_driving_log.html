@@ -126,17 +126,17 @@
       <div class="form-text" id="gpsStatus" role="status" aria-live="polite"></div>
     </div>
     <div class="mb-3">
-      {{ form.location.label(class="form-label") }}
-      {{ form.location(class="form-control", placeholder="Customer, warehouse, dock, yard, truck stop", list="locationMemory", autocomplete="off", data_no_autosave="true") }}
+      <label class="form-label" for="{{ form.location.id }}">Current location name</label>
+      {{ form.location(class="form-control", placeholder="Name at this address (optional)", list="locationMemory", autocomplete="off", data_no_autosave="true") }}
       <datalist id="locationMemory">
         {% for place in fm.locations %}<option value="{{ place }}"></option>{% endfor %}
       </datalist>
       <div class="mt-2" id="gpsPlaceChoices" hidden>
-        <label for="gpsPlaceSelect" class="form-label mb-1">Suggested</label>
+        <label for="gpsPlaceSelect" class="form-label mb-1">Suggested names for this address</label>
         <select id="gpsPlaceSelect" class="form-select"></select>
-        <div class="form-text">Exact-address matches can fill the name. Nearby names are suggestions only.</div>
+        <div class="form-text">These name the address above. They do not set the destination.</div>
       </div>
-      <div class="form-text">Correct this name once and it will be remembered for later stops.</div>
+      <div class="form-text">This is where you are now. It does not set where you are going next.</div>
     </div>
     {% if config.ENABLE_DESTINATION_AUTOCOMPLETE %}
     {# Where this route is headed. Required before Start Route on the first stop. #}
@@ -174,7 +174,9 @@
         border: 1px solid rgba(91,157,255,.5) !important;
         box-shadow: 0 0 14px rgba(91,157,255,.24) !important;
         color: #eaf2ff !important;
-        min-width: 96px;
+        min-width: 148px;
+        max-width: 100%;
+        white-space: normal;
       }
       #destinationSuggestions .list-group-item {
         background: rgba(12,19,34,.96);
@@ -201,9 +203,9 @@
          data-autocomplete-url="{{ url_for('driver.destination_autocomplete_api') }}"
          data-details-url="{{ url_for('driver.destination_details_api') }}"
          data-gate-start="{{ '1' if not has_today_logs else '0' }}">
-      <label class="form-label fw-bold text-uppercase" for="destinationSearch">Destination</label>
-      <input type="text" id="destinationSearch" class="form-control" placeholder="Enter destination address or business name" autocomplete="off" data-no-autosave="true">
-      <div class="form-text">Start typing the destination. Select the correct place before starting route.</div>
+      <label class="form-label fw-bold text-uppercase" for="destinationSearch">Next destination</label>
+      <input type="text" id="destinationSearch" class="form-control" placeholder="Next stop address or business name" autocomplete="off" data-no-autosave="true">
+      <div class="form-text">This is where you are going after the start location.</div>
       <div class="form-text" id="destinationStatus" role="status" aria-live="polite"></div>
       <div class="list-group mt-1" id="destinationSuggestions" hidden></div>
       <button type="button" class="btn btn-sm btn-primary mt-2" id="destinationManualBtn" hidden>Use what I typed</button>
@@ -228,7 +230,7 @@
             <div class="dest-summary-empty" id="mapsSummaryEmpty" hidden>No Maps driver summary available yet.</div>
           </div>
           {% endif %}
-          <button type="button" class="btn btn-sm mt-2" id="destinationChangeBtn">Change</button>
+          <button type="button" class="btn btn-sm mt-2" id="destinationChangeBtn">Change Destination</button>
         </div>
       </div>
     </div>

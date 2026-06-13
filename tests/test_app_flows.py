@@ -10878,10 +10878,10 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     page = client.get("/new_driving_log")
     body = page.get_data(as_text=True)
     assert 'name="location_address"' in body
-    assert "Place / customer name" in body
-    assert "Suggested" in body
-    assert "Exact-address matches can fill the name" in body
-    assert "Nearby names are suggestions only" in body
+    assert "Current location name" in body
+    assert "Suggested names for this address" in body
+    assert "These name the address above" in body
+    assert "This is where you are now" in body
     assert "/gps/place-candidates" in body
     assert "/gps/destination-lookup" in body
     assert "data-gps-destination-url" in body
@@ -11194,7 +11194,7 @@ def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(cli
     assert "1100 Receiver Ave, Industrial City, MI 49512" in add_stop_body
     assert "locationRecents" in add_stop_body
     assert "showInitialCustomerSuggestions" in add_stop_body
-    assert "Suggested" in add_stop_body
+    assert "Suggested names for this address" in add_stop_body
     assert "Primary Receiver" in add_stop_body
     assert 'name="load_size" value="Auto parts (42000 lbs)"' in add_stop_body
     assert 'name="secondary_load" value="Pallets (12000 lbs)"' in add_stop_body

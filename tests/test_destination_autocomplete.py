@@ -404,7 +404,8 @@ def test_start_route_button_disabled_until_destination_on_first_stop(client, app
     body = page.get_data(as_text=True)
     assert page.status_code == 200
     assert 'id="destinationSection"' in body
-    assert "Enter destination address or business name" in body
+    assert "Next stop address or business name" in body
+    assert "This is where you are going after the start location." in body
     assert 'data-gate-start="1"' in body
     assert 'id="startRouteBtn"' in body
     assert "disabled" in body  # Start Route is gated until destination is confirmed
@@ -418,7 +419,7 @@ def test_start_route_button_disabled_until_destination_on_first_stop(client, app
     assert "function suggestionLabel" in body
     assert "input.value = resolvedName" in body
     assert "applyDestination(data.destination, s)" in body
-    assert '<button type="button" class="btn btn-sm mt-2" id="destinationChangeBtn">Change</button>' in body
+    assert '<button type="button" class="btn btn-sm mt-2" id="destinationChangeBtn">Change Destination</button>' in body
 
 
 def test_manual_destination_saved_when_google_unavailable(client, app):
