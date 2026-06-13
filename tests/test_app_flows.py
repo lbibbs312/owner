@@ -2898,6 +2898,129 @@ def test_pretrip_fuel_level_photo_saves_as_inspection_evidence_not_damage(client
     assert b"PreTrip Inspection Evidence" in pdf.data
 
 
+def test_driver_log_sheet_polishes_route_flow_loads_and_pretrip_fuel_support(client, app):
+    from datetime import date
+
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DamageReport, DriverLog, PreTrip, ProofMediaFile, User
+
+        create_user("sheet_polish_driver", "sheet-polish@example.com", "driver", first_name="Route", last_name="Polish")
+        driver = User.query.filter_by(username="sheet_polish_driver").one()
+        route_date = date.today()
+        pretrip = PreTrip(
+            user_id=driver.id,
+            pretrip_date=route_date,
+            truck_number="ST4",
+            trailer_number="TR2",
+            start_fuel_level="Full",
+        )
+        db.session.add(pretrip)
+        db.session.flush()
+        db.session.add(
+            ProofMediaFile(
+                packet_type="pretrip_dvir_issue",
+                owner_type="pretrip",
+                owner_id=pretrip.id,
+                category="pretrip_fuel_level",
+                filename="fuel-level.jpg",
+                original_filename="fuel-level.jpg",
+                uploaded_by_id=driver.id,
+                related_truck="ST4",
+                related_trailer="TR2",
+                manager_note="Fuel level proof: Full",
+            )
+        )
+        db.session.add(
+            DamageReport(
+                reported_by_id=driver.id,
+                truck_number="ST4",
+                trailer_number="TR2",
+                plant_name="Other",
+                stage="before",
+                move_reference=f"PreTrip #{pretrip.id}",
+                description="Low fuel photo before route start",
+            )
+        )
+        db.session.add_all(
+            [
+                DriverLog(
+                    driver_id=driver.id,
+                    date=route_date,
+                    plant_name="Raleigh East",
+                    location_address="3500 Raleigh Dr SE, Grand Rapids, MI 49512",
+                    load_size="Empty",
+                    depart_load_size="Empty",
+                    no_pickup=True,
+                    arrive_time="07:00",
+                    depart_time="07:10",
+                ),
+                DriverLog(
+                    driver_id=driver.id,
+                    date=route_date,
+                    plant_name="Paint Central",
+                    location_address="4200 Broadmoor Ave SE, Grand Rapids, MI 49512",
+                    load_size="Empty",
+                    depart_load_size="Pallets (0 lbs) -> Plastic Plate",
+                    commodity="Pallets",
+                    weight="0",
+                    arrive_time="07:30",
+                    depart_time="07:45",
+                ),
+                DriverLog(
+                    driver_id=driver.id,
+                    date=route_date,
+                    plant_name="Plastic Plate",
+                    location_address="3500 Raleigh Dr SE, Grand Rapids, MI 49512",
+                    load_size="Pallets (0 lbs) -> Plastic Plate",
+                    commodity="Pallets",
+                    weight="0",
+                    arrive_time="08:15",
+                ),
+            ]
+        )
+        db.session.commit()
+
+    login(client, "sheet_polish_driver")
+    response = client.get("/driver_logs_print")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+
+    assert "Route Flow" in body
+    assert "Raleigh East" in body
+    assert "Paint Central" in body
+    assert "Plastic Plate" in body
+    assert "flow-arrow" in body
+    assert "Load Flow History" in body
+    assert "Picked up Pallets at Paint Central" in body
+    assert "Delivered Pallets at Plastic Plate" in body
+    assert "Current load" in body
+    assert "Pallets" in body
+    assert "Delivered at Plastic Plate, departure pending" in body
+    assert "Pretrip fuel level photo attached." in body
+    assert "Damage / Shortage / Rejection" not in body
+    assert "Damage / problem events" not in body
+    assert "#1 Incident - Other" not in body
+    assert "Pallets (0 lbs)" not in body
+    assert "Weight 0" not in body
+    assert "Out:</span> --" not in body
+    assert "Route history</dt><dd>Raleigh East /" not in body
+    assert "3500 Raleigh Dr SE" in body
+
+    attachment = client.get("/driver_logs_print/attachment")
+    assert attachment.status_code == 200
+    pdf_body = attachment.data.decode("latin-1", "ignore")
+    assert "ROUTE FLOW" in pdf_body
+    assert "LOAD FLOW HISTORY" in pdf_body
+    assert "Pretrip fuel level photo attached." in pdf_body
+    assert "Pallets (0 lbs)" not in pdf_body
+    assert "Pallets \\(0 lbs\\)" not in pdf_body
+    assert "Weight 0" not in pdf_body
+    assert "Out: --" not in pdf_body
+    assert "Damage / Shortage / Rejection" not in pdf_body
+    assert "Raleigh East /" not in pdf_body
+
+
 def test_pretrip_damage_photo_can_be_moved_to_inspection_evidence(client, app):
     from datetime import date
 

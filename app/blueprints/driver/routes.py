@@ -12,6 +12,7 @@ import mimetypes
 import os
 import re
 import shutil
+import textwrap
 from uuid import uuid4
 
 import pytz
@@ -1998,7 +1999,11 @@ def _route_sheet_wait_minutes(logs, *, now=None):
 
 
 def _route_sheet_supporting_data(driver_id, route_date, logs, log_routes, route_context, *, now=None):
-    damage_reports = _today_damage_reports(driver_id, route_date) if driver_id else []
+    raw_damage_reports = _today_damage_reports(driver_id, route_date) if driver_id else []
+    damage_reports = [report for report in raw_damage_reports if not _sheet_pretrip_support_report_label(report)]
+    support_document_notes = [
+        label for label in (_sheet_pretrip_support_report_label(report) for report in raw_damage_reports) if label
+    ]
     exception_notes = []
     log_issue_details = {}
     for log in logs or []:
@@ -2021,9 +2026,13 @@ def _route_sheet_supporting_data(driver_id, route_date, logs, log_routes, route_
         note = f"{label}: {detail}" if detail else label
         if note not in exception_notes:
             exception_notes.append(note)
-    total_miles = _total_miles_for_pretrips(
+    route_pretrips = (
         _active_pretrips_query().filter_by(user_id=driver_id, pretrip_date=route_date).all()
-    ) if driver_id and route_date else None
+        if driver_id and route_date
+        else []
+    )
+    support_document_notes.extend(_sheet_pretrip_media_notes(route_pretrips))
+    total_miles = _total_miles_for_pretrips(route_pretrips) if route_pretrips else None
     return {
         "damage_reports": damage_reports,
         "damage_report_details": [damage_report_detail_label(report) for report in damage_reports],
@@ -2031,6 +2040,7 @@ def _route_sheet_supporting_data(driver_id, route_date, logs, log_routes, route_
         "exception_notes": exception_notes,
         "log_issue_details": log_issue_details,
         "route_documents": collect_route_documents(logs, plant_label=_plant_label),
+        "support_document_notes": _dedupe_sheet_lines(support_document_notes),
         "summary": {
             "total_stops": (getattr(route_context, "route_summary", {}) or {}).get("total_stops", len(logs or [])),
             "open_stops": (getattr(route_context, "route_summary", {}) or {}).get(
@@ -2211,6 +2221,124 @@ def _sheet_clean(value):
     return str(value or "").strip()
 
 
+def _dedupe_sheet_lines(lines):
+    seen = set()
+    cleaned = []
+    for line in lines or []:
+        text = _sheet_clean(line)
+        key = text.lower()
+        if not text or key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(text)
+    return cleaned
+
+
+def _sheet_positive_weight_label(value):
+    text = _sheet_clean(value)
+    if not text:
+        return ""
+    match = re.search(r"-?\d{1,3}(?:,\d{3})*(?:\.\d+)?|-?\d+(?:\.\d+)?", text)
+    if not match:
+        return ""
+    try:
+        amount = float(match.group(0).replace(",", ""))
+    except ValueError:
+        return ""
+    if amount <= 0:
+        return ""
+    return f"{amount:g} lbs"
+
+
+def _sheet_strip_weight(text, *, keep_positive=True):
+    def convert(match):
+        try:
+            amount = float(match.group(1).replace(",", ""))
+        except ValueError:
+            return ""
+        return f" ({amount:g} lbs)" if keep_positive and amount > 0 else ""
+
+    return re.sub(r"\s*\(\s*(-?\d{1,3}(?:,\d{3})*(?:\.\d+)?|-?\d+(?:\.\d+)?)\s*lbs?\s*\)", convert, text, flags=re.I)
+
+
+def _sheet_load_text(value, *, include_weight=True):
+    text = load_display(value) if value is not None else ""
+    text = freight_cargo_text(text)
+    text = _sheet_strip_weight(text, keep_positive=include_weight)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _sheet_load_commodity(value):
+    return _sheet_load_text(value, include_weight=False)
+
+
+def _sheet_join_flow(parts, *, pdf=False):
+    cleaned = _dedupe_sheet_lines(parts)
+    return (" to " if pdf else " \u2192 ").join(cleaned)
+
+
+def _sheet_flow_item(label, parts):
+    cleaned = _dedupe_sheet_lines(parts)
+    return {"label": label, "value": _sheet_join_flow(cleaned), "pdf_value": _sheet_join_flow(cleaned, pdf=True), "kind": "flow", "parts": cleaned}
+
+
+def _sheet_item_label_value(item):
+    if isinstance(item, dict):
+        return item.get("label", ""), item.get("value", ""), item
+    label, value = item
+    return label, value, None
+
+
+def _sheet_item_real(item):
+    label, value, meta = _sheet_item_label_value(item)
+    if meta and meta.get("kind") == "flow":
+        return bool(meta.get("parts"))
+    return _sheet_real(value)
+
+
+def _sheet_pretrip_support_report_label(report):
+    move_reference = _sheet_clean(getattr(report, "move_reference", ""))
+    if not move_reference.lower().startswith("pretrip #"):
+        return ""
+    text = " ".join(
+        _sheet_clean(value).lower()
+        for value in (
+            getattr(report, "description", ""),
+            getattr(report, "plant_name", ""),
+            getattr(report, "stage", ""),
+            move_reference,
+        )
+    )
+    fuel_level_words = ("fuel level", "fuel gauge", "low fuel", "fuel tank", "full fuel", "fuel proof")
+    damage_words = ("damage", "dent", "scratch", "scrape", "broken", "crack", "leak", "rejection", "shortage")
+    if any(word in text for word in fuel_level_words) and not any(word in text for word in damage_words):
+        return "Pretrip fuel level photo attached."
+    return ""
+
+
+def _sheet_pretrip_media_notes(pretrips):
+    notes = []
+    pretrip_ids = [pretrip.id for pretrip in pretrips or [] if getattr(pretrip, "id", None)]
+    if not pretrip_ids:
+        return notes
+    media_rows = (
+        ProofMediaFile.query.filter(ProofMediaFile.owner_type == "pretrip", ProofMediaFile.owner_id.in_(pretrip_ids))
+        .order_by(ProofMediaFile.uploaded_at.asc(), ProofMediaFile.id.asc())
+        .all()
+    )
+    for media in media_rows:
+        category = _sheet_clean(getattr(media, "category", "")).lower()
+        note = _sheet_clean(getattr(media, "manager_note", ""))
+        if category == "pretrip_fuel_level":
+            notes.append("Pretrip fuel level photo attached.")
+        elif "inspection" in category or "pretrip" in category:
+            notes.append("Pretrip photo attached.")
+        elif note:
+            notes.append("Supporting document attached.")
+    return notes
+
+
 def _sheet_location_key(value):
     return re.sub(r"[^a-z0-9]+", "", _sheet_clean(value).lower())
 
@@ -2363,6 +2491,7 @@ def _sheet_route_status_label(route_context, logs):
 # these entirely rather than showing placeholder filler.
 _SHEET_PLACEHOLDERS = {
     "",
+    "empty",
     "not recorded",
     "none recorded",
     "not started",
@@ -2386,12 +2515,12 @@ def _sheet_card(title, items, *, show=True):
     """Build a card containing only items with real values; return None if empty."""
     if not show:
         return None
-    real_items = [(label, value) for label, value in items if _sheet_real(value)]
+    real_items = [item for item in items if _sheet_item_real(item)]
     return {"title": title, "items": real_items} if real_items else None
 
 
 def _sheet_load_label(value):
-    text = load_display(value) if value is not None else ""
+    text = _sheet_load_text(value)
     return text or "Empty"
 
 
@@ -2399,12 +2528,14 @@ def _sheet_cargo_label(log, route, row_state, key):
     if key == "in":
         value = (row_state or {}).get("cargo_in") or (route or {}).get("arrive_cargo_desc") or (route or {}).get("arrive_desc") or _sheet_load_label(log.load_size)
     else:
+        if not log.depart_time:
+            return "Pending departure"
         value = (row_state or {}).get("cargo_out") or (route or {}).get("depart_cargo_desc")
         if not value:
-            if not log.depart_time:
-                return "Pending"
             value = _sheet_load_label(log.depart_load_size)
-    return value or "Empty"
+    if value in {"--", "Pending"}:
+        return "Pending departure" if key == "out" else ""
+    return _sheet_load_text(value) or "Empty"
 
 
 _SHEET_NOTE_NOISE = {"stop complete", "picked up load", "departed empty", "unloaded, departed empty"}
@@ -2434,9 +2565,17 @@ def _sheet_polish_note(line, plant_name):
     if _sheet_note_is_noise(text):
         return None
     if low.startswith("loaded "):
-        return "Picked up " + text[len("Loaded "):]
+        cargo = _sheet_load_commodity(text[len("Loaded "):]).rstrip(".")
+        return f"Picked up {cargo}." if cargo else "Picked up load."
+    if low.startswith("delivered "):
+        cargo = _sheet_load_commodity(text[len("Delivered "):]).rstrip(".")
+        return f"Delivered {cargo}." if cargo else "Delivered load."
+    if low.startswith("unloaded "):
+        cargo = _sheet_load_commodity(text[len("Unloaded "):]).rstrip(".")
+        return f"Delivered {cargo}." if cargo else "Delivered load."
     if low.startswith("continuing with "):
-        return f"Continued with {text[len('Continuing with '):].rstrip('.')} onboard."
+        cargo = _sheet_load_commodity(text[len("Continuing with "):]).rstrip(".")
+        return f"Continued with {cargo} onboard." if cargo else "Continued with load onboard."
     return text
 
 
@@ -2447,7 +2586,7 @@ def _sheet_stop_notes(log, route, issue, route_task_events, row_state, plant_nam
     notes = []
     finalized = getattr(route_context, "route_status", None) == "finalized"
     if not log.depart_time:
-        notes.append(f"Route End: {plant_name}" if finalized else "Current stop: departure pending")
+        notes.append(f"Route End: {plant_name}" if finalized else "Departure pending.")
     elif index == 1:
         notes.append("Shift start.")
     for line in (route or {}).get("summary_lines") or []:
@@ -2461,7 +2600,7 @@ def _sheet_stop_notes(log, route, issue, route_task_events, row_state, plant_nam
     if (route or {}).get("deviation_reason"):
         notes.append(f"Deviation: {(route or {}).get('deviation_reason')}")
     if log.no_pickup:
-        no_pickup_note = "No pickup at origin." if index == 1 else "No pickup."
+        no_pickup_note = "No pickup."
         if no_pickup_note not in notes:
             notes.append(no_pickup_note)
     if log.hot_parts or log.part_number:
@@ -2600,6 +2739,7 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
         timeline_rows.append(
             {
                 "stop_no": index,
+                "stop_label": plant_name,
                 "location": location_display,
                 "location_lines": location_lines,
                 "location_address": _sheet_clean(getattr(log, "location_address", None)),
@@ -2625,22 +2765,32 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
         )
 
     current_cargo = getattr(route_context, "current_cargo", {}) or {}
-    current_load = current_cargo.get("cargo_display") or current_cargo.get("value") or ""
+    current_load = _sheet_load_commodity(current_cargo.get("cargo_display") or current_cargo.get("value") or "")
+    current_load_status = ""
+    open_stop = next((log for log in reversed(logs) if not log.depart_time), None)
+    if open_stop and is_freight_load(getattr(open_stop, "load_size", None)) and freight_load_destined_here(
+        open_stop.load_size, open_stop.plant_name, getattr(open_stop, "location_address", None)
+    ):
+        current_load = _sheet_load_commodity(open_stop.load_size)
+        current_load_status = f"Delivered at {_plant_label(open_stop.plant_name)}, departure pending"
     load_labels = []
+    weight_labels = []
     for log in logs:
         if log.commodity:
-            label = log.commodity
-            if log.weight:
-                label = f"{label} ({log.weight} lbs)"
+            label = _sheet_load_commodity(log.commodity)
             if label not in load_labels:
                 load_labels.append(label)
+            weight = _sheet_positive_weight_label(log.weight)
+            if weight and weight not in weight_labels:
+                weight_labels.append(weight)
     if not load_labels:
         for row in timeline_rows:
             for value in (row["load_in"], row["load_out"]):
-                if value and value not in {"Empty", "Pending"} and value not in load_labels:
-                    load_labels.append(value)
+                label = _sheet_load_commodity(value)
+                if label and label not in {"Empty", "Pending departure"} and label not in load_labels:
+                    load_labels.append(label)
     unload_blocked = [
-        f"{row['location']}: {note}"
+        f"{row['stop_label']}: {note}"
         for row in timeline_rows
         for note in row["notes"]
         if note.startswith("Not unloaded") or note.startswith("Second stop not unloaded")
@@ -2649,13 +2799,37 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
     # timeline's Load Flow column); collapse immediate repeats so it stays one line.
     route_history = []
     for row in timeline_rows:
-        location = row["location"]
+        location = row["stop_label"]
         if location and (not route_history or route_history[-1] != location):
             route_history.append(location)
 
+    load_flow_history = []
+    if timeline_rows and timeline_rows[0]["load_in"] == "Empty":
+        load_flow_history.append("Empty")
+    for log, row in zip(logs, timeline_rows):
+        route = (log_routes or {}).get(log.id, {})
+        stop = row["stop_label"]
+        delivered_primary = bool(route.get("unloaded_on_arrival")) or bool(
+            not log.depart_time
+            and is_freight_load(getattr(log, "load_size", None))
+            and freight_load_destined_here(log.load_size, log.plant_name, getattr(log, "location_address", None))
+        )
+        if delivered_primary:
+            cargo = _sheet_load_commodity(route.get("arrive_desc") or log.load_size)
+            if cargo and cargo != "Empty":
+                load_flow_history.append(f"Delivered {cargo} at {stop}")
+        if route.get("secondary_dropped_on_arrival"):
+            cargo = _sheet_load_commodity(route.get("arrive_secondary_desc") or getattr(log, "secondary_load", None))
+            if cargo and cargo != "Empty":
+                load_flow_history.append(f"Delivered {cargo} at {stop}")
+        if log.depart_time and not log.no_pickup:
+            outbound = _sheet_load_commodity(route.get("depart_desc") or log.depart_load_size)
+            inbound = _sheet_load_commodity(route.get("arrive_desc") or log.load_size)
+            if outbound and outbound not in {"Empty", inbound}:
+                load_flow_history.append(f"Picked up {outbound} at {stop}")
+
     issue_lines = []
     issue_lines.extend(route_sheet_data.get("exception_notes") or [])
-    issue_lines.extend(route_sheet_data.get("damage_report_details") or [])
     for log in logs:
         if log.downtime_reason:
             issue_lines.append(f"{_plant_label(log.plant_name)}: {log.downtime_reason}")
@@ -2663,8 +2837,6 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
         f"{doc.get('doc_label')} - {doc.get('owner_label')}" + (f" - {doc.get('note')}" if doc.get("note") else "")
         for doc in route_sheet_data.get("route_documents") or []
     ]
-    if document_lines:
-        issue_lines.extend(f"Document attached: {line}" for line in document_lines)
 
     posttrip_remarks = _sheet_clean(getattr(last_posttrip, "remarks", None))
     maintenance_notes = []
@@ -2695,19 +2867,19 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
     total_stops = summary.get("total_stops", len(logs))
     open_stops = summary.get("open_stops", 0)
 
-    weights = "; ".join(sorted({log.weight for log in logs if log.weight}))
+    weights = "; ".join(weight_labels)
     commodity = "; ".join(load_labels)
     damage_text = "; ".join(route_sheet_data.get("damage_report_details") or [])
     delay_reasons = "; ".join(log.downtime_reason for log in logs if log.downtime_reason)
     not_unloaded = "; ".join(unload_blocked)
     problem_events = "; ".join(issue_lines)
-    docs_photos = "; ".join(document_lines)
-    route_history_text = " / ".join(route_history)
     maintenance_text = "; ".join(maintenance_notes)
-    pickup_stop = next((row["location"] for row in timeline_rows if row["load_out"] not in {"", "Empty", "Pending"}), "")
-    delivery_stop = next((row["location"] for row in timeline_rows if any("Delivered" in note or "Unloaded" in note for note in row["notes"])), "")
+    pickup_stop = next((row["stop_label"] for row in timeline_rows if row["load_out"] not in {"", "Empty", "Pending", "Pending departure"}), "")
+    delivery_stop = next((event.rsplit(" at ", 1)[1] for event in load_flow_history if event.startswith("Delivered ") and " at " in event), "")
     if unload_blocked:
         unloaded_status = "; ".join(unload_blocked)
+    elif current_load_status:
+        unloaded_status = ""
     elif current_load and current_load != "Empty":
         unloaded_status = "In truck"
     else:
@@ -2797,19 +2969,29 @@ def _driver_log_sheet_model(driver, route_date, logs, pretrips, log_routes, rout
         ]),
         _sheet_card("What Was Hauled / Load", [
             ("Current load", current_load),
+            ("Status", current_load_status),
             ("Commodity", commodity),
             ("Weight", weights),
             ("Pickup stop", pickup_stop),
             ("Delivery / unload stop", delivery_stop),
             ("Unloaded status", unloaded_status),
-            ("Damage / shortage / rejection", damage_text),
-            ("Route history", route_history_text),
         ]),
+        _sheet_card("Route Flow", [
+            _sheet_flow_item("Route history", route_history),
+        ]),
+        _sheet_card("Load Flow History", [
+            _sheet_flow_item("Load movement", load_flow_history),
+        ], show=bool(load_flow_history)),
+        _sheet_card("Damage / Shortage / Rejection", [
+            ("Reports", damage_text),
+        ], show=bool(damage_text)),
+        _sheet_card("Attached Photos / Documents", [
+            ("Supporting documents", "; ".join(_dedupe_sheet_lines((route_sheet_data.get("support_document_notes") or []) + document_lines))),
+        ], show=bool((route_sheet_data.get("support_document_notes") or []) or document_lines)),
         _sheet_card("Notes / Events", [
             ("Delay reasons", delay_reasons),
             ("Not unloaded reasons", not_unloaded),
-            ("Damage / problem events", problem_events),
-            ("Photos / documents", docs_photos),
+            ("Route issues", problem_events),
         ]),
     ] if card]
 
@@ -3733,6 +3915,115 @@ def _draw_log_sheet_tiles(pdf, tiles, y):
     return y - rows_used * (tile_h + 5) - 8
 
 
+def _pdf_wrapped_lines(value, width_chars, *, max_lines=None):
+    chunks = value if isinstance(value, (list, tuple)) else [value]
+    lines = []
+    for chunk in chunks:
+        text = (
+            _sheet_clean(chunk)
+            .replace("\u2014", " - ")
+            .replace("\u2013", " - ")
+            .replace("\u2192", " to ")
+            .replace("\xa0", " ")
+        )
+        if not text:
+            continue
+        wrapped = textwrap.wrap(
+            text,
+            width=max(8, int(width_chars)),
+            break_long_words=False,
+            replace_whitespace=False,
+        )
+        lines.extend(wrapped or [text])
+    if max_lines and len(lines) > max_lines:
+        lines = lines[:max_lines]
+        if len(lines[-1]) > 3:
+            lines[-1] = lines[-1].rstrip(" .;") + "..."
+    return lines
+
+
+def _draw_sheet_table_header(pdf, x, y, widths, headers):
+    header_h = 26
+    total_width = sum(widths)
+    pdf.fill_rect(x, y - header_h, total_width, header_h, rgb=MD_PDF_BLUE)
+    pdf.rect(x, y - header_h, total_width, header_h)
+    cx = x
+    for idx, width in enumerate(widths):
+        pdf.line(cx, y, cx, y - header_h)
+        pdf.multiline_text(
+            cx + 3,
+            y - 10,
+            headers[idx],
+            max(6, int(width / 4.5)),
+            size=6,
+            bold=True,
+            leading=7,
+            max_lines=2,
+            color=MD_PDF_WHITE,
+        )
+        cx += width
+    pdf.line(cx, y, cx, y - header_h)
+    return y - header_h
+
+
+def _draw_log_sheet_timeline_table(pdf, log_sheet, y):
+    show_miles = log_sheet["show_miles_col"]
+    show_fuel = log_sheet["show_fuel_col"]
+    headers = ["Stop #", "Location / Stop", "Time / Wait", "Load Flow"]
+    widths = [28, 106, 82, 96]
+    if show_miles:
+        headers.append("Miles Since Last Stop")
+        widths.append(54)
+    if show_fuel:
+        headers.append("Fuel Used / Recorded")
+        widths.append(62)
+    headers.append("Notes")
+    widths.append(524 - sum(widths))
+
+    x = 36
+    y = _draw_sheet_table_header(pdf, x, y, widths, headers)
+    for row_index, row in enumerate(log_sheet["timeline_rows"]):
+        time_wait = [f"Arrive: {row['arrive'] or '--'}", f"Depart: {row['depart'] or '--'}"]
+        if row["wait"]:
+            time_wait.append(row["wait"])
+        load_flow = [f"In: {row['load_in'] or '--'}", f"Out: {row['load_out'] or '--'}"]
+        cells = [str(row["stop_no"]), row.get("location_lines") or row["location"] or "--", time_wait, load_flow]
+        if show_miles:
+            cells.append(row["miles_since"])
+        if show_fuel:
+            cells.append(row["fuel"])
+        cells.append("; ".join(row["notes"]) if row["notes"] else "")
+
+        wrapped = [
+            _pdf_wrapped_lines(value, max(7, int(width / 3.7)), max_lines=6)
+            for value, width in zip(cells, widths)
+        ]
+        row_h = max(34, 12 + max((len(lines) or 1) * 8 for lines in wrapped))
+        if y - row_h < 150:
+            pdf.add_page()
+            y = _draw_sheet_table_header(pdf, x, 748, widths, headers)
+        if row_index % 2:
+            pdf.fill_rect(x, y - row_h, sum(widths), row_h, rgb=(247, 249, 253))
+        pdf.rect(x, y - row_h, sum(widths), row_h)
+        cx = x
+        for idx, width in enumerate(widths):
+            pdf.line(cx, y, cx, y - row_h)
+            for line_idx, line in enumerate(wrapped[idx]):
+                pdf.text(cx + 3, y - 10 - line_idx * 8, line, size=6.2, bold=(idx == 0))
+            cx += width
+        pdf.line(cx, y, cx, y - row_h)
+        y -= row_h
+    return y - 10
+
+
+def _pdf_card_item_height(item, col_w):
+    label, value, meta = _sheet_item_label_value(item)
+    display_value = meta.get("pdf_value") if meta else value
+    max_lines = 4 if meta and meta.get("kind") == "flow" else 3
+    lines = _pdf_wrapped_lines(display_value, max(12, int((col_w - 18) / 3.7)), max_lines=max_lines)
+    return 10 + max(1, len(lines)) * 8, lines
+
+
 def _draw_log_sheet_cards(pdf, cards, y):
     if not cards:
         return y
@@ -3743,21 +4034,26 @@ def _draw_log_sheet_cards(pdf, cards, y):
     index = 0
     while index < len(cards):
         pair = cards[index:index + 2]
-        row_h = max(20 + len(card["items"]) * 9 for card in pair)
+        measured = []
+        for card in pair:
+            item_measurements = [_pdf_card_item_height(item, col_w) for item in card["items"]]
+            measured.append((card, item_measurements, 24 + sum(height for height, _lines in item_measurements)))
+        row_h = max(height for _card, _items, height in measured)
         if y - row_h < 150:
             pdf.add_page()
             y = 748
-        for col, card in enumerate(pair):
+        for col, (card, item_measurements, ch) in enumerate(measured):
             cx = cols_x[col]
-            ch = 18 + len(card["items"]) * 9
             pdf.rect(cx, y - ch, col_w, ch)
             pdf.fill_rect(cx, y - 3, col_w, 3, rgb=MD_PDF_BLUE)
             pdf.text(cx + 7, y - 13, (card.get("title") or "").upper(), size=7, bold=True, color=MD_PDF_INK)
-            iy = y - 24
-            for label, value in card["items"]:
-                pdf.text(cx + 7, iy, str(label), size=6, bold=True, color=MD_PDF_MUTED)
-                pdf.multiline_text(cx + 108, iy, str(value), max(6, int((col_w - 114) / 3.2)), size=6, leading=8, max_lines=1)
-                iy -= 9
+            iy = y - 26
+            for item, (item_h, value_lines) in zip(card["items"], item_measurements):
+                label, value, meta = _sheet_item_label_value(item)
+                pdf.text(cx + 7, iy, str(label).upper(), size=5.6, bold=True, color=MD_PDF_MUTED)
+                for line_idx, line in enumerate(value_lines or [""]):
+                    pdf.text(cx + 7, iy - 8 - line_idx * 8, line, size=7.1, bold=True, color=MD_PDF_INK)
+                iy -= item_h
         y -= row_h + 8
         index += 2
     return y
@@ -3790,33 +4086,8 @@ def _build_driver_logs_pdf(logs, the_date, driver=None, driver_signature=None, s
     y = _draw_log_sheet_tiles(pdf, log_sheet["summary_tiles"], y)
     pdf.text(36, y, "1. STOP TIMELINE", size=9, bold=True, color=MD_PDF_BLUE)
     y -= 12
-    show_miles = log_sheet["show_miles_col"]
-    show_fuel = log_sheet["show_fuel_col"]
-    headers = ["Stop #", "Location / Stop", "Time / Wait", "Load Flow"]
-    widths = [26, 80, 96, 100]
-    if show_miles:
-        headers.append("Miles Since Last Stop")
-        widths.append(60)
-    if show_fuel:
-        headers.append("Fuel Used / Recorded")
-        widths.append(66)
-    headers.append("Notes")
-    widths.append(524 - sum(widths))
-    rows = []
-    for row in log_sheet["timeline_rows"]:
-        time_wait = [f"Arrive: {row['arrive'] or '--'}", f"Depart: {row['depart'] or '--'}"]
-        if row["wait"]:
-            time_wait.append(row["wait"])
-        load_flow = [f"IN: {row['load_in'] or '--'}", f"OUT: {row['load_out'] or '--'}"]
-        cells = [str(row["stop_no"]), row.get("location_lines") or row["location"] or "--", time_wait, load_flow]
-        if show_miles:
-            cells.append(row["miles_since"])
-        if show_fuel:
-            cells.append(row["fuel"])
-        cells.append("; ".join(row["notes"]) if row["notes"] else "")
-        rows.append(cells)
-    if rows:
-        y = pdf.table(36, y, widths, 32, headers, rows, font_size=6, max_lines=3, header_rgb=MD_PDF_BLUE, header_color=MD_PDF_WHITE)
+    if log_sheet["timeline_rows"]:
+        y = _draw_log_sheet_timeline_table(pdf, log_sheet, y)
     else:
         pdf.text(44, y, "No stops for selected date.", size=8)
         y -= 18

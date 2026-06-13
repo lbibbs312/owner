@@ -85,12 +85,16 @@
     .notes-list { margin: 0; padding-left: 0.15in; }
     .notes-list li { margin: 0 0 2px; }
 
-    .summary-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.1in; margin-top: 0.04in; }
-    .summary-card { border: 1px solid var(--md-line); border-top: 3px solid var(--md-blue); border-radius: 4px; padding: 0.08in 0.1in 0.09in; }
-    .summary-card h3 { margin: 0 0 0.05in; padding-bottom: 0.03in; border-bottom: 1px solid var(--md-line); font-size: 8pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.03em; color: var(--md-ink); }
-    .summary-card dl { margin: 0; display: grid; grid-template-columns: minmax(0, 1.15in) minmax(0, 1fr); gap: 2px 0.1in; font-size: 8pt; }
-    .summary-card dt { font-weight: 700; color: var(--md-muted); }
-    .summary-card dd { margin: 0; color: var(--md-ink); }
+    .summary-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.12in; margin-top: 0.04in; }
+    .summary-card { border: 1px solid var(--md-line); border-top: 3px solid var(--md-blue); border-radius: 5px; padding: 0.1in 0.12in 0.11in; background: #fff; }
+    .summary-card h3 { margin: 0 0 0.07in; padding-bottom: 0.04in; border-bottom: 1px solid var(--md-line); font-size: 8.4pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.03em; color: var(--md-ink); }
+    .summary-card dl { margin: 0; display: grid; grid-template-columns: 1fr; gap: 0.055in; font-size: 8pt; }
+    .summary-card dt { margin: 0 0 1px; font-size: 6.7pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.035em; color: var(--md-muted); }
+    .summary-card dd { margin: 0; color: var(--md-ink); font-weight: 650; line-height: 1.38; overflow-wrap: anywhere; }
+    .summary-field { break-inside: avoid; }
+    .summary-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 1px; }
+    .flow-chip { display: inline-flex; align-items: center; min-height: 18px; border: 1px solid #c9d4e8; border-radius: 999px; background: #f7f9fd; padding: 2px 7px; color: var(--md-ink); font-weight: 800; line-height: 1.15; }
+    .flow-arrow { color: var(--md-blue); font-weight: 900; }
 
     .signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5in; margin-top: 0.2in; }
     .sig-label { font-size: 7.5pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; color: var(--md-muted); }
@@ -225,7 +229,30 @@
         {% for card in sheet.cards %}
           <div class="summary-card">
             <h3>{{ card.title }}</h3>
-            <dl>{% for label, value in card['items'] %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>
+            <dl>
+              {% for item in card['items'] %}
+                {% if item is mapping %}
+                  <div class="summary-field summary-field-{{ item.kind|default('text') }}">
+                    <dt>{{ item.label }}</dt>
+                    <dd>
+                      {% if item.kind == 'flow' and item.parts %}
+                        <div class="summary-flow">
+                          {% for part in item.parts %}
+                            <span class="flow-chip">{{ part }}</span>
+                            {% if not loop.last %}<span class="flow-arrow">&rarr;</span>{% endif %}
+                          {% endfor %}
+                        </div>
+                      {% else %}
+                        {{ item.value }}
+                      {% endif %}
+                    </dd>
+                  </div>
+                {% else %}
+                  {% set label, value = item %}
+                  <div class="summary-field"><dt>{{ label }}</dt><dd>{{ value }}</dd></div>
+                {% endif %}
+              {% endfor %}
+            </dl>
           </div>
         {% endfor %}
       </div>
