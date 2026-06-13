@@ -24,6 +24,28 @@ def _clean(value, default=None):
     return value or default
 
 
+def _format_number(value):
+    if value is None:
+        return None
+    try:
+        return f"{float(value):g}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _label_date(value):
+    return value.isoformat() if value else None
+
+
+def _join_parts(*values, separator=" "):
+    parts = [str(value).strip() for value in values if str(value or "").strip()]
+    return separator.join(parts) or None
+
+
+def _city_state(city, state):
+    return _join_parts(city, state, separator=", ")
+
+
 def _parse_date(value):
     value = _clean(value)
     if not value:
@@ -137,7 +159,25 @@ def create_ifta_worksheet_from_form(form, files, *, user, report_context=None):
         loaded_empty_deadhead=_clean(form.get("loaded_empty_deadhead")),
         notes=_clean(form.get("trip_notes")),
     )
-    if any(getattr(trip, field) is not None for field in ("trip_start_date", "origin_city", "destination_city", "total_trip_distance", "jurisdiction")):
+    trip_driver_supplied = any(
+        getattr(trip, field) is not None
+        for field in (
+            "origin_city",
+            "origin_state",
+            "destination_city",
+            "destination_state",
+            "route_traveled",
+            "total_trip_distance",
+            "jurisdiction",
+            "jurisdiction_distance",
+            "taxable_distance",
+            "nontaxable_distance",
+            "toll_distance",
+            "loaded_empty_deadhead",
+            "notes",
+        )
+    )
+    if trip_driver_supplied:
         db.session.add(trip)
     receipt_filename, receipt_hash, receipt_data, receipt_mimetype = save_ifta_receipt(files.get("receipt_photo"), worksheet.id)
     fuel_driver_supplied = bool(
@@ -177,6 +217,47 @@ def create_ifta_worksheet_from_form(form, files, *, user, report_context=None):
     return worksheet
 
 
+def _trip_has_route_facts(row):
+    return bool(
+        _clean(row.origin_city)
+        or _clean(row.origin_state)
+        or _clean(row.destination_city)
+        or _clean(row.destination_state)
+        or _clean(row.route_traveled)
+        or row.total_trip_distance is not None
+    )
+
+
+def _trip_has_jurisdiction_miles(row):
+    return bool(_clean(row.jurisdiction) and row.jurisdiction_distance is not None and row.jurisdiction_distance > 0)
+
+
+def _fuel_has_facts(fuel):
+    return bool(
+        fuel.purchase_date
+        or _clean(fuel.seller_name)
+        or _clean(fuel.seller_address)
+        or _clean(fuel.city)
+        or _clean(fuel.state_or_province)
+        or fuel.gallons_or_liters is not None
+        or _clean(fuel.fuel_type)
+        or fuel.total_sale_amount is not None
+        or fuel.price_per_gallon_or_liter is not None
+        or _clean(fuel.vehicle_unit_number)
+        or _clean(fuel.purchaser_name)
+        or ifta_receipt_available(fuel)
+    )
+
+
+def _fuel_review_label(fuel):
+    label = _join_parts(_label_date(fuel.purchase_date), fuel.city or fuel.seller_name or fuel.seller_address)
+    if label:
+        return f"{label} fuel record"
+    if fuel.id:
+        return f"fuel record #{fuel.id}"
+    return "fuel record"
+
+
 def worksheet_summaries(worksheet):
     miles_by_jurisdiction = {}
     taxable_by_jurisdiction = {}
@@ -190,23 +271,26 @@ def worksheet_summaries(worksheet):
     total_fuel = 0.0
 
     for row in worksheet.trip_rows:
-        jurisdiction = row.jurisdiction or "Not recorded"
-        miles = row.jurisdiction_distance or row.total_trip_distance or 0
-        miles_by_jurisdiction[jurisdiction] = miles_by_jurisdiction.get(jurisdiction, 0) + miles
-        taxable_by_jurisdiction[jurisdiction] = taxable_by_jurisdiction.get(jurisdiction, 0) + (row.taxable_distance or 0)
-        nontaxable_by_jurisdiction[jurisdiction] = nontaxable_by_jurisdiction.get(jurisdiction, 0) + (row.nontaxable_distance or 0)
-        total_distance += row.total_trip_distance or miles or 0
-        if row.beginning_odometer is None or row.ending_odometer is None:
+        if _trip_has_jurisdiction_miles(row):
+            jurisdiction = row.jurisdiction
+            miles = row.jurisdiction_distance
+            miles_by_jurisdiction[jurisdiction] = miles_by_jurisdiction.get(jurisdiction, 0) + miles
+            taxable_by_jurisdiction[jurisdiction] = taxable_by_jurisdiction.get(jurisdiction, 0) + (row.taxable_distance or 0)
+            nontaxable_by_jurisdiction[jurisdiction] = nontaxable_by_jurisdiction.get(jurisdiction, 0) + (row.nontaxable_distance or 0)
+        total_distance += row.total_trip_distance or 0
+        if _trip_has_route_facts(row) and (row.beginning_odometer is None or row.ending_odometer is None):
             missing_odometer_rows.append(row)
-        if row.jurisdiction_distance is None:
+        if _trip_has_route_facts(row) and not _trip_has_jurisdiction_miles(row):
             missing_jurisdiction_distance_rows.append(row)
 
     for row in worksheet.fuel_records:
-        jurisdiction = row.state_or_province or "Not recorded"
-        fuel_type = row.fuel_type or "Not recorded"
         gallons = row.gallons_or_liters or 0
-        fuel_by_jurisdiction[jurisdiction] = fuel_by_jurisdiction.get(jurisdiction, 0) + gallons
-        fuel_by_type[fuel_type] = fuel_by_type.get(fuel_type, 0) + gallons
+        if row.state_or_province and gallons > 0:
+            jurisdiction = row.state_or_province
+            fuel_by_jurisdiction[jurisdiction] = fuel_by_jurisdiction.get(jurisdiction, 0) + gallons
+        if row.fuel_type and gallons > 0:
+            fuel_type = row.fuel_type
+            fuel_by_type[fuel_type] = fuel_by_type.get(fuel_type, 0) + gallons
         total_fuel += gallons
         if not ifta_receipt_available(row):
             missing_receipt_rows.append(row)
@@ -227,16 +311,30 @@ def worksheet_summaries(worksheet):
 def ifta_open_items(worksheet):
     summaries = worksheet_summaries(worksheet)
     items = []
+    if not _clean(worksheet.base_jurisdiction):
+        items.append("Add base jurisdiction.")
+    if not _clean(worksheet.carrier_name):
+        items.append("Add carrier name.")
+    if not _clean(worksheet.ifta_license_number):
+        items.append("Add IFTA license number, if applicable.")
+    for fuel in worksheet.fuel_records:
+        if not _fuel_has_facts(fuel):
+            continue
+        label = _fuel_review_label(fuel)
+        if fuel.gallons_or_liters is None:
+            items.append(f"Add gallons for {label}.")
+        if not ifta_receipt_available(fuel):
+            items.append(f"Attach receipt photo for {label}.")
+    if not worksheet.trip_rows or not any(_trip_has_jurisdiction_miles(row) for row in worksheet.trip_rows):
+        items.append("Add jurisdiction mileage before using this worksheet for IFTA review.")
+    if not worksheet.trip_rows or not any(_trip_has_route_facts(row) for row in worksheet.trip_rows):
+        items.append("Add trip origin/destination or route miles.")
+    elif summaries["missing_jurisdiction_distance_rows"]:
+        items.append("Add jurisdiction mileage for recorded trip rows.")
     if summaries["missing_odometer_rows"]:
-        items.append("Missing odometer rows")
-    if summaries["missing_receipt_rows"]:
-        items.append("Missing receipt rows")
-    if summaries["missing_jurisdiction_distance_rows"]:
-        items.append("Missing jurisdiction distance rows")
-    if worksheet.review_status in {"Draft", "Needs Review"}:
-        items.append("IFTA Review")
+        items.append("Add beginning and ending odometer for recorded trip rows.")
     if not worksheet.manager_signature and worksheet.review_status == "Closed":
-        items.append("Manager signature not captured")
+        items.append("Add manager signature before closing this worksheet.")
     return items
 
 
@@ -251,21 +349,107 @@ def ifta_packet_status(worksheet):
 def ifta_fuel_rows(worksheet):
     rows = []
     for index, fuel in enumerate(worksheet.fuel_records, 1):
+        if not _fuel_has_facts(fuel):
+            continue
         receipt_available = ifta_receipt_available(fuel)
         receipt_ext = os.path.splitext(fuel.receipt_photo or "")[1].lower()
         receipt_is_image = receipt_available and (
             receipt_ext in IMAGE_RECEIPT_EXTENSIONS
             or (getattr(fuel, "receipt_mimetype", None) or "").startswith("image/")
         )
+        location = _city_state(fuel.city, fuel.state_or_province)
+        facts = [
+            ("Date", _label_date(fuel.purchase_date)),
+            ("Seller", fuel.seller_name),
+            ("Address", fuel.seller_address),
+            ("Location", location),
+            ("Gallons or liters", _format_number(fuel.gallons_or_liters)),
+            ("Fuel type", fuel.fuel_type),
+            ("Tax paid", fuel.tax_paid),
+            ("Total sale", f"${fuel.total_sale_amount:.2f}" if fuel.total_sale_amount is not None else None),
+            ("Vehicle unit", fuel.vehicle_unit_number),
+            ("Purchaser", fuel.purchaser_name),
+        ]
         rows.append(
             {
                 "number": index,
                 "fuel": fuel,
+                "label": fuel.seller_name or location or fuel.fuel_type or f"Fuel record #{index}",
+                "facts": [(label, value) for label, value in facts if value not in (None, "")],
                 "receipt_available": receipt_available,
                 "receipt_is_image": receipt_is_image,
-                "receipt_status": "Available" if receipt_available else "Photo not available in upload storage",
-                "receipt_hash": fuel.receipt_hash or "Not recorded",
-                "receipt_photo": fuel.receipt_photo or "Not recorded",
+                "receipt_hash": fuel.receipt_hash,
+                "receipt_photo": fuel.receipt_photo,
+            }
+        )
+    return rows
+
+
+def ifta_cover_fields(worksheet):
+    quarter_year = _join_parts(worksheet.reporting_period_quarter, worksheet.reporting_year)
+    fields = [
+        ("Driver", worksheet.driver.display_name if worksheet.driver else None),
+        ("Truck", worksheet.truck),
+        ("Trailer", worksheet.trailer),
+        ("VIN and unit", worksheet.vin_or_vehicle_unit_number),
+        ("Fleet number", worksheet.fleet_number),
+        ("Quarter and year", quarter_year),
+    ]
+    return [(label, value) for label, value in fields if value not in (None, "")]
+
+
+def ifta_vehicle_fields(worksheet, summaries):
+    fields = [
+        ("Base jurisdiction", worksheet.base_jurisdiction),
+        ("Carrier name", worksheet.carrier_name),
+        ("IFTA license number", worksheet.ifta_license_number),
+        ("Average MPG estimate", _format_number(summaries["average_mpg_estimate"])),
+    ]
+    return [(label, value) for label, value in fields if value not in (None, "")]
+
+
+def ifta_distance_rows(summaries):
+    rows = []
+    for jurisdiction, miles in summaries["total_miles_by_jurisdiction"].items():
+        rows.append(
+            {
+                "jurisdiction": jurisdiction,
+                "total_miles": _format_number(miles),
+                "taxable_miles": _format_number(summaries["taxable_miles_by_jurisdiction"].get(jurisdiction, 0)),
+                "nontaxable_miles": _format_number(summaries["nontaxable_miles_by_jurisdiction"].get(jurisdiction, 0)),
+            }
+        )
+    return rows
+
+
+def ifta_trip_rows(worksheet):
+    rows = []
+    for index, row in enumerate(worksheet.trip_rows, 1):
+        if not _trip_has_route_facts(row):
+            continue
+        dates = _join_parts(_label_date(row.trip_start_date), _label_date(row.trip_end_date), separator=" to ")
+        origin = _city_state(row.origin_city, row.origin_state)
+        destination = _city_state(row.destination_city, row.destination_state)
+        odometer = None
+        if row.beginning_odometer is not None or row.ending_odometer is not None:
+            odometer = _join_parts(_format_number(row.beginning_odometer), _format_number(row.ending_odometer), separator=" to ")
+        jurisdiction = None
+        if row.jurisdiction or row.jurisdiction_distance is not None:
+            jurisdiction = _join_parts(row.jurisdiction, _format_number(row.jurisdiction_distance), separator=" - ")
+        facts = [
+            ("Dates", dates),
+            ("Origin", origin),
+            ("Destination", destination),
+            ("Route", row.route_traveled),
+            ("Odometer", odometer),
+            ("Total distance", _format_number(row.total_trip_distance)),
+            ("Jurisdiction distance", jurisdiction),
+            ("Notes", row.notes),
+        ]
+        rows.append(
+            {
+                "number": index,
+                "facts": [(label, value) for label, value in facts if value not in (None, "")],
             }
         )
     return rows
@@ -273,6 +457,11 @@ def ifta_fuel_rows(worksheet):
 
 def build_ifta_packet(worksheet, *, generated_by):
     generated_at = datetime.utcnow()
+    summaries = worksheet_summaries(worksheet)
+    fuel_rows = ifta_fuel_rows(worksheet)
+    receipt_rows = [row for row in fuel_rows if row["receipt_available"]]
+    distance_rows = ifta_distance_rows(summaries)
+    trip_rows = ifta_trip_rows(worksheet)
     return {
         "worksheet": worksheet,
         "document_number": f"IFTA-{worksheet.id:06d}",
@@ -282,8 +471,19 @@ def build_ifta_packet(worksheet, *, generated_by):
         "generated_at": _label_dt(generated_at),
         "current_status": ifta_packet_status(worksheet),
         "open_items": ifta_open_items(worksheet),
-        "summaries": worksheet_summaries(worksheet),
-        "fuel_rows": ifta_fuel_rows(worksheet),
+        "summaries": summaries,
+        "cover_fields": ifta_cover_fields(worksheet),
+        "vehicle_fields": ifta_vehicle_fields(worksheet, summaries),
+        "distance_rows": distance_rows,
+        "fuel_rows": fuel_rows,
+        "receipt_rows": receipt_rows,
+        "trip_rows": trip_rows,
+        "has_vehicle_summary": bool(ifta_vehicle_fields(worksheet, summaries)),
+        "has_distance_summary": bool(distance_rows),
+        "has_fuel_summary": bool(fuel_rows),
+        "has_receipts": bool(receipt_rows),
+        "has_trip_detail": bool(trip_rows),
+        "raw_log_rows": [],
     }
 
 

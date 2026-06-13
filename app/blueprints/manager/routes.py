@@ -12,10 +12,11 @@ Now wired against app.models.Task / app.extensions.db like everything else.
 from datetime import date, datetime
 import csv
 import io
+import mimetypes
 import os
 import re
 
-from flask import current_app, flash, jsonify, make_response, redirect, render_template, request, send_from_directory, url_for
+from flask import abort, current_app, flash, jsonify, make_response, redirect, render_template, request, send_file, send_from_directory, url_for
 from flask_login import current_user
 import pytz
 from sqlalchemy import or_
@@ -25,7 +26,7 @@ from app.services.database_status import database_status
 from app.services.accident_packets import build_accident_packet
 from app.services.driver_wait import dock_time_review_label
 from app.services.evidence_packet import build_damage_evidence_packet
-from app.services.ifta_worksheets import build_ifta_packet
+from app.services.ifta_worksheets import build_ifta_packet, ifta_receipt_path
 from app.services.packet_classification import PacketClassification, classify_damage_report, packet_label_for_report
 from app.services.document_numbers import (
     document_meta,
@@ -38,7 +39,7 @@ from app.services.document_numbers import (
 from app.extensions import db, socketio
 from app.forms.followup import OperationalFollowUpForm
 from app.forms.task import TaskForm
-from app.models import ActivityEvent, AccidentIncidentReport, AuditEvent, DamagePhoto, DamageReport, DispatchCapture, DriverLog, DriverLogPhoto, ExceptionEvent, HotPartPhoto, IftaWorksheet, MoveRequest, OperationalFollowUp, PacketManagerReview, PartScanEvent, PlantTransfer, PreTrip, ShiftRecord, Task, User
+from app.models import ActivityEvent, AccidentIncidentReport, AuditEvent, DamagePhoto, DamageReport, DispatchCapture, DriverLog, DriverLogPhoto, ExceptionEvent, HotPartPhoto, IftaFuelRecord, IftaWorksheet, MoveRequest, OperationalFollowUp, PacketManagerReview, PartScanEvent, PlantTransfer, PreTrip, ShiftRecord, Task, User
 from app.services.activity import record_activity
 from app.services.audit import model_snapshot, record_audit_event
 from app.services.dispatch_capture import create_dispatch_capture, convert_dispatch_capture, dismiss_dispatch_capture, open_dispatch_captures
@@ -2392,8 +2393,29 @@ def ifta_worksheet_packet(worksheet_id):
         "ifta_worksheet_packet.html",
         packet=packet,
         manager_view=True,
+        receipt_endpoint="manager.ifta_receipt",
         back_url=url_for("manager.view_ifta_worksheet", worksheet_id=worksheet.id),
     )
+
+
+@bp.route("/ifta-worksheet/receipt/<int:fuel_id>")
+def ifta_receipt(fuel_id):
+    fuel = IftaFuelRecord.query.get_or_404(fuel_id)
+    path = ifta_receipt_path(fuel.receipt_photo)
+    if path:
+        return send_from_directory(os.path.dirname(path), os.path.basename(path))
+    if fuel.receipt_data:
+        mimetype = (
+            fuel.receipt_mimetype
+            or mimetypes.guess_type(fuel.receipt_photo or "")[0]
+            or "application/octet-stream"
+        )
+        return send_file(
+            io.BytesIO(fuel.receipt_data),
+            mimetype=mimetype,
+            download_name=fuel.receipt_photo or f"fuel-receipt-{fuel.id}",
+        )
+    abort(404)
 
 
 @bp.route("/ifta-worksheet/<int:worksheet_id>/review", methods=["POST"])

@@ -6829,6 +6829,7 @@ def ifta_worksheet_packet(worksheet_id):
         "ifta_worksheet_packet.html",
         packet=packet,
         manager_view=False,
+        receipt_endpoint="driver.ifta_receipt",
         back_url=url_for("driver.view_ifta_worksheet", worksheet_id=worksheet.id),
     )
 

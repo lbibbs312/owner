@@ -74,7 +74,7 @@
 	              {% if fuel.fuel_type %} &middot; {{ fuel.fuel_type }}{% endif %}
 	              {% if fuel.total_sale_amount is not none %} &middot; ${{ "%.2f"|format(fuel.total_sale_amount) }}{% endif %}
 	            </span>
-	            <span>Receipt hash: {{ row.receipt_hash }}</span>
+	            {% if row.receipt_hash %}<span>Receipt hash: {{ row.receipt_hash }}</span>{% endif %}
 	          </div>
 	          <div>
 	            {% if row.receipt_available %}
@@ -84,7 +84,7 @@
 	              {% endif %}
 	              <a class="ifta-receipt-link" href="{{ receipt_url }}">Open receipt</a>
 	            {% else %}
-	              <span>{{ row.receipt_status }}</span>
+	              <span>Receipt not attached</span>
 	            {% endif %}
 	          </div>
 	        </article>

@@ -326,6 +326,10 @@ def test_ifta_packet_includes_support_fields_and_missing_receipt_state(client, a
     )
     assert response.status_code == 302
 
+    view_body = client.get(response.headers["Location"]).get_data(as_text=True)
+    assert "Receipt not attached" in view_body
+    assert "Receipt hash: None" not in view_body
+
     packet = client.get("/ifta-worksheet/1/packet")
     assert packet.status_code == 200
     text = visible_text(packet.get_data(as_text=True))
@@ -347,8 +351,55 @@ def test_ifta_packet_includes_support_fields_and_missing_receipt_state(client, a
     assert "Fuel Stop" in text
     assert "100 Fuel Way" in text
     assert "diesel" in text
-    assert "Photo not available in upload storage" in text
-    assert "Missing receipt rows" in text
+    assert "Attach receipt photo for 2026-04-01 Toledo fuel record." in text
+    assert "Missing receipt rows" not in text
+    assert "Photo not available in upload storage" not in text
+    assert "Receipt Photos and File Hashes" not in text
+    assert "Accurate Page" not in text
+
+
+def test_sparse_ifta_packet_is_review_checklist_not_fake_pages(client, app):
+    with app.app_context():
+        create_user("ifta_sparse_driver", "ifta-sparse@example.com", "driver", first_name="Sparse", last_name="Driver")
+
+    login(client, "ifta_sparse_driver")
+    response = client.post(
+        "/ifta-worksheet/new",
+        data={
+            "purchase_date": "2026-06-10",
+            "fuel_city": "Grand Rapids",
+            "state_or_province": "MI",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    packet = client.get("/ifta-worksheet/1/packet")
+    assert packet.status_code == 200
+    body = packet.get_data(as_text=True)
+    text = visible_text(body)
+
+    assert text.count("Open Items for Review") == 1
+    assert "Add base jurisdiction." in text
+    assert "Add carrier name." in text
+    assert "Add IFTA license number, if applicable." in text
+    assert "Add gallons for 2026-06-10 Grand Rapids fuel record." in text
+    assert "Attach receipt photo for 2026-06-10 Grand Rapids fuel record." in text
+    assert "Add jurisdiction mileage before using this worksheet for IFTA review." in text
+    assert "Add trip origin/destination or route miles." in text
+    assert "Fuel Records" in text
+    assert "Grand Rapids" in text
+    assert "Distance by Jurisdiction" not in text
+    assert "Receipt Photos and File Hashes" not in text
+    assert "Trip Detail" not in text
+    assert "Appendix A" not in text
+    assert "Appendix B" not in text
+    assert "Raw Log" not in text
+    assert "Not recorded" not in text
+    assert "Photo not available in upload storage" not in text
+    assert "Receipt hash" not in text
+    assert "Accurate Page" not in text
+    assert "<nav" not in body
 
 
 def test_ifta_receipt_photo_renders_on_view_and_packet(client, app):
@@ -386,6 +437,8 @@ def test_ifta_receipt_photo_renders_on_view_and_packet(client, app):
     assert 'class="receipt-preview"' in packet_body
     assert "ifta-receipt-1-" in packet_body
     assert ".jpg" in packet_body
+    assert "Receipt Photos and File Hashes" in packet_body
+    assert "Photo not available in upload storage" not in packet_body
 
 
 def test_fuel_tank_damage_form_submission_routes_to_fuel_record_with_photo(client, app):

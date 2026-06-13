@@ -1,172 +1,385 @@
-{% extends "base.html" %}
-{% block content %}
-<style>
-  .packet-doc { max-width:960px; margin:0 auto; padding:20px; color:#111827; background:#fff; }
-  .packet-actions { display:flex; justify-content:flex-end; gap:8px; margin-bottom:12px; }
-  .packet-page { display:block; border:1px solid #d1d5db; padding:22px; margin-bottom:20px; page-break-after:always; break-after:page; overflow:hidden; }
-  .packet-brand { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; align-items:start; border-bottom:2px solid #111827; padding-bottom:12px; margin-bottom:14px; }
-  .packet-brand-title { display:block; min-width:0; }
-  .packet-brand-label { display:block; margin-bottom:5px; color:#374151; font-size:.72rem; font-weight:950; text-transform:uppercase; letter-spacing:.08em; }
-  .packet-brand h1,
-  .packet-brand h2 { display:block; margin:0; font-weight:950; font-size:1.35rem; line-height:1.15; }
-  .packet-brand strong,
-  .packet-brand .packet-subtitle { display:block; margin-top:5px; color:#374151; font-weight:900; line-height:1.3; }
-  .packet-meta { display:block; font-size:.78rem; font-weight:800; text-align:right; line-height:1.45; white-space:nowrap; }
-  .packet-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 14px; }
-  .packet-field { border-bottom:1px solid #e5e7eb; padding:6px 0; }
-  .packet-field span { display:block; color:#6b7280; font-size:.68rem; font-weight:900; text-transform:uppercase; }
-  .packet-field strong { display:block; font-weight:900; }
-  .open-list { margin:8px 0 0; padding-left:18px; }
-  table { width:100%; border-collapse:collapse; margin-top:8px; }
-	  th, td { border:1px solid #d1d5db; padding:6px; font-size:.78rem; text-align:left; vertical-align:top; }
-	  th { background:#f3f4f6; }
-	  .receipt-preview { display:block; width:100%; max-width:520px; max-height:520px; object-fit:contain; margin-bottom:6px; border:1px solid #d1d5db; background:#fff; }
-	  .receipt-file-link { overflow-wrap:anywhere; }
-  @media (max-width:700px) { .packet-brand { grid-template-columns:1fr; } .packet-meta { text-align:left; white-space:normal; } }
-  @media print { .packet-actions, nav, header.app-nav, .navbar { display:none !important; } .packet-doc { max-width:none; padding:0; } .packet-page { border:0; margin:0; min-height:100vh; } .packet-page:last-child { page-break-after:auto; break-after:auto; } }
-</style>
-
-<main class="packet-doc official-print-document">
-  <div class="packet-actions no-print">
-    <a class="btn btn-outline-secondary" href="{{ back_url }}">Back</a>
-    <button class="btn btn-primary" onclick="window.print()" type="button">Print Packet</button>
-  </div>
-
-  <section class="packet-page">
-    <div class="packet-brand">
-      <div class="packet-brand-title">
-        <span class="packet-brand-label">MoveDefense</span>
-        <h1>IFTA Support Worksheet</h1>
-      </div>
-      <div class="packet-meta">
-        Document number: {{ packet.document_number }}<br>
-        Packet type: {{ packet.packet_type }}<br>
-        Generated: {{ packet.generated_at }}<br>
-        Accurate Page 1 of 5
-      </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ packet.packet_title }} {{ packet.document_number }}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink:#111827;
+      --muted:#4b5563;
+      --rule:#d1d5db;
+      --soft:#f3f4f6;
+      --review:#92400e;
+      --review-bg:#fffbeb;
+      --review-rule:#f59e0b;
+    }
+    * { box-sizing:border-box; }
+    body {
+      margin:0;
+      background:#eef2f7;
+      color:var(--ink);
+      font-family:Arial, Helvetica, sans-serif;
+      line-height:1.4;
+    }
+    .packet-doc {
+      max-width:920px;
+      margin:0 auto;
+      padding:20px;
+    }
+    .packet-actions {
+      display:flex;
+      justify-content:flex-end;
+      gap:8px;
+      margin-bottom:12px;
+    }
+    .packet-actions a,
+    .packet-actions button {
+      border:1px solid #1f2937;
+      border-radius:6px;
+      background:#fff;
+      color:#111827;
+      padding:8px 12px;
+      font:700 .88rem Arial, Helvetica, sans-serif;
+      text-decoration:none;
+      cursor:pointer;
+    }
+    .packet-actions button {
+      background:#111827;
+      color:#fff;
+    }
+    .packet-page {
+      background:#fff;
+      border:1px solid var(--rule);
+      padding:28px;
+      margin-bottom:16px;
+      page-break-inside:avoid;
+      break-inside:avoid;
+    }
+    .packet-brand {
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      gap:18px;
+      align-items:start;
+      border-bottom:3px solid var(--ink);
+      padding-bottom:14px;
+      margin-bottom:18px;
+    }
+    .packet-brand-label {
+      display:block;
+      margin-bottom:5px;
+      color:var(--muted);
+      font-size:.72rem;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+    }
+    .packet-brand h1,
+    .packet-brand h2 {
+      margin:0;
+      font-size:1.45rem;
+      line-height:1.12;
+      font-weight:900;
+    }
+    .packet-meta {
+      min-width:220px;
+      text-align:right;
+      color:#374151;
+      font-size:.78rem;
+      line-height:1.45;
+      font-weight:700;
+      white-space:nowrap;
+    }
+    .packet-copy {
+      margin:0 0 16px;
+      color:#374151;
+      font-weight:700;
+    }
+    .packet-grid {
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px 18px;
+      margin-bottom:16px;
+    }
+    .packet-field {
+      border-bottom:1px solid #e5e7eb;
+      padding:6px 0 8px;
+      min-width:0;
+    }
+    .packet-field span {
+      display:block;
+      color:#6b7280;
+      font-size:.68rem;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.05em;
+    }
+    .packet-field strong {
+      display:block;
+      margin-top:2px;
+      color:#111827;
+      font-size:.95rem;
+      font-weight:900;
+      overflow-wrap:anywhere;
+    }
+    .open-list {
+      display:grid;
+      gap:8px;
+      margin:10px 0 0;
+      padding:0;
+      list-style:none;
+    }
+    .open-list li {
+      border:1px solid var(--review-rule);
+      background:var(--review-bg);
+      color:var(--review);
+      padding:9px 11px;
+      font-weight:800;
+    }
+    .packet-section-title {
+      margin:0 0 12px;
+      padding-bottom:7px;
+      border-bottom:1px solid var(--rule);
+      font-size:.86rem;
+      color:#111827;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+    }
+    table {
+      width:100%;
+      border-collapse:collapse;
+      margin-top:8px;
+    }
+    th,
+    td {
+      border:1px solid var(--rule);
+      padding:7px 8px;
+      font-size:.8rem;
+      text-align:left;
+      vertical-align:top;
+    }
+    th {
+      background:var(--soft);
+      color:#374151;
+      font-size:.7rem;
+      text-transform:uppercase;
+      letter-spacing:.05em;
+    }
+    .record-list {
+      display:grid;
+      gap:12px;
+    }
+    .record-card {
+      border:1px solid var(--rule);
+      padding:12px;
+      page-break-inside:avoid;
+      break-inside:avoid;
+    }
+    .record-card h3 {
+      margin:0 0 8px;
+      font-size:1rem;
+      font-weight:900;
+    }
+    .fact-grid {
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:7px 14px;
+    }
+    .fact-grid div {
+      border-bottom:1px solid #e5e7eb;
+      padding-bottom:6px;
+      min-width:0;
+    }
+    .fact-grid span {
+      display:block;
+      color:#6b7280;
+      font-size:.68rem;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.05em;
+    }
+    .fact-grid strong {
+      display:block;
+      margin-top:2px;
+      overflow-wrap:anywhere;
+    }
+    .receipt-preview {
+      display:block;
+      width:100%;
+      max-width:520px;
+      max-height:520px;
+      object-fit:contain;
+      margin-bottom:8px;
+      border:1px solid var(--rule);
+      background:#fff;
+    }
+    .receipt-file-link {
+      display:inline-block;
+      color:#111827;
+      font-weight:900;
+      overflow-wrap:anywhere;
+    }
+    .hash {
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size:.72rem;
+      overflow-wrap:anywhere;
+    }
+    @media (max-width:700px) {
+      .packet-doc { padding:12px; }
+      .packet-page { padding:20px; }
+      .packet-brand { grid-template-columns:1fr; }
+      .packet-meta { min-width:0; text-align:left; white-space:normal; }
+      .packet-grid,
+      .fact-grid { grid-template-columns:1fr; }
+    }
+    @media print {
+      @page { margin:.45in; }
+      body { background:#fff; }
+      .packet-doc { max-width:none; padding:0; }
+      .packet-actions { display:none !important; }
+      .packet-page {
+        border:0;
+        padding:0;
+        margin:0 0 18px;
+        page-break-after:auto;
+        break-after:auto;
+      }
+      .packet-page + .packet-page {
+        padding-top:10px;
+      }
+      a { color:#111827; text-decoration:none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="packet-doc official-print-document">
+    <div class="packet-actions no-print">
+      <a href="{{ back_url }}">Back</a>
+      <button type="button" onclick="window.print()">Print Packet</button>
     </div>
-    <div class="packet-grid">
-      <div class="packet-field"><span>Worksheet title</span><strong>{{ packet.packet_title }}</strong></div>
-      <div class="packet-field"><span>Status</span><strong>{{ packet.current_status }}</strong></div>
-      <div class="packet-field"><span>Driver</span><strong>{{ packet.worksheet.driver.display_name if packet.worksheet.driver else 'Not recorded' }}</strong></div>
-      <div class="packet-field"><span>Truck</span><strong>{{ packet.worksheet.truck or 'Not recorded' }}</strong></div>
-      <div class="packet-field"><span>Trailer</span><strong>{{ packet.worksheet.trailer or 'Not recorded' }}</strong></div>
-      <div class="packet-field"><span>VIN and unit</span><strong>{{ packet.worksheet.vin_or_vehicle_unit_number or 'Not recorded' }}</strong></div>
-      <div class="packet-field"><span>Quarter and year</span><strong>{{ packet.worksheet.reporting_period_quarter or 'Not recorded' }} {{ packet.worksheet.reporting_year or 'Not recorded' }}</strong></div>
-      <div class="packet-field"><span>Review status</span><strong>{{ packet.worksheet.review_status }}</strong></div>
-    </div>
-    <p>We provide this as an IFTA support worksheet for record review. We do not provide tax filing or tax advice.</p>
-    {% if packet.open_items %}
-      <h2>Open Items for Review</h2>
-      <ul class="open-list">{% for item in packet.open_items %}<li>{{ item }}</li>{% endfor %}</ul>
+
+    <section class="packet-page">
+      <div class="packet-brand">
+        <div>
+          <span class="packet-brand-label">MoveDefense</span>
+          <h1>{{ packet.packet_title }}</h1>
+        </div>
+        <div class="packet-meta">
+          Document number: {{ packet.document_number }}<br>
+          Packet type: {{ packet.packet_type }}<br>
+          Generated: {{ packet.generated_at }}
+        </div>
+      </div>
+
+      <p class="packet-copy">This is an IFTA support worksheet for record review. It is not tax filing or tax advice.</p>
+
+      {% if packet.cover_fields %}
+        <div class="packet-grid">
+          {% for label, value in packet.cover_fields %}
+            <div class="packet-field"><span>{{ label }}</span><strong>{{ value }}</strong></div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if packet.open_items %}
+        <h2 class="packet-section-title">Open Items for Review</h2>
+        <ul class="open-list">
+          {% for item in packet.open_items %}<li>{{ item }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    </section>
+
+    {% if packet.has_vehicle_summary %}
+      <section class="packet-page">
+        <h2 class="packet-section-title">Vehicle and Reporting Period Summary</h2>
+        <div class="packet-grid">
+          {% for label, value in packet.vehicle_fields %}
+            <div class="packet-field"><span>{{ label }}</span><strong>{{ value }}</strong></div>
+          {% endfor %}
+        </div>
+      </section>
     {% endif %}
-  </section>
 
-  <section class="packet-page">
-    <div class="packet-brand"><div class="packet-brand-title"><h2>Vehicle and Reporting Period Summary</h2></div><div class="packet-meta">Accurate Page 2 of 5</div></div>
-    <div class="packet-grid">
-      <div class="packet-field"><span>Base jurisdiction</span><strong>{{ packet.worksheet.base_jurisdiction or 'Not recorded' }}</strong></div>
-      <div class="packet-field"><span>Carrier name</span><strong>{{ packet.worksheet.carrier_name or 'Not recorded' }}</strong></div>
-      <div class="packet-field"><span>IFTA license number</span><strong>{{ packet.worksheet.ifta_license_number or 'Not recorded' }}</strong></div>
-      <div class="packet-field"><span>Average MPG estimate</span><strong>{{ packet.summaries.average_mpg_estimate if packet.summaries.average_mpg_estimate else 'Not available' }}</strong></div>
-    </div>
-  </section>
+    {% if packet.has_distance_summary %}
+      <section class="packet-page">
+        <h2 class="packet-section-title">Distance by Jurisdiction</h2>
+        <table>
+          <thead>
+            <tr><th>Jurisdiction</th><th>Total miles</th><th>Taxable miles</th><th>Nontaxable miles</th></tr>
+          </thead>
+          <tbody>
+            {% for row in packet.distance_rows %}
+              <tr>
+                <td>{{ row.jurisdiction }}</td>
+                <td>{{ row.total_miles }}</td>
+                <td>{{ row.taxable_miles }}</td>
+                <td>{{ row.nontaxable_miles }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    {% endif %}
 
-  <section class="packet-page">
-    <div class="packet-brand"><div class="packet-brand-title"><h2>Distance by Jurisdiction</h2></div><div class="packet-meta">Accurate Page 3 of 5</div></div>
-    <table>
-      <tr><th>Jurisdiction</th><th>Total miles</th><th>Taxable miles</th><th>Nontaxable miles</th></tr>
-      {% for jurisdiction, miles in packet.summaries.total_miles_by_jurisdiction.items() %}
-        <tr>
-          <td>{{ jurisdiction }}</td>
-          <td>{{ miles }}</td>
-          <td>{{ packet.summaries.taxable_miles_by_jurisdiction.get(jurisdiction, 0) }}</td>
-          <td>{{ packet.summaries.nontaxable_miles_by_jurisdiction.get(jurisdiction, 0) }}</td>
-        </tr>
-      {% else %}
-        <tr><td colspan="4">No trip distance rows recorded.</td></tr>
-      {% endfor %}
-    </table>
-  </section>
+    {% if packet.has_fuel_summary %}
+      <section class="packet-page">
+        <h2 class="packet-section-title">Fuel Records</h2>
+        <div class="record-list">
+          {% for row in packet.fuel_rows %}
+            <article class="record-card">
+              <h3>{{ row.label }}</h3>
+              <div class="fact-grid">
+                {% for label, value in row.facts %}
+                  <div><span>{{ label }}</span><strong>{{ value }}</strong></div>
+                {% endfor %}
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
 
-  <section class="packet-page">
-    <div class="packet-brand"><div class="packet-brand-title"><h2>Fuel Purchases</h2></div><div class="packet-meta">Accurate Page 4 of 5</div></div>
-    <table>
-      <tr><th>Purchase date</th><th>Seller</th><th>Location</th><th>Gallons or liters</th><th>Fuel type</th><th>Tax paid</th></tr>
-      {% for row in packet.worksheet.fuel_records %}
-        <tr>
-          <td>{{ row.purchase_date or 'Not recorded' }}</td>
-          <td>{{ row.seller_name or 'Not recorded' }}</td>
-	          <td>
-	            {% if row.seller_address %}
-	              {{ row.seller_address }}
-	              {% if row.city or row.state_or_province %}<br>{{ [row.city, row.state_or_province]|select|join(', ') }}{% endif %}
-	            {% elif row.city or row.state_or_province %}
-	              {{ [row.city, row.state_or_province]|select|join(', ') }}
-	            {% else %}
-	              Not recorded
-	            {% endif %}
-	          </td>
-          <td>{{ row.gallons_or_liters if row.gallons_or_liters is not none else 'Not recorded' }}</td>
-          <td>{{ row.fuel_type or 'Not recorded' }}</td>
-          <td>{{ row.tax_paid or 'unknown' }}</td>
-        </tr>
-      {% else %}
-        <tr><td colspan="6">No fuel rows recorded.</td></tr>
-      {% endfor %}
-    </table>
-  </section>
+    {% if packet.has_receipts %}
+      <section class="packet-page">
+        <h2 class="packet-section-title">Receipt Photos and File Hashes</h2>
+        <div class="record-list">
+          {% for row in packet.receipt_rows %}
+            <article class="record-card">
+              {% set receipt_url = url_for(receipt_endpoint|default('driver.ifta_receipt'), fuel_id=row.fuel.id) %}
+              {% if row.receipt_is_image %}
+                <img class="receipt-preview" src="{{ receipt_url }}" alt="Fuel receipt row {{ row.number }}">
+              {% endif %}
+              {% if row.receipt_photo %}
+                <a class="receipt-file-link" href="{{ receipt_url }}">{{ row.receipt_photo }}</a>
+              {% endif %}
+              {% if row.receipt_hash %}
+                <div class="packet-field"><span>Receipt hash</span><strong class="hash">{{ row.receipt_hash }}</strong></div>
+              {% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
 
-  <section class="packet-page">
-    <div class="packet-brand"><div class="packet-brand-title"><h2>Receipt Photos and File Hashes</h2></div><div class="packet-meta">Accurate Page 5 of 5</div></div>
-    <table>
-      <tr><th>Fuel row</th><th>Receipt photo</th><th>Receipt hash</th><th>File status</th></tr>
-	      {% for row in packet.fuel_rows %}
-	        <tr>
-	          <td>{{ row.number }}</td>
-	          <td>
-	            {% if row.receipt_available %}
-	              {% set receipt_url = url_for('driver.ifta_receipt', fuel_id=row.fuel.id) %}
-	              {% if row.receipt_is_image %}
-	                <img class="receipt-preview" src="{{ receipt_url }}" alt="Fuel receipt row {{ row.number }}">
-	              {% endif %}
-	              <a class="receipt-file-link" href="{{ receipt_url }}">{{ row.receipt_photo }}</a>
-	            {% else %}
-	              Photo not available in upload storage
-	            {% endif %}
-          </td>
-          <td>{{ row.receipt_hash }}</td>
-          <td>{{ row.receipt_status }}</td>
-        </tr>
-      {% else %}
-        <tr><td colspan="4">Photo not available in upload storage</td></tr>
-      {% endfor %}
-    </table>
-  </section>
-
-  <section class="packet-page">
-    <div class="packet-brand"><div class="packet-brand-title"><h2>Appendix A — Trip Rows</h2></div></div>
-    <table>
-      <tr><th>Dates</th><th>Origin</th><th>Destination</th><th>Route</th><th>Odometer</th><th>Total distance</th><th>Jurisdiction distance</th></tr>
-      {% for row in packet.worksheet.trip_rows %}
-        <tr>
-          <td>{{ row.trip_start_date or 'Not recorded' }} to {{ row.trip_end_date or 'Not recorded' }}</td>
-          <td>{{ row.origin_city or 'Not recorded' }}, {{ row.origin_state or 'Not recorded' }}</td>
-          <td>{{ row.destination_city or 'Not recorded' }}, {{ row.destination_state or 'Not recorded' }}</td>
-          <td>{{ row.route_traveled or 'Not recorded' }}</td>
-          <td>{{ row.beginning_odometer if row.beginning_odometer is not none else 'Not recorded' }} to {{ row.ending_odometer if row.ending_odometer is not none else 'Not recorded' }}</td>
-          <td>{{ row.total_trip_distance if row.total_trip_distance is not none else 'Not recorded' }}</td>
-          <td>{{ row.jurisdiction }} - {{ row.jurisdiction_distance if row.jurisdiction_distance is not none else 'Not recorded' }}</td>
-        </tr>
-      {% else %}
-        <tr><td colspan="7">No trip rows recorded.</td></tr>
-      {% endfor %}
-    </table>
-  </section>
-
-  <section class="packet-page">
-    <div class="packet-brand"><div class="packet-brand-title"><h2>Appendix B — Raw Log</h2></div></div>
-    <p>Raw packet event export is not attached to this worksheet.</p>
-  </section>
-</main>
-{% endblock %}
+    {% if packet.has_trip_detail %}
+      <section class="packet-page">
+        <h2 class="packet-section-title">Trip Detail</h2>
+        <div class="record-list">
+          {% for row in packet.trip_rows %}
+            <article class="record-card">
+              <h3>Trip row {{ row.number }}</h3>
+              <div class="fact-grid">
+                {% for label, value in row.facts %}
+                  <div><span>{{ label }}</span><strong>{{ value }}</strong></div>
+                {% endfor %}
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+  </main>
+</body>
+</html>
