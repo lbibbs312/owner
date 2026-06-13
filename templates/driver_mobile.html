@@ -5033,20 +5033,20 @@
         .md-desk-v3{display:none}
         @media (min-width:640px) and (min-height:560px){
           .board-only-shell .duty-quickcard{display:none}
-          .md-desk-v3{display:block;max-width:880px;margin:0 auto;padding:6px 0 8px}
+          .md-desk-v3{display:block;max-width:960px;margin:0 auto;padding:6px 0 8px}
           .md-driver-bottom-nav.md-driver-bottom-nav{display:grid !important}
           .driver-ops-shell.board-only-shell .wide-body{padding-bottom:118px}
         }
         .md-desk-v3 .md-v3-head{display:flex;justify-content:space-between;align-items:baseline;margin:2px 2px 9px}
         .md-desk-v3 .md-v3-head .k{color:#8fa3bf;font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
         .md-desk-v3 .md-v3-head span:last-child{color:#7f93b3;font-size:12px;font-weight:700}
-        .md-v3-cta{display:flex;align-items:center;gap:18px;width:100%;text-decoration:none;margin:0 0 16px;padding:22px 24px;border-radius:16px;border:1px solid rgba(111,227,154,.4);background:linear-gradient(180deg,rgba(18,34,28,.9),rgba(10,18,24,.92));box-shadow:0 20px 50px rgba(0,0,0,.45),inset 0 0 50px rgba(111,227,154,.06)}
+        .md-v3-cta{display:flex;align-items:center;gap:18px;width:100%;text-decoration:none;margin:0 0 18px;padding:30px 34px;border-radius:18px;border:1px solid rgba(111,227,154,.4);background:linear-gradient(180deg,rgba(18,34,28,.9),rgba(10,18,24,.92));box-shadow:0 20px 50px rgba(0,0,0,.45),inset 0 0 50px rgba(111,227,154,.06)}
         .md-v3-cta .ic{width:54px;height:54px;flex:0 0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(111,227,154,.12);border:1px solid rgba(111,227,154,.45);box-shadow:0 0 22px rgba(111,227,154,.3)}
         .md-v3-cta .ic svg{width:24px;height:24px;color:#6fe39a;margin-left:2px}
         .md-v3-cta .tx{display:flex;flex-direction:column;gap:3px;min-width:0}
-        .md-v3-cta .tx em{font-style:normal;font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#6fe39a}
-        .md-v3-cta .tx strong{font-size:26px;font-weight:850;letter-spacing:-.02em;color:#f3ede2;line-height:1.12}
-        .md-v3-cta .tx small{font-size:12.5px;color:#8fa3bf}
+        .md-v3-cta .tx em{font-style:normal;font-family:ui-monospace,Menlo,monospace;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#6fe39a}
+        .md-v3-cta .tx strong{font-size:32px;font-weight:850;letter-spacing:-.02em;color:#f3ede2;line-height:1.1}
+        .md-v3-cta .tx small{font-size:13.5px;color:#8fa3bf}
         .md-v3-stops{margin:0 0 16px}
         .md-v3-stop{display:flex;align-items:center;gap:13px;padding:12px 15px;border-radius:11px;margin-bottom:8px;background:rgba(15,24,38,.82);border:1px solid rgba(91,157,255,.16)}
         .md-v3-stop.is-current{border-color:rgba(127,178,255,.5);box-shadow:0 0 18px rgba(91,157,255,.14)}
@@ -5056,20 +5056,19 @@
         .md-v3-stop .info small{font-size:11.5px;color:#8094b3;font-family:ui-monospace,Menlo,monospace}
         .md-v3-stop .state{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#9fb6dd;white-space:nowrap}
         .md-v3-empty{padding:18px;text-align:center;color:#7f93b3;font-size:13px;border:1px dashed rgba(91,157,255,.2);border-radius:11px}
-        .md-v3-log{padding:14px 16px;border-radius:14px;background:rgba(13,21,34,.85);border:1px solid rgba(91,157,255,.16)}
-        .md-v3-grid{margin:4px 0 10px;border-radius:10px;overflow:hidden}
+        .md-v3-log{padding:18px 20px;border-radius:16px;background:rgba(13,21,34,.85);border:1px solid rgba(91,157,255,.16)}
+        .md-v3-grid{margin:6px 0 12px;border-radius:10px;overflow:hidden}
         .md-v3-grid svg{display:block;width:100%;height:auto}
         .md-v3-hos{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
         .md-v3-hos .hos-cell{flex:1;min-width:120px;display:flex;flex-direction:column;gap:2px;padding:9px 12px;border-radius:9px;background:rgba(10,17,28,.6);border:1px solid rgba(91,157,255,.14)}
         .md-v3-hos .hos-cell span{font-size:10.5px;color:#8094b3;font-family:ui-monospace,Menlo,monospace;text-transform:uppercase;letter-spacing:.06em}
-        .md-v3-hos .hos-cell strong{font-size:16px;color:#f3ede2;font-weight:800}
+        .md-v3-hos .hos-cell strong{font-size:18px;color:#f3ede2;font-weight:800}
         .md-v3-log-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:11.5px;color:#7f93b3}
         .md-v3-log-foot a{color:#7fb2ff;text-decoration:none;font-weight:700}
       </style>
       <div class="md-desk-v3">
         {% set v3_url = (cta_urls.get(primary.action) if primary and cta_urls.get(primary.action) else (cta_urls.get('add_stop') or url_for('driver.new_driving_log'))) %}
         <a class="md-v3-cta" href="{{ v3_url }}">
-          <span class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
           <span class="tx">
             <em>{% if current_stop %}Current stop &middot; {{ current_stop.plant_name }}{% else %}Ready for dispatch{% endif %}</em>
             <strong>{{ (primary.label if primary else none) or cta.next_action or 'Log first stop' }}</strong>

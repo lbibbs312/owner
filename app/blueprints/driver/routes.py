@@ -5387,25 +5387,11 @@ def new_driving_log():
     form.secondary_load.data = current_secondary_value
     if getattr(current_user, "is_day_driver", False):
         _prefill_day_driver_cargo(form, current_user.id, local_date)
-        if not _open_stop_for_driver(current_user.id, local_date):
-            last_loaded = (
-                DriverLog.query.filter(
-                    DriverLog.driver_id == current_user.id,
-                    DriverLog.date == local_date,
-                    DriverLog.deleted_at.is_(None),
-                    DriverLog.depart_time.isnot(None),
-                    DriverLog.destination.isnot(None),
-                )
-                .order_by(DriverLog.id.desc())
-                .first()
-            )
-            if last_loaded and not is_empty_load(last_loaded.depart_load_size):
-                # In transit: arriving means landing at the destination typed on
-                # the last loaded departure. Keep the customer name blank so GPS
-                # and Google suggestions show immediately; address can still be
-                # prefilled because it is the stronger physical stop fact.
-                if not form.location_address.data:
-                    form.location_address.data = last_loaded.destination_address
+        # Day drivers log the stop where they are physically standing. Leave the
+        # address blank so the form auto-pings GPS for the current location and
+        # surfaces customer-name suggestions, instead of pre-filling the last
+        # stop's destination (which suppressed the GPS auto-fill). The expected
+        # destination still rides along as the GPS/search hint in the template.
     if request.args.get("report_type") == "truck_issue":
         form.maintenance.data = True
     elif request.args.get("report_type") == "route_note":
