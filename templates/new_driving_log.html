@@ -140,6 +140,43 @@
     </div>
     {% if config.ENABLE_DESTINATION_AUTOCOMPLETE %}
     {# Where this route is headed. Required before Start Route on the first stop. #}
+    <style>
+      /* Dark-theme the destination card + suggestions so they read on the night
+         shell instead of Bootstrap's white panels. */
+      #destinationSelected.card {
+        background: linear-gradient(180deg, rgba(17,27,46,.94), rgba(12,19,34,.94));
+        border: 1px solid rgba(91,157,255,.30);
+        border-radius: 14px;
+        box-shadow: 0 0 22px rgba(11,18,32,.5);
+        color: #e6eefc;
+      }
+      #destinationSelected .card-body { color: #e6eefc; }
+      #destinationGoingName { color: #ffffff; font-weight: 800; }
+      #destinationGoingAddress { color: #9fb3d1 !important; }
+      #driverNotesCard > .text-uppercase { color: #f0b860; letter-spacing: .04em; }
+      #driverNotesList { color: #d7e3f7; }
+      #driverNotesList li { margin-bottom: 3px; line-height: 1.35; }
+      #destinationSuggestions .list-group-item {
+        background: rgba(12,19,34,.96);
+        border: 1px solid rgba(91,157,255,.20);
+        color: #e6eefc;
+      }
+      #destinationSuggestions .list-group-item + .list-group-item { border-top: none; }
+      #destinationSuggestions .list-group-item:hover,
+      #destinationSuggestions .list-group-item:focus {
+        background: rgba(47,109,240,.30);
+        color: #ffffff;
+      }
+      #destinationSuggestions .text-muted { color: #9fb3d1 !important; }
+      #destinationSection #destinationManualBtn,
+      #destinationSection #destinationChangeBtn {
+        background: rgba(91,157,255,.14);
+        border: 1px solid rgba(91,157,255,.5);
+        box-shadow: 0 0 14px rgba(91,157,255,.25);
+        color: #eaf2ff;
+      }
+      #destinationStatus { color: #9fb3d1; }
+    </style>
     <div class="mb-3" id="destinationSection"
          data-autocomplete-url="{{ url_for('driver.destination_autocomplete_api') }}"
          data-details-url="{{ url_for('driver.destination_details_api') }}"

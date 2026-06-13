@@ -3519,8 +3519,8 @@ def destination_details_api():
     place_id = str(data.get("place_id") or "").strip()[:512]
     if not place_id:
         return jsonify({"ok": False, "error": "missing_place_id", "destination": None, "session_token": session_token})
-    include_reviews = bool(current_app.config.get("ENABLE_GOOGLE_REVIEW_SUMMARY", False))
-    include_generative = bool(current_app.config.get("ENABLE_GOOGLE_GENERATIVE_SUMMARY", False))
+    include_reviews = bool(current_app.config.get("ENABLE_GOOGLE_REVIEW_SUMMARY", True))
+    include_generative = bool(current_app.config.get("ENABLE_GOOGLE_GENERATIVE_SUMMARY", True))
     try:
         details = destination_place_details(
             place_id,

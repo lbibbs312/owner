@@ -704,13 +704,22 @@ def destination_place_details(place_id, *, session_token="", include_reviews=Fal
     params = {}
     if session_token:
         params["sessionToken"] = session_token
-    response = requests.get(
-        PLACE_DETAILS_URL + place_id,
-        headers={"X-Goog-Api-Key": key, "X-Goog-FieldMask": ",".join(fields)},
-        params=params or None,
-        timeout=6,
-    )
-    data = response.json()
+
+    def _fetch(field_list):
+        resp = requests.get(
+            PLACE_DETAILS_URL + place_id,
+            headers={"X-Goog-Api-Key": key, "X-Goog-FieldMask": ",".join(field_list)},
+            params=params or None,
+            timeout=6,
+        )
+        return resp, resp.json()
+
+    response, data = _fetch(fields)
+    if (response.status_code >= 400 or data.get("error")) and len(fields) > len(DESTINATION_DETAILS_FIELDS):
+        # Review / generative-summary fields are not enabled for every key or
+        # region. Don't let that break destination selection — retry with the
+        # minimal field set so the driver still gets the place + base notes.
+        response, data = _fetch(list(DESTINATION_DETAILS_FIELDS))
     if response.status_code >= 400 or data.get("error"):
         error = data.get("error") or {}
         return {

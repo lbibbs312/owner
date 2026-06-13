@@ -151,6 +151,46 @@ def test_place_details_service_returns_minimal_fields_and_raw(monkeypatch):
     assert calls[0][2]["sessionToken"] == "tok-1"
 
 
+def test_place_details_retries_without_optional_fields_on_error(monkeypatch):
+    # Turning the review/AI flags on must never break destination selection when a
+    # key/region can't serve those fields: the call retries with minimal fields.
+    from flask import Flask
+
+    flask_app = Flask(__name__)
+    flask_app.config["GOOGLE_MAPS_API_KEY"] = "test-key"
+    masks = []
+
+    def fake_get(url, *, headers, params, timeout):
+        mask = headers.get("X-Goog-FieldMask")
+        masks.append(mask)
+        if "reviews" in mask or "generativeSummary" in mask:
+            return FakeResponse({"error": {"status": "INVALID_ARGUMENT", "message": "unsupported field"}}, status_code=400)
+        return FakeResponse(
+            {
+                "id": "p1",
+                "displayName": {"text": "Receiver Yard"},
+                "formattedAddress": "1 Dock Rd, City, MI, USA",
+                "location": {"latitude": 42.0, "longitude": -85.0},
+            }
+        )
+
+    monkeypatch.setattr(google_places.requests, "get", fake_get)
+    with flask_app.app_context():
+        result = google_places.destination_place_details("p1", include_reviews=True, include_generative=True)
+
+    assert result["ok"] is True
+    assert result["place"]["name"] == "Receiver Yard"
+    assert len(masks) == 2  # first attempt (with optional fields) failed, retried minimal
+    assert "reviews" in masks[0]
+    assert "reviews" not in masks[1] and "generativeSummary" not in masks[1]
+
+
+def test_review_and_generative_summary_flags_default_on(app):
+    assert app.config["ENABLE_GOOGLE_REVIEW_SUMMARY"] is True
+    assert app.config["ENABLE_GOOGLE_GENERATIVE_SUMMARY"] is True
+    assert app.config["ENABLE_TRUCKER_PLACE_SUMMARY"] is True
+
+
 # ----- endpoint-level --------------------------------------------------------
 def test_autocomplete_endpoint_returns_suggestions_with_session_token(client, app, monkeypatch):
     with app.app_context():
