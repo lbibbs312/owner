@@ -422,6 +422,17 @@ def test_start_route_button_disabled_until_destination_on_first_stop(client, app
     assert "applyDestination(data.destination, s)" in body
     assert "function selectedDestinationVisible" in body
     assert "function repairDestinationFieldsFromCard" in body
+    assert "function confirmSelectedDestination" in body
+    assert "function cancelSelectedDestination" in body
+    assert "function typedDestinationReady" in body
+    assert "function startRouteButton" in body
+    assert "function ensureDestinationBeforeSubmit" in body
+    assert "destinationConfirmed() || typedDestinationReady()" in body
+    assert "routeForm.addEventListener('submit', ensureDestinationBeforeSubmit)" in body
+    assert "document.addEventListener('DOMContentLoaded', syncStartButton)" in body
+    assert 'id="destinationCancelBtn"' in body
+    assert 'aria-label="Cancel selected destination"' in body
+    assert "selected.addEventListener('click', confirmSelectedDestination)" in body
     assert "if (destinationConfirmed()) clearSelection();" in body
     assert "destinationChangeBtn" not in body
 

@@ -91,6 +91,51 @@
         min-height:1.1em;
         transition:color .16s ease, opacity .16s ease;
       }
+      .gps-select-wrap {
+        position:relative;
+      }
+      #gpsPlaceSelect {
+        padding-right:70px;
+        appearance:none;
+        -webkit-appearance:none;
+        background-image:none;
+      }
+      .gps-select-cue {
+        position:absolute;
+        right:14px;
+        top:50%;
+        transform:translateY(-50%);
+        display:flex;
+        align-items:center;
+        gap:8px;
+        color:#eaf2ff;
+        pointer-events:none;
+      }
+      .gps-select-count {
+        min-width:22px;
+        height:22px;
+        padding:0 6px;
+        border-radius:999px;
+        border:1px solid rgba(91,157,255,.55);
+        background:rgba(47,109,240,.24);
+        display:none;
+        align-items:center;
+        justify-content:center;
+        font-size:.78rem;
+        font-weight:900;
+        line-height:1;
+      }
+      .gps-select-count:not(:empty) {
+        display:inline-flex;
+      }
+      .gps-select-caret {
+        width:11px;
+        height:11px;
+        border-right:2px solid currentColor;
+        border-bottom:2px solid currentColor;
+        transform:rotate(45deg);
+        margin-top:-5px;
+      }
       #gpsStatus.is-loading {
         display:inline-block;
         font-weight:850;
@@ -130,7 +175,13 @@
       </datalist>
       <div class="mt-2" id="gpsPlaceChoices" hidden>
         <label for="gpsPlaceSelect" class="form-label mb-1">Suggested current location names</label>
-        <select id="gpsPlaceSelect" class="form-select"></select>
+        <div class="gps-select-wrap">
+          <select id="gpsPlaceSelect" class="form-select"></select>
+          <span class="gps-select-cue" aria-hidden="true">
+            <span class="gps-select-count" id="gpsPlaceCount"></span>
+            <span class="gps-select-caret"></span>
+          </span>
+        </div>
         <div class="form-text">These name where you are now. They do not set the next destination.</div>
       </div>
       <div class="form-text">Tap GPS to set the current address, then pick or type the place name.</div>
@@ -185,6 +236,37 @@
         color: #eaf2ff;
       }
       #destinationStatus { color: #9fb3d1; }
+      #destinationSelected {
+        position: relative;
+        cursor: pointer;
+      }
+      #destinationSelected.is-confirmed {
+        border-color: rgba(111,227,154,.56) !important;
+        box-shadow: 0 0 22px rgba(43,213,118,.16), inset 0 1px 0 rgba(91,157,255,.08) !important;
+      }
+      #destinationSelected .card-body { padding-right: 48px; }
+      #destinationCancelBtn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        border: 1px solid rgba(159,179,209,.38);
+        background: rgba(12,19,34,.92);
+        color: #eaf2ff;
+        font-size: 22px;
+        font-weight: 800;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #destinationCancelBtn:focus,
+      #destinationCancelBtn:hover {
+        border-color: rgba(255,82,71,.72);
+        color: #ffffff;
+      }
     </style>
     <div class="mb-3" id="destinationSection"
          data-autocomplete-url="{{ url_for('driver.destination_autocomplete_api') }}"
@@ -205,7 +287,8 @@
       <input type="hidden" name="destination_source" id="destination_source" data-no-autosave="true">
       <input type="hidden" name="destination_confirmed" id="destination_confirmed" value="" data-no-autosave="true">
 
-      <div class="card mt-2" id="destinationSelected" hidden>
+      <div class="card mt-2" id="destinationSelected" role="button" tabindex="0" aria-label="Confirm selected destination" hidden>
+        <button type="button" id="destinationCancelBtn" aria-label="Cancel selected destination">&times;</button>
         <div class="card-body py-2">
           <div class="dest-label">Going to</div>
           <div class="dest-name" id="destinationGoingName"></div>
@@ -236,9 +319,11 @@
         var addressSelect = document.getElementById('gpsAddressSelect');
         var placeChoices = document.getElementById('gpsPlaceChoices');
         var placeSelect = document.getElementById('gpsPlaceSelect');
+        var placeCount = document.getElementById('gpsPlaceCount');
         var gpsPlacesUrl = gpsBtn ? gpsBtn.getAttribute('data-gps-places-url') : '';
         var destinationLookupUrl = gpsBtn ? gpsBtn.getAttribute('data-gps-destination-url') : '';
         var gpsPlaceHint = gpsBtn ? clean(gpsBtn.getAttribute('data-gps-place-hint')) : '';
+        if (gpsPlaceHint.toLowerCase() === 'none') gpsPlaceHint = '';
         var placeMemory = {{ (fm.places or [])|tojson }};
         var locationMemory = {{ (fm.locations or [])|tojson }};
         var locationRecents = {{ (fm.location_recents or [])|tojson }};
@@ -257,6 +342,17 @@
           gpsStatus.textContent = message || '';
           gpsStatus.classList.toggle('is-loading', !!loading);
           gpsStatus.setAttribute('aria-busy', loading ? 'true' : 'false');
+        }
+
+        function notifyInputChanged(input) {
+          if (!input) return;
+          try {
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+          } catch (e) {
+            var legacyEvent = document.createEvent('Event');
+            legacyEvent.initEvent('input', true, true);
+            input.dispatchEvent(legacyEvent);
+          }
         }
 
         function formatDistance(candidate) {
@@ -322,10 +418,16 @@
           return label || 'Nearby place';
         }
 
+        function setPlaceCount(count) {
+          if (!placeCount) return;
+          placeCount.textContent = count > 1 ? String(count) : '';
+        }
+
         function applyAddress(candidate, force) {
           var value = addressValue(candidate);
           if (value && (force || !addressInput.value.trim())) {
             addressInput.value = value;
+            notifyInputChanged(addressInput);
           }
         }
 
@@ -333,10 +435,28 @@
           if (!candidate) return;
           if (candidate.address && (forceAddress || !addressInput.value.trim())) {
             addressInput.value = candidate.address;
+            notifyInputChanged(addressInput);
           }
           if (candidate.name && (forceName || !nameInput.value.trim())) {
             nameInput.value = candidate.name;
+            notifyInputChanged(nameInput);
           }
+        }
+
+        function applyGpsNameFallback(candidates, addressCandidates) {
+          if (!nameInput || nameInput.value.trim()) return false;
+          var named = (candidates || []).find(function (candidate) { return clean(candidate && candidate.name); });
+          if (named) {
+            applyCandidate(named, true, false);
+            return true;
+          }
+          var address = addressValue((addressCandidates || [])[0]);
+          if (address) {
+            nameInput.value = address;
+            notifyInputChanged(nameInput);
+            return true;
+          }
+          return false;
         }
 
         function selectedCandidate() {
@@ -375,6 +495,7 @@
           currentCandidates = candidates || [];
           if (!placeChoices || !placeSelect || !currentCandidates.length) {
             if (placeChoices) placeChoices.hidden = true;
+            setPlaceCount(0);
             return;
           }
           placeSelect.disabled = false;
@@ -385,11 +506,13 @@
             option.textContent = candidateLabel(candidate);
             placeSelect.appendChild(option);
           });
+          setPlaceCount(currentCandidates.length);
           placeChoices.hidden = false;
         }
 
         function renderPlaceNotice(message) {
           currentCandidates = [];
+          setPlaceCount(0);
           if (!placeChoices || !placeSelect) return;
           placeSelect.innerHTML = '';
           var option = document.createElement('option');
@@ -435,6 +558,26 @@
           var r = normalizeAddress(right);
           if (!l || !r) return false;
           return l === r || l.indexOf(r) !== -1 || r.indexOf(l) !== -1;
+        }
+
+        function queryTokens(value) {
+          return normalizeAddress(value).split(' ').filter(function (token) {
+            return token.length >= 3 || /^\d+$/.test(token);
+          });
+        }
+
+        function candidateMatchesQuery(candidate, query) {
+          var tokens = queryTokens(query);
+          if (!tokens.length) return true;
+          var haystack = normalizeAddress([
+            candidate && candidate.name,
+            candidate && candidate.address,
+            candidate && candidate.formatted_address,
+            candidate && candidate.value
+          ].filter(Boolean).join(' '));
+          return !!haystack && tokens.every(function (token) {
+            return haystack.indexOf(token) !== -1;
+          });
         }
 
         // Pool of the driver's saved recents (name + address), with any saved
@@ -529,7 +672,8 @@
               .then(function (r) { return r.ok ? r.json() : null; })
               .then(function (data) {
                 if (activeRequest !== customerLookupId) return;
-                var googlePlaces = normalizeGooglePlaces(data && Array.isArray(data.places) ? data.places : [], 'google_text');
+                var googlePlaces = normalizeGooglePlaces(data && Array.isArray(data.places) ? data.places : [], 'google_text')
+                  .filter(function (place) { return candidateMatchesQuery(place, query); });
                 renderCandidates(mergeCandidates(googlePlaces, memoryMatches).slice(0, 5));
               })
               .catch(function () {
@@ -627,11 +771,12 @@
                     : 'GPS set. ' + trustMessage, false);
                   return;
                 }
+                var filledVisibleName = applyGpsNameFallback(candidates, addressCandidates);
                 if (googlePlaces.length || candidates.length) {
                   var setLabel = addressCandidates.length ? 'GPS address set' : 'GPS set';
                   setGpsStatus(accuracy
-                    ? setLabel + ' (+/-' + accuracy + ' m). Nearby customer names are suggestions only.'
-                    : setLabel + '. Nearby customer names are suggestions only.', false);
+                    ? setLabel + ' (+/-' + accuracy + ' m). ' + (filledVisibleName ? 'Current location filled; pick another if needed.' : 'Nearby current-location names are suggestions only.')
+                    : setLabel + '. ' + (filledVisibleName ? 'Current location filled; pick another if needed.' : 'Nearby current-location names are suggestions only.'), false);
                   return;
                 }
                 if (googleError) {
@@ -649,6 +794,7 @@
               .catch(function () {
                 renderAddressChoices([]);
                 renderCandidates(savedPlaces);
+                applyGpsNameFallback(savedPlaces, []);
                 if (!savedPlaces.length) renderPlaceNotice('Google places could not be reached - type the current location name');
                 setGpsStatus(accuracy
                   ? 'GPS coordinates set (+/-' + accuracy + ' m). Type or pick the place.'
@@ -722,6 +868,7 @@
         var list = document.getElementById('destinationSuggestions');
         var manualBtn = document.getElementById('destinationManualBtn');
         var selected = document.getElementById('destinationSelected');
+        var cancelBtn = document.getElementById('destinationCancelBtn');
         var goingName = document.getElementById('destinationGoingName');
         var goingAddress = document.getElementById('destinationGoingAddress');
         var summaryList = document.getElementById('driverSummaryLines');
@@ -737,7 +884,8 @@
           source: document.getElementById('destination_source'),
           confirmed: document.getElementById('destination_confirmed')
         };
-        var startBtn = document.getElementById('startRouteBtn');
+        var startBtn = null;
+        var routeForm = section.closest('form');
         var requireDestination = section.getAttribute('data-gate-start') === '1';
         var latInput = document.getElementById('gps_latitude') || document.querySelector('[name="gps_latitude"]');
         var lonInput = document.getElementById('gps_longitude') || document.querySelector('[name="gps_longitude"]');
@@ -773,17 +921,47 @@
         function destinationConfirmed() {
           return !!((fields.confirmed && clean(fields.confirmed.value) === 'true') || selectedDestinationVisible());
         }
+        function typedDestinationReady() {
+          return clean(input && input.value).length >= 2;
+        }
+        function startRouteButton() {
+          if (!startBtn) startBtn = document.getElementById('startRouteBtn');
+          return startBtn;
+        }
         function syncStartButton() {
-          if (!startBtn || !requireDestination) return;
+          var button = startRouteButton();
+          if (!button || !requireDestination) return;
           repairDestinationFieldsFromCard();
-          startBtn.disabled = !(locationKnown() && destinationConfirmed());
+          button.disabled = !(locationKnown() && (destinationConfirmed() || typedDestinationReady()));
+        }
+
+        function confirmSelectedDestination() {
+          repairDestinationFieldsFromCard();
+          if (selected) selected.classList.add('is-confirmed');
+          if (list) { list.hidden = true; list.innerHTML = ''; }
+          if (manualBtn) manualBtn.hidden = true;
+          setStatus('');
+          syncStartButton();
         }
 
         function clearSelection() {
           Object.keys(fields).forEach(function (k) { if (fields[k]) fields[k].value = ''; });
-          if (selected) selected.hidden = true;
+          if (selected) {
+            selected.hidden = true;
+            selected.classList.remove('is-confirmed');
+          }
           renderDriverSummary(null);
           syncStartButton();
+        }
+
+        function cancelSelectedDestination() {
+          clearSelection();
+          if (input) {
+            input.value = '';
+            input.focus();
+          }
+          setStatus('Destination cleared.');
+          sessionToken = newToken();
         }
 
         function renderDriverSummary(summary) {
@@ -854,7 +1032,7 @@
           if (selected) selected.hidden = false;
           if (list) { list.hidden = true; list.innerHTML = ''; }
           if (manualBtn) manualBtn.hidden = true;
-          syncStartButton();
+          confirmSelectedDestination();
         }
 
         function destinationDetailsBody(s) {
@@ -901,6 +1079,12 @@
           renderDriverSummary(null);
         }
 
+        function ensureDestinationBeforeSubmit() {
+          if (!destinationConfirmed() && typedDestinationReady()) {
+            manualConfirm();
+          }
+        }
+
         function runAutocomplete() {
           var text = clean(input && input.value);
           if (text.length < 2) { showSuggestions([]); if (manualBtn) manualBtn.hidden = true; return; }
@@ -942,13 +1126,35 @@
             if (destinationConfirmed()) clearSelection();
             window.clearTimeout(debounceTimer);
             debounceTimer = window.setTimeout(runAutocomplete, 300);
+            syncStartButton();
           });
         }
         if (manualBtn) manualBtn.addEventListener('click', manualConfirm);
+        if (routeForm) routeForm.addEventListener('submit', ensureDestinationBeforeSubmit);
+        if (selected) {
+          selected.addEventListener('click', confirmSelectedDestination);
+          selected.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+              ev.preventDefault();
+              confirmSelectedDestination();
+            }
+          });
+        }
+        if (cancelBtn) {
+          cancelBtn.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            cancelSelectedDestination();
+          });
+        }
         if (latInput) ['input', 'change'].forEach(function (ev) { latInput.addEventListener(ev, syncStartButton); });
-        if (addressInput) addressInput.addEventListener('input', syncStartButton);
-        if (nameInput) nameInput.addEventListener('input', syncStartButton);
-        syncStartButton();
+        if (addressInput) ['input', 'change'].forEach(function (ev) { addressInput.addEventListener(ev, syncStartButton); });
+        if (nameInput) ['input', 'change'].forEach(function (ev) { nameInput.addEventListener(ev, syncStartButton); });
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', syncStartButton);
+        } else {
+          window.setTimeout(syncStartButton, 0);
+        }
       })();
     </script>
     {% else %}
