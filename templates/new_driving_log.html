@@ -143,14 +143,19 @@
     <style>
       /* Dark-theme the destination card + suggestions so they read on the night
          shell instead of Bootstrap's white panels. */
+      body.md-shell #destinationSelected.card,
       #destinationSelected.card {
-        background: linear-gradient(180deg, rgba(17,27,46,.94), rgba(12,19,34,.94));
-        border: 1px solid rgba(91,157,255,.30);
-        border-radius: 14px;
-        box-shadow: 0 0 22px rgba(11,18,32,.5);
-        color: #e6eefc;
+        background: linear-gradient(180deg, rgba(17,27,46,.96), rgba(12,19,34,.96)) !important;
+        border: 1px solid rgba(91,157,255,.36) !important;
+        border-radius: 14px !important;
+        box-shadow: 0 0 22px rgba(11,18,32,.5), inset 0 1px 0 rgba(91,157,255,.08) !important;
+        color: #e6eefc !important;
       }
-      #destinationSelected .card-body { color: #e6eefc; }
+      body.md-shell #destinationSelected .card-body,
+      #destinationSelected .card-body {
+        background: transparent !important;
+        color: #e6eefc !important;
+      }
       #destinationSelected .dest-label {
         color: #f0b860;
         font-size: .72rem;
@@ -164,6 +169,13 @@
       .dest-summary-list { list-style: none; padding: 0; margin: .15rem 0 0; color: #d7e3f7; }
       .dest-summary-list li { font-size: .88rem; line-height: 1.4; margin-bottom: 3px; }
       .dest-summary-empty { color: #9fb3d1; font-size: .85rem; margin-top: .15rem; }
+      #destinationSelected #destinationChangeBtn {
+        background: rgba(91,157,255,.14) !important;
+        border: 1px solid rgba(91,157,255,.5) !important;
+        box-shadow: 0 0 14px rgba(91,157,255,.24) !important;
+        color: #eaf2ff !important;
+        min-width: 96px;
+      }
       #destinationSuggestions .list-group-item {
         background: rgba(12,19,34,.96);
         border: 1px solid rgba(91,157,255,.20);
@@ -216,7 +228,7 @@
             <div class="dest-summary-empty" id="mapsSummaryEmpty" hidden>No Maps driver summary available yet.</div>
           </div>
           {% endif %}
-          <button type="button" class="btn btn-sm mt-2" id="destinationChangeBtn">Change destination</button>
+          <button type="button" class="btn btn-sm mt-2" id="destinationChangeBtn">Change</button>
         </div>
       </div>
     </div>
@@ -821,16 +833,24 @@
           list.hidden = false;
         }
 
-        function applyDestination(dest) {
-          if (fields.place_name) fields.place_name.value = dest.place_name || '';
-          if (fields.address) fields.address.value = dest.address || '';
+        function suggestionLabel(s) {
+          return clean(s && (s.main_text || s.formatted_address || s.secondary_text));
+        }
+
+        function applyDestination(dest, sourceSuggestion) {
+          var fallbackName = suggestionLabel(sourceSuggestion);
+          var resolvedName = clean(dest.place_name) || fallbackName || clean(dest.address) || 'Destination';
+          var resolvedAddress = clean(dest.address) || clean(sourceSuggestion && (sourceSuggestion.formatted_address || sourceSuggestion.secondary_text));
+          if (fields.place_name) fields.place_name.value = resolvedName;
+          if (fields.address) fields.address.value = resolvedAddress;
           if (fields.lat) fields.lat.value = (dest.lat == null ? '' : dest.lat);
           if (fields.lng) fields.lng.value = (dest.lng == null ? '' : dest.lng);
           if (fields.place_id) fields.place_id.value = dest.place_id || '';
           if (fields.source) fields.source.value = dest.source || 'google_places';
           if (fields.confirmed) fields.confirmed.value = 'true';
-          if (goingName) goingName.textContent = dest.place_name || dest.address || 'Destination';
-          if (goingAddress) goingAddress.textContent = dest.address || '';
+          if (input) input.value = resolvedName;
+          if (goingName) goingName.textContent = resolvedName;
+          if (goingAddress) goingAddress.textContent = resolvedAddress;
           if (selected) selected.hidden = false;
           if (list) { list.hidden = true; list.innerHTML = ''; }
           if (manualBtn) manualBtn.hidden = true;
@@ -855,19 +875,19 @@
           }).then(function (r) { return r.ok ? r.json() : null; })
             .then(function (data) {
               if (!data || !data.ok || !data.destination) {
-                applyDestination({ place_name: s.main_text, address: s.formatted_address || s.secondary_text || '', source: 'manual' });
+                applyDestination({ place_name: s.main_text, address: s.formatted_address || s.secondary_text || '', source: 'manual' }, s);
                 renderDriverSummary(null);
                 setStatus('');
                 sessionToken = newToken();
                 return;
               }
-              applyDestination(data.destination);
+              applyDestination(data.destination, s);
               renderDriverSummary(data.driver_summary);
               setStatus('');
               sessionToken = newToken();
             })
             .catch(function () {
-              applyDestination({ place_name: s.main_text, address: s.formatted_address || '', source: 'manual' });
+              applyDestination({ place_name: s.main_text, address: s.formatted_address || '', source: 'manual' }, s);
               renderDriverSummary(null);
               setStatus('');
               sessionToken = newToken();
