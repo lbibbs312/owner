@@ -26,6 +26,15 @@ LOAD_SIZE_CHOICES = [
     ("Hazmat", "Hazmat"),
 ]
 
+FUEL_LEVEL_CHOICES = [
+    ("", "Select fuel level..."),
+    ("Full", "Full"),
+    ("3/4", "3/4"),
+    ("1/2", "1/2"),
+    ("1/4", "1/4"),
+    ("Empty", "Empty"),
+]
+
 YES_NO_CHOICES = [("", "Select..."), ("yes", "Yes"), ("no", "No")]
 
 SECONDARY_LOAD_TYPE_CHOICES = [
@@ -96,6 +105,7 @@ class DriverLogForm(FlaskForm):
     location = StringField("Place / customer name", validators=[Optional()])
     commodity = StringField("Commodity (what are you hauling?)", validators=[Optional()])
     weight = StringField("Weight (lbs)", validators=[Optional()])
+    fuel_level = SelectField("Current Fuel Level", choices=FUEL_LEVEL_CHOICES, validators=[Optional()])
     fuel_mileage = IntegerField("Odometer at Fuel or Truck Issue", validators=[Optional()])
     hot_parts = BooleanField("Hot Parts")
     part_number = StringField("Part Number or Hot Part Number")

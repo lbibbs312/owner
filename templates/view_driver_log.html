@@ -418,7 +418,7 @@
             <p class="detail-pair"><span>Departing With</span><strong>{% if log_route.depart_desc is none %}Pending{% elif log.no_pickup %}No Pickup{% else %}{{ log_route.depart_cargo_desc }}{% endif %}</strong></p>
           {% endif %}
           <p class="detail-pair"><span>Maintenance</span><strong>{{ "Yes" if log.maintenance else "No" }}{% if log.maintenance and log.fuel_mileage %} - Odometer {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}{% if log.fuel_mileage and log.fuel_mileage >= 1000000 %} | Verify unusually high odometer entry{% endif %}</strong></p>
-          <p class="detail-pair"><span>Fuel</span><strong>{{ "Yes" if log.fuel else "No" }}</strong></p>
+          <p class="detail-pair"><span>Fuel</span><strong>{% if log.fuel %}Yes{% if log.fuel_level %} - {{ log.fuel_level }}{% endif %}{% if log.fuel_mileage %} - {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}{% else %}No{% endif %}</strong></p>
           <p class="detail-pair"><span>Meeting</span><strong>{{ "Yes" if log.meeting else "No" }}</strong></p>
           <p class="detail-pair"><span>Stop Progress</span><strong>{% if log.depart_time %}Arrival and departure recorded{% else %}Driver is still at this selected stop{% endif %}{% if stop_position and stop_count %} | Route position {{ stop_position }} of {{ stop_count }}{% endif %}</strong></p>
           <p class="detail-pair"><span>Arrive Time</span><strong>{{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</strong></p>
@@ -434,7 +434,7 @@
     <p><strong>Date:</strong> {{ log.date }}</p>
     <p><strong>Plant Name:</strong> {{ log.plant_name }}</p>
     <p><strong>Maintenance:</strong> {{ "Yes" if log.maintenance else "No" }}{% if log.maintenance and log.fuel_mileage %} - Odometer {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</p>
-    <p><strong>Fuel:</strong> {{ "Yes" if log.fuel else "No" }}</p>
+    <p><strong>Fuel:</strong> {% if log.fuel %}Yes{% if log.fuel_level %} - {{ log.fuel_level }}{% endif %}{% if log.fuel_mileage %} - {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}{% else %}No{% endif %}</p>
     <p><strong>Meeting:</strong> {{ "Yes" if log.meeting else "No" }}</p>
     <p><strong>Arrive Time:</strong> {{ log.arrive_time|to_local_time if log.arrive_time else '--' }}</p>
     <p><strong>Depart Time:</strong> {{ log.depart_time|to_12h_format if log.depart_time else '--' }}</p>

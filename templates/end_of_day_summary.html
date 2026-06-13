@@ -151,7 +151,7 @@
         <tr>
           <th>Fuel Stop</th>
           <td>{{ "{:,}".format(fl.fuel_mileage) }} mi</td>
-          <td class="text-muted small">{% if start_mi %}+{{ "{:,}".format(fl.fuel_mileage - start_mi) }} from start{% endif %}</td>
+          <td class="text-muted small">{% if fl.fuel_level %}Fuel: {{ fl.fuel_level }}{% endif %}{% if start_mi %}{% if fl.fuel_level %} · {% endif %}+{{ "{:,}".format(fl.fuel_mileage - start_mi) }} from start{% endif %}</td>
         </tr>
         {% endfor %}
         {% if end_mi %}

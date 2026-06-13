@@ -404,8 +404,9 @@ def test_start_route_button_disabled_until_destination_on_first_stop(client, app
     body = page.get_data(as_text=True)
     assert page.status_code == 200
     assert 'id="destinationSection"' in body
-    assert "Next stop address or business name" in body
-    assert "This is where you are going after the start location." in body
+    assert "Next destination name / location" in body
+    assert "Business name or address" in body
+    assert "This is where you are going after the current location." in body
     assert 'data-gate-start="1"' in body
     assert 'id="startRouteBtn"' in body
     assert "disabled" in body  # Start Route is gated until destination is confirmed
@@ -419,6 +420,8 @@ def test_start_route_button_disabled_until_destination_on_first_stop(client, app
     assert "function suggestionLabel" in body
     assert "input.value = resolvedName" in body
     assert "applyDestination(data.destination, s)" in body
+    assert "function selectedDestinationVisible" in body
+    assert "function repairDestinationFieldsFromCard" in body
     assert "if (destinationConfirmed()) clearSelection();" in body
     assert "destinationChangeBtn" not in body
 

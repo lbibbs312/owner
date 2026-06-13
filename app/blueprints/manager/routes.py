@@ -266,6 +266,7 @@ def _route_export_response(ctx, *, filename, delimiter, content_type, title):
         "Delay Minutes",
         "Issue",
         "Fuel",
+        "Fuel Level",
         "Fuel Mileage",
     ])
     route_summary = ctx.get("route_summary") or {}
@@ -293,6 +294,7 @@ def _route_export_response(ctx, *, filename, delimiter, content_type, title):
             log.dock_wait_minutes or "",
             log.downtime_reason or "",
             log.fuel or "",
+            getattr(log, "fuel_level", "") or "",
             log.fuel_mileage or "",
         ])
     response = make_response(output.getvalue())

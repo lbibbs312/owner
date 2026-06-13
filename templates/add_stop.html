@@ -60,7 +60,12 @@
         </div>
       </div>
       <div class="form-check">{{ form.fuel(class="form-check-input", id="fuelCheck") }} {{ form.fuel.label(class="form-check-label") }}</div>
-      <div class="w-100 d-none" id="fuelMileagePanel">{{ form.fuel_mileage.label(class="form-label") }}{{ form.fuel_mileage(class="form-control", placeholder="Current odometer reading") }}</div>
+      <div class="w-100 d-none" id="fuelMileagePanel">
+        <div class="row g-3">
+          <div class="col-md-5" id="fuelLevelField">{{ form.fuel_level.label(class="form-label") }}{{ form.fuel_level(class="form-select") }}</div>
+          <div class="col-md-7">{{ form.fuel_mileage.label(class="form-label") }}{{ form.fuel_mileage(class="form-control", placeholder="Current odometer reading") }}</div>
+        </div>
+      </div>
       <div class="form-check">{{ form.meeting(class="form-check-input") }} {{ form.meeting.label(class="form-check-label") }}</div>
     </div>
 
@@ -77,9 +82,12 @@
   const fuelCheck = document.getElementById('fuelCheck');
   const maintenanceCheck = document.getElementById('maintenanceCheck');
   const fuelMileagePanel = document.getElementById('fuelMileagePanel');
+  const fuelLevelField = document.getElementById('fuelLevelField');
   function syncFuelMileage() {
+    const showFuelLevel = !!(fuelCheck && fuelCheck.checked);
     const showMileage = (fuelCheck && fuelCheck.checked) || (maintenanceCheck && maintenanceCheck.checked);
     fuelMileagePanel.classList.toggle('d-none', !showMileage);
+    if (fuelLevelField) fuelLevelField.classList.toggle('d-none', !showFuelLevel);
   }
   if (fuelCheck) fuelCheck.addEventListener('change', syncFuelMileage);
   if (maintenanceCheck) maintenanceCheck.addEventListener('change', syncFuelMileage);

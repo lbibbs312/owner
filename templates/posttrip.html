@@ -12,6 +12,7 @@
     {% if fuel_logs %}
       {% for fl in fuel_logs %}
         <span class="ms-3"><strong>Fuel Stop:</strong> {{ "{:,}".format(fl.fuel_mileage) }}
+          {% if fl.fuel_level %} · Fuel {{ fl.fuel_level }}{% endif %}
           {% if pretrip.start_mileage %}(+{{ "{:,}".format(fl.fuel_mileage - pretrip.start_mileage) }} mi from start){% endif %}
         </span>
       {% endfor %}

@@ -1168,7 +1168,7 @@
                 <div class="md-row-fact"><span>Depart</span><strong>{{ log.depart_time|to_12h_format if log.depart_time else '--' }}</strong></div>
                 <div class="md-row-fact"><span>In</span><strong>{{ arrive_label }}</strong></div>
                 <div class="md-row-fact"><span>Out</span><strong>{{ depart_label }}</strong></div>
-                <div class="md-row-fact"><span>Fuel and Odometer</span><strong>{% if log.fuel %}Fuel stop{% if log.fuel_mileage %} · {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}{% elif log.fuel_mileage %}{{ "{:,}".format(log.fuel_mileage) }} mi{% else %}No fuel logged{% endif %}</strong></div>
+                <div class="md-row-fact"><span>Fuel and Odometer</span><strong>{% if log.fuel %}Fuel stop{% if log.fuel_level %} · {{ log.fuel_level }}{% endif %}{% if log.fuel_mileage %} · {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}{% elif log.fuel_mileage %}{{ "{:,}".format(log.fuel_mileage) }} mi{% else %}No fuel logged{% endif %}</strong></div>
               </div>
 
               {% if log.location_address %}
@@ -1199,7 +1199,7 @@
                 {% if log.no_pickup %}<span><strong>No pickup:</strong> driver departed without cargo pickup.</span>{% endif %}
                 {% if log.hot_parts %}<span><strong>Hot part:</strong> {{ log.part_number or 'part number not recorded' }}</span>{% elif log.part_number %}<span><strong>Part:</strong> {{ log.part_number }}</span>{% endif %}
                 {% if log.maintenance %}<span><strong>Truck issue:</strong> {{ log.downtime_reason or 'Issue recorded' }}{% if log.fuel_mileage %} · {{ "{:,}".format(log.fuel_mileage) }} mi{% endif %}</span>{% endif %}
-                {% if log.fuel %}<span><strong>Fuel:</strong>{% if log.fuel_mileage %} {{ "{:,}".format(log.fuel_mileage) }} mi{% else %} recorded{% endif %}</span>{% endif %}
+                {% if log.fuel %}<span><strong>Fuel:</strong>{% if log.fuel_level %} {{ log.fuel_level }}{% endif %}{% if log.fuel_mileage %} · {{ "{:,}".format(log.fuel_mileage) }} mi{% elif not log.fuel_level %} recorded{% endif %}</span>{% endif %}
                 {% if wait_value %}<span><strong>Wait:</strong> {{ wait_value }}</span>{% endif %}
                 {% if log.meeting %}<span><strong>Meeting:</strong> recorded service stop.</span>{% endif %}
                 {% for event in (route_task_events or {}).get(log.id, []) %}
@@ -1350,6 +1350,7 @@
             <td>
               {% if log.fuel %}
                 <strong class="route-label">Yes</strong>
+                {% if log.fuel_level %}<br><small class="text-muted fw-semibold">{{ log.fuel_level }}</small>{% endif %}
                 {% if log.fuel_mileage %}<br><small class="text-muted fw-semibold">{{ "{:,}".format(log.fuel_mileage) }} mi</small>{% endif %}
               {% else %}
                 <strong class="route-label">No</strong>

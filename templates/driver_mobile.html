@@ -5227,7 +5227,7 @@
               <td style="padding:4px 0;color:#0891b2;font-weight:700;">Fuel Stop</td>
               <td style="padding:4px 0;font-weight:600;text-align:right;">{{ "{:,}".format(fl.fuel_mileage) }} mi</td>
               <td style="padding:4px 0;text-align:right;color:#64748b;font-size:.8rem;">
-                {% if start_mi %}+{{ "{:,}".format(fl.fuel_mileage - start_mi) }} from start{% endif %}
+                {% if fl.fuel_level %}Fuel: {{ fl.fuel_level }}{% endif %}{% if start_mi %}{% if fl.fuel_level %} · {% endif %}+{{ "{:,}".format(fl.fuel_mileage - start_mi) }} from start{% endif %}
               </td>
             </tr>
             {% endfor %}

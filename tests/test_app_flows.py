@@ -5377,6 +5377,7 @@ def test_truck_issue_records_odometer_without_fuel_stop(client, app):
         log = DriverLog.query.filter_by(plant_name="RE").one()
         assert log.maintenance is True
         assert log.fuel is False
+        assert log.fuel_level is None
         assert log.fuel_mileage == 12345
 
     page = client.get("/driver_logs")
@@ -5384,6 +5385,43 @@ def test_truck_issue_records_odometer_without_fuel_stop(client, app):
     # (label format updated 2026-06; was "Truck Issue - 12,345 mi").
     assert b"Truck issue:" in page.data
     assert b"12,345 mi" in page.data
+
+
+def test_fuel_stop_records_current_fuel_level(client, app):
+    with app.app_context():
+        create_user("fuel_level_driver", "fuel-level@example.com", "driver")
+
+    login(client, "fuel_level_driver")
+    page = client.get("/new_driving_log")
+    body = page.get_data(as_text=True)
+    assert "Current Fuel Level" in body
+    assert 'name="fuel_level"' in body
+
+    response = client.post(
+        "/new_driving_log",
+        data={
+            "plant_name": "RE",
+            "load_size": "Empty",
+            "fuel": "y",
+            "fuel_level": "3/4",
+            "fuel_mileage": "12345",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        from app.models import DriverLog
+
+        log = DriverLog.query.filter_by(plant_name="RE").one()
+        assert log.fuel is True
+        assert log.fuel_level == "3/4"
+        assert log.fuel_mileage == 12345
+
+    logs_page = client.get("/driver_logs")
+    assert b"Fuel:" in logs_page.data
+    assert b"3/4" in logs_page.data
+    assert b"12,345 mi" in logs_page.data
 
 
 def test_new_log_load_state_ignores_previous_days_and_finalized_route(client, app):
@@ -10878,10 +10916,11 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     page = client.get("/new_driving_log")
     body = page.get_data(as_text=True)
     assert 'name="location_address"' in body
+    assert 'type="hidden"' in re.search(r'<input[^>]+name="location_address"[^>]*>', body).group(0)
     assert "Current location name" in body
-    assert "Suggested names for this address" in body
-    assert "These name the address above" in body
-    assert "This is where you are now" in body
+    assert "Suggested current location names" in body
+    assert "These name where you are now" in body
+    assert "Tap GPS to set the current address" in body
     assert "/gps/place-candidates" in body
     assert "/gps/destination-lookup" in body
     assert "data-gps-destination-url" in body
@@ -10894,8 +10933,8 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     assert "nominatim.openstreetmap.org" not in body
     assert "Google Places key is missing on the server. Saved places only." in body
     assert "Google Places is blocked for this server key. Saved places only." in body
-    assert "No Google places found here - type the address and name" in body
-    assert "Google places could not be reached - type the address and name" in body
+    assert "No Google places found here - type the current location name" in body
+    assert "Google places could not be reached - type the current location name" in body
     assert "m away" in body
     assert "Nearby customer names are suggestions only" in body
     assert "customerChoiceTouched" in body
@@ -11194,7 +11233,7 @@ def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(cli
     assert "1100 Receiver Ave, Industrial City, MI 49512" in add_stop_body
     assert "locationRecents" in add_stop_body
     assert "showInitialCustomerSuggestions" in add_stop_body
-    assert "Suggested names for this address" in add_stop_body
+    assert "Suggested current location names" in add_stop_body
     assert "Primary Receiver" in add_stop_body
     assert 'name="load_size" value="Auto parts (42000 lbs)"' in add_stop_body
     assert 'name="secondary_load" value="Pallets (12000 lbs)"' in add_stop_body

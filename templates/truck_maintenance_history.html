@@ -96,7 +96,7 @@
               {% if item.fuel_logs %}
                 {% for fuel in item.fuel_logs %}
                   <div class="event">
-                    <p class="title">{{ "{:,}".format(fuel.mileage) }} mi</p>
+                    <p class="title">{{ "{:,}".format(fuel.mileage) }} mi{% if fuel.fuel_level %} · {{ fuel.fuel_level }}{% endif %}</p>
                     <p class="meta">{{ fuel.time_label }} at {{ fuel.plant }}</p>
                   </div>
                 {% endfor %}

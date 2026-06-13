@@ -468,7 +468,7 @@
                 </div>
                 <small>
                   {% if item.fuel_logs %}
-                    {% for fuel in item.fuel_logs[:2] %}{% if not loop.first %}; {% endif %}{{ "{:,}".format(fuel.mileage) }} mi at {{ fuel.plant }}{% endfor %}
+                    {% for fuel in item.fuel_logs[:2] %}{% if not loop.first %}; {% endif %}{{ "{:,}".format(fuel.mileage) }} mi{% if fuel.fuel_level %} ({{ fuel.fuel_level }}){% endif %} at {{ fuel.plant }}{% endfor %}
                   {% elif item.remarks %}
                     {{ item.remarks }}
                   {% else %}

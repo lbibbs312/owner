@@ -113,30 +113,27 @@
       }
     </style>
     <div class="mb-3">
-      {{ form.location_address.label(class="form-label") }}
+      <label class="form-label" for="{{ form.location.id }}">Current location name</label>
       <div class="d-flex gap-2 align-items-stretch">
-        {{ form.location_address(class="form-control", placeholder="Street address, road, city, state", autocomplete="off", data_no_autosave="true") }}
-        <button type="button" id="gpsFillBtn" class="btn btn-primary d-flex align-items-center" style="min-width:52px;justify-content:center;" aria-label="Use my GPS location" title="Use my GPS location" data-gps-places-url="{{ url_for('driver.gps_place_candidates') }}" data-gps-destination-url="{{ url_for('driver.gps_destination_lookup') }}" data-gps-place-hint="{{ gps_place_hint }}">
+        {{ form.location(class="form-control", placeholder="Customer, warehouse, dock, yard, truck stop", list="locationMemory", autocomplete="off", data_no_autosave="true") }}
+        <button type="button" id="gpsFillBtn" class="btn btn-primary d-flex align-items-center" style="min-width:52px;justify-content:center;" aria-label="Use GPS for current location" title="Use GPS for current location" data-gps-places-url="{{ url_for('driver.gps_place_candidates') }}" data-gps-destination-url="{{ url_for('driver.gps_destination_lookup') }}" data-gps-place-hint="{{ gps_place_hint }}">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
         </button>
       </div>
+      {{ form.location_address(type="hidden", data_no_autosave="true") }}
       <input type="hidden" name="gps_latitude" id="gps_latitude" data-no-autosave="true">
       <input type="hidden" name="gps_longitude" id="gps_longitude" data-no-autosave="true">
       <input type="hidden" name="gps_accuracy_m" id="gps_accuracy_m" data-no-autosave="true">
       <div class="form-text" id="gpsStatus" role="status" aria-live="polite"></div>
-    </div>
-    <div class="mb-3">
-      <label class="form-label" for="{{ form.location.id }}">Current location name</label>
-      {{ form.location(class="form-control", placeholder="Name at this address (optional)", list="locationMemory", autocomplete="off", data_no_autosave="true") }}
       <datalist id="locationMemory">
         {% for place in fm.locations %}<option value="{{ place }}"></option>{% endfor %}
       </datalist>
       <div class="mt-2" id="gpsPlaceChoices" hidden>
-        <label for="gpsPlaceSelect" class="form-label mb-1">Suggested names for this address</label>
+        <label for="gpsPlaceSelect" class="form-label mb-1">Suggested current location names</label>
         <select id="gpsPlaceSelect" class="form-select"></select>
-        <div class="form-text">These name the address above. They do not set the destination.</div>
+        <div class="form-text">These name where you are now. They do not set the next destination.</div>
       </div>
-      <div class="form-text">This is where you are now. It does not set where you are going next.</div>
+      <div class="form-text">Tap GPS to set the current address, then pick or type the place name.</div>
     </div>
     {% if config.ENABLE_DESTINATION_AUTOCOMPLETE %}
     {# Where this route is headed. Required before Start Route on the first stop. #}
@@ -193,9 +190,9 @@
          data-autocomplete-url="{{ url_for('driver.destination_autocomplete_api') }}"
          data-details-url="{{ url_for('driver.destination_details_api') }}"
          data-gate-start="{{ '1' if not has_today_logs else '0' }}">
-      <label class="form-label fw-bold text-uppercase" for="destinationSearch">Next destination</label>
-      <input type="text" id="destinationSearch" class="form-control" placeholder="Next stop address or business name" autocomplete="off" data-no-autosave="true">
-      <div class="form-text">This is where you are going after the start location.</div>
+      <label class="form-label fw-bold text-uppercase" for="destinationSearch">Next destination name / location</label>
+      <input type="text" id="destinationSearch" class="form-control" placeholder="Business name or address" autocomplete="off" data-no-autosave="true">
+      <div class="form-text">This is where you are going after the current location.</div>
       <div class="form-text" id="destinationStatus" role="status" aria-live="polite"></div>
       <div class="list-group mt-1" id="destinationSuggestions" hidden></div>
       <button type="button" class="btn btn-sm btn-primary mt-2" id="destinationManualBtn" hidden>Use what I typed</button>
@@ -643,7 +640,7 @@
                   return;
                 }
                 if (!data.fallback_address) {
-                  renderPlaceNotice('No Google places found here - type the address and name');
+                  renderPlaceNotice('No Google places found here - type the current location name');
                 }
                 setGpsStatus(googleError || (accuracy
                   ? 'GPS set (+/-' + accuracy + ' m). Type the place name if needed.'
@@ -652,14 +649,14 @@
               .catch(function () {
                 renderAddressChoices([]);
                 renderCandidates(savedPlaces);
-                if (!savedPlaces.length) renderPlaceNotice('Google places could not be reached - type the address and name');
+                if (!savedPlaces.length) renderPlaceNotice('Google places could not be reached - type the current location name');
                 setGpsStatus(accuracy
                   ? 'GPS coordinates set (+/-' + accuracy + ' m). Type or pick the place.'
                   : 'GPS coordinates set. Type or pick the place.', false);
               });
           }, function () {
-            setGpsStatus(auto ? '' : 'Could not get GPS - type the address.', false);
-            if (!auto) renderPlaceNotice('Could not get GPS - type the address and name');
+            setGpsStatus(auto ? '' : 'Could not get GPS - type the current location name.', false);
+            if (!auto) renderPlaceNotice('Could not get GPS - type the current location name');
           });
         }
 
@@ -742,10 +739,10 @@
         };
         var startBtn = document.getElementById('startRouteBtn');
         var requireDestination = section.getAttribute('data-gate-start') === '1';
-        var latInput = document.getElementById('gps_latitude');
-        var lonInput = document.getElementById('gps_longitude');
-        var nameInput = document.getElementById('location');
-        var addressInput = document.getElementById('location_address');
+        var latInput = document.getElementById('gps_latitude') || document.querySelector('[name="gps_latitude"]');
+        var lonInput = document.getElementById('gps_longitude') || document.querySelector('[name="gps_longitude"]');
+        var nameInput = document.getElementById('location') || document.querySelector('[name="location"]');
+        var addressInput = document.getElementById('location_address') || document.querySelector('[name="location_address"]');
 
         var sessionToken = newToken();
         var debounceTimer = null;
@@ -761,11 +758,24 @@
         function locationKnown() {
           return !!(clean(addressInput && addressInput.value) || clean(nameInput && nameInput.value) || clean(latInput && latInput.value));
         }
+        function selectedDestinationVisible() {
+          return !!(selected && !selected.hidden && clean(goingName && goingName.textContent));
+        }
+        function repairDestinationFieldsFromCard() {
+          if (!selectedDestinationVisible()) return;
+          var cardName = clean(goingName && goingName.textContent);
+          var cardAddress = clean(goingAddress && goingAddress.textContent);
+          if (fields.place_name && !clean(fields.place_name.value)) fields.place_name.value = cardName;
+          if (fields.address && !clean(fields.address.value)) fields.address.value = cardAddress;
+          if (fields.source && !clean(fields.source.value)) fields.source.value = 'manual';
+          if (fields.confirmed) fields.confirmed.value = 'true';
+        }
         function destinationConfirmed() {
-          return !!(fields.confirmed && clean(fields.confirmed.value) === 'true');
+          return !!((fields.confirmed && clean(fields.confirmed.value) === 'true') || selectedDestinationVisible());
         }
         function syncStartButton() {
           if (!startBtn || !requireDestination) return;
+          repairDestinationFieldsFromCard();
           startBtn.disabled = !(locationKnown() && destinationConfirmed());
         }
 
@@ -961,7 +971,12 @@
     {# Freight: truck-issue and meeting capture live behind Service / the bottom bar, not on every stop. #}
     <div class="d-flex flex-wrap gap-3 mb-3">
       <div class="form-check">{{ form.fuel(class="form-check-input", id="fuelCheck") }} {{ form.fuel.label(class="form-check-label") }}</div>
-      <div class="w-100 d-none" id="fuelMileagePanel">{{ form.fuel_mileage.label(class="form-label") }}{{ form.fuel_mileage(class="form-control", placeholder="Current odometer reading") }}</div>
+      <div class="w-100 d-none" id="fuelMileagePanel">
+        <div class="row g-3">
+          <div class="col-md-5" id="fuelLevelField">{{ form.fuel_level.label(class="form-label") }}{{ form.fuel_level(class="form-select") }}</div>
+          <div class="col-md-7">{{ form.fuel_mileage.label(class="form-label") }}{{ form.fuel_mileage(class="form-control", placeholder="Current odometer reading") }}</div>
+        </div>
+      </div>
     </div>
     {% else %}
     <div class="d-flex flex-wrap gap-3 mb-3">
@@ -973,7 +988,12 @@
         </div>
       </div>
       <div class="form-check">{{ form.fuel(class="form-check-input", id="fuelCheck") }} {{ form.fuel.label(class="form-check-label") }}</div>
-      <div class="w-100 d-none" id="fuelMileagePanel">{{ form.fuel_mileage.label(class="form-label") }}{{ form.fuel_mileage(class="form-control", placeholder="Current odometer reading") }}</div>
+      <div class="w-100 d-none" id="fuelMileagePanel">
+        <div class="row g-3">
+          <div class="col-md-5" id="fuelLevelField">{{ form.fuel_level.label(class="form-label") }}{{ form.fuel_level(class="form-select") }}</div>
+          <div class="col-md-7">{{ form.fuel_mileage.label(class="form-label") }}{{ form.fuel_mileage(class="form-control", placeholder="Current odometer reading") }}</div>
+        </div>
+      </div>
       <div class="form-check">{{ form.meeting(class="form-check-input") }} {{ form.meeting.label(class="form-check-label") }}</div>
     </div>
     {% endif %}
@@ -993,9 +1013,12 @@
   const fuelCheck = document.getElementById('fuelCheck');
   const maintenanceCheck = document.getElementById('maintenanceCheck');
   const fuelMileagePanel = document.getElementById('fuelMileagePanel');
+  const fuelLevelField = document.getElementById('fuelLevelField');
   function syncFuelMileage() {
+    const showFuelLevel = !!(fuelCheck && fuelCheck.checked);
     const showMileage = (fuelCheck && fuelCheck.checked) || (maintenanceCheck && maintenanceCheck.checked);
     fuelMileagePanel.classList.toggle('d-none', !showMileage);
+    if (fuelLevelField) fuelLevelField.classList.toggle('d-none', !showFuelLevel);
   }
   if (fuelCheck) fuelCheck.addEventListener('change', syncFuelMileage);
   if (maintenanceCheck) maintenanceCheck.addEventListener('change', syncFuelMileage);

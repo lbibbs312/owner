@@ -144,7 +144,7 @@ from app.models import (
 
 
 PLANT_TRANSFER_LINE_COUNT = 20
-DRIVER_LOG_AUDIT_FIELDS = ["plant_name", "load_size", "depart_load_size", "secondary_load", "downtime_reason", "part_number", "hot_parts", "arrive_time", "depart_time", "dock_wait_minutes", "maintenance", "fuel", "fuel_mileage", "meeting", "location_address", "destination_address", "gps_latitude", "gps_longitude", "gps_accuracy_m"]
+DRIVER_LOG_AUDIT_FIELDS = ["plant_name", "load_size", "depart_load_size", "secondary_load", "downtime_reason", "part_number", "hot_parts", "arrive_time", "depart_time", "dock_wait_minutes", "maintenance", "fuel", "fuel_level", "fuel_mileage", "meeting", "location_address", "destination_address", "gps_latitude", "gps_longitude", "gps_accuracy_m"]
 PLANT_TRANSFER_AUDIT_FIELDS = ["transfer_number", "transfer_date", "ship_to", "ship_from", "trailer_number", "driver_name", "driver_initials", "transfer_time", "loaded_by"]
 DAMAGE_REPORT_AUDIT_FIELDS = [
     "reported_by_id",
@@ -1164,6 +1164,13 @@ def _apply_log_part_fields(log, form):
 
 def _form_mileage_value(form):
     return form.fuel_mileage.data if (form.fuel.data or form.maintenance.data) else None
+
+
+def _form_fuel_level_value(form):
+    if not form.fuel.data:
+        return None
+    value = (form.fuel_level.data or "").strip()
+    return value or None
 
 
 def _optional_float_from_form(name, *, minimum=None, maximum=None):
@@ -3787,6 +3794,7 @@ def _truck_history_fuel_entries(logs):
             {
                 "log": log,
                 "mileage": log.fuel_mileage,
+                "fuel_level": getattr(log, "fuel_level", None),
                 "plant": _plant_label(log.plant_name),
                 "time_label": _truck_history_time_label(log),
             }
@@ -4441,7 +4449,12 @@ def _build_eod_pdf(the_date, logs, plant_transfers, driver_signature=None, signa
             f"Start Fuel: {start_fuel}" if start_fuel else "",
         ])
     for fuel_log in fuel_logs:
-        note = f"+{fuel_log.fuel_mileage - start_mileage:,} from start" if start_mileage is not None else ""
+        note_parts = []
+        if getattr(fuel_log, "fuel_level", None):
+            note_parts.append(f"Fuel: {fuel_log.fuel_level}")
+        if start_mileage is not None:
+            note_parts.append(f"+{fuel_log.fuel_mileage - start_mileage:,} from start")
+        note = " · ".join(note_parts)
         mileage_rows.append(["Fuel Stop", f"{fuel_log.fuel_mileage:,} mi", note])
     if route_posttrip:
         total_note = f" - {end_mileage - start_mileage:,} total mi" if end_mileage is not None and start_mileage is not None else ""
@@ -5505,6 +5518,7 @@ def new_driving_log():
             arrive_time=arrive_time_str,
             maintenance=form.maintenance.data,
             fuel=form.fuel.data,
+            fuel_level=_form_fuel_level_value(form),
             fuel_mileage=_form_mileage_value(form),
             meeting=form.meeting.data,
             date=local_date,
@@ -5658,6 +5672,7 @@ def add_stop():
             arrive_time=arrive_time_str,
             maintenance=form.maintenance.data,
             fuel=form.fuel.data,
+            fuel_level=_form_fuel_level_value(form),
             fuel_mileage=_form_mileage_value(form),
             meeting=form.meeting.data,
             date=log_date,
@@ -5751,6 +5766,7 @@ def edit_driver_log(log_id):
         log.maintenance = form.maintenance.data
         log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), _form_truck_issue_text(form), form.maintenance.data)
         log.fuel = form.fuel.data
+        log.fuel_level = _form_fuel_level_value(form)
         log.fuel_mileage = _form_mileage_value(form)
         log.meeting = form.meeting.data
         departure_dest = form.departure_destination.data
@@ -6439,6 +6455,7 @@ def pickup_driver_log(log_id):
         log.maintenance = form.maintenance.data
         log.downtime_reason = _compose_downtime_reason(_preserved_non_truck_reasons(log), _form_truck_issue_text(form), form.maintenance.data)
         log.fuel = form.fuel.data
+        log.fuel_level = _form_fuel_level_value(form)
         log.fuel_mileage = _form_mileage_value(form)
         log.meeting = form.meeting.data
         _sync_next_open_stop_arrival_cargo(log)
