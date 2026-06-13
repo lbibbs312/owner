@@ -10879,9 +10879,9 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     body = page.get_data(as_text=True)
     assert 'name="location_address"' in body
     assert "Place / customer name" in body
-    assert "GPS address matches" in body
-    assert "Customer name matches" in body
+    assert "Suggested" in body
     assert "Exact-address matches can fill the name" in body
+    assert "Nearby names are suggestions only" in body
     assert "/gps/place-candidates" in body
     assert "/gps/destination-lookup" in body
     assert "data-gps-destination-url" in body
@@ -10937,6 +10937,9 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
 
     next_form = client.get("/new_driving_log").get_data(as_text=True)
     assert '<option value="Customer Dock 4">' in next_form
+    assert "locationRecents" in next_form
+    assert "2200 Customer Dock Dr, Industrial City, MI 49512" in next_form
+    assert "force || candidate.source === 'saved'" in next_form
     print_page = client.get("/driver_logs_print").get_data(as_text=True)
     assert "Customer Dock 4" in print_page
     assert "2200 Customer Dock Dr, Industrial City, MI 49512" in print_page
@@ -11188,9 +11191,10 @@ def test_day_driver_departure_saves_second_freight_load_and_prefills_arrival(cli
     location_input = re.search(r'<input[^>]+id="location"[^>]*>', add_stop_body)
     assert location_input is not None
     assert 'value="Primary Receiver"' not in location_input.group(0)
-    assert 'value="1100 Receiver Ave, Industrial City, MI 49512"' in add_stop_body
+    assert "1100 Receiver Ave, Industrial City, MI 49512" in add_stop_body
+    assert "locationRecents" in add_stop_body
     assert "showInitialCustomerSuggestions" in add_stop_body
-    assert "Customer name matches" in add_stop_body
+    assert "Suggested" in add_stop_body
     assert "Primary Receiver" in add_stop_body
     assert 'name="load_size" value="Auto parts (42000 lbs)"' in add_stop_body
     assert 'name="secondary_load" value="Pallets (12000 lbs)"' in add_stop_body

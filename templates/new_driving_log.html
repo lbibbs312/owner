@@ -80,7 +80,7 @@
 
     {% if current_user.is_day_driver %}
     {# Freight stop: where you are (memory + GPS) and what you're hauling. #}
-    {% set fm = freight_memory or {'locations': [], 'commodities': [], 'weight_map': {}} %}
+    {% set fm = freight_memory or {'locations': [], 'location_recents': [], 'commodities': [], 'weight_map': {}} %}
     {% set gps_place_hint = (next_stop_context.destination_label if next_stop_context and next_stop_context.destination_label else active_destination) %}
     <style>
       @keyframes gpsStatusSweep {
@@ -158,6 +158,7 @@
         var gpsPlaceHint = gpsBtn ? clean(gpsBtn.getAttribute('data-gps-place-hint')) : '';
         var placeMemory = {{ (fm.places or [])|tojson }};
         var locationMemory = {{ (fm.locations or [])|tojson }};
+        var locationRecents = {{ (fm.location_recents or [])|tojson }};
         var currentAddresses = [];
         var currentCandidates = [];
         var customerChoiceTouched = false;
@@ -266,7 +267,7 @@
           var candidate = selectedCandidate();
           if (!candidate) return;
           if (force || isTrustedCandidate(candidate)) {
-            applyCandidate(candidate, true, false);
+            applyCandidate(candidate, true, force || candidate.source === 'saved');
           }
         }
 
@@ -338,16 +339,37 @@
           return merged;
         }
 
+        function recentLocationPlaces() {
+          var seen = {};
+          var places = [];
+          function add(name, address) {
+            name = clean(name);
+            address = clean(address);
+            if (!name) return;
+            var key = name.toLowerCase();
+            if (seen[key]) {
+              if (address && !seen[key].address) seen[key].address = address;
+              return;
+            }
+            var item = { name: name, address: address, source: 'saved' };
+            seen[key] = item;
+            places.push(item);
+          }
+          (locationRecents || []).forEach(function (place) {
+            add(place && place.name, place && place.address);
+          });
+          (locationMemory || []).forEach(function (label) { add(label, ''); });
+          return places;
+        }
+
         function rememberedTextPlaces(query) {
           var tokens = clean(query).toLowerCase().split(/\s+/).filter(function (token) { return token.length >= 2; });
-          return (locationMemory || []).filter(function (label) {
-            var haystack = clean(label).toLowerCase();
+          return recentLocationPlaces().filter(function (place) {
+            var haystack = clean((place.name || '') + ' ' + (place.address || '')).toLowerCase();
             if (!haystack) return false;
             if (!tokens.length) return true;
             return tokens.every(function (token) { return haystack.indexOf(token) !== -1; });
-          }).slice(0, 5).map(function (label) {
-            return { name: label, address: '', source: 'saved' };
-          });
+          }).slice(0, 5);
         }
 
         function normalizeGooglePlaces(places, source) {

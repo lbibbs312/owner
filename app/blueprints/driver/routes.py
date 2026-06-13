@@ -3313,12 +3313,20 @@ def _freight_stop_memory(driver_id, limit=40):
         .limit(limit)
         .all()
     )
-    locations, destinations, commodities, weight_map, places = [], [], [], {}, []
+    locations, location_recents, destinations, commodities, weight_map, places = [], {}, [], [], {}, []
 
-    def add_location(label):
+    def add_location(label, address=""):
         label = (label or "").strip()
-        if label and label != "Day Route" and label not in locations:
+        address = (address or "").strip()
+        if not label or label == "Day Route":
+            return
+        if label not in locations:
             locations.append(label)
+        key = label.lower()
+        if key not in location_recents:
+            location_recents[key] = {"name": label, "address": address}
+        elif address and not location_recents[key].get("address"):
+            location_recents[key]["address"] = address
 
     def add_destination(name="", address=""):
         name = (name or "").strip()
@@ -3339,6 +3347,7 @@ def _freight_stop_memory(driver_id, limit=40):
     for place in learned_places:
         label = (place.label or "").strip()
         add_destination(label)
+        add_location(label)
         if label and place.center_latitude is not None and place.center_longitude is not None:
             places.append(
                 {
@@ -3349,9 +3358,12 @@ def _freight_stop_memory(driver_id, limit=40):
                 }
             )
     for log in rows:
-        add_destination(getattr(log, "destination", None), getattr(log, "destination_address", None))
+        destination_name = getattr(log, "destination", None)
+        destination_address = getattr(log, "destination_address", None)
+        add_destination(destination_name, destination_address)
+        add_location(destination_name, destination_address)
         add_destination(secondary_destination_label(getattr(log, "secondary_load", None)))
-        add_location(log.plant_name)
+        add_location(log.plant_name, getattr(log, "location_address", None))
         commodity = (log.commodity or "").strip()
         if commodity:
             if commodity not in commodities:
@@ -3361,6 +3373,7 @@ def _freight_stop_memory(driver_id, limit=40):
                 weight_map[commodity.lower()] = weight
     return {
         "locations": locations[:8],
+        "location_recents": list(location_recents.values())[:8],
         "destinations": destinations[:8],
         "places": places[:20],
         "commodities": commodities[:5],
