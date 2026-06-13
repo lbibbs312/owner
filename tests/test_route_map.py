@@ -1544,11 +1544,14 @@ def test_active_wait_banner_mutes_depart_button_when_board_cta_owns_it(app):
         assert "2:14" in html
         assert "elapsed" in html
 
-    # The duplicate depart button is gone when muted, present otherwise.
+    # The duplicate depart button is gone when muted, present otherwise, and it
+    # opens the actual active stop instead of a generic mobile flow.
     assert "driver-active-wait-action" not in muted
-    assert ">Depart and Load<" not in muted
+    assert ">Record Departure<" not in muted
     assert "driver-active-wait-action" in shown
-    assert ">Depart and Load<" in shown
+    assert ">Record Departure<" in shown
+    assert 'href="/driver_logs/1/depart"' in shown
+    assert "flow=depart" not in shown
 
 
 # ---------------------------------------------------------------------------
