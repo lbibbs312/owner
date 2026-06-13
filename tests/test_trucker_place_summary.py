@@ -1,5 +1,7 @@
 """TruckerPlaceSummaryService turns whatever official place data exists into
 short driver notes, prefers our own saved notes, and never invents notes."""
+from datetime import date
+
 from app.services.trucker_place_summary import NOTE_KEYS, TruckerPlaceSummaryService
 
 
@@ -93,3 +95,30 @@ def test_review_summary_only_used_when_review_flag_enabled():
     on = TruckerPlaceSummaryService(enable_reviews=True).build(payload)
     assert on["entrance_note"] is not None
     assert "guard shack" in on["entrance_note"].lower()
+
+
+def test_driver_summary_uses_route_hours_parking_and_nearby_fuel():
+    service = TruckerPlaceSummaryService()
+    today = date.today().strftime("%A")
+    result = service.driver_summary(
+        {
+            "place_name": "Receiver Warehouse",
+            "formatted_address": "1 Dock Rd, Grand Rapids, MI",
+            "parkingOptions": {"freeParkingLot": True},
+            "currentOpeningHours": {
+                "openNow": True,
+                "weekdayDescriptions": [f"{today}: 8:00 AM - 5:00 PM"],
+            },
+        },
+        route={"ok": True, "duration_text": "13 min", "distance_text": "4.2 mi", "route_text": "via US-131"},
+        nearby_places=[{"name": "Speedway", "distance_text": "0.4 mi"}],
+    )
+
+    assert result["driver_summary_lines"] == [
+        "13 min away via US-131",
+        "Open today until 5:00 PM",
+        "Free parking lot on site",
+        "Fuel nearby: Speedway (0.4 mi)",
+    ]
+    assert result["source"] == "mixed"
+    assert result["confidence"] >= 60

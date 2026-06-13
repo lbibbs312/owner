@@ -185,6 +185,76 @@ def test_place_details_retries_without_optional_fields_on_error(monkeypatch):
     assert "reviews" not in masks[1] and "generativeSummary" not in masks[1]
 
 
+def test_route_summary_uses_google_routes_api(monkeypatch):
+    from flask import Flask
+
+    flask_app = Flask(__name__)
+    flask_app.config["GOOGLE_MAPS_API_KEY"] = "test-key"
+    calls = []
+
+    def fake_post(url, *, headers, json, timeout):
+        calls.append((url, headers, json))
+        return FakeResponse(
+            {
+                "routes": [
+                    {
+                        "duration": "753s",
+                        "distanceMeters": 4828,
+                        "description": "US-131 S",
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr(google_places.requests, "post", fake_post)
+    with flask_app.app_context():
+        result = google_places.route_summary(42.929224, -85.662701, 42.95, -85.67)
+
+    assert calls[0][0] == google_places.ROUTES_URL
+    assert calls[0][1]["X-Goog-FieldMask"] == "routes.duration,routes.distanceMeters,routes.description"
+    assert calls[0][2]["travelMode"] == "DRIVE"
+    assert result == {
+        "ok": True,
+        "distance_text": "3.0 mi",
+        "duration_text": "13 min",
+        "route_text": "via US-131 S",
+    }
+
+
+def test_nearby_truck_services_returns_closest_fuel(monkeypatch):
+    from flask import Flask
+
+    flask_app = Flask(__name__)
+    flask_app.config["GOOGLE_MAPS_API_KEY"] = "test-key"
+    calls = []
+
+    def fake_post(url, *, headers, json, timeout):
+        calls.append((url, headers, json))
+        return FakeResponse(
+            {
+                "places": [
+                    {
+                        "displayName": {"text": "Speedway"},
+                        "location": {"latitude": 42.951, "longitude": -85.67},
+                        "types": ["gas_station", "point_of_interest", "establishment"],
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr(google_places.requests, "post", fake_post)
+    with flask_app.app_context():
+        result = google_places.nearby_truck_services(42.95, -85.67, limit=5)
+
+    assert calls[0][0] == google_places.NEARBY_URL
+    assert calls[0][2]["includedTypes"] == ["gas_station"]
+    assert calls[0][2]["maxResultCount"] == 5
+    assert calls[0][2]["locationRestriction"]["circle"]["radius"] == google_places.NEARBY_FUEL_RADIUS_M
+    assert result[0]["name"] == "Speedway"
+    assert result[0]["type"] == "fuel nearby"
+    assert result[0]["distance_text"]
+
+
 def test_review_and_generative_summary_flags_default_on(app):
     assert app.config["ENABLE_GOOGLE_REVIEW_SUMMARY"] is True
     assert app.config["ENABLE_GOOGLE_GENERATIVE_SUMMARY"] is True
@@ -227,7 +297,7 @@ def test_autocomplete_endpoint_returns_suggestions_with_session_token(client, ap
     assert second.get_json()["suggestions"][0]["main_text"] == "Warehouse founders"
 
 
-def test_details_endpoint_populates_destination_and_driver_notes(client, app, monkeypatch):
+def test_details_endpoint_populates_destination_and_driver_summary(client, app, monkeypatch):
     with app.app_context():
         _make_day_driver()
 
@@ -250,10 +320,18 @@ def test_details_endpoint_populates_destination_and_driver_notes(client, app, mo
         }
 
     monkeypatch.setattr("app.blueprints.driver.routes.destination_place_details", fake_details)
+    monkeypatch.setattr(
+        "app.blueprints.driver.routes.route_summary",
+        lambda *args: {"ok": True, "duration_text": "12 min", "distance_text": "4.1 mi", "route_text": "via US-131"},
+    )
+    monkeypatch.setattr(
+        "app.blueprints.driver.routes.nearby_truck_services",
+        lambda *args: [{"name": "Speedway", "distance_text": "0.4 mi"}],
+    )
     _login(client)
 
     response = client.post("/api/places/destination-details",
-                           json={"place_id": "place-123", "session_token": "tok-9"})
+                           json={"place_id": "place-123", "session_token": "tok-9", "lat": 42.929, "lng": -85.662})
     assert response.status_code == 200
     data = response.get_json()
     assert data["ok"] is True
@@ -264,9 +342,15 @@ def test_details_endpoint_populates_destination_and_driver_notes(client, app, mo
     assert dest["place_id"] == "place-123"
     assert dest["source"] == "google_places"
     assert dest["confirmed"] is True
-    # Trucker summary card filled from official parking/hours fields.
-    assert data["driver_notes"]["parking_note"] == "Free parking lot on site"
-    assert data["driver_notes"]["hours_note"] == "Open now"
+    # Maps driver summary card is filled from route, official parking/hours fields, and nearby fuel.
+    assert data["driver_summary"]["driver_summary_lines"] == [
+        "12 min away via US-131",
+        "Open now",
+        "Free parking lot on site",
+        "Fuel nearby: Speedway (0.4 mi)",
+    ]
+    assert data["driver_summary"]["nearby_driver_places"][0]["name"] == "Speedway"
+    assert "driver_notes" not in data
 
 
 def test_details_endpoint_missing_place_id_is_graceful(client, app):
@@ -326,6 +410,9 @@ def test_start_route_button_disabled_until_destination_on_first_stop(client, app
     assert "disabled" in body  # Start Route is gated until destination is confirmed
     assert "/api/places/destination-autocomplete" in body
     assert "/api/places/destination-details" in body
+    assert "Maps driver summary" in body
+    assert "driverSummaryLines" in body
+    assert "driverNotesList" not in body
 
 
 def test_manual_destination_saved_when_google_unavailable(client, app):

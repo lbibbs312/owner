@@ -34,6 +34,8 @@ DESTINATION_DETAILS_REVIEW_FIELDS = ("reviews", "reviewSummary")
 DESTINATION_DETAILS_GENERATIVE_FIELDS = ("generativeSummary",)
 MIN_AUTOCOMPLETE_QUERY_LENGTH = 2
 AUTOCOMPLETE_BIAS_RADIUS_M = 50000
+ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
+NEARBY_FUEL_RADIUS_M = 8000
 
 BUSINESS_TYPES = {
     "accounting",
@@ -744,3 +746,116 @@ def destination_place_details(place_id, *, session_token="", include_reviews=Fal
         "source": "google_places",
     }
     return {"ok": True, "place": place, "raw": data}
+
+
+def _meters_to_miles_text(meters):
+    try:
+        meters = float(meters)
+    except (TypeError, ValueError):
+        return ""
+    miles = meters / 1609.344
+    if miles < 0.1:
+        return f"{int(round(meters))} m"
+    if miles < 10:
+        return f"{miles:.1f} mi"
+    return f"{int(round(miles))} mi"
+
+
+def _duration_to_text(duration):
+    try:
+        seconds = int(str(duration).rstrip("s"))
+    except (TypeError, ValueError):
+        return ""
+    minutes = max(1, int(round(seconds / 60)))
+    if minutes < 60:
+        return f"{minutes} min"
+    hours, rem = divmod(minutes, 60)
+    return f"{hours} hr {rem} min" if rem else f"{hours} hr"
+
+
+def route_summary(origin_lat, origin_lng, dest_lat, dest_lng):
+    """Drive time / distance from the start location to the destination via the
+    Routes API. Returns ``{"ok": False}`` on any problem so callers can omit it."""
+    key = _api_key()
+    o_lat, o_lng = _float_or_none(origin_lat), _float_or_none(origin_lng)
+    d_lat, d_lng = _float_or_none(dest_lat), _float_or_none(dest_lng)
+    if not key or None in (o_lat, o_lng, d_lat, d_lng):
+        return {"ok": False, "error": "missing_input"}
+    body = {
+        "origin": {"location": {"latLng": {"latitude": o_lat, "longitude": o_lng}}},
+        "destination": {"location": {"latLng": {"latitude": d_lat, "longitude": d_lng}}},
+        "travelMode": "DRIVE",
+    }
+    try:
+        response = requests.post(
+            ROUTES_URL,
+            headers={
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": key,
+                "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.description",
+            },
+            json=body,
+            timeout=6,
+        )
+        data = response.json()
+    except requests.RequestException:
+        return {"ok": False, "error": "request_failed"}
+    if response.status_code >= 400 or data.get("error") or not data.get("routes"):
+        error = data.get("error") or {}
+        return {"ok": False, "error": error.get("status") or f"http_{response.status_code}"}
+    route = data["routes"][0]
+    description = _clean(route.get("description"))
+    return {
+        "ok": True,
+        "distance_text": _meters_to_miles_text(route.get("distanceMeters")),
+        "duration_text": _duration_to_text(route.get("duration")),
+        "route_text": f"via {description}" if description else "",
+    }
+
+
+def nearby_truck_services(lat, lng, *, limit=3, radius_m=NEARBY_FUEL_RADIUS_M):
+    """Fuel stations near the destination, closest first. Best-effort: returns
+    [] on any error. We do not claim diesel/DEF without fuelOptions data."""
+    key = _api_key()
+    lat, lng = _float_or_none(lat), _float_or_none(lng)
+    if not key or lat is None or lng is None:
+        return []
+    body = {
+        "includedTypes": ["gas_station"],
+        "maxResultCount": min(max(int(limit), 1), 10),
+        "rankPreference": "DISTANCE",
+        "locationRestriction": {"circle": {"center": {"latitude": lat, "longitude": lng}, "radius": radius_m}},
+    }
+    try:
+        response = requests.post(
+            NEARBY_URL,
+            headers={
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": key,
+                "X-Goog-FieldMask": "places.displayName,places.location,places.types,places.primaryType",
+            },
+            json=body,
+            timeout=6,
+        )
+        data = response.json()
+    except requests.RequestException:
+        return []
+    if response.status_code >= 400 or data.get("error"):
+        return []
+    results = []
+    for place in data.get("places") or []:
+        name = _place_name(place)
+        point = _place_point(place)
+        if not name or point is None:
+            continue
+        results.append(
+            {
+                "name": name,
+                "type": "fuel nearby",
+                "distance_text": _meters_to_miles_text(_distance_m(lat, lng, point[0], point[1])),
+                "hints": [],
+            }
+        )
+        if len(results) >= limit:
+            break
+    return results

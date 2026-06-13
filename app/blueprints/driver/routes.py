@@ -61,6 +61,8 @@ from app.services.google_places import (
     destination_place_details,
     lookup_destination_place,
     nearby_place_candidates,
+    nearby_truck_services,
+    route_summary,
 )
 from app.services.trucker_place_summary import TruckerPlaceSummaryService
 from app.services.document_numbers import (
@@ -3552,33 +3554,55 @@ def destination_details_api():
         "business_status": place.get("business_status") or "",
         "google_maps_uri": place.get("google_maps_uri") or "",
     }
-    driver_notes = None
+    # Optional current/start GPS so we can add travel time + nearby fuel.
+    origin_lat = _json_bounded_float(data.get("lat"), minimum=-90, maximum=90)
+    origin_lng = _json_bounded_float(data.get("lng"), minimum=-180, maximum=180)
+    route = None
+    if None not in (origin_lat, origin_lng, place.get("lat"), place.get("lng")):
+        try:
+            route = route_summary(origin_lat, origin_lng, place["lat"], place["lng"])
+        except Exception:
+            current_app.logger.exception("Route summary failed for user_id=%s", current_user.id)
+            route = None
+    nearby = []
+    if place.get("lat") is not None and place.get("lng") is not None:
+        try:
+            nearby = nearby_truck_services(place["lat"], place["lng"])
+        except Exception:
+            current_app.logger.exception("Nearby fuel lookup failed for user_id=%s", current_user.id)
+            nearby = []
+
+    driver_summary = None
     if current_app.config.get("ENABLE_TRUCKER_PLACE_SUMMARY", True):
         summary = TruckerPlaceSummaryService(
             enable_reviews=include_reviews,
             enable_generative=include_generative,
         )
-        # Build notes from official Places fields only; the raw Google payload is
-        # never returned to the client or persisted.
-        driver_notes = summary.build({
-            "place_id": destination["place_id"],
-            "place_name": destination["place_name"],
-            "formatted_address": destination["address"],
-            "types": place.get("types") or [],
-            "parkingOptions": raw.get("parkingOptions"),
-            "fuelOptions": raw.get("fuelOptions"),
-            "currentOpeningHours": raw.get("currentOpeningHours"),
-            "regularOpeningHours": raw.get("regularOpeningHours"),
-            "businessStatus": raw.get("businessStatus"),
-            "reviews": raw.get("reviews"),
-            "reviewSummary": raw.get("reviewSummary"),
-            "generativeSummary": raw.get("generativeSummary"),
-            "known_place_notes": {},
-        })
+        # Compose Maps-style lines from official Places fields only; the raw
+        # Google payload is never returned to the client or persisted.
+        driver_summary = summary.driver_summary(
+            {
+                "place_id": destination["place_id"],
+                "place_name": destination["place_name"],
+                "formatted_address": destination["address"],
+                "types": place.get("types") or [],
+                "parkingOptions": raw.get("parkingOptions"),
+                "fuelOptions": raw.get("fuelOptions"),
+                "currentOpeningHours": raw.get("currentOpeningHours"),
+                "regularOpeningHours": raw.get("regularOpeningHours"),
+                "businessStatus": raw.get("businessStatus"),
+                "reviews": raw.get("reviews"),
+                "reviewSummary": raw.get("reviewSummary"),
+                "generativeSummary": raw.get("generativeSummary"),
+                "known_place_notes": {},
+            },
+            route=route,
+            nearby_places=nearby,
+        )
     return jsonify({
         "ok": True,
         "destination": destination,
-        "driver_notes": driver_notes,
+        "driver_summary": driver_summary,
         "session_token": session_token,
     })
 

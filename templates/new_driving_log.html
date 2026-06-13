@@ -151,11 +151,19 @@
         color: #e6eefc;
       }
       #destinationSelected .card-body { color: #e6eefc; }
-      #destinationGoingName { color: #ffffff; font-weight: 800; }
-      #destinationGoingAddress { color: #9fb3d1 !important; }
-      #driverNotesCard > .text-uppercase { color: #f0b860; letter-spacing: .04em; }
-      #driverNotesList { color: #d7e3f7; }
-      #driverNotesList li { margin-bottom: 3px; line-height: 1.35; }
+      #destinationSelected .dest-label {
+        color: #f0b860;
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+      }
+      #destinationGoingName { color: #ffffff; font-weight: 800; font-size: 1.02rem; line-height: 1.25; }
+      #destinationGoingAddress { color: #9fb3d1; font-size: .85rem; margin-bottom: .15rem; }
+      #mapsSummaryCard { margin-top: .5rem; }
+      .dest-summary-list { list-style: none; padding: 0; margin: .15rem 0 0; color: #d7e3f7; }
+      .dest-summary-list li { font-size: .88rem; line-height: 1.4; margin-bottom: 3px; }
+      .dest-summary-empty { color: #9fb3d1; font-size: .85rem; margin-top: .15rem; }
       #destinationSuggestions .list-group-item {
         background: rgba(12,19,34,.96);
         border: 1px solid rgba(91,157,255,.20);
@@ -198,18 +206,14 @@
 
       <div class="card mt-2" id="destinationSelected" hidden>
         <div class="card-body py-2">
-          <div class="fw-semibold">Going to: <span id="destinationGoingName"></span></div>
-          <div class="text-muted small" id="destinationGoingAddress"></div>
+          <div class="dest-label">Going to</div>
+          <div class="dest-name" id="destinationGoingName"></div>
+          <div class="dest-address" id="destinationGoingAddress"></div>
           {% if config.ENABLE_TRUCKER_PLACE_SUMMARY %}
-          <div class="mt-2" id="driverNotesCard">
-            <div class="fw-bold small text-uppercase">Driver notes</div>
-            <ul class="list-unstyled small mb-0" id="driverNotesList">
-              <li>Parking: <span data-note="parking">No note yet</span></li>
-              <li>Dock/backing: <span data-note="dock">No note yet</span></li>
-              <li>Entrance: <span data-note="entrance">No note yet</span></li>
-              <li>Loading/unloading: <span data-note="loadunload">No note yet</span></li>
-              <li>Hours: <span data-note="hours">No note yet</span></li>
-            </ul>
+          <div class="mt-2" id="mapsSummaryCard">
+            <div class="dest-label">Maps driver summary</div>
+            <ul class="dest-summary-list" id="driverSummaryLines"></ul>
+            <div class="dest-summary-empty" id="mapsSummaryEmpty" hidden>No Maps driver summary available yet.</div>
           </div>
           {% endif %}
           <button type="button" class="btn btn-sm mt-2" id="destinationChangeBtn">Change destination</button>
@@ -708,7 +712,7 @@
     </script>
     <script>
       // DESTINATION search: Google-style autocomplete, Place Details on select,
-      // and a short trucker "Driver notes" card. Manual entry always works if
+      // and a short Maps-style driver summary. Manual entry always works if
       // Google is unavailable.
       (function () {
         var section = document.getElementById('destinationSection');
@@ -721,7 +725,8 @@
         var goingName = document.getElementById('destinationGoingName');
         var goingAddress = document.getElementById('destinationGoingAddress');
         var changeBtn = document.getElementById('destinationChangeBtn');
-        var notesList = document.getElementById('driverNotesList');
+        var summaryList = document.getElementById('driverSummaryLines');
+        var summaryEmpty = document.getElementById('mapsSummaryEmpty');
         var autocompleteUrl = section.getAttribute('data-autocomplete-url');
         var detailsUrl = section.getAttribute('data-details-url');
         var fields = {
@@ -765,22 +770,22 @@
         function clearSelection() {
           Object.keys(fields).forEach(function (k) { if (fields[k]) fields[k].value = ''; });
           if (selected) selected.hidden = true;
+          renderDriverSummary(null);
           syncStartButton();
         }
 
-        function setNote(key, value) {
-          if (!notesList) return;
-          var el = notesList.querySelector('[data-note="' + key + '"]');
-          if (el) el.textContent = (value && clean(value)) ? clean(value) : 'No note yet';
-        }
-        function renderDriverNotes(notes) {
-          if (!notesList) return;
-          notes = notes || {};
-          setNote('parking', notes.parking_note || notes.overnight_parking_note);
-          setNote('dock', notes.dock_note || notes.backing_note);
-          setNote('entrance', notes.entrance_note);
-          setNote('loadunload', notes.loading_speed_note || notes.unloading_speed_note);
-          setNote('hours', notes.hours_note);
+        function renderDriverSummary(summary) {
+          if (!summaryList) return;
+          summaryList.innerHTML = '';
+          var lines = summary && Array.isArray(summary.driver_summary_lines)
+            ? summary.driver_summary_lines.filter(function (line) { return clean(line); })
+            : [];
+          lines.forEach(function (line) {
+            var item = document.createElement('li');
+            item.textContent = clean(line);
+            summaryList.appendChild(item);
+          });
+          if (summaryEmpty) summaryEmpty.hidden = !!lines.length;
         }
 
         function milesAway(meters) {
@@ -832,28 +837,38 @@
           syncStartButton();
         }
 
+        function destinationDetailsBody(s) {
+          var body = { place_id: s.place_id, session_token: sessionToken };
+          if (latInput && lonInput && clean(latInput.value) && clean(lonInput.value)) {
+            body.lat = Number(latInput.value);
+            body.lng = Number(lonInput.value);
+          }
+          return body;
+        }
+
         function selectSuggestion(s) {
           setStatus('Loading destination...');
           fetch(detailsUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ place_id: s.place_id, session_token: sessionToken })
+            body: JSON.stringify(destinationDetailsBody(s))
           }).then(function (r) { return r.ok ? r.json() : null; })
             .then(function (data) {
               if (!data || !data.ok || !data.destination) {
                 applyDestination({ place_name: s.main_text, address: s.formatted_address || s.secondary_text || '', source: 'manual' });
-                renderDriverNotes(null);
+                renderDriverSummary(null);
                 setStatus('');
                 sessionToken = newToken();
                 return;
               }
               applyDestination(data.destination);
-              renderDriverNotes(data.driver_notes);
+              renderDriverSummary(data.driver_summary);
               setStatus('');
               sessionToken = newToken();
             })
             .catch(function () {
               applyDestination({ place_name: s.main_text, address: s.formatted_address || '', source: 'manual' });
+              renderDriverSummary(null);
               setStatus('');
               sessionToken = newToken();
             });
@@ -863,6 +878,7 @@
           var typed = clean(input && input.value);
           if (!typed) return;
           applyDestination({ place_name: typed, address: '', source: 'manual' });
+          renderDriverSummary(null);
         }
 
         function runAutocomplete() {

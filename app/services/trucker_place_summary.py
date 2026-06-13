@@ -16,6 +16,7 @@ stays ``None`` and the UI shows "No note yet".
 """
 from __future__ import annotations
 
+import datetime
 import re
 
 NOTE_KEYS = (
@@ -118,6 +119,111 @@ class TruckerPlaceSummaryService:
         result["confidence"] = _CONFIDENCE[source]
         result["source"] = source
         return result
+
+    # -- driver-facing Maps summary (natural bullets, only-if-present) -----
+    def driver_summary(self, payload, *, route=None, nearby_places=None):
+        """Compose a compact, Maps-style driver summary. Lines are short natural
+        sentences and only appear when the data actually exists — never a grid of
+        'No note yet' placeholders."""
+        payload = payload or {}
+        notes = self.build(payload)
+        lines = []
+
+        distance_text = ""
+        route_text = ""
+        if route and route.get("ok"):
+            distance_text = _clean(route.get("duration_text")) or _clean(route.get("distance_text"))
+            route_text = _clean(route.get("route_text"))
+            if distance_text:
+                lines.append(f"{distance_text} away {route_text}".strip())
+
+        hours_summary = self._hours_summary(payload) or _clean(notes.get("hours_note"))
+        if hours_summary:
+            lines.append(hours_summary)
+
+        parking = notes.get("overnight_parking_note") or notes.get("parking_note")
+        if parking:
+            lines.append(_clean(parking))
+        dock = notes.get("backing_note") or notes.get("dock_note")
+        if dock:
+            lines.append(_clean(dock))
+        if notes.get("entrance_note"):
+            lines.append(_clean(notes["entrance_note"]))
+        load_unload = notes.get("loading_speed_note") or notes.get("unloading_speed_note")
+        if load_unload:
+            lines.append(_clean(load_unload))
+
+        nearby = []
+        for place in (nearby_places or [])[:3]:
+            name = _clean(place.get("name"))
+            if not name:
+                continue
+            nearby.append(
+                {
+                    "name": name,
+                    "type": _clean(place.get("type")) or "fuel nearby",
+                    "distance_text": _clean(place.get("distance_text")),
+                    "hints": [h for h in (place.get("hints") or []) if _clean(h)],
+                }
+            )
+        if nearby:
+            top = nearby[0]
+            fuel_line = f"Fuel nearby: {top['name']}"
+            if top["distance_text"]:
+                fuel_line = f"{fuel_line} ({top['distance_text']})"
+            lines.append(fuel_line)
+
+        source = notes.get("source", "none")
+        has_route = bool(route and route.get("ok"))
+        has_maps_summary = has_route or bool(nearby)
+        if has_maps_summary and source == "none":
+            source = "maps_summary"
+        elif has_maps_summary and source != "none":
+            source = "mixed"
+        confidence = notes.get("confidence", 0)
+        if has_route:
+            confidence = max(confidence, 50)
+        if nearby:
+            confidence = max(confidence, 40)
+
+        return {
+            "destination_name": _clean(payload.get("place_name")),
+            "destination_address": _clean(payload.get("formatted_address")),
+            "distance_text": distance_text,
+            "route_text": route_text,
+            "hours_summary": hours_summary,
+            "driver_summary_lines": lines,
+            "nearby_driver_places": nearby,
+            "source": source,
+            "confidence": confidence,
+        }
+
+    def _hours_summary(self, payload):
+        hours = payload.get("currentOpeningHours") or payload.get("regularOpeningHours")
+        if not isinstance(hours, dict):
+            status = (payload.get("businessStatus") or payload.get("business_status") or "").upper()
+            if status == "CLOSED_PERMANENTLY":
+                return "Permanently closed"
+            if status == "CLOSED_TEMPORARILY":
+                return "Temporarily closed"
+            return ""
+        open_now = hours.get("openNow")
+        descriptions = hours.get("weekdayDescriptions") or []
+        today_name = datetime.date.today().strftime("%A").lower()
+        today_desc = next((d for d in descriptions if _clean(d).lower().startswith(today_name)), "")
+        if open_now is True:
+            close = self._closing_time(today_desc)
+            return f"Open today until {close}" if close else "Open now"
+        if open_now is False:
+            return "Closed now"
+        return ""
+
+    @staticmethod
+    def _closing_time(today_desc):
+        if not today_desc or "24 hours" in today_desc.lower():
+            return ""
+        times = re.findall(r"\d{1,2}(?::\d{2})?\s*[AP]M", today_desc, re.I)
+        return times[-1].upper() if times else ""
 
     # -- tier 1: our own saved notes --------------------------------------
     def _apply_known(self, notes, known):
