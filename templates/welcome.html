@@ -3,107 +3,446 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MoveDefense Paperwork Packets</title>
+  <title>MoveDefense Pricing</title>
   <style>
     :root {
-      --ink:#0f172a;
-      --muted:#64748b;
-      --line:#dbe4ef;
+      --ink:#111827;
+      --muted:#5b6575;
+      --line:#d9e2ef;
       --blue:#2563eb;
       --blue-dark:#1d4ed8;
-      --green:#16a34a;
-      --bg:#f8fafc;
+      --green:#138a4f;
+      --gold:#b7791f;
+      --bg:#f7f9fc;
       --panel:#ffffff;
+      --soft:#eef5ff;
     }
     * { box-sizing:border-box; }
-    body { margin:0; background:var(--bg); color:var(--ink); font-family:Montserrat,Inter,Arial,sans-serif; }
-    a { color:inherit; }
-    .topbar { border-bottom:1px solid var(--line); background:#fff; position:sticky; top:0; z-index:20; }
-    .topbar-inner { max-width:1180px; margin:0 auto; padding:16px 22px; display:flex; align-items:center; justify-content:space-between; gap:18px; }
-    .brand { display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:0; }
-    .brand-mark { width:36px; height:36px; border-radius:8px; background:var(--blue); display:grid; place-items:center; color:#fff; }
-    .nav-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-    .btn { border:1px solid var(--line); border-radius:8px; padding:10px 14px; text-decoration:none; font-weight:800; font-size:.9rem; display:inline-flex; align-items:center; justify-content:center; line-height:1.2; }
-    .btn.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
-    .btn.primary:hover { background:var(--blue-dark); }
-    .btn.ghost { background:#fff; color:var(--ink); }
-    .checkout-form { margin-top:auto; }
-    .checkout-form .btn { width:100%; cursor:pointer; }
-    .wrap { max-width:1180px; margin:0 auto; padding:46px 22px 58px; }
-    .hero { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr); gap:32px; align-items:center; }
-    .eyebrow { display:inline-flex; align-items:center; gap:8px; color:#166534; background:#dcfce7; border:1px solid #bbf7d0; border-radius:999px; padding:6px 10px; font-size:.78rem; font-weight:800; }
-    .eyebrow::before { content:""; width:8px; height:8px; background:var(--green); clip-path:polygon(50% 0,100% 100%,0 100%); }
-    h1 { margin:18px 0 14px; font-size:clamp(2.2rem,5vw,4.8rem); line-height:.96; letter-spacing:0; font-weight:900; }
-    .lead { max-width:650px; color:#475569; font-size:1.1rem; line-height:1.55; margin:0 0 22px; }
-    .hero-actions { display:flex; gap:12px; flex-wrap:wrap; margin-top:24px; }
-    .proof-panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 18px 45px rgba(15,23,42,.08); overflow:hidden; }
-    .proof-head { padding:18px 20px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; }
-    .proof-head strong { font-size:1rem; }
-    .proof-state { color:#166534; font-weight:900; font-size:.76rem; }
-    .proof-body { padding:18px 20px; display:grid; gap:12px; }
-    .proof-row { display:grid; grid-template-columns:130px minmax(0,1fr); gap:10px; padding:10px 0; border-bottom:1px solid #eef2f7; }
-    .proof-row:last-child { border-bottom:0; }
-    .proof-row span { color:var(--muted); font-size:.78rem; font-weight:800; text-transform:uppercase; }
-    .proof-row strong { font-size:.95rem; overflow-wrap:anywhere; }
-    .section { margin-top:48px; }
-    .section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-bottom:18px; }
-    .section h2 { margin:0; font-size:2rem; letter-spacing:0; }
-    .section p { margin:7px 0 0; color:var(--muted); line-height:1.5; }
-    .cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
-    .card, .price-card, .service-card { background:#fff; border:1px solid var(--line); border-radius:8px; padding:18px; }
-    .card h3, .service-card h3 { margin:0 0 8px; font-size:1.05rem; }
-    .card p, .service-card p { margin:0; color:#475569; line-height:1.48; }
-    .pricing-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:14px; }
-    .price-card.featured { border-color:var(--blue); box-shadow:0 0 0 1px var(--blue) inset, 0 12px 28px rgba(37,99,235,.14); }
-    .pass-best { margin:-4px 0 2px; color:#475569; font-size:.82rem; font-weight:700; }
-    .pass-badges { display:flex; gap:6px; flex-wrap:wrap; margin:2px 0 2px; }
-    .pass-badge { font-size:.68rem; font-weight:800; border:1px solid var(--line); border-radius:6px; padding:3px 6px; background:#f8fafc; }
-    .pass-badge.warn { border-color:#fde68a; background:#fffbeb; color:#92400e; }
-    .pass-upsell { margin:6px 0 0; color:#64748b; font-size:.74rem; font-weight:700; }
-    .price-card { display:flex; flex-direction:column; gap:12px; min-height:100%; }
-    .price-name { font-weight:900; font-size:1rem; }
-    .price { font-size:1.7rem; font-weight:900; }
-    .price small { color:var(--muted); font-size:.8rem; font-weight:700; }
-    .price-card ul { margin:0; padding-left:18px; color:#334155; line-height:1.45; font-size:.88rem; }
-    .price-card li + li { margin-top:6px; }
-    .product-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
-    .product-pill { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:10px; font-weight:800; }
-    .product-pill span:nth-child(2) { color:var(--blue); white-space:nowrap; }
-    .product-pill form { grid-column:1 / -1; margin:4px 0 0; }
-    .product-pill button { width:100%; }
-    .disclaimer { margin-top:22px; padding:16px 18px; background:#fff; border:1px solid var(--line); border-radius:8px; color:#475569; line-height:1.55; font-weight:600; }
-    .site-footer { border-top:1px solid var(--line); background:#fff; }
-    .site-footer-inner { max-width:1180px; margin:0 auto; padding:18px 22px; }
-    .public-footer-links { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; color:var(--muted); font-size:.92rem; }
-    .public-footer-links a { color:var(--blue); font-weight:800; text-decoration:none; }
-    @media (max-width:980px) {
-      .hero, .pricing-grid { grid-template-columns:1fr; }
-      .cards, .product-row { grid-template-columns:1fr; }
-      .section-head { display:block; }
+    html { scroll-behavior:smooth; }
+    body {
+      margin:0;
+      background:var(--bg);
+      color:var(--ink);
+      font-family:Montserrat,Inter,Arial,sans-serif;
+      overflow-x:hidden;
     }
-    @media (max-width:560px) {
-      .topbar-inner { align-items:flex-start; flex-direction:column; }
-      .nav-actions, .btn { width:100%; }
-      .hero-actions { display:grid; grid-template-columns:1fr; }
-      .proof-row { grid-template-columns:1fr; }
-      .product-pill { grid-template-columns:1fr; }
+    a { color:inherit; }
+    .topbar {
+      background:#fff;
+      border-bottom:1px solid var(--line);
+      position:sticky;
+      top:0;
+      z-index:20;
+    }
+    .topbar-inner {
+      max-width:1180px;
+      margin:0 auto;
+      padding:14px 22px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+    }
+    .brand {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:900;
+      letter-spacing:0;
+      text-decoration:none;
+    }
+    .brand-mark {
+      width:36px;
+      height:36px;
+      border-radius:8px;
+      background:#0f172a;
+      display:grid;
+      place-items:center;
+      color:#fff;
+      box-shadow:inset 0 0 0 2px #fbbf24;
+    }
+    .brand-mark svg { width:20px; height:20px; }
+    .nav-actions {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .btn {
+      border:1px solid var(--line);
+      border-radius:8px;
+      padding:10px 14px;
+      background:#fff;
+      color:var(--ink);
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-size:.9rem;
+      font-weight:900;
+      line-height:1.2;
+      text-decoration:none;
+      white-space:normal;
+      text-align:center;
+    }
+    .btn.primary {
+      background:var(--blue);
+      border-color:var(--blue);
+      color:#fff;
+    }
+    .btn.primary:hover { background:var(--blue-dark); }
+    .btn.ghost:hover { border-color:#a8b6ca; }
+    .wrap {
+      max-width:1180px;
+      margin:0 auto;
+      padding:42px 22px 56px;
+    }
+    .hero {
+      display:grid;
+      grid-template-columns:minmax(0,1fr) minmax(280px,.78fr);
+      gap:34px;
+      align-items:center;
+    }
+    h1 {
+      margin:0;
+      max-width:760px;
+      font-size:clamp(2.35rem,6vw,5.15rem);
+      line-height:.95;
+      letter-spacing:0;
+      font-weight:950;
+    }
+    h1 span { display:block; }
+    .lead {
+      max-width:620px;
+      margin:18px 0 0;
+      color:#384454;
+      font-size:1.12rem;
+      line-height:1.45;
+    }
+    .offer-row {
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin:22px 0 0;
+    }
+    .offer-pill {
+      border:1px solid var(--line);
+      border-radius:8px;
+      background:#fff;
+      padding:9px 11px;
+      color:#253044;
+      font-size:.86rem;
+      font-weight:900;
+    }
+    .hero-actions {
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-top:24px;
+    }
+    .hero-shot {
+      background:#0b1324;
+      border:1px solid #1c2b45;
+      border-radius:8px;
+      overflow:hidden;
+      box-shadow:0 18px 44px rgba(15,23,42,.18);
+    }
+    .hero-shot img {
+      display:block;
+      width:100%;
+      aspect-ratio:10 / 14;
+      object-fit:cover;
+      object-position:top center;
+    }
+    .shot-caption {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:12px 14px;
+      color:#dbeafe;
+      font-size:.76rem;
+      font-weight:900;
+      text-transform:uppercase;
+    }
+    .shot-caption span:last-child {
+      color:#86efac;
+      white-space:nowrap;
+    }
+    .section {
+      margin-top:48px;
+    }
+    .section-head {
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:20px;
+      margin-bottom:16px;
+    }
+    .section h2 {
+      margin:0;
+      font-size:clamp(1.7rem,3vw,2.2rem);
+      letter-spacing:0;
+    }
+    .section p {
+      margin:6px 0 0;
+      color:var(--muted);
+      line-height:1.45;
+    }
+    .workflow-grid {
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:14px;
+    }
+    .workflow-card,
+    .price-card,
+    .product-row,
+    .note-strip,
+    .free-strip {
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:8px;
+    }
+    .workflow-card {
+      overflow:hidden;
+    }
+    .workflow-card img {
+      display:block;
+      width:100%;
+      height:330px;
+      object-fit:cover;
+      object-position:top center;
+      background:#0b1324;
+      border-bottom:1px solid var(--line);
+    }
+    .workflow-card.packet img {
+      object-position:top left;
+    }
+    .workflow-copy {
+      padding:14px;
+    }
+    .step {
+      color:var(--gold);
+      font-size:.72rem;
+      font-weight:950;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+    }
+    .workflow-copy h3,
+    .price-name {
+      margin:6px 0 0;
+      font-size:1.04rem;
+      font-weight:950;
+    }
+    .workflow-copy p {
+      margin-top:6px;
+      color:#475569;
+      font-size:.92rem;
+    }
+    .free-strip {
+      display:grid;
+      grid-template-columns:auto minmax(0,1fr) auto;
+      gap:14px;
+      align-items:center;
+      padding:14px;
+      margin-bottom:14px;
+    }
+    .free-strip strong {
+      font-size:1.05rem;
+      font-weight:950;
+    }
+    .free-strip p {
+      margin:0;
+      color:#475569;
+      font-size:.93rem;
+    }
+    .pricing-grid {
+      display:grid;
+      grid-template-columns:repeat(5,minmax(0,1fr));
+      gap:14px;
+    }
+    .price-card {
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      padding:16px;
+      min-height:100%;
+    }
+    .price-card.featured {
+      border-color:var(--blue);
+      box-shadow:0 0 0 1px var(--blue) inset, 0 12px 26px rgba(37,99,235,.12);
+    }
+    .price {
+      font-size:1.85rem;
+      font-weight:950;
+      line-height:1;
+    }
+    .price small {
+      color:var(--muted);
+      font-size:.82rem;
+      font-weight:800;
+    }
+    .use-case {
+      margin:0;
+      color:#475569;
+      font-size:.88rem;
+      line-height:1.38;
+      min-height:2.4em;
+    }
+    .price-card ul {
+      margin:0;
+      padding-left:18px;
+      color:#253044;
+      font-size:.86rem;
+      line-height:1.42;
+    }
+    .price-card li + li { margin-top:5px; }
+    .checkout-form {
+      margin-top:auto;
+    }
+    .checkout-form .btn {
+      width:100%;
+    }
+    .product-list {
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .product-row {
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto auto;
+      gap:12px;
+      align-items:center;
+      padding:12px;
+    }
+    .product-row strong {
+      font-size:.94rem;
+      font-weight:950;
+    }
+    .product-row span {
+      color:var(--blue);
+      font-weight:950;
+      white-space:nowrap;
+    }
+    .product-row form {
+      margin:0;
+    }
+    .note-strip {
+      margin-top:20px;
+      padding:14px 16px;
+      color:#475569;
+      font-size:.92rem;
+      font-weight:700;
+      line-height:1.45;
+    }
+    .note-strip strong {
+      color:var(--ink);
+      font-weight:950;
+    }
+    .site-footer {
+      border-top:1px solid var(--line);
+      background:#fff;
+    }
+    .site-footer-inner {
+      max-width:1180px;
+      margin:0 auto;
+      padding:18px 22px;
+    }
+    .public-footer-links {
+      display:flex;
+      justify-content:center;
+      gap:8px;
+      flex-wrap:wrap;
+      color:var(--muted);
+      font-size:.92rem;
+    }
+    .public-footer-links a {
+      color:var(--blue);
+      font-weight:900;
+      text-decoration:none;
+    }
+    @media (max-width:1080px) {
+      .pricing-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .price-card.featured { grid-column:auto; }
+    }
+    @media (max-width:900px) {
+      .hero { grid-template-columns:1fr; }
+      .hero-shot {
+        max-width:460px;
+      }
+      .workflow-grid,
+      .product-list {
+        grid-template-columns:1fr;
+      }
+      .workflow-card img {
+        height:390px;
+      }
+    }
+    @media (max-width:620px) {
+      .topbar-inner {
+        align-items:flex-start;
+        flex-direction:column;
+      }
+      .nav-actions,
+      .nav-actions .btn,
+      .hero-actions,
+      .hero-actions .btn {
+        width:100%;
+      }
+      .wrap {
+        padding-top:32px;
+      }
+      h1 {
+        font-size:2.05rem;
+        line-height:1.02;
+      }
+      .lead {
+        font-size:.98rem;
+      }
+      .hero > div {
+        width:100%;
+        max-width:346px;
+      }
+      .offer-row {
+        display:grid;
+        grid-template-columns:1fr;
+      }
+      .hero-shot {
+        max-width:none;
+      }
+      .section-head {
+        display:block;
+      }
+      .free-strip,
+      .pricing-grid {
+        grid-template-columns:1fr;
+      }
+      .product-row {
+        grid-template-columns:1fr;
+      }
+      .product-row .btn {
+        width:100%;
+      }
+      .workflow-card img {
+        height:330px;
+      }
     }
   </style>
 </head>
 <body>
   <nav class="topbar">
     <div class="topbar-inner">
-      <div class="brand">
+      <a class="brand" href="{{ url_for('public.welcome') }}">
         <span class="brand-mark" aria-hidden="true">
-          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h10M4 18h16"/>
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M7 11h10M7 15h7M5 4h14v16H5z"/>
           </svg>
         </span>
         <span>MoveDefense</span>
-      </div>
+      </a>
       <div class="nav-actions">
         <a class="btn ghost" href="{{ url_for('auth.login') }}">Login</a>
-        <a class="btn primary" href="#pricing">View pricing</a>
+        <a class="btn primary" href="#pricing">Pricing</a>
       </div>
     </div>
   </nav>
@@ -111,48 +450,58 @@
   <main class="wrap">
     <section class="hero">
       <div>
-        <span class="eyebrow">DOT-ready recordkeeping</span>
-        <h1>Turn driver paperwork into clean route, incident, and IFTA support packets.</h1>
-        <p class="lead">We help owner-operators and small fleets capture the facts before texts, photos, receipts, and paper forms get lost.</p>
+        <h1><span>Driver paperwork</span><span>into clean packets.</span></h1>
+        <p class="lead">Use our workspace to capture routes, inspections, fuel, photos, and PDFs without chasing texts later.</p>
+        <div class="offer-row" aria-label="MoveDefense offer">
+          <span class="offer-pill">Route packets</span>
+          <span class="offer-pill">Incident and damage packets</span>
+          <span class="offer-pill">Fuel and IFTA support</span>
+        </div>
         <div class="hero-actions">
           <a class="btn primary" href="#pricing">View pricing</a>
-          <a class="btn ghost" href="#packets">Preview packets</a>
-          <a class="btn ghost" href="#fleet-office">Set up small fleet</a>
+          <a class="btn ghost" href="#workflow">See workflow</a>
         </div>
       </div>
-      <aside class="proof-panel" aria-label="Sample packet summary">
-        <div class="proof-head">
-          <strong>MoveDefense packet preview</strong>
-          <span class="proof-state">Ready for review</span>
-        </div>
-        <div class="proof-body">
-          <div class="proof-row"><span>Packet</span><strong>Route packet with inspection, fuel, documents, and photos</strong></div>
-          <div class="proof-row"><span>Records</span><strong>PreTrip, PostTrip, route stops, fuel and odometer, and uploaded files</strong></div>
-          <div class="proof-row"><span>Review</span><strong>Manager Review, Safety Review, Claim Review, DOT Review, or IFTA Review when needed</strong></div>
-          <div class="proof-row"><span>Output</span><strong>PDF packet, document wallet, and tax-preparer support worksheet</strong></div>
-        </div>
-      </aside>
+      <figure class="hero-shot">
+        <img src="{{ url_for('static', filename='marketing/workflow-route-board.jpg') }}" alt="MoveDefense live driver route board">
+        <figcaption class="shot-caption">
+          <span>Actual app screen</span>
+          <span>Live route board</span>
+        </figcaption>
+      </figure>
     </section>
 
-    <section class="section" id="packets">
+    <section class="section" id="workflow">
       <div class="section-head">
         <div>
-          <h2>What we organize</h2>
-          <p>MoveDefense turns daily route activity into packets that are easier to store, review, and send when needed.</p>
+          <h2>The workflow</h2>
+          <p>Driver records the day. Proof stays with the route. The packet exports when needed.</p>
         </div>
       </div>
-      <div class="cards">
-        <article class="card">
-          <h3>Route packets</h3>
-          <p>We connect driver routes, stop notes, document uploads, signatures, and manager closeout into one route record.</p>
+      <div class="workflow-grid">
+        <article class="workflow-card">
+          <img src="{{ url_for('static', filename='marketing/workflow-route-board.jpg') }}" alt="Route board with current driver action">
+          <div class="workflow-copy">
+            <div class="step">Step 1</div>
+            <h3>Capture the route</h3>
+            <p>Stops, load flow, wait time, and driver actions stay in one route record.</p>
+          </div>
         </article>
-        <article class="card">
-          <h3>Incident and damage packets</h3>
-          <p>We separate accident facts, vehicle damage, cargo damage, photos, statements, and claim review instead of mixing every issue into one bucket.</p>
+        <article class="workflow-card">
+          <img src="{{ url_for('static', filename='marketing/workflow-fuel-proof.jpg') }}" alt="Fuel record and receipt capture screen">
+          <div class="workflow-copy">
+            <div class="step">Step 2</div>
+            <h3>Add proof</h3>
+            <p>Fuel, receipts, photos, inspections, and notes attach to the same workday.</p>
+          </div>
         </article>
-        <article class="card">
-          <h3>Fuel and odometer records</h3>
-          <p>We prepare an IFTA support worksheet from available vehicle, distance, fuel, receipt, and route data without calculating tax due.</p>
+        <article class="workflow-card packet">
+          <img src="{{ url_for('static', filename='marketing/workflow-driver-packet.jpg') }}" alt="Exported driver packet summary">
+          <div class="workflow-copy">
+            <div class="step">Step 3</div>
+            <h3>Export the packet</h3>
+            <p>Print or save a clean route packet, inspection record, or fuel worksheet.</p>
+          </div>
         </article>
       </div>
     </section>
@@ -161,109 +510,81 @@
       <div class="section-head">
         <div>
           <h2>Pricing</h2>
-          <p>Start with forms, then move into our packet workspace as your recordkeeping grows.</p>
+          <p>Clear plans. No setup call required for the standard products.</p>
         </div>
       </div>
+
+      <div class="free-strip">
+        <strong>Free Preview - $0</strong>
+        <p>Create forms, save 3 records/month, and preview watermarked packets.</p>
+        <a class="btn ghost" href="#pricing">Choose a paid plan</a>
+      </div>
+
       <div class="pricing-grid">
-        <article class="price-card">
-          <div class="price-name">Free Preview</div>
-          <div class="price">$0</div>
-          <ul>
-            <li>Create forms</li>
-            <li>Save 3 records/month</li>
-            <li>Watermarked packet previews</li>
-            <li>7-day record history</li>
-            <li>No full packet export</li>
-            <li>No accident and incident packet</li>
-            <li>No manager review</li>
-            <li>No long-term document storage</li>
-          </ul>
-          <div class="checkout-form">
-            <a class="btn ghost" href="#pricing">Choose a paid plan</a>
-          </div>
-        </article>
-        <article class="price-card featured" id="daily-route-pass">
+        <article class="price-card featured">
           <div class="price-name">Daily Route Pass</div>
           <div class="price">$3.99<small>/day</small></div>
-          <p class="pass-best">Best for one-time or occasional drivers who need today's route paperwork.</p>
-          <div class="pass-badges">
-            <span class="pass-badge">1 route card</span>
-            <span class="pass-badge">1 export</span>
-            <span class="pass-badge warn">Expires end of day &middot; no history</span>
-          </div>
+          <p class="use-case">For one route day.</p>
           <ul>
-            <li>1 same-day route workspace</li>
-            <li>Route completion + proof/photo upload</li>
-            <li>Choose 1 export: route log, PreTrip, PostTrip, route packet, damage, or fuel/odometer</li>
-            <li>Export / print before it expires</li>
-            <li>Extra exports: 99&cent; per additional export</li>
-            <li>Export pack: 3 for $2.49</li>
-            <li>No saved history, manager review, or multi-driver dashboard</li>
+            <li>Same-day route workspace</li>
+            <li>Proof and photo upload</li>
+            <li>1 included export</li>
           </ul>
           <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='daily-route-pass') }}" method="POST">
-            <button class="btn primary" type="submit">Start Daily Route Pass</button>
+            <button class="btn primary" type="submit">Start pass</button>
           </form>
-          <p class="pass-upsell">Driving more than 5 days/month? Solo Driver is cheaper.</p>
         </article>
+
         <article class="price-card">
           <div class="price-name">Solo Driver</div>
           <div class="price">$19<small>/month</small></div>
+          <p class="use-case">For one driver keeping records.</p>
           <ul>
-            <li>Personal route records</li>
+            <li>Route records</li>
             <li>PDF packets</li>
-            <li>Driver document wallet</li>
-            <li>Basic damage and pretrip notes</li>
-            <li>Fuel and odometer records</li>
-            <li>30-day record history</li>
+            <li>30-day history</li>
           </ul>
           <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='solo-driver') }}" method="POST">
             <button class="btn primary" type="submit">Subscribe</button>
           </form>
         </article>
+
         <article class="price-card">
           <div class="price-name">Owner-Operator</div>
           <div class="price">$49<small>/month</small></div>
+          <p class="use-case">For a truck owner running their own paperwork.</p>
           <ul>
             <li>Route packets</li>
-            <li>Fuel, odometer, and IFTA support worksheet</li>
-            <li>Accident and Incident Packet</li>
-            <li>Damage photo packet</li>
-            <li>Driver document uploads</li>
-            <li>Receipt photo storage</li>
-            <li>Ready-for-tax-preparer exports</li>
+            <li>Incident and damage packets</li>
+            <li>Fuel and IFTA support</li>
           </ul>
           <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='owner-operator') }}" method="POST">
             <button class="btn primary" type="submit">Subscribe</button>
           </form>
         </article>
+
         <article class="price-card">
           <div class="price-name">Small Fleet</div>
           <div class="price">$149<small>/month</small></div>
+          <p class="use-case">For up to 5 drivers or vehicles.</p>
           <ul>
-            <li>Includes up to 5 drivers or vehicles</li>
-            <li>$15/month per extra driver or vehicle</li>
             <li>Manager dashboard</li>
             <li>Review queue</li>
-            <li>Multiple drivers</li>
-            <li>Accident and incident records</li>
-            <li>Damage and inspection packets</li>
-            <li>Document storage</li>
-            <li>Manager closeout and signatures</li>
+            <li>$15/month per extra driver or vehicle</li>
           </ul>
           <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='small-fleet') }}" method="POST">
             <button class="btn primary" type="submit">Subscribe</button>
           </form>
         </article>
-        <article class="price-card" id="fleet-office">
+
+        <article class="price-card">
           <div class="price-name">Fleet Office</div>
           <div class="price">$299+<small>/month</small></div>
+          <p class="use-case">For branded packets and cleanup help.</p>
           <ul>
             <li>Custom templates</li>
-            <li>Branded packets</li>
             <li>Monthly paperwork cleanup</li>
-            <li>Manager closeout support</li>
             <li>Up to 25 completed packets/month</li>
-            <li>Extra packets: $10-$15 each</li>
           </ul>
           <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='fleet-office') }}" method="POST">
             <button class="btn primary" type="submit">Start checkout</button>
@@ -276,26 +597,44 @@
       <div class="section-head">
         <div>
           <h2>One-time products</h2>
-          <p>Use downloadable forms when you are not ready for the online workspace yet.</p>
+          <p>Buy forms or setup work without a monthly plan.</p>
         </div>
       </div>
-      <div class="product-row">
-        <div class="product-pill"><span>Driver Forms Pack</span><span>$19</span><form action="{{ url_for('public.billing_checkout', plan_key='driver-forms-pack') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form></div>
-        <div class="product-pill"><span>Owner-Operator Record Kit</span><span>$49</span><form action="{{ url_for('public.billing_checkout', plan_key='record-kit') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form></div>
-        <div class="product-pill"><span>IFTA Fuel and Odometer Worksheet Bundle</span><span>$99</span><form action="{{ url_for('public.billing_checkout', plan_key='ifta-worksheet-bundle') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form></div>
-        <div class="product-pill"><span>Basic branded packet setup</span><span>$149</span><form action="{{ url_for('public.billing_checkout', plan_key='branded-packet-setup') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form></div>
-        <div class="product-pill"><span>Paper form conversion</span><span>$299</span><form action="{{ url_for('public.billing_checkout', plan_key='paper-form-conversion') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form></div>
-        <div class="product-pill"><span>Full small-fleet packet setup</span><span>$499</span><form action="{{ url_for('public.billing_checkout', plan_key='fleet-packet-setup') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form></div>
+      <div class="product-list">
+        <div class="product-row">
+          <strong>Driver Forms Pack</strong>
+          <span>$19</span>
+          <form action="{{ url_for('public.billing_checkout', plan_key='driver-forms-pack') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form>
+        </div>
+        <div class="product-row">
+          <strong>Owner-Operator Record Kit</strong>
+          <span>$49</span>
+          <form action="{{ url_for('public.billing_checkout', plan_key='record-kit') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form>
+        </div>
+        <div class="product-row">
+          <strong>IFTA Worksheet Bundle</strong>
+          <span>$99</span>
+          <form action="{{ url_for('public.billing_checkout', plan_key='ifta-worksheet-bundle') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form>
+        </div>
+        <div class="product-row">
+          <strong>Branded packet setup</strong>
+          <span>$149</span>
+          <form action="{{ url_for('public.billing_checkout', plan_key='branded-packet-setup') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form>
+        </div>
+        <div class="product-row">
+          <strong>Paper form conversion</strong>
+          <span>$299</span>
+          <form action="{{ url_for('public.billing_checkout', plan_key='paper-form-conversion') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form>
+        </div>
+        <div class="product-row">
+          <strong>Fleet packet setup</strong>
+          <span>$499</span>
+          <form action="{{ url_for('public.billing_checkout', plan_key='fleet-packet-setup') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form>
+        </div>
       </div>
-    </section>
-
-    <section class="section">
-      <article class="service-card">
-        <h3>MoveDefense Paperwork Cleanup — starting at $299/month</h3>
-        <p>We turn messy driver paperwork, route records, damage notes, fuel and odometer logs, and incident forms into clean packets your business can store, review, and send when needed.</p>
-      </article>
-      <div class="disclaimer">
-        We do not replace your safety manager, insurer, tax preparer, or DOT compliance officer. MoveDefense makes the record cleaner for FMCSA-aligned review, DOT-ready recordkeeping, insurance-ready packets, and IFTA support worksheets.
+      <div class="note-strip">
+        <strong>MoveDefense Paperwork Cleanup starts at $299/month.</strong>
+        We organize records for FMCSA-aligned review, DOT-ready recordkeeping, insurance-ready packet support, and IFTA support worksheets. Final safety, insurance, tax, and compliance decisions stay with your reviewers.
       </div>
     </section>
   </main>

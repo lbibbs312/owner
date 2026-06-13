@@ -52,23 +52,58 @@ def test_welcome_page_positions_packets_and_pricing(client):
     response = client.get("/")
 
     assert response.status_code == 200
+    body = response.get_data(as_text=True)
     text = _visible_text(response.get_data(as_text=True))
 
-    assert "Turn driver paperwork into clean route, incident, and IFTA support packets." in text
-    assert "We help owner-operators and small fleets" in text
-    assert "Preview packets" in text
+    assert "Driver paperwork into clean packets." in text
+    assert "Route packets" in text
+    assert "Incident and damage packets" in text
+    assert "Fuel and IFTA support" in text
+    assert "The workflow" in text
+    assert "Capture the route" in text
+    assert "Add proof" in text
+    assert "Export the packet" in text
+    assert "workflow-route-board.jpg" in body
+    assert "workflow-fuel-proof.jpg" in body
+    assert "workflow-driver-packet.jpg" in body
     assert "View pricing" in text
     assert "Choose a paid plan" in text
-    assert "Set up small fleet" in text
     assert "Free Preview" in text
+    assert "Daily Route Pass" in text
     assert "Solo Driver" in text
     assert "Owner-Operator" in text
     assert "Small Fleet" in text
     assert "Fleet Office" in text
-    assert "Includes up to 5 drivers or vehicles" in text
+    assert "For up to 5 drivers or vehicles." in text
     assert "$15/month per extra driver or vehicle" in text
     assert "MoveDefense Paperwork Cleanup" in text
-    assert "starting at $299/month" in text
+    assert "starts at $299/month" in text
+
+
+def test_welcome_page_renders_without_optional_bulletins(client, monkeypatch):
+    from sqlalchemy.exc import SQLAlchemyError
+
+    from app.blueprints.public import routes as public_routes
+
+    class BrokenTimestamp:
+        @staticmethod
+        def desc():
+            return "created_at desc"
+
+    class BrokenQuery:
+        def order_by(self, *_args, **_kwargs):
+            raise SQLAlchemyError("missing optional announcement table")
+
+    monkeypatch.setattr(
+        public_routes,
+        "Announcement",
+        SimpleNamespace(query=BrokenQuery(), created_at=BrokenTimestamp()),
+    )
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "Driver paperwork into clean packets." in _visible_text(response.get_data(as_text=True))
 
 
 def test_welcome_page_posts_paid_items_to_billing_checkout(client):

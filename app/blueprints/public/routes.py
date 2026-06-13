@@ -2,6 +2,7 @@ import os
 
 from flask import abort, current_app, jsonify, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.blueprints.public import bp
 from app.models import Announcement
@@ -18,7 +19,11 @@ from app.services.stripe_checkout import (
 
 @bp.route("/")
 def welcome():
-    bulletins = Announcement.query.order_by(Announcement.created_at.desc()).limit(5).all()
+    try:
+        bulletins = Announcement.query.order_by(Announcement.created_at.desc()).limit(5).all()
+    except SQLAlchemyError as exc:
+        current_app.logger.warning("public.welcome_bulletins_unavailable error=%s", exc.__class__.__name__)
+        bulletins = []
     return render_template("welcome.html", bulletins=bulletins)
 
 
