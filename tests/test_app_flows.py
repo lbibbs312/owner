@@ -7283,13 +7283,8 @@ def test_driver_mobile_pages_share_single_five_tab_bottom_nav(client, app):
 
     login(client, "nav_driver")
 
-    expected_items = [
-        "<strong>HM</strong><span>Home</span>",
-        "<strong>BR</strong><span>Breaks</span>",
-        "<strong>FL</strong><span>Fuel</span>",
-        "<strong>SV</strong><span>Service</span>",
-        "<strong>IN</strong><span>Inspections</span>",
-    ]
+    expected_icons = ["wheel", "break", "fuel", "service", "inspection"]
+    expected_labels = ["Home", "Breaks", "Fuel", "Service", "Inspections"]
     pages = [
         ("/mobile", "Home"),
         ("/mobile/breaks", "Breaks"),
@@ -7310,8 +7305,12 @@ def test_driver_mobile_pages_share_single_five_tab_bottom_nav(client, app):
         nav_start = body.index('<nav class="md-driver-bottom-nav"')
         nav_end = body.index("</nav>", nav_start)
         nav = body[nav_start:nav_end]
-        positions = [nav.index(item) for item in expected_items]
+        positions = [nav.index(f'data-nav-icon="{icon}"') for icon in expected_icons]
         assert positions == sorted(positions)
+        for label in expected_labels:
+            assert f"<span>{label}</span>" in nav
+        for old_badge in ("HM", "BR", "FL", "SV", "IN"):
+            assert f"<strong>{old_badge}</strong>" not in nav
         # Actions land on distinct workflow surfaces; Break is a POST button.
         assert 'href="/list_pretrips"' in nav
         assert 'href="/ifta-worksheet/new"' in nav
