@@ -85,7 +85,7 @@
     <div class="mb-3">
       {{ form.location_address.label(class="form-label") }}
       <div class="d-flex gap-2 align-items-stretch">
-        {{ form.location_address(class="form-control", placeholder="Street address, road, city, state", autocomplete="off") }}
+        {{ form.location_address(class="form-control", placeholder="Street address, road, city, state", autocomplete="off", data_no_autosave="true") }}
         <button type="button" id="gpsFillBtn" class="btn btn-primary d-flex align-items-center" style="min-width:52px;justify-content:center;" aria-label="Use my GPS location" title="Use my GPS location" data-gps-places-url="{{ url_for('driver.gps_place_candidates') }}" data-gps-destination-url="{{ url_for('driver.gps_destination_lookup') }}" data-gps-place-hint="{{ gps_place_hint }}">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
         </button>
@@ -102,7 +102,7 @@
     </div>
     <div class="mb-3">
       {{ form.location.label(class="form-label") }}
-      {{ form.location(class="form-control", placeholder="Customer, warehouse, dock, yard, truck stop", list="locationMemory", autocomplete="off") }}
+      {{ form.location(class="form-control", placeholder="Customer, warehouse, dock, yard, truck stop", list="locationMemory", autocomplete="off", data_no_autosave="true") }}
       <datalist id="locationMemory">
         {% for place in fm.locations %}<option value="{{ place }}"></option>{% endfor %}
       </datalist>
@@ -360,6 +360,17 @@
           }, 450);
         }
 
+        function showInitialCustomerSuggestions() {
+          var nameValue = clean(nameInput && nameInput.value);
+          if (nameValue) return;
+          var initialQuery = gpsPlaceHint || clean(addressInput && addressInput.value);
+          var memoryMatches = rememberedTextPlaces('');
+          if (memoryMatches.length) renderCandidates(memoryMatches);
+          if (initialQuery) {
+            requestCustomerLookup(initialQuery);
+          }
+        }
+
         function bestPosition(success, failure) {
           var options = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 };
           if (!navigator.geolocation.watchPosition) {
@@ -512,6 +523,7 @@
         // A driver entering a location is standing at it: ask GPS right away
         // and prefill, leaving the field editable.
         if (addressInput && !addressInput.value.trim()) fillFromGps(true);
+        else showInitialCustomerSuggestions();
       })();
     </script>
     {% else %}

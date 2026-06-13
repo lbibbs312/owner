@@ -4949,9 +4949,10 @@ def new_driving_log():
         (request.args.get("expected_destination") or "").strip()
         or ((route_context.next_stop_context or {}).get("destination") or "")
     )
-    if expected_destination and getattr(current_user, "is_day_driver", False) and not form.location.data:
-        form.location.data = _plant_label(expected_destination)
-    elif expected_destination and not form.plant_name.data:
+    # Day-driver customer names must remain editable discovery fields. Keep the
+    # expected destination as a GPS/search hint in the template instead of
+    # pre-filling stale text that blocks suggestions.
+    if expected_destination and not getattr(current_user, "is_day_driver", False) and not form.plant_name.data:
         ensure_legacy_plant_choice(form.plant_name, expected_destination)
         form.plant_name.data = expected_destination
     form.load_size.data = current_load_value if current_load_value != "Empty" else "Empty"
@@ -4972,10 +4973,9 @@ def new_driving_log():
             )
             if last_loaded and not is_empty_load(last_loaded.depart_load_size):
                 # In transit: arriving means landing at the destination typed on
-                # the last loaded departure, so offer both the saved business
-                # name and destination address.
-                if not form.location.data:
-                    form.location.data = last_loaded.destination
+                # the last loaded departure. Keep the customer name blank so GPS
+                # and Google suggestions show immediately; address can still be
+                # prefilled because it is the stronger physical stop fact.
                 if not form.location_address.data:
                     form.location_address.data = last_loaded.destination_address
     if request.args.get("report_type") == "truck_issue":
