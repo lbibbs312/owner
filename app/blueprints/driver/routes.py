@@ -8294,7 +8294,7 @@ def _inject_open_break():
     return {"open_break": None, "open_break_elapsed_seconds": 0, "open_break_elapsed_label": "00:00", "duty_card": None}
 
 
-@bp.route("/mobile/toggle-day-driver", methods=["POST"])
+@bp.route("/mobile/toggle-day-driver", methods=["GET", "POST"])
 @login_required
 def toggle_day_driver():
     """One-tap switch between the standard plant/part workspace and the
@@ -8302,6 +8302,8 @@ def toggle_day_driver():
     mode is testable without digging into Profile."""
     if current_user.role == "management":
         return redirect(url_for("manager.manager_dashboard"))
+    if request.method == "GET":
+        return redirect(url_for("driver.mobile_dashboard"))
     current_user.day_driver = not bool(current_user.day_driver)
     if current_user.day_driver and not (current_user.route_type or "").strip():
         current_user.route_type = "local_short_haul"

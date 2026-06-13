@@ -392,6 +392,10 @@
           return !!candidate && (candidate.source === 'saved' || candidate.trusted === true);
         }
 
+        function isGpsAutoFillCandidate(candidate) {
+          return !!candidate && candidate.source === 'google' && candidate.trusted === true;
+        }
+
         function candidateSourceLabel(candidate) {
           if (!candidate) return '';
           if (candidate.source === 'saved' || candidate.source === 'recent') return '\u23f2 Recent';
@@ -786,6 +790,18 @@
             if (!auto) renderPlaceNotice('GPS is not available in this browser');
             return;
           }
+          if (!auto) {
+            if (nameInput) {
+              nameInput.value = '';
+              notifyInputChanged(nameInput);
+            }
+            if (addressInput) {
+              addressInput.value = '';
+              notifyInputChanged(addressInput);
+            }
+            customerChoiceTouched = false;
+            renderCandidates([]);
+          }
           setGpsStatus('Getting precise location...', true);
           bestPosition(function (pos) {
             var lat = pos.coords.latitude.toFixed(6), lon = pos.coords.longitude.toFixed(6);
@@ -818,19 +834,19 @@
                 var candidates = mergeCandidates(googlePlaces, savedPlaces.concat(contextualRecents));
                 var googleError = googleErrorMessage(data);
                 var bestCandidate = candidates[0] || null;
-                var trustedCandidate = candidates.find(isTrustedCandidate);
+                var trustedCandidate = candidates.find(isGpsAutoFillCandidate);
                 renderAddressChoices(addressCandidates);
                 renderCandidates(candidates);
                 applyAddress(addressCandidates[0], !auto);
                 if (trustedCandidate) {
                   applyCandidate(trustedCandidate, !auto, false);
-                  var trustMessage = trustedCandidate.address_match ? 'Customer matched from this address.' : 'Customer match is within 20 ft.';
+                  var trustMessage = trustedCandidate.address_match ? 'Place matched from this address.' : 'Nearby place matched by live GPS.';
                   setGpsStatus(accuracy
                     ? 'GPS set (+/-' + accuracy + ' m). ' + trustMessage
                     : 'GPS set. ' + trustMessage, false);
                   return;
                 }
-                var filledVisibleName = applyGpsNameFallback(candidates, addressCandidates);
+                var filledVisibleName = applyGpsNameFallback(googlePlaces, addressCandidates);
                 if (googlePlaces.length || candidates.length) {
                   var setLabel = addressCandidates.length ? 'GPS address set' : 'GPS set';
                   setGpsStatus(accuracy
@@ -853,7 +869,6 @@
               .catch(function () {
                 renderAddressChoices([]);
                 renderCandidates(savedPlaces);
-                applyGpsNameFallback(savedPlaces, []);
                 if (!savedPlaces.length) renderPlaceNotice('Google places could not be reached - type the current location name');
                 setGpsStatus(accuracy
                   ? 'GPS coordinates set (+/-' + accuracy + ' m). Type or pick the place.'

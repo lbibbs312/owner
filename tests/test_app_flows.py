@@ -189,6 +189,10 @@ def test_driver_entry_forms_load_autosave(client, app):
     assert b'data-autosave-key="damage-report-new"' in damage_page.data
     assert b"js/autosave-drafts.js" in damage_page.data
 
+    with open("static/js/autosave-drafts.js", encoding="utf-8") as fh:
+        autosave_js = fh.read()
+    assert "if (control.dataset && control.dataset.noAutosave === 'true') return;" in autosave_js
+
 
 def test_new_driver_log_ignores_stale_hidden_cargo(client, app):
     with app.app_context():
@@ -10845,18 +10849,27 @@ def test_day_driver_dashboard_quick_toggle(client, app):
     assert "dd-mode-toggle" in home
     assert "Freight mode (day-driver) · Off" in home
 
+    # If an expired session returns to the POST-only toggle URL after login,
+    # the browser retries it as GET. That should land safely on the dashboard,
+    # not show a Method Not Allowed page.
+    safe_get = client.get("/mobile/toggle-day-driver", follow_redirects=False)
+    assert safe_get.status_code == 302
+    assert safe_get.headers["Location"].endswith("/mobile")
+    with app.app_context():
+        from app.models import User
+        assert User.query.filter_by(username="dd_toggle").one().day_driver is False
+
     # One tap turns it on (defaulting the route type) and the freight banner shows.
     resp = client.post("/mobile/toggle-day-driver", follow_redirects=False)
     assert resp.status_code == 302
     assert resp.headers["Location"].endswith("/mobile")
     with app.app_context():
-        from app.models import User
         u = User.query.filter_by(username="dd_toggle").one()
         assert u.day_driver is True
         assert u.route_type == "local_short_haul"
     on = client.get("/mobile").get_data(as_text=True)
     assert "dd-mode-toggle on" in on
-    assert "Day-Driver Freight Workspace" in on
+    assert "Freight mode (day-driver) · On" in on
 
     # Tapping again turns it back off.
     client.post("/mobile/toggle-day-driver")
@@ -10944,6 +10957,10 @@ def test_day_driver_gps_address_and_corrected_place_name_are_remembered(client, 
     assert "Nearby current-location names are suggestions only" in body
     assert "notifyInputChanged" in body
     assert "applyGpsNameFallback" in body
+    assert "isGpsAutoFillCandidate" in body
+    assert "candidates.find(isGpsAutoFillCandidate)" in body
+    assert "applyGpsNameFallback(googlePlaces, addressCandidates)" in body
+    assert "applyGpsNameFallback(savedPlaces" not in body
     assert "candidateMatchesQuery" in body
     assert "var typedQuery = clean(nameValue);" in body
     assert "typedQuery || forcedQuery || addressValue" in body

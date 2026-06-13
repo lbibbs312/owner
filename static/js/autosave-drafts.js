@@ -62,6 +62,7 @@
       const controls = Array.from(form.querySelectorAll(`[name="${CSS.escape(name)}"]`));
       if (!controls.length || !entry || typeof entry !== 'object') return;
       controls.forEach((control) => {
+        if (control.dataset && control.dataset.noAutosave === 'true') return;
         const type = (control.type || '').toLowerCase();
         if (type === 'radio') {
           control.checked = control.value === entry.value;
