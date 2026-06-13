@@ -150,6 +150,12 @@
   .dlog-recap-row { display:flex; justify-content:space-between; font-family:var(--md-mono); font-size:.8rem; }
   .dlog-recap-row.major strong { color:#ffd479; }
   .dlog-empty { color:var(--md-muted); font-size:.85rem; }
+  .dlog-cols { display:grid; gap:14px; }
+  .dlog-main, .dlog-side { display:grid; gap:14px; align-content:start; }
+  @media (min-width: 920px) {
+    .dlog-shell { width:min(1180px, 100%); }
+    .dlog-cols { grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); align-items:start; }
+  }
 </style>
 
 <div class="dlog-shell">
@@ -179,6 +185,8 @@
 
   <div class="dlog-gridcard">{{ view.grid_svg }}</div>
 
+  <div class="dlog-cols">
+  <div class="dlog-main">
   <div class="dlog-totals">
     {% for s, word in [('off', 'Off Duty'), ('sb', 'Sleeper'), ('d', 'Driving'), ('on', 'On Duty')] %}
       <div class="dlog-total"><span>{{ word }}</span><strong>{{ view.totals_fmt[s] }}</strong></div>
@@ -215,6 +223,8 @@
     {% endif %}
   </section>
 
+  </div>
+  <aside class="dlog-side">
   {% if view.recap.has_data %}
   <section class="dlog-card">
     <span class="k">Recap &mdash; 70 hour / 8 day</span>
@@ -239,6 +249,8 @@
     </div>
   </section>
   {% endif %}
+  </aside>
+  </div>
 
 </div>
 

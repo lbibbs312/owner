@@ -94,11 +94,6 @@
       <input type="hidden" name="gps_longitude" id="gps_longitude" data-no-autosave="true">
       <input type="hidden" name="gps_accuracy_m" id="gps_accuracy_m" data-no-autosave="true">
       <div class="form-text" id="gpsStatus" style="min-height:1.1em;"></div>
-      <div class="mt-2" id="gpsAddressChoices" hidden>
-        <label for="gpsAddressSelect" class="form-label mb-1">GPS address matches</label>
-        <select id="gpsAddressSelect" class="form-select"></select>
-        <div class="form-text">Pick the physical address closest to your dock.</div>
-      </div>
     </div>
     <div class="mb-3">
       {{ form.location.label(class="form-label") }}
@@ -107,7 +102,7 @@
         {% for place in fm.locations %}<option value="{{ place }}"></option>{% endfor %}
       </datalist>
       <div class="mt-2" id="gpsPlaceChoices" hidden>
-        <label for="gpsPlaceSelect" class="form-label mb-1">Customer name matches</label>
+        <label for="gpsPlaceSelect" class="form-label mb-1">Suggested</label>
         <select id="gpsPlaceSelect" class="form-select"></select>
         <div class="form-text">Exact-address matches can fill the name. Nearby names are suggestions only.</div>
       </div>
