@@ -91,6 +91,9 @@ def test_driver_packet_entry_pages_use_clear_labels_and_neutral_defaults(client,
     assert "Recent records" not in fuel_body
     assert 'data-fuel-type="Diesel"' in fuel_body
     assert 'data-fuel-type="DEF"' in fuel_body
+    assert 'data-gps-hint="fuel station truck stop"' in fuel_body
+    assert "Nearby fuel stations" in fuel_body
+    assert "Suggested nearest fuel station" in fuel_body
     assert "IFTA license number" not in fuel_body
     assert "Base jurisdiction" not in fuel_body
     assert 'name="tax_paid"' not in fuel_body

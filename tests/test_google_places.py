@@ -167,6 +167,61 @@ def test_gps_address_lookup_can_return_five_business_suggestions(monkeypatch, fl
     assert payload["radius_m"] == 8
 
 
+def test_fuel_hint_requests_at_least_five_nearby_gas_stations(monkeypatch, flask_app):
+    post_calls = []
+
+    def fake_post(url, *, headers, json, timeout):
+        post_calls.append((url, json))
+        if url == google_places.TEXT_SEARCH_URL:
+            return FakeResponse({"places": []})
+        return FakeResponse(
+            {
+                "places": [
+                    {
+                        "id": f"fuel-{index}",
+                        "displayName": {"text": f"Fuel Station {index}"},
+                        "shortFormattedAddress": f"{1000 + index} Fuel Rd, Industrial City",
+                        "location": {
+                            "latitude": 42.900846 + (index * 0.001),
+                            "longitude": -85.531056,
+                        },
+                        "types": ["gas_station", "point_of_interest", "establishment"],
+                    }
+                    for index in range(1, 6)
+                ]
+            }
+        )
+
+    def fake_get(url, *, params, timeout):
+        return FakeResponse({"status": "OK", "results": []})
+
+    monkeypatch.setattr(google_places.requests, "post", fake_post)
+    monkeypatch.setattr(google_places.requests, "get", fake_get)
+
+    with flask_app.app_context():
+        payload = google_places.nearby_place_candidates(
+            42.900846,
+            -85.531056,
+            accuracy_m=8,
+            limit=3,
+            hint="fuel station truck stop",
+        )
+
+    nearby_request = post_calls[0][1]
+    assert nearby_request["includedTypes"] == ["gas_station"]
+    assert nearby_request["maxResultCount"] == 5
+    assert nearby_request["locationRestriction"]["circle"]["radius"] == google_places.FUEL_PLACE_RADIUS_M
+    assert len(payload["places"]) == 5
+    assert [place["name"] for place in payload["places"]] == [
+        "Fuel Station 1",
+        "Fuel Station 2",
+        "Fuel Station 3",
+        "Fuel Station 4",
+        "Fuel Station 5",
+    ]
+    assert payload["radius_m"] == google_places.FUEL_PLACE_RADIUS_M
+
+
 def test_precise_gps_keeps_close_google_place(monkeypatch, flask_app):
     def fake_post(url, *, headers, json, timeout):
         if url == google_places.TEXT_SEARCH_URL:

@@ -67,6 +67,9 @@ PREMISE_GEOCODE_TYPES = {"premise", "subpremise", "street_address"}
 DEFAULT_PLACE_RADIUS_M = 20
 CUSTOMER_PLACE_RADIUS_M = 6
 MAX_PLACE_RADIUS_M = 30
+FUEL_PLACE_RADIUS_M = 5000
+FUEL_MIN_SUGGESTIONS = 5
+FUEL_PLACE_TYPES = ("gas_station",)
 MIN_DESTINATION_QUERY_LENGTH = 4
 
 
@@ -99,17 +102,27 @@ def _float_or_none(value):
         return None
 
 
-def _candidate_radius_m(accuracy_m):
+def _is_fuel_hint(value):
+    text = (value or "").lower()
+    tokens = set(re.findall(r"[a-z0-9]+", text))
+    return bool(tokens & {"fuel", "gas", "gasoline", "diesel"}) or "truck stop" in text
+
+
+def _candidate_radius_m(accuracy_m, *, fuel_lookup=False):
     accuracy = _float_or_none(accuracy_m)
     if accuracy is None or accuracy <= 0:
-        return DEFAULT_PLACE_RADIUS_M
-    if accuracy <= 8:
-        return 8
-    if accuracy <= 15:
-        return 12
-    if accuracy <= 30:
-        return 20
-    return MAX_PLACE_RADIUS_M
+        radius = DEFAULT_PLACE_RADIUS_M
+    elif accuracy <= 8:
+        radius = 8
+    elif accuracy <= 15:
+        radius = 12
+    elif accuracy <= 30:
+        radius = 20
+    else:
+        radius = MAX_PLACE_RADIUS_M
+    if fuel_lookup:
+        return max(radius, FUEL_PLACE_RADIUS_M)
+    return radius
 
 
 def _trusted_place_distance_m(accuracy_m):
@@ -270,7 +283,7 @@ def _place_dedupe_key(place):
     )
 
 
-def _businesses_at_addresses(addresses, key, *, limit=5):
+def _businesses_at_addresses(addresses, key, *, limit=5, fuel_lookup=False):
     matches = []
     seen = set()
     for item in addresses[:5]:
@@ -306,6 +319,8 @@ def _businesses_at_addresses(addresses, key, *, limit=5):
         if payload.get("error"):
             continue
         for result in payload.get("places") or []:
+            if fuel_lookup and "gas_station" not in set(result.get("types") or []):
+                continue
             place = _destination_place(result)
             if not place or not place.get("name"):
                 continue
@@ -342,7 +357,23 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
             "fallback_address": "",
         }
 
-    radius = _candidate_radius_m(accuracy_m)
+    fuel_lookup = _is_fuel_hint(hint)
+    radius = _candidate_radius_m(accuracy_m, fuel_lookup=fuel_lookup)
+    result_limit = max(1, min(int(limit), 20))
+    if fuel_lookup:
+        result_limit = max(result_limit, FUEL_MIN_SUGGESTIONS)
+    request_payload = {
+        "maxResultCount": result_limit,
+        "rankPreference": "DISTANCE",
+        "locationRestriction": {
+            "circle": {
+                "center": {"latitude": lat, "longitude": lng},
+                "radius": radius,
+            }
+        },
+    }
+    if fuel_lookup:
+        request_payload["includedTypes"] = list(FUEL_PLACE_TYPES)
     response = requests.post(
         NEARBY_URL,
         headers={
@@ -360,16 +391,7 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
                 ]
             ),
         },
-        json={
-            "maxResultCount": max(1, min(int(limit), 20)),
-            "rankPreference": "DISTANCE",
-            "locationRestriction": {
-                "circle": {
-                    "center": {"latitude": lat, "longitude": lng},
-                    "radius": radius,
-                }
-            },
-        },
+        json=request_payload,
         timeout=6,
     )
     payload = response.json()
@@ -432,7 +454,11 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
     address_place_matches = []
     if address_candidates:
         try:
-            address_place_matches = _businesses_at_addresses(address_candidates, key)
+            address_place_matches = _businesses_at_addresses(
+                address_candidates,
+                key,
+                fuel_lookup=fuel_lookup,
+            )
         except requests.RequestException:
             address_place_matches = []
     for place in address_place_matches:
@@ -443,17 +469,27 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
         candidates.append(place)
 
     tokens = _hint_tokens(hint)
-    candidates.sort(
-        key=lambda item: (
-            0 if item.get("address_match") else 1,
-            -_hint_score(item, tokens),
-            item.get("distance_m", 0),
-            item["name"].lower(),
+    if fuel_lookup:
+        candidates.sort(
+            key=lambda item: (
+                0 if item.get("address_match") else 1,
+                item.get("distance_m", 0),
+                -_hint_score(item, tokens),
+                item["name"].lower(),
+            )
         )
-    )
+    else:
+        candidates.sort(
+            key=lambda item: (
+                0 if item.get("address_match") else 1,
+                -_hint_score(item, tokens),
+                item.get("distance_m", 0),
+                item["name"].lower(),
+            )
+        )
     return {
         "ok": True,
-        "places": candidates[:limit],
+        "places": candidates[:result_limit],
         "address_candidates": address_candidates,
         "fallback_address": fallback,
         "radius_m": radius,

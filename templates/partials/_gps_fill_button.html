@@ -33,6 +33,7 @@
 (function () {
   if (window.__mdGpsFill) return;
   window.__mdGpsFill = true;
+  var MAX_FUEL_SUGGEST_DISTANCE_M = 500;
 
   function q(sel) { return sel ? document.querySelector(sel) : null; }
 
@@ -64,6 +65,30 @@
     return !!cand && cand.trusted === true;
   }
 
+  function isFuelLookup(btn) {
+    return /\b(fuel|gas|gasoline|diesel)\b|truck\s+stop/i.test(btn.dataset.gpsHint || '');
+  }
+
+  function fuelLabel(btn) {
+    return isFuelLookup(btn) ? 'fuel station' : 'customer';
+  }
+
+  function placeHeading(btn) {
+    return isFuelLookup(btn) ? 'Nearby fuel stations' : 'Customer matches';
+  }
+
+  function fieldIsBlank(sel) {
+    var el = q(sel);
+    return !!el && !el.value.trim();
+  }
+
+  function isCloseFuelSuggestion(cand) {
+    if (!cand) return false;
+    if (cand.address_match || cand.trusted) return true;
+    var distance = Number(cand.distance_m);
+    return Number.isFinite(distance) && distance <= MAX_FUEL_SUGGEST_DISTANCE_M;
+  }
+
   function addressValue(cand) {
     return (cand && (cand.address || cand.formatted_address || cand.value || cand) || '').toString().trim();
   }
@@ -92,6 +117,21 @@
       setVal(d.gpsTargetState, cs.state, force);
     }
     setVal(d.gpsTargetSingle, cand.name || cand.address || '', force);
+  }
+
+  function suggestFuelPlace(btn, places) {
+    if (!isFuelLookup(btn) || !places || !places.length) return null;
+    if (!isCloseFuelSuggestion(places[0])) return null;
+    var d = btn.dataset;
+    if (d.gpsTargetName && fieldIsBlank(d.gpsTargetName)) {
+      apply(btn, places[0], false);
+      return places[0];
+    }
+    if (!d.gpsTargetName && d.gpsTargetSingle && fieldIsBlank(d.gpsTargetSingle)) {
+      apply(btn, places[0], false);
+      return places[0];
+    }
+    return null;
   }
 
   function panelFor(btn) {
@@ -167,7 +207,7 @@
   function renderChoices(panel, btn, candidates, preselectFirst) {
     renderOptionList(panel, candidates, {
       className: 'md-gps-place-choice',
-      heading: 'Customer matches',
+      heading: placeHeading(btn),
       max: 6,
       preselectFirst: !!preselectFirst,
       title: function (cand) { return cand.name || cand.address || 'Nearby place'; },
@@ -217,19 +257,29 @@
           renderAddressChoices(panel, btn, addresses, true);
           if (addresses.length && (!best || !trusted(best))) {
             applyAddress(btn, addresses[0], false);
-            status(panel, 'GPS street address: ' + addressValue(addresses[0]));
-            renderChoices(panel, btn, places, false);
+            var fuelSuggestion = suggestFuelPlace(btn, places);
+            if (fuelSuggestion) {
+              status(panel, 'Suggested nearest fuel station: ' + (fuelSuggestion.name || fuelSuggestion.address));
+            } else {
+              status(panel, isFuelLookup(btn)
+                ? 'GPS street address set. Pick the fuel station if it is shown below.'
+                : 'GPS street address: ' + addressValue(addresses[0]));
+            }
+            renderChoices(panel, btn, places, !!fuelSuggestion);
           } else if (best && trusted(best)) {
             if (addresses.length) applyAddress(btn, addresses[0], false);
             apply(btn, best, false);
             status(panel, best.address_match
-              ? 'GPS: ' + (best.name || best.address) + ' at this address'
-              : 'GPS: ' + (best.name || best.address) +
+              ? 'GPS ' + fuelLabel(btn) + ': ' + (best.name || best.address) + ' at this address'
+              : 'GPS ' + fuelLabel(btn) + ': ' + (best.name || best.address) +
                 (formatDistance(best) ? ' (' + formatDistance(best) + ')' : ''));
             renderChoices(panel, btn, places, true);
           } else if (places.length) {
-            status(panel, 'Nearby customer names are suggestions only.');
-            renderChoices(panel, btn, places, false);
+            var suggested = suggestFuelPlace(btn, places);
+            status(panel, suggested
+              ? 'Suggested nearest fuel station: ' + (suggested.name || suggested.address)
+              : 'Nearby ' + (isFuelLookup(btn) ? 'fuel stations' : 'customer names') + ' are suggestions only.');
+            renderChoices(panel, btn, places, !!suggested);
           } else {
             status(panel, lookupFailedMessage(data));
             renderChoices(panel, btn, [], false);
