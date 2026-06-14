@@ -1077,6 +1077,7 @@
             <button class="md-flow-row tone-{{ stop_badge.row_tone }}{% if stop.status == 'completed' and stop_badge.row_tone != 'active' %} is-completed-stop{% endif %}" type="button"
                     data-flow-row
                     data-detail-template="route-stop-{{ stop.stop_id }}"
+                    data-flow-inline-detail
                     data-title="Stop {{ stop.sequence }} - {{ stop.location_display if stop.location_display is defined and stop.location_display else stop.plant_name }}"
                     data-sheet-url="{{ route_sheet_url or stop.view_url or '#' }}"
                     data-flow-full-url="{{ stop.view_url or route_sheet_url or '#' }}"
@@ -1161,14 +1162,16 @@
               <div><span>Next</span><strong>{{ stop.next_action }}</strong></div>
             </div>
             {{ issue_panel(stop, stop.stop_id, depart_url if primary_stop and stop.stop_id == primary_stop.stop_id else none, route_finalized_for_cta) }}
-            {% if not route_finalized_for_cta %}
+            {% set stop_sheet_url = stop.view_url or route_sheet_url %}
             <div class="route-detail-actions">
+              {% if stop_sheet_url %}<a class="route-detail-link" href="{{ stop_sheet_url }}">Open Full Route Sheet</a>{% endif %}
+              {% if not route_finalized_for_cta %}
               <form action="{{ url_for('driver.delete_driver_log', log_id=stop.stop_id) }}" method="POST" onsubmit="return confirm('Delete this stop? It will be removed from your route.');">
                 <input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}">
                 <button class="route-detail-link danger" type="submit">Delete stop</button>
               </form>
+              {% endif %}
             </div>
-            {% endif %}
           </div>
         </template>
       {% endfor %}

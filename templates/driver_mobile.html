@@ -5814,8 +5814,9 @@
         if (!row || !board.contains(row)) return;
         event.preventDefault();
 
+        var wantsInlineDetail = row.hasAttribute('data-flow-inline-detail');
         var fullUrl = row.getAttribute('data-flow-full-url') || row.getAttribute('data-sheet-url');
-        if (usableUrl(fullUrl)) {
+        if (!wantsInlineDetail && usableUrl(fullUrl)) {
           window.location.href = fullUrl;
           return;
         }
