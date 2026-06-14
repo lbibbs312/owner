@@ -274,9 +274,7 @@
 <section class="compact-route-map md-flow-board" data-route-map-shell data-route-map-mode="route" data-route-sheet-url="{{ route_sheet_url or '#' }}" data-route-refresh-url="{{ url_for('driver.mobile_route_map_fragment', date=route_date.isoformat()) if route_date is defined and route_date else url_for('driver.mobile_route_map_fragment') }}">
   <div class="md-flow-head">
 	    <div>
-	      <span class="md-flow-kicker"><i></i> LIVE FLOW BOARD</span>
-	      
-	      {% if rm and rm.stops %}
+		      {% if rm and rm.stops %}
 	        <p class="md-flow-subline">{{ rm.stops|length }} stop{{ 's' if rm.stops|length != 1 else '' }}</p>
 	      {% elif is_empty_today_route %}
 	        <p class="md-flow-subline">Today · 0 stops</p>
@@ -306,7 +304,6 @@
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <form action="{{ end_route_url }}" method="POST" style="margin:0">
       <button class="md-flow-primary-cta" type="submit" style="width:100%; cursor:pointer">
-        <span>Required driver action</span>
         <strong>{{ primary_cta.label if primary_cta else 'End Shift' }}</strong>
         <small>{{ cta.route_state_message or 'Close this route' }}</small>
       </button>
@@ -315,7 +312,6 @@
   {% elif posttrip_url and primary_action == 'posttrip' %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta" href="{{ posttrip_url }}" data-flow-open-url="{{ posttrip_url }}">
-        <span>Required driver action</span>
         <strong>{{ primary_cta.label if primary_cta else 'Complete PostTrip' }}</strong>
         <small>{{ cta.route_state_message or 'Complete PostTrip to finish' }}</small>
       </a>
@@ -323,7 +319,6 @@
   {% elif not route_finalized_for_cta and depart_url and primary_stop %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta" href="{{ depart_url }}" data-flow-open-panel="depart" data-flow-panel-title="Depart Quick Flow" data-flow-panel-kicker="DEPART QUICK FLOW">
-        <span>Required driver action</span>
         <strong>{{ primary_cta.label if primary_cta else 'Record Departure' }}</strong>
         <small>{{ primary_stop.location_display if primary_stop.location_display is defined and primary_stop.location_display else primary_stop.plant_name }} &middot; record departure</small>
       </a>
@@ -331,7 +326,6 @@
   {% elif not route_finalized_for_cta and add_stop_url and (primary_action == 'add_stop' or (not (rm and rm.stops) and primary_action != 'start_shift') or show_between_loads_add_stop) %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta add-stop-action" href="{{ add_stop_url }}" data-flow-open-url="{{ add_stop_url }}" data-flow-panel-title="Log Current Stop">
-        <span>Required driver action</span>
         <strong>{{ add_stop_label }}</strong>
         <small>Use when you are at the stop now</small>
       </a>
@@ -339,7 +333,6 @@
   {% elif primary_cta and primary_action in ['attach_document', 'finalize_route', 'print_route', 'view_route', 'route_history', 'start_shift'] and urls.get(primary_action) %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">
       <a class="md-flow-primary-cta" href="{{ urls.get(primary_action) }}" data-flow-open-url="{{ urls.get(primary_action) }}" data-flow-panel-title="{{ primary_cta.label }}">
-        <span>Required driver action</span>
         <strong>{{ primary_cta.label }}</strong>
         <small>{% if primary_action == 'finalize_route' %}Ready To Finish{% else %}{{ cta.route_state_message or cta.next_action or 'Open route details' }}{% endif %}</small>
       </a>

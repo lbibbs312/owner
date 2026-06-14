@@ -11,10 +11,9 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255))
     role = db.Column(db.String(20), default="driver")  # "driver" or "management"
-    # Day-driver workspace mode: swaps the Lacks plant/part questions for the
-    # generic commodity + weight DVIR flow. Off by default so existing drivers
-    # keep the plant-transfer flow unchanged.
-    day_driver = db.Column(db.Boolean, default=False)
+    # Day-driver freight workspace — the core MoveDefense product (commodity +
+    # weight DVIR flow). On by default; the legacy plant/part flow is opt-out.
+    day_driver = db.Column(db.Boolean, default=True)
     # Day-driver route classification (drives the Hours Check display, not an ELD):
     # "local_short_haul" (default), "general_freight" (owner-operator), "company_shuttle".
     route_type = db.Column(db.String(30), nullable=True)

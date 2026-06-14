@@ -1771,8 +1771,9 @@ def _photo_upload_wants_json():
     return "application/json" in (request.headers.get("Accept") or "") or request.headers.get("X-Requested-With") == "fetch"
 
 
-def _save_pretrip_damage_report(pretrip, form):
-    uploaded_file = request.files.get(form.damage_photo.name)
+def _save_pretrip_damage_report(pretrip, form, uploaded_file=None):
+    if uploaded_file is None:
+        uploaded_file = request.files.get(form.damage_photo.name)
     if not uploaded_file or not uploaded_file.filename:
         return None
     description = (form.damage_report.data or "").strip() or "PreTrip damage photo."
@@ -4516,7 +4517,7 @@ def _build_plant_transfer_pdf(transfer, requested_copy):
         pdf.text(36, 588, f"Document No: {meta['document_no']}", size=8, bold=True)
         pdf.text(250, 588, f"Generated: {meta['generated_at']}", size=8)
         pdf.text(650, 588, f"Page {meta['page']}", size=8)
-        pdf.text(340, 566, "LACKS INDUSTRIES INC.", size=8, bold=True)
+        pdf.text(340, 566, "MoveDefense", size=8, bold=True)
         pdf.text(310, 548, "PLANT TRANSFER", size=18, bold=True)
         pdf.text(650, 552, f"No. {transfer.transfer_number or transfer.id}", size=10, bold=True)
         pdf.text(36, 530, f"SHIP TO: {transfer.ship_to}", size=9, bold=True)
@@ -4675,8 +4676,17 @@ def new_pretrip():
 
         db.session.add(new_pt)
         db.session.flush()
-        pretrip_evidence = _save_pretrip_evidence_photo(new_pt, form)
-        damage_report = _save_pretrip_damage_report(new_pt, form)
+        # One photo per PreTrip: a described defect routes it to a damage
+        # report, otherwise it is saved as inspection/fuel proof.
+        _pretrip_photo = request.files.get(form.fuel_level_photo.name)
+        _has_pretrip_photo = bool(_pretrip_photo and _pretrip_photo.filename)
+        _has_damage_text = bool((form.damage_report.data or "").strip())
+        if _has_pretrip_photo and _has_damage_text:
+            pretrip_evidence = None
+            damage_report = _save_pretrip_damage_report(new_pt, form, uploaded_file=_pretrip_photo)
+        else:
+            pretrip_evidence = _save_pretrip_evidence_photo(new_pt, form) if _has_pretrip_photo else None
+            damage_report = None
         existing_open_shift = ShiftRecord.query.filter_by(
             user_id=current_user.id, end_time=None
         ).first()
@@ -4724,12 +4734,10 @@ def new_pretrip():
 
         flash(
             (
-                "PreTrip saved with fuel photo and damage photo attached."
-                if pretrip_evidence and damage_report
-                else "PreTrip saved with fuel photo attached."
-                if pretrip_evidence
-                else "PreTrip saved with damage photo attached."
+                "PreTrip saved with damage photo attached."
                 if damage_report
+                else "PreTrip saved with photo attached."
+                if pretrip_evidence
                 else "PreTrip saved successfully!"
             ),
             "success",

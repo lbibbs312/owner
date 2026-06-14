@@ -65,11 +65,6 @@
         {{ form.start_fuel_level(class="form-select") }}
       </div>
     </div>
-    <div class="mb-3">
-      {{ form.fuel_level_photo.label }}
-      {{ form.fuel_level_photo(class="form-control", accept="image/*", capture="environment") }}
-      <div class="form-text">Use this for fuel gauge, fuel tank, or normal inspection proof. It will not create a damage report.</div>
-    </div>
 
     <hr>
 
@@ -338,13 +333,27 @@
       {{ form.damage_report.label }}
       {{ form.damage_report(class="form-control", rows="3") }}
     </div>
-    <div class="mb-3">
-      {{ form.damage_photo.label }}
-      {{ form.damage_photo(class="form-control", accept="image/*", capture="environment") }}
-      <div class="form-text">Only use this when actual damage or a defect is being reported.</div>
+    <!-- 9) ADD PHOTO — one photo per PreTrip -->
+    <style>
+      .pretrip-photo { margin-top: .25rem; }
+      .pretrip-photo-head { font-family: var(--md-display, inherit); font-weight: 900; font-size: 1.05rem; color: #dbe7ff; margin-bottom: .4rem; }
+      .pretrip-photo input[type="file"] {
+        display: block; width: 100%; padding: 14px; border-radius: 12px;
+        border: 1.5px dashed rgba(91,157,255,.55); background: rgba(10,17,28,.55);
+        color: #cfe0fb; font-weight: 700; cursor: pointer;
+      }
+      .pretrip-photo input[type="file"]::file-selector-button {
+        margin-right: 12px; padding: 10px 14px; border-radius: 9px; border: 0;
+        background: rgba(91,157,255,.2); color: #eaf1ff; font-weight: 800; cursor: pointer;
+      }
+    </style>
+    <div class="mb-3 pretrip-photo">
+      <div class="pretrip-photo-head">📷 Add Photo</div>
+      {{ form.fuel_level_photo(class="form-control form-control-lg", accept="image/*", capture="environment") }}
+      <div class="form-text">One photo for this PreTrip — fuel gauge, the truck, or any damage. If you describe damage above it is saved as the damage photo; otherwise it is inspection proof. Optional.</div>
     </div>
 
-    <!-- 9) SUBMIT -->
+    <!-- 10) SUBMIT -->
     {{ form.submit(class="btn btn-primary mt-3") }}
   </form>
 </div>

@@ -48,25 +48,21 @@
     grid-template-columns:1fr 1fr;
     gap:10px;
   }
+  /* All start-break presets are actions, not the active state — keep them
+     neutral. Amber is reserved for the live/active break (status card). */
   .break-preset-grid button {
     min-height:62px;
-    border:1px solid rgba(255,178,36,.45);
+    border:1px solid rgba(91,157,255,.32);
     border-radius:10px;
-    background:rgba(26,19,6,.5);
-    color:#ffe2a6;
+    background:rgba(10,17,28,.55);
+    color:#cfe0fb;
     font-family:var(--md-display);
     font-size:1rem;
     font-weight:950;
     text-transform:uppercase;
     letter-spacing:.04em;
-    box-shadow:0 0 14px rgba(255,178,36,.14);
+    box-shadow:0 0 12px rgba(91,157,255,.12);
     cursor:pointer;
-  }
-  .break-preset-grid button.wait {
-    border-color:rgba(91,157,255,.4);
-    background:rgba(10,17,28,.55);
-    color:#a9c7f5;
-    box-shadow:0 0 14px rgba(91,157,255,.14);
   }
   .break-preset-grid button:active { transform:translateY(1px); }
   /* Ledger lines: information, not actions — no card chrome. */

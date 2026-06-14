@@ -26,7 +26,11 @@
   .md-gps-options{display:grid;gap:6px;margin-top:6px;}
   .md-gps-option{display:block;width:100%;text-align:left;padding:9px 11px;border:1px solid rgba(91,157,255,.3);border-radius:8px;background:rgba(10,17,28,.7);color:#dbe7ff;font:inherit;font-size:.84rem;font-weight:700;line-height:1.35;cursor:pointer;overflow-wrap:anywhere;}
   .md-gps-option small{display:block;margin-top:2px;color:#8fa3bf;font-size:.72rem;font-weight:600;}
-  .md-gps-option[aria-pressed="true"]{border-color:rgba(91,157,255,.7);background:rgba(91,157,255,.16);box-shadow:0 0 10px rgba(91,157,255,.25);color:#fff;}
+  .md-gps-option[aria-pressed="true"]{border-color:rgba(43,213,118,.7);background:rgba(16,40,28,.72);box-shadow:0 0 12px rgba(43,213,118,.22);color:#eafff3;}
+  /* Once a match is tapped, collapse the alternatives so the pick is unambiguous. */
+  .md-gps-options.is-chosen .md-gps-option[aria-pressed="false"]{display:none;}
+  .md-gps-change{margin-top:6px;background:none;border:0;padding:2px 0;color:#7fb2ff;font:inherit;font-size:.74rem;font-weight:800;text-decoration:underline;cursor:pointer;}
+  .md-gps-change[hidden]{display:none;}
   .md-gps-option:active{transform:translateY(1px);}
 </style>
 <script>
@@ -167,6 +171,19 @@
     wrap.appendChild(heading);
     var list = document.createElement('div');
     list.className = 'md-gps-options';
+
+    // After a pick, the list collapses to the chosen row; this re-expands it.
+    var changeBtn = document.createElement('button');
+    changeBtn.type = 'button';
+    changeBtn.className = 'md-gps-change';
+    changeBtn.textContent = 'Change selection';
+    changeBtn.hidden = true;
+    changeBtn.addEventListener('click', function () {
+      list.classList.remove('is-chosen');
+      changeBtn.hidden = true;
+      heading.textContent = opts.heading + (candidates.length > 1 ? ' - tap one to use it' : '');
+    });
+
     candidates.slice(0, opts.max).forEach(function (cand, index) {
       var option = document.createElement('button');
       option.type = 'button';
@@ -185,10 +202,17 @@
           other.setAttribute('aria-pressed', 'false');
         });
         option.setAttribute('aria-pressed', 'true');
+        // Hide the alternatives so the driver can see what they picked.
+        if (candidates.length > 1) {
+          list.classList.add('is-chosen');
+          changeBtn.hidden = false;
+          heading.textContent = opts.heading;
+        }
       });
       list.appendChild(option);
     });
     wrap.appendChild(list);
+    wrap.appendChild(changeBtn);
     panel.appendChild(wrap);
   }
 

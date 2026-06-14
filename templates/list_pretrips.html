@@ -324,27 +324,26 @@
         <a href="{{ url_for('driver.new_pretrip') }}" class="btn btn-sm btn-primary">New PreTrip</a>
       </div>
 
-      {# The required action first — everything else is history below it. #}
+      {# Surface only an actionable state. "PreTrip Needed" is intentionally
+         dropped — the New PreTrip button above is already that call to action. #}
       {% set today_pts = pretrips|default([])|selectattr('pretrip_date', 'equalto', today_local_date)|list %}
       {% set open_pts = pretrips|default([])|rejectattr('posttrip')|list %}
       {% set my_open_pts = open_pts|selectattr('user_id', 'equalto', current_user.id)|list %}
-      <div class="inspection-now {% if not today_pts or open_pts %}warn{% endif %}">
+      {% if open_pts or today_pts %}
+      <div class="inspection-now {% if open_pts %}warn{% endif %}">
         <div>
           <span>Current action</span>
           {% if open_pts %}
             <strong>PostTrip Due &mdash; Truck {{ open_pts[0].truck_number or selected_truck_number }}</strong>
-          {% elif today_pts %}
-            <strong>PreTrip Complete &middot; No Open Defects</strong>
           {% else %}
-            <strong>PreTrip Needed</strong>
+            <strong>PreTrip Complete &middot; No Open Defects</strong>
           {% endif %}
         </div>
         {% if my_open_pts %}
           <a class="btn btn-sm btn-warning" href="{{ url_for('driver.do_posttrip', pretrip_id=my_open_pts[0].id) }}">Complete PostTrip</a>
-        {% elif not today_pts %}
-          <a class="btn btn-sm btn-warning" href="{{ url_for('driver.new_pretrip') }}">Start PreTrip</a>
         {% endif %}
       </div>
+      {% endif %}
 
       {% if inspection_trucks|length > 1 %}
         <div class="inspection-truck-list" aria-label="Current truck inspection choices">
@@ -366,7 +365,7 @@
         {% endfor %}
         {% set open_posttrip_count = pretrips|length - completed_posttrip_count.value %}
         <div class="inspection-switch" role="tablist" aria-label="Inspection views" data-inspection-switch>
-          <button type="button" class="inspection-switch-btn" role="tab" aria-selected="false" aria-controls="panel-prepost" data-insp-target="panel-prepost">
+          <button type="button" class="inspection-switch-btn active" role="tab" aria-selected="true" aria-controls="panel-prepost" data-insp-target="panel-prepost">
             <strong>PreTrips and PostTrips</strong>
             <span>{{ pretrips|length }} record{{ 's' if pretrips|length != 1 else '' }}{% if open_posttrip_count %} &middot; {{ open_posttrip_count }} open{% else %} &middot; all complete{% endif %}</span>
           </button>
@@ -375,9 +374,7 @@
             <span>{{ truck_history|length }} histor{{ 'ies' if truck_history|length != 1 else 'y' }}</span>
           </button>
         </div>
-        <p class="inspection-hint" data-inspection-hint>Select PreTrips and PostTrips or Fuel and Maintenance to view records for Truck {{ selected_truck_number }}.</p>
-
-        <section id="panel-prepost" class="inspection-panel" role="tabpanel" aria-label="PreTrip and PostTrip records" hidden>
+        <section id="panel-prepost" class="inspection-panel" role="tabpanel" aria-label="PreTrip and PostTrip records">
         <p class="inspection-section-title">PreTrip and PostTrip Records</p>
         {% if pretrips %}
           <div class="inspection-card-list">
