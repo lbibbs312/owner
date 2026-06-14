@@ -1009,9 +1009,11 @@
         }
         function syncStartButton() {
           var button = startRouteButton();
-          if (!button || !requireDestination) return;
+          if (!button) return;
+          // Destination is optional — keep the action tappable so it never
+          // dead-ends; missing data is handled on submit / server-side.
           repairDestinationFieldsFromCard();
-          button.disabled = !(locationKnown() && (destinationConfirmed() || typedDestinationReady() || destinationSkipped()));
+          button.disabled = false;
         }
 
         function confirmSelectedDestination() {
@@ -1303,12 +1305,9 @@
     </div>
     {% endif %}
 
-    {% set gate_destination = current_user.is_day_driver and not has_today_logs and config.ENABLE_DESTINATION_AUTOCOMPLETE %}
-    {% if gate_destination %}
-    {{ form.submit(class="btn btn-primary", id="startRouteBtn", value="Start Route", disabled=True) }}
-    {% else %}
+    {# Destination is optional, so never disable the action — let the driver
+       record the stop and validate server-side instead of dead-ending. #}
     {{ form.submit(class="btn btn-primary", id="startRouteBtn", value=("Start Route" if not has_today_logs else "Record Stop")) }}
-    {% endif %}
   </form>
 </div>
 
