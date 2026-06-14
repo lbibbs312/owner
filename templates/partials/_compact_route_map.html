@@ -329,6 +329,12 @@
         <strong>{{ add_stop_label }}</strong>
         <small>Use when you are at the stop now</small>
       </a>
+      {% if end_route_url and secondary_cta and secondary_cta.action == 'end_route' %}
+      {# Between loads: keep ending the shift available without forcing it. #}
+      <form action="{{ end_route_url }}" method="POST" style="margin:8px 0 0">
+        <button type="submit" style="width:100%;padding:11px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(148,163,184,.28);color:#9fb0c9;font-family:var(--md-mono,ui-monospace,monospace);font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">{{ secondary_cta.label or 'End Shift' }}</button>
+      </form>
+      {% endif %}
     </div>
   {% elif primary_cta and primary_action in ['attach_document', 'finalize_route', 'print_route', 'view_route', 'route_history', 'start_shift'] and urls.get(primary_action) %}
     <div class="md-flow-primary-cta-wrap" aria-label="Primary route action">

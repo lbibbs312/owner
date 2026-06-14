@@ -471,13 +471,18 @@ def build_route_cta_context(
                         + ". Record your arrival when you get there."
                     )
                 else:
-                    # All stops are closed but the shift is not ended. The next action
-                    # is End Shift; PostTrip becomes required INSIDE that flow, never
-                    # surfaced as the CTA right after the route (rules 4 & 5).
-                    next_action = "End Shift"
-                    primary = _route_cta("End Shift", "end_route")
-                    allowed_actions = ["end_route", "print_route", "view_route"]
-                    route_message = "All stops are closed. End your shift to finish the route."
+                    # Every stop is closed and nothing is in transit. In day-driver
+                    # freight the driver runs back-to-back loads, so a delivered last
+                    # stop is not the end of the shift — keep the route continuable
+                    # (Arrive at Next Stop) with End Shift as a deliberate secondary
+                    # instead of dead-ending into finalize. PostTrip still becomes
+                    # required inside the End Shift flow, never as the CTA here.
+                    display_mode = "active_route"
+                    next_action = "Arrive at Next Stop"
+                    primary = _route_cta("Arrive at Next Stop", "add_stop")
+                    secondary = _route_cta("End Shift", "end_route", "ghost")
+                    allowed_actions = ["add_stop", "end_route", "print_route", "view_route"]
+                    route_message = "Last stop delivered. Tap Arrive at Next Stop when you reach the next one, or End Shift if you are done."
         else:
             display_mode = "read_only_history" if selected_date_forced else "last_route"
             next_action = "Start new shift or View last route"
