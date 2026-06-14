@@ -22,11 +22,18 @@
   .md-gps-fill:active{box-shadow:0 0 16px rgba(91,157,255,.32);}
   .md-gps-fill[disabled]{opacity:.55;cursor:wait;}
   .md-gps-panel{margin-top:6px;font-size:.78rem;font-weight:600;color:#8fa3bf;line-height:1.4;}
-  .md-gps-panel label{display:block;margin-top:6px;color:#b8c7dd;font-size:.72rem;font-weight:900;text-transform:uppercase;}
+  .md-gps-status{margin:6px 0;color:#9fb3d1;font-weight:800;}
+  .md-gps-panel label{display:block;margin-top:8px;color:#b8c7dd;font-size:.72rem;font-weight:900;text-transform:uppercase;}
   .md-gps-options{display:grid;gap:6px;margin-top:6px;}
   .md-gps-option{display:block;width:100%;text-align:left;padding:9px 11px;border:1px solid rgba(91,157,255,.3);border-radius:8px;background:rgba(10,17,28,.7);color:#dbe7ff;font:inherit;font-size:.84rem;font-weight:700;line-height:1.35;cursor:pointer;overflow-wrap:anywhere;}
   .md-gps-option small{display:block;margin-top:2px;color:#8fa3bf;font-size:.72rem;font-weight:600;}
+  .md-gps-address-choice .md-gps-option{border-color:rgba(148,163,184,.34);background:rgba(10,17,28,.52);color:#cbd5e1;}
+  .md-gps-address-choice .md-gps-option small{color:#94a3b8;}
+  .md-gps-place-choice .md-gps-option{border-color:rgba(91,157,255,.42);background:rgba(18,31,54,.78);color:#eaf2ff;}
   .md-gps-option[aria-pressed="true"]{border-color:rgba(43,213,118,.7);background:rgba(16,40,28,.72);box-shadow:0 0 12px rgba(43,213,118,.22);color:#eafff3;}
+  .md-gps-picked{margin-top:8px;padding:9px 11px;border:1px solid rgba(43,213,118,.58);border-radius:8px;background:rgba(16,40,28,.58);color:#eafff3;box-shadow:0 0 12px rgba(43,213,118,.14);}
+  .md-gps-picked strong{display:block;font-size:.76rem;font-weight:950;text-transform:uppercase;letter-spacing:.04em;}
+  .md-gps-picked small{display:block;margin-top:2px;color:#a7f3d0;font-size:.72rem;font-weight:700;overflow-wrap:anywhere;}
   /* Once a match is tapped, collapse the alternatives so the pick is unambiguous. */
   .md-gps-options.is-chosen .md-gps-option[aria-pressed="false"]{display:none;}
   .md-gps-change{margin-top:6px;background:none;border:0;padding:2px 0;color:#7fb2ff;font:inherit;font-size:.74rem;font-weight:800;text-decoration:underline;cursor:pointer;}
@@ -158,9 +165,34 @@
     line.textContent = message || '';
   }
 
+  function clearSelectionSummary(panel) {
+    var picked = panel.querySelector('.md-gps-picked');
+    if (picked) picked.remove();
+  }
+
+  function clearSuggestionGroups(panel, title, detail) {
+    panel.querySelectorAll('.md-gps-address-choice, .md-gps-place-choice').forEach(function (node) {
+      node.remove();
+    });
+    clearSelectionSummary(panel);
+    if (!title) return;
+    var picked = document.createElement('div');
+    picked.className = 'md-gps-picked';
+    var main = document.createElement('strong');
+    main.textContent = title;
+    picked.appendChild(main);
+    if (detail) {
+      var small = document.createElement('small');
+      small.textContent = detail;
+      picked.appendChild(small);
+    }
+    panel.appendChild(picked);
+  }
+
   // Every candidate is a visible tappable row — a collapsed <select> hides
   // the alternatives and drivers never realize there is more than one match.
   function renderOptionList(panel, candidates, opts) {
+    clearSelectionSummary(panel);
     var old = panel.querySelector('.' + opts.className);
     if (old) old.remove();
     if (!candidates || !candidates.length) return;
@@ -198,6 +230,14 @@
       }
       option.addEventListener('click', function () {
         opts.use(cand);
+        if (opts.confirmTitle) {
+          clearSuggestionGroups(
+            panel,
+            opts.confirmTitle(cand),
+            opts.confirmDetail ? opts.confirmDetail(cand) : ''
+          );
+          return;
+        }
         list.querySelectorAll('.md-gps-option').forEach(function (other) {
           other.setAttribute('aria-pressed', 'false');
         });
@@ -219,12 +259,14 @@
   function renderAddressChoices(panel, btn, candidates, preselectFirst) {
     renderOptionList(panel, candidates, {
       className: 'md-gps-address-choice',
-      heading: 'Address matches',
+      heading: 'Current GPS address',
       max: 5,
       preselectFirst: !!preselectFirst,
       title: function (cand) { return addressValue(cand) || 'Nearby address'; },
-      meta: function () { return ''; },
-      use: function (cand) { applyAddress(btn, cand, true); }
+      meta: function () { return 'Current GPS address candidate'; },
+      use: function (cand) { applyAddress(btn, cand, true); },
+      confirmTitle: function () { return 'Current GPS address set'; },
+      confirmDetail: function (cand) { return addressValue(cand); }
     });
   }
 
@@ -242,7 +284,18 @@
         if (distance) bits.push(distance);
         return bits.join(' · ');
       },
-      use: function (cand) { apply(btn, cand, true); }
+      use: function (cand) { apply(btn, cand, true); },
+      confirmTitle: function (cand) {
+        return isFuelLookup(btn) ? 'Fuel station selected' : 'Location selected';
+      },
+      confirmDetail: function (cand) {
+        var bits = [];
+        if (cand.name) bits.push(cand.name);
+        if (cand.address) bits.push(cand.address);
+        var distance = formatDistance(cand);
+        if (distance) bits.push(distance);
+        return bits.join(' · ');
+      }
     });
   }
 
@@ -262,6 +315,7 @@
     }
     btn.disabled = true;
     status(panel, 'Getting GPS fix...');
+    clearSuggestionGroups(panel, '', '');
     navigator.geolocation.getCurrentPosition(function (position) {
       var lat = position.coords.latitude;
       var lng = position.coords.longitude;
@@ -278,18 +332,27 @@
           if (!addresses.length && data && data.fallback_address) addresses = [{ address: data.fallback_address }];
           var best = places[0] || null;
           // addresses[0] is auto-filled below whenever addresses exist.
-          renderAddressChoices(panel, btn, addresses, true);
+          renderAddressChoices(panel, btn, addresses, false);
           if (addresses.length && (!best || !trusted(best))) {
             applyAddress(btn, addresses[0], false);
             var fuelSuggestion = suggestFuelPlace(btn, places);
             if (fuelSuggestion) {
               status(panel, 'Suggested nearest fuel station: ' + (fuelSuggestion.name || fuelSuggestion.address));
+              clearSuggestionGroups(
+                panel,
+                isFuelLookup(btn) ? 'Fuel station selected' : 'Location selected',
+                [
+                  fuelSuggestion.name,
+                  fuelSuggestion.address,
+                  formatDistance(fuelSuggestion)
+                ].filter(Boolean).join(' · ')
+              );
             } else {
               status(panel, isFuelLookup(btn)
                 ? 'GPS street address set. Pick the fuel station if it is shown below.'
                 : 'GPS street address: ' + addressValue(addresses[0]));
+              renderChoices(panel, btn, places, false);
             }
-            renderChoices(panel, btn, places, !!fuelSuggestion);
           } else if (best && trusted(best)) {
             if (addresses.length) applyAddress(btn, addresses[0], false);
             apply(btn, best, false);
@@ -297,13 +360,33 @@
               ? 'GPS ' + fuelLabel(btn) + ': ' + (best.name || best.address) + ' at this address'
               : 'GPS ' + fuelLabel(btn) + ': ' + (best.name || best.address) +
                 (formatDistance(best) ? ' (' + formatDistance(best) + ')' : ''));
-            renderChoices(panel, btn, places, true);
+            clearSuggestionGroups(
+              panel,
+              isFuelLookup(btn) ? 'Fuel station selected' : 'Location selected',
+              [
+                best.name,
+                best.address,
+                formatDistance(best)
+              ].filter(Boolean).join(' · ')
+            );
           } else if (places.length) {
             var suggested = suggestFuelPlace(btn, places);
             status(panel, suggested
               ? 'Suggested nearest fuel station: ' + (suggested.name || suggested.address)
               : 'Nearby ' + (isFuelLookup(btn) ? 'fuel stations' : 'customer names') + ' are suggestions only.');
-            renderChoices(panel, btn, places, !!suggested);
+            if (suggested) {
+              clearSuggestionGroups(
+                panel,
+                isFuelLookup(btn) ? 'Fuel station selected' : 'Location selected',
+                [
+                  suggested.name,
+                  suggested.address,
+                  formatDistance(suggested)
+                ].filter(Boolean).join(' · ')
+              );
+            } else {
+              renderChoices(panel, btn, places, false);
+            }
           } else {
             status(panel, lookupFailedMessage(data));
             renderChoices(panel, btn, [], false);

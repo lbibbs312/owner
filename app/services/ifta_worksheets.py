@@ -17,6 +17,12 @@ from app.services.file_integrity import sha256_file
 
 IFTA_REVIEW_STATUSES = ("Draft", "Needs Review", "Ready for Tax Preparer", "Closed")
 IMAGE_RECEIPT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+QUARTER_MONTHS = {
+    1: "Jan-Mar",
+    2: "Apr-Jun",
+    3: "Jul-Sep",
+    4: "Oct-Dec",
+}
 
 
 def _clean(value, default=None):
@@ -62,6 +68,23 @@ def _label_date(value):
 def _join_parts(*values, separator=" "):
     parts = [str(value).strip() for value in values if str(value or "").strip()]
     return separator.join(parts) or None
+
+
+def _quarter_number(value):
+    value = _clean(value)
+    if not value:
+        return None
+    match = re.search(r"([1-4])", value)
+    return int(match.group(1)) if match else None
+
+
+def reporting_period_label(quarter, year):
+    number = _quarter_number(quarter)
+    year_label = str(year).strip() if year not in (None, "") else ""
+    if number:
+        label = f"Q{number} ({QUARTER_MONTHS[number]})"
+        return _join_parts(label, year_label)
+    return _join_parts(quarter, year_label)
 
 
 def _city_state(city, state):
@@ -426,14 +449,13 @@ def ifta_fuel_rows(worksheet):
 
 
 def ifta_cover_fields(worksheet):
-    quarter_year = _join_parts(worksheet.reporting_period_quarter, worksheet.reporting_year)
     fields = [
         ("Driver", worksheet.driver.display_name if worksheet.driver else None),
         ("Truck", worksheet.truck),
         ("Trailer", worksheet.trailer),
         ("VIN and unit", worksheet.vin_or_vehicle_unit_number),
         ("Fleet number", worksheet.fleet_number),
-        ("Quarter and year", quarter_year),
+        ("Reporting period", reporting_period_label(worksheet.reporting_period_quarter, worksheet.reporting_year)),
     ]
     return [(label, value) for label, value in fields if value not in (None, "")]
 
@@ -612,11 +634,10 @@ def build_fuel_mileage_report(worksheet, *, generated_by):
         [row.trip_start_date for row in worksheet.trip_rows],
         [row.trip_end_date for row in worksheet.trip_rows],
     )
-    quarter_year = _join_parts(worksheet.reporting_period_quarter, worksheet.reporting_year)
     vehicle_fields = [
         ("Driver", worksheet.driver.display_name if worksheet.driver else None),
         ("Date range", date_range),
-        ("Quarter", quarter_year),
+        ("Reporting period", reporting_period_label(worksheet.reporting_period_quarter, worksheet.reporting_year)),
         ("Truck", worksheet.truck),
         ("Trailer", worksheet.trailer),
         ("Vehicle unit", worksheet.vin_or_vehicle_unit_number),

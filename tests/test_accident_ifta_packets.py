@@ -93,8 +93,12 @@ def test_driver_packet_entry_pages_use_clear_labels_and_neutral_defaults(client,
     assert 'data-fuel-type="Diesel"' in fuel_body
     assert 'data-fuel-type="DEF"' in fuel_body
     assert 'data-gps-hint="fuel station truck stop"' in fuel_body
+    assert "Current GPS address" in fuel_body
+    assert "Current GPS address candidate" in fuel_body
     assert "Nearby fuel stations" in fuel_body
     assert "Suggested nearest fuel station" in fuel_body
+    assert "Fuel station selected" in fuel_body
+    assert "clearSuggestionGroups" in fuel_body
     assert "IFTA license number" not in fuel_body
     assert "Base jurisdiction" not in fuel_body
     assert 'name="tax_paid"' not in fuel_body
@@ -337,6 +341,10 @@ def test_ifta_packet_includes_support_fields_and_missing_receipt_state(client, a
     assert "Receipt hash: None" not in view_body
     assert "Fuel & Mileage Report" in view_text
     assert "IFTA Worksheet" in view_text
+    assert "Reporting period" in view_text
+    assert "Q2 (Apr-Jun) 2026" in view_text
+    assert "IFTA Review Details" in view_text
+    assert "MoveDefense Demo Carrier" in view_text
 
     fuel_report = client.get("/ifta-worksheet/1/fuel-mileage-report")
     assert fuel_report.status_code == 200
@@ -430,6 +438,8 @@ def test_fuel_mileage_report_handles_fuel_only_odometer_without_ifta_checklist(c
     response = client.post(
         "/ifta-worksheet/new",
         data={
+            "reporting_period_quarter": "Q2",
+            "reporting_year": "2026",
             "purchase_date": "2026-06-14",
             "seller_name": "Walmart Supercenter",
             "seller_address": "3505 Kraft Ave SE",
@@ -443,6 +453,13 @@ def test_fuel_mileage_report_handles_fuel_only_odometer_without_ifta_checklist(c
         follow_redirects=False,
     )
     assert response.status_code == 302
+
+    view = client.get("/ifta-worksheet/1")
+    assert view.status_code == 200
+    view_text = visible_text(view.get_data(as_text=True))
+    assert "Reporting period Q2 (Apr-Jun) 2026" in view_text
+    assert "Base jurisdiction" not in view_text
+    assert "Carrier" not in view_text
 
     report = client.get("/ifta-worksheet/1/fuel-mileage-report")
     assert report.status_code == 200
@@ -481,6 +498,11 @@ def test_ifta_receipt_photo_renders_on_view_and_packet(client, app):
     )
     assert response.status_code == 302
 
+    with app.app_context():
+        from app.models import IftaFuelRecord
+
+        receipt_hash = IftaFuelRecord.query.one().receipt_hash
+
     view = client.get(response.headers["Location"])
     body = view.get_data(as_text=True)
     assert "Pilot Fuel" in body
@@ -489,6 +511,9 @@ def test_ifta_receipt_photo_renders_on_view_and_packet(client, app):
     assert 'class="ifta-receipt-open"' in body
     assert 'class="ifta-receipt-preview"' in body
     assert "Open receipt" in body
+    assert "Receipt proof hash" in body
+    assert receipt_hash in body
+    assert "Receipt hash:" not in body
 
     packet = client.get("/ifta-worksheet/1/packet")
     packet_body = packet.get_data(as_text=True)
@@ -498,6 +523,8 @@ def test_ifta_receipt_photo_renders_on_view_and_packet(client, app):
     assert "ifta-receipt-1-" in packet_body
     assert ".jpg" in packet_body
     assert "Receipt Photos and File Hashes" in packet_body
+    assert "Receipt proof hash" in packet_body
+    assert receipt_hash in packet_body
     assert "Photo not available in upload storage" not in packet_body
 
 
