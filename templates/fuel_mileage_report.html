@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ report.report_title }} {{ report.document_number }}</title>
+  <style>
+    :root {
+      color-scheme:light;
+      --ink:#111827;
+      --muted:#526179;
+      --line:#cbd5e1;
+      --soft:#f8fafc;
+      --green:#166534;
+      --blue:#1d4ed8;
+    }
+    * { box-sizing:border-box; }
+    body {
+      margin:0;
+      background:#e8edf3;
+      color:var(--ink);
+      font-family:Arial, Helvetica, sans-serif;
+      line-height:1.35;
+    }
+    .doc {
+      max-width:920px;
+      margin:0 auto;
+      padding:18px;
+    }
+    .actions {
+      display:flex;
+      justify-content:flex-end;
+      gap:8px;
+      margin-bottom:10px;
+    }
+    .actions a,
+    .actions button {
+      border:1px solid #111827;
+      border-radius:4px;
+      background:#fff;
+      color:#111827;
+      padding:8px 12px;
+      font:700 .86rem Arial, Helvetica, sans-serif;
+      text-decoration:none;
+      cursor:pointer;
+    }
+    .actions button { background:#111827; color:#fff; }
+    .sheet {
+      background:#fff;
+      border:1px solid var(--line);
+      padding:30px 34px;
+      box-shadow:0 10px 24px rgba(15,23,42,.08);
+    }
+    .header {
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      gap:24px;
+      align-items:start;
+      border-bottom:3px solid var(--ink);
+      padding-bottom:14px;
+      margin-bottom:16px;
+    }
+    .brand {
+      display:block;
+      margin-bottom:4px;
+      color:var(--muted);
+      font-size:.68rem;
+      font-weight:900;
+      letter-spacing:.09em;
+      text-transform:uppercase;
+    }
+    h1 {
+      margin:0;
+      font-size:1.55rem;
+      line-height:1.08;
+      font-weight:900;
+    }
+    .meta {
+      min-width:230px;
+      text-align:right;
+      color:#243041;
+      font-size:.76rem;
+      line-height:1.48;
+      font-weight:700;
+      white-space:nowrap;
+    }
+    .lede {
+      margin:0 0 14px;
+      color:#374151;
+      font-size:.9rem;
+      font-weight:700;
+    }
+    .summary {
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      border:1px solid var(--line);
+      margin-bottom:16px;
+    }
+    .summary div {
+      min-width:0;
+      padding:10px 11px;
+      border-right:1px solid #e5e7eb;
+      border-bottom:1px solid #e5e7eb;
+    }
+    .summary div:nth-child(4n) { border-right:0; }
+    .summary span,
+    .field-grid span,
+    .label,
+    .receipt-meta span {
+      display:block;
+      color:#64748b;
+      font-size:.64rem;
+      font-weight:900;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+    .summary strong {
+      display:block;
+      margin-top:3px;
+      color:#111827;
+      font-size:.98rem;
+      font-weight:900;
+      overflow-wrap:anywhere;
+    }
+    .section {
+      margin-top:16px;
+      page-break-inside:avoid;
+      break-inside:avoid;
+    }
+    .section h2 {
+      margin:0 0 9px;
+      padding-bottom:6px;
+      border-bottom:1px solid var(--line);
+      color:#111827;
+      font-size:.82rem;
+      font-weight:900;
+      letter-spacing:.07em;
+      text-transform:uppercase;
+      page-break-after:avoid;
+      break-after:avoid;
+    }
+    .field-grid {
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      border:1px solid #e5e7eb;
+    }
+    .field-grid div {
+      min-width:0;
+      padding:8px 10px;
+      border-right:1px solid #e5e7eb;
+      border-bottom:1px solid #e5e7eb;
+    }
+    .field-grid div:nth-child(3n) { border-right:0; }
+    .field-grid strong {
+      display:block;
+      margin-top:2px;
+      color:#111827;
+      font-size:.88rem;
+      font-weight:900;
+      overflow-wrap:anywhere;
+    }
+    table {
+      width:100%;
+      border-collapse:collapse;
+      margin-top:6px;
+    }
+    th,
+    td {
+      border:1px solid var(--line);
+      padding:6px 7px;
+      font-size:.76rem;
+      text-align:left;
+      vertical-align:top;
+      overflow-wrap:anywhere;
+    }
+    th {
+      background:var(--soft);
+      color:#374151;
+      font-size:.63rem;
+      font-weight:900;
+      letter-spacing:.05em;
+      text-transform:uppercase;
+    }
+    .numeric { text-align:right; white-space:nowrap; }
+    .receipt-grid {
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:12px;
+    }
+    .receipt-card {
+      border:1px solid var(--line);
+      padding:10px;
+      page-break-inside:avoid;
+      break-inside:avoid;
+    }
+    .receipt-card h3 {
+      margin:0 0 7px;
+      font-size:.9rem;
+      font-weight:900;
+    }
+    .receipt-preview {
+      display:block;
+      width:100%;
+      max-height:230px;
+      object-fit:contain;
+      margin-bottom:8px;
+      border:1px solid #e5e7eb;
+      background:#fff;
+    }
+    .receipt-file-link {
+      display:inline-block;
+      color:#111827;
+      font-size:.78rem;
+      font-weight:900;
+      text-decoration:none;
+    }
+    .receipt-meta {
+      display:grid;
+      gap:5px;
+      margin-top:7px;
+    }
+    .receipt-meta strong,
+    .hash {
+      display:block;
+      color:#111827;
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size:.68rem;
+      font-weight:800;
+      overflow-wrap:anywhere;
+    }
+    .empty-note {
+      margin:0;
+      border:1px solid #dbe4ee;
+      background:#f8fafc;
+      padding:10px;
+      color:#475569;
+      font-weight:800;
+    }
+    .footer {
+      margin-top:20px;
+      padding-top:8px;
+      border-top:1px solid var(--line);
+      color:#64748b;
+      font-size:.68rem;
+      font-weight:700;
+    }
+    @media (max-width:760px) {
+      .doc { padding:10px; }
+      .sheet { padding:22px 18px; }
+      .header { grid-template-columns:1fr; }
+      .meta { min-width:0; text-align:left; white-space:normal; }
+      .summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .summary div:nth-child(4n) { border-right:1px solid #e5e7eb; }
+      .summary div:nth-child(2n) { border-right:0; }
+      .field-grid,
+      .receipt-grid { grid-template-columns:1fr; }
+      .field-grid div { border-right:0; }
+    }
+    @media print {
+      @page { size:letter; margin:.45in; }
+      body {
+        background:#fff;
+        -webkit-print-color-adjust:exact;
+        print-color-adjust:exact;
+      }
+      .doc { max-width:none; padding:0; }
+      .actions { display:none !important; }
+      .sheet { border:0; padding:0; box-shadow:none; }
+      .summary { grid-template-columns:repeat(4,minmax(0,1fr)); }
+      .field-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .field-grid div { border-right:1px solid #e5e7eb; }
+      .field-grid div:nth-child(3n) { border-right:0; }
+      .section { page-break-inside:auto; break-inside:auto; }
+      .receipt-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      a { color:#111827; text-decoration:none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="doc official-print-document">
+    <div class="actions no-print">
+      <a href="{{ back_url }}">Back</a>
+      <button type="button" onclick="window.print()">Print Report</button>
+    </div>
+    <article class="sheet">
+      <header class="header">
+        <div>
+          <span class="brand">MoveDefense</span>
+          <h1>{{ report.report_title }}</h1>
+        </div>
+        <div class="meta">
+          Document number: {{ report.document_number }}<br>
+          Generated: {{ report.generated_at }}<br>
+          Generated by: {{ report.generated_by }}
+        </div>
+      </header>
+
+      <p class="lede">Summary of fuel purchases, odometer readings, mileage notes, and receipt proof.</p>
+
+      <div class="summary" aria-label="Fuel and mileage summary">
+        {% for label, value in report.summary_cards %}
+          <div><span>{{ label }}</span><strong>{{ value }}</strong></div>
+        {% endfor %}
+      </div>
+
+      {% if report.vehicle_fields %}
+        <section class="section">
+          <h2>Driver and Vehicle</h2>
+          <div class="field-grid">
+            {% for label, value in report.vehicle_fields %}
+              <div><span>{{ label }}</span><strong>{{ value }}</strong></div>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+
+      <section class="section">
+        <h2>Fuel Purchases</h2>
+        {% if report.fuel_rows %}
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Location</th>
+                <th class="numeric">Volume</th>
+                <th>Fuel</th>
+                <th class="numeric">Amount</th>
+                <th>Receipt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in report.fuel_rows %}
+                <tr>
+                  <td>{{ row.date or '' }}</td>
+                  <td>
+                    <strong>{{ row.seller or row.label }}</strong>
+                    {% if row.address %}<br>{{ row.address }}{% endif %}
+                    {% if row.location %}<br>{{ row.location }}{% endif %}
+                  </td>
+                  <td class="numeric">{{ row.volume or '' }}</td>
+                  <td>{{ row.fuel_type or '' }}</td>
+                  <td class="numeric">{{ row.amount or '' }}</td>
+                  <td>{{ row.receipt_status }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p class="empty-note">No fuel purchases are saved in this report yet.</p>
+        {% endif %}
+      </section>
+
+      {% if report.has_mileage %}
+        <section class="section">
+          <h2>Odometer and Mileage</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Dates</th>
+                <th>Trip or route</th>
+                <th>Odometer</th>
+                <th class="numeric">Miles</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in report.mileage_rows %}
+                <tr>
+                  <td>{{ row.dates or '' }}</td>
+                  <td>
+                    {% if row.trip %}<strong>{{ row.trip }}</strong>{% endif %}
+                    {% if row.route %}<br><span class="label">Route</span>{{ row.route }}{% endif %}
+                  </td>
+                  <td>{{ row.odometer or '' }}</td>
+                  <td class="numeric">{{ row.distance or '' }}</td>
+                  <td>{{ row.notes or '' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </section>
+      {% endif %}
+
+      {% if report.has_receipts %}
+        <section class="section">
+          <h2>Receipt Proof</h2>
+          <div class="receipt-grid">
+            {% for row in report.receipt_rows %}
+              <article class="receipt-card">
+                {% set receipt_url = url_for(receipt_endpoint|default('driver.ifta_receipt'), fuel_id=row.fuel.id) %}
+                <h3>{{ row.label }}</h3>
+                {% if row.receipt_is_image %}
+                  <img class="receipt-preview" src="{{ receipt_url }}" alt="Fuel receipt row {{ row.number }}">
+                {% endif %}
+                <a class="receipt-file-link" href="{{ receipt_url }}">{{ row.receipt_report_label }}</a>
+                <div class="receipt-meta">
+                  {% if row.date %}<div><span>Date</span><strong>{{ row.date }}</strong></div>{% endif %}
+                  {% if row.amount %}<div><span>Amount</span><strong>{{ row.amount }}</strong></div>{% endif %}
+                  {% if row.receipt_hash %}<div><span>Receipt hash</span><strong class="hash">{{ row.receipt_hash }}</strong></div>{% endif %}
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+
+      <footer class="footer">
+        {{ report.document_number }} - {{ report.report_title }} - {{ report.generated_at }}
+      </footer>
+    </article>
+  </main>
+</body>
+</html>

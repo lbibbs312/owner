@@ -55,10 +55,12 @@
     <div class="ifta-actions">
       {% if manager_view|default(false) %}
         <a class="btn btn-outline-secondary" href="{{ url_for('manager.review_dashboard') }}">Review Queue</a>
-        <a class="btn btn-primary" href="{{ url_for('manager.ifta_worksheet_packet', worksheet_id=worksheet.id) }}">Packet</a>
+        <a class="btn btn-primary" href="{{ url_for('manager.fuel_mileage_report', worksheet_id=worksheet.id) }}">Fuel & Mileage Report</a>
+        <a class="btn btn-outline-secondary" href="{{ url_for('manager.ifta_worksheet_packet', worksheet_id=worksheet.id) }}">IFTA Worksheet</a>
       {% else %}
         <a class="btn btn-outline-secondary" href="{{ url_for('driver.mobile_dashboard') }}">Workspace</a>
-        <a class="btn btn-primary" href="{{ url_for('driver.ifta_worksheet_packet', worksheet_id=worksheet.id) }}">Packet</a>
+        <a class="btn btn-primary" href="{{ url_for('driver.fuel_mileage_report', worksheet_id=worksheet.id) }}">Fuel & Mileage Report</a>
+        <a class="btn btn-outline-secondary" href="{{ url_for('driver.ifta_worksheet_packet', worksheet_id=worksheet.id) }}">IFTA Worksheet</a>
       {% endif %}
     </div>
   </div>

@@ -33,10 +33,16 @@ def _format_number(value):
         return str(value)
 
 
-def _format_unit(value, unit):
+def _format_unit(value, unit, *, commas=False):
     number = _format_number(value)
     if number is None:
         return None
+    if commas:
+        try:
+            parsed = float(value)
+            number = f"{parsed:,.0f}" if parsed.is_integer() else f"{parsed:,.2f}".rstrip("0").rstrip(".")
+        except (TypeError, ValueError):
+            pass
     return f"{number} {unit}"
 
 
@@ -190,6 +196,8 @@ def create_ifta_worksheet_from_form(form, files, *, user, report_context=None):
             "nontaxable_distance",
             "toll_distance",
             "loaded_empty_deadhead",
+            "beginning_odometer",
+            "ending_odometer",
             "notes",
         )
     )
@@ -322,7 +330,7 @@ def worksheet_summaries(worksheet):
         "nontaxable_miles_by_jurisdiction": nontaxable_by_jurisdiction,
         "total_fuel_purchased_by_jurisdiction": fuel_by_jurisdiction,
         "total_gallons_liters_by_fuel_type": fuel_by_type,
-        "average_mpg_estimate": round(total_distance / total_fuel, 2) if total_fuel else None,
+        "average_mpg_estimate": round(total_distance / total_fuel, 2) if total_distance and total_fuel else None,
         "missing_odometer_rows": missing_odometer_rows,
         "missing_receipt_rows": missing_receipt_rows,
         "missing_jurisdiction_distance_rows": missing_jurisdiction_distance_rows,
@@ -526,6 +534,107 @@ def ifta_summary_cards(*, status, open_items, summaries, fuel_rows, receipt_rows
         if distance_rows:
             cards.append(("Jurisdictions", str(len(distance_rows))))
     return [(label, value) for label, value in cards if value not in (None, "")]
+
+
+def _report_date_range(*rows):
+    dates = []
+    for row in rows:
+        for value in row:
+            if value:
+                dates.append(value)
+    dates = sorted(set(dates))
+    if not dates:
+        return None
+    if len(dates) == 1:
+        return _label_date(dates[0])
+    return f"{_label_date(dates[0])} to {_label_date(dates[-1])}"
+
+
+def _receipt_report_label(row):
+    extension = os.path.splitext(row.get("receipt_photo") or "")[1].lower().lstrip(".")
+    if extension:
+        return f"Receipt image ({extension.upper()})" if extension in {"jpg", "jpeg", "png", "gif", "webp"} else f"Receipt file ({extension.upper()})"
+    return "Receipt file"
+
+
+def fuel_mileage_rows(worksheet):
+    rows = []
+    for index, row in enumerate(worksheet.trip_rows, 1):
+        odometer = None
+        if row.beginning_odometer is not None and row.ending_odometer is not None:
+            odometer = f"{_format_unit(row.beginning_odometer, 'mi', commas=True)} to {_format_unit(row.ending_odometer, 'mi', commas=True)}"
+        elif row.ending_odometer is not None:
+            odometer = _format_unit(row.ending_odometer, "mi", commas=True)
+        elif row.beginning_odometer is not None:
+            odometer = _format_unit(row.beginning_odometer, "mi", commas=True)
+        trip = _join_parts(_city_state(row.origin_city, row.origin_state), _city_state(row.destination_city, row.destination_state), separator=" to ")
+        dates = _join_parts(_label_date(row.trip_start_date), _label_date(row.trip_end_date), separator=" to ")
+        distance = _format_unit(row.total_trip_distance, "mi", commas=True)
+        if not any((dates, trip, row.route_traveled, odometer, distance, row.notes)):
+            continue
+        rows.append(
+            {
+                "number": index,
+                "dates": dates,
+                "trip": trip,
+                "route": row.route_traveled,
+                "odometer": odometer,
+                "distance": distance,
+                "notes": row.notes,
+            }
+        )
+    return rows
+
+
+def fuel_mileage_summary_cards(summaries, fuel_rows, receipt_rows, mileage_rows):
+    cards = [("Fuel records", str(len(fuel_rows)))]
+    if summaries["total_fuel"] > 0:
+        cards.append(("Fuel volume", _format_unit(summaries["total_fuel"], "gal/L", commas=True)))
+    if summaries["total_sale_amount"] > 0:
+        cards.append(("Fuel spend", _format_money(summaries["total_sale_amount"])))
+    if fuel_rows:
+        cards.append(("Receipt proof", f"{len(receipt_rows)} of {len(fuel_rows)} attached"))
+    if summaries["total_distance"] > 0:
+        cards.append(("Recorded miles", _format_unit(summaries["total_distance"], "mi", commas=True)))
+    if mileage_rows:
+        cards.append(("Mileage entries", str(len(mileage_rows))))
+    return [(label, value) for label, value in cards if value not in (None, "")]
+
+
+def build_fuel_mileage_report(worksheet, *, generated_by):
+    generated_at = datetime.utcnow()
+    summaries = worksheet_summaries(worksheet)
+    fuel_rows = ifta_fuel_rows(worksheet)
+    receipt_rows = [dict(row, receipt_report_label=_receipt_report_label(row)) for row in fuel_rows if row["receipt_available"]]
+    mileage_rows = fuel_mileage_rows(worksheet)
+    date_range = _report_date_range(
+        [row["fuel"].purchase_date for row in fuel_rows],
+        [row.trip_start_date for row in worksheet.trip_rows],
+        [row.trip_end_date for row in worksheet.trip_rows],
+    )
+    quarter_year = _join_parts(worksheet.reporting_period_quarter, worksheet.reporting_year)
+    vehicle_fields = [
+        ("Driver", worksheet.driver.display_name if worksheet.driver else None),
+        ("Date range", date_range),
+        ("Quarter", quarter_year),
+        ("Truck", worksheet.truck),
+        ("Trailer", worksheet.trailer),
+        ("Vehicle unit", worksheet.vin_or_vehicle_unit_number),
+    ]
+    return {
+        "worksheet": worksheet,
+        "document_number": f"FUEL-{worksheet.id:06d}",
+        "report_title": "Fuel & Mileage Report",
+        "generated_by": generated_by.display_name,
+        "generated_at": _label_dt(generated_at),
+        "summary_cards": fuel_mileage_summary_cards(summaries, fuel_rows, receipt_rows, mileage_rows),
+        "vehicle_fields": [(label, value) for label, value in vehicle_fields if value not in (None, "")],
+        "fuel_rows": fuel_rows,
+        "receipt_rows": receipt_rows,
+        "mileage_rows": mileage_rows,
+        "has_receipts": bool(receipt_rows),
+        "has_mileage": bool(mileage_rows),
+    }
 
 
 def build_ifta_packet(worksheet, *, generated_by):

@@ -1,3 +1,4 @@
+import html as html_lib
 import re
 from datetime import date, datetime
 from io import BytesIO
@@ -53,7 +54,7 @@ def login(client, login_name, password="password1"):
 def visible_text(html):
     text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", html, flags=re.I | re.S)
     text = re.sub(r"<[^>]+>", " ", text)
-    return re.sub(r"\s+", " ", text)
+    return html_lib.unescape(re.sub(r"\s+", " ", text))
 
 
 def test_accident_form_trigger_logic_is_not_forced_for_regular_damage():
@@ -331,8 +332,23 @@ def test_ifta_packet_includes_support_fields_and_missing_receipt_state(client, a
     assert response.status_code == 302
 
     view_body = client.get(response.headers["Location"]).get_data(as_text=True)
+    view_text = visible_text(view_body)
     assert "Receipt not attached" in view_body
     assert "Receipt hash: None" not in view_body
+    assert "Fuel & Mileage Report" in view_text
+    assert "IFTA Worksheet" in view_text
+
+    fuel_report = client.get("/ifta-worksheet/1/fuel-mileage-report")
+    assert fuel_report.status_code == 200
+    fuel_report_text = visible_text(fuel_report.get_data(as_text=True))
+    assert "Fuel & Mileage Report" in fuel_report_text
+    assert "Fuel Purchases" in fuel_report_text
+    assert "Odometer and Mileage" in fuel_report_text
+    assert "1,000 mi to 1,120 mi" in fuel_report_text
+    assert "Open Items for Review" not in fuel_report_text
+    assert "Add base jurisdiction" not in fuel_report_text
+    assert "Average MPG" not in fuel_report_text
+    assert "IFTA Support Worksheet" not in fuel_report_text
 
     packet = client.get("/ifta-worksheet/1/packet")
     assert packet.status_code == 200
@@ -404,6 +420,44 @@ def test_sparse_ifta_packet_is_review_checklist_not_fake_pages(client, app):
     assert "Receipt hash" not in text
     assert "Accurate Page" not in text
     assert "<nav" not in body
+
+
+def test_fuel_mileage_report_handles_fuel_only_odometer_without_ifta_checklist(client, app):
+    with app.app_context():
+        create_user("fuel_report_driver", "fuel-report@example.com", "driver", first_name="Fuel", last_name="Report")
+
+    login(client, "fuel_report_driver")
+    response = client.post(
+        "/ifta-worksheet/new",
+        data={
+            "purchase_date": "2026-06-14",
+            "seller_name": "Walmart Supercenter",
+            "seller_address": "3505 Kraft Ave SE",
+            "fuel_city": "Grand Rapids",
+            "state_or_province": "MI",
+            "gallons_or_liters": "10",
+            "total_sale_amount": "44.70",
+            "fuel_type": "Gas",
+            "ending_odometer": "110100",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    report = client.get("/ifta-worksheet/1/fuel-mileage-report")
+    assert report.status_code == 200
+    text = visible_text(report.get_data(as_text=True))
+
+    assert "Fuel & Mileage Report" in text
+    assert "Walmart Supercenter" in text
+    assert "10 gal/L" in text
+    assert "$44.70" in text
+    assert "110,100 mi" in text
+    assert "Open Items for Review" not in text
+    assert "Add trip origin/destination" not in text
+    assert "Distance by Jurisdiction" not in text
+    assert "Average MPG" not in text
+    assert "IFTA Support Worksheet" not in text
 
 
 def test_ifta_receipt_photo_renders_on_view_and_packet(client, app):

@@ -4,7 +4,8 @@
 {% include 'partials/_md_shell.html' %}
 {% set ctx = report_context or {} %}
 <style>
-  .fuel-form { max-width:920px; margin:0 auto; padding:22px 14px; }
+  .fuel-form { max-width:920px; margin:0 auto; padding:22px 14px; min-width:0; box-sizing:border-box; }
+  .fuel-form.responsive-workspace { min-width:0; width:auto; }
   @media (min-width:1000px) { .fuel-form { max-width:1120px; } }
   .fuel-form h1 { margin:0 0 4px; color:var(--md-text); font-family:var(--md-display); font-size:clamp(2rem, 6vw, 3rem); font-weight:950; letter-spacing:0; line-height:.98; text-transform:uppercase; }
   .fuel-form .lead { margin:0 0 18px; color:var(--md-muted, #64748b); font-weight:750; line-height:1.45; }
@@ -15,7 +16,7 @@
   .fuel-record-row:active { border-color:rgba(91,157,255,.55); box-shadow:0 0 12px rgba(91,157,255,.22); }
   .fuel-record-main { min-width:0; text-decoration:none; }
   .fuel-record-row strong { display:block; color:var(--md-text); font-size:.92rem; overflow-wrap:anywhere; }
-  .fuel-record-row span { display:block; margin-top:2px; color:var(--md-muted); font-family:var(--md-mono); font-size:.68rem; font-weight:800; line-height:1.35; }
+  .fuel-record-row span { display:block; margin-top:2px; color:var(--md-muted); font-family:var(--md-mono); font-size:.68rem; font-weight:800; line-height:1.35; overflow-wrap:anywhere; white-space:normal; }
   .fuel-record-cta { display:inline-flex !important; align-items:center; gap:5px; margin-top:0 !important; color:#7fb2ff !important; white-space:nowrap; text-decoration:none; }
   .fuel-record-cta--muted { color:#8fa3bf !important; opacity:.9; }
   .fuel-type-chips { display:flex; flex-wrap:wrap; gap:7px; margin-top:6px; }
@@ -26,7 +27,7 @@
   .context-pill span { display:block; color:var(--md-muted); font-family:var(--md-mono); font-size:.58rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
   .context-pill strong { display:block; margin-top:4px; color:var(--md-text); font-size:.86rem; font-weight:900; overflow-wrap:anywhere; }
   .field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-  .field-grid label { display:grid; gap:5px; color:var(--md-text); font-size:.82rem; font-weight:850; }
+  .field-grid label { display:grid; gap:5px; color:var(--md-text); font-size:.82rem; font-weight:850; min-width:0; }
   .field-grid input,
   .field-grid select,
   .field-grid textarea {
@@ -38,17 +39,80 @@
     color:var(--md-text, #f8fafc);
     font:inherit;
   }
+  .field-grid label.fuel-field--number,
+  .field-grid label.fuel-field--odo,
+  .field-grid label.fuel-field--receipt,
+  .field-grid label.fuel-field--type {
+    border:1px solid rgba(91,157,255,.28);
+    border-radius:8px;
+    padding:10px;
+    background:linear-gradient(180deg, rgba(91,157,255,.11), rgba(5,13,23,.58));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  .field-grid label.fuel-field--number input,
+  .field-grid label.fuel-field--odo input {
+    min-height:54px;
+    border-color:rgba(91,157,255,.48);
+    background:rgba(3,10,20,.9);
+    color:#fff;
+    font-size:1.25rem;
+    font-weight:950;
+    letter-spacing:0;
+  }
+  .field-grid label.fuel-field--odo {
+    border-color:rgba(240,184,96,.42);
+    background:linear-gradient(180deg, rgba(240,184,96,.13), rgba(5,13,23,.58));
+  }
+  .field-grid label.fuel-field--odo input {
+    border-color:rgba(240,184,96,.58);
+  }
+  .field-grid label.fuel-field--receipt {
+    grid-column:1 / -1;
+    border-color:rgba(34,197,94,.35);
+    background:linear-gradient(180deg, rgba(34,197,94,.1), rgba(5,13,23,.58));
+  }
+  .field-grid label.fuel-field--receipt input[type="file"] {
+    min-height:50px;
+    padding:10px;
+    border-color:rgba(34,197,94,.35);
+  }
+  .field-grid label.fuel-field--type {
+    border-color:rgba(125,211,252,.34);
+  }
   .field-grid option { background:#07111f; color:#f8fafc; }
   .field-grid textarea { min-height:96px; resize:vertical; }
   .actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
   @media (max-width:800px) {
     .context-grid, .field-grid, .fuel-record-row { grid-template-columns:1fr; }
+    body.md-shell { overflow-x:hidden; }
+    .fuel-form,
+    .fuel-section,
+    .field-grid,
+    .fuel-record-row,
+    .fuel-record-main {
+      max-width:100%;
+      min-width:0;
+    }
+    .fuel-form .lead,
+    .fuel-record-main,
+    .fuel-record-main strong,
+    .fuel-record-main span {
+      overflow-wrap:anywhere;
+    }
+    .fuel-form { overflow-x:hidden; padding-left:0; padding-right:12px; }
+    .fuel-location-line { flex-wrap:wrap; }
+    .fuel-location-line > input { flex-basis:100% !important; }
+    .actions { justify-content:stretch; }
+    .actions .btn { flex:1 1 150px; min-width:0; }
+  }
+  @media (max-width:520px) {
+    .actions .btn { flex-basis:100%; }
   }
 </style>
 
 <main class="fuel-form responsive-workspace">
   <h1>Fuel Records</h1>
-  <p class="lead">Save fuel, receipt, odometer, and route notes. MoveDefense can use these records for an IFTA support worksheet later.</p>
+  <p class="lead">Fuel, odometer, receipt.</p>
   {% set recent_fuel_rows = recent_fuel_rows|default([]) %}
   {% if recent_fuel_rows %}
     <section class="fuel-section" aria-label="Recent fuel records">
@@ -74,9 +138,7 @@
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
               </a>
             {% else %}
-              <span class="fuel-record-cta fuel-record-cta--muted" aria-label="No saved fuel receipt">
-                {% if record.receipt_photo %}Receipt unavailable{% else %}No receipt attached{% endif %}
-              </span>
+              <span class="fuel-record-cta fuel-record-cta--muted" aria-label="No saved fuel receipt">Receipt not attached</span>
             {% endif %}
           </article>
         {% endfor %}
@@ -106,7 +168,7 @@
       <div class="field-grid">
         <label>Purchase date <input type="date" name="purchase_date" value="{{ ctx.route_date_value or '' }}"></label>
 	        <label>Fuel location
-	          <span style="display:flex;gap:8px;align-items:stretch;">
+          <span class="fuel-location-line" style="display:flex;gap:8px;align-items:stretch;">
 	            <input type="text" name="seller_name" id="fuel-location" value="{{ ctx.fuel_seller_name or '' }}" placeholder="Station, truck stop, yard, or fuel stop" style="flex:1;min-width:0;">
 	            {% set gps_fill = {'name': '#fuel-location', 'address': '#fuel-address', 'city': '#fuel-city', 'state': '#fuel-state', 'hint': 'fuel station truck stop'} %}
 	            {% include 'partials/_gps_fill_button.html' %}
@@ -115,10 +177,10 @@
 	        <label>Fuel address <input type="text" name="seller_address" id="fuel-address" value="{{ ctx.fuel_seller_address or '' }}" placeholder="Street address"></label>
 	        <label>City <input type="text" name="fuel_city" id="fuel-city" value="{{ ctx.fuel_city or '' }}"></label>
 	        <label>State or province <input type="text" name="state_or_province" id="fuel-state" value="{{ ctx.fuel_state or '' }}"></label>
-        <label>Gallons or liters <input type="number" name="gallons_or_liters" step="any" inputmode="decimal" data-fuel-gallons></label>
-        <label>Price per gallon or liter <input type="number" name="price_per_gallon_or_liter" step="any" inputmode="decimal" data-fuel-ppg placeholder="e.g. 3.89"></label>
-        <label>Total amount <input type="number" name="total_sale_amount" step="any" inputmode="decimal" data-fuel-total placeholder="Auto: gallons × price"></label>
-        <label>Fuel type
+        <label class="fuel-field--number">Gallons or liters <input type="number" name="gallons_or_liters" step="any" inputmode="decimal" data-fuel-gallons></label>
+        <label class="fuel-field--number">Price per gallon or liter <input type="number" name="price_per_gallon_or_liter" step="any" inputmode="decimal" data-fuel-ppg placeholder="e.g. 3.89"></label>
+        <label class="fuel-field--number">Total amount <input type="number" name="total_sale_amount" step="any" inputmode="decimal" data-fuel-total placeholder="Auto: gallons x price"></label>
+        <label class="fuel-field--type">Fuel type
           <input type="text" name="fuel_type" id="fuel-type" placeholder="Diesel, gas, DEF, other">
           <span class="fuel-type-chips" aria-label="Fuel type presets">
             <button type="button" data-fuel-type="Diesel">Diesel</button>
@@ -126,8 +188,8 @@
             <button type="button" data-fuel-type="DEF">DEF</button>
           </span>
         </label>
-        <label>Odometer now <input type="number" name="ending_odometer" step="any" inputmode="decimal" value="{{ ctx.current_mileage or '' }}"></label>
-        <label>Receipt photo <input type="file" name="receipt_photo" accept="image/*,.pdf"></label>
+        <label class="fuel-field--odo">Odometer now <input type="number" name="ending_odometer" step="any" inputmode="decimal" value="{{ ctx.current_mileage or '' }}"></label>
+        <label class="fuel-field--receipt">Receipt photo <input type="file" name="receipt_photo" accept="image/*,.pdf"></label>
         <label>Note <textarea name="trip_notes" placeholder="Low fuel note, receipt issue, route mileage note, or other context."></textarea></label>
       </div>
     </section>

@@ -10,7 +10,7 @@
 {% set md_nav_active = md_nav_active|default('', true) %}
 {% set endpoint = request.endpoint|default('', true) %}
 {% if not md_nav_active %}
-  {% if endpoint in ['driver.new_ifta_worksheet', 'driver.view_ifta_worksheet', 'driver.ifta_worksheet_packet'] %}
+  {% if endpoint in ['driver.new_ifta_worksheet', 'driver.view_ifta_worksheet', 'driver.ifta_worksheet_packet', 'driver.fuel_mileage_report'] %}
     {% set md_nav_active = 'fuel' %}
   {% elif endpoint == 'driver.mobile_breaks' %}
     {% set md_nav_active = 'break' %}

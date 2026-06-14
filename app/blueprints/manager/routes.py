@@ -26,7 +26,7 @@ from app.services.database_status import database_status
 from app.services.accident_packets import build_accident_packet
 from app.services.driver_wait import dock_time_review_label
 from app.services.evidence_packet import build_damage_evidence_packet
-from app.services.ifta_worksheets import build_ifta_packet, ifta_receipt_path
+from app.services.ifta_worksheets import build_fuel_mileage_report, build_ifta_packet, ifta_receipt_path
 from app.services.packet_classification import PacketClassification, classify_damage_report, packet_label_for_report
 from app.services.document_numbers import (
     document_meta,
@@ -2396,6 +2396,19 @@ def ifta_worksheet_packet(worksheet_id):
     return render_template(
         "ifta_worksheet_packet.html",
         packet=packet,
+        manager_view=True,
+        receipt_endpoint="manager.ifta_receipt",
+        back_url=url_for("manager.view_ifta_worksheet", worksheet_id=worksheet.id),
+    )
+
+
+@bp.route("/ifta-worksheet/<int:worksheet_id>/fuel-mileage-report")
+def fuel_mileage_report(worksheet_id):
+    worksheet = IftaWorksheet.query.get_or_404(worksheet_id)
+    report = build_fuel_mileage_report(worksheet, generated_by=current_user)
+    return render_template(
+        "fuel_mileage_report.html",
+        report=report,
         manager_view=True,
         receipt_endpoint="manager.ifta_receipt",
         back_url=url_for("manager.view_ifta_worksheet", worksheet_id=worksheet.id),

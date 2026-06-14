@@ -46,7 +46,7 @@ from app.services.accident_packets import (
 )
 from app.services.evidence_packet import build_damage_evidence_packet
 from app.services.file_integrity import sha256_file
-from app.services.ifta_worksheets import build_ifta_packet, create_ifta_worksheet_from_form, ifta_receipt_available, ifta_receipt_path
+from app.services.ifta_worksheets import build_fuel_mileage_report, build_ifta_packet, create_ifta_worksheet_from_form, ifta_receipt_available, ifta_receipt_path
 from app.services.packet_classification import (
     PacketClassification,
     classify_damage_report,
@@ -7518,6 +7518,22 @@ def ifta_worksheet_packet(worksheet_id):
     return render_template(
         "ifta_worksheet_packet.html",
         packet=packet,
+        manager_view=False,
+        receipt_endpoint="driver.ifta_receipt",
+        back_url=url_for("driver.view_ifta_worksheet", worksheet_id=worksheet.id),
+    )
+
+
+@bp.route("/ifta-worksheet/<int:worksheet_id>/fuel-mileage-report")
+@login_required
+def fuel_mileage_report(worksheet_id):
+    worksheet = IftaWorksheet.query.get_or_404(worksheet_id)
+    if not _driver_can_view_ifta(worksheet):
+        abort(403)
+    report = build_fuel_mileage_report(worksheet, generated_by=current_user)
+    return render_template(
+        "fuel_mileage_report.html",
+        report=report,
         manager_view=False,
         receipt_endpoint="driver.ifta_receipt",
         back_url=url_for("driver.view_ifta_worksheet", worksheet_id=worksheet.id),
