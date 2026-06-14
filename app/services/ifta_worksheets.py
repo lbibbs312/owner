@@ -65,6 +65,14 @@ def _label_date(value):
     return value.isoformat() if value else None
 
 
+def _label_generated_day(value):
+    if not value:
+        return None
+    if value.tzinfo is None:
+        value = pytz.utc.localize(value).astimezone(pytz.timezone("America/Detroit"))
+    return value.strftime("%Y-%m-%d")
+
+
 def _join_parts(*values, separator=" "):
     parts = [str(value).strip() for value in values if str(value or "").strip()]
     return separator.join(parts) or None
@@ -443,6 +451,7 @@ def ifta_fuel_rows(worksheet):
                 "receipt_is_image": receipt_is_image,
                 "receipt_hash": fuel.receipt_hash,
                 "receipt_photo": fuel.receipt_photo,
+                "receipt_report_label": _receipt_report_label({"receipt_photo": fuel.receipt_photo}),
             }
         )
     return rows
@@ -627,7 +636,7 @@ def build_fuel_mileage_report(worksheet, *, generated_by):
     generated_at = datetime.utcnow()
     summaries = worksheet_summaries(worksheet)
     fuel_rows = ifta_fuel_rows(worksheet)
-    receipt_rows = [dict(row, receipt_report_label=_receipt_report_label(row)) for row in fuel_rows if row["receipt_available"]]
+    receipt_rows = [row for row in fuel_rows if row["receipt_available"]]
     mileage_rows = fuel_mileage_rows(worksheet)
     date_range = _report_date_range(
         [row["fuel"].purchase_date for row in fuel_rows],
@@ -648,6 +657,7 @@ def build_fuel_mileage_report(worksheet, *, generated_by):
         "report_title": "Fuel & Mileage Report",
         "generated_by": generated_by.display_name,
         "generated_at": _label_dt(generated_at),
+        "generated_date": _label_generated_day(generated_at),
         "summary_cards": fuel_mileage_summary_cards(summaries, fuel_rows, receipt_rows, mileage_rows),
         "vehicle_fields": [(label, value) for label, value in vehicle_fields if value not in (None, "")],
         "fuel_rows": fuel_rows,
@@ -675,6 +685,7 @@ def build_ifta_packet(worksheet, *, generated_by):
         "packet_title": "IFTA Support Worksheet",
         "generated_by": generated_by.display_name,
         "generated_at": _label_dt(generated_at),
+        "generated_date": _label_generated_day(generated_at),
         "current_status": current_status,
         "open_items": open_items,
         "summary_cards": ifta_summary_cards(

@@ -5,307 +5,378 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ report.report_title }} {{ report.document_number }}</title>
   <style>
+    @page { size: Letter portrait; margin: 0.35in; }
     :root {
       color-scheme:light;
-      --ink:#111827;
-      --muted:#526179;
-      --line:#cbd5e1;
-      --soft:#f8fafc;
-      --green:#166534;
-      --blue:#1d4ed8;
+      --md-blue:#1f4ea3;
+      --md-blue-soft:#eaf0fb;
+      --md-ink:#1a2230;
+      --md-muted:#5b6675;
+      --md-line:#d4dae6;
     }
     * { box-sizing:border-box; }
+    html,
     body {
       margin:0;
-      background:#e8edf3;
-      color:var(--ink);
+      padding:0;
+      width:100%;
+      min-height:100%;
+    }
+    body {
+      background:#fff;
+      color:#111;
       font-family:Arial, Helvetica, sans-serif;
+      font-size:9pt;
       line-height:1.35;
     }
-    .doc {
-      max-width:920px;
-      margin:0 auto;
-      padding:18px;
-    }
-    .actions {
-      display:flex;
-      justify-content:flex-end;
-      gap:8px;
-      margin-bottom:10px;
-    }
-    .actions a,
-    .actions button {
-      border:1px solid #111827;
-      border-radius:4px;
-      background:#fff;
-      color:#111827;
-      padding:8px 12px;
-      font:700 .86rem Arial, Helvetica, sans-serif;
+    .print-page,
+    .official-print-document { width:100%; margin:0; padding:0; }
+    .print-controls { margin-bottom:0.12in; }
+    .print-btn,
+    .email-btn {
+      display:inline-block;
+      margin:0 0.05in 0.12in 0;
+      padding:8px 14px;
+      border:0;
+      color:#fff;
       text-decoration:none;
+      font-size:10pt;
+      line-height:1.1;
       cursor:pointer;
     }
-    .actions button { background:#111827; color:#fff; }
-    .sheet {
-      background:#fff;
-      border:1px solid var(--line);
-      padding:30px 34px;
-      box-shadow:0 10px 24px rgba(15,23,42,.08);
-    }
-    .header {
+    .print-btn { background:var(--md-blue); }
+    .email-btn { background:#198754; }
+    .document-header {
       display:grid;
-      grid-template-columns:minmax(0,1fr) auto;
-      gap:24px;
-      align-items:start;
-      border-bottom:3px solid var(--ink);
-      padding-bottom:14px;
-      margin-bottom:16px;
+      grid-template-columns:minmax(0,1fr) 2.9in;
+      gap:0.2in;
+      border-bottom:2px solid var(--md-blue);
+      padding-bottom:0.1in;
+      margin-bottom:0.08in;
     }
-    .brand {
-      display:block;
+    .brand-lockup {
+      display:flex;
+      align-items:center;
+      gap:7px;
       margin-bottom:4px;
-      color:var(--muted);
-      font-size:.68rem;
+    }
+    .brand-mark {
+      display:inline-flex;
+      width:30px;
+      height:30px;
+      border-radius:6px;
+      background:#0d1320;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .brand-mark img {
+      width:30px;
+      height:30px;
+      object-fit:contain;
+      display:block;
+    }
+    .brand-word {
+      font-size:12.5pt;
       font-weight:900;
-      letter-spacing:.09em;
+      letter-spacing:-0.01em;
+      color:var(--md-ink);
+    }
+    .brand-word .accent { color:var(--md-blue); }
+    .driver-kicker {
+      font-size:8pt;
+      font-weight:900;
       text-transform:uppercase;
+      letter-spacing:0.08em;
+      color:var(--md-muted);
     }
-    h1 {
-      margin:0;
-      font-size:1.55rem;
-      line-height:1.08;
+    .driver-name {
+      margin:1px 0;
+      font-size:15pt;
       font-weight:900;
+      text-transform:uppercase;
+      line-height:1;
     }
-    .meta {
-      min-width:230px;
-      text-align:right;
-      color:#243041;
-      font-size:.76rem;
-      line-height:1.48;
+    .driver-route-meta {
+      font-size:8.4pt;
+      font-weight:700;
+      color:var(--md-muted);
+    }
+    .document-meta {
+      font-size:8pt;
+      line-height:1.5;
+    }
+    .document-meta .row {
+      display:grid;
+      grid-template-columns:1.05in minmax(0,1fr);
+      gap:0.06in;
+      align-items:baseline;
+    }
+    .document-meta .k {
+      color:var(--md-muted);
       font-weight:700;
       white-space:nowrap;
     }
+    .document-meta .v {
+      font-weight:700;
+      text-align:right;
+    }
+    .document-meta .v.mono { font-weight:900; }
+    .document-title {
+      margin:0.04in 0 0.1in;
+      font-size:17pt;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:-0.01em;
+      line-height:1;
+      color:var(--md-ink);
+    }
+    .section-title {
+      margin:0.16in 0 0.06in;
+      font-size:9pt;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:0.05em;
+      color:var(--md-blue);
+    }
     .lede {
-      margin:0 0 14px;
-      color:#374151;
-      font-size:.9rem;
+      margin:0 0 0.09in;
+      color:var(--md-muted);
+      font-size:8.4pt;
       font-weight:700;
     }
-    .summary {
+    .fact-grid {
       display:grid;
       grid-template-columns:repeat(4,minmax(0,1fr));
-      border:1px solid var(--line);
-      margin-bottom:16px;
+      gap:0.08in;
     }
-    .summary div {
+    .fact-tile {
+      border:1px solid var(--md-line);
+      border-radius:4px;
+      padding:6px 9px;
+      background:#fff;
       min-width:0;
-      padding:10px 11px;
-      border-right:1px solid #e5e7eb;
-      border-bottom:1px solid #e5e7eb;
     }
-    .summary div:nth-child(4n) { border-right:0; }
-    .summary span,
+    .fact-tile .f-label {
+      display:block;
+      font-size:6.6pt;
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing:0.04em;
+      color:var(--md-muted);
+    }
+    .fact-tile .f-value {
+      display:block;
+      margin-top:1px;
+      font-size:9.5pt;
+      font-weight:900;
+      color:var(--md-ink);
+      line-height:1.2;
+      overflow-wrap:anywhere;
+    }
     .field-grid span,
     .label,
     .receipt-meta span {
       display:block;
-      color:#64748b;
-      font-size:.64rem;
-      font-weight:900;
-      letter-spacing:.06em;
+      color:var(--md-muted);
+      font-size:6.6pt;
+      font-weight:800;
+      letter-spacing:0.04em;
       text-transform:uppercase;
-    }
-    .summary strong {
-      display:block;
-      margin-top:3px;
-      color:#111827;
-      font-size:.98rem;
-      font-weight:900;
-      overflow-wrap:anywhere;
     }
     .section {
-      margin-top:16px;
       page-break-inside:avoid;
       break-inside:avoid;
-    }
-    .section h2 {
-      margin:0 0 9px;
-      padding-bottom:6px;
-      border-bottom:1px solid var(--line);
-      color:#111827;
-      font-size:.82rem;
-      font-weight:900;
-      letter-spacing:.07em;
-      text-transform:uppercase;
-      page-break-after:avoid;
-      break-after:avoid;
     }
     .field-grid {
       display:grid;
       grid-template-columns:repeat(3,minmax(0,1fr));
-      border:1px solid #e5e7eb;
+      gap:0.08in;
     }
     .field-grid div {
+      border:1px solid var(--md-line);
+      border-radius:4px;
+      padding:6px 9px;
       min-width:0;
-      padding:8px 10px;
-      border-right:1px solid #e5e7eb;
-      border-bottom:1px solid #e5e7eb;
     }
-    .field-grid div:nth-child(3n) { border-right:0; }
     .field-grid strong {
       display:block;
-      margin-top:2px;
-      color:#111827;
-      font-size:.88rem;
+      margin-top:1px;
+      color:var(--md-ink);
+      font-size:9pt;
       font-weight:900;
       overflow-wrap:anywhere;
     }
-    table {
+    table.timeline {
       width:100%;
       border-collapse:collapse;
-      margin-top:6px;
+      table-layout:fixed;
+      margin-top:0.04in;
     }
-    th,
-    td {
-      border:1px solid var(--line);
-      padding:6px 7px;
-      font-size:.76rem;
+    table.timeline th,
+    table.timeline td {
+      border:1px solid var(--md-line);
+      padding:4px 5px;
       text-align:left;
       vertical-align:top;
       overflow-wrap:anywhere;
     }
-    th {
-      background:var(--soft);
-      color:#374151;
-      font-size:.63rem;
-      font-weight:900;
-      letter-spacing:.05em;
+    table.timeline thead th {
+      background:var(--md-blue);
+      color:#fff;
+      font-weight:800;
       text-transform:uppercase;
+      font-size:6.6pt;
+      letter-spacing:0.03em;
+      border-color:var(--md-blue);
     }
+    table.timeline tbody tr:nth-child(even) td { background:#f7f9fd; }
     .numeric { text-align:right; white-space:nowrap; }
+    .col-date { width:13%; }
+    .col-location { width:35%; }
+    .col-volume { width:12%; }
+    .col-fuel { width:10%; }
+    .col-amount { width:12%; }
+    .col-receipt { width:auto; }
+    .cell-muted {
+      margin-top:2px;
+      color:var(--md-muted);
+      font-size:7.2pt;
+      font-weight:700;
+      line-height:1.25;
+    }
     .receipt-grid {
       display:grid;
       grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:12px;
+      gap:0.12in;
     }
     .receipt-card {
-      border:1px solid var(--line);
-      padding:10px;
+      border:1px solid var(--md-line);
+      border-top:3px solid var(--md-blue);
+      border-radius:5px;
+      padding:0.1in 0.12in 0.11in;
       page-break-inside:avoid;
       break-inside:avoid;
     }
     .receipt-card h3 {
-      margin:0 0 7px;
-      font-size:.9rem;
+      margin:0 0 0.07in;
+      padding-bottom:0.04in;
+      border-bottom:1px solid var(--md-line);
+      font-size:8.4pt;
       font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:0.03em;
+      color:var(--md-ink);
     }
     .receipt-preview {
       display:block;
       width:100%;
-      max-height:230px;
+      max-height:2.15in;
       object-fit:contain;
-      margin-bottom:8px;
-      border:1px solid #e5e7eb;
+      margin-bottom:0.07in;
+      border:1px solid var(--md-line);
       background:#fff;
     }
     .receipt-file-link {
       display:inline-block;
-      color:#111827;
-      font-size:.78rem;
+      color:var(--md-ink);
+      font-size:8pt;
       font-weight:900;
       text-decoration:none;
     }
     .receipt-meta {
       display:grid;
-      gap:5px;
-      margin-top:7px;
+      gap:0.055in;
+      margin-top:0.07in;
     }
     .receipt-meta strong,
     .hash {
       display:block;
-      color:#111827;
+      color:var(--md-ink);
       font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size:.68rem;
+      font-size:7pt;
       font-weight:800;
       overflow-wrap:anywhere;
     }
     .empty-note {
       margin:0;
-      border:1px solid #dbe4ee;
+      border:1px solid var(--md-line);
       background:#f8fafc;
       padding:10px;
-      color:#475569;
+      color:var(--md-muted);
       font-weight:800;
     }
     .footer {
-      margin-top:20px;
-      padding-top:8px;
-      border-top:1px solid var(--line);
-      color:#64748b;
-      font-size:.68rem;
-      font-weight:700;
+      margin-top:0.22in;
+      padding-top:0.07in;
+      border-top:1px solid var(--md-blue);
+      text-align:center;
+      color:var(--md-muted);
+      font-size:7.6pt;
+      font-style:italic;
     }
     @media (max-width:760px) {
-      .doc { padding:10px; }
-      .sheet { padding:22px 18px; }
-      .header { grid-template-columns:1fr; }
-      .meta { min-width:0; text-align:left; white-space:normal; }
-      .summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
-      .summary div:nth-child(4n) { border-right:1px solid #e5e7eb; }
-      .summary div:nth-child(2n) { border-right:0; }
+      body { padding:1rem; }
+      .document-header { grid-template-columns:1fr; }
+      .document-meta .v { text-align:left; }
+      .fact-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .field-grid,
       .receipt-grid { grid-template-columns:1fr; }
-      .field-grid div { border-right:0; }
     }
     @media print {
-      @page { size:letter; margin:.45in; }
-      body {
-        background:#fff;
-        -webkit-print-color-adjust:exact;
-        print-color-adjust:exact;
-      }
-      .doc { max-width:none; padding:0; }
-      .actions { display:none !important; }
-      .sheet { border:0; padding:0; box-shadow:none; }
-      .summary { grid-template-columns:repeat(4,minmax(0,1fr)); }
-      .field-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
-      .field-grid div { border-right:1px solid #e5e7eb; }
-      .field-grid div:nth-child(3n) { border-right:0; }
-      .section { page-break-inside:auto; break-inside:auto; }
-      .receipt-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
-      a { color:#111827; text-decoration:none; }
+      body { padding:0; }
+      .no-print, .print-controls { display:none !important; }
+      .fact-tile, .receipt-card, table.timeline tr { break-inside:avoid; }
+      * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      a { color:var(--md-ink); text-decoration:none; }
     }
   </style>
 </head>
 <body>
-  <main class="doc official-print-document">
-    <div class="actions no-print">
-      <a href="{{ back_url }}">Back</a>
-      <button type="button" onclick="window.print()">Print Report</button>
+  <div class="print-page">
+    <div class="print-controls no-print">
+      <button class="print-btn" type="button" onclick="window.print()">Print Report</button>
+      <a class="email-btn" href="{{ back_url }}">Back</a>
     </div>
-    <article class="sheet">
-      <header class="header">
+    <main class="official-print-document">
+      <header class="document-header">
         <div>
-          <span class="brand">MoveDefense</span>
-          <h1>{{ report.report_title }}</h1>
+          <div class="brand-lockup">
+            <span class="brand-mark"><img src="{{ url_for('static', filename='brand/movedefense_stripe_brand_icon_200x200.png') }}" alt="MoveDefense"></span>
+            <span class="brand-word">Move<span class="accent">Defense</span></span>
+          </div>
+          <div class="driver-kicker">Fuel record</div>
+          <div class="driver-name">{{ (report.worksheet.driver.display_name if report.worksheet.driver else report.generated_by)|upper }}</div>
+          <div class="driver-route-meta">
+            {% set route_bits = [] %}
+            {% for label, value in report.vehicle_fields %}
+              {% if label in ['Date range', 'Reporting period'] %}{% set _ = route_bits.append(value) %}{% endif %}
+            {% endfor %}
+            {{ route_bits|join(' - ') }}
+          </div>
         </div>
-        <div class="meta">
-          Document number: {{ report.document_number }}<br>
-          Generated: {{ report.generated_at }}<br>
-          Generated by: {{ report.generated_by }}
+        <div class="document-meta">
+          <div class="row"><span class="k">Fuel Report No:</span><span class="v mono">{{ report.document_number }}</span></div>
+          <div class="row"><span class="k">Created:</span><span class="v">{{ report.generated_date or report.generated_at }}</span></div>
+          <div class="row"><span class="k">Generated by:</span><span class="v">{{ report.generated_by }}</span></div>
+          {% if report.worksheet.truck or report.worksheet.trailer %}
+            <div class="row"><span class="k">Truck / Trailer:</span><span class="v">{{ report.worksheet.truck or '' }}{% if report.worksheet.trailer %} / {{ report.worksheet.trailer }}{% endif %}</span></div>
+          {% endif %}
         </div>
       </header>
 
+      <h1 class="document-title">{{ report.report_title }}</h1>
       <p class="lede">Summary of fuel purchases, odometer readings, mileage notes, and receipt proof.</p>
 
-      <div class="summary" aria-label="Fuel and mileage summary">
+      <div class="fact-grid" aria-label="Fuel and mileage summary">
         {% for label, value in report.summary_cards %}
-          <div><span>{{ label }}</span><strong>{{ value }}</strong></div>
+          <div class="fact-tile"><span class="f-label">{{ label }}</span><strong class="f-value">{{ value }}</strong></div>
         {% endfor %}
       </div>
 
       {% if report.vehicle_fields %}
         <section class="section">
-          <h2>Driver and Vehicle</h2>
+          <h2 class="section-title">Driver and Vehicle</h2>
           <div class="field-grid">
             {% for label, value in report.vehicle_fields %}
               <div><span>{{ label }}</span><strong>{{ value }}</strong></div>
@@ -315,17 +386,17 @@
       {% endif %}
 
       <section class="section">
-        <h2>Fuel Purchases</h2>
+        <h2 class="section-title">Fuel Purchases</h2>
         {% if report.fuel_rows %}
-          <table>
+          <table class="timeline">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Location</th>
-                <th class="numeric">Volume</th>
-                <th>Fuel</th>
-                <th class="numeric">Amount</th>
-                <th>Receipt</th>
+                <th class="col-date">Date</th>
+                <th class="col-location">Location / Stop</th>
+                <th class="col-volume numeric">Volume</th>
+                <th class="col-fuel">Fuel</th>
+                <th class="col-amount numeric">Amount</th>
+                <th class="col-receipt">Receipt</th>
               </tr>
             </thead>
             <tbody>
@@ -334,8 +405,8 @@
                   <td>{{ row.date or '' }}</td>
                   <td>
                     <strong>{{ row.seller or row.label }}</strong>
-                    {% if row.address %}<br>{{ row.address }}{% endif %}
-                    {% if row.location %}<br>{{ row.location }}{% endif %}
+                    {% if row.address %}<div class="cell-muted">{{ row.address }}</div>{% endif %}
+                    {% if row.location %}<div class="cell-muted">{{ row.location }}</div>{% endif %}
                   </td>
                   <td class="numeric">{{ row.volume or '' }}</td>
                   <td>{{ row.fuel_type or '' }}</td>
@@ -352,8 +423,8 @@
 
       {% if report.has_mileage %}
         <section class="section">
-          <h2>Odometer and Mileage</h2>
-          <table>
+          <h2 class="section-title">Odometer and Mileage</h2>
+          <table class="timeline">
             <thead>
               <tr>
                 <th>Dates</th>
@@ -383,7 +454,7 @@
 
       {% if report.has_receipts %}
         <section class="section">
-          <h2>Receipt Proof</h2>
+          <h2 class="section-title">Receipt Proof</h2>
           <div class="receipt-grid">
             {% for row in report.receipt_rows %}
               <article class="receipt-card">
@@ -405,9 +476,9 @@
       {% endif %}
 
       <footer class="footer">
-        {{ report.document_number }} - {{ report.report_title }} - {{ report.generated_at }}
+        {{ report.document_number }} - {{ report.report_title }} - {{ report.generated_date or report.generated_at }}
       </footer>
-    </article>
-  </main>
+    </main>
+  </div>
 </body>
 </html>

@@ -520,8 +520,8 @@ def test_ifta_receipt_photo_renders_on_view_and_packet(client, app):
     assert "Pilot Fuel" in packet_body
     assert "400 Fuel Plaza Dr" in packet_body
     assert 'class="receipt-preview"' in packet_body
-    assert "ifta-receipt-1-" in packet_body
-    assert ".jpg" in packet_body
+    assert "Receipt image (JPG)" in packet_body
+    assert "ifta-receipt-1-" not in packet_body
     assert "Receipt Photos and File Hashes" in packet_body
     assert "Receipt proof hash" in packet_body
     assert receipt_hash in packet_body
