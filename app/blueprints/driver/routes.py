@@ -5905,8 +5905,9 @@ def legacy_no_pickup_driver_log(log_id):
 @login_required
 def delete_driver_log(log_id):
     log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
+    next_url = request.form.get("next") or url_for("driver.driver_logs")
     if not _can_driver_change_same_day(log.driver_id, log.date, "driver log", "delete"):
-        return redirect(url_for("driver.driver_logs"))
+        return redirect(next_url)
 
     details = f"{log.plant_name} / {log.load_size} load for {log.date}."
     _soft_delete_record(log)
@@ -5921,8 +5922,8 @@ def delete_driver_log(log_id):
     )
     db.session.commit()
     _emit_driver_log_updated(log, "deleted")
-    flash("Driver log deleted.", "success")
-    return redirect(url_for("driver.driver_logs"))
+    flash("Stop deleted.", "success")
+    return redirect(next_url)
 
 
 @bp.route("/driver_logs/<int:log_id>/clear-hot", methods=["POST"], strict_slashes=False)
