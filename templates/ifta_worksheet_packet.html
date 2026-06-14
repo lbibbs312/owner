@@ -7,41 +7,44 @@
   <style>
     :root {
       color-scheme: light;
-      --ink:#111827;
+      --ink:#101827;
       --muted:#4b5563;
-      --rule:#d1d5db;
-      --soft:#f3f4f6;
-      --review:#92400e;
-      --review-bg:#fffbeb;
-      --review-rule:#f59e0b;
+      --light:#f8fafc;
+      --line:#cbd5e1;
+      --line-soft:#e5e7eb;
+      --blue:#1d4ed8;
+      --blue-soft:#eff6ff;
+      --review:#8a4b12;
+      --review-bg:#fff8ea;
+      --review-line:#e7b95a;
     }
     * { box-sizing:border-box; }
     body {
       margin:0;
-      background:#eef2f7;
+      background:#e8edf3;
       color:var(--ink);
       font-family:Arial, Helvetica, sans-serif;
-      line-height:1.4;
+      line-height:1.35;
     }
     .packet-doc {
       max-width:920px;
       margin:0 auto;
-      padding:20px;
+      padding:18px;
     }
     .packet-actions {
       display:flex;
       justify-content:flex-end;
       gap:8px;
-      margin-bottom:12px;
+      margin-bottom:10px;
     }
     .packet-actions a,
     .packet-actions button {
-      border:1px solid #1f2937;
-      border-radius:6px;
+      border:1px solid #111827;
+      border-radius:4px;
       background:#fff;
       color:#111827;
       padding:8px 12px;
-      font:700 .88rem Arial, Helvetica, sans-serif;
+      font:700 .86rem Arial, Helvetica, sans-serif;
       text-decoration:none;
       cursor:pointer;
     }
@@ -49,205 +52,298 @@
       background:#111827;
       color:#fff;
     }
-    .packet-page {
+    .packet-sheet {
       background:#fff;
-      border:1px solid var(--rule);
-      padding:28px;
-      margin-bottom:16px;
-      page-break-inside:avoid;
-      break-inside:avoid;
+      border:1px solid var(--line);
+      padding:30px 34px;
+      box-shadow:0 10px 24px rgba(15,23,42,.08);
     }
-    .packet-brand {
+    .packet-header {
       display:grid;
       grid-template-columns:minmax(0,1fr) auto;
-      gap:18px;
+      gap:24px;
       align-items:start;
       border-bottom:3px solid var(--ink);
       padding-bottom:14px;
-      margin-bottom:18px;
+      margin-bottom:16px;
     }
     .packet-brand-label {
       display:block;
-      margin-bottom:5px;
+      margin-bottom:4px;
       color:var(--muted);
-      font-size:.72rem;
+      font-size:.68rem;
       font-weight:900;
+      letter-spacing:.09em;
       text-transform:uppercase;
-      letter-spacing:.08em;
     }
-    .packet-brand h1,
-    .packet-brand h2 {
+    h1 {
       margin:0;
-      font-size:1.45rem;
-      line-height:1.12;
+      font-size:1.55rem;
+      line-height:1.08;
       font-weight:900;
     }
     .packet-meta {
-      min-width:220px;
+      min-width:230px;
       text-align:right;
-      color:#374151;
-      font-size:.78rem;
-      line-height:1.45;
+      color:#243041;
+      font-size:.76rem;
+      line-height:1.48;
       font-weight:700;
       white-space:nowrap;
     }
-    .packet-copy {
-      margin:0 0 16px;
+    .packet-note {
+      margin:0 0 14px;
       color:#374151;
+      font-size:.9rem;
       font-weight:700;
     }
-    .packet-grid {
+    .summary-strip {
       display:grid;
-      grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:10px 18px;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      border:1px solid var(--line);
       margin-bottom:16px;
     }
-    .packet-field {
-      border-bottom:1px solid #e5e7eb;
-      padding:6px 0 8px;
+    .summary-card {
       min-width:0;
+      padding:10px 11px;
+      border-right:1px solid var(--line-soft);
+      border-bottom:1px solid var(--line-soft);
     }
-    .packet-field span {
+    .summary-card:nth-child(4n) { border-right:0; }
+    .summary-card span,
+    .field-grid span,
+    .table-label,
+    .receipt-meta span {
       display:block;
-      color:#6b7280;
-      font-size:.68rem;
+      color:#64748b;
+      font-size:.64rem;
       font-weight:900;
+      letter-spacing:.06em;
       text-transform:uppercase;
-      letter-spacing:.05em;
     }
-    .packet-field strong {
+    .summary-card strong {
+      display:block;
+      margin-top:3px;
+      color:#111827;
+      font-size:.98rem;
+      font-weight:900;
+      overflow-wrap:anywhere;
+    }
+    .packet-section {
+      margin-top:16px;
+      page-break-inside:avoid;
+      break-inside:avoid;
+    }
+    .packet-section h2 {
+      margin:0 0 9px;
+      padding-bottom:6px;
+      border-bottom:1px solid var(--line);
+      color:#111827;
+      font-size:.82rem;
+      font-weight:900;
+      letter-spacing:.07em;
+      text-transform:uppercase;
+    }
+    .packet-section h3 {
+      margin:10px 0 6px;
+      color:#111827;
+      font-size:.78rem;
+      font-weight:900;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+    }
+    .packet-section h2,
+    .packet-section h3 {
+      page-break-after:avoid;
+      break-after:avoid;
+    }
+    .packet-review-grid {
+      display:grid;
+      grid-template-columns:minmax(0,1fr) minmax(245px,.72fr);
+      gap:18px;
+      align-items:start;
+    }
+    .field-grid {
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:0;
+      border:1px solid var(--line-soft);
+    }
+    .field-grid div {
+      min-width:0;
+      padding:8px 10px;
+      border-right:1px solid var(--line-soft);
+      border-bottom:1px solid var(--line-soft);
+    }
+    .field-grid div:nth-child(2n) { border-right:0; }
+    .field-grid strong {
       display:block;
       margin-top:2px;
       color:#111827;
-      font-size:.95rem;
+      font-size:.88rem;
       font-weight:900;
       overflow-wrap:anywhere;
     }
     .open-list {
       display:grid;
-      gap:8px;
-      margin:10px 0 0;
+      gap:5px;
+      margin:0;
       padding:0;
       list-style:none;
     }
     .open-list li {
-      border:1px solid var(--review-rule);
+      border-left:4px solid var(--review-line);
       background:var(--review-bg);
       color:var(--review);
-      padding:9px 11px;
+      padding:7px 9px;
+      font-size:.82rem;
       font-weight:800;
     }
-    .packet-section-title {
-      margin:0 0 12px;
-      padding-bottom:7px;
-      border-bottom:1px solid var(--rule);
-      font-size:.86rem;
-      color:#111827;
-      font-weight:900;
-      text-transform:uppercase;
-      letter-spacing:.06em;
+    .complete-note {
+      margin:0;
+      border:1px solid #bbf7d0;
+      background:#f0fdf4;
+      color:#166534;
+      padding:9px 10px;
+      font-weight:800;
     }
     table {
       width:100%;
       border-collapse:collapse;
-      margin-top:8px;
+      margin-top:6px;
     }
     th,
     td {
-      border:1px solid var(--rule);
-      padding:7px 8px;
-      font-size:.8rem;
+      border:1px solid var(--line);
+      padding:6px 7px;
+      font-size:.76rem;
       text-align:left;
       vertical-align:top;
+      overflow-wrap:anywhere;
     }
     th {
-      background:var(--soft);
+      background:var(--light);
       color:#374151;
-      font-size:.7rem;
-      text-transform:uppercase;
+      font-size:.63rem;
+      font-weight:900;
       letter-spacing:.05em;
+      text-transform:uppercase;
     }
-    .record-list {
+    td.numeric,
+    th.numeric {
+      text-align:right;
+      white-space:nowrap;
+    }
+    .empty-cell {
+      color:#9ca3af;
+    }
+    .receipt-grid {
       display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
       gap:12px;
     }
-    .record-card {
-      border:1px solid var(--rule);
-      padding:12px;
+    .receipt-card {
+      border:1px solid var(--line);
+      padding:10px;
       page-break-inside:avoid;
       break-inside:avoid;
     }
-    .record-card h3 {
-      margin:0 0 8px;
-      font-size:1rem;
-      font-weight:900;
-    }
-    .fact-grid {
-      display:grid;
-      grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:7px 14px;
-    }
-    .fact-grid div {
-      border-bottom:1px solid #e5e7eb;
-      padding-bottom:6px;
-      min-width:0;
-    }
-    .fact-grid span {
-      display:block;
-      color:#6b7280;
-      font-size:.68rem;
-      font-weight:900;
-      text-transform:uppercase;
-      letter-spacing:.05em;
-    }
-    .fact-grid strong {
-      display:block;
-      margin-top:2px;
-      overflow-wrap:anywhere;
+    .receipt-card h3 {
+      margin:0 0 7px;
+      font-size:.9rem;
+      letter-spacing:0;
+      text-transform:none;
     }
     .receipt-preview {
       display:block;
       width:100%;
-      max-width:520px;
-      max-height:520px;
+      max-height:260px;
       object-fit:contain;
       margin-bottom:8px;
-      border:1px solid var(--rule);
+      border:1px solid var(--line-soft);
       background:#fff;
     }
     .receipt-file-link {
       display:inline-block;
       color:#111827;
+      font-size:.78rem;
       font-weight:900;
       overflow-wrap:anywhere;
+      text-decoration:none;
     }
+    .receipt-meta {
+      display:grid;
+      gap:5px;
+      margin-top:7px;
+    }
+    .receipt-meta strong,
     .hash {
+      display:block;
+      color:#111827;
       font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size:.72rem;
+      font-size:.68rem;
+      font-weight:800;
       overflow-wrap:anywhere;
     }
-    @media (max-width:700px) {
-      .packet-doc { padding:12px; }
-      .packet-page { padding:20px; }
-      .packet-brand { grid-template-columns:1fr; }
+    .packet-footer {
+      margin-top:20px;
+      padding-top:8px;
+      border-top:1px solid var(--line);
+      color:#64748b;
+      font-size:.68rem;
+      font-weight:700;
+    }
+    @media (max-width:760px) {
+      .packet-doc { padding:10px; }
+      .packet-sheet { padding:22px 18px; }
+      .packet-header,
+      .packet-review-grid { grid-template-columns:1fr; }
       .packet-meta { min-width:0; text-align:left; white-space:normal; }
-      .packet-grid,
-      .fact-grid { grid-template-columns:1fr; }
+      .summary-strip { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .summary-card:nth-child(4n) { border-right:1px solid var(--line-soft); }
+      .summary-card:nth-child(2n) { border-right:0; }
+      .field-grid,
+      .receipt-grid { grid-template-columns:1fr; }
+      .field-grid div { border-right:0; }
     }
     @media print {
-      @page { margin:.45in; }
-      body { background:#fff; }
-      .packet-doc { max-width:none; padding:0; }
+      @page { size:letter; margin:.45in; }
+      body {
+        background:#fff;
+        -webkit-print-color-adjust:exact;
+        print-color-adjust:exact;
+      }
+      .packet-doc {
+        max-width:none;
+        padding:0;
+      }
       .packet-actions { display:none !important; }
-      .packet-page {
+      .packet-sheet {
         border:0;
         padding:0;
-        margin:0 0 18px;
-        page-break-after:auto;
-        break-after:auto;
+        box-shadow:none;
       }
-      .packet-page + .packet-page {
-        padding-top:10px;
+      .summary-strip {
+        grid-template-columns:repeat(4,minmax(0,1fr));
+      }
+      .packet-review-grid {
+        grid-template-columns:minmax(0,1.08fr) minmax(230px,.72fr);
+      }
+      .field-grid {
+        grid-template-columns:repeat(2,minmax(0,1fr));
+      }
+      .field-grid div {
+        border-right:1px solid var(--line-soft);
+      }
+      .field-grid div:nth-child(2n) {
+        border-right:0;
+      }
+      .packet-section {
+        page-break-inside:auto;
+        break-inside:auto;
+      }
+      .receipt-grid {
+        grid-template-columns:repeat(2,minmax(0,1fr));
       }
       a { color:#111827; text-decoration:none; }
     }
@@ -260,8 +356,8 @@
       <button type="button" onclick="window.print()">Print Packet</button>
     </div>
 
-    <section class="packet-page">
-      <div class="packet-brand">
+    <article class="packet-sheet">
+      <header class="packet-header">
         <div>
           <span class="packet-brand-label">MoveDefense</span>
           <h1>{{ packet.packet_title }}</h1>
@@ -269,117 +365,185 @@
         <div class="packet-meta">
           Document number: {{ packet.document_number }}<br>
           Packet type: {{ packet.packet_type }}<br>
-          Generated: {{ packet.generated_at }}
+          Generated: {{ packet.generated_at }}<br>
+          Generated by: {{ packet.generated_by }}
         </div>
+      </header>
+
+      <p class="packet-note">Fuel, mileage, and receipt support for record review. This is not tax filing or tax advice.</p>
+
+      <div class="summary-strip" aria-label="Packet summary">
+        {% for label, value in packet.summary_cards %}
+          <div class="summary-card"><span>{{ label }}</span><strong>{{ value }}</strong></div>
+        {% endfor %}
       </div>
 
-      <p class="packet-copy">This is an IFTA support worksheet for record review. It is not tax filing or tax advice.</p>
+      <div class="packet-review-grid">
+        {% if packet.cover_fields or packet.vehicle_fields %}
+          <section class="packet-section">
+            <h2>Vehicle and Reporting Period Summary</h2>
+            <div class="field-grid">
+              {% for label, value in packet.cover_fields + packet.vehicle_fields %}
+                <div><span>{{ label }}</span><strong>{{ value }}</strong></div>
+              {% endfor %}
+            </div>
+          </section>
+        {% endif %}
 
-      {% if packet.cover_fields %}
-        <div class="packet-grid">
-          {% for label, value in packet.cover_fields %}
-            <div class="packet-field"><span>{{ label }}</span><strong>{{ value }}</strong></div>
-          {% endfor %}
-        </div>
-      {% endif %}
+        <section class="packet-section">
+          <h2>Open Items for Review</h2>
+          {% if packet.open_items %}
+            <ul class="open-list">
+              {% for item in packet.open_items %}<li>{{ item }}</li>{% endfor %}
+            </ul>
+          {% else %}
+            <p class="complete-note">No open items were detected for this packet.</p>
+          {% endif %}
+        </section>
+      </div>
 
-      {% if packet.open_items %}
-        <h2 class="packet-section-title">Open Items for Review</h2>
-        <ul class="open-list">
-          {% for item in packet.open_items %}<li>{{ item }}</li>{% endfor %}
-        </ul>
-      {% endif %}
-    </section>
-
-    {% if packet.has_vehicle_summary %}
-      <section class="packet-page">
-        <h2 class="packet-section-title">Vehicle and Reporting Period Summary</h2>
-        <div class="packet-grid">
-          {% for label, value in packet.vehicle_fields %}
-            <div class="packet-field"><span>{{ label }}</span><strong>{{ value }}</strong></div>
-          {% endfor %}
-        </div>
-      </section>
-    {% endif %}
-
-    {% if packet.has_distance_summary %}
-      <section class="packet-page">
-        <h2 class="packet-section-title">Distance by Jurisdiction</h2>
-        <table>
-          <thead>
-            <tr><th>Jurisdiction</th><th>Total miles</th><th>Taxable miles</th><th>Nontaxable miles</th></tr>
-          </thead>
-          <tbody>
-            {% for row in packet.distance_rows %}
+      {% if packet.has_fuel_summary %}
+        <section class="packet-section">
+          <h2>Fuel Records</h2>
+          <table>
+            <thead>
               <tr>
-                <td>{{ row.jurisdiction }}</td>
-                <td>{{ row.total_miles }}</td>
-                <td>{{ row.taxable_miles }}</td>
-                <td>{{ row.nontaxable_miles }}</td>
+                <th>Date</th>
+                <th>Seller</th>
+                <th>Location</th>
+                <th class="numeric">Volume</th>
+                <th>Fuel</th>
+                <th class="numeric">Amount</th>
+                <th>Receipt</th>
               </tr>
+            </thead>
+            <tbody>
+              {% for row in packet.fuel_rows %}
+                <tr>
+                  <td>{{ row.date or '' }}</td>
+                  <td>
+                    <strong>{{ row.seller or row.label }}</strong>
+                    {% if row.address %}<br>{{ row.address }}{% endif %}
+                    {% if row.vehicle_unit %}<br><span class="table-label">Unit</span>{{ row.vehicle_unit }}{% endif %}
+                  </td>
+                  <td>{{ row.location or '' }}</td>
+                  <td class="numeric">{{ row.volume or '' }}</td>
+                  <td>{{ row.fuel_type or '' }}</td>
+                  <td class="numeric">{{ row.amount or '' }}</td>
+                  <td>{{ row.receipt_status }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </section>
+      {% endif %}
+
+      {% if packet.has_distance_summary %}
+        <section class="packet-section">
+          <h2>Distance by Jurisdiction</h2>
+          {% if packet.distance_rows %}
+            <table>
+              <thead>
+                <tr>
+                  <th>Jurisdiction</th>
+                  <th class="numeric">Total miles</th>
+                  <th class="numeric">Taxable miles</th>
+                  <th class="numeric">Nontaxable miles</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in packet.distance_rows %}
+                  <tr>
+                    <td>{{ row.jurisdiction }}</td>
+                    <td class="numeric">{{ row.total_miles }}</td>
+                    <td class="numeric">{{ row.taxable_miles }}</td>
+                    <td class="numeric">{{ row.nontaxable_miles }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% endif %}
+          {% if packet.fuel_jurisdiction_rows %}
+            <h3>Fuel Purchased by Jurisdiction</h3>
+            <table>
+              <thead>
+                <tr><th>Jurisdiction</th><th class="numeric">Fuel volume</th></tr>
+              </thead>
+              <tbody>
+                {% for row in packet.fuel_jurisdiction_rows %}
+                  <tr><td>{{ row.jurisdiction }}</td><td class="numeric">{{ row.volume }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% endif %}
+        </section>
+      {% endif %}
+
+      {% if packet.has_trip_detail %}
+        <section class="packet-section">
+          <h2>Trip Detail</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Dates</th>
+                <th>Trip</th>
+                <th>Odometer</th>
+                <th class="numeric">Distance</th>
+                <th>Jurisdiction</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in packet.trip_rows %}
+                <tr>
+                  <td>{{ row.dates or '' }}</td>
+                  <td>
+                    {% if row.origin or row.destination %}
+                      <strong>{{ row.origin or '' }}{% if row.origin and row.destination %} to {% endif %}{{ row.destination or '' }}</strong>
+                    {% endif %}
+                    {% if row.route %}<br><span class="table-label">Route</span>{{ row.route }}{% endif %}
+                  </td>
+                  <td>{{ row.odometer or '' }}</td>
+                  <td class="numeric">{{ row.total_distance or '' }}</td>
+                  <td>{{ row.jurisdiction or '' }}</td>
+                </tr>
+                {% if row.notes %}
+                  <tr><td colspan="5"><span class="table-label">Notes</span>{{ row.notes }}</td></tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </section>
+      {% endif %}
+
+      {% if packet.has_receipts %}
+        <section class="packet-section">
+          <h2>Receipt Photos and File Hashes</h2>
+          <div class="receipt-grid">
+            {% for row in packet.receipt_rows %}
+              <article class="receipt-card">
+                {% set receipt_url = url_for(receipt_endpoint|default('driver.ifta_receipt'), fuel_id=row.fuel.id) %}
+                <h3>{{ row.label }}</h3>
+                {% if row.receipt_is_image %}
+                  <img class="receipt-preview" src="{{ receipt_url }}" alt="Fuel receipt row {{ row.number }}">
+                {% endif %}
+                {% if row.receipt_photo %}
+                  <a class="receipt-file-link" href="{{ receipt_url }}">{{ row.receipt_photo }}</a>
+                {% endif %}
+                <div class="receipt-meta">
+                  {% if row.date %}<div><span>Date</span><strong>{{ row.date }}</strong></div>{% endif %}
+                  {% if row.amount %}<div><span>Amount</span><strong>{{ row.amount }}</strong></div>{% endif %}
+                  {% if row.receipt_hash %}<div><span>Receipt hash</span><strong class="hash">{{ row.receipt_hash }}</strong></div>{% endif %}
+                </div>
+              </article>
             {% endfor %}
-          </tbody>
-        </table>
-      </section>
-    {% endif %}
+          </div>
+        </section>
+      {% endif %}
 
-    {% if packet.has_fuel_summary %}
-      <section class="packet-page">
-        <h2 class="packet-section-title">Fuel Records</h2>
-        <div class="record-list">
-          {% for row in packet.fuel_rows %}
-            <article class="record-card">
-              <h3>{{ row.label }}</h3>
-              <div class="fact-grid">
-                {% for label, value in row.facts %}
-                  <div><span>{{ label }}</span><strong>{{ value }}</strong></div>
-                {% endfor %}
-              </div>
-            </article>
-          {% endfor %}
-        </div>
-      </section>
-    {% endif %}
-
-    {% if packet.has_receipts %}
-      <section class="packet-page">
-        <h2 class="packet-section-title">Receipt Photos and File Hashes</h2>
-        <div class="record-list">
-          {% for row in packet.receipt_rows %}
-            <article class="record-card">
-              {% set receipt_url = url_for(receipt_endpoint|default('driver.ifta_receipt'), fuel_id=row.fuel.id) %}
-              {% if row.receipt_is_image %}
-                <img class="receipt-preview" src="{{ receipt_url }}" alt="Fuel receipt row {{ row.number }}">
-              {% endif %}
-              {% if row.receipt_photo %}
-                <a class="receipt-file-link" href="{{ receipt_url }}">{{ row.receipt_photo }}</a>
-              {% endif %}
-              {% if row.receipt_hash %}
-                <div class="packet-field"><span>Receipt hash</span><strong class="hash">{{ row.receipt_hash }}</strong></div>
-              {% endif %}
-            </article>
-          {% endfor %}
-        </div>
-      </section>
-    {% endif %}
-
-    {% if packet.has_trip_detail %}
-      <section class="packet-page">
-        <h2 class="packet-section-title">Trip Detail</h2>
-        <div class="record-list">
-          {% for row in packet.trip_rows %}
-            <article class="record-card">
-              <h3>Trip row {{ row.number }}</h3>
-              <div class="fact-grid">
-                {% for label, value in row.facts %}
-                  <div><span>{{ label }}</span><strong>{{ value }}</strong></div>
-                {% endfor %}
-              </div>
-            </article>
-          {% endfor %}
-        </div>
-      </section>
-    {% endif %}
+      <footer class="packet-footer">
+        {{ packet.document_number }} - {{ packet.packet_type }} - {{ packet.generated_at }}
+      </footer>
+    </article>
   </main>
 </body>
 </html>
