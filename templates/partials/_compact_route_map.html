@@ -73,7 +73,7 @@
         </form>
         <a class="route-detail-link" href="{{ url_for('driver.edit_driver_log', log_id=log_id) }}">Add note</a>
       {% elif obj.no_pickup %}
-        <form action="{{ url_for('driver.no_pickup_driver_log', log_id=log_id) }}" method="POST"><button class="route-detail-link" type="submit">Confirm no pickup</button></form>
+        <form action="{{ url_for('driver.no_pickup_driver_log', log_id=log_id) }}" method="POST"><input type="hidden" name="next" value="{{ url_for('driver.mobile_dashboard') }}"><button class="route-detail-link" type="submit">Confirm no pickup</button></form>
         <a class="route-detail-link" href="{{ url_for('driver.edit_driver_log', log_id=log_id) }}">Add reason</a>
         <form action="{{ url_for('driver.record_driver_log_photo', log_id=log_id) }}" method="POST" enctype="multipart/form-data">
           <input type="hidden" name="source" value="proof">
@@ -871,7 +871,7 @@
               <h4>Any damage, issue, or proof note?</h4>
               <div class="depart-choice-grid">
                 <button type="button" data-depart-choice data-field="cargo_override_reason" data-value="" data-next-step="4">No issue</button>
-                <a class="depart-risk-link" href="{{ damage_url or '#' }}">&#9650; Damage or missing proof</a>
+                <a class="depart-risk-link" href="{{ damage_url or url_for('driver.new_damage_report') }}">&#9650; Damage or missing proof</a>
               </div>
               <label for="departProofNote">Optional note</label>
               <textarea id="departProofNote" data-depart-text="cargo_override_reason" placeholder="Short note only if something needs review"></textarea>

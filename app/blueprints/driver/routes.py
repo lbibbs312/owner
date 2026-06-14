@@ -6438,12 +6438,13 @@ def depart_driver_log(log_id):
 @login_required
 def no_pickup_driver_log(log_id):
     log = _active_driver_logs_query().filter_by(id=log_id).first_or_404()
+    next_url = request.values.get("next") or url_for("driver.driver_logs")
     guard = _guard_driver_log_mutation(log, "update")
     if guard:
         return guard
     if log.depart_time:
         flash("That log already has a departure time.", "warning")
-        return redirect(url_for("driver.driver_logs"))
+        return redirect(next_url)
 
     local_tz = pytz.timezone("America/Detroit")
     now_local = datetime.now(local_tz)
@@ -6451,7 +6452,7 @@ def no_pickup_driver_log(log_id):
     timing_errors = _route_timing_errors(log.driver_id, log.date, log.plant_name, _arrival_hhmm_for_log(log), depart_time, exclude_log_id=log.id, check_previous=False)
     if timing_errors:
         flash(timing_errors[0], "danger")
-        return redirect(url_for("driver.driver_logs"))
+        return redirect(next_url)
     log.no_pickup = True
     log.depart_load_size = "Empty"
     log.depart_time = depart_time
@@ -6476,7 +6477,7 @@ def no_pickup_driver_log(log_id):
     ingest_driver_log(log, commit=True)
     _emit_driver_log_updated(log, "no_pickup")
     flash(f"No pickup recorded for log #{log.id}.", "success")
-    return redirect(url_for("driver.driver_logs"))
+    return redirect(next_url)
 
 
 @bp.route("/driver_logs/<int:log_id>/pickup", methods=["GET", "POST"], strict_slashes=False)
