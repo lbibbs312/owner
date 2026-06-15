@@ -1,647 +1,2270 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MoveDefense Pricing</title>
-  <style>
-    :root {
-      --ink:#111827;
-      --muted:#5b6575;
-      --line:#d9e2ef;
-      --blue:#2563eb;
-      --blue-dark:#1d4ed8;
-      --green:#138a4f;
-      --gold:#b7791f;
-      --bg:#f7f9fc;
-      --panel:#ffffff;
-      --soft:#eef5ff;
-    }
-    * { box-sizing:border-box; }
-    html { scroll-behavior:smooth; }
-    body {
-      margin:0;
-      background:var(--bg);
-      color:var(--ink);
-      font-family:Montserrat,Inter,Arial,sans-serif;
-      overflow-x:hidden;
-    }
-    a { color:inherit; }
-    .topbar {
-      background:#fff;
-      border-bottom:1px solid var(--line);
-      position:sticky;
-      top:0;
-      z-index:20;
-    }
-    .topbar-inner {
-      max-width:1180px;
-      margin:0 auto;
-      padding:14px 22px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:16px;
-    }
-    .brand {
-      display:flex;
-      align-items:center;
-      gap:10px;
-      font-weight:900;
-      letter-spacing:0;
-      text-decoration:none;
-    }
-    .brand-mark {
-      width:36px;
-      height:36px;
-      border-radius:8px;
-      background:#0f172a;
-      display:grid;
-      place-items:center;
-      color:#fff;
-      box-shadow:inset 0 0 0 2px #fbbf24;
-    }
-    .brand-mark svg { width:20px; height:20px; }
-    .nav-actions {
-      display:flex;
-      align-items:center;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-    .btn {
-      border:1px solid var(--line);
-      border-radius:8px;
-      padding:10px 14px;
-      background:#fff;
-      color:var(--ink);
-      cursor:pointer;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      font-size:.9rem;
-      font-weight:900;
-      line-height:1.2;
-      text-decoration:none;
-      white-space:normal;
-      text-align:center;
-    }
-    .btn.primary {
-      background:var(--blue);
-      border-color:var(--blue);
-      color:#fff;
-    }
-    .btn.primary:hover { background:var(--blue-dark); }
-    .btn.ghost:hover { border-color:#a8b6ca; }
-    .wrap {
-      max-width:1180px;
-      margin:0 auto;
-      padding:42px 22px 56px;
-    }
-    .hero {
-      display:grid;
-      grid-template-columns:minmax(0,1fr) minmax(280px,.78fr);
-      gap:34px;
-      align-items:center;
-    }
-    h1 {
-      margin:0;
-      max-width:760px;
-      font-size:clamp(2.35rem,6vw,5.15rem);
-      line-height:.95;
-      letter-spacing:0;
-      font-weight:950;
-    }
-    h1 span { display:block; }
-    .lead {
-      max-width:620px;
-      margin:18px 0 0;
-      color:#384454;
-      font-size:1.12rem;
-      line-height:1.45;
-    }
-    .offer-row {
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      margin:22px 0 0;
-    }
-    .offer-pill {
-      border:1px solid var(--line);
-      border-radius:8px;
-      background:#fff;
-      padding:9px 11px;
-      color:#253044;
-      font-size:.86rem;
-      font-weight:900;
-    }
-    .hero-actions {
-      display:flex;
-      gap:12px;
-      flex-wrap:wrap;
-      margin-top:24px;
-    }
-    .hero-shot {
-      background:#0b1324;
-      border:1px solid #1c2b45;
-      border-radius:8px;
-      overflow:hidden;
-      box-shadow:0 18px 44px rgba(15,23,42,.18);
-    }
-    .hero-shot img {
-      display:block;
-      width:100%;
-      aspect-ratio:10 / 14;
-      object-fit:cover;
-      object-position:top center;
-    }
-    .shot-caption {
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      padding:12px 14px;
-      color:#dbeafe;
-      font-size:.76rem;
-      font-weight:900;
-      text-transform:uppercase;
-    }
-    .shot-caption span:last-child {
-      color:#86efac;
-      white-space:nowrap;
-    }
-    .section {
-      margin-top:48px;
-    }
-    .section-head {
-      display:flex;
-      align-items:flex-end;
-      justify-content:space-between;
-      gap:20px;
-      margin-bottom:16px;
-    }
-    .section h2 {
-      margin:0;
-      font-size:clamp(1.7rem,3vw,2.2rem);
-      letter-spacing:0;
-    }
-    .section p {
-      margin:6px 0 0;
-      color:var(--muted);
-      line-height:1.45;
-    }
-    .workflow-grid {
-      display:grid;
-      grid-template-columns:repeat(3,minmax(0,1fr));
-      gap:14px;
-    }
-    .workflow-card,
-    .price-card,
-    .product-row,
-    .note-strip,
-    .free-strip {
-      background:#fff;
-      border:1px solid var(--line);
-      border-radius:8px;
-    }
-    .workflow-card {
-      overflow:hidden;
-    }
-    .workflow-card img {
-      display:block;
-      width:100%;
-      height:330px;
-      object-fit:cover;
-      object-position:top center;
-      background:#0b1324;
-      border-bottom:1px solid var(--line);
-    }
-    .workflow-card.packet img {
-      object-position:top left;
-    }
-    .workflow-copy {
-      padding:14px;
-    }
-    .step {
-      color:var(--gold);
-      font-size:.72rem;
-      font-weight:950;
-      letter-spacing:.04em;
-      text-transform:uppercase;
-    }
-    .workflow-copy h3,
-    .price-name {
-      margin:6px 0 0;
-      font-size:1.04rem;
-      font-weight:950;
-    }
-    .workflow-copy p {
-      margin-top:6px;
-      color:#475569;
-      font-size:.92rem;
-    }
-    .free-strip {
-      display:grid;
-      grid-template-columns:auto minmax(0,1fr) auto;
-      gap:14px;
-      align-items:center;
-      padding:14px;
-      margin-bottom:14px;
-    }
-    .free-strip strong {
-      font-size:1.05rem;
-      font-weight:950;
-    }
-    .free-strip p {
-      margin:0;
-      color:#475569;
-      font-size:.93rem;
-    }
-    .pricing-grid {
-      display:grid;
-      grid-template-columns:repeat(5,minmax(0,1fr));
-      gap:14px;
-    }
-    .price-card {
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-      padding:16px;
-      min-height:100%;
-    }
-    .price-card.featured {
-      border-color:var(--blue);
-      box-shadow:0 0 0 1px var(--blue) inset, 0 12px 26px rgba(37,99,235,.12);
-    }
-    .price {
-      font-size:1.85rem;
-      font-weight:950;
-      line-height:1;
-    }
-    .price small {
-      color:var(--muted);
-      font-size:.82rem;
-      font-weight:800;
-    }
-    .use-case {
-      margin:0;
-      color:#475569;
-      font-size:.88rem;
-      line-height:1.38;
-      min-height:2.4em;
-    }
-    .price-card ul {
-      margin:0;
-      padding-left:18px;
-      color:#253044;
-      font-size:.86rem;
-      line-height:1.42;
-    }
-    .price-card li + li { margin-top:5px; }
-    .checkout-form {
-      margin-top:auto;
-    }
-    .checkout-form .btn {
-      width:100%;
-    }
-    .product-list {
-      display:grid;
-      grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:10px;
-    }
-    .product-row {
-      display:grid;
-      grid-template-columns:minmax(0,1fr) auto auto;
-      gap:12px;
-      align-items:center;
-      padding:12px;
-    }
-    .product-row strong {
-      font-size:.94rem;
-      font-weight:950;
-    }
-    .product-row span {
-      color:var(--blue);
-      font-weight:950;
-      white-space:nowrap;
-    }
-    .product-row form {
-      margin:0;
-    }
-    .note-strip {
-      margin-top:20px;
-      padding:14px 16px;
-      color:#475569;
-      font-size:.92rem;
-      font-weight:700;
-      line-height:1.45;
-    }
-    .note-strip strong {
-      color:var(--ink);
-      font-weight:950;
-    }
-    .site-footer {
-      border-top:1px solid var(--line);
-      background:#fff;
-    }
-    .site-footer-inner {
-      max-width:1180px;
-      margin:0 auto;
-      padding:18px 22px;
-    }
-    .public-footer-links {
-      display:flex;
-      justify-content:center;
-      gap:8px;
-      flex-wrap:wrap;
-      color:var(--muted);
-      font-size:.92rem;
-    }
-    .public-footer-links a {
-      color:var(--blue);
-      font-weight:900;
-      text-decoration:none;
-    }
-    @media (max-width:1080px) {
-      .pricing-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
-      .price-card.featured { grid-column:auto; }
-    }
-    @media (max-width:900px) {
-      .hero { grid-template-columns:1fr; }
-      .hero-shot {
-        max-width:460px;
-      }
-      .workflow-grid,
-      .product-list {
-        grid-template-columns:1fr;
-      }
-      .workflow-card img {
-        height:390px;
-      }
-    }
-    @media (max-width:620px) {
-      .topbar-inner {
-        align-items:flex-start;
-        flex-direction:column;
-      }
-      .nav-actions,
-      .nav-actions .btn,
-      .hero-actions,
-      .hero-actions .btn {
-        width:100%;
-      }
-      .wrap {
-        padding-top:32px;
-      }
-      h1 {
-        font-size:2.05rem;
-        line-height:1.02;
-      }
-      .lead {
-        font-size:.98rem;
-      }
-      .hero > div {
-        width:100%;
-        max-width:346px;
-      }
-      .offer-row {
-        display:grid;
-        grid-template-columns:1fr;
-      }
-      .hero-shot {
-        max-width:none;
-      }
-      .section-head {
-        display:block;
-      }
-      .free-strip,
-      .pricing-grid {
-        grid-template-columns:1fr;
-      }
-      .product-row {
-        grid-template-columns:1fr;
-      }
-      .product-row .btn {
-        width:100%;
-      }
-      .workflow-card img {
-        height:330px;
-      }
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<meta name="theme-color" content="#04060C" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath d='M20 3 34 8v11c0 9-6 15-14 18C12 34 6 28 6 19V8z' fill='%2304060C' stroke='%235cf0de' stroke-width='2.2'/%3E%3Cpath d='M20 25V13m0 0-5 5m5-5 5 5' stroke='%23eaf1ff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='20' cy='29.5' r='1.7' fill='%235cf0de'/%3E%3C/svg%3E" />
+<script>
+window.MOVEDEFENSE_CONFIG = Object.freeze({
+  googleMapsApiKey: {{ config.GOOGLE_MAPS_API_KEY|default('', true)|tojson }},
+  googleClientId: {{ config.GOOGLE_CLIENT_ID|default('', true)|tojson }}
+});
+</script>
+<title>MoveDefense — Driver Activity Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Saira:wght@500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================
+   MoveDefense — "Night Cockpit"
+   One canonical entity: STOP. Two-state CTA. Printable record.
+   ============================================================ */
+:root{
+  --void:#04060C;
+  --ink:#080B14;
+  --panel:rgba(255,255,255,.040);
+  --panel-2:rgba(255,255,255,.065);
+  --hair:rgba(255,255,255,.085);
+  --hair-2:rgba(255,255,255,.16);
+
+  --text:#EEF2FB;
+  --text-2:#A6B2CB;
+  --text-3:#6A748E;
+
+  --cyan:#3FE0CE;        /* ARRIVE */
+  --cyan-deep:#15B4A4;
+  --cyan-glow:rgba(63,224,206,.34);
+
+  --amber:#FF9E3D;       /* DEPART */
+  --amber-deep:#F27713;
+  --amber-glow:rgba(255,158,61,.38);
+
+  --good:#5FE0A0;
+  --drop:#62C9FF;
+  --pick:#FFB454;
+
+  --f-display:'Saira',system-ui,sans-serif;
+  --f-body:'Hanken Grotesk',system-ui,sans-serif;
+  --f-mono:'Space Mono',ui-monospace,monospace;
+
+  --app-w:472px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --sat:env(safe-area-inset-top,0px);
+  --sab:env(safe-area-inset-bottom,0px);
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:var(--f-body);
+  color:var(--text);
+  background:var(--void);
+  overflow-x:hidden;
+  letter-spacing:.1px;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+::selection{background:rgba(63,224,206,.28);color:#fff}
+button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer}
+input,select,textarea{font-family:inherit}
+::-webkit-scrollbar{width:0;height:0}
+
+/* ---------- Atmosphere ---------- */
+.atmos{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.atmos .mesh{position:absolute;inset:-20%;
+  background:
+    radial-gradient(48% 38% at 18% 8%, rgba(63,224,206,.16), transparent 60%),
+    radial-gradient(52% 44% at 88% 16%, rgba(255,158,61,.13), transparent 62%),
+    radial-gradient(60% 50% at 50% 108%, rgba(40,86,200,.20), transparent 60%),
+    radial-gradient(40% 30% at 80% 86%, rgba(63,224,206,.08), transparent 60%);
+  filter:saturate(1.05);
+  animation:breathe 17s var(--ease) infinite alternate;
+}
+@keyframes breathe{
+  0%{transform:translate3d(-1.5%,-1%,0) scale(1.02);opacity:.92}
+  100%{transform:translate3d(2%,1.5%,0) scale(1.08);opacity:1}
+}
+.atmos .road{position:absolute;left:50%;bottom:-8%;width:200%;height:62%;transform:translateX(-50%);
+  background:
+    repeating-linear-gradient(to top, rgba(255,255,255,.05) 0 1px, transparent 1px 64px),
+    radial-gradient(120% 80% at 50% 120%, rgba(63,224,206,.10), transparent 55%);
+  -webkit-mask-image:linear-gradient(to top, #000 0%, transparent 78%);
+          mask-image:linear-gradient(to top, #000 0%, transparent 78%);
+  transform:translateX(-50%) perspective(420px) rotateX(62deg);
+  transform-origin:bottom;opacity:.5}
+.streak{position:absolute;height:2px;border-radius:2px;filter:blur(.4px);opacity:0;
+  background:linear-gradient(90deg,transparent, var(--c,#fff), transparent);
+  animation:streak var(--d,9s) linear infinite;animation-delay:var(--delay,0s)}
+@keyframes streak{
+  0%{transform:translateX(-30vw) scaleX(.6);opacity:0}
+  10%{opacity:.55}
+  90%{opacity:.5}
+  100%{transform:translateX(120vw) scaleX(1.4);opacity:0}
+}
+.grain{position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")}
+
+/* ---------- App shell ---------- */
+#app{position:relative;z-index:2;width:100%;max-width:var(--app-w);margin:0 auto;min-height:100dvh}
+.screen{display:none;animation:screenIn .5s var(--ease-out) both}
+.screen.is-active{display:block}
+@keyframes screenIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ---------- Brand mark ---------- */
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:32px;height:32px;flex:0 0 auto;filter:drop-shadow(0 2px 10px rgba(63,224,206,.25))}
+.wordmark{font-family:var(--f-display);font-weight:700;font-size:18px;letter-spacing:.6px;line-height:1}
+.wordmark b{color:var(--cyan)}
+.wordmark .df{color:var(--text);opacity:.92}
+
+/* ============================================================
+   AUTH — local-first account gate
+   ============================================================ */
+#screen-auth{min-height:100dvh;padding:calc(var(--sat) + 24px) 22px calc(var(--sab) + 24px)}
+#screen-auth.is-active{display:flex;align-items:center}
+.auth-shell{width:100%}
+.auth-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.auth-chip{display:inline-flex;align-items:center;height:30px;padding:0 10px;border-radius:9px;border:1px solid var(--hair);background:rgba(255,255,255,.045);font-family:var(--f-mono);font-size:10.5px;color:var(--text-2);letter-spacing:.5px}
+.auth-card{border:1px solid var(--hair-2);border-radius:24px;background:linear-gradient(180deg,rgba(14,20,36,.94),rgba(7,10,19,.96));box-shadow:0 30px 90px rgba(0,0,0,.55);padding:20px;overflow:hidden}
+.auth-title{font-family:var(--f-display);font-size:31px;font-weight:800;line-height:1.02;margin:3px 0 7px;letter-spacing:-.3px}
+.auth-copy{color:var(--text-2);font-size:14px;line-height:1.45;margin:0 0 18px}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.auth-tab{height:42px;border-radius:13px;border:1px solid var(--hair);background:rgba(255,255,255,.035);color:var(--text-2);font-weight:700}
+.auth-tab.on{background:linear-gradient(135deg,var(--cyan),var(--cyan-deep));color:#02110f;border-color:transparent}
+.auth-field{margin-top:11px}
+.auth-field label{display:block;font-family:var(--f-mono);font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-3);margin:0 0 7px 2px}
+.auth-field input{width:100%;height:50px;border-radius:14px;border:1px solid var(--hair);background:rgba(255,255,255,.055);color:var(--text);font-size:15px;padding:0 14px;outline:none}
+.auth-field input:focus{border-color:rgba(63,224,206,.55);box-shadow:0 0 0 3px rgba(63,224,206,.12)}
+.auth-error,.auth-success{display:none;border-radius:14px;padding:12px 13px;margin:13px 0 0;font-size:13px;line-height:1.4}
+.auth-error.on{display:block;border:1px solid rgba(255,91,91,.38);background:rgba(255,91,91,.1);color:#ffd3d3}
+.auth-success.on{display:block;border:1px solid rgba(63,224,206,.35);background:rgba(63,224,206,.1);color:#d6fffa}
+.auth-actions{display:grid;gap:10px;margin-top:16px}
+.auth-primary,.auth-google{height:52px;border-radius:16px;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;gap:10px}
+.auth-primary{background:linear-gradient(135deg,var(--amber),var(--amber-deep));color:#120803;box-shadow:0 16px 40px rgba(255,158,61,.24)}
+.auth-google{border:1px solid var(--hair-2);background:rgba(255,255,255,.055);color:var(--text)}
+.auth-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;color:var(--text-3);font-size:13px}
+.auth-link{font-weight:700;color:var(--cyan);text-decoration:none}
+.auth-recovery{border:1px dashed rgba(63,224,206,.4);background:rgba(63,224,206,.08);border-radius:15px;padding:13px;margin-top:13px}
+.auth-recovery .code{font-family:var(--f-mono);font-size:18px;letter-spacing:1.2px;color:var(--text);margin-top:5px;word-break:break-word}
+.auth-foot{font-family:var(--f-mono);font-size:10.5px;color:var(--text-3);line-height:1.5;margin-top:14px;text-align:center}
+
+/* ============================================================
+   INTRO — Hero video carousel
+   ============================================================ */
+#screen-intro{min-height:100dvh}
+#screen-intro.is-active{display:flex;flex-direction:column}
+.hero{position:relative;flex:1;overflow:hidden;display:flex;flex-direction:column}
+.hero-stage{position:absolute;inset:0}
+.slide{position:absolute;inset:0;opacity:0;transition:opacity 1.1s var(--ease);transform:scale(1.08)}
+.slide.on{opacity:1;animation:kenburns 7s linear forwards}
+@keyframes kenburns{from{transform:scale(1.12)}to{transform:scale(1.24)}}
+.slide .scene{position:absolute;inset:0}
+.slide .veil{position:absolute;inset:0;background:linear-gradient(180deg, rgba(4,6,12,.25) 0%, rgba(4,6,12,.55) 52%, rgba(4,6,12,.96) 100%)}
+
+/* Scene 1 — night highway */
+.s1{background:
+  radial-gradient(80% 60% at 50% 120%, rgba(63,224,206,.22), transparent 60%),
+  linear-gradient(180deg,#06203a 0%, #07111f 55%, #04060c 100%)}
+.s1 .lane{position:absolute;left:50%;bottom:0;width:120%;height:70%;transform:translateX(-50%) perspective(380px) rotateX(64deg);transform-origin:bottom;
+  background:repeating-linear-gradient(to top, rgba(255,255,255,.22) 0 14px, transparent 14px 70px);
+  width:8px;filter:blur(.4px);opacity:.7}
+.s1 .glowdot{position:absolute;border-radius:50%;filter:blur(8px)}
+/* Scene 2 — dock dawn */
+.s2{background:
+  radial-gradient(90% 70% at 50% 8%, rgba(255,158,61,.30), transparent 60%),
+  linear-gradient(180deg,#2a1605 0%, #160d10 50%, #04060c 100%)}
+.s2 .door{position:absolute;bottom:0;width:13%;height:46%;background:linear-gradient(180deg, rgba(255,180,84,.20), rgba(0,0,0,.4));border-top:2px solid rgba(255,200,120,.35);box-shadow:inset 0 8px 24px rgba(0,0,0,.5)}
+/* Scene 3 — the record */
+.s3{background:
+  radial-gradient(70% 60% at 50% 40%, rgba(120,160,255,.18), transparent 60%),
+  linear-gradient(180deg,#0a1430 0%, #070d1a 60%, #04060c 100%)}
+.s3 .sheet-ph{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%) rotate(-4deg);width:160px;height:210px;border-radius:8px;
+  background:linear-gradient(180deg,#f6f8ff,#dfe6f5);box-shadow:0 30px 70px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.4) inset;opacity:.92}
+.s3 .sheet-ph::before{content:"";position:absolute;left:16px;right:16px;top:18px;height:8px;border-radius:2px;background:#0a1430;opacity:.85;box-shadow:0 20px 0 -2px #c9d3e8, 0 34px 0 -2px #c9d3e8, 0 48px 0 -2px #c9d3e8, 0 62px 0 -2px #c9d3e8}
+
+.hero-top{position:relative;z-index:3;display:flex;align-items:center;justify-content:space-between;
+  padding:calc(var(--sat) + 18px) 20px 0}
+.skip{font-size:13px;color:var(--text-2);letter-spacing:.4px;display:flex;align-items:center;gap:6px}
+.hero-body{position:relative;z-index:3;margin-top:auto;padding:0 24px 22px}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--cyan);margin-bottom:14px;
+  display:inline-flex;align-items:center;gap:8px}
+.eyebrow::before{content:"";width:18px;height:1px;background:var(--cyan);opacity:.7}
+.hero h1{font-family:var(--f-display);font-weight:800;font-size:clamp(34px,9vw,44px);line-height:1.02;letter-spacing:-.5px;margin:0 0 12px}
+.hero h1 em{font-style:normal;color:var(--cyan)}
+.hero p{margin:0;color:var(--text-2);font-size:15.5px;line-height:1.5;max-width:34ch}
+.dots{display:flex;gap:7px;margin:22px 0 0}
+.dots i{height:4px;width:18px;border-radius:4px;background:rgba(255,255,255,.18);transition:.4s var(--ease)}
+.dots i.on{width:34px;background:linear-gradient(90deg,var(--cyan),var(--cyan-deep));box-shadow:0 0 16px var(--cyan-glow)}
+.hero-cta{position:relative;z-index:3;padding:16px 20px calc(var(--sab) + 22px)}
+.enter{position:relative;width:100%;height:64px;border-radius:18px;font-family:var(--f-display);font-weight:700;font-size:17px;letter-spacing:.4px;
+  color:#04130f;background:linear-gradient(180deg,#5cf0de,#15b4a4);
+  box-shadow:0 14px 40px var(--cyan-glow),0 1px 0 rgba(255,255,255,.45) inset;
+  display:flex;align-items:center;justify-content:center;gap:10px;overflow:hidden;transition:transform .12s var(--ease)}
+.enter:active{transform:scale(.975)}
+.enter::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);transform:translateX(-120%);animation:sheen 3.6s ease-in-out infinite}
+@keyframes sheen{0%,55%{transform:translateX(-120%)}80%,100%{transform:translateX(120%)}}
+.intro-feats{display:flex;justify-content:center;gap:18px;margin-top:14px;color:var(--text-3);font-size:11.5px;font-family:var(--f-mono);letter-spacing:.5px}
+.intro-feats span{display:flex;align-items:center;gap:6px}
+.legal-links{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;color:var(--text-3);font-size:12px}
+.legal-links a{color:var(--text-2);text-decoration:none}
+.aud{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
+.aud span{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.6px;color:var(--text-2);padding:5px 11px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--hair)}
+
+/* ============================================================
+   TOP BAR
+   ============================================================ */
+.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:calc(var(--sat) + 12px) 16px 12px;
+  background:linear-gradient(180deg, rgba(4,6,12,.92), rgba(4,6,12,.55) 70%, transparent);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.tb-right{display:flex;align-items:center;gap:8px}
+.chip-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 13px;border-radius:11px;
+  background:var(--panel);border:1px solid var(--hair);color:var(--text-2);font-size:12.5px;font-weight:600;letter-spacing:.3px;
+  transition:.2s var(--ease)}
+.chip-btn:active{transform:scale(.96);background:var(--panel-2)}
+.chip-btn svg{opacity:.9}
+.icon-btn{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:var(--panel);border:1px solid var(--hair);color:var(--text)}
+.icon-btn:active{transform:scale(.94)}
+
+/* ============================================================
+   HOME
+   ============================================================ */
+#screen-home{padding-bottom:172px}
+.home-pad{padding:6px 16px 0}
+
+/* state hero */
+.statecard{position:relative;border-radius:22px;padding:20px 20px 18px;overflow:hidden;
+  background:linear-gradient(180deg, var(--panel-2), var(--panel));
+  border:1px solid var(--hair);box-shadow:0 1px 0 rgba(255,255,255,.06) inset, 0 24px 60px rgba(0,0,0,.45)}
+.statecard::before{content:"";position:absolute;inset:0;opacity:.9;pointer-events:none;
+  background:radial-gradient(70% 120% at 12% -10%, var(--state-wash,rgba(63,224,206,.16)), transparent 60%)}
+.sc-row{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sc-label{font-family:var(--f-mono);font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--state-c,var(--cyan));
+  display:inline-flex;align-items:center;gap:9px}
+.pulse{width:9px;height:9px;border-radius:50%;background:var(--state-c,var(--cyan));box-shadow:0 0 0 0 var(--state-c,var(--cyan));animation:pulse 2.2s var(--ease) infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,224,206,.45)}70%{box-shadow:0 0 0 12px rgba(63,224,206,0)}100%{box-shadow:0 0 0 0 rgba(63,224,206,0)}}
+.sc-place{position:relative;font-family:var(--f-display);font-weight:700;font-size:27px;line-height:1.08;letter-spacing:-.3px;margin:11px 0 3px;
+  display:flex;align-items:center;gap:8px}
+.sc-meta{position:relative;display:flex;flex-wrap:wrap;gap:14px;margin-top:9px;color:var(--text-3);font-family:var(--f-mono);font-size:11.5px;letter-spacing:.3px}
+.sc-meta b{color:var(--text-2);font-weight:400}
+.gps-pill{display:inline-flex;align-items:center;gap:6px;color:var(--cyan);opacity:.92}
+.gps-pill .lk{width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.clock{margin-left:auto;text-align:right;font-family:var(--f-mono);font-size:11.5px;color:var(--text-2)}
+.clock b{display:block;font-size:20px;color:var(--text);letter-spacing:1px}
+
+/* gauges */
+.gauges{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.gauge{position:relative;border-radius:16px;padding:13px 13px 12px;overflow:hidden;
+  background:var(--panel);border:1px solid var(--hair);cursor:pointer;transition:.2s var(--ease)}
+.gauge:active{background:var(--panel-2)}
+.gauge:focus-visible,.stop:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+.gauge .gk{font-family:var(--f-mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--text-3)}
+.gauge .gv{font-family:var(--f-display);font-weight:700;font-size:30px;line-height:1;margin-top:8px;letter-spacing:-.5px;
+  font-variant-numeric:tabular-nums}
+.gauge .gu{font-family:var(--f-mono);font-size:10px;color:var(--text-3);margin-top:4px;letter-spacing:.5px}
+.gauge .arc{position:absolute;right:-12px;bottom:-12px;width:60px;height:60px;border-radius:50%;
+  border:3px solid var(--g,var(--cyan));opacity:.18;
+  -webkit-mask:radial-gradient(transparent 56%,#000 57%);mask:radial-gradient(transparent 56%,#000 57%)}
+.gauge.g-stop{--g:var(--cyan)} .gauge.g-mile{--g:#7aa2ff} .gauge.g-fuel{--g:var(--amber)}
+.gauge.g-stop .gv{color:#bfeee6} .gauge.g-mile .gv{color:#cdd9ff} .gauge.g-fuel .gv{color:#ffd9af}
+
+/* ledger */
+.ledger-head{display:flex;align-items:center;justify-content:space-between;margin:24px 4px 12px}
+.ledger-head h2{font-family:var(--f-display);font-weight:700;font-size:14px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-2);margin:0}
+.ledger-head .count{font-family:var(--f-mono);font-size:11px;color:var(--text-3)}
+.timeline{position:relative;padding-left:6px}
+.empty-ledger{border:1px solid var(--hair);border-radius:18px;padding:18px;color:var(--text-2);background:rgba(255,255,255,.035);font-size:14px;line-height:1.45}
+.tl-item{position:relative;padding:0 0 14px 30px;animation:rise .5s var(--ease-out) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.tl-item::before{content:"";position:absolute;left:9px;top:26px;bottom:-2px;width:2px;
+  background:linear-gradient(180deg,var(--hair-2),transparent)}
+.tl-item:last-child::before{display:none}
+.node{position:absolute;left:0;top:13px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;
+  background:var(--ink);border:2px solid var(--hair-2);font-family:var(--f-mono);font-size:10px;color:var(--text-2);z-index:2}
+.tl-item.live .node{border-color:var(--amber);color:var(--amber);box-shadow:0 0 0 4px rgba(255,158,61,.14)}
+.tl-item.transit .node{border-color:var(--cyan);color:var(--cyan);background:transparent}
+.stop{border-radius:16px;padding:13px 14px;background:var(--panel);border:1px solid var(--hair);transition:.2s var(--ease);cursor:pointer}
+.stop:active{background:var(--panel-2)}
+.stop-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.stop-name{font-family:var(--f-display);font-weight:600;font-size:16px;letter-spacing:-.2px}
+.stop-addr{font-family:var(--f-mono);font-size:10.5px;color:var(--text-3);margin-top:3px;letter-spacing:.2px}
+.dwell{flex:0 0 auto;text-align:right}
+.dwell .t{font-family:var(--f-mono);font-size:11px;color:var(--text-2)}
+.dwell .d{font-family:var(--f-display);font-weight:700;font-size:15px;color:var(--text);margin-top:2px}
+.dwell .d-lbl{font-family:var(--f-mono);font-size:9.5px;font-weight:600;color:var(--text-3);margin-left:4px;letter-spacing:.3px;text-transform:uppercase}
+.stop-foot{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.tag{display:inline-flex;align-items:center;gap:6px;height:25px;padding:0 10px;border-radius:8px;font-size:11px;font-weight:600;letter-spacing:.2px;
+  background:rgba(255,255,255,.04);border:1px solid var(--hair);color:var(--text-2);font-family:var(--f-mono)}
+.tag svg{opacity:.85}
+.tag.pick{color:var(--pick);border-color:rgba(255,180,84,.3);background:rgba(255,180,84,.08)}
+.tag.drop{color:var(--drop);border-color:rgba(98,201,255,.3);background:rgba(98,201,255,.08)}
+.tag.miles{color:#cdd9ff}
+.tag.start{color:var(--cyan);border-color:rgba(63,224,206,.28);background:rgba(63,224,206,.08)}
+.tag.pending{color:var(--text-3)}
+.tag.fuel{color:var(--amber);border-color:rgba(255,158,61,.28);background:rgba(255,158,61,.08)}
+.tag.photo{color:#bfeee6;border-color:rgba(63,224,206,.28);background:rgba(63,224,206,.08)}
+.tag.cargo{color:#bfeee6}
+.tag.live{color:var(--amber);border-color:rgba(255,158,61,.4);background:rgba(255,158,61,.1)}
+.tag.live .lk{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber);animation:blink 1.4s steps(2,end) infinite}
+@keyframes blink{50%{opacity:.25}}
+.note{margin-top:9px;font-size:12.5px;color:var(--text-2);line-height:1.4;padding-left:11px;border-left:2px solid var(--hair-2)}
+.transit-line{padding:2px 0 16px 4px;font-family:var(--f-mono);font-size:11.5px;color:var(--cyan);letter-spacing:.4px;display:flex;align-items:center;gap:8px}
+.transit-line .ln{flex:1;height:1px;background:linear-gradient(90deg,var(--cyan),transparent);opacity:.4}
+.stop-detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:12px 2px 16px}
+.stop-detail-head .name{font-family:var(--f-display);font-weight:750;font-size:23px;line-height:1.05}
+.stop-detail-head .addr{font-family:var(--f-mono);font-size:11px;color:var(--text-3);line-height:1.45;margin-top:6px}
+.detail-pill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:9px;background:rgba(255,255,255,.055);border:1px solid var(--hair);font-family:var(--f-mono);font-size:11px;color:var(--text-2);white-space:nowrap}
+.detail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin:10px 0 14px}
+.detail-metric{border:1px solid var(--hair);background:var(--panel);border-radius:14px;padding:12px}
+.detail-metric .mk{font-family:var(--f-mono);font-size:10px;letter-spacing:1.3px;text-transform:uppercase;color:var(--text-3)}
+.detail-metric .mv{font-family:var(--f-display);font-size:21px;font-weight:750;margin-top:5px}
+.detail-alert{border:1px solid rgba(255,91,91,.38);background:rgba(255,91,91,.1);color:#ffd3d3;border-radius:14px;padding:12px 13px;margin:10px 0 12px;font-size:12.5px;line-height:1.4}
+.detail-alert b{display:block;color:#fff;margin-bottom:2px}
+.summary-list{display:grid;gap:9px;margin-top:10px}
+.summary-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:start;border-top:1px solid var(--hair);padding:11px 2px 2px}
+.summary-row:first-child{border-top:0}
+.summary-row .rk{font-weight:700;color:var(--text);line-height:1.25}
+.summary-row .rs{font-family:var(--f-mono);font-size:10.5px;color:var(--text-3);line-height:1.45;margin-top:3px}
+.summary-row .rv{font-family:var(--f-display);font-weight:750;color:var(--text);white-space:nowrap}
+.summary-note{border:1px solid var(--hair);border-radius:14px;padding:12px 13px;background:rgba(255,255,255,.035);color:var(--text-2);font-size:13px;line-height:1.42;margin-top:10px}
+.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.photo-thumb{position:relative;border:1px solid var(--hair);border-radius:12px;overflow:hidden;background:var(--panel);aspect-ratio:1}
+.photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-del{position:absolute;right:5px;top:5px;width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(4,6,12,.72);color:var(--text);display:grid;place-items:center}
+.empty-detail{border:1px dashed var(--hair-2);border-radius:14px;padding:13px;color:var(--text-3);font-size:13px;line-height:1.4}
+
+/* ============================================================
+   DOMINANT CTA
+   ============================================================ */
+#cta-dock{position:fixed;left:0;right:0;bottom:0;z-index:40;display:none;
+  padding:14px 16px calc(var(--sab) + 16px);
+  background:linear-gradient(0deg, var(--void) 18%, rgba(4,6,12,.86) 60%, transparent);
+  max-width:var(--app-w);margin:0 auto}
+#cta-dock.show{display:block;animation:dockIn .5s var(--ease-out) both}
+@keyframes dockIn{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.cta{position:relative;width:100%;min-height:104px;border-radius:24px;overflow:hidden;
+  display:flex;align-items:center;gap:16px;padding:0 20px;text-align:left;
+  border:1px solid rgba(255,255,255,.14);
+  transition:transform .14s var(--ease), box-shadow .4s var(--ease)}
+.cta:active{transform:scale(.978)}
+.cta .ico{flex:0 0 auto;width:58px;height:58px;border-radius:18px;display:grid;place-items:center;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18)}
+.cta .txt{flex:1;min-width:0}
+.cta .verb{font-family:var(--f-mono);font-size:11px;letter-spacing:3px;text-transform:uppercase;opacity:.85}
+.cta .place{font-family:var(--f-display);font-weight:800;font-size:26px;line-height:1.05;letter-spacing:-.4px;margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cta .sub{font-size:12.5px;opacity:.82;margin-top:4px;font-weight:500}
+.cta .chev{flex:0 0 auto;opacity:.9}
+.cta::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.16),transparent 70%);transform:translateX(-130%)}
+.cta.swept::after{animation:sweep 1.1s var(--ease)}
+@keyframes sweep{to{transform:translateX(130%)}}
+
+.cta--arrive{color:#03130f;background:linear-gradient(135deg,#62f0de 0%,#19bcab 60%,#0e9d8f 100%);
+  box-shadow:0 18px 50px var(--cyan-glow), 0 1px 0 rgba(255,255,255,.4) inset;animation:breathC 3.4s var(--ease) infinite}
+@keyframes breathC{0%,100%{box-shadow:0 18px 44px rgba(63,224,206,.30),0 1px 0 rgba(255,255,255,.4) inset}50%{box-shadow:0 20px 64px rgba(63,224,206,.5),0 1px 0 rgba(255,255,255,.4) inset}}
+.cta--arrive .ico{background:rgba(3,19,15,.22);border-color:rgba(3,19,15,.25)}
+
+.cta--depart{color:#1d0f02;background:linear-gradient(135deg,#ffb65a 0%,#ff9226 55%,#f0760f 100%);
+  box-shadow:0 18px 50px var(--amber-glow), 0 1px 0 rgba(255,255,255,.4) inset;animation:breathA 3.4s var(--ease) infinite}
+@keyframes breathA{0%,100%{box-shadow:0 18px 44px rgba(255,158,61,.32),0 1px 0 rgba(255,255,255,.4) inset}50%{box-shadow:0 20px 64px rgba(255,158,61,.55),0 1px 0 rgba(255,255,255,.4) inset}}
+.cta--depart .ico{background:rgba(29,15,2,.2);border-color:rgba(29,15,2,.25)}
+
+/* ============================================================
+   BOTTOM SHEET — Depart quick-flow
+   ============================================================ */
+.scrim{position:fixed;inset:0;z-index:50;background:rgba(2,4,9,.66);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:.35s var(--ease)}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:51;max-width:var(--app-w);margin:0 auto;
+  background:linear-gradient(180deg,#0c111d,#070a12);border:1px solid var(--hair);border-bottom:0;
+  border-radius:26px 26px 0 0;box-shadow:0 -30px 80px rgba(0,0,0,.6);
+  transform:translateY(105%);transition:transform .42s var(--ease-out);
+  max-height:92dvh;overflow:auto;padding:0 18px calc(var(--sab) + 20px)}
+.sheet.on{transform:none}
+.grab{width:42px;height:5px;border-radius:5px;background:var(--hair-2);margin:11px auto 4px}
+.sheet h3{font-family:var(--f-display);font-weight:700;font-size:21px;letter-spacing:-.2px;margin:8px 2px 3px}
+.sheet .lede{color:var(--text-3);font-size:13px;margin:0 2px 18px}
+.sheet .lede b{color:var(--amber)}
+.field-label{font-family:var(--f-mono);font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--text-3);margin:18px 2px 9px}
+
+/* segmented load-change cards */
+.seg3{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.segc{position:relative;border-radius:15px;padding:15px 8px 13px;text-align:center;
+  background:var(--panel);border:1px solid var(--hair);transition:.18s var(--ease)}
+.segc:active{transform:scale(.96)}
+.segc .si{width:32px;height:32px;margin:0 auto 8px;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.05);color:var(--text-2)}
+.segc .sl{font-size:12.5px;font-weight:600}
+.segc.sel{border-color:var(--sc,var(--cyan));background:color-mix(in srgb, var(--sc,var(--cyan)) 12%, transparent);box-shadow:0 0 0 1px var(--sc,var(--cyan)) inset, 0 10px 30px -12px var(--sc,var(--cyan))}
+.segc.sel .si{background:var(--sc);color:#06120f}
+.segc.sel .sl{color:#fff}
+.segc[data-v="picked_up"]{--sc:var(--pick)} .segc[data-v="dropped_off"]{--sc:var(--drop)} .segc[data-v="none"]{--sc:var(--text-3)}
+.modepick{display:flex;flex-direction:column;gap:11px;margin-top:6px}
+.modecard{display:flex;align-items:center;gap:14px;text-align:left;width:100%;padding:16px 15px;border-radius:18px;background:var(--panel);border:1px solid var(--hair);transition:.18s var(--ease)}
+.modecard:active{transform:scale(.985);background:var(--panel-2)}
+.modecard .mi{width:46px;height:46px;flex:0 0 auto;border-radius:14px;display:grid;place-items:center;border:1px solid var(--hair)}
+.modecard .mt{font-family:var(--f-display);font-weight:700;font-size:17px;display:block}
+.modecard .ms{font-size:12.5px;color:var(--text-3);margin-top:3px;line-height:1.4;display:block}
+.modecard .mc{margin-left:auto;opacity:.55;flex:0 0 auto}
+.mc-gig .mi{background:rgba(63,224,206,.1);color:var(--cyan)}
+.mc-frt .mi{background:rgba(255,158,61,.1);color:var(--amber)}
+
+.input,.select,textarea.input{width:100%;height:52px;border-radius:14px;padding:0 15px;color:var(--text);font-size:15px;
+  background:var(--panel);border:1px solid var(--hair);transition:.2s var(--ease);outline:none}
+textarea.input{height:auto;padding:14px 15px;line-height:1.45;resize:none}
+.input:focus,.select:focus,textarea.input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(63,224,206,.14);background:var(--panel-2)}
+.input::placeholder{color:var(--text-3)}
+.place-field{position:relative}
+.place-results{display:none;margin:8px 0 0;border:1px solid var(--hair);border-radius:14px;background:rgba(10,15,27,.98);overflow:hidden}
+.place-results.open{display:block}
+.place-suggestion{width:100%;display:flex;align-items:center;gap:10px;padding:11px 13px;text-align:left;border-bottom:1px solid var(--hair);background:transparent;color:var(--text)}
+.place-suggestion:last-child{border-bottom:0}
+.place-suggestion:active{background:var(--panel-2)}
+.place-suggestion .pi{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;flex:0 0 auto;background:rgba(63,224,206,.1);color:var(--cyan)}
+.place-suggestion .pm{font-weight:700;font-size:14px}
+.place-suggestion .pa{color:var(--text-3);font-size:12px;margin-top:2px;line-height:1.35}
+.place-status{padding:10px 13px;color:var(--text-3);font-size:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.collapse{overflow:hidden;max-height:0;opacity:0;transition:max-height .4s var(--ease),opacity .3s var(--ease),margin .3s}
+.collapse.open{max-height:340px;opacity:1}
+.optrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 4px;border-top:1px solid var(--hair)}
+.optrow .ol{font-size:14px;font-weight:600}
+.optrow .od{font-size:12px;color:var(--text-3);margin-top:2px}
+/* toggle */
+.tgl{width:48px;height:28px;border-radius:20px;background:var(--panel-2);border:1px solid var(--hair);position:relative;flex:0 0 auto;transition:.25s var(--ease)}
+.tgl::after{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:var(--text-3);transition:.25s var(--ease)}
+.tgl.on{background:linear-gradient(90deg,var(--cyan-deep),var(--cyan));border-color:transparent}
+.tgl.on::after{left:22px;background:#04130f}
+
+.sheet-actions{display:flex;gap:10px;margin-top:22px}
+.btn-ghost{flex:0 0 auto;height:56px;padding:0 20px;border-radius:16px;background:var(--panel);border:1px solid var(--hair);color:var(--text-2);font-weight:600;font-size:14px}
+.btn-primary{flex:1;height:56px;border-radius:16px;font-family:var(--f-display);font-weight:700;font-size:16px;letter-spacing:.3px;
+  color:#1d0f02;background:linear-gradient(135deg,#ffb65a,#f0760f);box-shadow:0 14px 36px var(--amber-glow);
+  display:flex;align-items:center;justify-content:center;gap:9px;transition:transform .12s var(--ease)}
+.btn-primary:active{transform:scale(.975)}
+
+/* ============================================================
+   DRAWER
+   ============================================================ */
+.drawer{position:fixed;top:0;right:0;bottom:0;z-index:55;width:min(330px,86vw);
+  background:linear-gradient(180deg,#0b111d,#06090f);border-left:1px solid var(--hair);
+  transform:translateX(105%);transition:transform .4s var(--ease-out);padding:calc(var(--sat) + 18px) 18px 24px;
+  display:flex;flex-direction:column;gap:6px}
+.drawer.on{transform:none}
+.drawer .dh{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.driver-card{border-radius:16px;padding:15px;background:var(--panel);border:1px solid var(--hair);margin-bottom:8px}
+.driver-card .dn{font-family:var(--f-display);font-weight:700;font-size:17px}
+.driver-card .dl{font-family:var(--f-mono);font-size:11px;color:var(--text-3);margin-top:4px}
+.drawer-item{display:flex;align-items:center;gap:13px;padding:14px 12px;border-radius:13px;color:var(--text);font-size:14.5px;font-weight:500;transition:.18s var(--ease)}
+.drawer-item:active{background:var(--panel)}
+.drawer-item svg{opacity:.85;flex:0 0 auto}
+.drawer-item .sub{font-size:11.5px;color:var(--text-3);margin-top:2px}
+.drawer-item .right{margin-left:auto}
+.drawer-foot{margin-top:auto;font-family:var(--f-mono);font-size:10.5px;color:var(--text-3);line-height:1.6;text-align:center}
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+#toast{position:fixed;left:50%;bottom:0;z-index:70;transform:translate(-50%,140%);
+  max-width:calc(var(--app-w) - 40px);width:max-content;
+  display:flex;align-items:center;gap:11px;padding:13px 17px;border-radius:15px;
+  background:linear-gradient(180deg,#10182a,#0a0f1c);border:1px solid var(--hair-2);
+  box-shadow:0 18px 50px rgba(0,0,0,.6);transition:transform .45s var(--ease-out);font-size:13.5px;font-weight:600}
+#toast.show{transform:translate(-50%,-22px)}
+#toast .ti{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto}
+#toast.ok .ti{background:rgba(63,224,206,.16);color:var(--cyan)}
+#toast.go .ti{background:rgba(255,158,61,.16);color:var(--amber)}
+#toast.warn .ti{background:rgba(255,91,91,.16);color:#ff9f9f}
+#toast.warn{border-color:rgba(255,91,91,.35)}
+#toast .tt small{display:block;font-weight:500;color:var(--text-3);font-size:11px;font-family:var(--f-mono);margin-top:1px}
+
+/* ============================================================
+   EXPORT
+   ============================================================ */
+#screen-export{padding-bottom:40px}
+.export-bar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:10px;
+  padding:calc(var(--sat) + 12px) 16px 12px;
+  background:linear-gradient(180deg,rgba(4,6,12,.95),rgba(4,6,12,.6) 75%,transparent);backdrop-filter:blur(10px)}
+.export-bar h2{font-family:var(--f-display);font-weight:700;font-size:16px;letter-spacing:.3px;margin:0}
+.print-btn{margin-left:auto;display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:12px;
+  font-family:var(--f-display);font-weight:700;font-size:13.5px;letter-spacing:.3px;color:#04130f;
+  background:linear-gradient(135deg,#5cf0de,#15b4a4);box-shadow:0 10px 28px var(--cyan-glow)}
+.print-btn:active{transform:scale(.96)}
+.scope{display:flex;gap:7px;padding:14px 16px 4px}
+.scope button{flex:1;height:42px;border-radius:12px;background:var(--panel);border:1px solid var(--hair);color:var(--text-2);
+  font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.3px;transition:.2s var(--ease)}
+.scope button.on{color:#04130f;background:linear-gradient(135deg,#5cf0de,#15b4a4);border-color:transparent;box-shadow:0 8px 22px var(--cyan-glow)}
+.scope-extra{padding:8px 16px 0}
+.scope-extra select{width:100%}
+
+/* THE DOCUMENT (print-ready, paper) */
+.doc-wrap{padding:14px 14px 0}
+.doc{background:#fff;color:#0c1322;border-radius:14px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5);
+  font-family:var(--f-body)}
+.doc-band{background:linear-gradient(120deg,#0a1430 0%,#0d1f3d 60%,#0a2a3a 100%);color:#eaf1ff;padding:22px 24px 20px;position:relative;overflow:hidden}
+.doc-band::after{content:"";position:absolute;right:-40px;top:-40px;width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle,rgba(63,224,206,.28),transparent 65%)}
+.doc-band-top{display:flex;align-items:center;justify-content:space-between;gap:12px;position:relative}
+.doc-brand{display:flex;align-items:center;gap:11px}
+.doc-brand .wm{font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:.4px}
+.doc-brand .wm b{color:var(--cyan)}
+.doc-docno{text-align:right;font-family:var(--f-mono);font-size:10.5px;color:#9fb3d6;line-height:1.7}
+.doc-title{font-family:var(--f-display);font-weight:800;font-size:23px;letter-spacing:.4px;margin:16px 0 3px;position:relative}
+.doc-sub{position:relative;display:flex;flex-wrap:wrap;gap:18px;color:#aebfdd;font-size:12.5px;margin-top:6px}
+.doc-sub b{color:#eaf1ff;font-weight:600}
+.doc-body{padding:22px 24px 26px}
+
+.sumgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px}
+.sumcard{border:1px solid #e4e9f2;border-radius:11px;padding:12px 13px;background:#f8fafd}
+.sumcard .sk{font-family:var(--f-mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:#7c89a3}
+.sumcard .sv{font-family:var(--f-display);font-weight:800;font-size:23px;color:#0c1322;margin-top:6px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.sumcard .su{font-size:10.5px;color:#8a96ad;margin-top:1px}
+
+.doc h4{font-family:var(--f-display);font-weight:700;font-size:13px;letter-spacing:1.2px;text-transform:uppercase;color:#33415c;
+  margin:26px 0 11px;padding-bottom:8px;border-bottom:2px solid #eef1f7;display:flex;align-items:center;gap:9px}
+.doc h4 .bar{width:4px;height:15px;border-radius:3px;background:linear-gradient(180deg,#15b4a4,#0d1f3d)}
+table.tbl{width:100%;border-collapse:collapse;font-size:12px}
+table.tbl th{text-align:left;font-family:var(--f-mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;color:#7c89a3;
+  padding:8px 9px;border-bottom:1.5px solid #e4e9f2;white-space:nowrap}
+table.tbl td{padding:10px 9px;border-bottom:1px solid #eef1f7;vertical-align:top;color:#1c2740}
+table.tbl tr:nth-child(even) td{background:#fafbfd}
+table.tbl .num{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.tbl .seq{font-family:var(--f-mono);color:#94a0b8;width:22px}
+.loc-cell .ln{font-weight:600;color:#0c1322}
+.loc-cell .la{font-family:var(--f-mono);font-size:10px;color:#8a96ad;margin-top:2px}
+.pill{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;font-family:var(--f-mono);letter-spacing:.3px}
+.pill.pick{background:#fff1dd;color:#b5630a}
+.pill.drop{background:#e2f1ff;color:#1f6fb0}
+.pill.none{background:#eef1f7;color:#8a96ad}
+.tbl tfoot td{font-family:var(--f-mono);font-weight:700;color:#0c1322;border-top:2px solid #d9e0ec;background:#f4f7fb!important;padding:11px 9px}
+.doc-photos{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:8px}
+.doc-photo{border:1px solid #e4e9f2;border-radius:11px;overflow:hidden;background:#f8fafd}
+.doc-photo img{width:100%;height:170px;object-fit:cover;display:block}
+.doc-photo .cap{padding:8px 10px;font-family:var(--f-mono);font-size:10px;color:#53617b;line-height:1.35}
+
+.sig{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:34px}
+.sig .line{border-top:1.5px solid #29344c;padding-top:7px;font-size:11px;color:#7c89a3;font-family:var(--f-mono);letter-spacing:.3px}
+.disclaimer{margin-top:26px;padding:13px 15px;border-radius:10px;background:#f4f7fb;border:1px solid #e4e9f2;
+  font-size:11px;color:#6c7894;line-height:1.55;display:flex;gap:10px}
+.disclaimer svg{flex:0 0 auto;color:#9aa6bd;margin-top:1px}
+
+/* ============================================================
+   PRINT
+   ============================================================ */
+@media print{
+  @page{size:Letter;margin:14mm}
+  .atmos,.grain,.topbar,.export-bar,.scope,.scope-extra,#cta-dock,.scrim,.sheet,.drawer,#toast{display:none!important}
+  body{background:#fff}
+  #app{max-width:none}
+  .screen{display:none!important}
+  #screen-export.is-active{display:block!important;padding:0}
+  .doc-wrap{padding:0}
+  .doc{box-shadow:none;border-radius:0}
+  .doc-band,.sumcard,.pill,.tbl tfoot td,.tbl tr:nth-child(even) td,table.tbl td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  table.tbl{font-size:10.5px}
+  .sumgrid{margin-bottom:14px}
+}
+@media (max-width:380px){
+  .gauges{gap:8px}.gauge .gv{font-size:26px}
+  .cta .place{font-size:23px}
+}
+</style>
 </head>
 <body>
-  <nav class="topbar">
-    <div class="topbar-inner">
-      <a class="brand" href="{{ url_for('public.welcome') }}">
-        <span class="brand-mark" aria-hidden="true">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M7 11h10M7 15h7M5 4h14v16H5z"/>
+
+<!-- ATMOSPHERE -->
+<div class="atmos" aria-hidden="true">
+  <div class="mesh"></div>
+  <div class="road"></div>
+  <div class="streak" style="top:24%;width:140px;--c:rgba(63,224,206,.7);--d:11s;--delay:0s"></div>
+  <div class="streak" style="top:38%;width:90px;--c:rgba(255,158,61,.6);--d:8s;--delay:2.4s"></div>
+  <div class="streak" style="top:61%;width:200px;--c:rgba(120,160,255,.55);--d:13s;--delay:1.2s"></div>
+  <div class="streak" style="top:73%;width:110px;--c:rgba(63,224,206,.5);--d:9.5s;--delay:5s"></div>
+</div>
+<div class="grain" aria-hidden="true"></div>
+
+<div id="app">
+
+  <!-- ====================== AUTH ====================== -->
+  <section id="screen-auth" class="screen">
+    <div class="auth-shell" id="authRoot"></div>
+  </section>
+
+  <!-- ====================== INTRO / HERO ====================== -->
+  <section id="screen-intro" class="screen is-active">
+    <div class="hero">
+      <div class="hero-stage" id="heroStage">
+        <div class="slide on" data-i="0">
+          <div class="scene s1">
+            <div class="lane" style="left:38%"></div><div class="lane" style="left:50%;height:78%"></div><div class="lane" style="left:62%"></div>
+            <div class="glowdot" style="left:30%;bottom:30%;width:10px;height:10px;background:#ff5b5b"></div>
+            <div class="glowdot" style="left:68%;bottom:42%;width:8px;height:8px;background:#ffd36b"></div>
+            <div class="glowdot" style="left:58%;bottom:24%;width:14px;height:14px;background:#7afff0"></div>
+          </div><div class="veil"></div>
+        </div>
+        <div class="slide" data-i="1">
+          <div class="scene s2">
+            <div class="door" style="left:6%"></div><div class="door" style="left:22%"></div><div class="door" style="left:38%"></div>
+            <div class="door" style="left:54%"></div><div class="door" style="left:70%"></div><div class="door" style="left:86%"></div>
+          </div><div class="veil"></div>
+        </div>
+        <div class="slide" data-i="2">
+          <div class="scene s3"><div class="sheet-ph"></div></div><div class="veil"></div>
+        </div>
+      </div>
+
+      <div class="hero-top">
+        <div class="brand">
+          <svg class="logo" viewBox="0 0 40 40" fill="none">
+            <defs><linearGradient id="lg" x1="0" y1="0" x2="40" y2="40">
+              <stop offset="0" stop-color="#5cf0de"/><stop offset="1" stop-color="#ff9e3d"/></linearGradient></defs>
+            <path d="M20 3 L34 8 V19 C34 28 28 34 20 37 C12 34 6 28 6 19 V8 Z" stroke="url(#lg)" stroke-width="2.2" fill="rgba(63,224,206,.06)"/>
+            <path d="M20 25 L20 13 M20 13 L15 18 M20 13 L25 18" stroke="#eaf1ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="20" cy="29.5" r="1.7" fill="#5cf0de"/>
           </svg>
-        </span>
-        <span>MoveDefense</span>
-      </a>
-      <div class="nav-actions">
-        <a class="btn ghost" href="{{ url_for('auth.login') }}">Login</a>
-        <a class="btn primary" href="#pricing">Pricing</a>
+          <div class="wordmark"><b>Move</b><span class="df">Defense</span></div>
+        </div>
+        <button class="skip" onclick="enterApp()">Skip
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+
+      <div class="hero-body">
+        <div class="eyebrow" id="heroEyebrow">Driver activity log</div>
+        <h1 id="heroTitle">One tap logs<br><em>every stop.</em></h1>
+        <p id="heroText">Not an ELD. No duty status. Just a clean record of where you went, when, and how far — built for drivers who don't need hours-of-service.</p>
+        <div class="dots" id="heroDots">
+          <i class="on"></i><i></i><i></i>
+        </div>
+        <div class="aud">
+          <span>Delivery</span><span>Courier</span><span>Local CDL</span><span>Short-haul</span><span>1099</span>
+        </div>
       </div>
     </div>
-  </nav>
 
-  <main class="wrap">
-    <section class="hero">
+    <div class="hero-cta">
+      <button class="enter" onclick="enterApp()">
+        Start your shift
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="intro-feats">
+        <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.3 7-11a7 7 0 10-14 0c0 4.7 7 11 7 11z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="2.3" stroke="currentColor" stroke-width="1.8"/></svg>GPS stamped</span>
+        <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Print-ready</span>
+        <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 22a10 10 0 100-20 10 10 0 000 20z" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>One-handed</span>
+      </div>
+      <div class="legal-links"><a href="/privacy">Privacy</a><span>·</span><a href="/terms">Terms</a><span>·</span><a href="/contact">Contact</a></div>
+    </div>
+  </section>
+
+  <!-- ====================== HOME ====================== -->
+  <section id="screen-home" class="screen">
+    <header class="topbar">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 40 40" fill="none">
+          <path d="M20 3 L34 8 V19 C34 28 28 34 20 37 C12 34 6 28 6 19 V8 Z" stroke="url(#lg)" stroke-width="2.2" fill="rgba(63,224,206,.06)"/>
+          <path d="M20 25 L20 13 M20 13 L15 18 M20 13 L25 18" stroke="#eaf1ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="20" cy="29.5" r="1.7" fill="#5cf0de"/>
+        </svg>
+        <div class="wordmark"><b>Move</b><span class="df">Defense</span></div>
+      </div>
+      <div class="tb-right">
+        <button class="chip-btn" onclick="route('export')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M6 9V4h12v5M6 18H5a2 2 0 01-2-2v-4a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2h-1M7 14h10v6H7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Export
+        </button>
+        <button class="icon-btn" onclick="openDrawer()" aria-label="Menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="home-pad">
+      <!-- current state -->
+      <div class="statecard" id="stateCard"></div>
+      <!-- gauges -->
+      <div class="gauges" id="gauges"></div>
+      <!-- ledger -->
+      <div class="ledger-head">
+        <h2>Today's stops</h2>
+        <span class="count" id="ledgerCount"></span>
+      </div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+  </section>
+
+  <!-- ====================== EXPORT ====================== -->
+  <section id="screen-export" class="screen">
+    <div class="export-bar">
+      <button class="icon-btn" onclick="route('home')" aria-label="Back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <h2>Export record</h2>
+      <button class="print-btn" onclick="window.print()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M6 9V4h12v5M6 18H5a2 2 0 01-2-2v-4a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2h-1M7 14h10v6H7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Save PDF
+      </button>
+    </div>
+    <div class="scope">
+      <button data-scope="day" class="on" onclick="setScope('day')">Single day</button>
+      <button data-scope="range" onclick="setScope('range')">Date range</button>
+      <button data-scope="customer" onclick="setScope('customer')">By customer</button>
+    </div>
+    <div class="scope-extra" id="scopeExtra"></div>
+    <div class="doc-wrap"><div class="doc" id="doc"></div></div>
+  </section>
+</div>
+
+<!-- CTA DOCK -->
+<div id="cta-dock"></div>
+
+<!-- DEPART SHEET -->
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet"></div>
+
+<!-- DRAWER -->
+<div class="scrim" id="drawerScrim" onclick="closeDrawer()" style="z-index:54"></div>
+<aside class="drawer" id="drawer"></aside>
+
+<!-- TOAST -->
+<div id="toast"><div class="ti"></div><div class="tt"></div></div>
+
+<script>
+/* =====================================================================
+   MoveDefense — state machine + render. One STOP entity, two-state CTA.
+   ===================================================================== */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const KEY='movedefense.v2';
+const ROUTE_KEY='movedefense.lastRoute';
+const AUTH_KEY='movedefense.auth.v1';
+const LEGACY_KEYS=['movedefense.v1'];
+const CONFIG=window.MOVEDEFENSE_CONFIG||{};
+const GOOGLE_MAPS_API_KEY=String(CONFIG.googleMapsApiKey||'').trim();
+const GOOGLE_CLIENT_ID=String(CONFIG.googleClientId||'').trim();
+const PLACES_REGION_CODES=Array.isArray(CONFIG.placesRegionCodes)&&CONFIG.placesRegionCodes.length?CONFIG.placesRegionCodes:['us'];
+const PLACE_SEARCH_RADIUS_METERS=50000;
+const REGION_PLACE_TYPES=new Set(['locality','political','administrative_area_level_1','administrative_area_level_2','administrative_area_level_3','country','postal_code']);
+const ADDRESS_PLACE_TYPES=new Set(['street_address','street_number','route','intersection','premise','subpremise']);
+let googleMapsScriptPromise=null;
+let placesLibPromise=null;
+let placeBiasPromise=null;
+let placeBiasGeo=null;
+
+/* ---- helpers ---- */
+const pad=n=>String(n).padStart(2,'0');
+const fmtTime=t=>t?new Date(t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';
+const fmtDay=t=>new Date(t).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
+const fmtDayLong=t=>new Date(t).toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+const fmtDur=ms=>{if(ms==null||ms<0)return'—';if(ms<60000)return'<1 min';const m=Math.round(ms/60000);if(m<60)return m+' min';return Math.floor(m/60)+'h '+pad(m%60)+' min';};
+const fmtDurShort=ms=>{if(ms==null||ms<0)return'—';if(ms<60000)return'<1 min';const m=Math.round(ms/60000);return m<60?m+' min':Math.floor(m/60)+'h'+(m%60?(' '+(m%60)+' min'):'');};
+const money=n=>'$'+(n||0).toFixed(2);
+const dayKey=t=>new Date(t).toISOString().slice(0,10);
+const uid=()=>Math.random().toString(36).slice(2,9);
+function haversine(a,b){const R=3958.8,dLat=(b.lat-a.lat)*Math.PI/180,dLng=(b.lng-a.lng)*Math.PI/180,
+  s=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));}
+const loadStr=l=>!l||l.empty?'Empty':`${l.cargo} · ${(l.weight||0).toLocaleString()} lb`;
+
+/* ---- state ---- */
+let S=load();
+function load(){
+  LEGACY_KEYS.forEach(k=>localStorage.removeItem(k));
+  try{
+    const r=JSON.parse(localStorage.getItem(KEY));
+    if(r&&Array.isArray(r.stops))return normalizeState(r);
+  }catch(e){}
+  return emptyState();
+}
+function save(){localStorage.setItem(KEY,JSON.stringify(S));}
+
+function emptyState(mode='gig',chosen=false){
+  const now=new Date();
+  return {
+    driver:{name:'Driver',license:mode==='freight'?'Freight & haul mode':'Delivery / gig mode'},
+    logNumber:'MD-'+now.getFullYear()+'-'+String(now.getTime()).slice(-6),
+    settings:{mode,truckMode:mode==='freight',chosen},
+    position:'idle',
+    currentPlace:null,
+    destination:null,
+    odometer:0,
+    recents:[],
+    addrBook:{},
+    cargoHistory:[],
+    errorLog:[],
+    stops:[]
+  };
+}
+function normalizeState(r){
+  const mode=r.settings?.mode||'gig';
+  return {
+    ...emptyState(mode,!!r.settings?.chosen),
+    ...r,
+    driver:r.driver||{name:'Driver',license:mode==='freight'?'Freight & haul mode':'Delivery / gig mode'},
+    settings:{mode,truckMode:!!r.settings?.truckMode,chosen:!!r.settings?.chosen},
+    recents:Array.isArray(r.recents)?r.recents:[],
+    addrBook:r.addrBook&&typeof r.addrBook==='object'?r.addrBook:{},
+    cargoHistory:Array.isArray(r.cargoHistory)?r.cargoHistory:[],
+    errorLog:Array.isArray(r.errorLog)?r.errorLog:[],
+    stops:Array.isArray(r.stops)?r.stops:[]
+  };
+}
+
+/* =================== AUTH =================== */
+let A=loadAuth();
+let authMode='login';
+let authMessage=null;
+let authCreatedRecovery=null;
+let authResetEmail='';
+let googleIdentityPromise=null;
+
+function loadAuth(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(AUTH_KEY));
+    if(raw&&Array.isArray(raw.accounts))return {
+      accounts:raw.accounts,
+      sessionEmail:typeof raw.sessionEmail==='string'?raw.sessionEmail:null
+    };
+  }catch(e){}
+  return {accounts:[],sessionEmail:null};
+}
+function saveAuth(){localStorage.setItem(AUTH_KEY,JSON.stringify(A));}
+function normalizeEmail(email){return String(email||'').trim().toLowerCase();}
+function validEmail(email){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);}
+function currentUser(){return A.accounts.find(a=>a.email===A.sessionEmail)||null;}
+function authSignedIn(){return !!currentUser();}
+function authField(id){return ($('#'+id)?.value||'').trim();}
+function authSetMode(mode){
+  authMode=mode;
+  authMessage=null;
+  authCreatedRecovery=null;
+  if(mode==='login'||mode==='create')authResetEmail='';
+  renderAuth();
+}
+function authSetMessage(type,text,detail=''){authMessage={type,text,detail};renderAuth();}
+function authAccount(email){return A.accounts.find(a=>a.email===email);}
+function randomHex(bytes=16){
+  const b=new Uint8Array(bytes);
+  crypto.getRandomValues(b);
+  return [...b].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+function recoveryCode(){
+  const raw=randomHex(9).toUpperCase();
+  return `MD-${raw.slice(0,4)}-${raw.slice(4,8)}-${raw.slice(8,12)}`;
+}
+function cleanRecovery(value){return String(value||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');}
+async function hashSecret(secret,salt){
+  if(!crypto.subtle)throw new Error('Secure password storage is unavailable in this browser');
+  const enc=new TextEncoder();
+  const key=await crypto.subtle.importKey('raw',enc.encode(secret),'PBKDF2',false,['deriveBits']);
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode(salt),iterations:120000,hash:'SHA-256'},key,256);
+  return [...new Uint8Array(bits)].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+async function verifySecret(secret,salt,expected){return await hashSecret(secret,salt)===expected;}
+function authTitle(){
+  return authMode==='create'?'Create account':
+    authMode==='forgot'?'Forgot password':
+    authMode==='reset'?'Reset password':
+    authMode==='created'?'Save this code':'Sign in';
+}
+function authCopy(){
+  if(authMode==='create')return'Create one local driver account for this device. It works offline.';
+  if(authMode==='forgot')return'Offline reset uses the recovery code shown when the account was created.';
+  if(authMode==='reset')return'Set a new password with your recovery code.';
+  if(authMode==='created')return'This is the only offline reset code for this local account.';
+  return'Sign in to your on-device MoveDefense log.';
+}
+function authButtonLabel(){
+  return authMode==='create'?'Create account':
+    authMode==='forgot'?'Find account':
+    authMode==='reset'?'Reset password':
+    authMode==='created'?'Continue':'Sign in';
+}
+function renderAuth(){
+  const root=$('#authRoot');
+  if(!root)return;
+  const msg=authMessage?`<div class="${authMessage.type==='ok'?'auth-success':'auth-error'} on"><b>${escapeHtml(authMessage.text)}</b>${authMessage.detail?`<br>${escapeHtml(authMessage.detail)}`:''}</div>`:'';
+  const tabs=(authMode==='login'||authMode==='create')?`
+    <div class="auth-tabs">
+      <button class="auth-tab ${authMode==='login'?'on':''}" onclick="authSetMode('login')">Sign in</button>
+      <button class="auth-tab ${authMode==='create'?'on':''}" onclick="authSetMode('create')">Create</button>
+    </div>`:'';
+  const created=authMode==='created'&&authCreatedRecovery?`
+    <div class="auth-recovery">
+      <div class="auth-copy" style="margin:0;color:var(--text-2)">Recovery code for ${escapeHtml(authCreatedRecovery.email)}</div>
+      <div class="code">${escapeHtml(authCreatedRecovery.code)}</div>
+    </div>`:'';
+  const fields=authMode==='created'?created:`
+    ${authMode==='create'?`<div class="auth-field"><label for="authName">Name</label><input id="authName" autocomplete="name" placeholder="Driver name"></div>`:''}
+    <div class="auth-field"><label for="authEmail">Email</label><input id="authEmail" type="email" autocomplete="email" value="${escapeHtml(authResetEmail)}" placeholder="you@example.com"></div>
+    ${(authMode==='login'||authMode==='create')?`<div class="auth-field"><label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="${authMode==='create'?'new-password':'current-password'}" placeholder="Password"></div>`:''}
+    ${authMode==='create'?`<div class="auth-field"><label for="authConfirm">Confirm password</label><input id="authConfirm" type="password" autocomplete="new-password" placeholder="Repeat password"></div>`:''}
+    ${authMode==='reset'?`
+      <div class="auth-field"><label for="authRecovery">Recovery code</label><input id="authRecovery" autocomplete="one-time-code" placeholder="MD-XXXX-XXXX-XXXX"></div>
+      <div class="auth-field"><label for="authNewPassword">New password</label><input id="authNewPassword" type="password" autocomplete="new-password" placeholder="New password"></div>
+      <div class="auth-field"><label for="authNewConfirm">Confirm new password</label><input id="authNewConfirm" type="password" autocomplete="new-password" placeholder="Repeat password"></div>`:''}`;
+  root.innerHTML=`
+    <div class="auth-head">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 40 40" fill="none">
+          <path d="M20 3 L34 8 V19 C34 28 28 34 20 37 C12 34 6 28 6 19 V8 Z" stroke="url(#lg)" stroke-width="2.2" fill="rgba(63,224,206,.06)"/>
+          <path d="M20 25 L20 13 M20 13 L15 18 M20 13 L25 18" stroke="#eaf1ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="20" cy="29.5" r="1.7" fill="#5cf0de"/>
+        </svg>
+        <div class="wordmark"><b>Move</b><span class="df">Defense</span></div>
+      </div>
+      <div class="auth-chip">Offline ready</div>
+    </div>
+    <div class="auth-card">
+      <div class="auth-title">${authTitle()}</div>
+      <p class="auth-copy">${authCopy()}</p>
+      ${tabs}
+      <form onsubmit="submitAuth(event)" novalidate>
+        ${fields}
+        ${msg}
+        <div class="auth-actions">
+          <button class="auth-primary" type="submit">${authButtonLabel()} ${icoChev(18)}</button>
+          ${authMode==='login'?`<button class="auth-google" type="button" onclick="startGoogleSignIn()">
+            <span style="font-family:var(--f-display);font-weight:800">G</span> Login with Google
+          </button>`:''}
+        </div>
+      </form>
+      <div class="auth-row">
+        ${authMode==='login'?`<button class="auth-link" onclick="authSetMode('forgot')">Forgot password?</button>`:`<button class="auth-link" onclick="authSetMode('login')">Back to sign in</button>`}
+        <span>${A.accounts.length?A.accounts.length+' local account'+(A.accounts.length>1?'s':''):'No local account yet'}</span>
+      </div>
+      <div class="auth-foot">Email/password works offline. Google sign-in needs network and a configured Google client ID.</div>
+    </div>`;
+}
+async function submitAuth(event){
+  event.preventDefault();
+  try{
+    if(authMode==='created')return continueAfterAuth();
+    if(authMode==='login')return await submitLogin();
+    if(authMode==='create')return await submitCreateAccount();
+    if(authMode==='forgot')return submitForgotPassword();
+    if(authMode==='reset')return await submitPasswordReset();
+  }catch(error){
+    console.error('[MoveDefense auth]',error);
+    authSetMessage('error','Something went wrong',errorText(error));
+  }
+}
+async function submitLogin(){
+  const email=normalizeEmail(authField('authEmail')),password=$('#authPassword')?.value||'';
+  if(!validEmail(email))return authSetMessage('error','Enter a valid email address');
+  if(!password)return authSetMessage('error','Enter your password');
+  const account=authAccount(email);
+  if(!account)return authSetMessage('error','No local account found for that email','Create an account or use Google if configured.');
+  if(account.provider==='google'&&!account.passwordHash)return authSetMessage('error','This account uses Google sign-in');
+  if(!await verifySecret(password,account.passwordSalt,account.passwordHash))return authSetMessage('error','Wrong password','Try again or use Forgot password.');
+  account.lastLoginAt=Date.now();
+  A.sessionEmail=account.email;
+  saveAuth();
+  applyAuthToDriver(account);
+  continueAfterAuth();
+}
+async function submitCreateAccount(){
+  const email=normalizeEmail(authField('authEmail')),name=authField('authName')||'Driver';
+  const password=$('#authPassword')?.value||'',confirm=$('#authConfirm')?.value||'';
+  if(!validEmail(email))return authSetMessage('error','Enter a valid email address');
+  if(authAccount(email))return authSetMessage('error','Account already exists','Sign in or reset the password.');
+  if(password.length<8)return authSetMessage('error','Password must be at least 8 characters');
+  if(password!==confirm)return authSetMessage('error','Passwords do not match');
+  const passwordSalt=randomHex(),passwordHash=await hashSecret(password,passwordSalt);
+  const code=recoveryCode(),recoverySalt=randomHex(),recoveryHash=await hashSecret(cleanRecovery(code),recoverySalt);
+  const account={email,name,provider:'local',passwordSalt,passwordHash,recoverySalt,recoveryHash,createdAt:Date.now(),lastLoginAt:Date.now()};
+  A.accounts.push(account);
+  A.sessionEmail=email;
+  saveAuth();
+  applyAuthToDriver(account);
+  authCreatedRecovery={email,code};
+  authMode='created';
+  authMessage={type:'ok',text:'Account created',detail:'Keep this recovery code before continuing.'};
+  renderAuth();
+}
+function submitForgotPassword(){
+  const email=normalizeEmail(authField('authEmail'));
+  if(!validEmail(email))return authSetMessage('error','Enter a valid email address');
+  const account=authAccount(email);
+  if(!account)return authSetMessage('error','No local account found for that email');
+  if(!account.recoveryHash)return authSetMessage('error','This account cannot reset offline','Use Google sign-in for this email.');
+  authResetEmail=email;
+  authMode='reset';
+  authMessage={type:'ok',text:'Account found',detail:'Enter the recovery code and a new password.'};
+  renderAuth();
+}
+async function submitPasswordReset(){
+  const email=normalizeEmail(authField('authEmail')||authResetEmail);
+  const code=cleanRecovery(authField('authRecovery')),password=$('#authNewPassword')?.value||'',confirm=$('#authNewConfirm')?.value||'';
+  const account=authAccount(email);
+  if(!account)return authSetMessage('error','No local account found for that email');
+  if(!code)return authSetMessage('error','Enter the recovery code');
+  if(!await verifySecret(code,account.recoverySalt,account.recoveryHash))return authSetMessage('error','Recovery code did not match');
+  if(password.length<8)return authSetMessage('error','New password must be at least 8 characters');
+  if(password!==confirm)return authSetMessage('error','Passwords do not match');
+  account.passwordSalt=randomHex();
+  account.passwordHash=await hashSecret(password,account.passwordSalt);
+  account.provider=account.provider||'local';
+  account.lastResetAt=Date.now();
+  saveAuth();
+  authResetEmail=email;
+  authMode='login';
+  authMessage={type:'ok',text:'Password reset',detail:'Sign in with the new password.'};
+  renderAuth();
+}
+function applyAuthToDriver(account=currentUser()){
+  if(!account)return;
+  if(!S.driver||S.driver.name==='Driver'||!S.driver.name){
+    S.driver={...(S.driver||{}),name:account.name||account.email};
+    save();
+  }
+}
+function continueAfterAuth(){
+  const hasAppState=!!(S.settings?.chosen||S.stops.length||S.currentPlace||S.destination);
+  if(hasAppState){
+    const saved=localStorage.getItem(ROUTE_KEY);
+    route(saved==='export'?'export':'home');
+  }else{
+    heroGo(0);heroStart();route('intro');
+  }
+}
+function signOut(){
+  A.sessionEmail=null;
+  saveAuth();
+  closeDrawer();
+  closeSheet();
+  clearInterval(heroTimer);
+  authMode='login';
+  authMessage={type:'ok',text:'Signed out',detail:'Trip data remains on this device.'};
+  route('auth',false);
+  renderAuth();
+}
+async function startGoogleSignIn(){
+  if(!GOOGLE_CLIENT_ID)return authSetMessage('error','Google sign-in is not configured','Set GOOGLE_CLIENT_ID on Render. Email/password works offline.');
+  if(navigator.onLine===false)return authSetMessage('error','Google sign-in needs a network connection','Use email/password while offline.');
+  try{
+    await loadGoogleIdentity();
+    google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:handleGoogleCredential});
+    google.accounts.id.prompt(notification=>{
+      if(notification.isNotDisplayed?.()||notification.isSkippedMoment?.()){
+        authSetMessage('error','Google sign-in could not open',notification.getNotDisplayedReason?.()||notification.getSkippedReason?.()||'Try again.');
+      }
+    });
+  }catch(error){
+    console.error('[MoveDefense auth]',error);
+    authSetMessage('error','Google sign-in failed to load',errorText(error));
+  }
+}
+function loadGoogleIdentity(){
+  if(window.google?.accounts?.id)return Promise.resolve();
+  if(googleIdentityPromise)return googleIdentityPromise;
+  googleIdentityPromise=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');
+    script.src='https://accounts.google.com/gsi/client';
+    script.async=true;
+    script.defer=true;
+    script.onload=()=>resolve();
+    script.onerror=()=>reject(new Error('Google Identity script could not load'));
+    document.head.appendChild(script);
+  });
+  return googleIdentityPromise;
+}
+function decodeJwtPayload(token){
+  const part=String(token||'').split('.')[1];
+  if(!part)throw new Error('Google credential was empty');
+  const json=atob(part.replace(/-/g,'+').replace(/_/g,'/'));
+  return JSON.parse(decodeURIComponent([...json].map(c=>'%'+c.charCodeAt(0).toString(16).padStart(2,'0')).join('')));
+}
+function handleGoogleCredential(response){
+  try{
+    const payload=decodeJwtPayload(response.credential);
+    const email=normalizeEmail(payload.email);
+    if(!validEmail(email))throw new Error('Google did not return a usable email');
+    let account=authAccount(email);
+    if(!account){
+      account={email,name:payload.name||email,provider:'google',createdAt:Date.now()};
+      A.accounts.push(account);
+    }
+    account.name=payload.name||account.name||email;
+    account.provider='google';
+    account.lastLoginAt=Date.now();
+    A.sessionEmail=email;
+    saveAuth();
+    applyAuthToDriver(account);
+    continueAfterAuth();
+  }catch(error){
+    console.error('[MoveDefense auth]',error);
+    authSetMessage('error','Google sign-in failed',errorText(error));
+  }
+}
+
+/* =================== ROUTING / SCREENS =================== */
+function route(name,persist=true){
+  $$('.screen').forEach(s=>s.classList.remove('is-active'));
+  $('#screen-'+name).classList.add('is-active');
+  const showCta=name==='home';
+  $('#cta-dock').classList.toggle('show',showCta);
+  window.scrollTo(0,0);
+  if(persist&&name!=='intro')localStorage.setItem(ROUTE_KEY,name);
+  if(name==='home'){renderHome();}
+  if(name==='export'){renderExport();}
+}
+function enterApp(){clearInterval(heroTimer);if(!S.settings||!S.settings.chosen){openModePick();}else{route('home');}}
+function openModePick(){
+  $('#sheet').innerHTML=`
+    <div class="grab"></div>
+    <h3>How do you drive?</h3>
+    <p class="lede">Same logbook — it just shows the fields you need. Switch anytime.</p>
+    <div class="modepick">
+      <button class="modecard mc-gig" onclick="chooseMode('gig')">
+        <span class="mi">${icoPin(22)}</span>
+        <span><span class="mt">Delivery, gig &amp; 1099</span><span class="ms">Delivery, courier, rideshare, independent — just stops, miles &amp; time.</span></span>
+        <span class="mc">${icoChev(20)}</span></button>
+      <button class="modecard mc-frt" onclick="chooseMode('freight')">
+        <span class="mi">${icoTruck(22)}</span>
+        <span><span class="mt">Freight &amp; haul</span><span class="ms">Local, short-haul, ELD-exempt CDL — adds cargo, weight &amp; fuel.</span></span>
+        <span class="mc">${icoChev(20)}</span></button>
+    </div>
+    <button class="btn-ghost" style="width:100%;margin-top:14px" onclick="chooseMode('gig')">Skip — use delivery / gig defaults</button>
+    <p class="lede" style="margin:12px 2px 2px;text-align:center;opacity:.6">Not an ELD · no hours-of-service · built for any driver</p>`;
+  openSheet();
+}
+function chooseMode(mode){S=emptyState(mode,true);applyAuthToDriver();save();closeSheet();route('home');
+  toast('ok',mode==='freight'?icoTruck(16):icoPin(16),mode==='freight'?'Freight & haul mode':'Delivery / gig mode',mode==='freight'?'Cargo, weight and fuel are on':'Stops, miles and time');}
+
+/* =================== HERO CAROUSEL =================== */
+const HERO=[
+  {eye:'Delivery · gig · freight · 1099',title:'One tap logs<br><em>every stop.</em>',text:"Not an ELD. No duty status. Run deliveries, a courier route, or haul freight — same clean record of where you went, when, and how far."},
+  {eye:'Stops · miles · time',title:'Your whole day,<br><em>documented.</em>',text:'Arrive, depart, repeat. MoveDefense stamps the time, GPS and miles so you never rebuild a shift from memory — cargo and fuel only if you need them.'},
+  {eye:'Print · PDF · tax-ready',title:'A record anyone<br><em>respects.</em>',text:'Hand a clean trip & mileage log to a client, a platform, an employer, or your accountant. Single day, a date range, or every stop at one place.'}
+];
+let heroI=0,heroTimer;
+function heroGo(i){
+  heroI=(i+HERO.length)%HERO.length;
+  $$('#heroStage .slide').forEach(s=>s.classList.toggle('on',+s.dataset.i===heroI));
+  $$('#heroDots i').forEach((d,k)=>d.classList.toggle('on',k===heroI));
+  const h=HERO[heroI];
+  $('#heroEyebrow').textContent=h.eye;$('#heroTitle').innerHTML=h.title;$('#heroText').textContent=h.text;
+}
+function heroStart(){heroTimer=setInterval(()=>heroGo(heroI+1),5200);}
+(function heroSwipe(){let x0=null;const st=$('#heroStage');
+  st.addEventListener('touchstart',e=>x0=e.touches[0].clientX,{passive:true});
+  st.addEventListener('touchend',e=>{if(x0==null)return;const dx=e.changedTouches[0].clientX-x0;
+    if(Math.abs(dx)>40){clearInterval(heroTimer);heroGo(heroI+(dx<0?1:-1));heroStart();}x0=null;});
+})();
+
+/* =================== HOME RENDER =================== */
+function todayStops(){const k=dayKey(Date.now());return S.stops.filter(s=>dayKey(s.arrival_time)===k);}
+function renderHome(){renderState();renderGauges();renderLedger();renderCTA();}
+
+function renderState(){
+  const driving=S.position==='driving';
+  const idle=S.position==='idle'||(!S.currentPlace&&!S.destination);
+  const place=driving?S.destination:S.currentPlace;
+  const c=$('#stateCard');
+  c.style.setProperty('--state-c',driving?'var(--cyan)':'var(--amber)');
+  c.style.setProperty('--state-wash',driving?'rgba(63,224,206,.16)':'rgba(255,158,61,.15)');
+  const last=[...S.stops].reverse().find(s=>s.location);
+  const gps=driving?null:last?.location;
+  c.innerHTML=`
+    <div class="sc-row">
+      <span class="sc-label"><span class="pulse"></span>${idle?'Ready · no stops logged':driving?'En route · driving to':'Parked · on site at'}</span>
+      <div class="clock"><span id="clkLbl">${new Date().toLocaleDateString([],{weekday:'short'})}</span><b id="clk">${fmtTime(Date.now())}</b></div>
+    </div>
+    <div class="sc-place">${driving?icoRoad(18,'var(--cyan)'):icoPin(18,'var(--amber)')}${idle?'Start your first stop':place?.business_name||place?.name||'Next stop'}</div>
+    <div class="sc-meta">
+      ${idle
+        ? `<span class="gps-pill"><span class="lk"></span>GPS ready</span><span>No saved stops yet</span>`
+        : driving
+        ? `<span>${place?.address?('→ '+place.address):'Tap Arrive when you reach it'}</span>`
+        : `<span class="gps-pill"><span class="lk"></span>${formatGps(gps)}</span><span><b>${odoStr()}</b> mi odometer</span>`}
+    </div>`;
+}
+const odoStr=()=>S.odometer.toLocaleString();
+function formatGps(location){
+  const lat=location?.gps_lat,lng=location?.gps_lng;
+  return Number.isFinite(lat)&&Number.isFinite(lng)?lat.toFixed(4)+', '+lng.toFixed(4):'GPS unavailable';
+}
+
+function renderGauges(){
+  const ts=todayStops();
+  const miles=totalMilesForStops(ts)+activeLegMiles(ts);
+  const fuel=ts.reduce((a,s)=>a+(s.fuel?.gallons||0),0);
+  const onClock=ts.reduce((a,s)=>a+((s.departure_time||Date.now())-s.arrival_time),0);
+  const g=$('#gauges');
+  const third=(S.settings.truckMode||fuel>0)
+    ? gauge('fuel','Fuel',fuel.toFixed(0),'gallons','fuel')
+    : gauge('fuel','Active',(onClock/3600000).toFixed(1),'hrs on-clock','time');
+  g.innerHTML=`
+    ${gauge('stop','Stops',ts.length,'today','stop')}
+    ${gauge('mile','Miles',miles,'since 1st stop','mile')}
+    ${third}`;
+}
+function gauge(cls,k,v,u,kind){return `<div class="gauge g-${cls}" role="button" tabindex="0" onclick="openSummaryDetail('${kind}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openSummaryDetail('${kind}')}"><div class="arc"></div><div class="gk">${k}</div><div class="gv" data-to="${v}">${v}</div><div class="gu">${u}</div></div>`;}
+
+function openSummaryDetail(kind){
+  const stops=todayStops();
+  if(kind==='stop')return openStopsSummary(stops);
+  if(kind==='mile')return openMilesSummary(stops);
+  if(kind==='fuel')return openFuelSummary(stops);
+  return openTimeSummary(stops);
+}
+function summarySheet(title,subtitle,body){
+  $('#sheet').innerHTML=`
+    <div class="grab"></div>
+    <div class="stop-detail-head">
       <div>
-        <h1><span>Driver paperwork</span><span>into clean packets.</span></h1>
-        <p class="lead">Use our workspace to capture routes, inspections, fuel, photos, and PDFs without chasing texts later.</p>
-        <div class="offer-row" aria-label="MoveDefense offer">
-          <span class="offer-pill">Route packets</span>
-          <span class="offer-pill">Incident and damage packets</span>
-          <span class="offer-pill">Fuel and IFTA support</span>
-        </div>
-        <div class="hero-actions">
-          <a class="btn primary" href="#pricing">View pricing</a>
-          <a class="btn ghost" href="#workflow">See workflow</a>
-        </div>
+        <div class="name">${title}</div>
+        <div class="addr">${subtitle}</div>
       </div>
-      <figure class="hero-shot">
-        <img src="{{ url_for('static', filename='marketing/workflow-route-board.jpg') }}" alt="MoveDefense live driver route board">
-        <figcaption class="shot-caption">
-          <span>Actual app screen</span>
-          <span>Live route board</span>
-        </figcaption>
-      </figure>
-    </section>
-
-    <section class="section" id="workflow">
-      <div class="section-head">
-        <div>
-          <h2>The workflow</h2>
-          <p>Driver records the day. Proof stays with the route. The packet exports when needed.</p>
-        </div>
-      </div>
-      <div class="workflow-grid">
-        <article class="workflow-card">
-          <img src="{{ url_for('static', filename='marketing/workflow-route-board.jpg') }}" alt="Route board with current driver action">
-          <div class="workflow-copy">
-            <div class="step">Step 1</div>
-            <h3>Capture the route</h3>
-            <p>Stops, load flow, wait time, and driver actions stay in one route record.</p>
-          </div>
-        </article>
-        <article class="workflow-card">
-          <img src="{{ url_for('static', filename='marketing/workflow-fuel-proof.jpg') }}" alt="Fuel record and receipt capture screen">
-          <div class="workflow-copy">
-            <div class="step">Step 2</div>
-            <h3>Add proof</h3>
-            <p>Fuel, receipts, photos, inspections, and notes attach to the same workday.</p>
-          </div>
-        </article>
-        <article class="workflow-card packet">
-          <img src="{{ url_for('static', filename='marketing/workflow-driver-packet.jpg') }}" alt="Exported driver packet summary">
-          <div class="workflow-copy">
-            <div class="step">Step 3</div>
-            <h3>Export the packet</h3>
-            <p>Print or save a clean route packet, inspection record, or fuel worksheet.</p>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section class="section" id="pricing">
-      <div class="section-head">
-        <div>
-          <h2>Pricing</h2>
-          <p>Clear plans. No setup call required for the standard products.</p>
-        </div>
-      </div>
-
-      <div class="free-strip">
-        <strong>Free Preview - $0</strong>
-        <p>Create forms, save 3 records/month, and preview watermarked packets.</p>
-        <a class="btn ghost" href="#pricing">Choose a paid plan</a>
-      </div>
-
-      <div class="pricing-grid">
-        <article class="price-card featured">
-          <div class="price-name">Daily Route Pass</div>
-          <div class="price">$3.99<small>/day</small></div>
-          <p class="use-case">For one route day.</p>
-          <ul>
-            <li>Same-day route workspace</li>
-            <li>Proof and photo upload</li>
-            <li>1 included export</li>
-          </ul>
-          <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='daily-route-pass') }}" method="POST">
-            <button class="btn primary" type="submit">Start pass</button>
-          </form>
-        </article>
-
-        <article class="price-card">
-          <div class="price-name">Solo Driver</div>
-          <div class="price">$19<small>/month</small></div>
-          <p class="use-case">For one driver keeping records.</p>
-          <ul>
-            <li>Route records</li>
-            <li>PDF packets</li>
-            <li>30-day history</li>
-          </ul>
-          <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='solo-driver') }}" method="POST">
-            <button class="btn primary" type="submit">Subscribe</button>
-          </form>
-        </article>
-
-        <article class="price-card">
-          <div class="price-name">Owner-Operator</div>
-          <div class="price">$49<small>/month</small></div>
-          <p class="use-case">For a truck owner running their own paperwork.</p>
-          <ul>
-            <li>Route packets</li>
-            <li>Incident and damage packets</li>
-            <li>Fuel and IFTA support</li>
-          </ul>
-          <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='owner-operator') }}" method="POST">
-            <button class="btn primary" type="submit">Subscribe</button>
-          </form>
-        </article>
-
-        <article class="price-card">
-          <div class="price-name">Small Fleet</div>
-          <div class="price">$149<small>/month</small></div>
-          <p class="use-case">For up to 5 drivers or vehicles.</p>
-          <ul>
-            <li>Manager dashboard</li>
-            <li>Review queue</li>
-            <li>$15/month per extra driver or vehicle</li>
-          </ul>
-          <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='small-fleet') }}" method="POST">
-            <button class="btn primary" type="submit">Subscribe</button>
-          </form>
-        </article>
-
-        <article class="price-card">
-          <div class="price-name">Fleet Office</div>
-          <div class="price">$299+<small>/month</small></div>
-          <p class="use-case">For branded packets and cleanup help.</p>
-          <ul>
-            <li>Custom templates</li>
-            <li>Monthly paperwork cleanup</li>
-            <li>Up to 25 completed packets/month</li>
-          </ul>
-          <form class="checkout-form" action="{{ url_for('public.billing_checkout', plan_key='fleet-office') }}" method="POST">
-            <button class="btn primary" type="submit">Start checkout</button>
-          </form>
-        </article>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="section-head">
-        <div>
-          <h2>One-time products</h2>
-          <p>Buy forms or setup work without a monthly plan.</p>
-        </div>
-      </div>
-      <div class="product-list">
-        <div class="product-row">
-          <strong>Driver Forms Pack</strong>
-          <span>$19</span>
-          <form action="{{ url_for('public.billing_checkout', plan_key='driver-forms-pack') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form>
-        </div>
-        <div class="product-row">
-          <strong>Owner-Operator Record Kit</strong>
-          <span>$49</span>
-          <form action="{{ url_for('public.billing_checkout', plan_key='record-kit') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form>
-        </div>
-        <div class="product-row">
-          <strong>IFTA Worksheet Bundle</strong>
-          <span>$99</span>
-          <form action="{{ url_for('public.billing_checkout', plan_key='ifta-worksheet-bundle') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form>
-        </div>
-        <div class="product-row">
-          <strong>Branded packet setup</strong>
-          <span>$149</span>
-          <form action="{{ url_for('public.billing_checkout', plan_key='branded-packet-setup') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form>
-        </div>
-        <div class="product-row">
-          <strong>Paper form conversion</strong>
-          <span>$299</span>
-          <form action="{{ url_for('public.billing_checkout', plan_key='paper-form-conversion') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form>
-        </div>
-        <div class="product-row">
-          <strong>Fleet packet setup</strong>
-          <span>$499</span>
-          <form action="{{ url_for('public.billing_checkout', plan_key='fleet-packet-setup') }}" method="POST"><button class="btn ghost" type="submit">Buy</button></form>
-        </div>
-      </div>
-      <div class="note-strip">
-        <strong>MoveDefense Paperwork Cleanup starts at $299/month.</strong>
-        We organize records for FMCSA-aligned review, DOT-ready recordkeeping, insurance-ready packet support, and IFTA support worksheets. Final safety, insurance, tax, and compliance decisions stay with your reviewers.
-      </div>
-    </section>
-  </main>
-  <footer class="site-footer">
-    <div class="site-footer-inner">
-      {% include "partials/_public_footer_links.html" %}
+      <div class="detail-pill">Today</div>
     </div>
-  </footer>
+    ${body}
+    <div class="sheet-actions"><button class="btn-primary" onclick="closeSheet()">Done</button></div>`;
+  openSheet();
+}
+function openStopsSummary(stops){
+  const closed=stops.filter(s=>s.departure_time).length;
+  const open=stops.length-closed;
+  const dwell=stops.reduce((a,s)=>a+((s.departure_time||Date.now())-s.arrival_time),0);
+  const pickups=stops.filter(s=>s.load_change==='picked_up').length;
+  const deliveries=stops.filter(s=>s.load_change==='dropped_off').length;
+  const longest=[...stops].sort((a,b)=>((b.departure_time||Date.now())-b.arrival_time)-((a.departure_time||Date.now())-a.arrival_time))[0];
+  summarySheet('Stops summary','Counts, status, and dwell rollup',`
+    <div class="detail-grid">
+      <div class="detail-metric"><div class="mk">Logged</div><div class="mv">${stops.length}</div></div>
+      <div class="detail-metric"><div class="mk">Closed</div><div class="mv">${closed}</div></div>
+      <div class="detail-metric"><div class="mk">Open</div><div class="mv">${open}</div></div>
+      <div class="detail-metric"><div class="mk">Dwell</div><div class="mv">${fmtDurShort(dwell)}</div></div>
+    </div>
+    <div class="summary-list">
+      <div class="summary-row"><div><div class="rk">Load actions</div><div class="rs">${pickups} picked up · ${deliveries} delivered · ${Math.max(0,stops.length-pickups-deliveries)} stop only</div></div><div class="rv">${stops.length}</div></div>
+      <div class="summary-row"><div><div class="rk">First stop</div><div class="rs">${stops[0]?escapeHtml(stops[0].location.business_name):'No stops yet'}</div></div><div class="rv">${stops[0]?fmtTime(stops[0].arrival_time):'—'}</div></div>
+      <div class="summary-row"><div><div class="rk">Longest dwell</div><div class="rs">${longest?escapeHtml(longest.location.business_name):'No stops yet'}</div></div><div class="rv">${longest?fmtDurShort((longest.departure_time||Date.now())-longest.arrival_time):'—'}</div></div>
+    </div>`);
+}
+function openMilesSummary(stops){
+  const legs=mileageLegsForStops(stops);
+  const total=totalMilesForStops(stops)+activeLegMiles(stops);
+  const odoStart=odometerStartForStops(stops),odoEnd=odometerEndForStops(stops);
+  const rows=stops.map((s,i)=>{
+    const from=i===0?'Shift start':stops[i-1].location.business_name;
+    return `<div class="summary-row"><div><div class="rk">${escapeHtml(from)} → ${escapeHtml(s.location.business_name)}</div><div class="rs">${fmtTime(s.arrival_time)} · ${i===0?'first logged point':'arrival leg'}</div></div><div class="rv">${docLegCell(legs,i)}${legs[i]?' mi':''}</div></div>`;
+  }).join('');
+  const active=S.position==='driving'&&S.destination?`<div class="summary-row"><div><div class="rk">${escapeHtml(stops[stops.length-1]?.location.business_name||'Current stop')} → ${escapeHtml(S.destination.business_name)}</div><div class="rs">Current route estimate</div></div><div class="rv">${activeLegMiles(stops)||'—'} mi</div></div>`:'';
+  summarySheet('Mileage detail','Legs, odometer, and current estimate',`
+    <div class="detail-grid">
+      <div class="detail-metric"><div class="mk">Total</div><div class="mv">${total}</div></div>
+      <div class="detail-metric"><div class="mk">Legs</div><div class="mv">${Math.max(0,stops.length-1)}</div></div>
+      <div class="detail-metric"><div class="mk">Start odo</div><div class="mv">${odoStart.toLocaleString()}</div></div>
+      <div class="detail-metric"><div class="mk">End odo</div><div class="mv">${odoEnd.toLocaleString()}</div></div>
+    </div>
+    <div class="summary-list">${rows||'<div class="summary-note">No mileage yet.</div>'}${active}</div>`);
+}
+function openFuelSummary(stops){
+  const fuelStops=stops.filter(s=>s.fuel);
+  const gallons=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).gallons,0);
+  const cost=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).cost,0);
+  const rows=fuelStops.map(s=>{
+    const fuel=fuelAmounts(s.fuel);
+    return `<div class="summary-row"><div><div class="rk">${escapeHtml(s.fuel.location||s.location.business_name)}</div><div class="rs">${fmtTime(s.arrival_time)} · ${fuel.gallons.toFixed(1)} gallons</div></div><div class="rv">${money(fuel.cost)}</div></div>`;
+  }).join('');
+  summarySheet('Fuel detail','Fuel totals and purchase records',`
+    <div class="detail-grid">
+      <div class="detail-metric"><div class="mk">Gallons</div><div class="mv">${gallons.toFixed(gallons%1?1:0)}</div></div>
+      <div class="detail-metric"><div class="mk">Cost</div><div class="mv">${money(cost)}</div></div>
+      <div class="detail-metric"><div class="mk">Stops</div><div class="mv">${fuelStops.length}</div></div>
+      <div class="detail-metric"><div class="mk">Avg</div><div class="mv">${gallons&&cost?money(cost/gallons):'—'}</div></div>
+    </div>
+    <div class="summary-list">${rows||'<div class="summary-note">No fuel logged today. Tap a stop card to add fuel to that stop.</div>'}</div>`);
+}
+function openTimeSummary(stops){
+  const onLoc=stops.reduce((a,s)=>a+((s.departure_time||Date.now())-s.arrival_time),0);
+  let driving=0;for(let i=0;i<stops.length-1;i++){if(stops[i].departure_time)driving+=Math.max(0,stops[i+1].arrival_time-stops[i].departure_time);}
+  summarySheet('Time detail','On-location and between-stop totals',`
+    <div class="detail-grid">
+      <div class="detail-metric"><div class="mk">On location</div><div class="mv">${fmtDurShort(onLoc)}</div></div>
+      <div class="detail-metric"><div class="mk">Driving</div><div class="mv">${fmtDurShort(driving)}</div></div>
+      <div class="detail-metric"><div class="mk">Stops</div><div class="mv">${stops.length}</div></div>
+      <div class="detail-metric"><div class="mk">Open</div><div class="mv">${stops.filter(s=>!s.departure_time).length}</div></div>
+    </div>
+    <div class="summary-note">Active stop time is included until departure.</div>`);
+}
+
+function renderLedger(){
+  const ts=todayStops();
+  $('#ledgerCount').textContent=ts.length+' logged';
+  const tl=$('#timeline');tl.innerHTML='';
+  if(!ts.length){
+    tl.innerHTML='<div class="empty-ledger">No stops logged yet. Start the first stop to stamp the current time and GPS.</div>';
+    return;
+  }
+  ts.forEach((s,i)=>{
+    const open=!s.departure_time;
+    const dwell=open?(Date.now()-s.arrival_time):(s.departure_time-s.arrival_time);
+    const lc=s.load_change;
+    const cargoOn=S.settings.truckMode;
+    const tags=[];
+    tags.push(mileageTag(ts,i));
+    if(lc==='picked_up')tags.push(`<span class="tag pick">${icoUp(12)} Picked up</span>`);
+    else if(lc==='dropped_off')tags.push(`<span class="tag drop">${icoDown(12)} ${S.settings.truckMode?'Dropped off':'Delivered'}</span>`);
+    else if(lc==='none')tags.push(`<span class="tag">${S.settings.truckMode?'No load change':'Stop'}</span>`);
+    if(cargoOn && s.departed_with && !s.departed_with.empty)tags.push(`<span class="tag cargo">${icoBox(12)} ${s.departed_with.cargo} · ${(s.departed_with.weight).toLocaleString()} lb</span>`);
+    if(s.fuel)tags.push(`<span class="tag fuel">${icoFuel(12)} ${fuelLabel(s.fuel)}</span>`);
+    if(s.photos?.length)tags.push(`<span class="tag photo">${icoCamera(12)} ${s.photos.length} photo${s.photos.length>1?'s':''}</span>`);
+    if(open)tags.unshift(`<span class="tag live"><span class="lk"></span> On site</span>`);
+    tl.insertAdjacentHTML('beforeend',`
+      <div class="tl-item ${open?'live':''}" style="animation-delay:${i*55}ms">
+        <div class="node">${s.sequence}</div>
+        <div class="stop" role="button" tabindex="0" onclick="openStopDetail('${s.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openStopDetail('${s.id}')}">
+          <div class="stop-top">
+            <div><div class="stop-name">${s.location.business_name}</div>
+              <div class="stop-addr">${s.location.address}</div></div>
+            <div class="dwell"><div class="t">${fmtTime(s.arrival_time)} → ${s.departure_time?fmtTime(s.departure_time):'now'}</div>
+              <div class="d">${fmtDurShort(dwell)}<span class="d-lbl">${open?'on site':'dwell'}</span></div></div>
+          </div>
+          <div class="stop-foot">${tags.join('')}</div>
+          ${s.note?`<div class="note">${s.note}</div>`:''}
+        </div>
+      </div>`);
+  });
+  if(S.position==='driving'&&S.destination){
+    const leg=activeLegMiles(ts);
+    tl.insertAdjacentHTML('beforeend',`<div class="transit-line">${icoRoad(13,'var(--cyan)')} En route to ${S.destination.business_name}${leg?' · '+leg+' mi':''}<span class="ln"></span></div>`);
+  }
+}
+function mileageTag(stops,index){
+  const miles=mileageLegsForStops(stops)[index]||0;
+  if(index===0&&miles===0)return `<span class="tag start">${icoPin(12)} Start point</span>`;
+  if(!miles)return `<span class="tag pending">${icoRoad(12)} Mileage pending</span>`;
+  return `<span class="tag miles">${icoRoad(12)} ${miles} mi</span>`;
+}
+function fuelLabel(fuel){
+  const {gallons,cost}=fuelAmounts(fuel);
+  if(gallons&&cost)return `${gallons.toFixed(gallons%1?1:0)} gal · ${money(cost)}`;
+  if(gallons)return `${gallons.toFixed(gallons%1?1:0)} gal`;
+  return money(cost);
+}
+function fuelAmounts(fuel){
+  const gallons=Number(fuel?.gallons),cost=Number(fuel?.cost);
+  return {
+    gallons:Number.isFinite(gallons)?gallons:0,
+    cost:Number.isFinite(cost)?cost:0
+  };
+}
+function parseFuelNumber(selector){
+  const raw=($(selector)?.value||'').replace(/[^0-9.\-]/g,'');
+  const value=parseFloat(raw);
+  return Number.isFinite(value)?value:null;
+}
+function errorText(error){
+  if(!error)return'Unknown error';
+  if(typeof error==='string')return error;
+  if(error.message)return error.message;
+  if(error.name)return error.name;
+  return String(error);
+}
+function trimLogContext(context={}){
+  const clean={};
+  ['stopId','fileName','fileType','fileSize'].forEach(k=>{
+    if(context[k]!=null)clean[k]=context[k];
+  });
+  return clean;
+}
+function logAppError(event,error,context={}){
+  const entry={id:uid(),ts:Date.now(),event,message:errorText(error),context:trimLogContext(context)};
+  S.errorLog=[entry,...(Array.isArray(S.errorLog)?S.errorLog:[])].slice(0,20);
+  if(context.stopId){
+    const stop=findStop(context.stopId);
+    if(stop)stop.photo_errors=[entry,...(Array.isArray(stop.photo_errors)?stop.photo_errors:[])].slice(0,5);
+  }
+  try{save();}catch(e){}
+  console.error('[MoveDefense]',event,entry,error);
+  return entry;
+}
+function findStop(id){return S.stops.find(stop=>stop.id===id);}
+function stopIndex(id){return S.stops.findIndex(stop=>stop.id===id);}
+function openStopDetail(id){
+  const stop=findStop(id);
+  if(!stop)return;
+  const stops=todayStops();
+  const idx=Math.max(0,stops.findIndex(s=>s.id===id));
+  const legs=mileageLegsForStops(stops);
+  const miles=legs[idx]||0;
+  const dwell=(stop.departure_time||Date.now())-stop.arrival_time;
+  const fuel=stop.fuel||{};
+  const photos=stop.photos||[];
+  const photoErrors=Array.isArray(stop.photo_errors)?stop.photo_errors:[];
+  $('#sheet').innerHTML=`
+    <div class="grab"></div>
+    <div class="stop-detail-head">
+      <div>
+        <div class="name">${escapeHtml(stop.location.business_name||'Stop')}</div>
+        <div class="addr">${escapeHtml(stop.location.address||formatGps(stop.location))}</div>
+      </div>
+      <div class="detail-pill">${stop.departure_time?'Closed':'Open'}</div>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-metric"><div class="mk">Miles</div><div class="mv">${idx===0&&miles===0?'Start':(miles?miles+' mi':'Pending')}</div></div>
+      <div class="detail-metric"><div class="mk">Dwell</div><div class="mv">${fmtDurShort(dwell)}</div></div>
+      <div class="detail-metric"><div class="mk">Arrive</div><div class="mv">${fmtTime(stop.arrival_time)}</div></div>
+      <div class="detail-metric"><div class="mk">Depart</div><div class="mv">${stop.departure_time?fmtTime(stop.departure_time):'Now'}</div></div>
+    </div>
+
+    <div class="field-label">Fuel</div>
+    <div class="two">
+      <input class="input" id="detailFuelGal" inputmode="decimal" placeholder="Gallons" value="${Number.isFinite(Number(fuel.gallons))&&Number(fuel.gallons)>0?Number(fuel.gallons):''}" />
+      <input class="input" id="detailFuelCost" inputmode="decimal" placeholder="Cost $" value="${Number.isFinite(Number(fuel.cost))&&Number(fuel.cost)>0?Number(fuel.cost):''}" />
+    </div>
+    <div class="sheet-actions" style="padding-bottom:4px">
+      <button class="btn-ghost" onclick="clearStopFuel('${id}')">Clear fuel</button>
+      <button class="btn-primary" onclick="saveStopFuel('${id}')">Save fuel ${icoChev(18)}</button>
+    </div>
+
+    <div class="field-label">Photos</div>
+    ${photoErrors.length?`<div class="detail-alert"><b>Photo upload error</b>${escapeHtml(photoErrors[0].message)}<br><span>${fmtTime(photoErrors[0].ts)} · logged for this stop</span></div>`:''}
+    ${photos.length?`<div class="photo-grid">${photos.map(photo=>`
+      <div class="photo-thumb">
+        <img src="${photo.data}" alt="${escapeHtml(photo.name||'Stop photo')}">
+        <button class="photo-del" onclick="removeStopPhoto('${id}','${photo.id}')" aria-label="Remove photo">${icoReset(13)}</button>
+      </div>`).join('')}</div>`:'<div class="empty-detail">No photos attached to this stop.</div>'}
+    <input id="stopPhotoInput" type="file" accept="image/*" capture="environment" style="display:none" onchange="handleStopPhoto('${id}',this)" />
+    <div class="sheet-actions">
+      <button class="btn-ghost" onclick="closeSheet()">Done</button>
+      <button class="btn-primary" onclick="triggerStopPhoto()">${icoCamera(18)} Add photo</button>
+    </div>`;
+  openSheet();
+}
+function saveStopFuel(id){
+  const stop=findStop(id);
+  if(!stop)return;
+  const gallons=parseFuelNumber('#detailFuelGal');
+  const cost=parseFuelNumber('#detailFuelCost');
+  if(gallons===null&&cost===null){
+    stop.fuel=null;
+    save();renderHome();openStopDetail(id);
+    toast('ok',icoFuel(16),'Fuel cleared','No fuel saved on this stop');
+    return;
+  }
+  stop.fuel={gallons:gallons??0,cost:cost??0,location:stop.location.business_name};
+  save();renderHome();openStopDetail(id);
+  toast('ok',icoFuel(16),'Fuel saved',fuelLabel(stop.fuel));
+}
+function clearStopFuel(id){
+  const stop=findStop(id);
+  if(!stop)return;
+  stop.fuel=null;
+  save();renderHome();openStopDetail(id);
+  toast('ok',icoFuel(16),'Fuel cleared','No fuel saved on this stop');
+}
+function triggerStopPhoto(){
+  $('#stopPhotoInput')?.click();
+}
+async function handleStopPhoto(id,input){
+  const stop=findStop(id),file=input.files?.[0];
+  if(!file)return;
+  if(!stop){
+    logAppError('Photo upload failed',new Error('Stop was not found'),{stopId:id,fileName:file.name,fileType:file.type,fileSize:file.size});
+    toast('warn',icoCamera(16),'Photo not saved','Stop was not found');
+    return;
+  }
+  let pendingId=null;
+  try{
+    if(file.type&&!file.type.startsWith('image/'))throw new Error('Selected file is not an image');
+    const data=await resizePhoto(file);
+    stop.photos=Array.isArray(stop.photos)?stop.photos:[];
+    pendingId=uid();
+    stop.photos.push({id:pendingId,name:file.name||'stop-photo.jpg',type:'image/jpeg',added_at:Date.now(),data});
+    save();renderHome();openStopDetail(id);
+    toast('ok',icoCamera(16),'Photo added',stop.location.business_name);
+  }catch(e){
+    if(pendingId)stop.photos=(stop.photos||[]).filter(photo=>photo.id!==pendingId);
+    const entry=logAppError('Photo upload failed',e,{stopId:id,fileName:file.name,fileType:file.type,fileSize:file.size});
+    openStopDetail(id);
+    toast('warn',icoCamera(16),'Photo not saved',entry.message);
+  }finally{
+    input.value='';
+  }
+}
+function removeStopPhoto(stopId,photoId){
+  const stop=findStop(stopId);
+  if(!stop)return;
+  stop.photos=(stop.photos||[]).filter(photo=>photo.id!==photoId);
+  save();renderHome();openStopDetail(stopId);
+  toast('ok',icoCamera(16),'Photo removed','Stop updated');
+}
+function resizePhoto(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=()=>reject(new Error(reader.error?.message||'File could not be read'));
+    reader.onload=()=>{
+      const img=new Image();
+      img.onerror=()=>reject(new Error('Image could not be decoded'));
+      img.onload=()=>{
+        const max=900;
+        const scale=Math.min(1,max/Math.max(img.width,img.height));
+        const canvas=document.createElement('canvas');
+        canvas.width=Math.max(1,Math.round(img.width*scale));
+        canvas.height=Math.max(1,Math.round(img.height*scale));
+        const ctx=canvas.getContext('2d');
+        if(!ctx)return reject(new Error('Image canvas is unavailable'));
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
+        const data=canvas.toDataURL('image/jpeg',0.68);
+        if(!data||data.length<32)return reject(new Error('Image could not be compressed'));
+        resolve(data);
+      };
+      img.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/* =================== CTA =================== */
+function renderCTA(){
+  const driving=S.position==='driving';
+  const idle=S.position==='idle'||(!S.currentPlace&&!S.destination);
+  const place=driving?S.destination:S.currentPlace;
+  const name=place?.business_name||place?.name||'next stop';
+  const activeMiles=driving?activeLegMiles():0;
+  const dock=$('#cta-dock');
+  dock.innerHTML=`
+    <button class="cta ${driving||idle?'cta--arrive':'cta--depart'}" id="ctaBtn">
+      <span class="ico">${driving||idle?icoPin(28):icoRoad(28)}</span>
+      <span class="txt">
+        <span class="verb">${idle?'Start with current GPS':driving?'Tap on arrival':'Tap when you roll out'}</span>
+        <span class="place">${idle?'Record first stop':driving?'Arrive at '+shortName(name):'Depart '+shortName(name)}</span>
+        <span class="sub">${idle?'No saved location data':driving?(activeMiles?activeMiles+' mi leg · records arrival':'Records arrival time + GPS'):'Log load change, then go'}</span>
+      </span>
+      <span class="chev">${icoChev(26)}</span>
+    </button>`;
+  $('#ctaBtn').addEventListener('click',()=>{
+    const b=$('#ctaBtn');b.classList.add('swept');setTimeout(()=>b.classList.remove('swept'),1100);
+    haptic();
+    idle?openStartStop():driving?doArrive():openDepart();
+  });
+}
+const shortName=n=>n.length>18?n.slice(0,17)+'…':n;
+
+/* =================== ACTIONS =================== */
+function openStartStop(){
+  $('#sheet').innerHTML=`
+    <div class="grab"></div>
+    <h3>Start first stop</h3>
+    <p class="lede">This creates the first live stop from your current GPS. Name and odometer are optional.</p>
+    <div class="field-label">Current stop</div>
+    <div class="place-field">
+      <input class="input" id="startName" placeholder="Business or stop name" autocomplete="off" oninput="placeFieldInput('startName','startAddr','startPlaceResults',this)" />
+      <input class="input" id="startAddr" placeholder="Address" autocomplete="off" style="margin-top:10px" oninput="placeFieldInput('startName','startAddr','startPlaceResults',this)" />
+      <div class="place-results" id="startPlaceResults"></div>
+    </div>
+    <div class="field-label">Odometer</div>
+    <input class="input" id="startOdo" inputmode="numeric" placeholder="Odometer" />
+    <div class="sheet-actions">
+      <button class="btn-ghost" onclick="closeSheet()">Cancel</button>
+      <button class="btn-primary" onclick="confirmStartStop()">Start stop ${icoChev(18)}</button>
+    </div>`;
+  openSheet();
+  bindPlaceAutocomplete({nameId:'startName',addrId:'startAddr',resultsId:'startPlaceResults'});
+}
+async function confirmStartStop(){
+  const selected=selectedPlaceData('startName','startAddr');
+  const gps=await getPos()||selected?.geo;
+  const name=$('#startName')?.value.trim()||'Current location';
+  const addr=$('#startAddr')?.value.trim()||'';
+  const odoIn=parseInt($('#startOdo')?.value);
+  if(Number.isFinite(odoIn)&&odoIn>=0)S.odometer=odoIn;
+  const location={business_name:name,address:addr,gps_lat:gps?+gps.lat.toFixed(5):null,gps_lng:gps?+gps.lng.toFixed(5):null};
+  S.stops.push({
+    id:uid(),sequence:1,
+    arrival_time:Date.now(),departure_time:null,
+    location,odometer:S.odometer,miles_since_last_stop:0,
+    arrived_with:{empty:true},departed_with:null,load_change:null,fuel:null,note:''
+  });
+  S.position='parked';S.currentPlace={business_name:name,address:addr};S.destination=null;
+  rememberPlace(name,addr);
+  save();closeSheet();renderHome();
+  toast('ok',icoPin(16),'Stop started',gps?'GPS stamped':'GPS unavailable');
+}
+async function doArrive(){
+  const gps=await getPos();
+  const dest=S.destination||{business_name:'Unnamed stop',address:''};
+  const prev=S.stops[S.stops.length-1];
+  const prevGeo=toGeo(prev?.location);
+  const destGeo=toGeo(dest);
+  const useDestinationGeo=shouldUseDestinationGeo(gps,destGeo,prevGeo);
+  const arrivalGeo=useDestinationGeo?destGeo:(gps||destGeo||null);
+  const leg=useDestinationGeo&&Number.isFinite(dest.estimated_miles)?dest.estimated_miles:estimateLegMiles(prevGeo,arrivalGeo);
+  S.odometer+=leg;
+  S.stops.push({
+    id:uid(),sequence:S.stops.length+1,
+    arrival_time:Date.now(),departure_time:null,
+    location:{business_name:dest.business_name,address:dest.address||'',gps_lat:arrivalGeo?+arrivalGeo.lat.toFixed(5):null,gps_lng:arrivalGeo?+arrivalGeo.lng.toFixed(5):null},
+    odometer:S.odometer,miles_since_last_stop:leg,
+    arrived_with:prev&&prev.departed_with?{...prev.departed_with}:{empty:true},
+    departed_with:null,load_change:null,fuel:null,note:''
+  });
+  S.position='parked';
+  S.currentPlace={business_name:dest.business_name,address:dest.address||'',gps_lat:arrivalGeo?+arrivalGeo.lat.toFixed(5):null,gps_lng:arrivalGeo?+arrivalGeo.lng.toFixed(5):null};
+  S.destination=null;
+  save();renderHome();
+  toast('ok',icoPin(16),'Arrived',`${shortName(dest.business_name)} · ${leg} mi · ${arrivalGeo?'GPS stamped':'GPS unavailable'}`);
+}
+
+function openDepart(){
+  const place=S.currentPlace;
+  if(!place){openStartStop();return;}
+  const truck=S.settings.truckMode;
+  $('#sheet').innerHTML=`
+    <div class="grab"></div>
+    <h3>Depart ${place.business_name}</h3>
+    <p class="lede">The one thing we can't infer — <b>${truck?'did the load change here?':'did you pick up or deliver here?'}</b></p>
+
+    <div class="seg3" id="seg">
+      <div class="segc" data-v="picked_up" onclick="pickSeg(this)"><div class="si">${icoUp(18)}</div><div class="sl">Picked up</div></div>
+      <div class="segc" data-v="dropped_off" onclick="pickSeg(this)"><div class="si">${icoDown(18)}</div><div class="sl">${truck?'Dropped off':'Delivered'}</div></div>
+      <div class="segc" data-v="none" onclick="pickSeg(this)"><div class="si">${icoMinus(18)}</div><div class="sl">${truck?'No change':'Stop only'}</div></div>
+    </div>
+
+    ${truck?`
+    <div class="collapse" id="cargoWrap">
+      <div class="field-label">Cargo picked up <span style="opacity:.6">· optional</span></div>
+      <input class="input" id="cargoType" list="cargoList" placeholder="e.g. Palletized dry goods" />
+      <datalist id="cargoList">${S.cargoHistory.map(c=>`<option value="${c}">`).join('')}</datalist>
+      <div class="two" style="margin-top:10px">
+        <input class="input" id="cargoWeight" inputmode="numeric" placeholder="Weight (lb)" />
+        <input class="input" id="cargoRef" placeholder="BOL / ref #" />
+      </div>
+    </div>`:''}
+
+    <div class="field-label">Heading to next <span style="opacity:.6">· optional</span></div>
+    <div class="place-field">
+      <input class="input" id="nextName" list="recentsList" placeholder="Business or stop name" autocomplete="off" oninput="fillAddr();placeFieldInput('nextName','nextAddr','nextPlaceResults',this)" />
+      <datalist id="recentsList">${S.recents.map(r=>`<option value="${r}">`).join('')}</datalist>
+      <input class="input" id="nextAddr" placeholder="Address" autocomplete="off" style="margin-top:10px" oninput="placeFieldInput('nextName','nextAddr','nextPlaceResults',this)" />
+      <div class="place-results" id="nextPlaceResults"></div>
+    </div>
+
+    <div class="optrow" onclick="toggleOpt('fuelWrap',this)">
+      <div><div class="ol">Add fuel stop</div><div class="od">Gallons + cost at this location</div></div>
+      <div class="tgl" data-tgl></div>
+    </div>
+    <div class="collapse" id="fuelWrap">
+      <div class="two">
+        <input class="input" id="fuelGal" inputmode="decimal" placeholder="Gallons" />
+        <input class="input" id="fuelCost" inputmode="decimal" placeholder="Cost $" />
+      </div>
+    </div>
+
+    <div class="optrow" onclick="toggleOpt('noteWrap',this)">
+      <div><div class="ol">Add a note</div><div class="od">Seal #, dock, receiver, anything</div></div>
+      <div class="tgl" data-tgl></div>
+    </div>
+    <div class="collapse" id="noteWrap">
+      <textarea class="input" id="noteText" rows="2" placeholder="Note for this stop…"></textarea>
+    </div>
+
+    <div class="optrow" style="border-bottom:1px solid var(--hair)">
+      <div><div class="ol">Odometer</div><div class="od">Correct the reading if needed</div></div>
+      <input class="input" id="odoField" inputmode="numeric" value="${S.odometer}" style="width:120px;height:44px;text-align:right;font-family:var(--f-mono)"/>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn-ghost" onclick="closeSheet()">Cancel</button>
+      <button class="btn-primary" onclick="confirmDepart()">
+        Confirm departure ${icoChev(18)}
+      </button>
+    </div>`;
+  openSheet();
+  bindPlaceAutocomplete({nameId:'nextName',addrId:'nextAddr',resultsId:'nextPlaceResults'});
+}
+let segVal='none';
+function pickSeg(el){
+  segVal=el.dataset.v;
+  $$('#seg .segc').forEach(c=>c.classList.toggle('sel',c===el));
+  const cw=$('#cargoWrap');if(cw)cw.classList.toggle('open',segVal==='picked_up');
+}
+function fillAddr(){const n=$('#nextName').value.trim();const a=S.addrBook[n];if(a&&!$('#nextAddr').value)$('#nextAddr').value=a;}
+function toggleOpt(id,row){const w=$('#'+id);const on=w.classList.toggle('open');row.querySelector('[data-tgl]').classList.toggle('on',on);}
+
+async function confirmDepart(){
+  const gps=await getPos();
+  const cur=S.stops[S.stops.length-1]; // the open on-site stop
+  if(!cur){closeSheet();openStartStop();return;}
+  const truck=S.settings.truckMode;
+  // load state
+  let departed_with={empty:true};
+  if(!truck){
+    departed_with={empty:true}; // gig/1099: spine only — load_change records pickup/delivery
+  }else if(segVal==='picked_up'){
+    const cargo=($('#cargoType')?.value.trim())||(cur.arrived_with&&!cur.arrived_with.empty?cur.arrived_with.cargo:'Freight');
+    const weight=parseInt($('#cargoWeight')?.value)||cur.arrived_with?.weight||0;
+    departed_with={cargo,weight};
+    if(cargo&&!S.cargoHistory.includes(cargo))S.cargoHistory.unshift(cargo);
+  }else if(segVal==='dropped_off'){
+    departed_with={empty:true};
+  }else{ // none -> carry whatever you arrived with
+    departed_with=cur.arrived_with&&!cur.arrived_with.empty?{...cur.arrived_with}:{empty:true};
+  }
+  // fuel
+  let fuel=null;const fg=parseFuelNumber('#fuelGal'),fc=parseFuelNumber('#fuelCost');
+  if(fg!==null||fc!==null)fuel={gallons:fg??0,cost:fc??0,location:cur.location.business_name};
+  // odometer correction
+  const odoIn=parseInt($('#odoField')?.value);if(odoIn&&odoIn>=cur.odometer-200)S.odometer=odoIn;
+  // commit departure
+  cur.departure_time=Date.now();
+  cur.departed_with=departed_with;
+  cur.load_change=segVal;
+  cur.fuel=fuel;
+  const note=$('#noteText')?.value.trim();if(note)cur.note=note;
+  if(gps){cur.location.gps_lat=+gps.lat.toFixed(5);cur.location.gps_lng=+gps.lng.toFixed(5);}
+  // start driving
+  const nn=$('#nextName')?.value.trim();
+  const na=$('#nextAddr')?.value.trim();
+  const selected=selectedPlaceData('nextName','nextAddr');
+  const destinationGeo=selected?.geo||null;
+  const estimatedMiles=estimateLegMiles(toGeo(cur.location),destinationGeo);
+  rememberPlace(nn,na);
+  S.position='driving';
+  S.destination=nn?{
+    business_name:nn,
+    address:na||S.addrBook[nn]||'',
+    gps_lat:destinationGeo?.lat??null,
+    gps_lng:destinationGeo?.lng??null,
+    estimated_miles:estimatedMiles||0
+  }:{business_name:'Next stop',address:''};
+  S.currentPlace=null;
+  save();closeSheet();renderHome();
+  toast('go',icoRoad(16),'Departed '+shortName(cur.location.business_name),'Driving to '+shortName(S.destination.business_name));
+}
+function toGeo(location){
+  const lat=location?.gps_lat,lng=location?.gps_lng;
+  return Number.isFinite(lat)&&Number.isFinite(lng)?{lat,lng}:null;
+}
+function estimateLegMiles(fromGeo,toGeo){
+  return fromGeo&&toGeo?Math.max(0,Math.round(haversine(fromGeo,toGeo)*1.35)):0;
+}
+function activeLegMiles(stops=todayStops()){
+  if(S.position!=='driving'||!S.destination)return 0;
+  const last=stops[stops.length-1];
+  if(!last||!last.departure_time)return 0;
+  if(!Number.isFinite(S.destination.estimated_miles)){
+    S.destination.estimated_miles=estimateLegMiles(toGeo(last.location),toGeo(S.destination));
+  }
+  return S.destination.estimated_miles||0;
+}
+function finiteOdometer(stop){
+  const odo=Number(stop?.odometer);
+  return Number.isFinite(odo)?odo:null;
+}
+function odometerStartForStops(stops){
+  if(!stops.length)return 0;
+  const first=finiteOdometer(stops[0]);
+  if(first==null)return 0;
+  return Math.max(0,Math.round(first-(Number(stops[0].miles_since_last_stop)||0)));
+}
+function odometerEndForStops(stops){
+  for(let i=stops.length-1;i>=0;i--){
+    const odo=finiteOdometer(stops[i]);
+    if(odo!=null)return Math.round(odo);
+  }
+  return 0;
+}
+function odometerDeltaForStops(stops){
+  const start=odometerStartForStops(stops),end=odometerEndForStops(stops);
+  return end>start?Math.round(end-start):0;
+}
+function recordedLegMiles(stops,index){
+  const logged=Number(stops[index]?.miles_since_last_stop)||0;
+  if(logged>0)return Math.round(logged);
+  if(index>0){
+    const prev=finiteOdometer(stops[index-1]),cur=finiteOdometer(stops[index]);
+    if(prev!=null&&cur!=null&&cur>prev)return Math.round(cur-prev);
+    const geoMiles=estimateLegMiles(toGeo(stops[index-1]?.location),toGeo(stops[index]?.location));
+    if(geoMiles>0)return geoMiles;
+  }
+  return 0;
+}
+function mileageLegsForStops(stops=todayStops()){
+  const legs=stops.map((_,i)=>recordedLegMiles(stops,i));
+  const legTotal=legs.reduce((a,m)=>a+m,0);
+  const odoDelta=odometerDeltaForStops(stops);
+  const hasLogged=stops.some(stop=>(Number(stop?.miles_since_last_stop)||0)>0);
+  if(odoDelta>0&&!hasLogged)return fitLegsToTotal(legs,odoDelta);
+  if(odoDelta>legTotal&&legs.length){
+    const target=legs.length>1?legs.length-1:0;
+    legs[target]+=odoDelta-legTotal;
+  }
+  return legs;
+}
+function fitLegsToTotal(legs,total){
+  const out=legs.map(()=>0);
+  const indices=legs.map((m,i)=>m>0?i:null).filter(i=>i!=null);
+  if(!indices.length){
+    if(out.length)out[out.length-1]=total;
+    return out;
+  }
+  const sum=indices.reduce((a,i)=>a+legs[i],0);
+  let used=0;
+  const parts=indices.map(i=>{
+    const exact=legs[i]/sum*total;
+    const base=Math.floor(exact);
+    used+=base;
+    return {i,base,rem:exact-base};
+  }).sort((a,b)=>b.rem-a.rem);
+  let remaining=total-used;
+  parts.forEach(part=>{out[part.i]=part.base;});
+  for(let i=0;i<parts.length&&remaining>0;i++,remaining--)out[parts[i].i]+=1;
+  return out;
+}
+function totalMilesForStops(stops=todayStops()){
+  return mileageLegsForStops(stops).reduce((a,m)=>a+m,0);
+}
+function shouldUseDestinationGeo(gps,destGeo,prevGeo){
+  if(destGeo&&(!gps||(prevGeo&&haversine(prevGeo,gps)<0.1)))return true;
+  return false;
+}
+function rememberPlace(name,address){
+  if(name&&!S.recents.includes(name))S.recents.unshift(name);
+  if(name&&address)S.addrBook[name]=address;
+}
+
+/* =================== PLACE AUTOCOMPLETE =================== */
+function bindPlaceAutocomplete({nameId,addrId,resultsId}){
+  const nameInput=$('#'+nameId),addrInput=$('#'+addrId),results=$('#'+resultsId);
+  if(!nameInput||!addrInput||!results)return;
+  if(results._mdPlaceCtx)return results._mdPlaceCtx;
+  const ctx={nameInput,addrInput,results,items:[],token:null,timer:null,requestId:0};
+  results._mdPlaceCtx=ctx;
+  [nameInput,addrInput].forEach(input=>{
+    input.addEventListener('input',()=>{
+      schedulePlaceQuery(ctx,input);
+    });
+    input.addEventListener('focus',()=>{
+      const value=input.value.trim();
+      if(value.length>=2)queryPlaces(ctx,value);
+    });
+  });
+  results.addEventListener('mousedown',e=>e.preventDefault());
+  results.addEventListener('click',e=>{
+    const btn=e.target.closest('[data-place-index]');
+    if(btn)choosePlace(ctx,Number(btn.dataset.placeIndex));
+  });
+  return ctx;
+}
+function placeFieldInput(nameId,addrId,resultsId,input){
+  const ctx=bindPlaceAutocomplete({nameId,addrId,resultsId});
+  if(ctx) schedulePlaceQuery(ctx,input);
+}
+function schedulePlaceQuery(ctx,input){
+  clearPlaceSelection(ctx);
+  clearTimeout(ctx.timer);
+  ctx.timer=setTimeout(()=>queryPlaces(ctx,input.value),260);
+}
+function clearPlaceSelection(ctx){
+  [ctx.nameInput,ctx.addrInput].forEach(input=>{
+    delete input.dataset.placeName;
+    delete input.dataset.placeAddress;
+    delete input.dataset.placeLat;
+    delete input.dataset.placeLng;
+    delete input.dataset.placeId;
+  });
+}
+async function queryPlaces(ctx,raw){
+  const input=(raw||'').trim();
+  const id=++ctx.requestId;
+  if(input.length<2){renderPlaceResults(ctx,[]);return;}
+  renderPlaceStatus(ctx,'Searching nearby places...');
+  try{
+    const places=await ensurePlacesLib();
+    if(id!==ctx.requestId)return;
+    const Suggestion=places.AutocompleteSuggestion;
+    if(!Suggestion){renderPlaceStatus(ctx,'Place search is unavailable for this API key.');return;}
+    if(!ctx.token&&places.AutocompleteSessionToken)ctx.token=new places.AutocompleteSessionToken();
+    const request={input,includedRegionCodes:PLACES_REGION_CODES,sessionToken:ctx.token};
+    const origin=lastKnownGeo()||await placeBias();
+    if(origin){
+      request.origin=origin;
+      request.locationRestriction=placeBounds(origin,PLACE_SEARCH_RADIUS_METERS);
+    }
+    const {suggestions=[]}=await Suggestion.fetchAutocompleteSuggestions(request);
+    if(id!==ctx.requestId)return;
+    const predictions=suggestions.map(s=>s.placePrediction).filter(Boolean);
+    ctx.items=businessOrAddressFirst(predictions).slice(0,5);
+    renderPlaceResults(ctx,ctx.items);
+  }catch(e){
+    if(id===ctx.requestId)renderPlaceStatus(ctx,'Place search could not load.');
+  }
+}
+function renderPlaceResults(ctx,items){
+  if(!items.length){ctx.results.classList.remove('open');ctx.results.innerHTML='';return;}
+  ctx.results.innerHTML=items.map((item,i)=>{
+    const main=placeText(item.mainText)||placeText(item.text)||'Place';
+    const secondary=placeText(item.secondaryText)||'';
+    return `<button type="button" class="place-suggestion" data-place-index="${i}">
+      <span class="pi">${icoPin(16)}</span>
+      <span><span class="pm">${escapeHtml(main)}</span>${secondary?`<span class="pa">${escapeHtml(secondary)}</span>`:''}</span>
+    </button>`;
+  }).join('');
+  ctx.results.classList.add('open');
+}
+function renderPlaceStatus(ctx,message){
+  ctx.results.innerHTML=`<div class="place-status">${escapeHtml(message)}</div>`;
+  ctx.results.classList.add('open');
+}
+async function choosePlace(ctx,index){
+  const prediction=ctx.items[index];
+  if(!prediction)return;
+  renderPlaceStatus(ctx,'Filling place...');
+  try{
+    const place=prediction.toPlace();
+    await place.fetchFields({fields:['displayName','formattedAddress','location']});
+    const name=placeText(place.displayName)||placeText(prediction.mainText)||placeText(prediction.text)||'Selected place';
+    const address=place.formattedAddress||placeText(prediction.secondaryText)||'';
+    const geo=latLngToPlain(place.location);
+    ctx.nameInput.value=name;
+    ctx.addrInput.value=address;
+    [ctx.nameInput,ctx.addrInput].forEach(input=>{
+      input.dataset.placeName=name;
+      input.dataset.placeAddress=address;
+      input.dataset.placeId=place.id||prediction.placeId||'';
+      if(geo){input.dataset.placeLat=geo.lat;input.dataset.placeLng=geo.lng;}
+    });
+    ctx.results.classList.remove('open');
+    ctx.results.innerHTML='';
+    ctx.token=null;
+  }catch(e){
+    renderPlaceStatus(ctx,'Place details could not load.');
+  }
+}
+function selectedPlaceData(nameId,addrId){
+  const input=$('#'+nameId)||$('#'+addrId);
+  const lat=Number(input?.dataset.placeLat),lng=Number(input?.dataset.placeLng);
+  return input?.dataset.placeName?{
+    name:input.dataset.placeName,
+    address:input.dataset.placeAddress||'',
+    placeId:input.dataset.placeId||'',
+    geo:Number.isFinite(lat)&&Number.isFinite(lng)?{lat,lng}:null
+  }:null;
+}
+function lastKnownGeo(){
+  const last=[...S.stops].reverse().find(s=>toGeo(s.location));
+  return last?toGeo(last.location):null;
+}
+async function placeBias(){
+  if(placeBiasGeo)return placeBiasGeo;
+  if(!placeBiasPromise){
+    placeBiasPromise=(async()=>{
+      const pos=await browserPos()||await googleGeoFallback();
+      placeBiasGeo=pos?{lat:pos.lat,lng:pos.lng}:null;
+      return placeBiasGeo;
+    })();
+  }
+  return placeBiasPromise;
+}
+function placeText(value){
+  if(!value)return'';
+  if(typeof value==='string')return value;
+  return value.text||value.toString?.()||'';
+}
+function latLngToPlain(location){
+  if(!location)return null;
+  const lat=typeof location.lat==='function'?location.lat():location.lat;
+  const lng=typeof location.lng==='function'?location.lng():location.lng;
+  return Number.isFinite(lat)&&Number.isFinite(lng)?{lat,lng}:null;
+}
+function businessOrAddressFirst(predictions){
+  const preferred=predictions.filter(isBusinessOrAddressPrediction);
+  return preferred.length?preferred:predictions;
+}
+function isBusinessOrAddressPrediction(prediction){
+  const types=Array.isArray(prediction.types)?prediction.types:[];
+  if(types.some(type=>ADDRESS_PLACE_TYPES.has(type)))return true;
+  if(types.some(type=>REGION_PLACE_TYPES.has(type)))return false;
+  return true;
+}
+function placeBounds(origin,radiusMeters){
+  const latRadius=radiusMeters/111320;
+  const cos=Math.max(Math.cos(origin.lat*Math.PI/180),0.01);
+  const lngRadius=radiusMeters/(111320*cos);
+  return {
+    north:origin.lat+latRadius,
+    south:origin.lat-latRadius,
+    east:origin.lng+lngRadius,
+    west:origin.lng-lngRadius
+  };
+}
+function escapeHtml(value){
+  return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+async function ensurePlacesLib(){
+  if(placesLibPromise)return placesLibPromise;
+  placesLibPromise=(async()=>{
+    await loadGoogleMapsScript();
+    return await google.maps.importLibrary('places');
+  })();
+  return placesLibPromise;
+}
+function loadGoogleMapsScript(){
+  if(window.google?.maps?.importLibrary)return Promise.resolve();
+  if(!GOOGLE_MAPS_API_KEY)return Promise.reject(new Error('Missing Google Maps API key'));
+  if(googleMapsScriptPromise)return googleMapsScriptPromise;
+  googleMapsScriptPromise=new Promise((resolve,reject)=>{
+    const callbackName='__moveDefenseMapsReady';
+    window[callbackName]=()=>{
+      delete window[callbackName];
+      resolve();
+    };
+    const script=document.createElement('script');
+    script.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(GOOGLE_MAPS_API_KEY)+'&v=weekly&loading=async&libraries=places&callback='+callbackName;
+    script.async=true;
+    script.onerror=()=>{
+      delete window[callbackName];
+      reject(new Error('Google Maps JavaScript API failed to load'));
+    };
+    document.head.appendChild(script);
+  }).then(()=>{
+    if(!window.google?.maps?.importLibrary)throw new Error('Google Maps importLibrary unavailable');
+  });
+  return googleMapsScriptPromise;
+}
+
+/* =================== SHEET / DRAWER / TOAST =================== */
+function openSheet(){$('#scrim').classList.add('on');$('#sheet').classList.add('on');segVal='none';}
+function closeSheet(){$('#scrim').classList.remove('on');$('#sheet').classList.remove('on');}
+function openDrawer(){renderDrawer();$('#drawerScrim').classList.add('on');$('#drawer').classList.add('on');}
+function closeDrawer(){$('#drawerScrim').classList.remove('on');$('#drawer').classList.remove('on');}
+function renderDrawer(){
+  $('#drawer').innerHTML=`
+    <div class="dh"><div class="wordmark"><b>Move</b><span class="df">Defense</span></div>
+      <button class="icon-btn" onclick="closeDrawer()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>
+    <div class="driver-card"><div class="dn">${S.driver.name}</div><div class="dl">${S.driver.license}</div>
+      <div class="dl" style="margin-top:8px;color:var(--cyan)">Log ${S.logNumber}</div></div>
+    <button class="drawer-item" onclick="closeDrawer();route('export')">${icoDoc(20)}<div><div>Export record</div><div class="sub">Day · range · by customer</div></div></button>
+    <button class="drawer-item" onclick="closeDrawer();openModePick()">${S.settings.mode==='freight'?icoTruck(20):icoPin(20)}<div><div>Driver mode</div><div class="sub">${S.settings.mode==='freight'?'Freight & haul':'Delivery, gig & 1099'} · tap to switch</div></div></button>
+    <div class="drawer-item" onclick="toggleMode(this)">${icoBox(20)}
+      <div><div>Freight fields</div><div class="sub">Cargo · weight · fuel</div></div>
+      <div class="tgl ${S.settings.truckMode?'on':''} right" data-mode></div></div>
+    <button class="drawer-item" onclick="closeDrawer();replayIntro()">${icoPlay(20)}<div><div>Replay intro</div><div class="sub">The hero reel</div></div></button>
+    <button class="drawer-item" onclick="signOut()">${icoReset(20)}<div><div>Sign out</div><div class="sub">${escapeHtml(currentUser()?.email||'Local session')} · keeps logged data</div></div></button>
+    <button class="drawer-item" onclick="resetDay()">${icoReset(20)}<div><div>Clear logged data</div><div class="sub">Start fresh</div></div></button>
+    <div class="drawer-foot">MoveDefense · driver activity & trip record<br>Not an ELD · No hours-of-service</div>`;
+}
+function toggleMode(row){S.settings.truckMode=!S.settings.truckMode;row.querySelector('[data-mode]').classList.toggle('on',S.settings.truckMode);save();renderHome();}
+function replayIntro(){heroI=0;heroGo(0);clearInterval(heroTimer);heroStart();route('intro');}
+function resetDay(){localStorage.removeItem(KEY);S=emptyState(S.settings?.mode||'gig',true);applyAuthToDriver();save();closeDrawer();renderHome();toast('ok',icoReset(16),'Data cleared','Ready for a new shift');}
+function toast(kind,ico,title,sub){const t=$('#toast');t.className='';t.classList.add('show',kind);
+  t.querySelector('.ti').innerHTML=ico;t.querySelector('.tt').innerHTML=title+(sub?`<small>${sub}</small>`:'');
+  clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2600);}
+function haptic(){if(navigator.userActivation?.isActive&&navigator.vibrate)navigator.vibrate(14);}
+
+/* =================== GEOLOCATION =================== */
+async function getPos(){return await browserPos()||await googleGeoFallback();}
+function browserPos(){return new Promise(res=>{
+  if(!navigator.geolocation)return res(null);
+  navigator.geolocation.getCurrentPosition(
+    p=>res({lat:p.coords.latitude,lng:p.coords.longitude,source:'browser'}),
+    ()=>res(null),{enableHighAccuracy:true,timeout:3500,maximumAge:60000});
+});}
+async function googleGeoFallback(){
+  if(!GOOGLE_MAPS_API_KEY)return null;
+  try{
+    const rsp=await fetch('https://www.googleapis.com/geolocation/v1/geolocate?key='+encodeURIComponent(GOOGLE_MAPS_API_KEY),{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({considerIp:true})
+    });
+    if(!rsp.ok)return null;
+    const data=await rsp.json();
+    return data?.location?{lat:data.location.lat,lng:data.location.lng,accuracy:data.accuracy||null,source:'google'}:null;
+  }catch(e){return null;}
+}
+
+/* =================== EXPORT =================== */
+let scope='day',custFilter=null;
+function setScope(s){scope=s;$$('.scope button').forEach(b=>b.classList.toggle('on',b.dataset.scope===s));renderExport();}
+function renderExport(){
+  const ex=$('#scopeExtra');
+  if(scope==='customer'){
+    const names=[...new Set(S.stops.map(s=>s.location.business_name))];
+    if(!names.length){custFilter=null;ex.innerHTML='<p class="lede">No customer stops logged yet.</p>';}
+    else{if(!custFilter||!names.includes(custFilter))custFilter=mostVisited();
+      ex.innerHTML=`<select class="input select" onchange="custFilter=this.value;renderExport()">${names.map(n=>`<option ${n===custFilter?'selected':''}>${n}</option>`).join('')}</select>`;}
+  }else ex.innerHTML='';
+  $('#doc').innerHTML=buildDoc();
+}
+function mostVisited(){const m={};S.stops.forEach(s=>m[s.location.business_name]=(m[s.location.business_name]||0)+1);
+  return Object.entries(m).sort((a,b)=>b[1]-a[1])[0]?.[0]||null;}
+
+function selectStops(){
+  if(scope==='day'){const k=dayKey(Date.now());return S.stops.filter(s=>dayKey(s.arrival_time)===k);}
+  if(scope==='customer')return custFilter?S.stops.filter(s=>s.location.business_name===custFilter):[];
+  return [...S.stops];
+}
+function docLegCell(legs,index){
+  const miles=legs[index]||0;
+  if(index===0&&miles===0)return'Start';
+  return miles||'—';
+}
+function buildDoc(){
+  const stops=selectStops().sort((a,b)=>a.arrival_time-b.arrival_time);
+  const truck=S.settings.truckMode;
+  const legs=mileageLegsForStops(stops);
+  const miles=legs.reduce((a,m)=>a+m,0);
+  const fuelStops=stops.filter(s=>s.fuel);
+  const fuelGal=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).gallons,0);
+  const fuelCost=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).cost,0);
+  const onLoc=stops.reduce((a,s)=>a+((s.departure_time||Date.now())-s.arrival_time),0);
+  let driving=0;for(let i=0;i<stops.length-1;i++){if(stops[i].departure_time)driving+=Math.max(0,stops[i+1].arrival_time-stops[i].departure_time);}
+  const odoStart=odometerStartForStops(stops);
+  const odoEnd=odometerEndForStops(stops);
+  const d0=stops.length?stops[0].arrival_time:Date.now(),d1=stops.length?stops[stops.length-1].arrival_time:Date.now();
+  const sameDay=dayKey(d0)===dayKey(d1);
+  let rangeLabel = scope==='customer' ? custFilter
+    : sameDay ? fmtDayLong(d0) : (fmtDay(d0)+'  —  '+fmtDay(d1));
+  const title = scope==='customer'?'Customer Activity Summary':scope==='range'?'Trip & Activity Record':'Driver Activity Log';
+
+  const rows=stops.map((s,i)=>{
+    const dwell=(s.departure_time||Date.now())-s.arrival_time;
+    const lc=s.load_change==='picked_up'?'<span class="pill pick">PICKED UP</span>':
+             s.load_change==='dropped_off'?('<span class="pill drop">'+(truck?'DROPPED OFF':'DELIVERED')+'</span>'):
+             s.load_change==='none'?'<span class="pill none">—</span>':'<span class="pill none">ON SITE</span>';
+    const cargo=truck?(s.departed_with&&!s.departed_with.empty?`${s.departed_with.cargo}<br><span style="color:#8a96ad;font-family:var(--f-mono);font-size:10px">${s.departed_with.weight.toLocaleString()} lb</span>`:'<span style="color:#b3bccc">Empty</span>'):'—';
+    return `<tr>
+      <td class="seq">${s.sequence}</td>
+      <td class="num">${fmtTime(s.arrival_time)}</td>
+      <td class="num">${s.departure_time?fmtTime(s.departure_time):'—'}</td>
+      <td class="loc-cell"><div class="ln">${s.location.business_name}</div><div class="la">${s.location.address||(s.location.gps_lat+', '+s.location.gps_lng)}</div></td>
+      <td class="num">${fmtDur(dwell)}</td>
+      ${truck?`<td>${cargo}</td>`:''}
+      <td>${lc}</td>
+      <td class="num">${docLegCell(legs,i)}</td>
+    </tr>`;
+  }).join('');
+
+  // trip rows (leg = from previous stop to this stop)
+  const trips=stops.map((s,i)=>{
+    const from=i===0?'Shift start':stops[i-1].location.business_name;
+    return `<tr><td class="num">${fmtDay(s.arrival_time)}</td><td>${from}</td><td>${s.location.business_name}</td><td class="num">${docLegCell(legs,i)}</td></tr>`;
+  }).join('');
+
+  const fuelRows=fuelStops.map(s=>{
+    const fuel=fuelAmounts(s.fuel);
+    return `<tr><td class="num">${fmtDay(s.arrival_time)}</td><td>${escapeHtml(s.fuel.location||s.location.business_name||'Stop')}</td><td class="num">${fuel.gallons.toFixed(1)}</td><td class="num">${money(fuel.cost)}</td></tr>`;
+  }).join('');
+  const photoCards=stops.flatMap(s=>(s.photos||[]).map(photo=>`
+    <div class="doc-photo">
+      <img src="${photo.data}" alt="${escapeHtml(photo.name||'Stop photo')}">
+      <div class="cap">Stop ${s.sequence} · ${escapeHtml(s.location.business_name||'Stop')}<br>${fmtTime(photo.added_at||s.arrival_time)}</div>
+    </div>`)).join('');
+
+  return `
+  <div class="doc-band">
+    <div class="doc-band-top">
+      <div class="doc-brand">
+        <svg width="34" height="34" viewBox="0 0 40 40" fill="none">
+          <path d="M20 3 L34 8 V19 C34 28 28 34 20 37 C12 34 6 28 6 19 V8 Z" stroke="url(#lg)" stroke-width="2.2" fill="rgba(63,224,206,.08)"/>
+          <path d="M20 25 L20 13 M20 13 L15 18 M20 13 L25 18" stroke="#eaf1ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="20" cy="29.5" r="1.7" fill="#5cf0de"/></svg>
+        <div class="wm"><b>Move</b>Defense</div>
+      </div>
+      <div class="doc-docno">LOG ${S.logNumber}<br>${stops.length} STOPS<br>GEN ${new Date().toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</div>
+    </div>
+    <div class="doc-title">${title}</div>
+    <div class="doc-sub">
+      <span>Driver <b>${S.driver.name}</b></span>
+      <span>${S.driver.license}</span>
+      <span><b>${rangeLabel}</b></span>
+    </div>
+  </div>
+  <div class="doc-body">
+    <div class="sumgrid">
+      <div class="sumcard"><div class="sk">Total stops</div><div class="sv">${stops.length}</div><div class="su">locations</div></div>
+      <div class="sumcard"><div class="sk">Total miles</div><div class="sv">${miles.toLocaleString()}</div><div class="su">driven</div></div>
+      <div class="sumcard"><div class="sk">On location</div><div class="sv">${fmtDur(onLoc)}</div><div class="su">dwell time</div></div>
+      <div class="sumcard"><div class="sk">Driving</div><div class="sv">${fmtDur(driving)}</div><div class="su">between stops</div></div>
+    </div>
+
+    <h4><span class="bar"></span>Stop timeline</h4>
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Arrive</th><th>Depart</th><th>Location</th><th>Dwell</th>${truck?'<th>Cargo out</th>':''}<th>Load change</th><th class="num">Miles</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td colspan="${truck?7:6}">Total miles since first stop</td><td class="num">${miles.toLocaleString()}</td></tr></tfoot>
+    </table>
+
+    <h4><span class="bar"></span>Mileage / trip summary</h4>
+    <div class="sumgrid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+      <div class="sumcard"><div class="sk">Start odometer</div><div class="sv">${odoStart.toLocaleString()}</div><div class="su">miles</div></div>
+      <div class="sumcard"><div class="sk">End odometer</div><div class="sv">${odoEnd.toLocaleString()}</div><div class="su">miles</div></div>
+      <div class="sumcard"><div class="sk">Trip total</div><div class="sv">${miles.toLocaleString()}</div><div class="su">miles</div></div>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>Date</th><th>From</th><th>To</th><th class="num">Miles</th></tr></thead>
+      <tbody>${trips}</tbody>
+      <tfoot><tr><td colspan="3">Total</td><td class="num">${miles.toLocaleString()} mi</td></tr></tfoot>
+    </table>
+
+    ${fuelStops.length?`
+    <h4><span class="bar"></span>Fuel summary</h4>
+    <table class="tbl">
+      <thead><tr><th>Date</th><th>Location</th><th class="num">Gallons</th><th class="num">Cost</th></tr></thead>
+      <tbody>${fuelRows}</tbody>
+      <tfoot><tr><td colspan="2">${fuelStops.length} purchase${fuelStops.length>1?'s':''}</td><td class="num">${fuelGal.toFixed(1)}</td><td class="num">${money(fuelCost)}</td></tr></tfoot>
+    </table>`:''}
+
+    ${photoCards?`
+    <h4><span class="bar"></span>Stop photos</h4>
+    <div class="doc-photos">${photoCards}</div>`:''}
+
+    <div class="sig">
+      <div class="line">Driver signature&nbsp; · &nbsp;Date</div>
+      <div class="line">Received by&nbsp; · &nbsp;Date</div>
+    </div>
+
+    <div class="disclaimer">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      This is a driver activity / trip record. It is not an ELD or Hours-of-Service compliance document.
+    </div>
+  </div>`;
+}
+
+/* =================== ICONS =================== */
+function ic(d,sz,c,extra=''){return `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" style="${c?'color:'+c:''}">${d}${extra}</svg>`;}
+const icoPin=(s=16,c)=>ic('<path d="M12 21s7-6.3 7-11a7 7 0 10-14 0c0 4.7 7 11 7 11z" stroke="currentColor" stroke-width="1.9"/><circle cx="12" cy="10" r="2.4" stroke="currentColor" stroke-width="1.9"/>',s,c);
+const icoRoad=(s=16,c)=>ic('<path d="M8 21L10 3M16 21L14 3" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M12 7v2M12 13v2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>',s,c);
+const icoChev=(s=16,c)=>ic('<path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',s,c);
+const icoUp=(s=16,c)=>ic('<path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',s,c);
+const icoDown=(s=16,c)=>ic('<path d="M12 5v14M19 12l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',s,c);
+const icoMinus=(s=16,c)=>ic('<path d="M6 12h12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',s,c);
+const icoBox=(s=16,c)=>ic('<path d="M21 8l-9-5-9 5v8l9 5 9-5V8z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M3 8l9 5 9-5M12 13v8" stroke="currentColor" stroke-width="1.7"/>',s,c);
+const icoFuel=(s=16,c)=>ic('<path d="M5 21V5a2 2 0 012-2h6a2 2 0 012 2v16M3 21h14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M15 9h2.5A1.5 1.5 0 0119 10.5V16a2 2 0 002 2 2 2 0 002-2V8l-3-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M7 8h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',s,c);
+const icoCamera=(s=16,c)=>ic('<path d="M5 7h3l1.4-2h5.2L16 7h3a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.2" stroke="currentColor" stroke-width="1.7"/>',s,c);
+const icoDoc=(s=16,c)=>ic('<rect x="5" y="3" width="14" height="18" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M9 8h6M9 12h6M9 16h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',s,c);
+const icoTruck=(s=16,c)=>ic('<path d="M3 6h11v9H3zM14 9h4l3 3v3h-7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="7" cy="18" r="2" stroke="currentColor" stroke-width="1.7"/><circle cx="17.5" cy="18" r="2" stroke="currentColor" stroke-width="1.7"/>',s,c);
+const icoPlay=(s=16,c)=>ic('<path d="M7 5l11 7-11 7V5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',s,c);
+const icoReset=(s=16,c)=>ic('<path d="M4 12a8 8 0 108-8 8 8 0 00-6 2.7M4 4v4h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',s,c);
+
+/* =================== INIT =================== */
+function tickClock(){const c=$('#clk');if(c){c.textContent=fmtTime(Date.now());}}
+function bootApp(){
+  if(!authSignedIn()){
+    clearInterval(heroTimer);
+    route('auth',false);
+    renderAuth();
+    return;
+  }
+  const hasAppState=!!(S.settings?.chosen||S.stops.length||S.currentPlace||S.destination);
+  if(hasAppState){
+    clearInterval(heroTimer);
+    const saved=localStorage.getItem(ROUTE_KEY);
+    route(saved==='export'?'export':'home',false);
+    return;
+  }
+  heroGo(0);heroStart();route('intro',false);
+}
+setInterval(tickClock,30000);
+bootApp();
+window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeSheet();closeDrawer();}});
+</script>
 </body>
 </html>

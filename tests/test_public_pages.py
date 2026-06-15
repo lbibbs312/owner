@@ -48,36 +48,38 @@ def _allow_registration(client, **overrides):
         sess["registration_checkout"] = checkout
 
 
-def test_welcome_page_positions_packets_and_pricing(client):
+def test_welcome_page_serves_driver_logger_app(client):
     response = client.get("/")
 
     assert response.status_code == 200
     body = response.get_data(as_text=True)
-    text = _visible_text(response.get_data(as_text=True))
 
-    assert "Driver paperwork into clean packets." in text
-    assert "Route packets" in text
-    assert "Incident and damage packets" in text
-    assert "Fuel and IFTA support" in text
-    assert "The workflow" in text
-    assert "Capture the route" in text
-    assert "Add proof" in text
-    assert "Export the packet" in text
-    assert "workflow-route-board.jpg" in body
-    assert "workflow-fuel-proof.jpg" in body
-    assert "workflow-driver-packet.jpg" in body
-    assert "View pricing" in text
-    assert "Choose a paid plan" in text
-    assert "Free Preview" in text
-    assert "Daily Route Pass" in text
-    assert "Solo Driver" in text
-    assert "Owner-Operator" in text
-    assert "Small Fleet" in text
-    assert "Fleet Office" in text
-    assert "For up to 5 drivers or vehicles." in text
-    assert "$15/month per extra driver or vehicle" in text
-    assert "MoveDefense Paperwork Cleanup" in text
-    assert "starts at $299/month" in text
+    for expected in (
+        "MoveDefense",
+        "Driver Activity Log",
+        "Driver activity log",
+        "Create account",
+        "Login with Google",
+        "Forgot password?",
+        "Offline ready",
+        "Record first stop",
+        "window.MOVEDEFENSE_CONFIG",
+        "googleMapsApiKey",
+        "googleClientId",
+    ):
+        assert expected in body
+    for legacy in (
+        "Driver paperwork into clean packets.",
+        "MoveDefense Operations",
+        "Manager Dispatch",
+        "Production dispatch app",
+        "Small Fleet",
+        "Fleet Office",
+        "View pricing",
+        "Choose a paid plan",
+        "workflow-route-board.jpg",
+    ):
+        assert legacy not in body
 
 
 def test_welcome_page_renders_without_optional_bulletins(client, monkeypatch):
@@ -103,28 +105,16 @@ def test_welcome_page_renders_without_optional_bulletins(client, monkeypatch):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "Driver paperwork into clean packets." in _visible_text(response.get_data(as_text=True))
+    assert "Driver Activity Log" in response.get_data(as_text=True)
 
 
-def test_welcome_page_posts_paid_items_to_billing_checkout(client):
+def test_welcome_page_does_not_embed_marketing_checkout_forms(client):
     response = client.get("/")
 
     assert response.status_code == 200
     body = response.get_data(as_text=True)
 
-    for plan_key in (
-        "solo-driver",
-        "owner-operator",
-        "small-fleet",
-        "fleet-office",
-        "driver-forms-pack",
-        "record-kit",
-        "ifta-worksheet-bundle",
-        "branded-packet-setup",
-        "paper-form-conversion",
-        "fleet-packet-setup",
-    ):
-        assert f'action="/billing/checkout/{plan_key}" method="POST"' in body
+    assert "/billing/checkout/" not in body
     assert 'action="/register"' not in body
     assert 'href="/register"' not in body
 
@@ -256,9 +246,10 @@ def test_welcome_page_uses_safe_product_language(client):
     lower_text = text.lower()
 
     assert "MoveDefense" in text
-    assert re.search(r"\bwe\b", lower_text)
-    assert re.search(r"\bour\b", lower_text)
-    assert not re.search(r"\b(i|my|me)\b", lower_text)
+    assert "Driver activity log" in text
+    assert "Not an ELD" in text
+    assert "No duty status" in text
+    assert "hours-of-service" in lower_text
     for banned in (
         "critical",
         "exception",
@@ -270,10 +261,6 @@ def test_welcome_page_uses_safe_product_language(client):
         "guaranteed compliant",
     ):
         assert banned.lower() not in lower_text
-    assert "FMCSA-aligned" in text
-    assert "DOT-ready recordkeeping" in text
-    assert "insurance-ready packet" in lower_text
-    assert "IFTA support worksheet" in text
 
 
 def test_privacy_notice_is_public_plain_language_and_standalone(client):

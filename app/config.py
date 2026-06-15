@@ -155,6 +155,7 @@ class BaseConfig:
     STRIPE_PRICE_PAPER_FORM_CONVERSION = _env_str("STRIPE_PRICE_PAPER_FORM_CONVERSION")
     STRIPE_PRICE_FLEET_PACKET_SETUP = _env_str("STRIPE_PRICE_FLEET_PACKET_SETUP")
     GOOGLE_MAPS_API_KEY = _env_str("GOOGLE_MAPS_API_KEY")
+    GOOGLE_CLIENT_ID = _env_str("GOOGLE_CLIENT_ID") or _env_str("GOOGLE_OAUTH_CLIENT_ID")
     # Destination search + trucker place summary on the Start Shift Location page.
     # Review/AI summaries are ON by default; Place Details degrades gracefully if a
     # key/region can't serve those fields. Set the env var to "false" to disable.

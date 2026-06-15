@@ -4,8 +4,8 @@ services:
     env: python
     plan: standard
     repo: https://github.com/lbibbs312/owner
-    branch: claude/review-lacksdrivers-flask-kAOQQ
-    autoDeploy: false
+    branch: fix/owner-review-security-01
+    autoDeploy: true
 
     buildCommand: pip install -e .
     preDeployCommand: flask --app lacksdrivers.py deploy-db
@@ -30,6 +30,10 @@ services:
         value: "true"
       - key: PUBLIC_CONTACT_EMAIL
         value: "bibbstechnology@gmail.com"
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
       - key: SECRET_KEY
         sync: false
       - key: SQLALCHEMY_DATABASE_URI
