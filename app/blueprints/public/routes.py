@@ -27,6 +27,37 @@ def welcome():
     return render_template("welcome.html", bulletins=bulletins)
 
 
+@bp.route("/manifest.webmanifest")
+def web_manifest():
+    """Serve the PWA manifest with the correct media type for installability."""
+    return send_from_directory(
+        current_app.static_folder,
+        "manifest.webmanifest",
+        mimetype="application/manifest+json",
+    )
+
+
+@bp.route("/sw.js")
+def service_worker():
+    """Serve the service worker at the site root so its scope covers the app."""
+    response = send_from_directory(
+        current_app.static_folder, "sw.js", mimetype="text/javascript"
+    )
+    response.headers["Service-Worker-Allowed"] = "/"
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
+@bp.route("/.well-known/assetlinks.json")
+def android_asset_links():
+    """Digital Asset Links for the Android TWA (drops the in-app URL bar)."""
+    return send_from_directory(
+        os.path.join(current_app.static_folder, ".well-known"),
+        "assetlinks.json",
+        mimetype="application/json",
+    )
+
+
 @bp.route("/billing/checkout/<plan_key>", methods=["POST"])
 def billing_checkout(plan_key):
     plan = billing_plan(plan_key)

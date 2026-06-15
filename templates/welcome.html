@@ -14,7 +14,19 @@ window.MOVEDEFENSE_CONFIG = Object.freeze({
   googleClientId: {{ config.GOOGLE_CLIENT_ID|default('', true)|tojson }}
 });
 </script>
+<script>
+/* Register the MoveDefense service worker (PWA install + offline shell). */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(function () {});
+  });
+}
+</script>
 <title>MoveDefense — Driver Activity Log</title>
+<meta name="application-name" content="MoveDefense" />
+<meta name="apple-mobile-web-app-title" content="MoveDefense" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Saira:wght@500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
