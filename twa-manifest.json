@@ -1,0 +1,31 @@
+{
+  "packageId": "com.movedefense.app",
+  "host": "movedefense.com",
+  "name": "MoveDefense",
+  "launcherName": "MoveDefense",
+  "display": "standalone",
+  "themeColor": "#04060C",
+  "themeColorDark": "#04060C",
+  "navigationColor": "#04060C",
+  "navigationColorDark": "#04060C",
+  "navigationDividerColor": "#04060C",
+  "navigationDividerColorDark": "#04060C",
+  "backgroundColor": "#04060C",
+  "enableNotifications": true,
+  "startUrl": "/?source=pwa",
+  "iconUrl": "https://movedefense.com/static/icons/icon-512.png",
+  "maskableIconUrl": "https://movedefense.com/static/icons/icon-maskable-512.png",
+  "webManifestUrl": "https://movedefense.com/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "appVersion": "1.0.0",
+  "appVersionCode": 1,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "movedefense"
+  },
+  "orientation": "default",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "generatorApp": "github-actions-bubblewrap"
+}
