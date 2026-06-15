@@ -66,6 +66,14 @@ def test_welcome_page_serves_driver_logger_app(client):
         "Creating account",
         "Old driver/admin logins will not sign in here",
         "Fuel stop detected",
+        "Fuel log",
+        "Trip log",
+        "Save fuel PDF",
+        "PPG",
+        "MPG",
+        "Gas stations",
+        "Fuel by stop",
+        "Receipts uploaded",
         "gas_station",
         "Record first stop",
         "window.MOVEDEFENSE_CONFIG",
@@ -83,6 +91,7 @@ def test_welcome_page_serves_driver_logger_app(client):
         "View pricing",
         "Choose a paid plan",
         "workflow-route-board.jpg",
+        "Replay intro",
     ):
         assert legacy not in body
 

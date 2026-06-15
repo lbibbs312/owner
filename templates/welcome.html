@@ -226,10 +226,11 @@ input,select,textarea{font-family:inherit}
   padding:calc(var(--sat) + 12px) 16px 12px;
   background:linear-gradient(180deg, rgba(4,6,12,.92), rgba(4,6,12,.55) 70%, transparent);
   backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-.tb-right{display:flex;align-items:center;gap:8px}
+.tb-right{display:flex;align-items:center;gap:7px;flex:0 0 auto}
 .chip-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 13px;border-radius:11px;
   background:var(--panel);border:1px solid var(--hair);color:var(--text-2);font-size:12.5px;font-weight:600;letter-spacing:.3px;
   transition:.2s var(--ease)}
+.chip-btn.fuel-chip{color:#ffd9af;border-color:rgba(255,158,61,.26);background:rgba(255,158,61,.08)}
 .chip-btn:active{transform:scale(.96);background:var(--panel-2)}
 .chip-btn svg{opacity:.9}
 .icon-btn{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:var(--panel);border:1px solid var(--hair);color:var(--text)}
@@ -504,6 +505,47 @@ textarea.input{height:auto;padding:14px 15px;line-height:1.45;resize:none}
 .scope-extra{padding:8px 16px 0}
 .scope-extra select{width:100%}
 
+/* ============================================================
+   FUEL LOG
+   ============================================================ */
+#screen-fuel{padding-bottom:40px}
+.fuel-wrap{padding:12px 16px 24px}
+.fuel-head{border:1px solid var(--hair);border-radius:20px;padding:18px;background:linear-gradient(180deg,var(--panel-2),var(--panel));box-shadow:0 20px 54px rgba(0,0,0,.34)}
+.fuel-kicker{font-family:var(--f-mono);font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--amber);display:flex;align-items:center;gap:8px}
+.fuel-title{font-family:var(--f-display);font-size:29px;font-weight:800;line-height:1.05;margin:8px 0 4px}
+.fuel-sub{font-size:13px;line-height:1.45;color:var(--text-3);margin:0}
+.fuel-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:13px}
+.fuel-card{border:1px solid var(--hair);border-radius:15px;padding:13px;background:rgba(255,255,255,.035);min-width:0}
+.fuel-card .fk{font-family:var(--f-mono);font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-3)}
+.fuel-card .fv{font-family:var(--f-display);font-weight:800;font-size:25px;line-height:1;margin-top:8px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fuel-card .fu{font-family:var(--f-mono);font-size:10px;color:var(--text-3);margin-top:5px;line-height:1.35}
+.fuel-card.warn .fv{color:#ffd9af}
+.fuel-section{margin-top:20px}
+.fuel-section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:0 4px 10px}
+.fuel-section-head h3{font-family:var(--f-display);font-size:14px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-2);margin:0}
+.fuel-section-head span{font-family:var(--f-mono);font-size:11px;color:var(--text-3);white-space:nowrap}
+.fuel-list{display:grid;gap:10px}
+.fuel-row,.station-row{border:1px solid var(--hair);border-radius:16px;background:var(--panel);padding:13px}
+.fuel-row-top,.station-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}
+.fuel-row-main{width:100%;display:block;background:transparent;border:0;padding:0}
+.fuel-row-main:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:10px}
+.fuel-name{font-family:var(--f-display);font-weight:700;font-size:16px;line-height:1.2}
+.fuel-meta{font-family:var(--f-mono);font-size:10.5px;color:var(--text-3);line-height:1.45;margin-top:4px}
+.fuel-total{text-align:right;font-family:var(--f-display);font-size:18px;font-weight:800;color:#ffd9af;white-space:nowrap}
+.fuel-total span{display:block;font-family:var(--f-mono);font-size:10px;color:var(--text-3);font-weight:600;margin-top:3px}
+.fuel-pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.fuel-pill{display:inline-flex;align-items:center;gap:6px;height:25px;padding:0 9px;border:1px solid var(--hair);border-radius:8px;background:rgba(255,255,255,.04);font-family:var(--f-mono);font-size:10.5px;color:var(--text-2)}
+.fuel-actions{display:flex;gap:8px;margin-top:12px}
+.mini-btn{height:38px;padding:0 12px;border-radius:11px;border:1px solid var(--hair);background:rgba(255,255,255,.045);color:var(--text-2);font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.mini-btn.primary{flex:1;color:#1d0f02;background:linear-gradient(135deg,#ffb65a,#f0760f);border-color:transparent}
+.receipt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.receipt-thumb{position:relative;aspect-ratio:1;border:1px solid var(--hair);border-radius:11px;overflow:hidden;background:rgba(255,255,255,.04)}
+.receipt-thumb img{width:100%;height:100%;display:block;object-fit:cover}
+.receipt-del{position:absolute;right:4px;top:4px;width:24px;height:24px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(4,6,12,.72);color:var(--text);display:grid;place-items:center}
+.fuel-alert{border:1px solid rgba(255,91,91,.36);background:rgba(255,91,91,.1);color:#ffd3d3;border-radius:13px;padding:10px 11px;margin-top:10px;font-size:12px;line-height:1.4}
+.fuel-empty{border:1px dashed var(--hair-2);border-radius:16px;padding:15px;color:var(--text-3);font-size:13px;line-height:1.45;background:rgba(255,255,255,.025)}
+.fuel-print-wrap{display:none}
+
 /* THE DOCUMENT (print-ready, paper) */
 .doc-wrap{padding:14px 14px 0}
 .doc{background:#fff;color:#0c1322;border-radius:14px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5);
@@ -565,7 +607,10 @@ table.tbl .seq{font-family:var(--f-mono);color:#94a0b8;width:22px}
   body{background:#fff}
   #app{max-width:none}
   .screen{display:none!important}
-  #screen-export.is-active{display:block!important;padding:0}
+  #screen-export.is-active,#screen-fuel.is-active{display:block!important;padding:0}
+  #screen-fuel.is-active .fuel-wrap{display:none!important}
+  #screen-fuel.is-active .fuel-print-wrap{display:block!important;padding:0}
+  #screen-fuel.is-active .fuel-print{display:block!important}
   .doc-wrap{padding:0}
   .doc{box-shadow:none;border-radius:0}
   .doc-band,.sumcard,.pill,.tbl tfoot td,.tbl tr:nth-child(even) td,table.tbl td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -575,6 +620,8 @@ table.tbl .seq{font-family:var(--f-mono);color:#94a0b8;width:22px}
 @media (max-width:380px){
   .gauges{gap:8px}.gauge .gv{font-size:26px}
   .cta .place{font-size:23px}
+  .chip-btn{width:36px;padding:0;justify-content:center}
+  .chip-btn .btn-label{display:none}
 }
 </style>
 </head>
@@ -676,9 +723,13 @@ table.tbl .seq{font-family:var(--f-mono);color:#94a0b8;width:22px}
         <div class="wordmark"><b>Move</b><span class="df">Defense</span></div>
       </div>
       <div class="tb-right">
-        <button class="chip-btn" onclick="route('export')">
+        <button class="chip-btn" onclick="route('export')" aria-label="Trip log export">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M6 9V4h12v5M6 18H5a2 2 0 01-2-2v-4a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2h-1M7 14h10v6H7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Export
+          <span class="btn-label">Trip log</span>
+        </button>
+        <button class="chip-btn fuel-chip" onclick="route('fuel')" aria-label="Fuel log">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 21V5a2 2 0 012-2h6a2 2 0 012 2v16M3 21h14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M15 9h2.5A1.5 1.5 0 0119 10.5V16a2 2 0 002 2 2 2 0 002-2V8l-3-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M7 8h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span class="btn-label">Fuel log</span>
         </button>
         <button class="icon-btn" onclick="openDrawer()" aria-label="Menu">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -698,6 +749,22 @@ table.tbl .seq{font-family:var(--f-mono);color:#94a0b8;width:22px}
       </div>
       <div class="timeline" id="timeline"></div>
     </div>
+  </section>
+
+  <!-- ====================== FUEL ====================== -->
+  <section id="screen-fuel" class="screen">
+    <div class="export-bar">
+      <button class="icon-btn" onclick="route('home')" aria-label="Back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <h2>Fuel log</h2>
+      <button class="print-btn" onclick="printFuelLog()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M6 9V4h12v5M6 18H5a2 2 0 01-2-2v-4a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2h-1M7 14h10v6H7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Save fuel PDF
+      </button>
+    </div>
+    <div class="fuel-wrap" id="fuelPage"></div>
+    <div class="doc-wrap fuel-print-wrap"><div class="doc fuel-print" id="fuelDoc"></div></div>
   </section>
 
   <!-- ====================== EXPORT ====================== -->
@@ -1061,7 +1128,7 @@ function continueAfterAuth(){
   const hasAppState=!!(S.settings?.chosen||S.stops.length||S.currentPlace||S.destination);
   if(hasAppState){
     const saved=localStorage.getItem(ROUTE_KEY);
-    route(saved==='export'?'export':'home');
+    route(saved==='export'||saved==='fuel'?saved:'home');
   }else{
     heroGo(0);heroStart();route('intro');
   }
@@ -1147,6 +1214,7 @@ function route(name,persist=true){
   window.scrollTo(0,0);
   if(persist&&name!=='intro')localStorage.setItem(ROUTE_KEY,name);
   if(name==='home'){renderHome();}
+  if(name==='fuel'){renderFuel();}
   if(name==='export'){renderExport();}
 }
 function enterApp(){clearInterval(heroTimer);if(!S.settings||!S.settings.chosen){openModePick();}else{route('home');}}
@@ -1320,6 +1388,213 @@ function openFuelSummary(stops){
     </div>
     <div class="summary-list">${rows||'<div class="summary-note">No fuel logged today. Tap a stop card to add fuel to that stop.</div>'}</div>`);
 }
+function fuelReceipts(fuel){
+  return Array.isArray(fuel?.receipts)?fuel.receipts:[];
+}
+function fuelReceiptErrors(fuel){
+  return Array.isArray(fuel?.receipt_errors)?fuel.receipt_errors:[];
+}
+function stationName(stop){
+  return stop?.fuel?.location||stop?.location?.business_name||'Fuel stop';
+}
+function gallonsText(value){
+  const gallons=Number(value)||0;
+  if(!gallons)return '—';
+  return gallons.toFixed(gallons%1?1:0);
+}
+function ppgText(fuel){
+  const {gallons,cost}=fuelAmounts(fuel);
+  return gallons&&cost?money(cost/gallons):'—';
+}
+function mpgText(value){
+  return value?value.toFixed(1):'—';
+}
+function fuelStats(stops=todayStops()){
+  const fuelStops=stops.filter(s=>s.fuel);
+  const gallons=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).gallons,0);
+  const cost=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).cost,0);
+  const miles=totalMilesForStops(stops)+activeLegMiles(stops);
+  const receiptCount=fuelStops.reduce((a,s)=>a+fuelReceipts(s.fuel).length,0);
+  const stationMap=new Map();
+  fuelStops.forEach(stop=>{
+    const name=stationName(stop);
+    const current=stationMap.get(name)||{name,stops:0,gallons:0,cost:0,receipts:0};
+    const amount=fuelAmounts(stop.fuel);
+    current.stops+=1;
+    current.gallons+=amount.gallons;
+    current.cost+=amount.cost;
+    current.receipts+=fuelReceipts(stop.fuel).length;
+    stationMap.set(name,current);
+  });
+  return {
+    stops,
+    fuelStops,
+    gallons,
+    cost,
+    miles,
+    receiptCount,
+    stationStats:[...stationMap.values()].sort((a,b)=>b.cost-a.cost||b.gallons-a.gallons||a.name.localeCompare(b.name)),
+    ppg:gallons&&cost?cost/gallons:0,
+    mpg:gallons&&miles?miles/gallons:0
+  };
+}
+function renderFuel(){
+  const page=$('#fuelPage'),doc=$('#fuelDoc');
+  if(!page||!doc)return;
+  const stops=todayStops();
+  const stats=fuelStats(stops);
+  const legs=mileageLegsForStops(stops);
+  const stationRows=stats.stationStats.map(station=>{
+    const primary=station.gallons?gallonsText(station.gallons)+' gal':(station.cost?money(station.cost):'Fuel stop');
+    const secondary=station.gallons&&station.cost?money(station.cost):(station.cost?'cost only':'amounts optional');
+    return `
+    <div class="station-row">
+      <div>
+        <div class="fuel-name">${escapeHtml(station.name)}</div>
+        <div class="fuel-meta">${station.stops} stop${station.stops!==1?'s':''} · ${station.receipts} receipt${station.receipts!==1?'s':''} uploaded</div>
+      </div>
+      <div class="fuel-total">${primary}<span>${secondary}</span></div>
+    </div>`;
+  }).join('');
+  const stopRows=stats.fuelStops.map(stop=>{
+    const amount=fuelAmounts(stop.fuel);
+    const idx=Math.max(0,stops.findIndex(s=>s.id===stop.id));
+    const leg=legs[idx]||0;
+    const receipts=fuelReceipts(stop.fuel);
+    const errors=fuelReceiptErrors(stop.fuel);
+    return `<div class="fuel-row">
+      <div class="fuel-row-top">
+        <button class="fuel-row-main" onclick="openStopDetail('${stop.id}')" style="text-align:left;color:inherit">
+          <div class="fuel-name">${escapeHtml(stationName(stop))}</div>
+          <div class="fuel-meta">${fmtTime(stop.arrival_time)} · Stop ${stop.sequence} · ${escapeHtml(stop.location.address||formatGps(stop.location))}</div>
+        </button>
+        <div class="fuel-total">${amount.gallons?gallonsText(amount.gallons)+' gal':(amount.cost?money(amount.cost):'Fuel')}<span>${amount.cost?money(amount.cost):'no cost'}</span></div>
+      </div>
+      <div class="fuel-pills">
+        <span class="fuel-pill">${icoFuel(12)} PPG ${ppgText(stop.fuel)}</span>
+        <span class="fuel-pill">${icoRoad(12)} ${leg?leg+' mi':'miles pending'}</span>
+        <span class="fuel-pill">${icoCamera(12)} ${receipts.length} receipt${receipts.length!==1?'s':''}</span>
+      </div>
+      ${errors.length?`<div class="fuel-alert"><b>Receipt upload error</b><br>${escapeHtml(errors[0].message)} · ${fmtTime(errors[0].ts)}</div>`:''}
+      ${receipts.length?`<div class="receipt-grid">${receipts.map(receipt=>`
+        <div class="receipt-thumb">
+          <img src="${receipt.data}" alt="${escapeHtml(receipt.name||'Fuel receipt')}">
+          <button class="receipt-del" onclick="removeFuelReceipt('${stop.id}','${receipt.id}')" aria-label="Remove receipt">${icoReset(12)}</button>
+        </div>`).join('')}</div>`:''}
+      <input id="fuelReceiptInput-${stop.id}" type="file" accept="image/*" capture="environment" style="display:none" onchange="handleFuelReceipt('${stop.id}',this)" />
+      <div class="fuel-actions">
+        <button class="mini-btn" onclick="openStopDetail('${stop.id}')">${icoDoc(14)} Stop details</button>
+        <button class="mini-btn primary" onclick="triggerFuelReceipt('${stop.id}')">${icoCamera(14)} Upload receipt</button>
+      </div>
+    </div>`;
+  }).join('');
+  page.innerHTML=`
+    <div class="fuel-head">
+      <div class="fuel-kicker">${icoFuel(14)} Fuel for today</div>
+      <div class="fuel-title">${stats.gallons?gallonsText(stats.gallons)+' gallons':stats.fuelStops.length+' fuel stops'}</div>
+      <p class="fuel-sub">Gas-station destinations are treated as fuel stops automatically. Add gallons, cost, and receipt photos from the fuel log or the stop detail.</p>
+      <div class="fuel-grid">
+        <div class="fuel-card warn"><div class="fk">PPG</div><div class="fv">${stats.ppg?money(stats.ppg):'—'}</div><div class="fu">price per gallon</div></div>
+        <div class="fuel-card"><div class="fk">MPG</div><div class="fv">${mpgText(stats.mpg)}</div><div class="fu">${stats.miles} mi / ${gallonsText(stats.gallons)} gal</div></div>
+        <div class="fuel-card"><div class="fk">Fuel for day</div><div class="fv">${money(stats.cost)}</div><div class="fu">${gallonsText(stats.gallons)} gallons</div></div>
+        <div class="fuel-card"><div class="fk">Receipts uploaded</div><div class="fv">${stats.receiptCount}</div><div class="fu">${stats.fuelStops.length} fuel stop${stats.fuelStops.length!==1?'s':''}</div></div>
+      </div>
+    </div>
+    <div class="fuel-section">
+      <div class="fuel-section-head"><h3>Gas stations</h3><span>${stats.stationStats.length} station${stats.stationStats.length!==1?'s':''}</span></div>
+      <div class="fuel-list">${stationRows||'<div class="fuel-empty">No gas-station fuel stops logged today.</div>'}</div>
+    </div>
+    <div class="fuel-section">
+      <div class="fuel-section-head"><h3>Fuel by stop</h3><span>${stats.fuelStops.length} stop${stats.fuelStops.length!==1?'s':''}</span></div>
+      <div class="fuel-list">${stopRows||'<div class="fuel-empty">No fuel stops logged today. Gas-station destinations will appear here automatically, and any stop can become a fuel stop from its stop detail.</div>'}</div>
+    </div>`;
+  doc.innerHTML=buildFuelDoc(stops);
+}
+function buildFuelDoc(stops=todayStops()){
+  const stats=fuelStats(stops);
+  const legs=mileageLegsForStops(stops);
+  const rows=stats.fuelStops.map(stop=>{
+    const amount=fuelAmounts(stop.fuel);
+    const idx=Math.max(0,stops.findIndex(s=>s.id===stop.id));
+    const receipts=fuelReceipts(stop.fuel);
+    return `<tr>
+      <td class="num">${fmtDay(stop.arrival_time)}</td>
+      <td class="loc-cell"><div class="ln">${escapeHtml(stationName(stop))}</div><div class="la">${escapeHtml(stop.location.address||formatGps(stop.location))}</div></td>
+      <td class="num">${amount.gallons?amount.gallons.toFixed(1):'—'}</td>
+      <td class="num">${amount.cost?money(amount.cost):'—'}</td>
+      <td class="num">${ppgText(stop.fuel)}</td>
+      <td class="num">${legs[idx]||'—'}</td>
+      <td class="num">${receipts.length}</td>
+    </tr>`;
+  }).join('');
+  const stationRows=stats.stationStats.map(station=>`<tr>
+    <td>${escapeHtml(station.name)}</td>
+    <td class="num">${station.stops}</td>
+    <td class="num">${station.gallons?station.gallons.toFixed(1):'—'}</td>
+    <td class="num">${station.cost?money(station.cost):'—'}</td>
+    <td class="num">${station.receipts}</td>
+  </tr>`).join('');
+  const receiptCards=stats.fuelStops.flatMap(stop=>fuelReceipts(stop.fuel).map(receipt=>`
+    <div class="doc-photo">
+      <img src="${receipt.data}" alt="${escapeHtml(receipt.name||'Fuel receipt')}">
+      <div class="cap">Fuel receipt · Stop ${stop.sequence} · ${escapeHtml(stationName(stop))}<br>${fmtTime(receipt.added_at||stop.arrival_time)}</div>
+    </div>`)).join('');
+  const today=fmtDayLong(Date.now());
+  return `
+  <div class="doc-band">
+    <div class="doc-band-top">
+      <div class="doc-brand">
+        <svg width="34" height="34" viewBox="0 0 40 40" fill="none">
+          <path d="M20 3 L34 8 V19 C34 28 28 34 20 37 C12 34 6 28 6 19 V8 Z" stroke="url(#lg)" stroke-width="2.2" fill="rgba(63,224,206,.08)"/>
+          <path d="M20 25 L20 13 M20 13 L15 18 M20 13 L25 18" stroke="#eaf1ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="20" cy="29.5" r="1.7" fill="#5cf0de"/></svg>
+        <div class="wm"><b>Move</b>Defense</div>
+      </div>
+      <div class="doc-docno">FUEL LOG ${S.logNumber}<br>${stats.fuelStops.length} FUEL STOPS<br>GEN ${new Date().toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</div>
+    </div>
+    <div class="doc-title">Fuel Log</div>
+    <div class="doc-sub">
+      <span>Driver <b>${escapeHtml(S.driver.name)}</b></span>
+      <span>${escapeHtml(S.driver.license)}</span>
+      <span><b>${today}</b></span>
+    </div>
+  </div>
+  <div class="doc-body">
+    <div class="sumgrid">
+      <div class="sumcard"><div class="sk">PPG</div><div class="sv">${stats.ppg?money(stats.ppg):'—'}</div><div class="su">price per gallon</div></div>
+      <div class="sumcard"><div class="sk">MPG</div><div class="sv">${mpgText(stats.mpg)}</div><div class="su">miles per gallon</div></div>
+      <div class="sumcard"><div class="sk">Fuel today</div><div class="sv">${gallonsText(stats.gallons)}</div><div class="su">gallons</div></div>
+      <div class="sumcard"><div class="sk">Receipts</div><div class="sv">${stats.receiptCount}</div><div class="su">uploaded</div></div>
+    </div>
+
+    <h4><span class="bar"></span>Gas stations</h4>
+    <table class="tbl">
+      <thead><tr><th>Station</th><th class="num">Stops</th><th class="num">Gallons</th><th class="num">Cost</th><th class="num">Receipts</th></tr></thead>
+      <tbody>${stationRows||'<tr><td colspan="5">No gas-station fuel stops logged.</td></tr>'}</tbody>
+      <tfoot><tr><td>${stats.stationStats.length} station${stats.stationStats.length!==1?'s':''}</td><td class="num">${stats.fuelStops.length}</td><td class="num">${stats.gallons.toFixed(1)}</td><td class="num">${money(stats.cost)}</td><td class="num">${stats.receiptCount}</td></tr></tfoot>
+    </table>
+
+    <h4><span class="bar"></span>Fuel by stop</h4>
+    <table class="tbl">
+      <thead><tr><th>Date</th><th>Station / stop</th><th class="num">Gallons</th><th class="num">Cost</th><th class="num">PPG</th><th class="num">Miles</th><th class="num">Receipts</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="7">No fuel stops logged today.</td></tr>'}</tbody>
+      <tfoot><tr><td colspan="2">Fuel for day</td><td class="num">${stats.gallons.toFixed(1)}</td><td class="num">${money(stats.cost)}</td><td class="num">${stats.ppg?money(stats.ppg):'—'}</td><td class="num">${stats.miles.toLocaleString()}</td><td class="num">${stats.receiptCount}</td></tr></tfoot>
+    </table>
+
+    ${receiptCards?`
+    <h4><span class="bar"></span>Receipts uploaded</h4>
+    <div class="doc-photos">${receiptCards}</div>`:''}
+
+    <div class="disclaimer">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      This is a fuel and receipt log derived from the driver activity record. It is not an ELD or Hours-of-Service compliance document.
+    </div>
+  </div>`;
+}
+function printFuelLog(){
+  renderFuel();
+  setTimeout(()=>window.print(),50);
+}
 function openTimeSummary(stops){
   const onLoc=stops.reduce((a,s)=>a+((s.departure_time||Date.now())-s.arrival_time),0);
   let driving=0;for(let i=0;i<stops.length-1;i++){if(stops[i].departure_time)driving+=Math.max(0,stops[i+1].arrival_time-stops[i].departure_time);}
@@ -1415,7 +1690,7 @@ function isFuelStopPlace(place){
   return FUEL_STOP_TERMS.some(term=>text.includes(term));
 }
 function autoFuelRecord(location){
-  return {gallons:0,cost:0,location:location?.business_name||location?.name||'Fuel stop',auto:true};
+  return {gallons:0,cost:0,location:location?.business_name||location?.name||'Fuel stop',auto:true,receipts:[],receipt_errors:[]};
 }
 function fuelRecordFromInputs(location,existing=null){
   const fg=parseFuelNumber('#fuelGal'),fc=parseFuelNumber('#fuelCost');
@@ -1426,7 +1701,9 @@ function fuelRecordFromInputs(location,existing=null){
     gallons:fg??prev.gallons,
     cost:fc??prev.cost,
     location:location?.business_name||location?.name||existing?.location||'Fuel stop',
-    auto:fuelStop&&fg===null&&fc===null&&prev.gallons===0&&prev.cost===0
+    auto:fuelStop&&fg===null&&fc===null&&prev.gallons===0&&prev.cost===0,
+    receipts:fuelReceipts(existing),
+    receipt_errors:fuelReceiptErrors(existing)
   };
 }
 function parseFuelNumber(selector){
@@ -1443,7 +1720,7 @@ function errorText(error){
 }
 function trimLogContext(context={}){
   const clean={};
-  ['stopId','fileName','fileType','fileSize'].forEach(k=>{
+  ['stopId','fileName','fileType','fileSize','kind'].forEach(k=>{
     if(context[k]!=null)clean[k]=context[k];
   });
   return clean;
@@ -1453,7 +1730,12 @@ function logAppError(event,error,context={}){
   S.errorLog=[entry,...(Array.isArray(S.errorLog)?S.errorLog:[])].slice(0,20);
   if(context.stopId){
     const stop=findStop(context.stopId);
-    if(stop)stop.photo_errors=[entry,...(Array.isArray(stop.photo_errors)?stop.photo_errors:[])].slice(0,5);
+    if(stop&&context.kind==='fuel_receipt'){
+      stop.fuel=stop.fuel||autoFuelRecord(stop.location);
+      stop.fuel.receipt_errors=[entry,...fuelReceiptErrors(stop.fuel)].slice(0,5);
+    }else if(stop){
+      stop.photo_errors=[entry,...(Array.isArray(stop.photo_errors)?stop.photo_errors:[])].slice(0,5);
+    }
   }
   try{save();}catch(e){}
   console.error('[MoveDefense]',event,entry,error);
@@ -1519,19 +1801,27 @@ function saveStopFuel(id){
   const cost=parseFuelNumber('#detailFuelCost');
   if(gallons===null&&cost===null){
     stop.fuel=null;
-    save();renderHome();openStopDetail(id);
+    save();renderHome();renderFuel();openStopDetail(id);
     toast('ok',icoFuel(16),'Fuel cleared','No fuel saved on this stop');
     return;
   }
-  stop.fuel={gallons:gallons??0,cost:cost??0,location:stop.location.business_name};
-  save();renderHome();openStopDetail(id);
+  stop.fuel={
+    ...(stop.fuel||{}),
+    gallons:gallons??0,
+    cost:cost??0,
+    location:stop.location.business_name,
+    auto:false,
+    receipts:fuelReceipts(stop.fuel),
+    receipt_errors:fuelReceiptErrors(stop.fuel)
+  };
+  save();renderHome();renderFuel();openStopDetail(id);
   toast('ok',icoFuel(16),'Fuel saved',fuelLabel(stop.fuel));
 }
 function clearStopFuel(id){
   const stop=findStop(id);
   if(!stop)return;
   stop.fuel=null;
-  save();renderHome();openStopDetail(id);
+  save();renderHome();renderFuel();openStopDetail(id);
   toast('ok',icoFuel(16),'Fuel cleared','No fuel saved on this stop');
 }
 function triggerStopPhoto(){
@@ -1569,6 +1859,44 @@ function removeStopPhoto(stopId,photoId){
   stop.photos=(stop.photos||[]).filter(photo=>photo.id!==photoId);
   save();renderHome();openStopDetail(stopId);
   toast('ok',icoCamera(16),'Photo removed','Stop updated');
+}
+function triggerFuelReceipt(id){
+  $('#fuelReceiptInput-'+id)?.click();
+}
+async function handleFuelReceipt(id,input){
+  const stop=findStop(id),file=input.files?.[0];
+  if(!file)return;
+  if(!stop){
+    logAppError('Receipt upload failed',new Error('Stop was not found'),{kind:'fuel_receipt',stopId:id,fileName:file.name,fileType:file.type,fileSize:file.size});
+    renderFuel();
+    toast('warn',icoCamera(16),'Receipt not saved','Stop was not found');
+    return;
+  }
+  let pendingId=null;
+  try{
+    if(file.type&&!file.type.startsWith('image/'))throw new Error('Selected file is not an image');
+    const data=await resizePhoto(file);
+    stop.fuel=stop.fuel||autoFuelRecord(stop.location);
+    stop.fuel.receipts=fuelReceipts(stop.fuel);
+    pendingId=uid();
+    stop.fuel.receipts.push({id:pendingId,name:file.name||'fuel-receipt.jpg',type:'image/jpeg',added_at:Date.now(),data});
+    save();renderHome();renderFuel();
+    toast('ok',icoCamera(16),'Receipt uploaded',stationName(stop));
+  }catch(e){
+    if(pendingId&&stop?.fuel)stop.fuel.receipts=fuelReceipts(stop.fuel).filter(receipt=>receipt.id!==pendingId);
+    const entry=logAppError('Receipt upload failed',e,{kind:'fuel_receipt',stopId:id,fileName:file.name,fileType:file.type,fileSize:file.size});
+    renderFuel();
+    toast('warn',icoCamera(16),'Receipt not saved',entry.message);
+  }finally{
+    input.value='';
+  }
+}
+function removeFuelReceipt(stopId,receiptId){
+  const stop=findStop(stopId);
+  if(!stop?.fuel)return;
+  stop.fuel.receipts=fuelReceipts(stop.fuel).filter(receipt=>receipt.id!==receiptId);
+  save();renderHome();renderFuel();
+  toast('ok',icoCamera(16),'Receipt removed',stationName(stop));
 }
 function resizePhoto(file){
   return new Promise((resolve,reject)=>{
@@ -2153,7 +2481,7 @@ function renderDrawer(){
     <div class="drawer-item" onclick="toggleMode(this)">${icoBox(20)}
       <div><div>Freight fields</div><div class="sub">Cargo · weight · fuel</div></div>
       <div class="tgl ${S.settings.truckMode?'on':''} right" data-mode></div></div>
-    <button class="drawer-item" onclick="closeDrawer();replayIntro()">${icoPlay(20)}<div><div>Replay intro</div><div class="sub">The hero reel</div></div></button>
+    <button class="drawer-item" onclick="closeDrawer();route('fuel')">${icoFuel(20)}<div><div>Fuel log</div><div class="sub">PPG · MPG · receipts</div></div></button>
     <button class="drawer-item" onclick="signOut()">${icoReset(20)}<div><div>Sign out</div><div class="sub">${escapeHtml(currentUser()?.email||'Local session')} · keeps logged data</div></div></button>
     <button class="drawer-item" onclick="resetDay()">${icoReset(20)}<div><div>Clear logged data</div><div class="sub">Start fresh</div></div></button>
     <div class="drawer-foot">MoveDefense · driver activity & trip record<br>Not an ELD · No hours-of-service</div>`;
@@ -2363,7 +2691,7 @@ function bootApp(){
   if(hasAppState){
     clearInterval(heroTimer);
     const saved=localStorage.getItem(ROUTE_KEY);
-    route(saved==='export'?'export':'home',false);
+    route(saved==='export'||saved==='fuel'?saved:'home',false);
     return;
   }
   heroGo(0);heroStart();route('intro',false);
