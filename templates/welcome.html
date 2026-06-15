@@ -812,6 +812,7 @@ const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const KEY='movedefense.v2';
 const ROUTE_KEY='movedefense.lastRoute';
 const AUTH_KEY='movedefense.auth.v1';
+const SHEET_DRAFT_KEY='movedefense.sheetDraft.v1';
 const LEGACY_KEYS=['movedefense.v1'];
 const CONFIG=window.MOVEDEFENSE_CONFIG||{};
 const GOOGLE_MAPS_API_KEY=String(CONFIG.googleMapsApiKey||'').trim();
@@ -827,6 +828,7 @@ let placeBiasGeo=null;
 
 /* ---- helpers ---- */
 const pad=n=>String(n).padStart(2,'0');
+const cssEscape=value=>window.CSS&&CSS.escape?CSS.escape(String(value)):String(value).replace(/["\\]/g,'\\$&');
 const fmtTime=t=>t?new Date(t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';
 const fmtDay=t=>new Date(t).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
 const fmtDayLong=t=>new Date(t).toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'});
@@ -851,6 +853,127 @@ function load(){
   return emptyState();
 }
 function save(){localStorage.setItem(KEY,JSON.stringify(S));}
+
+const SHEET_PLACE_DATA_KEYS=['placeName','placeAddress','placeLat','placeLng','placeId','placeTypes'];
+function sheetDraftId(name){return (S.logNumber||'log')+':'+name;}
+function readSheetDrafts(){
+  try{
+    const drafts=JSON.parse(localStorage.getItem(SHEET_DRAFT_KEY)||'{}');
+    return drafts&&typeof drafts==='object'?drafts:{};
+  }catch(e){return {};}
+}
+function writeSheetDrafts(drafts){
+  try{localStorage.setItem(SHEET_DRAFT_KEY,JSON.stringify(drafts));}catch(e){}
+}
+function clearAllSheetDrafts(){
+  try{localStorage.removeItem(SHEET_DRAFT_KEY);}catch(e){}
+}
+function clearSheetDraft(name){
+  const drafts=readSheetDrafts();
+  delete drafts[sheetDraftId(name)];
+  writeSheetDrafts(drafts);
+}
+function clearSheetDraftById(id){
+  if(!id)return;
+  const drafts=readSheetDrafts();
+  delete drafts[id];
+  writeSheetDrafts(drafts);
+}
+function discardActiveSheetDraft(){
+  clearSheetDraftById($('#sheet')?.dataset.draftKey);
+}
+function draftControlKey(control){return control.id||control.name||'';}
+function shouldDraftControl(control){
+  const type=(control.type||'').toLowerCase();
+  return draftControlKey(control)&&!control.disabled&&!['button','submit','reset','file','password'].includes(type);
+}
+function collectSheetDraft(root=$('#sheet')){
+  const fields={};
+  $$('input,textarea,select',root).forEach(control=>{
+    if(!shouldDraftControl(control))return;
+    const type=(control.type||'').toLowerCase();
+    const entry={value:control.value};
+    if(type==='checkbox'||type==='radio')entry.checked=!!control.checked;
+    const data={};
+    SHEET_PLACE_DATA_KEYS.forEach(key=>{
+      if(control.dataset&&control.dataset[key]!=null)data[key]=control.dataset[key];
+    });
+    if(Object.keys(data).length)entry.dataset=data;
+    fields[draftControlKey(control)]=entry;
+  });
+  return {
+    fields,
+    segVal:$('#seg .segc.sel',root)?.dataset.v||segVal,
+    openWraps:$$('.collapse.open',root).map(el=>el.id).filter(Boolean),
+    updatedAt:Date.now()
+  };
+}
+function saveSheetDraftById(id,root=$('#sheet')){
+  if(!id||!root)return;
+  const drafts=readSheetDrafts();
+  drafts[id]=collectSheetDraft(root);
+  writeSheetDrafts(drafts);
+}
+function saveActiveSheetDraft(){
+  const sheet=$('#sheet');
+  if(sheet?.dataset.draftKey)saveSheetDraftById(sheet.dataset.draftKey,sheet);
+}
+function openDraftWrap(id){
+  const wrap=$('#'+id);
+  if(!wrap)return;
+  wrap.classList.add('open');
+  wrap.previousElementSibling?.querySelector('[data-tgl]')?.classList.add('on');
+}
+function applySheetDraft(id,root=$('#sheet')){
+  const draft=readSheetDrafts()[id];
+  if(!draft||!draft.fields)return null;
+  Object.entries(draft.fields).forEach(([key,entry])=>{
+    const control=$('#'+key,root)||root.querySelector(`[name="${cssEscape(key)}"]`);
+    if(!control||!shouldDraftControl(control))return;
+    const type=(control.type||'').toLowerCase();
+    if(type==='checkbox'||type==='radio')control.checked=!!entry.checked;
+    else control.value=entry.value==null?'':String(entry.value);
+    if(entry.dataset){
+      SHEET_PLACE_DATA_KEYS.forEach(dataKey=>{
+        if(entry.dataset[dataKey]!=null)control.dataset[dataKey]=entry.dataset[dataKey];
+      });
+    }
+  });
+  if(draft.segVal){
+    const seg=$(`#seg .segc[data-v="${cssEscape(draft.segVal)}"]`,root);
+    if(seg)pickSeg(seg);
+    else segVal=draft.segVal;
+  }
+  (draft.openWraps||[]).forEach(openDraftWrap);
+  if(draft.fields.fuelGal?.value||draft.fields.fuelCost?.value)openDraftWrap('fuelWrap');
+  if(draft.fields.noteText?.value)openDraftWrap('noteWrap');
+  if(draft.fields.cargoType?.value||draft.fields.cargoWeight?.value||draft.fields.cargoRef?.value)openDraftWrap('cargoWrap');
+  return draft;
+}
+function unbindSheetDraft(){
+  const sheet=$('#sheet');
+  if(!sheet)return;
+  if(sheet._mdSheetDraftCleanup){
+    sheet._mdSheetDraftCleanup();
+    sheet._mdSheetDraftCleanup=null;
+  }
+  delete sheet.dataset.draftKey;
+}
+function bindSheetDraft(name){
+  const sheet=$('#sheet');
+  if(!sheet)return;
+  unbindSheetDraft();
+  const id=sheetDraftId(name);
+  sheet.dataset.draftKey=id;
+  applySheetDraft(id,sheet);
+  const saveNow=()=>saveSheetDraftById(id,sheet);
+  sheet.addEventListener('input',saveNow);
+  sheet.addEventListener('change',saveNow);
+  sheet._mdSheetDraftCleanup=()=>{
+    sheet.removeEventListener('input',saveNow);
+    sheet.removeEventListener('change',saveNow);
+  };
+}
 
 function emptyState(mode='gig',chosen=false){
   const now=new Date();
@@ -1237,7 +1360,7 @@ function openModePick(){
     <p class="lede" style="margin:12px 2px 2px;text-align:center;opacity:.6">Not an ELD · no hours-of-service · built for any driver</p>`;
   openSheet();
 }
-function chooseMode(mode){S=emptyState(mode,true);applyAuthToDriver();save();closeSheet();route('home');
+function chooseMode(mode){clearAllSheetDrafts();S=emptyState(mode,true);applyAuthToDriver();save();closeSheet();route('home');
   toast('ok',mode==='freight'?icoTruck(16):icoPin(16),mode==='freight'?'Freight & haul mode':'Delivery / gig mode',mode==='freight'?'Cargo, weight and fuel are on':'Stops, miles and time');}
 
 /* =================== HERO CAROUSEL =================== */
@@ -1793,6 +1916,7 @@ function openStopDetail(id){
       <button class="btn-primary" onclick="triggerStopPhoto()">${icoCamera(18)} Add photo</button>
     </div>`;
   openSheet();
+  bindSheetDraft(`stop-detail:${id}`);
 }
 function saveStopFuel(id){
   const stop=findStop(id);
@@ -1801,7 +1925,7 @@ function saveStopFuel(id){
   const cost=parseFuelNumber('#detailFuelCost');
   if(gallons===null&&cost===null){
     stop.fuel=null;
-    save();renderHome();renderFuel();openStopDetail(id);
+    save();clearSheetDraft(`stop-detail:${id}`);renderHome();renderFuel();openStopDetail(id);
     toast('ok',icoFuel(16),'Fuel cleared','No fuel saved on this stop');
     return;
   }
@@ -1814,14 +1938,14 @@ function saveStopFuel(id){
     receipts:fuelReceipts(stop.fuel),
     receipt_errors:fuelReceiptErrors(stop.fuel)
   };
-  save();renderHome();renderFuel();openStopDetail(id);
+  save();clearSheetDraft(`stop-detail:${id}`);renderHome();renderFuel();openStopDetail(id);
   toast('ok',icoFuel(16),'Fuel saved',fuelLabel(stop.fuel));
 }
 function clearStopFuel(id){
   const stop=findStop(id);
   if(!stop)return;
   stop.fuel=null;
-  save();renderHome();renderFuel();openStopDetail(id);
+  save();clearSheetDraft(`stop-detail:${id}`);renderHome();renderFuel();openStopDetail(id);
   toast('ok',icoFuel(16),'Fuel cleared','No fuel saved on this stop');
 }
 function triggerStopPhoto(){
@@ -1966,11 +2090,12 @@ function openStartStop(){
     <div class="field-label">Odometer</div>
     <input class="input" id="startOdo" inputmode="numeric" placeholder="Odometer" />
     <div class="sheet-actions">
-      <button class="btn-ghost" onclick="closeSheet()">Cancel</button>
+      <button class="btn-ghost" onclick="discardActiveSheetDraft();closeSheet()">Cancel</button>
       <button class="btn-primary" onclick="confirmStartStop()">Start stop ${icoChev(18)}</button>
     </div>`;
   openSheet();
   bindPlaceAutocomplete({nameId:'startName',addrId:'startAddr',resultsId:'startPlaceResults'});
+  bindSheetDraft('start-stop');
 }
 async function confirmStartStop(){
   const selected=selectedPlaceData('startName','startAddr');
@@ -1994,7 +2119,7 @@ async function confirmStartStop(){
   });
   S.position='parked';S.currentPlace={...location};S.destination=null;
   rememberPlace(name,addr);
-  save();closeSheet();renderHome();
+  save();clearSheetDraft('start-stop');closeSheet();renderHome();
   toast('ok',icoPin(16),'Stop started',gps?'GPS stamped':'GPS unavailable');
 }
 async function doArrive(){
@@ -2098,27 +2223,30 @@ function openDepart(){
     </div>
 
     <div class="sheet-actions">
-      <button class="btn-ghost" onclick="closeSheet()">Cancel</button>
+      <button class="btn-ghost" onclick="discardActiveSheetDraft();closeSheet()">Cancel</button>
       <button class="btn-primary" onclick="confirmDepart()">
         ${fuelStop?'Depart fuel stop':'Confirm departure'} ${icoChev(18)}
       </button>
     </div>`;
   openSheet();
   bindPlaceAutocomplete({nameId:'nextName',addrId:'nextAddr',resultsId:'nextPlaceResults'});
+  bindSheetDraft(`depart:${cur.id}`);
 }
 let segVal='none';
 function pickSeg(el){
   segVal=el.dataset.v;
   $$('#seg .segc').forEach(c=>c.classList.toggle('sel',c===el));
   const cw=$('#cargoWrap');if(cw)cw.classList.toggle('open',segVal==='picked_up');
+  saveActiveSheetDraft();
 }
-function fillAddr(){const n=$('#nextName').value.trim();const a=S.addrBook[n];if(a&&!$('#nextAddr').value)$('#nextAddr').value=a;}
-function toggleOpt(id,row){const w=$('#'+id);const on=w.classList.toggle('open');row.querySelector('[data-tgl]').classList.toggle('on',on);}
+function fillAddr(){const n=$('#nextName').value.trim();const a=S.addrBook[n];if(a&&!$('#nextAddr').value){$('#nextAddr').value=a;saveActiveSheetDraft();}}
+function toggleOpt(id,row){const w=$('#'+id);const on=w.classList.toggle('open');row.querySelector('[data-tgl]').classList.toggle('on',on);saveActiveSheetDraft();}
 
 async function confirmDepart(){
   const gps=await getPos();
   const cur=S.stops[S.stops.length-1]; // the open on-site stop
   if(!cur){closeSheet();openStartStop();return;}
+  const departDraftName=`depart:${cur.id}`;
   const truck=S.settings.truckMode;
   const fuelStop=isFuelStopPlace(cur.location);
   // load state
@@ -2166,7 +2294,7 @@ async function confirmDepart(){
     place_types:selected?.types||[]
   }:{business_name:'Next stop',address:''};
   S.currentPlace=null;
-  save();closeSheet();renderHome();
+  save();clearSheetDraft(departDraftName);closeSheet();renderHome();
   toast('go',icoRoad(16),'Departed '+shortName(cur.location.business_name),'Driving to '+shortName(S.destination.business_name));
 }
 function toGeo(location){
@@ -2368,6 +2496,7 @@ async function choosePlace(ctx,index){
     ctx.results.classList.remove('open');
     ctx.results.innerHTML='';
     ctx.token=null;
+    saveActiveSheetDraft();
   }catch(e){
     renderPlaceStatus(ctx,'Place details could not load.');
   }
@@ -2466,8 +2595,8 @@ function loadGoogleMapsScript(){
 }
 
 /* =================== SHEET / DRAWER / TOAST =================== */
-function openSheet(){$('#scrim').classList.add('on');$('#sheet').classList.add('on');segVal='none';}
-function closeSheet(){$('#scrim').classList.remove('on');$('#sheet').classList.remove('on');}
+function openSheet(){unbindSheetDraft();$('#scrim').classList.add('on');$('#sheet').classList.add('on');segVal='none';}
+function closeSheet(){unbindSheetDraft();$('#scrim').classList.remove('on');$('#sheet').classList.remove('on');}
 function openDrawer(){renderDrawer();$('#drawerScrim').classList.add('on');$('#drawer').classList.add('on');}
 function closeDrawer(){$('#drawerScrim').classList.remove('on');$('#drawer').classList.remove('on');}
 function renderDrawer(){
@@ -2488,7 +2617,7 @@ function renderDrawer(){
 }
 function toggleMode(row){S.settings.truckMode=!S.settings.truckMode;row.querySelector('[data-mode]').classList.toggle('on',S.settings.truckMode);save();renderHome();}
 function replayIntro(){heroI=0;heroGo(0);clearInterval(heroTimer);heroStart();route('intro');}
-function resetDay(){localStorage.removeItem(KEY);S=emptyState(S.settings?.mode||'gig',true);applyAuthToDriver();save();closeDrawer();renderHome();toast('ok',icoReset(16),'Data cleared','Ready for a new shift');}
+function resetDay(){localStorage.removeItem(KEY);clearAllSheetDrafts();S=emptyState(S.settings?.mode||'gig',true);applyAuthToDriver();save();closeDrawer();renderHome();toast('ok',icoReset(16),'Data cleared','Ready for a new shift');}
 function toast(kind,ico,title,sub){const t=$('#toast');t.className='';t.classList.add('show',kind);
   t.querySelector('.ti').innerHTML=ico;t.querySelector('.tt').innerHTML=title+(sub?`<small>${sub}</small>`:'');
   clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2600);}
