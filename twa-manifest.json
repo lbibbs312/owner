@@ -12,6 +12,7 @@
   "navigationDividerColorDark": "#04060C",
   "backgroundColor": "#04060C",
   "enableNotifications": true,
+  "splashScreenFadeOutDuration": 300,
   "startUrl": "/?source=pwa",
   "iconUrl": "https://movedefense.com/static/icons/icon-512.png",
   "maskableIconUrl": "https://movedefense.com/static/icons/icon-maskable-512.png",
