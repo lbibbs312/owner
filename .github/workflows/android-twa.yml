@@ -71,6 +71,14 @@ jobs:
           EXP
           expect -f build-twa.exp
 
+      - name: Show generated gradle + manifest (debug)
+        if: always()
+        run: |
+          echo "===== app/build.gradle (numbered) ====="
+          [ -f app/build.gradle ] && cat -n app/build.gradle || echo "(no app/build.gradle)"
+          echo "===== twa-manifest.json (post-build) ====="
+          cat twa-manifest.json
+
       - name: Generate Digital Asset Links (assetlinks.json)
         env:
           KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
