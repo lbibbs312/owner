@@ -748,6 +748,38 @@ def destination_place_details(place_id, *, session_token="", include_reviews=Fal
     return {"ok": True, "place": place, "raw": data}
 
 
+def reverse_geocode(lat, lng):
+    """Lat/Lng -> nearest street address via the Geocoding API.
+
+    Used by the one-driver page's "fill address from GPS" control so it never
+    depends on the browser Maps JavaScript library loading.
+    """
+    key = _api_key()
+    la, ln = _float_or_none(lat), _float_or_none(lng)
+    if not key:
+        return {"ok": False, "error": "not_configured", "address": "", "place_id": "", "types": []}
+    if la is None or ln is None:
+        return {"ok": False, "error": "missing_input", "address": "", "place_id": "", "types": []}
+    try:
+        resp = requests.get(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+            params={"latlng": f"{la},{ln}", "key": key},
+            timeout=6,
+        )
+        data = resp.json()
+    except Exception:
+        return {"ok": False, "error": "request_failed", "address": "", "place_id": "", "types": []}
+    if data.get("status") != "OK" or not data.get("results"):
+        return {"ok": False, "error": data.get("status") or "no_result", "address": "", "place_id": "", "types": []}
+    top = data["results"][0]
+    return {
+        "ok": True,
+        "address": _format_address(top.get("formatted_address")),
+        "place_id": top.get("place_id") or "",
+        "types": list(top.get("types") or []),
+    }
+
+
 def _meters_to_miles_text(meters):
     try:
         meters = float(meters)

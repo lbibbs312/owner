@@ -8,6 +8,7 @@ from app.blueprints.public import bp
 from app.models import Announcement
 from app.services.database_status import database_status
 from app.services.route_context import build_route_context
+from app.services.google_places import autocomplete_destination, destination_place_details, reverse_geocode
 from app.services.registration_access import store_registration_checkout
 from app.services.stripe_checkout import (
     StripeCheckoutError,
@@ -56,6 +57,36 @@ def android_asset_links():
         "assetlinks.json",
         mimetype="application/json",
     )
+
+
+@bp.route("/api/geo/suggest", methods=["POST"])
+def geo_suggest():
+    """Public place-autocomplete proxy for the one-driver page (New Places API).
+
+    Runs the lookup server-side so the page never depends on the browser Maps
+    JavaScript library loading. Input length is capped to limit abuse.
+    """
+    data = request.get_json(silent=True) or {}
+    text = str(data.get("input") or "").strip()[:255]
+    token = str(data.get("session_token") or "").strip()[:128]
+    return jsonify(autocomplete_destination(text, lat=data.get("lat"), lng=data.get("lng"), session_token=token))
+
+
+@bp.route("/api/geo/details", methods=["POST"])
+def geo_details():
+    """Public place-details proxy (called when a driver taps a suggestion)."""
+    data = request.get_json(silent=True) or {}
+    place_id = str(data.get("place_id") or "").strip()[:512]
+    token = str(data.get("session_token") or "").strip()[:128]
+    if not place_id:
+        return jsonify({"ok": False, "error": "missing_place_id", "place": None})
+    return jsonify(destination_place_details(place_id, session_token=token))
+
+
+@bp.route("/api/geo/reverse", methods=["GET"])
+def geo_reverse():
+    """Public reverse-geocode proxy for the GPS address-fill control."""
+    return jsonify(reverse_geocode(request.args.get("lat"), request.args.get("lng")))
 
 
 @bp.route("/billing/checkout/<plan_key>", methods=["POST"])

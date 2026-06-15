@@ -609,7 +609,7 @@ table.tbl .seq{font-family:var(--f-mono);color:#94a0b8;width:22px}
 .tbl tfoot td{font-family:var(--f-mono);font-weight:700;color:#0c1322;border-top:2px solid #d9e0ec;background:#f4f7fb!important;padding:11px 9px}
 .doc-photos{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:8px}
 .doc-photo{border:1px solid #e4e9f2;border-radius:11px;overflow:hidden;background:#f8fafd}
-.doc-photo img{width:100%;height:170px;object-fit:cover;display:block}
+.doc-photo img{width:100%;height:auto;object-fit:contain;display:block;background:#f1f4f9}
 .doc-photo .cap{padding:8px 10px;font-family:var(--f-mono);font-size:10px;color:#53617b;line-height:1.35}
 
 .sig{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:34px}
@@ -637,6 +637,9 @@ table.tbl .seq{font-family:var(--f-mono);color:#94a0b8;width:22px}
   .doc-band,.sumcard,.pill,.tbl tfoot td,.tbl tr:nth-child(even) td,table.tbl td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   table.tbl{font-size:10.5px}
   .sumgrid{margin-bottom:14px}
+  .doc-photos{grid-template-columns:1fr;gap:8mm}
+  .doc-photo{break-inside:avoid}
+  .doc-photo img{max-height:120mm;object-fit:contain}
 }
 @media (max-width:380px){
   .gauges{gap:8px}.gauge .gv{font-size:26px}
@@ -2568,22 +2571,17 @@ async function queryPlaces(ctx,raw){
   const id=++ctx.requestId;
   if(input.length<2){renderPlaceResults(ctx,[]);return;}
   renderPlaceStatus(ctx,'Searching nearby places...');
+  if(!ctx.token)ctx.token=uid();
   try{
-    const places=await ensurePlacesLib();
-    if(id!==ctx.requestId)return;
-    const Suggestion=places.AutocompleteSuggestion;
-    if(!Suggestion){renderPlaceStatus(ctx,'Place search is unavailable for this API key.');return;}
-    if(!ctx.token&&places.AutocompleteSessionToken)ctx.token=new places.AutocompleteSessionToken();
-    const request={input,includedRegionCodes:PLACES_REGION_CODES,sessionToken:ctx.token};
     const origin=lastKnownGeo()||await placeBias();
-    if(origin){
-      request.origin=origin;
-      request.locationRestriction=placeBounds(origin,PLACE_SEARCH_RADIUS_METERS);
-    }
-    const {suggestions=[]}=await Suggestion.fetchAutocompleteSuggestions(request);
+    const body={input,session_token:ctx.token};
+    if(origin){body.lat=origin.lat;body.lng=origin.lng;}
+    const rsp=await fetch('/api/geo/suggest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const data=await rsp.json().catch(()=>({}));
     if(id!==ctx.requestId)return;
-    const predictions=suggestions.map(s=>s.placePrediction).filter(Boolean);
-    ctx.items=businessOrAddressFirst(predictions).slice(0,5);
+    if(!data.ok){renderPlaceStatus(ctx,data.error==='not_configured'?'Place search is not configured.':'Place search could not load.');return;}
+    if(data.session_token)ctx.token=data.session_token;
+    ctx.items=(data.suggestions||[]).slice(0,5);
     renderPlaceResults(ctx,ctx.items);
   }catch(e){
     if(id===ctx.requestId)renderPlaceStatus(ctx,'Place search could not load.');
@@ -2592,9 +2590,9 @@ async function queryPlaces(ctx,raw){
 function renderPlaceResults(ctx,items){
   if(!items.length){ctx.results.classList.remove('open');ctx.results.innerHTML='';return;}
   ctx.results.innerHTML=items.map((item,i)=>{
-    const main=placeText(item.mainText)||placeText(item.text)||'Place';
-    const secondary=placeText(item.secondaryText)||'';
-    const kind=placeSuggestionKind(item);
+    const main=item.main_text||item.formatted_address||'Place';
+    const secondary=item.secondary_text||'';
+    const kind=item.secondary_text?'Business or place':'Address';
     return `<button type="button" class="place-suggestion" data-place-index="${i}">
       <span class="pi">${icoPin(16)}</span>
       <span><span class="pk">${escapeHtml(kind)}</span><span class="pm">${escapeHtml(main)}</span>${secondary?`<span class="pa">${escapeHtml(secondary)}</span>`:''}</span>
@@ -2607,29 +2605,31 @@ function renderPlaceStatus(ctx,message){
   ctx.results.classList.add('open');
 }
 async function choosePlace(ctx,index){
-  const prediction=ctx.items[index];
-  if(!prediction)return;
+  const item=ctx.items[index];
+  if(!item)return;
   renderPlaceStatus(ctx,'Filling place...');
   try{
-    const place=prediction.toPlace();
-    await place.fetchFields({fields:['displayName','formattedAddress','location','types']});
-    const name=placeText(place.displayName)||placeText(prediction.mainText)||placeText(prediction.text)||'Selected place';
-    const address=place.formattedAddress||placeText(prediction.secondaryText)||'';
-    const geo=latLngToPlain(place.location);
-    const types=Array.isArray(place.types)?place.types:(Array.isArray(prediction.types)?prediction.types:[]);
+    const rsp=await fetch('/api/geo/details',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({place_id:item.place_id,session_token:ctx.token||''})});
+    const data=await rsp.json().catch(()=>({}));
+    const place=data&&data.ok?data.place:null;
+    if(!place){renderPlaceStatus(ctx,'Place details could not load.');return;}
+    const name=place.name||item.main_text||'Selected place';
+    const address=place.address||item.secondary_text||item.formatted_address||'';
+    const types=Array.isArray(place.types)?place.types:[];
+    const geo=(Number.isFinite(place.lat)&&Number.isFinite(place.lng))?{lat:place.lat,lng:place.lng}:null;
     const businessName=businessNameForPlace(name,address,types,ctx);
     ctx.nameInput.value=businessName;
     ctx.addrInput.value=address;
     [ctx.nameInput,ctx.addrInput].forEach(input=>{
       input.dataset.placeName=businessName;
       input.dataset.placeAddress=address;
-      input.dataset.placeId=place.id||prediction.placeId||'';
+      input.dataset.placeId=place.place_id||item.place_id||'';
       input.dataset.placeTypes=types.join('|');
       if(geo){input.dataset.placeLat=geo.lat;input.dataset.placeLng=geo.lng;}
     });
     ctx.results.classList.remove('open');
     ctx.results.innerHTML='';
-    ctx.token=null;
+    ctx.token=uid();
     saveActiveSheetDraft();
   }catch(e){
     renderPlaceStatus(ctx,'Place details could not load.');
@@ -2662,22 +2662,11 @@ function applyPlaceToInputs(ctx,place){
   saveActiveSheetDraft();
 }
 async function reverseGeocode(pos){
-  if(!GOOGLE_MAPS_API_KEY)return null;
   try{
-    await loadGoogleMapsScript();
-    if(!window.google?.maps?.Geocoder)return null;
-    const geocoder=new google.maps.Geocoder();
-    const result=await new Promise(resolve=>{
-      geocoder.geocode({location:{lat:pos.lat,lng:pos.lng}},(results,status)=>{
-        resolve(status==='OK'&&Array.isArray(results)&&results.length?results[0]:null);
-      });
-    });
-    if(!result)return null;
-    return {
-      address:result.formatted_address||'',
-      placeId:result.place_id||'',
-      types:Array.isArray(result.types)?result.types:[]
-    };
+    const rsp=await fetch('/api/geo/reverse?lat='+encodeURIComponent(pos.lat)+'&lng='+encodeURIComponent(pos.lng));
+    const data=await rsp.json().catch(()=>({}));
+    if(!data||!data.ok)return null;
+    return {address:data.address||'',placeId:data.place_id||'',types:Array.isArray(data.types)?data.types:[]};
   }catch(e){return null;}
 }
 async function fillAddressFromGps(nameId,addrId,resultsId,button){
