@@ -51,11 +51,10 @@ jobs:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
-          # `bubblewrap update` regenerates the Android project + checksum from
-          # twa-manifest.json non-interactively. (build's own regenerate path
-          # re-prompts for versionName even when it's set, hanging CI.)
-          bubblewrap update
-          bubblewrap build --skipPwaValidation
+          # Bubblewrap's regenerate path is interactive and always asks for the
+          # version. Feed the answers in order: y (regenerate) -> versionName ->
+          # versionCode. Signing comes from the BUBBLEWRAP_* env vars above.
+          printf 'y\n1.0.0\n1\n' | bubblewrap build --skipPwaValidation
 
       - name: Generate Digital Asset Links (assetlinks.json)
         env:
