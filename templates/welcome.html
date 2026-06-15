@@ -972,7 +972,7 @@ function applySheetDraft(id,root=$('#sheet')){
     else segVal=draft.segVal;
   }
   (draft.openWraps||[]).forEach(openDraftWrap);
-  if(draft.fields.fuelGal?.value||draft.fields.fuelCost?.value)openDraftWrap('fuelWrap');
+  if(draft.fields.fuelGal?.value||draft.fields.fuelCost?.value||draft.fields.fuelLevel?.value)openDraftWrap('fuelWrap');
   if(draft.fields.noteText?.value)openDraftWrap('noteWrap');
   if(draft.fields.cargoType?.value||draft.fields.cargoWeight?.value||draft.fields.cargoRef?.value)openDraftWrap('cargoWrap');
   return draft;
@@ -1546,20 +1546,22 @@ function openFuelSummary(stops){
   const fuelStops=stops.filter(s=>s.fuel);
   const gallons=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).gallons,0);
   const cost=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).cost,0);
+  const gaugeCount=fuelStops.reduce((a,s)=>a+(fuelGaugeText(s.fuel)!=='—'?1:0),0);
   const rows=fuelStops.map(s=>{
     const fuel=fuelAmounts(s.fuel);
-    const amount=fuel.gallons||fuel.cost?`${fuel.gallons.toFixed(1)} gallons`:'Fuel stop · gallons optional';
-    const cost=fuel.cost?money(fuel.cost):'';
-    return `<div class="summary-row"><div><div class="rk">${escapeHtml(s.fuel.location||s.location.business_name)}</div><div class="rs">${fmtTime(s.arrival_time)} · ${amount}</div></div><div class="rv">${cost}</div></div>`;
+    const gauge=fuelGaugeText(s.fuel);
+    const amount=fuel.gallons?`${fuel.gallons.toFixed(1)} gallons`:(fuel.cost?'cost only':(gauge!=='—'?`gauge ${escapeHtml(gauge)}`:(fuelReceipts(s.fuel).length?'receipt only':'fuel record')));
+    const fuelCost=fuel.cost?money(fuel.cost):'';
+    return `<div class="summary-row"><div><div class="rk">${escapeHtml(s.fuel.location||s.location.business_name)}</div><div class="rs">${fmtTime(s.arrival_time)} · ${amount}</div></div><div class="rv">${fuelCost}</div></div>`;
   }).join('');
-  summarySheet('Fuel detail','Fuel totals and purchase records',`
+  summarySheet('Fuel detail','Fuel records and receipts',`
     <div class="detail-grid">
-      <div class="detail-metric"><div class="mk">Gallons</div><div class="mv">${gallons.toFixed(gallons%1?1:0)}</div></div>
-      <div class="detail-metric"><div class="mk">Cost</div><div class="mv">${money(cost)}</div></div>
-      <div class="detail-metric"><div class="mk">Stops</div><div class="mv">${fuelStops.length}</div></div>
-      <div class="detail-metric"><div class="mk">Avg</div><div class="mv">${gallons&&cost?money(cost/gallons):'—'}</div></div>
+      <div class="detail-metric"><div class="mk">Gallons</div><div class="mv">${gallons?gallons.toFixed(gallons%1?1:0):'—'}</div></div>
+      <div class="detail-metric"><div class="mk">Cost</div><div class="mv">${cost?money(cost):'—'}</div></div>
+      <div class="detail-metric"><div class="mk">Records</div><div class="mv">${fuelStops.length}</div></div>
+      <div class="detail-metric"><div class="mk">Gauge</div><div class="mv">${gaugeCount||'—'}</div></div>
     </div>
-    <div class="summary-list">${rows||'<div class="summary-note">No fuel logged today. Tap a stop card to add fuel to that stop.</div>'}</div>`);
+    <div class="summary-list">${rows||'<div class="summary-note">No fuel records logged today.</div>'}</div>`);
 }
 function fuelReceipts(fuel){
   return Array.isArray(fuel?.receipts)?fuel.receipts:[];
@@ -1568,7 +1570,7 @@ function fuelReceiptErrors(fuel){
   return Array.isArray(fuel?.receipt_errors)?fuel.receipt_errors:[];
 }
 function stationName(stop){
-  return stop?.fuel?.location||stop?.location?.business_name||'Fuel stop';
+  return stop?.fuel?.location||stop?.location?.business_name||'Fuel record';
 }
 function gallonsText(value){
   const gallons=Number(value)||0;
@@ -1582,12 +1584,37 @@ function ppgText(fuel){
 function mpgText(value){
   return value?value.toFixed(1):'—';
 }
+function fuelRecordCountText(count){
+  return `${count} fuel record${count!==1?'s':''}`;
+}
+function fuelTankLevelValue(selector){
+  return ($(selector)?.value||'').trim();
+}
+function fuelGaugeText(fuel){
+  return String(fuel?.tank_level||'').trim()||'—';
+}
+function fuelGaugeSelect(id,value=''){
+  const current=String(value||'').trim();
+  const opts=[
+    ['','Tank gauge after stop'],
+    ['Empty','Empty'],
+    ['1/4','1/4 tank'],
+    ['1/2','1/2 tank'],
+    ['3/4','3/4 tank'],
+    ['Full','Full']
+  ];
+  return `<select class="input" id="${id}">${opts.map(([val,label])=>`<option value="${escapeHtml(val)}"${val===current?' selected':''}>${escapeHtml(label)}</option>`).join('')}</select>`;
+}
+function mpgStatusText(stats){
+  return stats.gallons?`MPG ${mpgText(stats.mpg)}`:'MPG needs gallons';
+}
 function fuelStats(stops=todayStops()){
   const fuelStops=stops.filter(s=>s.fuel);
   const gallons=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).gallons,0);
   const cost=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).cost,0);
   const miles=totalMilesForStops(stops)+activeLegMiles(stops);
   const receiptCount=fuelStops.reduce((a,s)=>a+fuelReceipts(s.fuel).length,0);
+  const gaugeCount=fuelStops.reduce((a,s)=>a+(fuelGaugeText(s.fuel)!=='—'?1:0),0);
   const stationMap=new Map();
   fuelStops.forEach(stop=>{
     const name=stationName(stop);
@@ -1606,6 +1633,7 @@ function fuelStats(stops=todayStops()){
     cost,
     miles,
     receiptCount,
+    gaugeCount,
     stationStats:[...stationMap.values()].sort((a,b)=>b.cost-a.cost||b.gallons-a.gallons||a.name.localeCompare(b.name)),
     ppg:gallons&&cost?cost/gallons:0,
     mpg:gallons&&miles?miles/gallons:0
@@ -1618,8 +1646,8 @@ function renderFuel(){
   const stats=fuelStats(stops);
   const legs=mileageLegsForStops(stops);
   const stationRows=stats.stationStats.map(station=>{
-    const primary=station.gallons?gallonsText(station.gallons)+' gal':(station.cost?money(station.cost):'Fuel stop');
-    const secondary=station.gallons&&station.cost?money(station.cost):(station.cost?'cost only':'amounts optional');
+    const primary=station.gallons?gallonsText(station.gallons)+' gal':(station.cost?money(station.cost):'Fuel record');
+    const secondary=station.gallons&&station.cost?money(station.cost):(station.cost?'cost only':(station.receipts?'receipt only':'amounts optional'));
     return `
     <div class="station-row">
       <div>
@@ -1635,16 +1663,18 @@ function renderFuel(){
     const leg=legs[idx]||0;
     const receipts=fuelReceipts(stop.fuel);
     const errors=fuelReceiptErrors(stop.fuel);
+    const gauge=fuelGaugeText(stop.fuel);
     return `<div class="fuel-row">
       <div class="fuel-row-top">
         <button class="fuel-row-main" onclick="openStopDetail('${stop.id}')" style="text-align:left;color:inherit">
           <div class="fuel-name">${escapeHtml(stationName(stop))}</div>
           <div class="fuel-meta">${fmtTime(stop.arrival_time)} · Stop ${stop.sequence} · ${escapeHtml(stop.location.address||formatGps(stop.location))}</div>
         </button>
-        <div class="fuel-total">${amount.gallons?gallonsText(amount.gallons)+' gal':(amount.cost?money(amount.cost):'Fuel')}<span>${amount.cost?money(amount.cost):'no cost'}</span></div>
+        <div class="fuel-total">${amount.gallons?gallonsText(amount.gallons)+' gal':(amount.cost?money(amount.cost):(gauge!=='—'?'Gauge '+escapeHtml(gauge):'Fuel record'))}<span>${amount.cost?money(amount.cost):'cost not recorded'}</span></div>
       </div>
       <div class="fuel-pills">
-        <span class="fuel-pill">${icoFuel(12)} PPG ${ppgText(stop.fuel)}</span>
+        <span class="fuel-pill">${icoFuel(12)} Gallons ${gallonsText(amount.gallons)}</span>
+        ${gauge!=='—'?`<span class="fuel-pill">${icoFuel(12)} Gauge ${escapeHtml(gauge)}</span>`:''}
         <span class="fuel-pill">${icoRoad(12)} ${leg?leg+' mi':'miles pending'}</span>
         <span class="fuel-pill">${icoCamera(12)} ${receipts.length} receipt${receipts.length!==1?'s':''}</span>
       </div>
@@ -1665,27 +1695,27 @@ function renderFuel(){
   }).join('');
   page.innerHTML=`
     <div class="fuel-head">
-      <div class="fuel-kicker">${icoFuel(14)} Fuel for today</div>
-      <div class="fuel-title">${stats.gallons?gallonsText(stats.gallons)+' gallons':stats.fuelStops.length+' fuel stops'}</div>
-      <p class="fuel-sub">Gas-station destinations are treated as fuel stops automatically. Add gallons, cost, and receipt photos from the fuel log or the stop detail.</p>
+      <div class="fuel-kicker">${icoFuel(14)} Fuel records today</div>
+      <div class="fuel-title">${stats.gallons?gallonsText(stats.gallons)+' gallons recorded':fuelRecordCountText(stats.fuelStops.length)}</div>
+      <p class="fuel-sub">Fuel records hold purchases, receipt photos, and optional tank gauge readings. Tank fuel is not known unless the gauge is recorded.</p>
       <div class="fuel-head-actions">
-        <button class="mini-btn primary" onclick="openManualFuelStop()">${icoFuel(14)} Record fuel stop</button>
+        <button class="mini-btn primary" onclick="openManualFuelStop()">${icoFuel(14)} Record fuel</button>
         <button class="mini-btn" onclick="printFuelLog()">${icoDoc(14)} Save PDF</button>
       </div>
       <div class="fuel-grid">
-        <div class="fuel-card warn"><div class="fk">PPG</div><div class="fv">${stats.ppg?money(stats.ppg):'—'}</div><div class="fu">price per gallon</div></div>
-        <div class="fuel-card"><div class="fk">MPG</div><div class="fv">${mpgText(stats.mpg)}</div><div class="fu">${stats.miles} mi / ${gallonsText(stats.gallons)} gal</div></div>
-        <div class="fuel-card"><div class="fk">Fuel for day</div><div class="fv">${money(stats.cost)}</div><div class="fu">${gallonsText(stats.gallons)} gallons</div></div>
-        <div class="fuel-card"><div class="fk">Receipts uploaded</div><div class="fv">${stats.receiptCount}</div><div class="fu">${stats.fuelStops.length} fuel stop${stats.fuelStops.length!==1?'s':''}</div></div>
+        <div class="fuel-card warn"><div class="fk">Gallons recorded</div><div class="fv">${gallonsText(stats.gallons)}</div><div class="fu">${stats.gaugeCount} gauge reading${stats.gaugeCount!==1?'s':''}</div></div>
+        <div class="fuel-card"><div class="fk">Spend recorded</div><div class="fv">${stats.cost?money(stats.cost):'—'}</div><div class="fu">${stats.ppg?money(stats.ppg)+' per gallon':'PPG needs gallons + cost'}</div></div>
+        <div class="fuel-card"><div class="fk">Route miles</div><div class="fv">${stats.miles.toLocaleString()}</div><div class="fu">${mpgStatusText(stats)}</div></div>
+        <div class="fuel-card"><div class="fk">Receipts uploaded</div><div class="fv">${stats.receiptCount}</div><div class="fu">${fuelRecordCountText(stats.fuelStops.length)}</div></div>
       </div>
     </div>
     <div class="fuel-section">
-      <div class="fuel-section-head"><h3>Gas stations</h3><span>${stats.stationStats.length} station${stats.stationStats.length!==1?'s':''}</span></div>
-      <div class="fuel-list">${stationRows||`<div class="fuel-empty">No gas-station fuel stops logged today.<button class="mini-btn primary" onclick="openManualFuelStop()">${icoFuel(14)} Record fuel stop</button></div>`}</div>
+      <div class="fuel-section-head"><h3>Fuel locations</h3><span>${stats.stationStats.length} station${stats.stationStats.length!==1?'s':''}</span></div>
+      <div class="fuel-list">${stationRows||`<div class="fuel-empty">No fuel records logged today.<button class="mini-btn primary" onclick="openManualFuelStop()">${icoFuel(14)} Record fuel</button></div>`}</div>
     </div>
     <div class="fuel-section">
-      <div class="fuel-section-head"><h3>Fuel by stop</h3><span>${stats.fuelStops.length} stop${stats.fuelStops.length!==1?'s':''}</span></div>
-      <div class="fuel-list">${stopRows||`<div class="fuel-empty">No fuel stops logged today. Gas-station destinations will appear here automatically, and any stop can become a fuel stop from its stop detail.<button class="mini-btn primary" onclick="openManualFuelStop()">${icoCamera(14)} Add receipt record</button></div>`}</div>
+      <div class="fuel-section-head"><h3>Records by stop</h3><span>${stats.fuelStops.length} stop${stats.fuelStops.length!==1?'s':''}</span></div>
+      <div class="fuel-list">${stopRows||`<div class="fuel-empty">No fuel records logged today. Gas-station destinations can appear here automatically, and any stop can hold a fuel receipt.<button class="mini-btn primary" onclick="openManualFuelStop()">${icoCamera(14)} Add receipt record</button></div>`}</div>
     </div>`;
   doc.innerHTML=buildFuelDoc(stops);
   hydratePhotos(page);
@@ -1698,12 +1728,14 @@ function buildFuelDoc(stops=todayStops()){
     const amount=fuelAmounts(stop.fuel);
     const idx=Math.max(0,stops.findIndex(s=>s.id===stop.id));
     const receipts=fuelReceipts(stop.fuel);
+    const gauge=fuelGaugeText(stop.fuel);
     return `<tr>
       <td class="num">${fmtDay(stop.arrival_time)}</td>
       <td class="loc-cell"><div class="ln">${escapeHtml(stationName(stop))}</div><div class="la">${escapeHtml(stop.location.address||formatGps(stop.location))}</div></td>
       <td class="num">${amount.gallons?amount.gallons.toFixed(1):'—'}</td>
       <td class="num">${amount.cost?money(amount.cost):'—'}</td>
       <td class="num">${ppgText(stop.fuel)}</td>
+      <td class="num">${escapeHtml(gauge)}</td>
       <td class="num">${legs[idx]||'—'}</td>
       <td class="num">${receipts.length}</td>
     </tr>`;
@@ -1731,7 +1763,7 @@ function buildFuelDoc(stops=todayStops()){
           <circle cx="20" cy="29.5" r="1.7" fill="#5cf0de"/></svg>
         <div class="wm"><b>Move</b>Defense</div>
       </div>
-      <div class="doc-docno">FUEL LOG ${S.logNumber}<br>${stats.fuelStops.length} FUEL STOPS<br>GEN ${new Date().toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</div>
+      <div class="doc-docno">FUEL LOG ${S.logNumber}<br>${stats.fuelStops.length} FUEL RECORDS<br>GEN ${new Date().toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</div>
     </div>
     <div class="doc-title">Fuel Log</div>
     <div class="doc-sub">
@@ -1742,24 +1774,24 @@ function buildFuelDoc(stops=todayStops()){
   </div>
   <div class="doc-body">
     <div class="sumgrid">
-      <div class="sumcard"><div class="sk">PPG</div><div class="sv">${stats.ppg?money(stats.ppg):'—'}</div><div class="su">price per gallon</div></div>
-      <div class="sumcard"><div class="sk">MPG</div><div class="sv">${mpgText(stats.mpg)}</div><div class="su">miles per gallon</div></div>
-      <div class="sumcard"><div class="sk">Fuel today</div><div class="sv">${gallonsText(stats.gallons)}</div><div class="su">gallons</div></div>
+      <div class="sumcard"><div class="sk">Gallons</div><div class="sv">${gallonsText(stats.gallons)}</div><div class="su">${stats.gaugeCount} gauge reading${stats.gaugeCount!==1?'s':''}</div></div>
+      <div class="sumcard"><div class="sk">Spend</div><div class="sv">${stats.cost?money(stats.cost):'—'}</div><div class="su">${stats.ppg?money(stats.ppg)+' per gallon':'PPG needs gallons + cost'}</div></div>
+      <div class="sumcard"><div class="sk">Route miles</div><div class="sv">${stats.miles.toLocaleString()}</div><div class="su">${mpgStatusText(stats)}</div></div>
       <div class="sumcard"><div class="sk">Receipts</div><div class="sv">${stats.receiptCount}</div><div class="su">uploaded</div></div>
     </div>
 
-    <h4><span class="bar"></span>Gas stations</h4>
+    <h4><span class="bar"></span>Fuel locations</h4>
     <table class="tbl">
       <thead><tr><th>Station</th><th class="num">Stops</th><th class="num">Gallons</th><th class="num">Cost</th><th class="num">Receipts</th></tr></thead>
-      <tbody>${stationRows||'<tr><td colspan="5">No gas-station fuel stops logged.</td></tr>'}</tbody>
+      <tbody>${stationRows||'<tr><td colspan="5">No fuel records logged.</td></tr>'}</tbody>
       <tfoot><tr><td>${stats.stationStats.length} station${stats.stationStats.length!==1?'s':''}</td><td class="num">${stats.fuelStops.length}</td><td class="num">${stats.gallons.toFixed(1)}</td><td class="num">${money(stats.cost)}</td><td class="num">${stats.receiptCount}</td></tr></tfoot>
     </table>
 
-    <h4><span class="bar"></span>Fuel by stop</h4>
+    <h4><span class="bar"></span>Records by stop</h4>
     <table class="tbl">
-      <thead><tr><th>Date</th><th>Station / stop</th><th class="num">Gallons</th><th class="num">Cost</th><th class="num">PPG</th><th class="num">Miles</th><th class="num">Receipts</th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="7">No fuel stops logged today.</td></tr>'}</tbody>
-      <tfoot><tr><td colspan="2">Fuel for day</td><td class="num">${stats.gallons.toFixed(1)}</td><td class="num">${money(stats.cost)}</td><td class="num">${stats.ppg?money(stats.ppg):'—'}</td><td class="num">${stats.miles.toLocaleString()}</td><td class="num">${stats.receiptCount}</td></tr></tfoot>
+      <thead><tr><th>Date</th><th>Station / stop</th><th class="num">Gallons</th><th class="num">Cost</th><th class="num">PPG</th><th class="num">Gauge</th><th class="num">Miles</th><th class="num">Receipts</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="8">No fuel records logged today.</td></tr>'}</tbody>
+      <tfoot><tr><td colspan="2">Purchase totals</td><td class="num">${stats.gallons.toFixed(1)}</td><td class="num">${money(stats.cost)}</td><td class="num">${stats.ppg?money(stats.ppg):'—'}</td><td class="num">${stats.gaugeCount||'—'}</td><td class="num">${stats.miles.toLocaleString()}</td><td class="num">${stats.receiptCount}</td></tr></tfoot>
     </table>
 
     ${receiptCards?`
@@ -1768,7 +1800,7 @@ function buildFuelDoc(stops=todayStops()){
 
     <div class="disclaimer">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      This is a fuel and receipt log derived from the driver activity record. It is not an ELD or Hours-of-Service compliance document.
+      This is a purchase, receipt, and optional tank-gauge log derived from the driver activity record. It does not calculate fuel remaining unless a tank gauge reading was recorded.
     </div>
   </div>`;
 }
@@ -1780,12 +1812,12 @@ async function printFuelLog(){
 function openManualFuelStop(){
   $('#sheet').innerHTML=`
     <div class="grab"></div>
-    <h3>Record fuel stop</h3>
+    <h3>Record fuel</h3>
     <p class="lede">Add a fuel purchase or receipt to today's fuel log.</p>
-    <div class="field-label">Fuel stop</div>
+    <div class="field-label">Fuel location</div>
     <div class="place-field">
       <label class="input-label" for="manualFuelName">Station / stop name</label>
-      <input class="input" id="manualFuelName" placeholder="Station or fuel stop" autocomplete="off" oninput="placeFieldInput('manualFuelName','manualFuelAddr','manualFuelPlaceResults',this)" />
+      <input class="input" id="manualFuelName" placeholder="Station or fuel location" autocomplete="off" oninput="placeFieldInput('manualFuelName','manualFuelAddr','manualFuelPlaceResults',this)" />
       <label class="input-label" for="manualFuelAddr">Address</label>
       <div class="address-row">
         <input class="input" id="manualFuelAddr" placeholder="Address" autocomplete="off" oninput="placeFieldInput('manualFuelName','manualFuelAddr','manualFuelPlaceResults',this)" />
@@ -1798,6 +1830,7 @@ function openManualFuelStop(){
       <input class="input" id="manualFuelGal" inputmode="decimal" placeholder="Gallons" />
       <input class="input" id="manualFuelCost" inputmode="decimal" placeholder="Cost $" />
     </div>
+    <div style="margin-top:10px">${fuelGaugeSelect('manualFuelLevel')}</div>
     <div class="field-label">Receipt</div>
     <input id="manualFuelReceiptUploadInput" type="file" accept="image/*" style="display:none" onchange="manualFuelReceiptPicked(this)" />
     <input id="manualFuelReceiptCameraInput" type="file" accept="image/*" capture="environment" style="display:none" onchange="manualFuelReceiptPicked(this)" />
@@ -1872,10 +1905,11 @@ async function confirmManualFuelStop(){
   const address=$('#manualFuelAddr')?.value.trim()||selected?.address||'';
   const gallons=parseFuelNumber('#manualFuelGal');
   const cost=parseFuelNumber('#manualFuelCost');
+  const tankLevel=fuelTankLevelValue('#manualFuelLevel');
   const note=$('#manualFuelNote')?.value.trim()||'';
   const file=$('#manualFuelReceiptUploadInput')?.files?.[0]||$('#manualFuelReceiptCameraInput')?.files?.[0]||null;
-  if(!typedName&&!selected?.name&&gallons===null&&cost===null&&!file){
-    toast('warn',icoFuel(16),'Fuel record not saved','Add a station, amount, or receipt');
+  if(!typedName&&!selected?.name&&gallons===null&&cost===null&&!tankLevel&&!file){
+    toast('warn',icoFuel(16),'Fuel record not saved','Add a station, amount, receipt, or gauge');
     return;
   }
   const name=typedName||selected?.name||shortAddressName(address)||'Fuel receipt';
@@ -1898,7 +1932,7 @@ async function confirmManualFuelStop(){
     arrived_with:cargo,
     departed_with:cargo,
     load_change:'none',
-    fuel:{gallons:gallons??0,cost:cost??0,location:name,auto:false,receipts:[],receipt_errors:[]},
+    fuel:{gallons:gallons??0,cost:cost??0,tank_level:tankLevel,location:name,auto:false,receipts:[],receipt_errors:[]},
     manual_fuel:true,
     note
   };
@@ -1981,7 +2015,9 @@ function fuelLabel(fuel){
   const {gallons,cost}=fuelAmounts(fuel);
   if(gallons&&cost)return `${gallons.toFixed(gallons%1?1:0)} gal · ${money(cost)}`;
   if(gallons)return `${gallons.toFixed(gallons%1?1:0)} gal`;
-  if(!cost)return 'Fuel stop';
+  const gauge=fuelGaugeText(fuel);
+  if(gauge!=='—')return `Gauge ${gauge}`;
+  if(!cost)return fuelReceipts(fuel).length?'Fuel receipt':'Fuel record';
   return money(cost);
 }
 function fuelAmounts(fuel){
@@ -2011,18 +2047,20 @@ function isFuelStopPlace(place){
   return FUEL_STOP_TERMS.some(term=>text.includes(term));
 }
 function autoFuelRecord(location){
-  return {gallons:0,cost:0,location:location?.business_name||location?.name||'Fuel stop',auto:true,receipts:[],receipt_errors:[]};
+  return {gallons:0,cost:0,tank_level:'',location:location?.business_name||location?.name||'Fuel record',auto:true,receipts:[],receipt_errors:[]};
 }
 function fuelRecordFromInputs(location,existing=null){
   const fg=parseFuelNumber('#fuelGal'),fc=parseFuelNumber('#fuelCost');
+  const tankLevel=fuelTankLevelValue('#fuelLevel');
   const prev=fuelAmounts(existing);
   const fuelStop=isFuelStopPlace(location);
-  if(!fuelStop&&fg===null&&fc===null)return null;
+  if(!fuelStop&&fg===null&&fc===null&&!tankLevel)return null;
   return {
     gallons:fg??prev.gallons,
     cost:fc??prev.cost,
-    location:location?.business_name||location?.name||existing?.location||'Fuel stop',
-    auto:fuelStop&&fg===null&&fc===null&&prev.gallons===0&&prev.cost===0,
+    tank_level:tankLevel,
+    location:location?.business_name||location?.name||existing?.location||'Fuel record',
+    auto:fuelStop&&fg===null&&fc===null&&!tankLevel&&prev.gallons===0&&prev.cost===0,
     receipts:fuelReceipts(existing),
     receipt_errors:fuelReceiptErrors(existing)
   };
@@ -2114,6 +2152,7 @@ function openStopDetail(id){
       <input class="input" id="detailFuelGal" inputmode="decimal" placeholder="Gallons" value="${Number.isFinite(Number(fuel.gallons))&&Number(fuel.gallons)>0?Number(fuel.gallons):''}" />
       <input class="input" id="detailFuelCost" inputmode="decimal" placeholder="Cost $" value="${Number.isFinite(Number(fuel.cost))&&Number(fuel.cost)>0?Number(fuel.cost):''}" />
     </div>
+    <div style="margin-top:10px">${fuelGaugeSelect('detailFuelLevel',fuel.tank_level)}</div>
     <div class="sheet-actions" style="padding-bottom:4px">
       <button class="btn-ghost" onclick="clearStopFuel('${id}')">Clear fuel</button>
       <button class="btn-primary" onclick="saveStopFuel('${id}')">Save fuel ${icoChev(18)}</button>
@@ -2198,21 +2237,25 @@ function saveStopFuel(id){
   if(!stop)return;
   const gallons=parseFuelNumber('#detailFuelGal');
   const cost=parseFuelNumber('#detailFuelCost');
-  if(gallons===null&&cost===null){
-    deleteFuelReceiptBlobs(stop.fuel);
+  const tankLevel=fuelTankLevelValue('#detailFuelLevel');
+  const receipts=fuelReceipts(stop.fuel);
+  const receiptErrors=fuelReceiptErrors(stop.fuel);
+  const keepFuel=Boolean(gallons!==null||cost!==null||tankLevel||receipts.length||receiptErrors.length||isFuelStopPlace(stop.location));
+  if(!keepFuel){
     stop.fuel=null;
     save();clearSheetDraft(`stop-detail:${id}`);renderHome();renderFuel();openStopDetail(id);
-    toast('ok',icoFuel(16),'Fuel cleared','No fuel saved on this stop');
+    toast('ok',icoFuel(16),'Fuel record empty','No fuel saved on this stop');
     return;
   }
   stop.fuel={
     ...(stop.fuel||{}),
     gallons:gallons??0,
     cost:cost??0,
+    tank_level:tankLevel,
     location:stop.location.business_name,
-    auto:false,
-    receipts:fuelReceipts(stop.fuel),
-    receipt_errors:fuelReceiptErrors(stop.fuel)
+    auto:isFuelStopPlace(stop.location)&&gallons===null&&cost===null&&!tankLevel,
+    receipts,
+    receipt_errors:receiptErrors
   };
   save();clearSheetDraft(`stop-detail:${id}`);renderHome();renderFuel();openStopDetail(id);
   toast('ok',icoFuel(16),'Fuel saved',fuelLabel(stop.fuel));
@@ -2539,9 +2582,9 @@ function openDepart(){
   $('#sheet').innerHTML=`
     <div class="grab"></div>
     <h3>Depart ${place.business_name}</h3>
-    <p class="lede">${fuelStop?'Fuel stop detected. Load stays unchanged; add gallons or cost if you want them on the record.':`The one thing we can't infer — <b>${truck?'did the load change here?':'did you pick up or deliver here?'}</b>`}</p>
+    <p class="lede">${fuelStop?'Fuel record detected. Load stays unchanged; add gallons, cost, or tank gauge if you want them on the record.':`The one thing we can't infer — <b>${truck?'did the load change here?':'did you pick up or deliver here?'}</b>`}</p>
 
-    ${fuelStop?`<div class="summary-note">${icoFuel(16)} This stop is being logged as fuel because the destination is a gas station.</div>`:`
+    ${fuelStop?`<div class="summary-note">${icoFuel(16)} This stop is logged as a fuel record because the destination is a gas station.</div>`:`
     <div class="seg3" id="seg">
       <div class="segc" data-v="picked_up" onclick="pickSeg(this)"><div class="si">${icoUp(18)}</div><div class="sl">Picked up</div></div>
       <div class="segc" data-v="dropped_off" onclick="pickSeg(this)"><div class="si">${icoDown(18)}</div><div class="sl">${truck?'Dropped off':'Delivered'}</div></div>
@@ -2577,9 +2620,10 @@ function openDepart(){
     <div class="two">
       <input class="input" id="fuelGal" inputmode="decimal" placeholder="Gallons" value="${Number.isFinite(Number(fuel.gallons))&&Number(fuel.gallons)>0?Number(fuel.gallons):''}" />
       <input class="input" id="fuelCost" inputmode="decimal" placeholder="Cost $" value="${Number.isFinite(Number(fuel.cost))&&Number(fuel.cost)>0?Number(fuel.cost):''}" />
-    </div>`:`
+    </div>
+    <div style="margin-top:10px">${fuelGaugeSelect('fuelLevel',fuel.tank_level)}</div>`:`
     <div class="optrow" onclick="toggleOpt('fuelWrap',this)">
-      <div><div class="ol">Add fuel stop</div><div class="od">Gallons + cost at this location</div></div>
+      <div><div class="ol">Add fuel record</div><div class="od">Gallons, cost, or tank gauge at this location</div></div>
       <div class="tgl" data-tgl></div>
     </div>
     <div class="collapse" id="fuelWrap">
@@ -2587,6 +2631,7 @@ function openDepart(){
         <input class="input" id="fuelGal" inputmode="decimal" placeholder="Gallons" />
         <input class="input" id="fuelCost" inputmode="decimal" placeholder="Cost $" />
       </div>
+      <div style="margin-top:10px">${fuelGaugeSelect('fuelLevel')}</div>
     </div>`}
 
     <div class="optrow" onclick="toggleOpt('noteWrap',this)">
@@ -3120,7 +3165,7 @@ function renderDrawer(){
     <div class="drawer-item" onclick="toggleMode(this)">${icoBox(20)}
       <div><div>Freight fields</div><div class="sub">Cargo · weight · fuel</div></div>
       <div class="tgl ${S.settings.truckMode?'on':''} right" data-mode></div></div>
-    <button class="drawer-item" onclick="closeDrawer();route('fuel')">${icoFuel(20)}<div><div>Fuel log</div><div class="sub">PPG · MPG · receipts</div></div></button>
+    <button class="drawer-item" onclick="closeDrawer();route('fuel')">${icoFuel(20)}<div><div>Fuel log</div><div class="sub">receipts · gallons · gauge</div></div></button>
     <button class="drawer-item" onclick="signOut()">${icoReset(20)}<div><div>Sign out</div><div class="sub">${escapeHtml(currentUser()?.email||'Driver account')} · keeps logged data</div></div></button>
     <button class="drawer-item" onclick="resetDay()">${icoReset(20)}<div><div>Clear logged data</div><div class="sub">Start fresh</div></div></button>
     <div class="drawer-foot">MoveDefense · driver activity & trip record<br>Not an ELD · No hours-of-service</div>`;
@@ -3196,6 +3241,7 @@ function buildDoc(){
   const fuelStops=stops.filter(s=>s.fuel);
   const fuelGal=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).gallons,0);
   const fuelCost=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).cost,0);
+  const fuelGaugeCount=fuelStops.reduce((a,s)=>a+(fuelGaugeText(s.fuel)!=='—'?1:0),0);
   const onLoc=stops.reduce((a,s)=>a+((s.departure_time||Date.now())-s.arrival_time),0);
   let driving=0;for(let i=0;i<stops.length-1;i++){if(stops[i].departure_time)driving+=Math.max(0,stops[i+1].arrival_time-stops[i].departure_time);}
   const odoStart=odometerStartForStops(stops);
@@ -3232,7 +3278,7 @@ function buildDoc(){
 
   const fuelRows=fuelStops.map(s=>{
     const fuel=fuelAmounts(s.fuel);
-    return `<tr><td class="num">${fmtDay(s.arrival_time)}</td><td>${escapeHtml(s.fuel.location||s.location.business_name||'Stop')}</td><td class="num">${fuel.gallons?fuel.gallons.toFixed(1):'—'}</td><td class="num">${fuel.cost?money(fuel.cost):'—'}</td></tr>`;
+    return `<tr><td class="num">${fmtDay(s.arrival_time)}</td><td>${escapeHtml(s.fuel.location||s.location.business_name||'Stop')}</td><td class="num">${fuel.gallons?fuel.gallons.toFixed(1):'—'}</td><td class="num">${fuel.cost?money(fuel.cost):'—'}</td><td class="num">${escapeHtml(fuelGaugeText(s.fuel))}</td></tr>`;
   }).join('');
   const photoCards=stops.flatMap(s=>(s.photos||[]).map(photo=>`
     <div class="doc-photo">
@@ -3287,11 +3333,11 @@ function buildDoc(){
     </table>
 
     ${fuelStops.length?`
-    <h4><span class="bar"></span>Fuel summary</h4>
+    <h4><span class="bar"></span>Fuel / receipt summary</h4>
     <table class="tbl">
-      <thead><tr><th>Date</th><th>Location</th><th class="num">Gallons</th><th class="num">Cost</th></tr></thead>
+      <thead><tr><th>Date</th><th>Location</th><th class="num">Gallons</th><th class="num">Cost</th><th class="num">Gauge</th></tr></thead>
       <tbody>${fuelRows}</tbody>
-      <tfoot><tr><td colspan="2">${fuelStops.length} purchase${fuelStops.length>1?'s':''}</td><td class="num">${fuelGal.toFixed(1)}</td><td class="num">${money(fuelCost)}</td></tr></tfoot>
+      <tfoot><tr><td colspan="2">${fuelRecordCountText(fuelStops.length)}</td><td class="num">${fuelGal.toFixed(1)}</td><td class="num">${money(fuelCost)}</td><td class="num">${fuelGaugeCount||'—'}</td></tr></tfoot>
     </table>`:''}
 
     ${photoCards?`
