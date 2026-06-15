@@ -1418,18 +1418,19 @@ function renderState(){
   c.style.setProperty('--state-wash',driving?'rgba(63,224,206,.16)':'rgba(255,158,61,.15)');
   const last=[...S.stops].reverse().find(s=>s.location);
   const gps=driving?null:last?.location;
-  const parkedLocation=place?.address||formatGps(gps);
+  const parkedLocation=displayLocationLine(place||gps);
+  const placeName=idle?'Start your first stop':driving?displayPlaceName(place,'Next stop'):displayPlaceName(place,'GPS stop');
   c.innerHTML=`
     <div class="sc-row">
       <span class="sc-label"><span class="pulse"></span>${idle?'Ready · no stops logged':driving?'En route · driving to':'Parked · on site at'}</span>
       <div class="clock"><span id="clkLbl">${new Date().toLocaleDateString([],{weekday:'short'})}</span><b id="clk">${fmtTime(Date.now())}</b></div>
     </div>
-    <div class="sc-place">${driving?icoRoad(18,'var(--cyan)'):icoPin(18,'var(--amber)')}${idle?'Start your first stop':place?.business_name||place?.name||'Next stop'}</div>
+    <div class="sc-place">${driving?icoRoad(18,'var(--cyan)'):icoPin(18,'var(--amber)')}${escapeHtml(placeName)}</div>
     <div class="sc-meta">
       ${idle
         ? `<span class="gps-pill"><span class="lk"></span>GPS ready</span><span>No saved stops yet</span>`
         : driving
-        ? `<span>${place?.address?('→ '+escapeHtml(place.address)):'Tap Arrive when you reach it'}</span>`
+        ? `<span>${visibleAddress(place)?('→ '+escapeHtml(visibleAddress(place))):'Tap Arrive when you reach it'}</span>`
         : `<span class="gps-pill"><span class="lk"></span>${escapeHtml(parkedLocation)}</span><span><b>${odoStr()}</b> mi odometer</span>`}
     </div>`;
 }
@@ -1437,6 +1438,27 @@ const odoStr=()=>S.odometer.toLocaleString();
 function formatGps(location){
   const lat=location?.gps_lat,lng=location?.gps_lng;
   return Number.isFinite(lat)&&Number.isFinite(lng)?lat.toFixed(4)+', '+lng.toFixed(4):'GPS unavailable';
+}
+function isCoordinateText(value){
+  return /^-?\d{1,3}(?:\.\d+)?\s*,\s*-?\d{1,3}(?:\.\d+)?$/.test(String(value||'').trim());
+}
+function visibleAddress(location){
+  const address=String(location?.address||'').trim();
+  return isCoordinateText(address)?'':address;
+}
+function isGenericStopName(name){
+  return ['next stop','current gps location','gps location','stop'].includes(String(name||'').trim().toLowerCase());
+}
+function editablePlaceName(location){
+  const name=String(location?.business_name||location?.name||'').trim();
+  return name&&!isGenericStopName(name)?name:'';
+}
+function displayPlaceName(location,fallback='GPS stop'){
+  return editablePlaceName(location)||shortAddressName(visibleAddress(location))||fallback;
+}
+function displayLocationLine(location){
+  if(visibleAddress(location))return visibleAddress(location);
+  return toGeo(location)?'GPS stamped':'Address not set';
 }
 
 function renderGauges(){
@@ -1780,8 +1802,8 @@ function renderLedger(){
         <div class="node">${s.sequence}</div>
         <div class="stop" role="button" tabindex="0" onclick="openStopDetail('${s.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openStopDetail('${s.id}')}">
           <div class="stop-top">
-            <div><div class="stop-name">${s.location.business_name}</div>
-              <div class="stop-addr">${s.location.address}</div></div>
+            <div><div class="stop-name">${escapeHtml(displayPlaceName(s.location))}</div>
+              <div class="stop-addr">${escapeHtml(displayLocationLine(s.location))}</div></div>
             <div class="dwell"><div class="t">${fmtTime(s.arrival_time)} → ${s.departure_time?fmtTime(s.departure_time):'now'}</div>
               <div class="d">${fmtDurShort(dwell)}<span class="d-lbl">${open?'on site':'dwell'}</span></div></div>
           </div>
@@ -1903,8 +1925,8 @@ function openStopDetail(id){
     <div class="grab"></div>
     <div class="stop-detail-head">
       <div>
-        <div class="name">${escapeHtml(stop.location.business_name||'Stop')}</div>
-        <div class="addr">${escapeHtml(stop.location.address||formatGps(stop.location))}</div>
+        <div class="name">${escapeHtml(displayPlaceName(stop.location))}</div>
+        <div class="addr">${escapeHtml(displayLocationLine(stop.location))}</div>
       </div>
       <div class="detail-pill">${stop.departure_time?'Closed':'Open'}</div>
     </div>
@@ -1918,10 +1940,10 @@ function openStopDetail(id){
     <div class="field-label">Stop details</div>
     <div class="place-field">
       <label class="input-label" for="detailStopName">Customer / business name</label>
-      <input class="input" id="detailStopName" placeholder="Customer, business, or stop name" autocomplete="off" value="${escapeHtml(stop.location.business_name||'')}" oninput="placeFieldInput('detailStopName','detailStopAddr','detailPlaceResults',this)" />
+      <input class="input" id="detailStopName" placeholder="Customer, business, or stop name" autocomplete="off" value="${escapeHtml(editablePlaceName(stop.location))}" oninput="placeFieldInput('detailStopName','detailStopAddr','detailPlaceResults',this)" />
       <label class="input-label" for="detailStopAddr">Address</label>
       <div class="address-row">
-        <input class="input" id="detailStopAddr" placeholder="Address" autocomplete="off" value="${escapeHtml(stop.location.address||'')}" oninput="placeFieldInput('detailStopName','detailStopAddr','detailPlaceResults',this)" />
+        <input class="input" id="detailStopAddr" placeholder="Address" autocomplete="off" value="${escapeHtml(visibleAddress(stop.location))}" oninput="placeFieldInput('detailStopName','detailStopAddr','detailPlaceResults',this)" />
         <button type="button" class="gps-address-btn" aria-label="Use current GPS for this address" title="Use current GPS" onclick="fillAddressFromGps('detailStopName','detailStopAddr','detailPlaceResults',this)">${icoPin(18)}</button>
       </div>
       <div class="place-results" id="detailPlaceResults"></div>
@@ -1963,8 +1985,8 @@ function saveStopDetails(id){
   const stop=findStop(id);
   if(!stop)return;
   const selected=selectedPlaceData('detailStopName','detailStopAddr');
-  const name=$('#detailStopName')?.value.trim()||selected?.name||stop.location.business_name||'Stop';
   const address=$('#detailStopAddr')?.value.trim()||selected?.address||'';
+  const name=$('#detailStopName')?.value.trim()||selected?.name||editablePlaceName(stop.location)||shortAddressName(address)||'GPS stop';
   const geo=selected?.geo||toGeo(stop.location);
   stop.location={
     ...stop.location,
@@ -2005,7 +2027,7 @@ function repairStateAfterStopDelete(){
 function deleteStop(id){
   const stop=findStop(id);
   if(!stop)return;
-  const label=stop.location.business_name||stop.location.address||'this stop';
+  const label=displayPlaceName(stop.location,'this stop');
   if(!confirm(`Delete ${label}? This removes its fuel, photos, and receipt links from this log.`))return;
   S.stops=S.stops.filter(item=>item.id!==id);
   clearSheetDraft(`stop-detail:${id}`);
@@ -2624,7 +2646,7 @@ function withTimeout(promise,ms,fallback=null){
 }
 function applyPlaceToInputs(ctx,place){
   const name=place.name??ctx.nameInput.value.trim();
-  const address=place.address||gpsAddressLabel(place.geo);
+  const address=place.address??ctx.addrInput.value.trim();
   ctx.nameInput.value=name;
   ctx.addrInput.value=address;
   [ctx.nameInput,ctx.addrInput].forEach(input=>{
@@ -2675,7 +2697,7 @@ async function fillAddressFromGps(nameId,addrId,resultsId,button){
     const geo={lat:+pos.lat.toFixed(5),lng:+pos.lng.toFixed(5)};
     applyPlaceToInputs(ctx,{
       name:ctx.nameInput.value.trim(),
-      address:gpsAddressLabel(geo),
+      address:ctx.addrInput.value.trim(),
       geo,
       placeId:'',
       types:['gps_location']
