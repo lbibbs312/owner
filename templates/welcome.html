@@ -435,7 +435,9 @@ textarea.input{height:auto;padding:14px 15px;line-height:1.45;resize:none}
 .input:focus,.select:focus,textarea.input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(63,224,206,.14);background:var(--panel-2)}
 .input::placeholder{color:var(--text-3)}
 .place-field{position:relative}
-.address-row{display:grid;grid-template-columns:minmax(0,1fr) 52px;gap:10px;margin-top:10px}
+.input-label{display:block;margin:0 2px 7px;color:var(--text-3);font-size:12px;font-weight:600}
+.place-field .input-label:not(:first-child){margin-top:10px}
+.address-row{display:grid;grid-template-columns:minmax(0,1fr) 52px;gap:10px}
 .address-row .input{margin-top:0!important}
 .gps-address-btn{width:52px;height:52px;border-radius:14px;border:1px solid var(--hair);background:var(--panel);color:var(--cyan);display:grid;place-items:center;transition:.18s var(--ease)}
 .gps-address-btn:active{transform:scale(.96);background:var(--panel-2)}
@@ -448,6 +450,7 @@ textarea.input{height:auto;padding:14px 15px;line-height:1.45;resize:none}
 .place-suggestion .pi{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;flex:0 0 auto;background:rgba(63,224,206,.1);color:var(--cyan)}
 .place-suggestion .pm{font-weight:700;font-size:14px}
 .place-suggestion .pa{color:var(--text-3);font-size:12px;margin-top:2px;line-height:1.35}
+.place-suggestion .pk{display:inline-block;margin-bottom:3px;color:var(--cyan);font-family:var(--f-mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase}
 .place-status{padding:10px 13px;color:var(--text-3);font-size:12px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .collapse{overflow:hidden;max-height:0;opacity:0;transition:max-height .4s var(--ease),opacity .3s var(--ease),margin .3s}
@@ -2101,7 +2104,9 @@ function openStartStop(){
     <p class="lede">This creates the first live stop from your current GPS. Name and odometer are optional.</p>
     <div class="field-label">Current stop</div>
     <div class="place-field">
-      <input class="input" id="startName" placeholder="Business or stop name" autocomplete="off" oninput="placeFieldInput('startName','startAddr','startPlaceResults',this)" />
+      <label class="input-label" for="startName">Customer / business name</label>
+      <input class="input" id="startName" placeholder="Customer, business, or stop name" autocomplete="off" oninput="placeFieldInput('startName','startAddr','startPlaceResults',this)" />
+      <label class="input-label" for="startAddr">Address</label>
       <div class="address-row">
         <input class="input" id="startAddr" placeholder="Address" autocomplete="off" oninput="placeFieldInput('startName','startAddr','startPlaceResults',this)" />
         <button type="button" class="gps-address-btn" aria-label="Use current GPS for this address" title="Use current GPS" onclick="fillAddressFromGps('startName','startAddr','startPlaceResults',this)">${icoPin(18)}</button>
@@ -2207,8 +2212,10 @@ function openDepart(){
 
     <div class="field-label">Heading to next <span style="opacity:.6">· optional</span></div>
     <div class="place-field">
-      <input class="input" id="nextName" list="recentsList" placeholder="Business or stop name" autocomplete="off" oninput="fillAddr();placeFieldInput('nextName','nextAddr','nextPlaceResults',this)" />
+      <label class="input-label" for="nextName">Customer / business name</label>
+      <input class="input" id="nextName" list="recentsList" placeholder="Customer, business, or stop name" autocomplete="off" oninput="fillAddr();placeFieldInput('nextName','nextAddr','nextPlaceResults',this)" />
       <datalist id="recentsList">${S.recents.map(r=>`<option value="${r}">`).join('')}</datalist>
+      <label class="input-label" for="nextAddr">Address</label>
       <div class="address-row">
         <input class="input" id="nextAddr" placeholder="Address" autocomplete="off" oninput="placeFieldInput('nextName','nextAddr','nextPlaceResults',this)" />
         <button type="button" class="gps-address-btn" aria-label="Use current GPS for this address" title="Use current GPS" onclick="fillAddressFromGps('nextName','nextAddr','nextPlaceResults',this)">${icoPin(18)}</button>
@@ -2307,11 +2314,13 @@ async function confirmDepart(){
   const selected=selectedPlaceData('nextName','nextAddr');
   const destinationGeo=selected?.geo||null;
   const estimatedMiles=estimateLegMiles(toGeo(cur.location),destinationGeo);
-  rememberPlace(nn,na);
+  const destinationAddress=na||selected?.address||S.addrBook[nn]||'';
+  const destinationName=nn||selected?.name||shortAddressName(destinationAddress)||'Next stop';
+  rememberPlace(nn,destinationAddress);
   S.position='driving';
-  S.destination=nn?{
-    business_name:nn,
-    address:na||S.addrBook[nn]||'',
+  S.destination=(nn||destinationAddress||selected)?{
+    business_name:destinationName,
+    address:destinationAddress,
     gps_lat:destinationGeo?.lat??null,
     gps_lng:destinationGeo?.lng??null,
     estimated_miles:estimatedMiles||0,
@@ -2328,6 +2337,7 @@ function toGeo(location){
 function estimateLegMiles(fromGeo,toGeo){
   return fromGeo&&toGeo?Math.max(0,Math.round(haversine(fromGeo,toGeo)*1.35)):0;
 }
+function shortAddressName(address){return String(address||'').split(',')[0].trim();}
 function activeLegMiles(stops=todayStops()){
   if(S.position!=='driving'||!S.destination)return 0;
   const last=stops[stops.length-1];
@@ -2426,6 +2436,7 @@ function bindPlaceAutocomplete({nameId,addrId,resultsId}){
     });
     input.addEventListener('focus',()=>{
       const value=input.value.trim();
+      ctx.activeField=input===ctx.addrInput?'address':'name';
       if(value.length>=2)queryPlaces(ctx,value);
     });
   });
@@ -2441,6 +2452,7 @@ function placeFieldInput(nameId,addrId,resultsId,input){
   if(ctx) schedulePlaceQuery(ctx,input);
 }
 function schedulePlaceQuery(ctx,input){
+  ctx.activeField=input===ctx.addrInput?'address':'name';
   clearPlaceSelection(ctx);
   clearTimeout(ctx.timer);
   ctx.timer=setTimeout(()=>queryPlaces(ctx,input.value),260);
@@ -2486,9 +2498,10 @@ function renderPlaceResults(ctx,items){
   ctx.results.innerHTML=items.map((item,i)=>{
     const main=placeText(item.mainText)||placeText(item.text)||'Place';
     const secondary=placeText(item.secondaryText)||'';
+    const kind=placeSuggestionKind(item);
     return `<button type="button" class="place-suggestion" data-place-index="${i}">
       <span class="pi">${icoPin(16)}</span>
-      <span><span class="pm">${escapeHtml(main)}</span>${secondary?`<span class="pa">${escapeHtml(secondary)}</span>`:''}</span>
+      <span><span class="pk">${escapeHtml(kind)}</span><span class="pm">${escapeHtml(main)}</span>${secondary?`<span class="pa">${escapeHtml(secondary)}</span>`:''}</span>
     </button>`;
   }).join('');
   ctx.results.classList.add('open');
@@ -2508,10 +2521,11 @@ async function choosePlace(ctx,index){
     const address=place.formattedAddress||placeText(prediction.secondaryText)||'';
     const geo=latLngToPlain(place.location);
     const types=Array.isArray(place.types)?place.types:(Array.isArray(prediction.types)?prediction.types:[]);
-    ctx.nameInput.value=name;
+    const businessName=businessNameForPlace(name,address,types,ctx);
+    ctx.nameInput.value=businessName;
     ctx.addrInput.value=address;
     [ctx.nameInput,ctx.addrInput].forEach(input=>{
-      input.dataset.placeName=name;
+      input.dataset.placeName=businessName;
       input.dataset.placeAddress=address;
       input.dataset.placeId=place.id||prediction.placeId||'';
       input.dataset.placeTypes=types.join('|');
@@ -2529,7 +2543,7 @@ function gpsAddressLabel(pos){
   return Number(pos.lat).toFixed(5)+', '+Number(pos.lng).toFixed(5);
 }
 function applyPlaceToInputs(ctx,place){
-  const name=place.name||ctx.nameInput.value.trim()||'Current GPS location';
+  const name=place.name??ctx.nameInput.value.trim();
   const address=place.address||gpsAddressLabel(place.geo);
   ctx.nameInput.value=name;
   ctx.addrInput.value=address;
@@ -2582,7 +2596,7 @@ async function fillAddressFromGps(nameId,addrId,resultsId,button){
     const geocoded=await reverseGeocode(pos);
     const geo={lat:+pos.lat.toFixed(5),lng:+pos.lng.toFixed(5)};
     applyPlaceToInputs(ctx,{
-      name:ctx.nameInput.value.trim()||'Current GPS location',
+      name:ctx.nameInput.value.trim(),
       address:geocoded?.address||gpsAddressLabel(geo),
       geo,
       placeId:geocoded?.placeId||'',
@@ -2599,8 +2613,9 @@ async function fillAddressFromGps(nameId,addrId,resultsId,button){
 function selectedPlaceData(nameId,addrId){
   const input=$('#'+nameId)||$('#'+addrId);
   const lat=Number(input?.dataset.placeLat),lng=Number(input?.dataset.placeLng);
-  return input?.dataset.placeName?{
-    name:input.dataset.placeName,
+  const hasSelected=!!(input&&(input.dataset.placeName||input.dataset.placeAddress||input.dataset.placeLat||input.dataset.placeId));
+  return hasSelected?{
+    name:input.dataset.placeName||'',
     address:input.dataset.placeAddress||'',
     placeId:input.dataset.placeId||'',
     types:(input.dataset.placeTypes||'').split('|').filter(Boolean),
@@ -2638,10 +2653,30 @@ function businessOrAddressFirst(predictions){
   return preferred.length?preferred:predictions;
 }
 function isBusinessOrAddressPrediction(prediction){
-  const types=Array.isArray(prediction.types)?prediction.types:[];
-  if(types.some(type=>ADDRESS_PLACE_TYPES.has(type)))return true;
-  if(types.some(type=>REGION_PLACE_TYPES.has(type)))return false;
+  const types=predictionTypes(prediction);
+  if(isAddressTypes(types))return true;
+  if(isRegionTypes(types))return false;
   return true;
+}
+function predictionTypes(prediction){return Array.isArray(prediction?.types)?prediction.types.map(type=>String(type).toLowerCase()):[];}
+function isAddressTypes(types){return types.some(type=>ADDRESS_PLACE_TYPES.has(type));}
+function isRegionTypes(types){return types.some(type=>REGION_PLACE_TYPES.has(type));}
+function placeSuggestionKind(prediction){
+  const types=predictionTypes(prediction);
+  if(isRegionTypes(types))return'Area';
+  if(isAddressTypes(types))return'Address';
+  return'Business / customer';
+}
+function normalizedPlaceText(value){return String(value||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
+function businessNameForPlace(name,address,types,ctx){
+  const existing=ctx.nameInput.value.trim();
+  const typedAddress=ctx.activeField==='address';
+  const normalizedName=normalizedPlaceText(name);
+  const normalizedAddress=normalizedPlaceText(address);
+  const addressOnly=isAddressTypes(types.map(type=>String(type).toLowerCase()))||(normalizedName&&normalizedAddress.includes(normalizedName));
+  if(addressOnly&&typedAddress)return existing;
+  if(addressOnly)return existing||'';
+  return name||existing;
 }
 function placeBounds(origin,radiusMeters){
   const latRadius=radiusMeters/111320;
