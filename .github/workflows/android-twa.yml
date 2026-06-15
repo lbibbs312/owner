@@ -51,10 +51,11 @@ jobs:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
-          # Generate the Android project from twa-manifest.json, then build.
-          # A finite set of "y" answers the regenerate/SDK prompts without the
-          # infinite `yes` stream that chokes Bubblewrap's prompt reader.
-          printf 'y\ny\ny\ny\n' | bubblewrap build --skipPwaValidation
+          # `bubblewrap update` regenerates the Android project + checksum from
+          # twa-manifest.json non-interactively. (build's own regenerate path
+          # re-prompts for versionName even when it's set, hanging CI.)
+          bubblewrap update
+          bubblewrap build --skipPwaValidation
 
       - name: Generate Digital Asset Links (assetlinks.json)
         env:
