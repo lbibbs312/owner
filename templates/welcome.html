@@ -2617,7 +2617,7 @@ async function choosePlace(ctx,index){
     const address=place.address||item.secondary_text||item.formatted_address||'';
     const types=Array.isArray(place.types)?place.types:[];
     const geo=(Number.isFinite(place.lat)&&Number.isFinite(place.lng))?{lat:place.lat,lng:place.lng}:null;
-    const businessName=businessNameForPlace(name,address,types,ctx);
+    const businessName=shortPlaceName(businessNameForPlace(name,address,types,ctx));
     ctx.nameInput.value=businessName;
     ctx.addrInput.value=address;
     [ctx.nameInput,ctx.addrInput].forEach(input=>{
@@ -2693,16 +2693,28 @@ async function fillAddressFromGps(nameId,addrId,resultsId,button){
     });
     toast('ok',icoPin(16),'GPS added',gpsAddressLabel(geo));
     if(button){button.disabled=false;button.removeAttribute('aria-busy');button.innerHTML=previous||icoPin(18);}
-    const geocoded=await withTimeout(reverseGeocode(geo),2200,null);
-    if(geocoded?.address){
+    const nearby=await withTimeout(fetchNearbyPlace(geo),2800,null);
+    if(nearby&&nearby.name){
       applyPlaceToInputs(ctx,{
-        name:ctx.nameInput.value.trim(),
-        address:geocoded.address,
+        name:shortPlaceName(nearby.name),
+        address:nearby.address||ctx.addrInput.value.trim(),
         geo,
-        placeId:geocoded.placeId||'',
-        types:geocoded.types||['gps_location']
+        placeId:nearby.place_id||'',
+        types:nearby.types||['establishment']
       });
-      toast('ok',icoPin(16),'Address added',geocoded.address);
+      toast('ok',icoPin(16),'Place added',shortPlaceName(nearby.name));
+    }else{
+      const geocoded=await withTimeout(reverseGeocode(geo),2200,null);
+      if(geocoded?.address){
+        applyPlaceToInputs(ctx,{
+          name:ctx.nameInput.value.trim(),
+          address:geocoded.address,
+          geo,
+          placeId:geocoded.placeId||'',
+          types:geocoded.types||['gps_location']
+        });
+        toast('ok',icoPin(16),'Address added',geocoded.address);
+      }
     }
   }catch(e){
     renderPlaceStatus(ctx,'GPS address could not load.');
@@ -2778,6 +2790,23 @@ function businessNameForPlace(name,address,types,ctx){
   if(addressOnly&&typedAddress)return existing;
   if(addressOnly)return existing||'';
   return name||existing;
+}
+function shortPlaceName(value){
+  let s=String(value||'').trim();
+  if(!s)return'';
+  const comma=s.indexOf(',');
+  if(comma>0&&comma<=46)s=s.slice(0,comma).trim();
+  return s.length>46?s.slice(0,45).trim()+'…':s;
+}
+async function fetchNearbyPlace(geo){
+  try{
+    const rsp=await fetch('/api/geo/nearby?lat='+encodeURIComponent(geo.lat)+'&lng='+encodeURIComponent(geo.lng));
+    const data=await rsp.json().catch(()=>({}));
+    if(!data||!data.ok)return null;
+    const place=(data.places||[])[0];
+    if(!place||!place.name)return null;
+    return {name:place.name,address:place.address||data.fallback_address||'',place_id:place.place_id||'',types:[]};
+  }catch(e){return null;}
 }
 function placeBounds(origin,radiusMeters){
   const latRadius=radiusMeters/111320;

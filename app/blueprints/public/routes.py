@@ -8,7 +8,12 @@ from app.blueprints.public import bp
 from app.models import Announcement
 from app.services.database_status import database_status
 from app.services.route_context import build_route_context
-from app.services.google_places import autocomplete_destination, destination_place_details, reverse_geocode
+from app.services.google_places import (
+    autocomplete_destination,
+    destination_place_details,
+    reverse_geocode,
+    nearby_place_candidates,
+)
 from app.services.registration_access import store_registration_checkout
 from app.services.stripe_checkout import (
     StripeCheckoutError,
@@ -87,6 +92,16 @@ def geo_details():
 def geo_reverse():
     """Public reverse-geocode proxy for the GPS address-fill control."""
     return jsonify(reverse_geocode(request.args.get("lat"), request.args.get("lng")))
+
+
+@bp.route("/api/geo/nearby", methods=["GET"])
+def geo_nearby():
+    """Nearest business/place to a GPS point — lets the GPS pin name the stop."""
+    lat = request.args.get("lat", type=float)
+    lng = request.args.get("lng", type=float)
+    if lat is None or lng is None:
+        return jsonify({"ok": False, "error": "missing_input", "places": []})
+    return jsonify(nearby_place_candidates(lat, lng, limit=6, radius_m=160))
 
 
 @bp.route("/billing/checkout/<plan_key>", methods=["POST"])

@@ -369,7 +369,7 @@ def _businesses_at_addresses(addresses, key, *, limit=5, fuel_lookup=False):
     return matches
 
 
-def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
+def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint="", radius_m=None):
     """Return likely business/place candidates near a raw browser GPS point."""
     key = _api_key()
     if not key:
@@ -383,7 +383,7 @@ def nearby_place_candidates(lat, lng, *, accuracy_m=None, limit=8, hint=""):
         }
 
     fuel_lookup = _is_fuel_hint(hint)
-    radius = _candidate_radius_m(accuracy_m, fuel_lookup=fuel_lookup)
+    radius = float(radius_m) if radius_m else _candidate_radius_m(accuracy_m, fuel_lookup=fuel_lookup)
     result_limit = max(1, min(int(limit), 20))
     if fuel_lookup:
         result_limit = max(result_limit, FUEL_MIN_SUGGESTIONS)
@@ -628,7 +628,7 @@ def autocomplete_destination(text, *, lat=None, lng=None, session_token="", limi
     bias_lat = _float_or_none(lat)
     bias_lng = _float_or_none(lng)
     if bias_lat is not None and bias_lng is not None:
-        payload["locationBias"] = {
+        payload["locationRestriction"] = {
             "circle": {
                 "center": {"latitude": bias_lat, "longitude": bias_lng},
                 "radius": AUTOCOMPLETE_BIAS_RADIUS_M,
