@@ -609,7 +609,7 @@ table.tbl .seq{font-family:var(--f-mono);color:#94a0b8;width:22px}
 .tbl tfoot td{font-family:var(--f-mono);font-weight:700;color:#0c1322;border-top:2px solid #d9e0ec;background:#f4f7fb!important;padding:11px 9px}
 .doc-photos{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:8px}
 .doc-photo{border:1px solid #e4e9f2;border-radius:11px;overflow:hidden;background:#f8fafd}
-.doc-photo img{width:100%;height:auto;object-fit:contain;display:block;background:#f1f4f9}
+.doc-photo img{width:100%;height:auto;max-height:7.25in;object-fit:contain;display:block;background:#f1f4f9}
 .doc-photo .cap{padding:8px 10px;font-family:var(--f-mono);font-size:10px;color:#53617b;line-height:1.35}
 
 .sig{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:34px}
@@ -798,7 +798,7 @@ table.tbl .seq{font-family:var(--f-mono);color:#94a0b8;width:22px}
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <h2>Export record</h2>
-      <button class="print-btn" onclick="window.print()">
+      <button class="print-btn" onclick="printExport()">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M6 9V4h12v5M6 18H5a2 2 0 01-2-2v-4a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2h-1M7 14h10v6H7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Save PDF
       </button>
@@ -1648,7 +1648,7 @@ function renderFuel(){
       ${errors.length?`<div class="fuel-alert"><b>Receipt upload error</b><br>${escapeHtml(errors[0].message)} · ${fmtTime(errors[0].ts)}</div>`:''}
       ${receipts.length?`<div class="receipt-grid">${receipts.map(receipt=>`
         <div class="receipt-thumb">
-          <img src="${receipt.data}" alt="${escapeHtml(receipt.name||'Fuel receipt')}">
+          <img ${photoImgAttrs(receipt,'Fuel receipt')}>
           <button class="receipt-del" onclick="removeFuelReceipt('${stop.id}','${receipt.id}')" aria-label="Remove receipt">${icoReset(12)}</button>
         </div>`).join('')}</div>`:''}
       <input id="fuelReceiptInput-${stop.id}" type="file" accept="image/*" capture="environment" style="display:none" onchange="handleFuelReceipt('${stop.id}',this)" />
@@ -1679,6 +1679,8 @@ function renderFuel(){
       <div class="fuel-list">${stopRows||'<div class="fuel-empty">No fuel stops logged today. Gas-station destinations will appear here automatically, and any stop can become a fuel stop from its stop detail.</div>'}</div>
     </div>`;
   doc.innerHTML=buildFuelDoc(stops);
+  hydratePhotos(page);
+  hydratePhotos(doc);
 }
 function buildFuelDoc(stops=todayStops()){
   const stats=fuelStats(stops);
@@ -1706,7 +1708,7 @@ function buildFuelDoc(stops=todayStops()){
   </tr>`).join('');
   const receiptCards=stats.fuelStops.flatMap(stop=>fuelReceipts(stop.fuel).map(receipt=>`
     <div class="doc-photo">
-      <img src="${receipt.data}" alt="${escapeHtml(receipt.name||'Fuel receipt')}">
+      <img ${photoImgAttrs(receipt,'Fuel receipt')}>
       <div class="cap">Fuel receipt · Stop ${stop.sequence} · ${escapeHtml(stationName(stop))}<br>${fmtTime(receipt.added_at||stop.arrival_time)}</div>
     </div>`)).join('');
   const today=fmtDayLong(Date.now());
@@ -1761,8 +1763,9 @@ function buildFuelDoc(stops=todayStops()){
     </div>
   </div>`;
 }
-function printFuelLog(){
+async function printFuelLog(){
   renderFuel();
+  await hydratePhotos($('#fuelDoc'));
   setTimeout(()=>window.print(),50);
 }
 function openTimeSummary(stops){
@@ -1972,7 +1975,7 @@ function openStopDetail(id){
     ${photoErrors.length?`<div class="detail-alert"><b>Photo upload error</b>${escapeHtml(photoErrors[0].message)}<br><span>${fmtTime(photoErrors[0].ts)} · logged for this stop</span></div>`:''}
     ${photos.length?`<div class="photo-grid">${photos.map(photo=>`
       <div class="photo-thumb">
-        <img src="${photo.data}" alt="${escapeHtml(photo.name||'Stop photo')}">
+        <img ${photoImgAttrs(photo,'Stop photo')}>
         <button class="photo-del" onclick="removeStopPhoto('${id}','${photo.id}')" aria-label="Remove photo">${icoReset(13)}</button>
       </div>`).join('')}</div>`:'<div class="empty-detail">No photos attached to this stop.</div>'}
     <input id="stopPhotoInput" type="file" accept="image/*" capture="environment" style="display:none" onchange="handleStopPhoto('${id}',this)" />
@@ -1983,6 +1986,7 @@ function openStopDetail(id){
   openSheet();
   bindPlaceAutocomplete({nameId:'detailStopName',addrId:'detailStopAddr',resultsId:'detailPlaceResults'});
   bindSheetDraft(`stop-detail:${id}`);
+  hydratePhotos($('#sheet'));
 }
 function saveStopDetails(id){
   const stop=findStop(id);
@@ -2032,6 +2036,7 @@ function deleteStop(id){
   if(!stop)return;
   const label=displayPlaceName(stop.location,'this stop');
   if(!confirm(`Delete ${label}? This removes its fuel, photos, and receipt links from this log.`))return;
+  deleteStopPhotoBlobs(stop);
   S.stops=S.stops.filter(item=>item.id!==id);
   clearSheetDraft(`stop-detail:${id}`);
   repairStateAfterStopDelete();
@@ -2044,6 +2049,7 @@ function saveStopFuel(id){
   const gallons=parseFuelNumber('#detailFuelGal');
   const cost=parseFuelNumber('#detailFuelCost');
   if(gallons===null&&cost===null){
+    deleteFuelReceiptBlobs(stop.fuel);
     stop.fuel=null;
     save();clearSheetDraft(`stop-detail:${id}`);renderHome();renderFuel();openStopDetail(id);
     toast('ok',icoFuel(16),'Fuel cleared','No fuel saved on this stop');
@@ -2064,6 +2070,7 @@ function saveStopFuel(id){
 function clearStopFuel(id){
   const stop=findStop(id);
   if(!stop)return;
+  deleteFuelReceiptBlobs(stop.fuel);
   stop.fuel=null;
   save();clearSheetDraft(`stop-detail:${id}`);renderHome();renderFuel();openStopDetail(id);
   toast('ok',icoFuel(16),'Fuel cleared','No fuel saved on this stop');
@@ -2080,16 +2087,20 @@ async function handleStopPhoto(id,input){
     return;
   }
   let pendingId=null;
+  let pendingBlobId=null;
   try{
     if(file.type&&!file.type.startsWith('image/'))throw new Error('Selected file is not an image');
-    const data=await resizePhoto(file);
-    stop.photos=Array.isArray(stop.photos)?stop.photos:[];
     pendingId=uid();
-    stop.photos.push({id:pendingId,name:file.name||'stop-photo.jpg',type:'image/jpeg',added_at:Date.now(),data});
+    pendingBlobId=`stop:${pendingId}`;
+    const blob=await resizePhoto(file);
+    await photoStorePut(pendingBlobId,blob);
+    stop.photos=Array.isArray(stop.photos)?stop.photos:[];
+    stop.photos.push({id:pendingId,blob_id:pendingBlobId,name:file.name||'stop-photo.jpg',type:'image/jpeg',size:blob.size,added_at:Date.now()});
     save();renderHome();openStopDetail(id);
     toast('ok',icoCamera(16),'Photo added',stop.location.business_name);
   }catch(e){
     if(pendingId)stop.photos=(stop.photos||[]).filter(photo=>photo.id!==pendingId);
+    if(pendingBlobId)photoStoreDel(pendingBlobId);
     const entry=logAppError('Photo upload failed',e,{stopId:id,fileName:file.name,fileType:file.type,fileSize:file.size});
     openStopDetail(id);
     toast('warn',icoCamera(16),'Photo not saved',entry.message);
@@ -2100,7 +2111,9 @@ async function handleStopPhoto(id,input){
 function removeStopPhoto(stopId,photoId){
   const stop=findStop(stopId);
   if(!stop)return;
+  const photo=(stop.photos||[]).find(photo=>photo.id===photoId);
   stop.photos=(stop.photos||[]).filter(photo=>photo.id!==photoId);
+  deletePhotoBlob(photo);
   save();renderHome();openStopDetail(stopId);
   toast('ok',icoCamera(16),'Photo removed','Stop updated');
 }
@@ -2117,17 +2130,21 @@ async function handleFuelReceipt(id,input){
     return;
   }
   let pendingId=null;
+  let pendingBlobId=null;
   try{
     if(file.type&&!file.type.startsWith('image/'))throw new Error('Selected file is not an image');
-    const data=await resizePhoto(file);
     stop.fuel=stop.fuel||autoFuelRecord(stop.location);
     stop.fuel.receipts=fuelReceipts(stop.fuel);
     pendingId=uid();
-    stop.fuel.receipts.push({id:pendingId,name:file.name||'fuel-receipt.jpg',type:'image/jpeg',added_at:Date.now(),data});
+    pendingBlobId=`receipt:${pendingId}`;
+    const blob=await resizePhoto(file);
+    await photoStorePut(pendingBlobId,blob);
+    stop.fuel.receipts.push({id:pendingId,blob_id:pendingBlobId,name:file.name||'fuel-receipt.jpg',type:'image/jpeg',size:blob.size,added_at:Date.now()});
     save();renderHome();renderFuel();
     toast('ok',icoCamera(16),'Receipt uploaded',stationName(stop));
   }catch(e){
     if(pendingId&&stop?.fuel)stop.fuel.receipts=fuelReceipts(stop.fuel).filter(receipt=>receipt.id!==pendingId);
+    if(pendingBlobId)photoStoreDel(pendingBlobId);
     const entry=logAppError('Receipt upload failed',e,{kind:'fuel_receipt',stopId:id,fileName:file.name,fileType:file.type,fileSize:file.size});
     renderFuel();
     toast('warn',icoCamera(16),'Receipt not saved',entry.message);
@@ -2138,34 +2155,117 @@ async function handleFuelReceipt(id,input){
 function removeFuelReceipt(stopId,receiptId){
   const stop=findStop(stopId);
   if(!stop?.fuel)return;
+  const receipt=fuelReceipts(stop.fuel).find(receipt=>receipt.id===receiptId);
   stop.fuel.receipts=fuelReceipts(stop.fuel).filter(receipt=>receipt.id!==receiptId);
+  deletePhotoBlob(receipt);
   save();renderHome();renderFuel();
   toast('ok',icoCamera(16),'Receipt removed',stationName(stop));
 }
+/* ---- Photo blob store (IndexedDB): keeps base64 out of the localStorage
+   state blob, which is what used to overflow quota / fail to save. ---- */
+const PHOTO_DB_NAME='md-photos',PHOTO_STORE='blobs';let _photoDB=null;
+function photoDB(){
+  if(_photoDB)return _photoDB;
+  _photoDB=new Promise((resolve,reject)=>{
+    let req;try{req=indexedDB.open(PHOTO_DB_NAME,1);}catch(e){return reject(e);}
+    req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(PHOTO_STORE))db.createObjectStore(PHOTO_STORE);};
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error||new Error('idb_open_failed'));
+  });
+  return _photoDB;
+}
+function photoStorePut(id,blob){return photoDB().then(db=>new Promise((res,rej)=>{const tx=db.transaction(PHOTO_STORE,'readwrite');tx.objectStore(PHOTO_STORE).put(blob,id);tx.oncomplete=()=>res(true);tx.onerror=()=>rej(tx.error);}));}
+function photoStoreGet(id){return photoDB().then(db=>new Promise((res,rej)=>{const tx=db.transaction(PHOTO_STORE,'readonly');const r=tx.objectStore(PHOTO_STORE).get(id);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error);}));}
+function photoStoreDel(id){return photoDB().then(db=>new Promise(res=>{const tx=db.transaction(PHOTO_STORE,'readwrite');tx.objectStore(PHOTO_STORE).delete(id);tx.oncomplete=()=>res(true);tx.onerror=()=>res(false);})).catch(()=>{});}
+const _photoUrlCache={};
+function photoBlobId(photo){return photo?.blob_id||photo?.blobId||photo?.id||'';}
+function photoImgAttrs(photo,alt='Photo'){
+  const safeAlt=escapeHtml(photo?.name||alt);
+  if(photo?.data)return `src="${escapeHtml(photo.data)}" alt="${safeAlt}"`;
+  const id=photoBlobId(photo);
+  return id?`data-photo="${escapeHtml(id)}" alt="${safeAlt}"`:`alt="${safeAlt}"`;
+}
+function clearPhotoUrl(id){
+  if(!id||!_photoUrlCache[id])return;
+  try{URL.revokeObjectURL(_photoUrlCache[id]);}catch(e){}
+  delete _photoUrlCache[id];
+}
+function deletePhotoBlob(photo){
+  const id=photoBlobId(photo);
+  clearPhotoUrl(id);
+  if(id)photoStoreDel(id);
+}
+function deleteFuelReceiptBlobs(fuel){fuelReceipts(fuel).forEach(deletePhotoBlob);}
+function deleteStopPhotoBlobs(stop){
+  (stop?.photos||[]).forEach(deletePhotoBlob);
+  deleteFuelReceiptBlobs(stop?.fuel);
+}
+function deleteStatePhotoBlobs(state){(state?.stops||[]).forEach(deleteStopPhotoBlobs);}
+async function hydratePhotos(root){
+  if(!root||!root.querySelectorAll)return;
+  const pending=[];
+  for(const img of root.querySelectorAll('img[data-photo]')){
+    const pid=img.getAttribute('data-photo');
+    if(!pid||img.getAttribute('src'))continue;
+    if(_photoUrlCache[pid]){img.src=_photoUrlCache[pid];continue;}
+    pending.push(photoStoreGet(pid).then(blob=>{
+      if(!blob)return;
+      const url=URL.createObjectURL(blob);
+      _photoUrlCache[pid]=url;
+      img.src=url;
+    }).catch(()=>{}));
+  }
+  await Promise.all(pending);
+}
 function resizePhoto(file){
   return new Promise((resolve,reject)=>{
-    const reader=new FileReader();
-    reader.onerror=()=>reject(new Error(reader.error?.message||'File could not be read'));
-    reader.onload=()=>{
-      const img=new Image();
-      img.onerror=()=>reject(new Error('Image could not be decoded'));
-      img.onload=()=>{
-        const max=900;
-        const scale=Math.min(1,max/Math.max(img.width,img.height));
-        const canvas=document.createElement('canvas');
-        canvas.width=Math.max(1,Math.round(img.width*scale));
-        canvas.height=Math.max(1,Math.round(img.height*scale));
-        const ctx=canvas.getContext('2d');
-        if(!ctx)return reject(new Error('Image canvas is unavailable'));
-        ctx.drawImage(img,0,0,canvas.width,canvas.height);
-        const data=canvas.toDataURL('image/jpeg',0.68);
-        if(!data||data.length<32)return reject(new Error('Image could not be compressed'));
-        resolve(data);
-      };
-      img.src=reader.result;
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    const cleanup=()=>{try{URL.revokeObjectURL(url);}catch(e){}};
+    img.onerror=()=>{cleanup();reject(new Error('Image could not be decoded'));};
+    img.onload=()=>{
+      const max=1280;
+      const scale=Math.min(1,max/Math.max(img.width,img.height));
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.max(1,Math.round(img.width*scale));
+      canvas.height=Math.max(1,Math.round(img.height*scale));
+      const ctx=canvas.getContext('2d');
+      if(!ctx){cleanup();return reject(new Error('Image canvas is unavailable'));}
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      canvas.toBlob(blob=>{
+        cleanup();
+        blob&&blob.size?resolve(blob):reject(new Error('Image could not be compressed'));
+      },'image/jpeg',0.72);
     };
-    reader.readAsDataURL(file);
+    img.src=url;
   });
+}
+async function migrateLegacyPhotoData(){
+  const jobs=[];
+  (S.stops||[]).forEach(stop=>{
+    (stop.photos||[]).forEach(photo=>{if(photo?.data)jobs.push({item:photo,prefix:'stop'});});
+    fuelReceipts(stop.fuel).forEach(receipt=>{if(receipt?.data)jobs.push({item:receipt,prefix:'receipt'});});
+  });
+  if(!jobs.length)return;
+  let changed=false;
+  for(const job of jobs){
+    try{
+      const id=job.item.blob_id||`${job.prefix}:${job.item.id||uid()}`;
+      const blob=await (await fetch(job.item.data)).blob();
+      await photoStorePut(id,blob);
+      job.item.id=job.item.id||uid();
+      job.item.blob_id=id;
+      job.item.size=blob.size;
+      delete job.item.data;
+      changed=true;
+    }catch(e){}
+  }
+  if(changed){
+    try{save();}catch(e){logAppError('Photo migration failed',e,{kind:'photo_migration'});}
+    renderHome();
+    renderFuel();
+    if($('#screen-export')?.classList.contains('is-active'))renderExport();
+  }
 }
 
 /* =================== CTA =================== */
@@ -2877,7 +2977,7 @@ function renderDrawer(){
 }
 function toggleMode(row){S.settings.truckMode=!S.settings.truckMode;row.querySelector('[data-mode]').classList.toggle('on',S.settings.truckMode);save();renderHome();}
 function replayIntro(){heroI=0;heroGo(0);clearInterval(heroTimer);heroStart();route('intro');}
-function resetDay(){localStorage.removeItem(KEY);clearAllSheetDrafts();S=emptyState(S.settings?.mode||'gig',true);applyAuthToDriver();save();closeDrawer();renderHome();toast('ok',icoReset(16),'Data cleared','Ready for a new shift');}
+function resetDay(){deleteStatePhotoBlobs(S);localStorage.removeItem(KEY);clearAllSheetDrafts();S=emptyState(S.settings?.mode||'gig',true);applyAuthToDriver();save();closeDrawer();renderHome();toast('ok',icoReset(16),'Data cleared','Ready for a new shift');}
 function toast(kind,ico,title,sub){const t=$('#toast');t.className='';t.classList.add('show',kind);
   t.querySelector('.ti').innerHTML=ico;t.querySelector('.tt').innerHTML=title+(sub?`<small>${sub}</small>`:'');
   clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2600);}
@@ -2918,6 +3018,12 @@ function renderExport(){
       ex.innerHTML=`<select class="input select" onchange="custFilter=this.value;renderExport()">${names.map(n=>`<option ${n===custFilter?'selected':''}>${n}</option>`).join('')}</select>`;}
   }else ex.innerHTML='';
   $('#doc').innerHTML=buildDoc();
+  hydratePhotos($('#doc'));
+}
+async function printExport(){
+  renderExport();
+  await hydratePhotos($('#doc'));
+  setTimeout(()=>window.print(),50);
 }
 function mostVisited(){const m={};S.stops.forEach(s=>m[s.location.business_name]=(m[s.location.business_name]||0)+1);
   return Object.entries(m).sort((a,b)=>b[1]-a[1])[0]?.[0]||null;}
@@ -2980,7 +3086,7 @@ function buildDoc(){
   }).join('');
   const photoCards=stops.flatMap(s=>(s.photos||[]).map(photo=>`
     <div class="doc-photo">
-      <img src="${photo.data}" alt="${escapeHtml(photo.name||'Stop photo')}">
+      <img ${photoImgAttrs(photo,'Stop photo')}>
       <div class="cap">Stop ${s.sequence} · ${escapeHtml(s.location.business_name||'Stop')}<br>${fmtTime(photo.added_at||s.arrival_time)}</div>
     </div>`)).join('');
 
@@ -3090,6 +3196,7 @@ function bootApp(){
 }
 setInterval(tickClock,30000);
 bootApp();
+migrateLegacyPhotoData();
 /* PWA shortcut doorways: an installed-app long-press shortcut opens /?do=<feature>.
    This just jumps to an existing screen using the same route()/enterApp() the
    in-app buttons already call — it never creates a stop or any new state. */
