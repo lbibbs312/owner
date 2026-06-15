@@ -2839,6 +2839,19 @@ function bootApp(){
 }
 setInterval(tickClock,30000);
 bootApp();
+/* PWA shortcut doorways: an installed-app long-press shortcut opens /?do=<feature>.
+   This just jumps to an existing screen using the same route()/enterApp() the
+   in-app buttons already call — it never creates a stop or any new state. */
+(function pwaDoorway(){
+  try{
+    const want=new URLSearchParams(location.search).get('do');
+    if(!want||!authSignedIn())return;
+    const screen={log:'home',stop:'home',home:'home',fuel:'fuel',sheet:'export',export:'export'}[want.toLowerCase()];
+    if(!screen)return;
+    if(screen==='home'){enterApp();}else{route(screen);}
+    history.replaceState(null,'',location.pathname);
+  }catch(e){}
+})();
 window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeSheet();closeDrawer();}});
 </script>
 </body>
