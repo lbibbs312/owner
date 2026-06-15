@@ -15,7 +15,7 @@ window.MOVEDEFENSE_CONFIG = Object.freeze({
 });
 </script>
 <script>
-/* Register the MoveDefense service worker (PWA install + offline shell). */
+/* Register the MoveDefense service worker for installed app support. */
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", function () {
     navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(function () {});
@@ -435,6 +435,11 @@ textarea.input{height:auto;padding:14px 15px;line-height:1.45;resize:none}
 .input:focus,.select:focus,textarea.input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(63,224,206,.14);background:var(--panel-2)}
 .input::placeholder{color:var(--text-3)}
 .place-field{position:relative}
+.address-row{display:grid;grid-template-columns:minmax(0,1fr) 52px;gap:10px;margin-top:10px}
+.address-row .input{margin-top:0!important}
+.gps-address-btn{width:52px;height:52px;border-radius:14px;border:1px solid var(--hair);background:var(--panel);color:var(--cyan);display:grid;place-items:center;transition:.18s var(--ease)}
+.gps-address-btn:active{transform:scale(.96);background:var(--panel-2)}
+.gps-address-btn:disabled{opacity:.58;cursor:wait}
 .place-results{display:none;margin:8px 0 0;border:1px solid var(--hair);border-radius:14px;background:rgba(10,15,27,.98);overflow:hidden}
 .place-results.open{display:block}
 .place-suggestion{width:100%;display:flex;align-items:center;gap:10px;padding:11px 13px;text-align:left;border-bottom:1px solid var(--hair);background:transparent;color:var(--text)}
@@ -1409,6 +1414,7 @@ function renderState(){
   c.style.setProperty('--state-wash',driving?'rgba(63,224,206,.16)':'rgba(255,158,61,.15)');
   const last=[...S.stops].reverse().find(s=>s.location);
   const gps=driving?null:last?.location;
+  const parkedLocation=place?.address||formatGps(gps);
   c.innerHTML=`
     <div class="sc-row">
       <span class="sc-label"><span class="pulse"></span>${idle?'Ready · no stops logged':driving?'En route · driving to':'Parked · on site at'}</span>
@@ -1419,8 +1425,8 @@ function renderState(){
       ${idle
         ? `<span class="gps-pill"><span class="lk"></span>GPS ready</span><span>No saved stops yet</span>`
         : driving
-        ? `<span>${place?.address?('→ '+place.address):'Tap Arrive when you reach it'}</span>`
-        : `<span class="gps-pill"><span class="lk"></span>${formatGps(gps)}</span><span><b>${odoStr()}</b> mi odometer</span>`}
+        ? `<span>${place?.address?('→ '+escapeHtml(place.address)):'Tap Arrive when you reach it'}</span>`
+        : `<span class="gps-pill"><span class="lk"></span>${escapeHtml(parkedLocation)}</span><span><b>${odoStr()}</b> mi odometer</span>`}
     </div>`;
 }
 const odoStr=()=>S.odometer.toLocaleString();
@@ -2096,7 +2102,10 @@ function openStartStop(){
     <div class="field-label">Current stop</div>
     <div class="place-field">
       <input class="input" id="startName" placeholder="Business or stop name" autocomplete="off" oninput="placeFieldInput('startName','startAddr','startPlaceResults',this)" />
-      <input class="input" id="startAddr" placeholder="Address" autocomplete="off" style="margin-top:10px" oninput="placeFieldInput('startName','startAddr','startPlaceResults',this)" />
+      <div class="address-row">
+        <input class="input" id="startAddr" placeholder="Address" autocomplete="off" oninput="placeFieldInput('startName','startAddr','startPlaceResults',this)" />
+        <button type="button" class="gps-address-btn" aria-label="Use current GPS for this address" title="Use current GPS" onclick="fillAddressFromGps('startName','startAddr','startPlaceResults',this)">${icoPin(18)}</button>
+      </div>
       <div class="place-results" id="startPlaceResults"></div>
     </div>
     <div class="field-label">Odometer</div>
@@ -2200,7 +2209,10 @@ function openDepart(){
     <div class="place-field">
       <input class="input" id="nextName" list="recentsList" placeholder="Business or stop name" autocomplete="off" oninput="fillAddr();placeFieldInput('nextName','nextAddr','nextPlaceResults',this)" />
       <datalist id="recentsList">${S.recents.map(r=>`<option value="${r}">`).join('')}</datalist>
-      <input class="input" id="nextAddr" placeholder="Address" autocomplete="off" style="margin-top:10px" oninput="placeFieldInput('nextName','nextAddr','nextPlaceResults',this)" />
+      <div class="address-row">
+        <input class="input" id="nextAddr" placeholder="Address" autocomplete="off" oninput="placeFieldInput('nextName','nextAddr','nextPlaceResults',this)" />
+        <button type="button" class="gps-address-btn" aria-label="Use current GPS for this address" title="Use current GPS" onclick="fillAddressFromGps('nextName','nextAddr','nextPlaceResults',this)">${icoPin(18)}</button>
+      </div>
       <div class="place-results" id="nextPlaceResults"></div>
     </div>
 
@@ -2511,6 +2523,77 @@ async function choosePlace(ctx,index){
     saveActiveSheetDraft();
   }catch(e){
     renderPlaceStatus(ctx,'Place details could not load.');
+  }
+}
+function gpsAddressLabel(pos){
+  return Number(pos.lat).toFixed(5)+', '+Number(pos.lng).toFixed(5);
+}
+function applyPlaceToInputs(ctx,place){
+  const name=place.name||ctx.nameInput.value.trim()||'Current GPS location';
+  const address=place.address||gpsAddressLabel(place.geo);
+  ctx.nameInput.value=name;
+  ctx.addrInput.value=address;
+  [ctx.nameInput,ctx.addrInput].forEach(input=>{
+    input.dataset.placeName=name;
+    input.dataset.placeAddress=address;
+    input.dataset.placeId=place.placeId||'';
+    input.dataset.placeTypes=(place.types||[]).join('|');
+    input.dataset.placeLat=place.geo.lat;
+    input.dataset.placeLng=place.geo.lng;
+  });
+  ctx.results.classList.remove('open');
+  ctx.results.innerHTML='';
+  saveActiveSheetDraft();
+}
+async function reverseGeocode(pos){
+  if(!GOOGLE_MAPS_API_KEY)return null;
+  try{
+    await loadGoogleMapsScript();
+    if(!window.google?.maps?.Geocoder)return null;
+    const geocoder=new google.maps.Geocoder();
+    const result=await new Promise(resolve=>{
+      geocoder.geocode({location:{lat:pos.lat,lng:pos.lng}},(results,status)=>{
+        resolve(status==='OK'&&Array.isArray(results)&&results.length?results[0]:null);
+      });
+    });
+    if(!result)return null;
+    return {
+      address:result.formatted_address||'',
+      placeId:result.place_id||'',
+      types:Array.isArray(result.types)?result.types:[]
+    };
+  }catch(e){return null;}
+}
+async function fillAddressFromGps(nameId,addrId,resultsId,button){
+  const ctx=bindPlaceAutocomplete({nameId,addrId,resultsId});
+  if(!ctx)return;
+  haptic();
+  const previous=button?.innerHTML;
+  if(button){button.disabled=true;button.setAttribute('aria-busy','true');}
+  renderPlaceStatus(ctx,'Getting current GPS...');
+  try{
+    const pos=await getPos();
+    if(!pos){
+      renderPlaceStatus(ctx,'GPS unavailable. Check location permission.');
+      toast('warn',icoPin(16),'GPS unavailable','Check location permission');
+      return;
+    }
+    renderPlaceStatus(ctx,'Finding address...');
+    const geocoded=await reverseGeocode(pos);
+    const geo={lat:+pos.lat.toFixed(5),lng:+pos.lng.toFixed(5)};
+    applyPlaceToInputs(ctx,{
+      name:ctx.nameInput.value.trim()||'Current GPS location',
+      address:geocoded?.address||gpsAddressLabel(geo),
+      geo,
+      placeId:geocoded?.placeId||'',
+      types:geocoded?.types||['gps_location']
+    });
+    toast('ok',icoPin(16),'GPS address added',geocoded?.address||gpsAddressLabel(geo));
+  }catch(e){
+    renderPlaceStatus(ctx,'GPS address could not load.');
+    toast('warn',icoPin(16),'GPS failed','Try again near a stronger signal');
+  }finally{
+    if(button){button.disabled=false;button.removeAttribute('aria-busy');button.innerHTML=previous||icoPin(18);}
   }
 }
 function selectedPlaceData(nameId,addrId){
