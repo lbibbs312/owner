@@ -51,10 +51,25 @@ jobs:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
-          # Bubblewrap's regenerate path is interactive and always asks for the
-          # version. Feed the answers in order: y (regenerate) -> versionName ->
-          # versionCode. Signing comes from the BUBBLEWRAP_* env vars above.
-          printf 'y\n1.0.0\n1\n' | bubblewrap build --skipPwaValidation
+          # Bubblewrap's regenerate path is interactive (inquirer prompts) and
+          # ignores piped stdin. Drive it through a real pty with `expect`,
+          # answering each prompt as it appears. Signing uses the env vars above.
+          sudo apt-get update -qq && sudo apt-get install -y -qq expect
+          cat > build-twa.exp <<'EXP'
+          set timeout 1200
+          spawn bubblewrap build --skipPwaValidation
+          expect {
+            -re {regenerate your}              { send -- "y\r"; exp_continue }
+            -re {versionName for the new App}  { send -- "1.0.0\r"; exp_continue }
+            -re {versionCode for the new App}  { send -- "1\r"; exp_continue }
+            -re {\(Y/n\)}                      { send -- "y\r"; exp_continue }
+            -re {\(y/N\)}                      { send -- "y\r"; exp_continue }
+            eof
+          }
+          catch wait result
+          exit [lindex $result 3]
+          EXP
+          expect -f build-twa.exp
 
       - name: Generate Digital Asset Links (assetlinks.json)
         env:
