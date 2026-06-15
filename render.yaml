@@ -30,6 +30,10 @@ services:
         value: "movedefense.com"
       - key: REDIRECT_HOSTS
         value: "lacksdrivers.com,www.lacksdrivers.com"
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
       - key: SECRET_KEY
         sync: false
       - key: SQLALCHEMY_DATABASE_URI

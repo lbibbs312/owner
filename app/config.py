@@ -112,6 +112,12 @@ class BaseConfig:
     PUBLIC_URL = os.environ.get("PUBLIC_URL", APP_URL).rstrip("/")
     CANONICAL_HOST = _canonical_host()
     REDIRECT_HOSTS = _env_csv("REDIRECT_HOSTS")
+    GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "").strip()
+    GOOGLE_CLIENT_ID = (
+        os.environ.get("GOOGLE_CLIENT_ID")
+        or os.environ.get("GOOGLE_OAUTH_CLIENT_ID")
+        or ""
+    ).strip()
     DRIVER_LOG_PHOTO_UPLOAD_FOLDER = _env_upload_folder(
         "DRIVER_LOG_PHOTO_UPLOAD_FOLDER",
         "uploads/driver_log_photos",
