@@ -470,6 +470,7 @@ textarea.input{height:auto;padding:14px 15px;line-height:1.45;resize:none}
   color:#1d0f02;background:linear-gradient(135deg,#ffb65a,#f0760f);box-shadow:0 14px 36px var(--amber-glow);
   display:flex;align-items:center;justify-content:center;gap:9px;transition:transform .12s var(--ease)}
 .btn-primary:active{transform:scale(.975)}
+.btn-danger{flex:0 0 auto;height:56px;padding:0 18px;border-radius:16px;background:rgba(255,91,91,.12);border:1px solid rgba(255,91,91,.38);color:#ffd3d3;font-weight:700;font-size:14px}
 
 /* ============================================================
    DRAWER
@@ -1914,6 +1915,24 @@ function openStopDetail(id){
       <div class="detail-metric"><div class="mk">Depart</div><div class="mv">${stop.departure_time?fmtTime(stop.departure_time):'Now'}</div></div>
     </div>
 
+    <div class="field-label">Stop details</div>
+    <div class="place-field">
+      <label class="input-label" for="detailStopName">Customer / business name</label>
+      <input class="input" id="detailStopName" placeholder="Customer, business, or stop name" autocomplete="off" value="${escapeHtml(stop.location.business_name||'')}" oninput="placeFieldInput('detailStopName','detailStopAddr','detailPlaceResults',this)" />
+      <label class="input-label" for="detailStopAddr">Address</label>
+      <div class="address-row">
+        <input class="input" id="detailStopAddr" placeholder="Address" autocomplete="off" value="${escapeHtml(stop.location.address||'')}" oninput="placeFieldInput('detailStopName','detailStopAddr','detailPlaceResults',this)" />
+        <button type="button" class="gps-address-btn" aria-label="Use current GPS for this address" title="Use current GPS" onclick="fillAddressFromGps('detailStopName','detailStopAddr','detailPlaceResults',this)">${icoPin(18)}</button>
+      </div>
+      <div class="place-results" id="detailPlaceResults"></div>
+      <label class="input-label" for="detailStopNote">Note</label>
+      <textarea class="input" id="detailStopNote" rows="2" placeholder="Note for this stop">${escapeHtml(stop.note||'')}</textarea>
+    </div>
+    <div class="sheet-actions" style="padding-bottom:4px">
+      <button class="btn-danger" onclick="deleteStop('${id}')">Delete</button>
+      <button class="btn-primary" onclick="saveStopDetails('${id}')">Save details ${icoChev(18)}</button>
+    </div>
+
     <div class="field-label">Fuel</div>
     <div class="two">
       <input class="input" id="detailFuelGal" inputmode="decimal" placeholder="Gallons" value="${Number.isFinite(Number(fuel.gallons))&&Number(fuel.gallons)>0?Number(fuel.gallons):''}" />
@@ -1937,7 +1956,62 @@ function openStopDetail(id){
       <button class="btn-primary" onclick="triggerStopPhoto()">${icoCamera(18)} Add photo</button>
     </div>`;
   openSheet();
+  bindPlaceAutocomplete({nameId:'detailStopName',addrId:'detailStopAddr',resultsId:'detailPlaceResults'});
   bindSheetDraft(`stop-detail:${id}`);
+}
+function saveStopDetails(id){
+  const stop=findStop(id);
+  if(!stop)return;
+  const selected=selectedPlaceData('detailStopName','detailStopAddr');
+  const name=$('#detailStopName')?.value.trim()||selected?.name||stop.location.business_name||'Stop';
+  const address=$('#detailStopAddr')?.value.trim()||selected?.address||'';
+  const geo=selected?.geo||toGeo(stop.location);
+  stop.location={
+    ...stop.location,
+    business_name:name,
+    address,
+    gps_lat:geo?+geo.lat.toFixed(5):stop.location.gps_lat,
+    gps_lng:geo?+geo.lng.toFixed(5):stop.location.gps_lng,
+    place_types:selected?.types||placeTypes(stop.location)
+  };
+  stop.note=$('#detailStopNote')?.value.trim()||'';
+  if(stop.fuel)stop.fuel.location=name;
+  if(S.position==='parked'&&!stop.departure_time&&S.stops[S.stops.length-1]?.id===id)S.currentPlace={...stop.location};
+  rememberPlace(name,address);
+  save();clearSheetDraft(`stop-detail:${id}`);renderHome();renderFuel();openStopDetail(id);
+  toast('ok',icoDoc(16),'Stop updated',name);
+}
+function resequenceStops(){S.stops.forEach((stop,index)=>{stop.sequence=index+1;});}
+function repairStateAfterStopDelete(){
+  resequenceStops();
+  if(!S.stops.length){
+    S.position='idle';S.currentPlace=null;S.destination=null;S.odometer=0;
+    return;
+  }
+  const openStop=[...S.stops].reverse().find(stop=>!stop.departure_time);
+  if(openStop){
+    S.position='parked';
+    S.currentPlace={...openStop.location};
+    S.destination=null;
+    const odo=finiteOdometer(openStop);if(odo!=null)S.odometer=odo;
+    return;
+  }
+  if(S.position==='parked'){
+    S.position=S.destination?'driving':'idle';
+    S.currentPlace=null;
+  }
+  if(S.position==='driving')S.currentPlace=null;
+}
+function deleteStop(id){
+  const stop=findStop(id);
+  if(!stop)return;
+  const label=stop.location.business_name||stop.location.address||'this stop';
+  if(!confirm(`Delete ${label}? This removes its fuel, photos, and receipt links from this log.`))return;
+  S.stops=S.stops.filter(item=>item.id!==id);
+  clearSheetDraft(`stop-detail:${id}`);
+  repairStateAfterStopDelete();
+  save();closeSheet();renderHome();renderFuel();
+  toast('ok',icoReset(16),'Stop deleted',label);
 }
 function saveStopFuel(id){
   const stop=findStop(id);
@@ -2542,6 +2616,12 @@ async function choosePlace(ctx,index){
 function gpsAddressLabel(pos){
   return Number(pos.lat).toFixed(5)+', '+Number(pos.lng).toFixed(5);
 }
+function withTimeout(promise,ms,fallback=null){
+  return new Promise(resolve=>{
+    const timer=setTimeout(()=>resolve(fallback),ms);
+    promise.then(value=>{clearTimeout(timer);resolve(value);}).catch(()=>{clearTimeout(timer);resolve(fallback);});
+  });
+}
 function applyPlaceToInputs(ctx,place){
   const name=place.name??ctx.nameInput.value.trim();
   const address=place.address||gpsAddressLabel(place.geo);
@@ -2592,17 +2672,27 @@ async function fillAddressFromGps(nameId,addrId,resultsId,button){
       toast('warn',icoPin(16),'GPS unavailable','Check location permission');
       return;
     }
-    renderPlaceStatus(ctx,'Finding address...');
-    const geocoded=await reverseGeocode(pos);
     const geo={lat:+pos.lat.toFixed(5),lng:+pos.lng.toFixed(5)};
     applyPlaceToInputs(ctx,{
       name:ctx.nameInput.value.trim(),
-      address:geocoded?.address||gpsAddressLabel(geo),
+      address:gpsAddressLabel(geo),
       geo,
-      placeId:geocoded?.placeId||'',
-      types:geocoded?.types||['gps_location']
+      placeId:'',
+      types:['gps_location']
     });
-    toast('ok',icoPin(16),'GPS address added',geocoded?.address||gpsAddressLabel(geo));
+    toast('ok',icoPin(16),'GPS added',gpsAddressLabel(geo));
+    if(button){button.disabled=false;button.removeAttribute('aria-busy');button.innerHTML=previous||icoPin(18);}
+    const geocoded=await withTimeout(reverseGeocode(geo),2200,null);
+    if(geocoded?.address){
+      applyPlaceToInputs(ctx,{
+        name:ctx.nameInput.value.trim(),
+        address:geocoded.address,
+        geo,
+        placeId:geocoded.placeId||'',
+        types:geocoded.types||['gps_location']
+      });
+      toast('ok',icoPin(16),'Address added',geocoded.address);
+    }
   }catch(e){
     renderPlaceStatus(ctx,'GPS address could not load.');
     toast('warn',icoPin(16),'GPS failed','Try again near a stronger signal');
@@ -2763,14 +2853,17 @@ function browserPos(){return new Promise(res=>{
 });}
 async function googleGeoFallback(){
   if(!GOOGLE_MAPS_API_KEY)return null;
+  const controller=window.AbortController?new AbortController():null;
+  const timer=controller?setTimeout(()=>controller.abort(),3500):null;
   try{
     const rsp=await fetch('https://www.googleapis.com/geolocation/v1/geolocate?key='+encodeURIComponent(GOOGLE_MAPS_API_KEY),{
-      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({considerIp:true})
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({considerIp:true}),signal:controller?.signal
     });
     if(!rsp.ok)return null;
     const data=await rsp.json();
     return data?.location?{lat:data.location.lat,lng:data.location.lng,accuracy:data.accuracy||null,source:'google'}:null;
   }catch(e){return null;}
+  finally{if(timer)clearTimeout(timer);}
 }
 
 /* =================== EXPORT =================== */
