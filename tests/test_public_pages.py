@@ -65,6 +65,8 @@ def test_welcome_page_serves_driver_logger_app(client):
         "Checking password",
         "Creating account",
         "Old driver/admin logins will not sign in here",
+        "Fuel stop detected",
+        "gas_station",
         "Record first stop",
         "window.MOVEDEFENSE_CONFIG",
         "googleMapsApiKey",

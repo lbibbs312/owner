@@ -1307,7 +1307,9 @@ function openFuelSummary(stops){
   const cost=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).cost,0);
   const rows=fuelStops.map(s=>{
     const fuel=fuelAmounts(s.fuel);
-    return `<div class="summary-row"><div><div class="rk">${escapeHtml(s.fuel.location||s.location.business_name)}</div><div class="rs">${fmtTime(s.arrival_time)} · ${fuel.gallons.toFixed(1)} gallons</div></div><div class="rv">${money(fuel.cost)}</div></div>`;
+    const amount=fuel.gallons||fuel.cost?`${fuel.gallons.toFixed(1)} gallons`:'Fuel stop · gallons optional';
+    const cost=fuel.cost?money(fuel.cost):'';
+    return `<div class="summary-row"><div><div class="rk">${escapeHtml(s.fuel.location||s.location.business_name)}</div><div class="rs">${fmtTime(s.arrival_time)} · ${amount}</div></div><div class="rv">${cost}</div></div>`;
   }).join('');
   summarySheet('Fuel detail','Fuel totals and purchase records',`
     <div class="detail-grid">
@@ -1348,7 +1350,7 @@ function renderLedger(){
     tags.push(mileageTag(ts,i));
     if(lc==='picked_up')tags.push(`<span class="tag pick">${icoUp(12)} Picked up</span>`);
     else if(lc==='dropped_off')tags.push(`<span class="tag drop">${icoDown(12)} ${S.settings.truckMode?'Dropped off':'Delivered'}</span>`);
-    else if(lc==='none')tags.push(`<span class="tag">${S.settings.truckMode?'No load change':'Stop'}</span>`);
+    else if(lc==='none'&&!s.fuel)tags.push(`<span class="tag">${S.settings.truckMode?'No load change':'Stop'}</span>`);
     if(cargoOn && s.departed_with && !s.departed_with.empty)tags.push(`<span class="tag cargo">${icoBox(12)} ${s.departed_with.cargo} · ${(s.departed_with.weight).toLocaleString()} lb</span>`);
     if(s.fuel)tags.push(`<span class="tag fuel">${icoFuel(12)} ${fuelLabel(s.fuel)}</span>`);
     if(s.photos?.length)tags.push(`<span class="tag photo">${icoCamera(12)} ${s.photos.length} photo${s.photos.length>1?'s':''}</span>`);
@@ -1383,6 +1385,7 @@ function fuelLabel(fuel){
   const {gallons,cost}=fuelAmounts(fuel);
   if(gallons&&cost)return `${gallons.toFixed(gallons%1?1:0)} gal · ${money(cost)}`;
   if(gallons)return `${gallons.toFixed(gallons%1?1:0)} gal`;
+  if(!cost)return 'Fuel stop';
   return money(cost);
 }
 function fuelAmounts(fuel){
@@ -1390,6 +1393,40 @@ function fuelAmounts(fuel){
   return {
     gallons:Number.isFinite(gallons)?gallons:0,
     cost:Number.isFinite(cost)?cost:0
+  };
+}
+const FUEL_PLACE_TYPES=new Set(['gas_station']);
+const FUEL_STOP_TERMS=[
+  'gas station','fuel stop','fuel station','service station','truck stop','travel center','petroleum','diesel',
+  'marathon','shell','bp','exxon','mobil','speedway','circle k','pilot','flying j',"love's",'loves',
+  'ta travel','travelcenters','sunoco','citgo','chevron','texaco','valero','murphy','wawa','sheetz',
+  'quiktrip','kum & go',"casey's",'caseys','7-eleven','meijer gas','costco gas',"sam's club gas"
+];
+function placeTypes(place){
+  if(Array.isArray(place?.place_types))return place.place_types;
+  if(Array.isArray(place?.types))return place.types;
+  if(typeof place?.place_types==='string')return place.place_types.split('|').filter(Boolean);
+  return [];
+}
+function isFuelStopPlace(place){
+  const types=placeTypes(place).map(type=>String(type).toLowerCase());
+  if(types.some(type=>FUEL_PLACE_TYPES.has(type)))return true;
+  const text=`${place?.business_name||place?.name||''} ${place?.address||''}`.toLowerCase();
+  return FUEL_STOP_TERMS.some(term=>text.includes(term));
+}
+function autoFuelRecord(location){
+  return {gallons:0,cost:0,location:location?.business_name||location?.name||'Fuel stop',auto:true};
+}
+function fuelRecordFromInputs(location,existing=null){
+  const fg=parseFuelNumber('#fuelGal'),fc=parseFuelNumber('#fuelCost');
+  const prev=fuelAmounts(existing);
+  const fuelStop=isFuelStopPlace(location);
+  if(!fuelStop&&fg===null&&fc===null)return null;
+  return {
+    gallons:fg??prev.gallons,
+    cost:fc??prev.cost,
+    location:location?.business_name||location?.name||existing?.location||'Fuel stop',
+    auto:fuelStop&&fg===null&&fc===null&&prev.gallons===0&&prev.cost===0
   };
 }
 function parseFuelNumber(selector){
@@ -1566,14 +1603,15 @@ function renderCTA(){
   const place=driving?S.destination:S.currentPlace;
   const name=place?.business_name||place?.name||'next stop';
   const activeMiles=driving?activeLegMiles():0;
+  const fuelStop=!driving&&!idle&&isFuelStopPlace(place);
   const dock=$('#cta-dock');
   dock.innerHTML=`
     <button class="cta ${driving||idle?'cta--arrive':'cta--depart'}" id="ctaBtn">
-      <span class="ico">${driving||idle?icoPin(28):icoRoad(28)}</span>
+      <span class="ico">${driving||idle?icoPin(28):(fuelStop?icoFuel(28):icoRoad(28))}</span>
       <span class="txt">
         <span class="verb">${idle?'Start with current GPS':driving?'Tap on arrival':'Tap when you roll out'}</span>
         <span class="place">${idle?'Record first stop':driving?'Arrive at '+shortName(name):'Depart '+shortName(name)}</span>
-        <span class="sub">${idle?'No saved location data':driving?(activeMiles?activeMiles+' mi leg · records arrival':'Records arrival time + GPS'):'Log load change, then go'}</span>
+        <span class="sub">${idle?'No saved location data':driving?(activeMiles?activeMiles+' mi leg · records arrival':'Records arrival time + GPS'):(fuelStop?'Fuel stop · load stays unchanged':'Log load change, then go')}</span>
       </span>
       <span class="chev">${icoChev(26)}</span>
     </button>`;
@@ -1613,14 +1651,20 @@ async function confirmStartStop(){
   const addr=$('#startAddr')?.value.trim()||'';
   const odoIn=parseInt($('#startOdo')?.value);
   if(Number.isFinite(odoIn)&&odoIn>=0)S.odometer=odoIn;
-  const location={business_name:name,address:addr,gps_lat:gps?+gps.lat.toFixed(5):null,gps_lng:gps?+gps.lng.toFixed(5):null};
+  const location={
+    business_name:name,address:addr,
+    gps_lat:gps?+gps.lat.toFixed(5):null,
+    gps_lng:gps?+gps.lng.toFixed(5):null,
+    place_types:selected?.types||[]
+  };
+  const fuel=isFuelStopPlace(location)?autoFuelRecord(location):null;
   S.stops.push({
     id:uid(),sequence:1,
     arrival_time:Date.now(),departure_time:null,
     location,odometer:S.odometer,miles_since_last_stop:0,
-    arrived_with:{empty:true},departed_with:null,load_change:null,fuel:null,note:''
+    arrived_with:{empty:true},departed_with:null,load_change:null,fuel,note:''
   });
-  S.position='parked';S.currentPlace={business_name:name,address:addr};S.destination=null;
+  S.position='parked';S.currentPlace={...location};S.destination=null;
   rememberPlace(name,addr);
   save();closeSheet();renderHome();
   toast('ok',icoPin(16),'Stop started',gps?'GPS stamped':'GPS unavailable');
@@ -1635,16 +1679,23 @@ async function doArrive(){
   const arrivalGeo=useDestinationGeo?destGeo:(gps||destGeo||null);
   const leg=useDestinationGeo&&Number.isFinite(dest.estimated_miles)?dest.estimated_miles:estimateLegMiles(prevGeo,arrivalGeo);
   S.odometer+=leg;
+  const location={
+    business_name:dest.business_name,address:dest.address||'',
+    gps_lat:arrivalGeo?+arrivalGeo.lat.toFixed(5):null,
+    gps_lng:arrivalGeo?+arrivalGeo.lng.toFixed(5):null,
+    place_types:placeTypes(dest)
+  };
+  const fuel=isFuelStopPlace(location)?autoFuelRecord(location):null;
   S.stops.push({
     id:uid(),sequence:S.stops.length+1,
     arrival_time:Date.now(),departure_time:null,
-    location:{business_name:dest.business_name,address:dest.address||'',gps_lat:arrivalGeo?+arrivalGeo.lat.toFixed(5):null,gps_lng:arrivalGeo?+arrivalGeo.lng.toFixed(5):null},
+    location,
     odometer:S.odometer,miles_since_last_stop:leg,
     arrived_with:prev&&prev.departed_with?{...prev.departed_with}:{empty:true},
-    departed_with:null,load_change:null,fuel:null,note:''
+    departed_with:null,load_change:null,fuel,note:''
   });
   S.position='parked';
-  S.currentPlace={business_name:dest.business_name,address:dest.address||'',gps_lat:arrivalGeo?+arrivalGeo.lat.toFixed(5):null,gps_lng:arrivalGeo?+arrivalGeo.lng.toFixed(5):null};
+  S.currentPlace={...location};
   S.destination=null;
   save();renderHome();
   toast('ok',icoPin(16),'Arrived',`${shortName(dest.business_name)} · ${leg} mi · ${arrivalGeo?'GPS stamped':'GPS unavailable'}`);
@@ -1653,19 +1704,23 @@ async function doArrive(){
 function openDepart(){
   const place=S.currentPlace;
   if(!place){openStartStop();return;}
+  const cur=S.stops[S.stops.length-1];
   const truck=S.settings.truckMode;
+  const fuelStop=isFuelStopPlace(cur?.location||place);
+  const fuel=cur?.fuel||{};
   $('#sheet').innerHTML=`
     <div class="grab"></div>
     <h3>Depart ${place.business_name}</h3>
-    <p class="lede">The one thing we can't infer — <b>${truck?'did the load change here?':'did you pick up or deliver here?'}</b></p>
+    <p class="lede">${fuelStop?'Fuel stop detected. Load stays unchanged; add gallons or cost if you want them on the record.':`The one thing we can't infer — <b>${truck?'did the load change here?':'did you pick up or deliver here?'}</b>`}</p>
 
+    ${fuelStop?`<div class="summary-note">${icoFuel(16)} This stop is being logged as fuel because the destination is a gas station.</div>`:`
     <div class="seg3" id="seg">
       <div class="segc" data-v="picked_up" onclick="pickSeg(this)"><div class="si">${icoUp(18)}</div><div class="sl">Picked up</div></div>
       <div class="segc" data-v="dropped_off" onclick="pickSeg(this)"><div class="si">${icoDown(18)}</div><div class="sl">${truck?'Dropped off':'Delivered'}</div></div>
       <div class="segc" data-v="none" onclick="pickSeg(this)"><div class="si">${icoMinus(18)}</div><div class="sl">${truck?'No change':'Stop only'}</div></div>
-    </div>
+    </div>`}
 
-    ${truck?`
+    ${truck&&!fuelStop?`
     <div class="collapse" id="cargoWrap">
       <div class="field-label">Cargo picked up <span style="opacity:.6">· optional</span></div>
       <input class="input" id="cargoType" list="cargoList" placeholder="e.g. Palletized dry goods" />
@@ -1684,6 +1739,12 @@ function openDepart(){
       <div class="place-results" id="nextPlaceResults"></div>
     </div>
 
+    ${fuelStop?`
+    <div class="field-label">Fuel <span style="opacity:.6">· optional</span></div>
+    <div class="two">
+      <input class="input" id="fuelGal" inputmode="decimal" placeholder="Gallons" value="${Number.isFinite(Number(fuel.gallons))&&Number(fuel.gallons)>0?Number(fuel.gallons):''}" />
+      <input class="input" id="fuelCost" inputmode="decimal" placeholder="Cost $" value="${Number.isFinite(Number(fuel.cost))&&Number(fuel.cost)>0?Number(fuel.cost):''}" />
+    </div>`:`
     <div class="optrow" onclick="toggleOpt('fuelWrap',this)">
       <div><div class="ol">Add fuel stop</div><div class="od">Gallons + cost at this location</div></div>
       <div class="tgl" data-tgl></div>
@@ -1693,7 +1754,7 @@ function openDepart(){
         <input class="input" id="fuelGal" inputmode="decimal" placeholder="Gallons" />
         <input class="input" id="fuelCost" inputmode="decimal" placeholder="Cost $" />
       </div>
-    </div>
+    </div>`}
 
     <div class="optrow" onclick="toggleOpt('noteWrap',this)">
       <div><div class="ol">Add a note</div><div class="od">Seal #, dock, receiver, anything</div></div>
@@ -1711,7 +1772,7 @@ function openDepart(){
     <div class="sheet-actions">
       <button class="btn-ghost" onclick="closeSheet()">Cancel</button>
       <button class="btn-primary" onclick="confirmDepart()">
-        Confirm departure ${icoChev(18)}
+        ${fuelStop?'Depart fuel stop':'Confirm departure'} ${icoChev(18)}
       </button>
     </div>`;
   openSheet();
@@ -1731,9 +1792,13 @@ async function confirmDepart(){
   const cur=S.stops[S.stops.length-1]; // the open on-site stop
   if(!cur){closeSheet();openStartStop();return;}
   const truck=S.settings.truckMode;
+  const fuelStop=isFuelStopPlace(cur.location);
   // load state
   let departed_with={empty:true};
-  if(!truck){
+  if(fuelStop){
+    departed_with=cur.arrived_with&&!cur.arrived_with.empty?{...cur.arrived_with}:{empty:true};
+    segVal='none';
+  }else if(!truck){
     departed_with={empty:true}; // gig/1099: spine only — load_change records pickup/delivery
   }else if(segVal==='picked_up'){
     const cargo=($('#cargoType')?.value.trim())||(cur.arrived_with&&!cur.arrived_with.empty?cur.arrived_with.cargo:'Freight');
@@ -1746,8 +1811,7 @@ async function confirmDepart(){
     departed_with=cur.arrived_with&&!cur.arrived_with.empty?{...cur.arrived_with}:{empty:true};
   }
   // fuel
-  let fuel=null;const fg=parseFuelNumber('#fuelGal'),fc=parseFuelNumber('#fuelCost');
-  if(fg!==null||fc!==null)fuel={gallons:fg??0,cost:fc??0,location:cur.location.business_name};
+  let fuel=fuelRecordFromInputs(cur.location,cur.fuel);
   // odometer correction
   const odoIn=parseInt($('#odoField')?.value);if(odoIn&&odoIn>=cur.odometer-200)S.odometer=odoIn;
   // commit departure
@@ -1770,7 +1834,8 @@ async function confirmDepart(){
     address:na||S.addrBook[nn]||'',
     gps_lat:destinationGeo?.lat??null,
     gps_lng:destinationGeo?.lng??null,
-    estimated_miles:estimatedMiles||0
+    estimated_miles:estimatedMiles||0,
+    place_types:selected?.types||[]
   }:{business_name:'Next stop',address:''};
   S.currentPlace=null;
   save();closeSheet();renderHome();
@@ -1907,6 +1972,7 @@ function clearPlaceSelection(ctx){
     delete input.dataset.placeLat;
     delete input.dataset.placeLng;
     delete input.dataset.placeId;
+    delete input.dataset.placeTypes;
   });
 }
 async function queryPlaces(ctx,raw){
@@ -1957,16 +2023,18 @@ async function choosePlace(ctx,index){
   renderPlaceStatus(ctx,'Filling place...');
   try{
     const place=prediction.toPlace();
-    await place.fetchFields({fields:['displayName','formattedAddress','location']});
+    await place.fetchFields({fields:['displayName','formattedAddress','location','types']});
     const name=placeText(place.displayName)||placeText(prediction.mainText)||placeText(prediction.text)||'Selected place';
     const address=place.formattedAddress||placeText(prediction.secondaryText)||'';
     const geo=latLngToPlain(place.location);
+    const types=Array.isArray(place.types)?place.types:(Array.isArray(prediction.types)?prediction.types:[]);
     ctx.nameInput.value=name;
     ctx.addrInput.value=address;
     [ctx.nameInput,ctx.addrInput].forEach(input=>{
       input.dataset.placeName=name;
       input.dataset.placeAddress=address;
       input.dataset.placeId=place.id||prediction.placeId||'';
+      input.dataset.placeTypes=types.join('|');
       if(geo){input.dataset.placeLat=geo.lat;input.dataset.placeLng=geo.lng;}
     });
     ctx.results.classList.remove('open');
@@ -1983,6 +2051,7 @@ function selectedPlaceData(nameId,addrId){
     name:input.dataset.placeName,
     address:input.dataset.placeAddress||'',
     placeId:input.dataset.placeId||'',
+    types:(input.dataset.placeTypes||'').split('|').filter(Boolean),
     geo:Number.isFinite(lat)&&Number.isFinite(lng)?{lat,lng}:null
   }:null;
 }
@@ -2187,7 +2256,7 @@ function buildDoc(){
 
   const fuelRows=fuelStops.map(s=>{
     const fuel=fuelAmounts(s.fuel);
-    return `<tr><td class="num">${fmtDay(s.arrival_time)}</td><td>${escapeHtml(s.fuel.location||s.location.business_name||'Stop')}</td><td class="num">${fuel.gallons.toFixed(1)}</td><td class="num">${money(fuel.cost)}</td></tr>`;
+    return `<tr><td class="num">${fmtDay(s.arrival_time)}</td><td>${escapeHtml(s.fuel.location||s.location.business_name||'Stop')}</td><td class="num">${fuel.gallons?fuel.gallons.toFixed(1):'—'}</td><td class="num">${fuel.cost?money(fuel.cost):'—'}</td></tr>`;
   }).join('');
   const photoCards=stops.flatMap(s=>(s.photos||[]).map(photo=>`
     <div class="doc-photo">
