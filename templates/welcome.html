@@ -964,11 +964,11 @@ function authTitle(){
     authMode==='created'?'Save this code':'Sign in';
 }
 function authCopy(){
-  if(authMode==='create')return'Create one local driver account for this device. It works offline.';
-  if(authMode==='forgot')return'Offline reset uses the recovery code shown when the account was created.';
+  if(authMode==='create')return'Create your MoveDefense driver account for trip logs, fuel records, receipts, and exports.';
+  if(authMode==='forgot')return'Use the recovery code from your account setup to reset your password.';
   if(authMode==='reset')return'Set a new password with your recovery code.';
-  if(authMode==='created')return'This is the only offline reset code for this local account.';
-  return'Sign in to your on-device MoveDefense log.';
+  if(authMode==='created')return'Keep this recovery code somewhere safe before continuing.';
+  return'Sign in to your MoveDefense driver log.';
 }
 function authButtonLabel(){
   return authMode==='create'?'Create account':
@@ -1011,7 +1011,7 @@ function renderAuth(){
         </svg>
         <div class="wordmark"><b>Move</b><span class="df">Defense</span></div>
       </div>
-      <div class="auth-chip">Offline ready</div>
+      <div class="auth-chip">Driver account</div>
     </div>
     <div class="auth-card">
       <div class="auth-title">${authTitle()}</div>
@@ -1029,9 +1029,9 @@ function renderAuth(){
       </form>
       <div class="auth-row">
         ${authMode==='login'?`<button class="auth-link" onclick="authSetMode('forgot')" ${authSubmitting?'disabled':''}>Forgot password?</button>`:`<button class="auth-link" onclick="authSetMode('login')" ${authSubmitting?'disabled':''}>Back to sign in</button>`}
-        <span>${A.accounts.length?A.accounts.length+' local account'+(A.accounts.length>1?'s':''):'No local account yet'}</span>
+        <span>Private driver access</span>
       </div>
-      <div class="auth-foot">Email/password works offline. Google sign-in needs network and a configured Google client ID.</div>
+      <div class="auth-foot">Protect trip logs, fuel records, receipts, and exports with your driver account.</div>
     </div>`;
 }
 async function submitAuth(event){
@@ -1053,9 +1053,9 @@ async function submitLogin(){
   if(!validEmail(email))return authSetMessage('error','Enter a valid email address');
   if(!password)return authSetMessage('error','Enter your password');
   const account=authAccount(email);
-  if(!account)return authSetMessage('error','No local account found for that email','This one-phone logger uses a local offline account. Old driver/admin logins will not sign in here. Tap Create first.');
+  if(!account)return authSetMessage('error','No account found for that email','Create a driver account first, then sign in with that email.');
   if(account.provider==='google'&&!account.passwordHash)return authSetMessage('error','This account uses Google sign-in');
-  authSetBusy('Checking password','Encrypting and comparing on this device. This can take a few seconds on older phones.');
+  authSetBusy('Checking password','Verifying your sign-in.');
   if(!await verifySecret(password,account.passwordSalt,account.passwordHash))return authSetMessage('error','Wrong password','Try again or use Forgot password.');
   authSubmitting=false;
   account.lastLoginAt=Date.now();
@@ -1071,7 +1071,7 @@ async function submitCreateAccount(){
   if(authAccount(email))return authSetMessage('error','Account already exists','Sign in or reset the password.');
   if(password.length<8)return authSetMessage('error','Password must be at least 8 characters');
   if(password!==confirm)return authSetMessage('error','Passwords do not match');
-  authSetBusy('Creating account','Encrypting your password and recovery code on this device.');
+  authSetBusy('Creating account','Setting up your driver account.');
   const passwordSalt=randomHex(),passwordHash=await hashSecret(password,passwordSalt);
   const code=recoveryCode(),recoverySalt=randomHex(),recoveryHash=await hashSecret(cleanRecovery(code),recoverySalt);
   const account={email,name,provider:'local',passwordSalt,passwordHash,recoverySalt,recoveryHash,createdAt:Date.now(),lastLoginAt:Date.now()};
@@ -1089,8 +1089,8 @@ function submitForgotPassword(){
   const email=normalizeEmail(authField('authEmail'));
   if(!validEmail(email))return authSetMessage('error','Enter a valid email address');
   const account=authAccount(email);
-  if(!account)return authSetMessage('error','No local account found for that email','Tap Create first on this phone. Old MoveDefense logins are separate from this local logger.');
-  if(!account.recoveryHash)return authSetMessage('error','This account cannot reset offline','Use Google sign-in for this email.');
+  if(!account)return authSetMessage('error','No account found for that email','Create a driver account first, then set up password recovery.');
+  if(!account.recoveryHash)return authSetMessage('error','Password reset is unavailable','Use Google sign-in for this email.');
   authResetEmail=email;
   authMode='reset';
   authMessage={type:'ok',text:'Account found',detail:'Enter the recovery code and a new password.'};
@@ -1100,11 +1100,11 @@ async function submitPasswordReset(){
   const email=normalizeEmail(authField('authEmail')||authResetEmail);
   const code=cleanRecovery(authField('authRecovery')),password=$('#authNewPassword')?.value||'',confirm=$('#authNewConfirm')?.value||'';
   const account=authAccount(email);
-  if(!account)return authSetMessage('error','No local account found for that email');
+  if(!account)return authSetMessage('error','No account found for that email');
   if(!code)return authSetMessage('error','Enter the recovery code');
   if(password.length<8)return authSetMessage('error','New password must be at least 8 characters');
   if(password!==confirm)return authSetMessage('error','Passwords do not match');
-  authSetBusy('Resetting password','Checking the recovery code and encrypting the new password.');
+  authSetBusy('Resetting password','Checking your recovery code.');
   if(!await verifySecret(code,account.recoverySalt,account.recoveryHash))return authSetMessage('error','Recovery code did not match');
   account.passwordSalt=randomHex();
   account.passwordHash=await hashSecret(password,account.passwordSalt);
@@ -1140,15 +1140,15 @@ function signOut(){
   closeSheet();
   clearInterval(heroTimer);
   authMode='login';
-  authMessage={type:'ok',text:'Signed out',detail:'Trip data remains on this device.'};
+  authMessage={type:'ok',text:'Signed out',detail:'Your saved trip records were kept.'};
   route('auth',false);
   renderAuth();
 }
 async function startGoogleSignIn(){
-  if(!GOOGLE_CLIENT_ID)return authSetMessage('error','Google sign-in is not configured','Set GOOGLE_CLIENT_ID on Render. Email/password works offline.');
-  if(navigator.onLine===false)return authSetMessage('error','Google sign-in needs a network connection','Use email/password while offline.');
+  if(!GOOGLE_CLIENT_ID)return authSetMessage('error','Google sign-in is unavailable','Use email and password, or try again later.');
+  if(navigator.onLine===false)return authSetMessage('error','Google sign-in needs a network connection','Use email and password, or try again later.');
   try{
-    authSetBusy('Opening Google sign-in','Waiting for Google Identity Services.');
+    authSetBusy('Opening Google sign-in','Connecting to Google.');
     await loadGoogleIdentity();
     google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:handleGoogleCredential});
     google.accounts.id.prompt(notification=>{
@@ -2482,7 +2482,7 @@ function renderDrawer(){
       <div><div>Freight fields</div><div class="sub">Cargo · weight · fuel</div></div>
       <div class="tgl ${S.settings.truckMode?'on':''} right" data-mode></div></div>
     <button class="drawer-item" onclick="closeDrawer();route('fuel')">${icoFuel(20)}<div><div>Fuel log</div><div class="sub">PPG · MPG · receipts</div></div></button>
-    <button class="drawer-item" onclick="signOut()">${icoReset(20)}<div><div>Sign out</div><div class="sub">${escapeHtml(currentUser()?.email||'Local session')} · keeps logged data</div></div></button>
+    <button class="drawer-item" onclick="signOut()">${icoReset(20)}<div><div>Sign out</div><div class="sub">${escapeHtml(currentUser()?.email||'Driver account')} · keeps logged data</div></div></button>
     <button class="drawer-item" onclick="resetDay()">${icoReset(20)}<div><div>Clear logged data</div><div class="sub">Start fresh</div></div></button>
     <div class="drawer-foot">MoveDefense · driver activity & trip record<br>Not an ELD · No hours-of-service</div>`;
 }
