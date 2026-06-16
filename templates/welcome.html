@@ -1114,6 +1114,7 @@ let serverSessionUnavailable=false;
 let serverSaveTimer=null;
 let serverSaveInFlight=false;
 let serverSavePending=false;
+let serverDayLoadInFlight=false;
 let activeRoute='auth';
 let appHistoryGuardReady=false;
 
@@ -1229,6 +1230,54 @@ function applyServerStatePayload(state){
   }
   return false;
 }
+function stateForDate(key=selectedDateKey){
+  const data=normalizeState(S);
+  const currentDay=key===todayKey();
+  return {
+    ...data,
+    day_key:key,
+    currentPlace:currentDay?data.currentPlace:null,
+    destination:currentDay?data.destination:null,
+    stops:stopsForDate(key).map(stop=>({...stop,day_key:key}))
+  };
+}
+async function saveServerDayStateNow(key=selectedDateKey){
+  if(!A?.serverUser||navigator.onLine===false||!isDateKey(key))return null;
+  const data=stateForDate(key);
+  if(!data.stops.length&&!data.currentPlace&&!data.destination)return null;
+  return await apiFetch('/api/driver-day-state',{method:'POST',body:{date:key,data}});
+}
+function renderActiveDateRoute(){
+  if(activeRoute==='home')renderHome();
+  else if(activeRoute==='fuel')renderFuel();
+  else if(activeRoute==='export')renderExport();
+}
+async function loadServerDayState(key=selectedDateKey){
+  if(!A?.serverUser||navigator.onLine===false||serverDayLoadInFlight||!isDateKey(key))return false;
+  if(stopsForDate(key).length)return false;
+  serverDayLoadInFlight=true;
+  try{
+    const payload=await apiFetch('/api/driver-day-state?date='+encodeURIComponent(key));
+    const data=payload?.state?.data;
+    if(!data||typeof data!=='object')return false;
+    const dayState=normalizeState(data);
+    const incoming=dayState.stops.filter(stop=>dayKey(stop.arrival_time)===key);
+    if(!incoming.length)return false;
+    const existingIds=new Set(S.stops.map(stop=>stop.id));
+    const fresh=incoming.filter(stop=>!existingIds.has(stop.id));
+    if(!fresh.length)return false;
+    S.stops=[...S.stops,...fresh].sort((a,b)=>a.arrival_time-b.arrival_time);
+    resequenceStops();
+    saveLocalState();
+    renderActiveDateRoute();
+    return true;
+  }catch(error){
+    console.warn('[MoveDefense day sync]',error);
+    return false;
+  }finally{
+    serverDayLoadInFlight=false;
+  }
+}
 function queueServerStateSave(){
   if(!A?.serverUser||navigator.onLine===false)return;
   serverSavePending=true;
@@ -1244,7 +1293,12 @@ async function saveServerStateNow(){
   serverSaveInFlight=true;
   serverSavePending=false;
   try{
-    return await apiFetch('/api/driver-state',{method:'POST',body:{data:S}});
+    const result=await apiFetch('/api/driver-state',{method:'POST',body:{data:S}});
+    saveServerDayStateNow(selectedDateKey).catch(error=>console.warn('[MoveDefense day sync]',error));
+    if(selectedDateKey!==todayKey()){
+      saveServerDayStateNow(todayKey()).catch(error=>console.warn('[MoveDefense day sync]',error));
+    }
+    return result;
   }finally{
     serverSaveInFlight=false;
     if(serverSavePending){
@@ -1262,6 +1316,7 @@ async function loadServerSession(){
       setServerUser(payload.user);
       const loaded=applyServerStatePayload(payload.state);
       if(!loaded&&hasUsefulState(S))queueServerStateSave();
+      loadServerDayState(selectedDateKey);
       return payload.user;
     }
     if(A.serverUser){
@@ -1284,6 +1339,7 @@ async function completeServerAuth(payload){
   if(!loaded&&hasUsefulState(S)){
     await saveServerStateNow();
   }
+  loadServerDayState(selectedDateKey);
   continueAfterAuth();
 }
 function randomHex(bytes=16){
@@ -1665,6 +1721,7 @@ function setViewDate(value){
   else if(activeRoute==='fuel')renderFuel();
   else if(activeRoute==='export')renderExport();
   else renderDateStrips();
+  loadServerDayState(key);
 }
 function shiftViewDate(days){setViewDate(shiftDateKey(selectedDateKey,days));}
 function renderHome(){renderDateStrips();renderState();renderGauges();renderLedger();renderCTA();}

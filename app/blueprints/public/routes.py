@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import re
+from datetime import datetime, timezone
 
 from flask import abort, current_app, jsonify, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user, login_required, login_user, logout_user
@@ -10,7 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.blueprints.public import bp
 from app.extensions import db
-from app.models import Announcement, DriverState, User
+from app.models import Announcement, DriverDayState, DriverState, User
 from app.services.database_status import database_status
 from app.services.route_context import build_route_context
 from app.services.google_places import (
@@ -29,6 +30,8 @@ from app.services.stripe_checkout import (
 )
 
 MAX_DRIVER_STATE_BYTES = 2_000_000
+MAX_DRIVER_DAY_STATE_BYTES = 400_000
+DAY_KEY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _json_body():
@@ -51,6 +54,51 @@ def _find_user_by_login(identifier):
     return User.query.filter(
         (func.lower(User.email) == login) | (func.lower(User.username) == login)
     ).first()
+
+
+def _valid_day_key(value):
+    return bool(DAY_KEY_RE.match(str(value or "")))
+
+
+def _json_size(data):
+    encoded = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+    return encoded, len(encoded.encode("utf-8"))
+
+
+def _decode_state_data(raw):
+    try:
+        data = json.loads(raw or "{}")
+    except (TypeError, ValueError):
+        data = {}
+    return data if isinstance(data, dict) else {}
+
+
+def _driver_state_data(user):
+    state = DriverState.query.filter_by(user_id=user.id).first()
+    return _decode_state_data(state.data) if state else {}
+
+
+def _stop_day_key(stop):
+    explicit = stop.get("day_key") if isinstance(stop, dict) else None
+    if _valid_day_key(explicit):
+        return explicit
+    try:
+        millis = float(stop.get("arrival_time"))
+    except (AttributeError, TypeError, ValueError):
+        return ""
+    if not millis:
+        return ""
+    return datetime.fromtimestamp(millis / 1000, tz=timezone.utc).date().isoformat()
+
+
+def _state_for_day(state_data, day_key):
+    data = dict(state_data) if isinstance(state_data, dict) else {}
+    stops = data.get("stops")
+    data["stops"] = [
+        stop for stop in stops if isinstance(stop, dict) and _stop_day_key(stop) == day_key
+    ] if isinstance(stops, list) else []
+    data["day_key"] = day_key
+    return data
 
 
 def _split_driver_name(name):
@@ -77,15 +125,42 @@ def _driver_state_response(user):
     state = DriverState.query.filter_by(user_id=user.id).first()
     if not state:
         return {"exists": False, "data": None, "updated_at": None}
-    try:
-        data = json.loads(state.data or "{}")
-    except (TypeError, ValueError):
-        data = {}
+    data = _decode_state_data(state.data)
     return {
         "exists": True,
-        "data": data if isinstance(data, dict) else {},
+        "data": data,
         "updated_at": state.updated_at.isoformat() if state.updated_at else None,
     }
+
+
+def _driver_day_state_response(user, day_key):
+    state = DriverDayState.query.filter_by(user_id=user.id, day_key=day_key).first()
+    if state:
+        return {
+            "exists": True,
+            "date": day_key,
+            "data": _decode_state_data(state.data),
+            "updated_at": state.updated_at.isoformat() if state.updated_at else None,
+            "source": "driver_day_state",
+        }
+
+    fallback = _state_for_day(_driver_state_data(user), day_key)
+    return {
+        "exists": False,
+        "date": day_key,
+        "data": fallback if fallback.get("stops") else None,
+        "updated_at": None,
+        "source": "driver_state_fallback" if fallback.get("stops") else None,
+    }
+
+
+def _upsert_driver_day_state(user, day_key, data):
+    state = DriverDayState.query.filter_by(user_id=user.id, day_key=day_key).first()
+    if not state:
+        state = DriverDayState(user_id=user.id, day_key=day_key)
+        db.session.add(state)
+    state.data = data
+    return state
 
 
 def _account_response(user):
@@ -324,11 +399,12 @@ def api_driver_state():
 
     if request.content_length and request.content_length > MAX_DRIVER_STATE_BYTES:
         return jsonify({"ok": False, "error": "state_too_large"}), 413
-    data = _json_body().get("data")
+    body = _json_body()
+    data = body.get("data")
     if not isinstance(data, dict):
         return jsonify({"ok": False, "error": "invalid_state"}), 400
-    encoded = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
-    if len(encoded.encode("utf-8")) > MAX_DRIVER_STATE_BYTES:
+    encoded, byte_size = _json_size(data)
+    if byte_size > MAX_DRIVER_STATE_BYTES:
         return jsonify({"ok": False, "error": "state_too_large"}), 413
 
     state = DriverState.query.filter_by(user_id=user.id).first()
@@ -336,8 +412,51 @@ def api_driver_state():
         state = DriverState(user_id=user.id)
         db.session.add(state)
     state.data = encoded
+
+    day_states = body.get("day_states")
+    if day_states is not None:
+        if not isinstance(day_states, dict):
+            return jsonify({"ok": False, "error": "invalid_day_states"}), 400
+        for day_key, day_data in day_states.items():
+            if not _valid_day_key(day_key) or not isinstance(day_data, dict):
+                return jsonify({"ok": False, "error": "invalid_day_state"}), 400
+            day_encoded, day_byte_size = _json_size(day_data)
+            if day_byte_size > MAX_DRIVER_DAY_STATE_BYTES:
+                return jsonify({"ok": False, "error": "day_state_too_large"}), 413
+            _upsert_driver_day_state(user, day_key, day_encoded)
+
     db.session.commit()
     return jsonify({"ok": True, "state": _driver_state_response(user)})
+
+
+@bp.route("/api/driver-day-state", methods=["GET", "POST"])
+def api_driver_day_state():
+    user, error = _require_driver_api_user()
+    if error:
+        return error
+
+    if request.method == "GET":
+        day_key = str(request.args.get("date") or "").strip()
+        if not _valid_day_key(day_key):
+            return jsonify({"ok": False, "error": "invalid_date"}), 400
+        return jsonify({"ok": True, "state": _driver_day_state_response(user, day_key)})
+
+    if request.content_length and request.content_length > MAX_DRIVER_DAY_STATE_BYTES:
+        return jsonify({"ok": False, "error": "day_state_too_large"}), 413
+    body = _json_body()
+    day_key = str(body.get("date") or "").strip()
+    data = body.get("data")
+    if not _valid_day_key(day_key):
+        return jsonify({"ok": False, "error": "invalid_date"}), 400
+    if not isinstance(data, dict):
+        return jsonify({"ok": False, "error": "invalid_day_state"}), 400
+
+    encoded, byte_size = _json_size(data)
+    if byte_size > MAX_DRIVER_DAY_STATE_BYTES:
+        return jsonify({"ok": False, "error": "day_state_too_large"}), 413
+    _upsert_driver_day_state(user, day_key, encoded)
+    db.session.commit()
+    return jsonify({"ok": True, "state": _driver_day_state_response(user, day_key)})
 
 
 @bp.route("/billing/checkout/<plan_key>", methods=["POST"])

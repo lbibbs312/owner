@@ -87,6 +87,7 @@ def test_welcome_page_serves_driver_logger_app(client):
         "/api/account/login",
         "/api/account/register",
         "/api/driver-state",
+        "/api/driver-day-state",
         "movedefense.viewDate.v1",
         "setViewDate",
         "stopsForDate(selectedDateKey)",
@@ -207,20 +208,39 @@ def test_one_driver_api_registers_and_persists_state(client, app):
             }
         ],
     }
-    saved = client.post("/api/driver-state", json={"data": state})
+    day_state = {
+        **state,
+        "day_key": "2026-06-16",
+        "stops": [{**state["stops"][0], "day_key": "2026-06-16"}],
+    }
+    saved = client.post(
+        "/api/driver-state",
+        json={"data": state, "day_states": {"2026-06-16": day_state}},
+    )
 
     assert saved.status_code == 200
     assert saved.get_json()["state"]["data"]["logNumber"] == "MD-2026-001"
 
     with app.app_context():
-        from app.models import DriverState, User
+        from app.models import DriverDayState, DriverState, User
 
         user = User.query.filter_by(email="sync-driver@example.com").first()
         record = DriverState.query.filter_by(user_id=user.id).first()
+        day_record = DriverDayState.query.filter_by(
+            user_id=user.id, day_key="2026-06-16"
+        ).first()
         assert json.loads(record.data)["stops"][0]["location"]["business_name"] == "Receiver Dock"
+        assert json.loads(day_record.data)["stops"][0]["day_key"] == "2026-06-16"
+
+    day_payload = client.get("/api/driver-day-state?date=2026-06-16")
+
+    assert day_payload.status_code == 200
+    assert day_payload.get_json()["state"]["exists"] is True
+    assert day_payload.get_json()["state"]["data"]["stops"][0]["location"]["business_name"] == "Receiver Dock"
 
     client.post("/api/account/logout")
     assert client.get("/api/driver-state").status_code == 401
+    assert client.get("/api/driver-day-state?date=2026-06-16").status_code == 401
 
     login = client.post(
         "/api/account/login",
