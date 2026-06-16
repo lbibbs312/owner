@@ -2,7 +2,7 @@ import hashlib
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import abort, current_app, jsonify, make_response, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user, login_required, login_user, logout_user
@@ -193,6 +193,14 @@ def _account_response(user):
     }
 
 
+def _empty_driver_state_response():
+    return {"exists": False, "data": None, "updated_at": None}
+
+
+def _is_owner_api_user(user):
+    return bool(user and user.role in {"management", "owner"})
+
+
 def _require_driver_api_user():
     if not current_user.is_authenticated:
         return None, (jsonify({"ok": False, "error": "not_authenticated"}), 401)
@@ -201,9 +209,121 @@ def _require_driver_api_user():
     return current_user, None
 
 
-def _login_driver(user):
+def _require_owner_api_user():
+    if not current_user.is_authenticated:
+        return None, (jsonify({"ok": False, "error": "not_authenticated"}), 401)
+    if not _is_owner_api_user(current_user):
+        return None, (jsonify({"ok": False, "error": "owner_required"}), 403)
+    return current_user, None
+
+
+def _login_account(user):
+    user.last_login_at = datetime.utcnow()
+    db.session.add(user)
+    db.session.commit()
     login_user(user, remember=True)
     remember_role_login(user)
+
+
+def _login_driver(user):
+    _login_account(user)
+
+
+def _iso_datetime(value):
+    if not value:
+        return None
+    if value.tzinfo is not None:
+        value = value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value.isoformat(timespec="seconds") + "Z"
+
+
+def _owner_stats_response():
+    now = datetime.utcnow()
+    cutoffs = {
+        "active_today": now - timedelta(days=1),
+        "active_7_days": now - timedelta(days=7),
+        "active_30_days": now - timedelta(days=30),
+        "created_today": now - timedelta(days=1),
+        "created_7_days": now - timedelta(days=7),
+        "created_30_days": now - timedelta(days=30),
+    }
+    drivers = User.query.filter_by(role="driver").order_by(User.id.desc()).all()
+    driver_ids = {driver.id for driver in drivers}
+    state_rows = {
+        row.user_id: row
+        for row in DriverState.query.filter(DriverState.user_id.in_(driver_ids)).all()
+    } if driver_ids else {}
+    day_rows = (
+        DriverDayState.query.filter(DriverDayState.user_id.in_(driver_ids)).all()
+        if driver_ids else []
+    )
+    day_counts = {}
+    latest_day_sync = {}
+    for row in day_rows:
+        day_counts[row.user_id] = day_counts.get(row.user_id, 0) + 1
+        if row.updated_at and (
+            not latest_day_sync.get(row.user_id) or row.updated_at > latest_day_sync[row.user_id]
+        ):
+            latest_day_sync[row.user_id] = row.updated_at
+
+    def latest_activity_for(user_id):
+        candidates = []
+        state = state_rows.get(user_id)
+        if state and state.updated_at:
+            candidates.append(state.updated_at)
+        if latest_day_sync.get(user_id):
+            candidates.append(latest_day_sync[user_id])
+        return max(candidates) if candidates else None
+
+    rows = []
+    active_counts = {key: 0 for key in cutoffs}
+    created_counts = {"created_today": 0, "created_7_days": 0, "created_30_days": 0}
+    synced_accounts = 0
+    for driver in drivers:
+        latest_activity = max(
+            [value for value in [driver.last_login_at, latest_activity_for(driver.id)] if value],
+            default=None,
+        )
+        saved_days = day_counts.get(driver.id, 0)
+        has_saved_state = bool(state_rows.get(driver.id) or saved_days)
+        if has_saved_state:
+            synced_accounts += 1
+        for key in ("active_today", "active_7_days", "active_30_days"):
+            cutoff = cutoffs[key]
+            if latest_activity and latest_activity >= cutoff:
+                active_counts[key] += 1
+        for key in created_counts:
+            if driver.created_at and driver.created_at >= cutoffs[key]:
+                created_counts[key] += 1
+        rows.append(
+            {
+                "id": driver.id,
+                "name": driver.display_name,
+                "username": driver.username,
+                "email": driver.email,
+                "saved": has_saved_state,
+                "saved_days": saved_days,
+                "created_at": _iso_datetime(driver.created_at),
+                "last_login_at": _iso_datetime(driver.last_login_at),
+                "last_activity_at": _iso_datetime(latest_activity),
+            }
+        )
+
+    rows.sort(key=lambda row: row["last_activity_at"] or "", reverse=True)
+    return {
+        "generated_at": _iso_datetime(now),
+        "total_accounts": len(drivers),
+        "created_today": created_counts["created_today"],
+        "created_7_days": created_counts["created_7_days"],
+        "created_30_days": created_counts["created_30_days"],
+        "synced_accounts": synced_accounts,
+        "active_today": active_counts["active_today"],
+        "active_7_days": active_counts["active_7_days"],
+        "active_30_days": active_counts["active_30_days"],
+        "unsynced_accounts": len(drivers) - synced_accounts,
+        "day_snapshots": len(day_rows),
+        "recent_accounts": rows[:20],
+    }
 
 
 def _apk_metadata():
@@ -379,17 +499,30 @@ def api_account_login():
     user = _find_user_by_login(identifier)
     if not user or not user.password_hash or not user.check_password(password):
         return jsonify({"ok": False, "error": "invalid_credentials"}), 401
-    if user.role != "driver":
-        return jsonify({"ok": False, "error": "driver_required"}), 403
 
-    _login_driver(user)
+    if user.role == "driver":
+        _login_driver(user)
+        state = _driver_state_response(user)
+    elif _is_owner_api_user(user):
+        _login_account(user)
+        state = _empty_driver_state_response()
+    else:
+        return jsonify({"ok": False, "error": "driver_required"}), 403
     return jsonify(
         {
             "ok": True,
             "user": _account_response(user),
-            "state": _driver_state_response(user),
+            "state": state,
         }
     )
+
+
+@bp.route("/api/owner/stats", methods=["GET"])
+def api_owner_stats():
+    _user, error = _require_owner_api_user()
+    if error:
+        return error
+    return jsonify({"ok": True, "stats": _owner_stats_response()})
 
 
 @bp.route("/api/account/logout", methods=["POST"])
@@ -403,16 +536,26 @@ def api_account_logout():
 def api_account_me():
     if not current_user.is_authenticated:
         return jsonify({"ok": True, "authenticated": False})
-    if current_user.role != "driver":
+    if current_user.role == "driver":
+        return jsonify(
+            {
+                "ok": True,
+                "authenticated": True,
+                "user": _account_response(current_user),
+                "state": _driver_state_response(current_user),
+            }
+        )
+    if _is_owner_api_user(current_user):
+        return jsonify(
+            {
+                "ok": True,
+                "authenticated": True,
+                "user": _account_response(current_user),
+                "state": _empty_driver_state_response(),
+            }
+        )
+    else:
         return jsonify({"ok": True, "authenticated": False})
-    return jsonify(
-        {
-            "ok": True,
-            "authenticated": True,
-            "user": _account_response(current_user),
-            "state": _driver_state_response(current_user),
-        }
-    )
 
 
 @bp.route("/api/driver-state", methods=["GET", "POST"])

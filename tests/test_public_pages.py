@@ -1,6 +1,7 @@
 import json
 import re
 import sys
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from html import unescape
 
@@ -124,6 +125,13 @@ def test_welcome_page_serves_driver_logger_app(client):
         "lbibbs322",
     ):
         assert legacy not in body
+    visible_text = _visible_text(body)
+    for private_owner_text in (
+        "Account stats",
+        "Private account stats",
+        "Visible only to owner accounts",
+    ):
+        assert private_owner_text not in visible_text
 
 
 def test_welcome_page_renders_without_optional_bulletins(client, monkeypatch):
@@ -310,6 +318,85 @@ def test_one_driver_api_login_accepts_existing_driver_username(client, app):
     payload = response.get_json()
     assert payload["ok"] is True
     assert payload["user"]["username"] == "lbibbs312"
+
+
+def test_welcome_owner_stats_are_private_to_management_accounts(client, app):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import DriverDayState, DriverState, User
+
+        manager = User(
+            username="owner1",
+            email="owner@example.com",
+            role="management",
+            created_at=datetime.utcnow() - timedelta(days=2),
+        )
+        manager.set_password("ownerpass")
+        active_driver = User(
+            username="active-driver",
+            email="active-driver@example.com",
+            role="driver",
+            created_at=datetime.utcnow() - timedelta(hours=4),
+            last_login_at=datetime.utcnow() - timedelta(hours=1),
+        )
+        active_driver.set_password("driverpass")
+        quiet_driver = User(
+            username="quiet-driver",
+            email="quiet-driver@example.com",
+            role="driver",
+            created_at=datetime.utcnow() - timedelta(days=10),
+        )
+        quiet_driver.set_password("driverpass")
+        db.session.add_all([manager, active_driver, quiet_driver])
+        db.session.flush()
+        db.session.add(
+            DriverState(
+                user_id=active_driver.id,
+                data=json.dumps({"stops": [{"id": "stop1"}]}),
+                updated_at=datetime.utcnow() - timedelta(hours=2),
+            )
+        )
+        db.session.add(
+            DriverDayState(
+                user_id=active_driver.id,
+                day_key="2026-06-16",
+                data=json.dumps({"stops": [{"id": "stop1"}]}),
+                updated_at=datetime.utcnow() - timedelta(hours=2),
+            )
+        )
+        db.session.commit()
+
+    anon = client.get("/api/owner/stats")
+    assert anon.status_code == 401
+
+    driver_login = client.post(
+        "/api/account/login",
+        json={"login": "active-driver@example.com", "password": "driverpass"},
+    )
+    assert driver_login.status_code == 200
+    blocked = client.get("/api/owner/stats")
+    assert blocked.status_code == 403
+    assert blocked.get_json()["error"] == "owner_required"
+
+    client.post("/api/account/logout")
+    owner_login = client.post(
+        "/api/account/login",
+        json={"login": "owner@example.com", "password": "ownerpass"},
+    )
+    assert owner_login.status_code == 200
+    owner_payload = owner_login.get_json()
+    assert owner_payload["user"]["role"] == "management"
+    assert owner_payload["state"] == {"exists": False, "data": None, "updated_at": None}
+
+    stats_response = client.get("/api/owner/stats")
+    assert stats_response.status_code == 200
+    stats = stats_response.get_json()["stats"]
+    assert stats["total_accounts"] == 2
+    assert stats["created_7_days"] == 1
+    assert stats["active_today"] == 1
+    assert stats["synced_accounts"] == 1
+    assert stats["day_snapshots"] == 1
+    assert stats["recent_accounts"][0]["email"] == "active-driver@example.com"
 
 
 def test_billing_checkout_fails_closed_until_stripe_is_configured(client, app):

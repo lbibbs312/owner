@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -22,6 +24,8 @@ class User(db.Model, UserMixin):
     employee_id = db.Column(db.String(32), nullable=True)
     shift = db.Column(db.String(16), nullable=True)
     department = db.Column(db.String(32), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=True)
+    last_login_at = db.Column(db.DateTime, nullable=True)
 
     tasks = db.relationship(
         "Task",

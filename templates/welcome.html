@@ -171,6 +171,28 @@ input,select,textarea{font-family:inherit}
 .auth-foot{font-family:var(--f-mono);font-size:10.5px;color:var(--text-3);line-height:1.5;margin-top:14px;text-align:center}
 
 /* ============================================================
+   OWNER — private welcome-app account stats
+   ============================================================ */
+#screen-owner{min-height:100dvh;padding-bottom:34px}
+.owner-pad{padding:4px 16px 0;display:grid;gap:14px}
+.owner-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.owner-kpi{border:1px solid var(--hair);border-radius:16px;background:var(--panel);padding:13px;min-width:0}
+.owner-kpi span{display:block;font-family:var(--f-mono);font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-3)}
+.owner-kpi b{display:block;margin-top:8px;font-family:var(--f-display);font-size:30px;line-height:1;font-variant-numeric:tabular-nums}
+.owner-panel{border:1px solid var(--hair);border-radius:18px;background:linear-gradient(180deg,var(--panel-2),var(--panel));overflow:hidden}
+.owner-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 14px;border-bottom:1px solid var(--hair)}
+.owner-panel-head h2{font-family:var(--f-display);font-size:18px;margin:0}
+.owner-panel-head span{font-family:var(--f-mono);font-size:10.5px;color:var(--text-3)}
+.owner-list{display:grid}
+.owner-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:12px 14px;border-top:1px solid rgba(255,255,255,.055)}
+.owner-row:first-child{border-top:0}
+.owner-row strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.owner-row small{display:block;margin-top:3px;color:var(--text-3);overflow-wrap:anywhere}
+.owner-status{text-align:right;font-family:var(--f-mono);font-size:10.5px;color:var(--cyan);white-space:nowrap}
+.owner-empty{padding:14px;color:var(--text-3);font-size:13px;line-height:1.45}
+@media (min-width:520px){.owner-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* ============================================================
    INTRO — Hero video carousel
    ============================================================ */
 #screen-intro{min-height:100dvh}
@@ -852,6 +874,26 @@ table.tbl .seq{font-family:var(--f-mono);color:#94a0b8;width:22px}
     <div class="scope-extra" id="scopeExtra"></div>
     <div class="doc-wrap"><div class="doc" id="doc"></div></div>
   </section>
+
+  <!-- ====================== OWNER ====================== -->
+  <section id="screen-owner" class="screen">
+    <header class="topbar">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 40 40" fill="none">
+          <path d="M20 3 L34 8 V19 C34 28 28 34 20 37 C12 34 6 28 6 19 V8 Z" stroke="url(#lg)" stroke-width="2.2" fill="rgba(63,224,206,.06)"/>
+          <path d="M20 25 L20 13 M20 13 L15 18 M20 13 L25 18" stroke="#eaf1ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="20" cy="29.5" r="1.7" fill="#5cf0de"/>
+        </svg>
+        <div class="wordmark"><b>Move</b><span class="df">Defense</span></div>
+      </div>
+      <div class="tb-right">
+        <button class="icon-btn" onclick="openDrawer()" aria-label="Menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </header>
+    <div class="owner-pad" id="ownerRoot"></div>
+  </section>
 </div>
 
 <!-- CTA DOCK -->
@@ -1134,6 +1176,8 @@ function normalizeEmail(email){return String(email||'').trim().toLowerCase();}
 function validEmail(email){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);}
 function currentUser(){return A.serverUser||A.accounts.find(a=>a.email===A.sessionEmail)||null;}
 function authSignedIn(){return !!currentUser();}
+function isOwnerUser(user=currentUser()){return ['management','owner'].includes(String(user?.role||'').toLowerCase());}
+function isDriverUser(user=currentUser()){return !!user&&String(user.role||'driver').toLowerCase()==='driver'&&!isOwnerUser(user);}
 function authField(id){return ($('#'+id)?.value||'').trim();}
 function authSetMode(mode){
   authSubmitting=false;
@@ -1174,6 +1218,7 @@ function apiErrorMessage(error,fallback='Request failed'){
   if(code==='account_exists')return'Account already exists';
   if(code==='weak_password')return'Password must be at least 8 characters';
   if(code==='driver_required')return'Driver account required';
+  if(code==='owner_required')return'Owner account required';
   if(code==='not_authenticated')return'Sign in required';
   return errorText(error)||fallback;
 }
@@ -1250,7 +1295,7 @@ function stateForDate(key=selectedDateKey){
   };
 }
 async function saveServerDayStateNow(key=selectedDateKey){
-  if(!A?.serverUser||navigator.onLine===false||!isDateKey(key))return null;
+  if(!isDriverUser(A?.serverUser)||navigator.onLine===false||!isDateKey(key))return null;
   const data=stateForDate(key);
   if(!data.stops.length&&!data.currentPlace&&!data.destination)return null;
   return await apiFetch('/api/driver-day-state',{method:'POST',body:{date:key,data}});
@@ -1261,7 +1306,7 @@ function renderActiveDateRoute(){
   else if(activeRoute==='export')renderExport();
 }
 async function loadServerDayState(key=selectedDateKey){
-  if(!A?.serverUser||navigator.onLine===false||serverDayLoadInFlight||!isDateKey(key))return false;
+  if(!isDriverUser(A?.serverUser)||navigator.onLine===false||serverDayLoadInFlight||!isDateKey(key))return false;
   if(stopsForDate(key).length)return false;
   serverDayLoadInFlight=true;
   try{
@@ -1287,13 +1332,13 @@ async function loadServerDayState(key=selectedDateKey){
   }
 }
 function queueServerStateSave(){
-  if(!A?.serverUser||navigator.onLine===false)return;
+  if(!isDriverUser(A?.serverUser)||navigator.onLine===false)return;
   serverSavePending=true;
   clearTimeout(serverSaveTimer);
   serverSaveTimer=setTimeout(()=>saveServerStateNow().catch(error=>console.warn('[MoveDefense sync]',error)),900);
 }
 async function saveServerStateNow(){
-  if(!A?.serverUser||navigator.onLine===false)return null;
+  if(!isDriverUser(A?.serverUser)||navigator.onLine===false)return null;
   if(serverSaveInFlight){
     serverSavePending=true;
     return null;
@@ -1322,6 +1367,7 @@ async function loadServerSession(){
     const payload=await apiFetch('/api/account/me');
     if(payload.authenticated&&payload.user){
       setServerUser(payload.user);
+      if(isOwnerUser(payload.user))return payload.user;
       const loaded=applyServerStatePayload(payload.state);
       if(!loaded&&hasUsefulState(S))queueServerStateSave();
       loadServerDayState(selectedDateKey);
@@ -1342,6 +1388,12 @@ async function loadServerSession(){
 async function completeServerAuth(payload){
   if(!payload?.user)throw new Error('Server did not return an account');
   setServerUser(payload.user);
+  if(isOwnerUser(payload.user)){
+    closeDrawer();
+    closeSheet();
+    route('owner',false);
+    return;
+  }
   const loaded=applyServerStatePayload(payload.state);
   applyAuthToDriver(currentUser());
   if(!loaded&&hasUsefulState(S)){
@@ -1539,12 +1591,51 @@ function applyAuthToDriver(account=currentUser()){
   }
 }
 function continueAfterAuth(){
+  if(isOwnerUser())return route('owner',false);
   const hasAppState=!!(S.settings?.chosen||S.stops.length||S.currentPlace||S.destination);
   if(hasAppState){
     const saved=localStorage.getItem(ROUTE_KEY);
     route(saved==='export'||saved==='fuel'?saved:'home');
   }else{
     heroGo(0);heroStart();route('intro');
+  }
+}
+function ownerNumber(value){return Number(value||0).toLocaleString();}
+function ownerTime(value){
+  if(!value)return'No server activity yet';
+  return new Date(value).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+}
+function ownerAccountRow(account){
+  return `<div class="owner-row">
+    <div><strong>${escapeHtml(account.name||account.username||account.email)}</strong><small>${escapeHtml(account.email||account.username||'Driver account')} · ${ownerNumber(account.saved_days)} saved day${Number(account.saved_days||0)===1?'':'s'}</small></div>
+    <div class="owner-status">${escapeHtml(ownerTime(account.last_activity_at))}</div>
+  </div>`;
+}
+async function renderOwnerStats(){
+  const root=$('#ownerRoot');
+  if(!root)return;
+  if(!isOwnerUser()){
+    root.innerHTML='<div class="owner-empty">Owner access required.</div>';
+    return;
+  }
+  root.innerHTML='<div class="owner-empty">Loading account activity...</div>';
+  try{
+    const payload=await apiFetch('/api/owner/stats');
+    const stats=payload.stats||{};
+    const rows=(stats.recent_accounts||[]).map(ownerAccountRow).join('');
+    root.innerHTML=`
+      <div class="owner-kpis">
+        <div class="owner-kpi"><span>Total accounts</span><b>${ownerNumber(stats.total_accounts)}</b></div>
+        <div class="owner-kpi"><span>Active 24h</span><b>${ownerNumber(stats.active_today)}</b></div>
+        <div class="owner-kpi"><span>Active 7d</span><b>${ownerNumber(stats.active_7_days)}</b></div>
+        <div class="owner-kpi"><span>Created 7d</span><b>${ownerNumber(stats.created_7_days)}</b></div>
+      </div>
+      <div class="owner-panel">
+        <div class="owner-panel-head"><h2>Account Activity</h2><span>${ownerNumber(stats.synced_accounts)} synced · ${ownerNumber(stats.day_snapshots)} saved days</span></div>
+        <div class="owner-list">${rows||'<div class="owner-empty">No driver accounts yet.</div>'}</div>
+      </div>`;
+  }catch(error){
+    root.innerHTML=`<div class="owner-empty">Could not load owner stats. ${escapeHtml(apiErrorMessage(error))}</div>`;
   }
 }
 async function signOut(){
@@ -1648,9 +1739,10 @@ function syncCtaHeight(){
   document.documentElement.style.setProperty('--cta-h',h+'px');
 }
 function route(name,persist=true){
+  if(name==='owner'&&!isOwnerUser())name='auth';
   activeRoute=name;
   $$('.screen').forEach(s=>s.classList.remove('is-active'));
-  $('#screen-'+name).classList.add('is-active');
+  $('#screen-'+name)?.classList.add('is-active');
   const showCta=name==='home';
   $('#cta-dock').classList.toggle('show',showCta);
   syncCtaHeight();
@@ -1659,6 +1751,7 @@ function route(name,persist=true){
   if(name==='home'){renderHome();}
   if(name==='fuel'){renderFuel();}
   if(name==='export'){renderExport();}
+  if(name==='owner'){renderOwnerStats();}
 }
 function enterApp(){clearInterval(heroTimer);if(!S.settings||!S.settings.chosen){openModePick();}else{route('home');}}
 function openModePick(){
@@ -3507,6 +3600,17 @@ function closeSheet(){unbindSheetDraft();$('#scrim').classList.remove('on');$('#
 function openDrawer(){renderDrawer();$('#drawerScrim').classList.add('on');$('#drawer').classList.add('on');}
 function closeDrawer(){$('#drawerScrim').classList.remove('on');$('#drawer').classList.remove('on');}
 function renderDrawer(){
+  if(isOwnerUser()){
+    $('#drawer').innerHTML=`
+      <div class="dh"><div class="wordmark"><b>Move</b><span class="df">Defense</span></div>
+        <button class="icon-btn" onclick="closeDrawer()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>
+      <div class="driver-card"><div class="dn">${escapeHtml(currentUser()?.name||'Owner')}</div><div class="dl">${escapeHtml(currentUser()?.email||'Owner account')}</div>
+        <div class="dl" style="margin-top:8px;color:var(--cyan)">Private account stats</div></div>
+      <button class="drawer-item" onclick="closeDrawer();route('owner',false)">${icoDoc(20)}<div><div>Account stats</div><div class="sub">Users · active accounts · saved days</div></div></button>
+      <button class="drawer-item" onclick="signOut()">${icoReset(20)}<div><div>Sign out</div><div class="sub">${escapeHtml(currentUser()?.email||'Owner account')}</div></div></button>
+      <div class="drawer-foot">MoveDefense owner tools<br>Visible only to owner accounts</div>`;
+    return;
+  }
   $('#drawer').innerHTML=`
     <div class="dh"><div class="wordmark"><b>Move</b><span class="df">Defense</span></div>
       <button class="icon-btn" onclick="closeDrawer()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>
@@ -3767,6 +3871,11 @@ function tickClock(){const c=$('#clk');if(c){c.textContent=fmtTime(Date.now());}
 async function bootApp(){
   installAppHistoryGuard();
   await loadServerSession();
+  if(isOwnerUser()){
+    clearInterval(heroTimer);
+    route('owner',false);
+    return;
+  }
   const localOnlyUser=!A.serverUser&&A.sessionEmail&&authAccount(A.sessionEmail);
   if(localOnlyUser&&navigator.onLine!==false&&!serverSessionUnavailable){
     clearInterval(heroTimer);
