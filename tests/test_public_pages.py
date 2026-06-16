@@ -90,6 +90,7 @@ def test_welcome_page_serves_driver_logger_app(client):
         "/api/account/register",
         "/api/driver-state",
         "/api/driver-day-state",
+        "/api/driver-telemetry",
         "movedefense.viewDate.v1",
         "setViewDate",
         "stopsForDate(selectedDateKey)",
@@ -99,7 +100,9 @@ def test_welcome_page_serves_driver_logger_app(client):
         "handleAppBackGesture",
         "serverSessionUnavailable=true;",
         "role:user.role||'driver'",
-        "authSubmitting=false;\n    closeDrawer();\n    closeSheet();\n    route('owner',false);",
+        "Online Now",
+        "Recent Exports",
+        "authSubmitting=false;\n    stopDriverTelemetry();\n    closeDrawer();\n    closeSheet();\n    route('owner',false);",
     ):
         assert expected in body
     for legacy in (
@@ -325,7 +328,7 @@ def test_one_driver_api_login_accepts_existing_driver_username(client, app):
 def test_welcome_owner_stats_are_private_to_management_accounts(client, app):
     with app.app_context():
         from app.extensions import db
-        from app.models import DriverDayState, DriverState, User
+        from app.models import DriverDayState, DriverPresence, DriverState, User
 
         manager = User(
             username="owner1",
@@ -351,16 +354,17 @@ def test_welcome_owner_stats_are_private_to_management_accounts(client, app):
         quiet_driver.set_password("driverpass")
         db.session.add_all([manager, active_driver, quiet_driver])
         db.session.flush()
+        active_driver_id = active_driver.id
         db.session.add(
             DriverState(
-                user_id=active_driver.id,
+                user_id=active_driver_id,
                 data=json.dumps({"stops": [{"id": "stop1"}]}),
                 updated_at=datetime.utcnow() - timedelta(hours=2),
             )
         )
         db.session.add(
             DriverDayState(
-                user_id=active_driver.id,
+                user_id=active_driver_id,
                 day_key="2026-06-16",
                 data=json.dumps({"stops": [{"id": "stop1"}]}),
                 updated_at=datetime.utcnow() - timedelta(hours=2),
@@ -379,6 +383,70 @@ def test_welcome_owner_stats_are_private_to_management_accounts(client, app):
     blocked = client.get("/api/owner/stats")
     assert blocked.status_code == 403
     assert blocked.get_json()["error"] == "owner_required"
+    heartbeat = client.post(
+        "/api/driver-telemetry",
+        json={
+            "event_type": "heartbeat",
+            "session_id": "session-1",
+            "visible": True,
+            "screen": "home",
+            "route_state": "driving",
+            "current_target": "Receiver Dock",
+            "stop_count": 3,
+            "day_key": "2026-06-16",
+            "location": {
+                "label": "Grand Rapids Dock",
+                "city": "Grand Rapids",
+                "state": "MI",
+            },
+        },
+    )
+    assert heartbeat.status_code == 200
+    with app.app_context():
+        from app.extensions import db
+
+        presence = DriverPresence.query.filter_by(user_id=active_driver_id).one()
+        presence.last_heartbeat_at = datetime.utcnow() - timedelta(seconds=45)
+        db.session.commit()
+    heartbeat = client.post(
+        "/api/driver-telemetry",
+        json={
+            "event_type": "heartbeat",
+            "session_id": "session-1",
+            "visible": True,
+            "screen": "home",
+            "route_state": "driving",
+            "current_target": "Receiver Dock",
+            "stop_count": 3,
+            "day_key": "2026-06-16",
+            "location": {
+                "label": "Grand Rapids Dock",
+                "city": "Grand Rapids",
+                "state": "MI",
+            },
+        },
+    )
+    assert heartbeat.status_code == 200
+    export = client.post(
+        "/api/driver-telemetry",
+        json={
+            "event_type": "export",
+            "session_id": "session-1",
+            "screen": "export",
+            "route_state": "driving",
+            "export_type": "trip_export",
+            "export_label": "Trip export",
+            "scope": "day",
+            "day_key": "2026-06-16",
+            "stop_count": 3,
+            "location": {
+                "label": "Grand Rapids Dock",
+                "city": "Grand Rapids",
+                "state": "MI",
+            },
+        },
+    )
+    assert export.status_code == 200
 
     client.post("/api/account/logout")
     owner_login = client.post(
@@ -396,8 +464,15 @@ def test_welcome_owner_stats_are_private_to_management_accounts(client, app):
     assert stats["total_accounts"] == 2
     assert stats["created_7_days"] == 1
     assert stats["active_today"] == 1
+    assert stats["online_now"] == 1
     assert stats["synced_accounts"] == 1
     assert stats["day_snapshots"] == 1
+    assert stats["exports_24h"] == 1
+    assert stats["total_app_seconds_today"] >= 40
+    assert stats["active_sessions"][0]["presence"]["city"] == "Grand Rapids"
+    assert stats["active_sessions"][0]["presence"]["state"] == "MI"
+    assert stats["recent_exports"][0]["driver_email"] == "active-driver@example.com"
+    assert stats["recent_exports"][0]["city"] == "Grand Rapids"
     assert stats["recent_accounts"][0]["email"] == "active-driver@example.com"
 
 

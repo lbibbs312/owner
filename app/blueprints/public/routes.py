@@ -11,7 +11,14 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.blueprints.public import bp
 from app.extensions import db
-from app.models import Announcement, DriverDayState, DriverState, User
+from app.models import (
+    Announcement,
+    DriverActivityEvent,
+    DriverDayState,
+    DriverPresence,
+    DriverState,
+    User,
+)
 from app.services.database_status import database_status
 from app.services.route_context import build_route_context
 from app.services.google_places import (
@@ -31,6 +38,9 @@ from app.services.stripe_checkout import (
 
 MAX_DRIVER_STATE_BYTES = 2_000_000
 MAX_DRIVER_DAY_STATE_BYTES = 400_000
+MAX_DRIVER_TELEMETRY_BYTES = 20_000
+ONLINE_WINDOW = timedelta(minutes=2)
+HEARTBEAT_MAX_SECONDS = 120
 DAY_KEY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -237,6 +247,128 @@ def _iso_datetime(value):
     return value.isoformat(timespec="seconds") + "Z"
 
 
+def _trim_text(value, max_length):
+    text = str(value or "").strip()
+    return text[:max_length] if text else None
+
+
+def _presence_location(data):
+    location = data.get("location") if isinstance(data.get("location"), dict) else {}
+    return {
+        "location_label": _trim_text(location.get("label") or location.get("name"), 160),
+        "city": _trim_text(location.get("city"), 80),
+        "state": _trim_text(location.get("state"), 40),
+    }
+
+
+def _telemetry_day_key(value, now):
+    key = str(value or "").strip()
+    return key if _valid_day_key(key) else now.date().isoformat()
+
+
+def _int_value(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _presence_response(presence, now=None):
+    if not presence:
+        return None
+    now = now or datetime.utcnow()
+    online = bool(presence.last_seen_at and presence.last_seen_at >= now - ONLINE_WINDOW)
+    return {
+        "online": online,
+        "session_id": presence.session_id,
+        "screen": presence.screen,
+        "route_state": presence.route_state,
+        "location_label": presence.location_label,
+        "city": presence.city,
+        "state": presence.state,
+        "current_target": presence.current_target,
+        "stop_count": presence.stop_count or 0,
+        "active_today_seconds": presence.active_today_seconds or 0,
+        "total_active_seconds": presence.total_active_seconds or 0,
+        "export_count": presence.export_count or 0,
+        "last_seen_at": _iso_datetime(presence.last_seen_at),
+        "last_export_at": _iso_datetime(presence.last_export_at),
+        "last_export_type": presence.last_export_type,
+    }
+
+
+def _record_driver_telemetry(user, data):
+    now = datetime.utcnow()
+    event_type = _trim_text(data.get("event_type") or "heartbeat", 32) or "heartbeat"
+    if event_type not in {"heartbeat", "export"}:
+        return None, (jsonify({"ok": False, "error": "invalid_event_type"}), 400)
+
+    presence = DriverPresence.query.filter_by(user_id=user.id).first()
+    if not presence:
+        presence = DriverPresence(user_id=user.id, first_seen_at=now)
+        db.session.add(presence)
+
+    session_id = _trim_text(data.get("session_id"), 80)
+    day_key = _telemetry_day_key(data.get("day_key"), now)
+    if presence.active_day_key != day_key:
+        presence.active_day_key = day_key
+        presence.active_today_seconds = 0
+
+    if event_type == "heartbeat":
+        visible = data.get("visible", True) is not False
+        same_session = bool(session_id and presence.session_id == session_id)
+        if visible and same_session and presence.last_heartbeat_at:
+            delta = int((now - presence.last_heartbeat_at).total_seconds())
+            if 0 < delta <= HEARTBEAT_MAX_SECONDS:
+                presence.active_today_seconds = (presence.active_today_seconds or 0) + delta
+                presence.total_active_seconds = (presence.total_active_seconds or 0) + delta
+        presence.last_heartbeat_at = now
+
+    location = _presence_location(data)
+    presence.session_id = session_id or presence.session_id
+    presence.last_seen_at = now
+    presence.screen = _trim_text(data.get("screen"), 32)
+    presence.route_state = _trim_text(data.get("route_state"), 32)
+    presence.current_target = _trim_text(data.get("current_target"), 160)
+    presence.stop_count = max(0, _int_value(data.get("stop_count")))
+    presence.location_label = location["location_label"]
+    presence.city = location["city"]
+    presence.state = location["state"]
+
+    if event_type == "export":
+        export_type = _trim_text(data.get("export_type") or "export", 40) or "export"
+        export_label = _trim_text(data.get("export_label") or export_type, 128)
+        metadata = {
+            "export_type": export_type,
+            "scope": _trim_text(data.get("scope"), 40),
+            "day_key": day_key,
+            "date_from": _trim_text(data.get("date_from"), 10),
+            "date_to": _trim_text(data.get("date_to"), 10),
+            "customer": _trim_text(data.get("customer"), 120),
+            "stop_count": presence.stop_count or 0,
+        }
+        db.session.add(
+            DriverActivityEvent(
+                user_id=user.id,
+                event_type="export",
+                event_label=export_label,
+                session_id=session_id,
+                screen=presence.screen,
+                location_label=presence.location_label,
+                city=presence.city,
+                state=presence.state,
+                metadata_json=json.dumps(metadata, separators=(",", ":")),
+                created_at=now,
+            )
+        )
+        presence.export_count = (presence.export_count or 0) + 1
+        presence.last_export_at = now
+        presence.last_export_type = export_type
+
+    db.session.commit()
+    return presence, None
+
+
 def _owner_stats_response():
     now = datetime.utcnow()
     cutoffs = {
@@ -255,6 +387,31 @@ def _owner_stats_response():
     } if driver_ids else {}
     day_rows = (
         DriverDayState.query.filter(DriverDayState.user_id.in_(driver_ids)).all()
+        if driver_ids else []
+    )
+    presence_rows = {
+        row.user_id: row
+        for row in DriverPresence.query.filter(DriverPresence.user_id.in_(driver_ids)).all()
+    } if driver_ids else {}
+    exports_24h = (
+        DriverActivityEvent.query
+        .filter(
+            DriverActivityEvent.user_id.in_(driver_ids),
+            DriverActivityEvent.event_type == "export",
+            DriverActivityEvent.created_at >= cutoffs["active_today"],
+        )
+        .count()
+        if driver_ids else 0
+    )
+    recent_export_rows = (
+        DriverActivityEvent.query
+        .filter(
+            DriverActivityEvent.user_id.in_(driver_ids),
+            DriverActivityEvent.event_type == "export",
+        )
+        .order_by(DriverActivityEvent.created_at.desc())
+        .limit(12)
+        .all()
         if driver_ids else []
     )
     day_counts = {}
@@ -279,15 +436,33 @@ def _owner_stats_response():
     active_counts = {key: 0 for key in cutoffs}
     created_counts = {"created_today": 0, "created_7_days": 0, "created_30_days": 0}
     synced_accounts = 0
+    online_now = 0
+    total_app_seconds_today = 0
+    active_sessions = []
     for driver in drivers:
+        presence = presence_rows.get(driver.id)
+        presence_data = _presence_response(presence, now)
         latest_activity = max(
-            [value for value in [driver.last_login_at, latest_activity_for(driver.id)] if value],
+            [
+                value
+                for value in [
+                    driver.last_login_at,
+                    latest_activity_for(driver.id),
+                    presence.last_seen_at if presence else None,
+                    presence.last_export_at if presence else None,
+                ]
+                if value
+            ],
             default=None,
         )
         saved_days = day_counts.get(driver.id, 0)
         has_saved_state = bool(state_rows.get(driver.id) or saved_days)
         if has_saved_state:
             synced_accounts += 1
+        if presence_data:
+            total_app_seconds_today += presence_data["active_today_seconds"]
+            if presence_data["online"]:
+                online_now += 1
         for key in ("active_today", "active_7_days", "active_30_days"):
             cutoff = cutoffs[key]
             if latest_activity and latest_activity >= cutoff:
@@ -306,13 +481,48 @@ def _owner_stats_response():
                 "created_at": _iso_datetime(driver.created_at),
                 "last_login_at": _iso_datetime(driver.last_login_at),
                 "last_activity_at": _iso_datetime(latest_activity),
+                "presence": presence_data,
             }
         )
+        if presence_data and presence_data["online"]:
+            active_sessions.append(rows[-1])
 
-    rows.sort(key=lambda row: row["last_activity_at"] or "", reverse=True)
+    def export_row(row):
+        driver = next((item for item in drivers if item.id == row.user_id), None)
+        try:
+            metadata = json.loads(row.metadata_json or "{}")
+        except (TypeError, ValueError):
+            metadata = {}
+        return {
+            "id": row.id,
+            "driver_id": row.user_id,
+            "driver_name": driver.display_name if driver else "Driver",
+            "driver_email": driver.email if driver else "",
+            "event_label": row.event_label,
+            "export_type": metadata.get("export_type") or row.event_label or "export",
+            "scope": metadata.get("scope"),
+            "day_key": metadata.get("day_key"),
+            "date_from": metadata.get("date_from"),
+            "date_to": metadata.get("date_to"),
+            "customer": metadata.get("customer"),
+            "stop_count": metadata.get("stop_count") or 0,
+            "location_label": row.location_label,
+            "city": row.city,
+            "state": row.state,
+            "created_at": _iso_datetime(row.created_at),
+        }
+
+    rows.sort(
+        key=lambda row: (
+            1 if (row.get("presence") or {}).get("online") else 0,
+            row["last_activity_at"] or "",
+        ),
+        reverse=True,
+    )
     return {
         "generated_at": _iso_datetime(now),
         "total_accounts": len(drivers),
+        "online_now": online_now,
         "created_today": created_counts["created_today"],
         "created_7_days": created_counts["created_7_days"],
         "created_30_days": created_counts["created_30_days"],
@@ -320,8 +530,12 @@ def _owner_stats_response():
         "active_today": active_counts["active_today"],
         "active_7_days": active_counts["active_7_days"],
         "active_30_days": active_counts["active_30_days"],
+        "exports_24h": exports_24h,
+        "total_app_seconds_today": total_app_seconds_today,
         "unsynced_accounts": len(drivers) - synced_accounts,
         "day_snapshots": len(day_rows),
+        "active_sessions": active_sessions[:12],
+        "recent_exports": [export_row(row) for row in recent_export_rows],
         "recent_accounts": rows[:20],
     }
 
@@ -523,6 +737,19 @@ def api_owner_stats():
     if error:
         return error
     return jsonify({"ok": True, "stats": _owner_stats_response()})
+
+
+@bp.route("/api/driver-telemetry", methods=["POST"])
+def api_driver_telemetry():
+    user, error = _require_driver_api_user()
+    if error:
+        return error
+    if request.content_length and request.content_length > MAX_DRIVER_TELEMETRY_BYTES:
+        return jsonify({"ok": False, "error": "telemetry_too_large"}), 413
+    presence, error = _record_driver_telemetry(user, _json_body())
+    if error:
+        return error
+    return jsonify({"ok": True, "presence": _presence_response(presence)})
 
 
 @bp.route("/api/account/logout", methods=["POST"])

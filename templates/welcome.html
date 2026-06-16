@@ -189,6 +189,12 @@ input,select,textarea{font-family:inherit}
 .owner-row strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .owner-row small{display:block;margin-top:3px;color:var(--text-3);overflow-wrap:anywhere}
 .owner-status{text-align:right;font-family:var(--f-mono);font-size:10.5px;color:var(--cyan);white-space:nowrap}
+.owner-row.is-online .owner-status{color:var(--green)}
+.owner-live{display:grid;gap:8px}
+.owner-dot{display:inline-block;width:7px;height:7px;border-radius:999px;background:var(--text-3);margin-right:6px;vertical-align:1px}
+.owner-dot.on{background:var(--green);box-shadow:0 0 0 3px rgba(49,211,125,.13)}
+.owner-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.owner-pill{border:1px solid var(--hair);border-radius:999px;padding:3px 7px;font-family:var(--f-mono);font-size:10px;color:var(--text-2);background:rgba(255,255,255,.03)}
 .owner-empty{padding:14px;color:var(--text-3);font-size:13px;line-height:1.45}
 @media (min-width:520px){.owner-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
 
@@ -921,6 +927,7 @@ const ROUTE_KEY='movedefense.lastRoute';
 const AUTH_KEY='movedefense.auth.v1';
 const SHEET_DRAFT_KEY='movedefense.sheetDraft.v1';
 const VIEW_DATE_KEY='movedefense.viewDate.v1';
+const TELEMETRY_SESSION_KEY='movedefense.telemetrySession.v1';
 const LEGACY_KEYS=['movedefense.v1'];
 const CONFIG=window.MOVEDEFENSE_CONFIG||{};
 const GOOGLE_MAPS_API_KEY=String(CONFIG.googleMapsApiKey||'').trim();
@@ -1159,6 +1166,8 @@ let serverSavePending=false;
 let serverDayLoadInFlight=false;
 let activeRoute='auth';
 let appHistoryGuardReady=false;
+let telemetryTimer=null;
+let ownerStatsTimer=null;
 
 function loadAuth(){
   try{
@@ -1263,7 +1272,7 @@ function setServerUser(user){
   if(account){
     A.sessionEmail=account.email;
     const local=authAccount(account.email);
-    if(local)Object.assign(local,{name:account.name,provider:'server',serverId:account.serverId,username:account.username});
+    if(local)Object.assign(local,{name:account.name,role:account.role,provider:'server',serverId:account.serverId,username:account.username});
     else A.accounts.push({...account});
   }
   saveAuth();
@@ -1271,6 +1280,88 @@ function setServerUser(user){
 function clearServerUser(){
   A.serverUser=null;
   saveAuth();
+}
+function telemetrySessionId(){
+  try{
+    let id=localStorage.getItem(TELEMETRY_SESSION_KEY);
+    if(!id){
+      id='md-'+Date.now().toString(36)+'-'+randomHex(6);
+      localStorage.setItem(TELEMETRY_SESSION_KEY,id);
+    }
+    return id;
+  }catch(e){
+    return 'md-'+Date.now().toString(36)+'-'+uid();
+  }
+}
+function cityStateFromAddress(address){
+  const parts=String(address||'').split(',').map(part=>part.trim()).filter(Boolean);
+  let city='',state='';
+  if(parts.length>=3){
+    city=parts[parts.length-3]||'';
+    state=(parts[parts.length-2]||'').split(/\s+/)[0]||'';
+  }else if(parts.length>=2){
+    city=parts[0]||'';
+    state=(parts[1]||'').split(/\s+/)[0]||'';
+  }
+  return {city,state};
+}
+function activeTelemetryLocation(){
+  const driving=S.position==='driving';
+  const last=[...S.stops].reverse().find(stop=>stop.location)?.location;
+  const place=driving?S.destination:(S.currentPlace||last);
+  const address=visibleAddress(place);
+  const parsed=cityStateFromAddress(address);
+  return {
+    label:displayPlaceName(place,driving?'Destination':'Current location'),
+    address,
+    city:parsed.city,
+    state:parsed.state
+  };
+}
+function driverTelemetryPayload(eventType='heartbeat',extra={}){
+  const location=activeTelemetryLocation();
+  return {
+    event_type:eventType,
+    session_id:telemetrySessionId(),
+    visible:!document.hidden,
+    screen:activeRoute,
+    route_state:S.position,
+    current_target:S.position==='driving'?displayPlaceName(S.destination,'Destination'):'',
+    stop_count:Array.isArray(S.stops)?S.stops.length:0,
+    day_key:todayKey(),
+    location,
+    ...extra
+  };
+}
+async function sendDriverTelemetry(eventType='heartbeat',extra={}){
+  if(!isDriverUser(A?.serverUser)||navigator.onLine===false)return null;
+  try{
+    return await apiFetch('/api/driver-telemetry',{method:'POST',body:driverTelemetryPayload(eventType,extra)});
+  }catch(error){
+    console.warn('[MoveDefense telemetry]',error);
+    return null;
+  }
+}
+function stopDriverTelemetry(){
+  clearInterval(telemetryTimer);
+  telemetryTimer=null;
+}
+function startDriverTelemetry(){
+  stopDriverTelemetry();
+  if(!isDriverUser(A?.serverUser))return;
+  setTimeout(()=>sendDriverTelemetry(),1200);
+  telemetryTimer=setInterval(()=>sendDriverTelemetry(),30000);
+}
+function trackDriverExport(exportType,meta={}){
+  return sendDriverTelemetry('export',{
+    export_type:exportType,
+    export_label:meta.label||exportType,
+    scope:meta.scope||scope,
+    day_key:meta.day_key||meta.date_from||selectedDateKey,
+    date_from:meta.date_from||selectedDateKey,
+    date_to:meta.date_to||selectedDateKey,
+    customer:meta.customer||custFilter||'',
+  });
 }
 function applyServerStatePayload(state){
   const data=state?.data;
@@ -1368,10 +1459,14 @@ async function loadServerSession(){
     const payload=await apiFetch('/api/account/me');
     if(payload.authenticated&&payload.user){
       setServerUser(payload.user);
-      if(isOwnerUser(payload.user))return payload.user;
+      if(isOwnerUser(payload.user)){
+        stopDriverTelemetry();
+        return payload.user;
+      }
       const loaded=applyServerStatePayload(payload.state);
       if(!loaded&&hasUsefulState(S))queueServerStateSave();
       loadServerDayState(selectedDateKey);
+      startDriverTelemetry();
       return payload.user;
     }
     if(A.serverUser){
@@ -1391,6 +1486,7 @@ async function completeServerAuth(payload){
   setServerUser(payload.user);
   if(isOwnerUser(payload.user)){
     authSubmitting=false;
+    stopDriverTelemetry();
     closeDrawer();
     closeSheet();
     route('owner',false);
@@ -1402,6 +1498,8 @@ async function completeServerAuth(payload){
     await saveServerStateNow();
   }
   loadServerDayState(selectedDateKey);
+  authSubmitting=false;
+  startDriverTelemetry();
   continueAfterAuth();
 }
 function randomHex(bytes=16){
@@ -1603,45 +1701,121 @@ function continueAfterAuth(){
   }
 }
 function ownerNumber(value){return Number(value||0).toLocaleString();}
+function ownerDuration(seconds){
+  const total=Math.max(0,Number(seconds)||0);
+  if(total<60)return'<1 min';
+  const mins=Math.round(total/60);
+  if(mins<60)return mins+' min';
+  return Math.floor(mins/60)+'h '+(mins%60)+'m';
+}
 function ownerTime(value){
   if(!value)return'No server activity yet';
-  return new Date(value).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  const date=new Date(value);
+  return Number.isFinite(date.getTime())?date.toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'No server activity yet';
+}
+function ownerLocationText(item){
+  const p=item?.presence||item||{};
+  const region=[p.city,p.state].filter(Boolean).join(', ');
+  return region||p.location_label||'Location pending';
 }
 function ownerAccountRow(account){
-  return `<div class="owner-row">
-    <div><strong>${escapeHtml(account.name||account.username||account.email)}</strong><small>${escapeHtml(account.email||account.username||'Driver account')} · ${ownerNumber(account.saved_days)} saved day${Number(account.saved_days||0)===1?'':'s'}</small></div>
-    <div class="owner-status">${escapeHtml(ownerTime(account.last_activity_at))}</div>
+  const p=account.presence||{};
+  const online=!!p.online;
+  return `<div class="owner-row ${online?'is-online':''}">
+    <div>
+      <strong><span class="owner-dot ${online?'on':''}"></span>${escapeHtml(account.name||account.username||account.email)}</strong>
+      <small>${escapeHtml(account.email||account.username||'Driver account')} · ${escapeHtml(ownerLocationText(account))}</small>
+      <div class="owner-meta">
+        <span class="owner-pill">${escapeHtml(p.route_state||'idle')}</span>
+        <span class="owner-pill">${ownerNumber(p.stop_count)} stops</span>
+        <span class="owner-pill">${ownerDuration(p.active_today_seconds)} today</span>
+        <span class="owner-pill">${ownerNumber(account.saved_days)} saved days</span>
+      </div>
+    </div>
+    <div class="owner-status">${online?'ONLINE':escapeHtml(ownerTime(account.last_activity_at))}</div>
   </div>`;
 }
-async function renderOwnerStats(){
+function ownerSessionRow(account){
+  const p=account.presence||{};
+  return `<div class="owner-row is-online">
+    <div>
+      <strong><span class="owner-dot on"></span>${escapeHtml(account.name||account.email)}</strong>
+      <small>${escapeHtml(ownerLocationText(account))}${p.current_target?` · To ${escapeHtml(p.current_target)}`:''}</small>
+      <div class="owner-meta">
+        <span class="owner-pill">${escapeHtml(p.screen||'app')}</span>
+        <span class="owner-pill">${escapeHtml(p.route_state||'idle')}</span>
+        <span class="owner-pill">${ownerDuration(p.active_today_seconds)} today</span>
+      </div>
+    </div>
+    <div class="owner-status">${escapeHtml(ownerTime(p.last_seen_at))}</div>
+  </div>`;
+}
+function ownerExportRow(event){
+  return `<div class="owner-row">
+    <div>
+      <strong>${escapeHtml(event.driver_name||event.driver_email||'Driver')}</strong>
+      <small>${escapeHtml(event.event_label||event.export_type||'Export')} · ${escapeHtml(ownerLocationText(event))}</small>
+      <div class="owner-meta">
+        <span class="owner-pill">${escapeHtml(event.scope||'export')}</span>
+        <span class="owner-pill">${ownerNumber(event.stop_count)} stops</span>
+        ${event.customer?`<span class="owner-pill">${escapeHtml(event.customer)}</span>`:''}
+      </div>
+    </div>
+    <div class="owner-status">${escapeHtml(ownerTime(event.created_at))}</div>
+  </div>`;
+}
+function stopOwnerStatsRefresh(){
+  clearInterval(ownerStatsTimer);
+  ownerStatsTimer=null;
+}
+function startOwnerStatsRefresh(){
+  if(ownerStatsTimer||!isOwnerUser())return;
+  ownerStatsTimer=setInterval(()=>{if(activeRoute==='owner'&&isOwnerUser())renderOwnerStats({silent:true});},15000);
+}
+async function renderOwnerStats({silent=false}={}){
   const root=$('#ownerRoot');
   if(!root)return;
   if(!isOwnerUser()){
     root.innerHTML='<div class="owner-empty">Owner access required.</div>';
     return;
   }
-  root.innerHTML='<div class="owner-empty">Loading account activity...</div>';
+  if(!silent||!root.dataset.loaded)root.innerHTML='<div class="owner-empty">Loading account activity...</div>';
   try{
     const payload=await apiFetch('/api/owner/stats');
     const stats=payload.stats||{};
     const rows=(stats.recent_accounts||[]).map(ownerAccountRow).join('');
+    const liveRows=(stats.active_sessions||[]).map(ownerSessionRow).join('');
+    const exportRows=(stats.recent_exports||[]).map(ownerExportRow).join('');
     root.innerHTML=`
       <div class="owner-kpis">
         <div class="owner-kpi"><span>Total accounts</span><b>${ownerNumber(stats.total_accounts)}</b></div>
+        <div class="owner-kpi"><span>Online now</span><b>${ownerNumber(stats.online_now)}</b></div>
         <div class="owner-kpi"><span>Active 24h</span><b>${ownerNumber(stats.active_today)}</b></div>
-        <div class="owner-kpi"><span>Active 7d</span><b>${ownerNumber(stats.active_7_days)}</b></div>
+        <div class="owner-kpi"><span>App time today</span><b>${escapeHtml(ownerDuration(stats.total_app_seconds_today))}</b></div>
+        <div class="owner-kpi"><span>Exports 24h</span><b>${ownerNumber(stats.exports_24h)}</b></div>
         <div class="owner-kpi"><span>Created 7d</span><b>${ownerNumber(stats.created_7_days)}</b></div>
+      </div>
+      <div class="owner-panel">
+        <div class="owner-panel-head"><h2>Online Now</h2><span>${escapeHtml(ownerTime(stats.generated_at))}</span></div>
+        <div class="owner-list">${liveRows||'<div class="owner-empty">No driver app is online right now.</div>'}</div>
+      </div>
+      <div class="owner-panel">
+        <div class="owner-panel-head"><h2>Recent Exports</h2><span>${ownerNumber(stats.exports_24h)} in 24h</span></div>
+        <div class="owner-list">${exportRows||'<div class="owner-empty">No recent exports yet.</div>'}</div>
       </div>
       <div class="owner-panel">
         <div class="owner-panel-head"><h2>Account Activity</h2><span>${ownerNumber(stats.synced_accounts)} synced · ${ownerNumber(stats.day_snapshots)} saved days</span></div>
         <div class="owner-list">${rows||'<div class="owner-empty">No driver accounts yet.</div>'}</div>
       </div>`;
+    root.dataset.loaded='1';
   }catch(error){
     root.innerHTML=`<div class="owner-empty">Could not load owner stats. ${escapeHtml(apiErrorMessage(error))}</div>`;
   }
 }
 async function signOut(){
   try{await apiFetch('/api/account/logout',{method:'POST'});}catch(e){}
+  stopDriverTelemetry();
+  stopOwnerStatsRefresh();
   A.sessionEmail=null;
   A.serverUser=null;
   saveAuth();
@@ -1753,7 +1927,9 @@ function route(name,persist=true){
   if(name==='home'){renderHome();}
   if(name==='fuel'){renderFuel();}
   if(name==='export'){renderExport();}
-  if(name==='owner'){renderOwnerStats();}
+  if(name==='owner'){startOwnerStatsRefresh();renderOwnerStats();}
+  else stopOwnerStatsRefresh();
+  if(isDriverUser(A?.serverUser))sendDriverTelemetry().catch(()=>{});
 }
 function enterApp(){clearInterval(heroTimer);if(!S.settings||!S.settings.chosen){openModePick();}else{route('home');}}
 function openModePick(){
@@ -2239,6 +2415,7 @@ function buildFuelDoc(stops=todayStops()){
 async function printFuelLog(){
   renderFuel();
   await hydratePhotos($('#fuelDoc'));
+  await trackDriverExport('fuel_pdf',{label:'Fuel PDF',scope:'fuel',date_from:selectedDateKey,date_to:selectedDateKey});
   setTimeout(()=>window.print(),50);
 }
 function openManualFuelStop(){
@@ -3708,6 +3885,8 @@ function renderExport(){
 async function printExport(){
   renderExport();
   await hydratePhotos($('#doc'));
+  const range=scope==='range'?exportRangeBounds():[selectedDateKey,selectedDateKey];
+  await trackDriverExport('trip_export',{label:'Trip export',scope,date_from:range[0],date_to:range[1],customer:custFilter||''});
   setTimeout(()=>window.print(),50);
 }
 function mostVisited(){const m={};S.stops.forEach(s=>m[s.location.business_name]=(m[s.location.business_name]||0)+1);
@@ -3870,6 +4049,8 @@ const icoReset=(s=16,c)=>ic('<path d="M4 12a8 8 0 108-8 8 8 0 00-6 2.7M4 4v4h4" 
 
 /* =================== INIT =================== */
 function tickClock(){const c=$('#clk');if(c){c.textContent=fmtTime(Date.now());}}
+document.addEventListener('visibilitychange',()=>{if(isDriverUser(A?.serverUser))sendDriverTelemetry().catch(()=>{});});
+window.addEventListener('online',()=>{if(isDriverUser(A?.serverUser))sendDriverTelemetry().catch(()=>{});});
 async function bootApp(){
   installAppHistoryGuard();
   await loadServerSession();

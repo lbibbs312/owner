@@ -28,7 +28,12 @@ from app.models.autolog import (
     SyncOutbox,
 )
 from app.models.draft import DraftEntry
-from app.models.driver_state import DriverDayState, DriverState
+from app.models.driver_state import (
+    DriverActivityEvent,
+    DriverDayState,
+    DriverPresence,
+    DriverState,
+)
 from app.models.duty import DutyStatusEvent
 from app.models.dispatch_capture import DispatchCapture
 from app.models.followup import OperationalFollowUp
@@ -95,6 +100,8 @@ __all__ = [
     "DamageReport",
     "DraftEntry",
     "DriverDayState",
+    "DriverPresence",
+    "DriverActivityEvent",
     "DriverState",
     "DispatchCapture",
     "OperationalFollowUp",
