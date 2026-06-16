@@ -71,13 +71,14 @@ if ("serviceWorker" in navigator) {
 }
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%}
+html,body{height:100%;overscroll-behavior:none}
 body{
   margin:0;
   font-family:var(--f-body);
   color:var(--text);
   background:var(--void);
   overflow-x:hidden;
+  overscroll-behavior:none;
   letter-spacing:.1px;
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
@@ -1059,6 +1060,8 @@ let serverSessionUnavailable=false;
 let serverSaveTimer=null;
 let serverSaveInFlight=false;
 let serverSavePending=false;
+let activeRoute='auth';
+let appHistoryGuardReady=false;
 
 function loadAuth(){
   try{
@@ -1207,6 +1210,10 @@ async function loadServerSession(){
       if(!loaded&&hasUsefulState(S))queueServerStateSave();
       return payload.user;
     }
+    if(A.serverUser){
+      serverSessionUnavailable=true;
+      return A.serverUser;
+    }
     clearServerUser();
     return null;
   }catch(error){
@@ -1283,7 +1290,7 @@ function renderAuth(){
   const loginAutocomplete=authMode==='login'?'username':'email';
   const fields=authMode==='created'?created:`
     ${authMode==='create'?`<div class="auth-field"><label for="authName">Name</label><input id="authName" autocomplete="name" placeholder="Driver name"></div>`:''}
-    <div class="auth-field"><label for="authEmail">${loginLabel}</label><input id="authEmail" type="${loginType}" autocomplete="${loginAutocomplete}" value="${escapeHtml(authResetEmail)}" placeholder="${authMode==='login'?'you@example.com or lbibbs312':'you@example.com'}"></div>
+    <div class="auth-field"><label for="authEmail">${loginLabel}</label><input id="authEmail" type="${loginType}" autocomplete="${loginAutocomplete}" value="${escapeHtml(authResetEmail)}" placeholder="${authMode==='login'?'Email or username':'Email address'}"></div>
     ${(authMode==='login'||authMode==='create')?`<div class="auth-field"><label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="${authMode==='create'?'new-password':'current-password'}" placeholder="Password"></div>`:''}
     ${authMode==='create'?`<div class="auth-field"><label for="authConfirm">Confirm password</label><input id="authConfirm" type="password" autocomplete="new-password" placeholder="Repeat password"></div>`:''}
     ${authMode==='reset'?`
@@ -1483,7 +1490,31 @@ function handleGoogleCredential(response){
 }
 
 /* =================== ROUTING / SCREENS =================== */
+function isStandaloneApp(){
+  return !!(
+    window.matchMedia?.('(display-mode: standalone)').matches||
+    navigator.standalone||
+    String(document.referrer||'').startsWith('android-app://')
+  );
+}
+function installAppHistoryGuard(){
+  if(appHistoryGuardReady||!isStandaloneApp()||!history?.pushState)return;
+  appHistoryGuardReady=true;
+  try{
+    history.replaceState({mdRoot:true},'',location.href);
+    history.pushState({mdGuard:true},'',location.href);
+  }catch(e){return;}
+  window.addEventListener('popstate',handleAppBackGesture);
+}
+function handleAppBackGesture(){
+  try{history.pushState({mdGuard:true},'',location.href);}catch(e){}
+  if($('#sheet')?.classList.contains('on'))return closeSheet();
+  if($('#drawer')?.classList.contains('on'))return closeDrawer();
+  if(activeRoute==='fuel'||activeRoute==='export')return route('home',false);
+  if(activeRoute==='intro'&&authSignedIn())return route('home',false);
+}
 function route(name,persist=true){
+  activeRoute=name;
   $$('.screen').forEach(s=>s.classList.remove('is-active'));
   $('#screen-'+name).classList.add('is-active');
   const showCta=name==='home';
@@ -3502,6 +3533,7 @@ const icoReset=(s=16,c)=>ic('<path d="M4 12a8 8 0 108-8 8 8 0 00-6 2.7M4 4v4h4" 
 /* =================== INIT =================== */
 function tickClock(){const c=$('#clk');if(c){c.textContent=fmtTime(Date.now());}}
 async function bootApp(){
+  installAppHistoryGuard();
   await loadServerSession();
   const localOnlyUser=!A.serverUser&&A.sessionEmail&&authAccount(A.sessionEmail);
   if(localOnlyUser&&navigator.onLine!==false&&!serverSessionUnavailable){

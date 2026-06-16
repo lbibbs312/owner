@@ -85,6 +85,10 @@ def test_welcome_page_serves_driver_logger_app(client):
         "/api/account/login",
         "/api/account/register",
         "/api/driver-state",
+        "overscroll-behavior:none",
+        "installAppHistoryGuard",
+        "handleAppBackGesture",
+        "serverSessionUnavailable=true;",
     ):
         assert expected in body
     for legacy in (
@@ -107,6 +111,9 @@ def test_welcome_page_serves_driver_logger_app(client):
         "Old driver/admin logins",
         "configured Google client ID",
         "Google Identity Services",
+        "you@example.com",
+        "lbibbs312",
+        "lbibbs322",
     ):
         assert legacy not in body
 
