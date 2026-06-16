@@ -4,9 +4,13 @@ compatibility_date = "2026-06-16"
 account_id = "746191c2d2bef207e6254e4ba80e95da"
 workers_dev = false
 
-routes = [
-  { pattern = "movedefense.com/*", zone_name = "movedefense.com" }
-]
+[[routes]]
+pattern = "movedefense.com/*"
+zone_id = "223844ac286efc2425144343588c8e7a"
+
+[[routes]]
+pattern = "www.movedefense.com/*"
+zone_id = "223844ac286efc2425144343588c8e7a"
 
 [[r2_buckets]]
 binding = "MD_R2_FALLBACK"

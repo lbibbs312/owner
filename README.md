@@ -47,6 +47,11 @@ gateway errors during deploys. The Worker proxies normal traffic to Render,
 snapshots only public app-shell files into R2, and serves the last good shell
 when Render returns `502`, `503`, `504`, `522`, `523`, or `524`.
 
+Cloudflare DNS for `movedefense.com` should use a proxied apex `CNAME` to the
+Render hostname (`lacksdrivers-com.onrender.com`) so Workers routes fire on the
+root domain. `www.movedefense.com` should also be proxied and covered by the
+Worker route.
+
 No Cloudflare token belongs in this repo. Set it only in your shell or CI:
 
 ```bash

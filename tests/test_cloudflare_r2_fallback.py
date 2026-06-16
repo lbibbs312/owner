@@ -13,6 +13,7 @@ def test_cloudflare_worker_snapshots_public_shell_only():
     assert "MD_R2_FALLBACK" in combined
     assert "movedefense-app-shell" in wrangler
     assert "movedefense.com/*" in wrangler
+    assert "www.movedefense.com/*" in wrangler
     assert "746191c2d2bef207e6254e4ba80e95da" in wrangler
     for status in ("502", "503", "504", "522", "523", "524"):
         assert status in worker
