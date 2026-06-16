@@ -94,6 +94,14 @@ function updatingResponse(key) {
   });
 }
 
+function withWorkerHeader(response) {
+  if (!response) return response;
+
+  const forwarded = new Response(response.body, response);
+  forwarded.headers.set("x-movedefense-worker", "r2-fallback");
+  return forwarded;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const key = snapshotKey(request);
@@ -116,6 +124,6 @@ export default {
       return (await readSnapshot(bucket, key, request)) || updatingResponse(key);
     }
 
-    return originResponse;
+    return withWorkerHeader(originResponse);
   },
 };
