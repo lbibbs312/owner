@@ -275,7 +275,7 @@ input,select,textarea{font-family:inherit}
 /* ============================================================
    HOME
    ============================================================ */
-#screen-home{padding-bottom:172px}
+#screen-home{padding-bottom:calc(var(--cta-h, 172px) + 16px)}
 .home-pad{padding:6px 16px 0}
 .home-col{display:contents}
 
@@ -398,8 +398,8 @@ input,select,textarea{font-family:inherit}
   background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18)}
 .cta .txt{flex:1;min-width:0;display:flex;flex-direction:column}
 .cta .verb{font-family:var(--f-mono);font-size:11px;letter-spacing:3px;text-transform:uppercase;opacity:.85}
-.cta .place{display:block;max-width:100%;font-family:var(--f-display);font-weight:800;font-size:26px;line-height:1.05;letter-spacing:-.4px;margin-top:3px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cta .place{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;max-width:100%;font-family:var(--f-display);font-weight:800;font-size:26px;line-height:1.1;letter-spacing:-.4px;margin-top:3px;
+  overflow:hidden;overflow-wrap:anywhere}
 .cta .sub{font-size:12.5px;opacity:.82;margin-top:4px;font-weight:500}
 .cta .chev{flex:0 0 auto;opacity:.9}
 .cta::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.16),transparent 70%);transform:translateX(-130%)}
@@ -1631,12 +1631,29 @@ function handleAppBackGesture(){
   if(activeRoute==='fuel'||activeRoute==='export')return route('home',false);
   if(activeRoute==='intro'&&authSignedIn())return route('home',false);
 }
+let _ctaRO=null;
+function syncCtaHeight(){
+  const dock=$('#cta-dock');
+  if(!dock)return;
+  // Keep the home stop list's bottom clearance equal to the live CTA height so a
+  // taller (wrapped) button never overlaps the last stop, at any font size.
+  if(!_ctaRO&&'ResizeObserver'in window){
+    _ctaRO=new ResizeObserver(()=>{
+      const h=dock.classList.contains('show')?dock.offsetHeight:0;
+      document.documentElement.style.setProperty('--cta-h',h+'px');
+    });
+    _ctaRO.observe(dock);
+  }
+  const h=dock.classList.contains('show')?dock.offsetHeight:0;
+  document.documentElement.style.setProperty('--cta-h',h+'px');
+}
 function route(name,persist=true){
   activeRoute=name;
   $$('.screen').forEach(s=>s.classList.remove('is-active'));
   $('#screen-'+name).classList.add('is-active');
   const showCta=name==='home';
   $('#cta-dock').classList.toggle('show',showCta);
+  syncCtaHeight();
   window.scrollTo(0,0);
   if(persist&&name!=='intro')localStorage.setItem(ROUTE_KEY,name);
   if(name==='home'){renderHome();}
@@ -2802,7 +2819,7 @@ function renderCTA(){
       <span class="ico">${driving||idle?icoPin(28):(fuelStop?icoFuel(28):icoRoad(28))}</span>
       <span class="txt">
         <span class="verb">${idle?'Start with current GPS':driving?'Tap on arrival':'Tap when you roll out'}</span>
-        <span class="place">${idle?'Record first stop':driving?'Arrive at '+shortName(name):'Depart '+shortName(name)}</span>
+        <span class="place">${idle?'Record first stop':driving?'Arrive at '+name:'Depart '+name}</span>
         <span class="sub">${idle?'No saved location data':driving?(activeMiles?activeMiles+' mi leg · records arrival':'Records arrival time + GPS'):(fuelStop?'Fuel stop · load stays unchanged':'Log load change, then go')}</span>
       </span>
       <span class="chev">${icoChev(26)}</span>
@@ -2812,6 +2829,7 @@ function renderCTA(){
     haptic();
     idle?openStartStop():driving?doArrive():openDepart();
   });
+  syncCtaHeight();
 }
 const shortName=n=>n.length>18?n.slice(0,17)+'…':n;
 
