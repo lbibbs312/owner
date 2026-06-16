@@ -1,3 +1,4 @@
+import json
 import re
 import sys
 from types import SimpleNamespace
@@ -81,6 +82,9 @@ def test_welcome_page_serves_driver_logger_app(client):
         "window.MOVEDEFENSE_CONFIG",
         "googleMapsApiKey",
         "googleClientId",
+        "/api/account/login",
+        "/api/account/register",
+        "/api/driver-state",
     ):
         assert expected in body
     for legacy in (
@@ -142,6 +146,83 @@ def test_welcome_page_does_not_embed_marketing_checkout_forms(client):
     assert "/billing/checkout/" not in body
     assert 'action="/register"' not in body
     assert 'href="/register"' not in body
+
+
+def test_one_driver_api_registers_and_persists_state(client, app):
+    response = client.post(
+        "/api/account/register",
+        json={
+            "email": "sync-driver@example.com",
+            "password": "password123",
+            "name": "Sync Driver",
+        },
+    )
+
+    assert response.status_code == 201
+    account = response.get_json()
+    assert account["ok"] is True
+    assert account["user"]["email"] == "sync-driver@example.com"
+    assert account["state"]["exists"] is False
+
+    state = {
+        "driver": {"name": "Sync Driver", "license": "Freight & haul mode"},
+        "logNumber": "MD-2026-001",
+        "settings": {"mode": "freight", "truckMode": True, "chosen": True},
+        "position": "idle",
+        "stops": [
+            {
+                "id": "stop1",
+                "sequence": 1,
+                "arrival_time": 1781577600000,
+                "location": {"business_name": "Receiver Dock", "address": "100 Test Ave"},
+            }
+        ],
+    }
+    saved = client.post("/api/driver-state", json={"data": state})
+
+    assert saved.status_code == 200
+    assert saved.get_json()["state"]["data"]["logNumber"] == "MD-2026-001"
+
+    with app.app_context():
+        from app.models import DriverState, User
+
+        user = User.query.filter_by(email="sync-driver@example.com").first()
+        record = DriverState.query.filter_by(user_id=user.id).first()
+        assert json.loads(record.data)["stops"][0]["location"]["business_name"] == "Receiver Dock"
+
+    client.post("/api/account/logout")
+    assert client.get("/api/driver-state").status_code == 401
+
+    login = client.post(
+        "/api/account/login",
+        json={"login": "sync-driver@example.com", "password": "password123"},
+    )
+
+    assert login.status_code == 200
+    payload = login.get_json()
+    assert payload["state"]["exists"] is True
+    assert payload["state"]["data"]["stops"][0]["location"]["business_name"] == "Receiver Dock"
+
+
+def test_one_driver_api_login_accepts_existing_driver_username(client, app):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import User
+
+        user = User(username="lbibbs312", email="lbibbs312@example.com", role="driver")
+        user.set_password("0000")
+        db.session.add(user)
+        db.session.commit()
+
+    response = client.post(
+        "/api/account/login",
+        json={"login": "lbibbs312", "password": "0000"},
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["ok"] is True
+    assert payload["user"]["username"] == "lbibbs312"
 
 
 def test_billing_checkout_fails_closed_until_stripe_is_configured(client, app):

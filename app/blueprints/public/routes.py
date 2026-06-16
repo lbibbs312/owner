@@ -1,11 +1,15 @@
+import json
 import os
+import re
 
 from flask import abort, current_app, jsonify, redirect, render_template, request, send_from_directory, url_for
-from flask_login import current_user, login_required
+from flask_login import current_user, login_required, login_user, logout_user
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.blueprints.public import bp
-from app.models import Announcement
+from app.extensions import db
+from app.models import Announcement, DriverState, User
 from app.services.database_status import database_status
 from app.services.route_context import build_route_context
 from app.services.google_places import (
@@ -15,12 +19,95 @@ from app.services.google_places import (
     nearby_place_candidates,
 )
 from app.services.registration_access import store_registration_checkout
+from app.services.role_session import clear_role_logins, remember_role_login
 from app.services.stripe_checkout import (
     StripeCheckoutError,
     billing_plan,
     create_checkout_session,
     verified_registration_checkout,
 )
+
+MAX_DRIVER_STATE_BYTES = 2_000_000
+
+
+def _json_body():
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
+
+
+def _normalize_email(value):
+    return str(value or "").strip().lower()
+
+
+def _normalize_identifier(value):
+    return str(value or "").strip().lower()
+
+
+def _find_user_by_login(identifier):
+    login = _normalize_identifier(identifier)
+    if not login:
+        return None
+    return User.query.filter(
+        (func.lower(User.email) == login) | (func.lower(User.username) == login)
+    ).first()
+
+
+def _split_driver_name(name):
+    parts = str(name or "").strip().split(None, 1)
+    if not parts:
+        return None, None
+    if len(parts) == 1:
+        return parts[0][:64], None
+    return parts[0][:64], parts[1][:64]
+
+
+def _unique_username(email, name=""):
+    source = email.split("@", 1)[0] or name or "driver"
+    base = re.sub(r"[^A-Za-z0-9_.-]+", "", source)[:48] or "driver"
+    candidate = base
+    suffix = 2
+    while User.query.filter(func.lower(User.username) == candidate.lower()).first():
+        candidate = f"{base[:54]}{suffix}"
+        suffix += 1
+    return candidate[:64]
+
+
+def _driver_state_response(user):
+    state = DriverState.query.filter_by(user_id=user.id).first()
+    if not state:
+        return {"exists": False, "data": None, "updated_at": None}
+    try:
+        data = json.loads(state.data or "{}")
+    except (TypeError, ValueError):
+        data = {}
+    return {
+        "exists": True,
+        "data": data if isinstance(data, dict) else {},
+        "updated_at": state.updated_at.isoformat() if state.updated_at else None,
+    }
+
+
+def _account_response(user):
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "name": user.display_name,
+        "role": user.role,
+    }
+
+
+def _require_driver_api_user():
+    if not current_user.is_authenticated:
+        return None, (jsonify({"ok": False, "error": "not_authenticated"}), 401)
+    if current_user.role != "driver":
+        return None, (jsonify({"ok": False, "error": "driver_required"}), 403)
+    return current_user, None
+
+
+def _login_driver(user):
+    login_user(user, remember=True)
+    remember_role_login(user)
 
 
 @bp.route("/")
@@ -120,6 +207,125 @@ def install_app_download():
         as_attachment=True,
         download_name="MoveDefense.apk",
     )
+
+
+@bp.route("/api/account/register", methods=["POST"])
+def api_account_register():
+    data = _json_body()
+    email = _normalize_email(data.get("email"))
+    password = str(data.get("password") or "")
+    name = str(data.get("name") or "").strip()
+    if not email or "@" not in email:
+        return jsonify({"ok": False, "error": "invalid_email"}), 400
+    if len(password) < 8:
+        return jsonify({"ok": False, "error": "weak_password"}), 400
+
+    existing = _find_user_by_login(email)
+    if existing:
+        if existing.role == "driver" and existing.password_hash and existing.check_password(password):
+            _login_driver(existing)
+            return jsonify(
+                {
+                    "ok": True,
+                    "user": _account_response(existing),
+                    "state": _driver_state_response(existing),
+                }
+            )
+        return jsonify({"ok": False, "error": "account_exists"}), 409
+
+    first_name, last_name = _split_driver_name(name)
+    user = User(
+        username=_unique_username(email, name),
+        email=email,
+        role="driver",
+        first_name=first_name,
+        last_name=last_name,
+    )
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+    _login_driver(user)
+    return jsonify(
+        {
+            "ok": True,
+            "user": _account_response(user),
+            "state": _driver_state_response(user),
+        }
+    ), 201
+
+
+@bp.route("/api/account/login", methods=["POST"])
+def api_account_login():
+    data = _json_body()
+    identifier = _normalize_identifier(data.get("login") or data.get("email"))
+    password = str(data.get("password") or "")
+    if not identifier or not password:
+        return jsonify({"ok": False, "error": "missing_credentials"}), 400
+
+    user = _find_user_by_login(identifier)
+    if not user or not user.password_hash or not user.check_password(password):
+        return jsonify({"ok": False, "error": "invalid_credentials"}), 401
+    if user.role != "driver":
+        return jsonify({"ok": False, "error": "driver_required"}), 403
+
+    _login_driver(user)
+    return jsonify(
+        {
+            "ok": True,
+            "user": _account_response(user),
+            "state": _driver_state_response(user),
+        }
+    )
+
+
+@bp.route("/api/account/logout", methods=["POST"])
+def api_account_logout():
+    clear_role_logins()
+    logout_user()
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/account/me", methods=["GET"])
+def api_account_me():
+    if not current_user.is_authenticated:
+        return jsonify({"ok": True, "authenticated": False})
+    if current_user.role != "driver":
+        return jsonify({"ok": True, "authenticated": False})
+    return jsonify(
+        {
+            "ok": True,
+            "authenticated": True,
+            "user": _account_response(current_user),
+            "state": _driver_state_response(current_user),
+        }
+    )
+
+
+@bp.route("/api/driver-state", methods=["GET", "POST"])
+def api_driver_state():
+    user, error = _require_driver_api_user()
+    if error:
+        return error
+
+    if request.method == "GET":
+        return jsonify({"ok": True, "state": _driver_state_response(user)})
+
+    if request.content_length and request.content_length > MAX_DRIVER_STATE_BYTES:
+        return jsonify({"ok": False, "error": "state_too_large"}), 413
+    data = _json_body().get("data")
+    if not isinstance(data, dict):
+        return jsonify({"ok": False, "error": "invalid_state"}), 400
+    encoded = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+    if len(encoded.encode("utf-8")) > MAX_DRIVER_STATE_BYTES:
+        return jsonify({"ok": False, "error": "state_too_large"}), 413
+
+    state = DriverState.query.filter_by(user_id=user.id).first()
+    if not state:
+        state = DriverState(user_id=user.id)
+        db.session.add(state)
+    state.data = encoded
+    db.session.commit()
+    return jsonify({"ok": True, "state": _driver_state_response(user)})
 
 
 @bp.route("/billing/checkout/<plan_key>", methods=["POST"])

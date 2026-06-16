@@ -891,7 +891,8 @@ function load(){
   }catch(e){}
   return emptyState();
 }
-function save(){localStorage.setItem(KEY,JSON.stringify(S));}
+function saveLocalState(){localStorage.setItem(KEY,JSON.stringify(S));}
+function save(){saveLocalState();queueServerStateSave();}
 
 const SHEET_PLACE_DATA_KEYS=['placeName','placeAddress','placeLat','placeLng','placeId','placeTypes'];
 function sheetDraftId(name){return (S.logNumber||'log')+':'+name;}
@@ -1054,21 +1055,26 @@ let authSubmitting=false;
 let authCreatedRecovery=null;
 let authResetEmail='';
 let googleIdentityPromise=null;
+let serverSessionUnavailable=false;
+let serverSaveTimer=null;
+let serverSaveInFlight=false;
+let serverSavePending=false;
 
 function loadAuth(){
   try{
     const raw=JSON.parse(localStorage.getItem(AUTH_KEY));
     if(raw&&Array.isArray(raw.accounts))return {
       accounts:raw.accounts,
-      sessionEmail:typeof raw.sessionEmail==='string'?raw.sessionEmail:null
+      sessionEmail:typeof raw.sessionEmail==='string'?raw.sessionEmail:null,
+      serverUser:raw.serverUser&&typeof raw.serverUser==='object'?raw.serverUser:null
     };
   }catch(e){}
-  return {accounts:[],sessionEmail:null};
+  return {accounts:[],sessionEmail:null,serverUser:null};
 }
 function saveAuth(){localStorage.setItem(AUTH_KEY,JSON.stringify(A));}
 function normalizeEmail(email){return String(email||'').trim().toLowerCase();}
 function validEmail(email){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);}
-function currentUser(){return A.accounts.find(a=>a.email===A.sessionEmail)||null;}
+function currentUser(){return A.serverUser||A.accounts.find(a=>a.email===A.sessionEmail)||null;}
 function authSignedIn(){return !!currentUser();}
 function authField(id){return ($('#'+id)?.value||'').trim();}
 function authSetMode(mode){
@@ -1101,6 +1107,124 @@ function authSetBusy(text,detail=''){
   form?.querySelectorAll('.auth-tab,.auth-google,.auth-link').forEach(btn=>{btn.disabled=true;});
 }
 function authAccount(email){return A.accounts.find(a=>a.email===email);}
+function hasUsefulState(state=S){
+  return !!(state?.settings?.chosen||state?.stops?.length||state?.currentPlace||state?.destination);
+}
+function apiErrorMessage(error,fallback='Request failed'){
+  const code=error?.data?.error||'';
+  if(code==='invalid_credentials')return'Wrong password';
+  if(code==='account_exists')return'Account already exists';
+  if(code==='weak_password')return'Password must be at least 8 characters';
+  if(code==='driver_required')return'Driver account required';
+  if(code==='not_authenticated')return'Sign in required';
+  return errorText(error)||fallback;
+}
+async function apiFetch(path,{method='GET',body=null}={}){
+  const init={method,credentials:'same-origin',headers:{'Accept':'application/json'}};
+  if(body!=null){
+    init.headers['Content-Type']='application/json';
+    init.body=JSON.stringify(body);
+  }
+  const rsp=await fetch(path,init);
+  const data=await rsp.json().catch(()=>({}));
+  if(!rsp.ok){
+    const error=new Error(data.message||data.error||`Request failed (${rsp.status})`);
+    error.status=rsp.status;
+    error.data=data;
+    throw error;
+  }
+  return data;
+}
+function serverAccount(user){
+  if(!user)return null;
+  return {
+    email:normalizeEmail(user.email),
+    username:user.username||'',
+    name:user.name||user.email||'Driver',
+    provider:'server',
+    serverId:user.id
+  };
+}
+function setServerUser(user){
+  const account=serverAccount(user);
+  A.serverUser=account;
+  if(account){
+    A.sessionEmail=account.email;
+    const local=authAccount(account.email);
+    if(local)Object.assign(local,{name:account.name,provider:'server',serverId:account.serverId,username:account.username});
+    else A.accounts.push({...account});
+  }
+  saveAuth();
+}
+function clearServerUser(){
+  A.serverUser=null;
+  saveAuth();
+}
+function applyServerStatePayload(state){
+  const data=state?.data;
+  if(!data||typeof data!=='object')return false;
+  const serverUseful=hasUsefulState(data);
+  const localUseful=hasUsefulState(S);
+  if(serverUseful&&!localUseful){
+    S=normalizeState(data);
+    saveLocalState();
+    return true;
+  }
+  return false;
+}
+function queueServerStateSave(){
+  if(!A?.serverUser||navigator.onLine===false)return;
+  serverSavePending=true;
+  clearTimeout(serverSaveTimer);
+  serverSaveTimer=setTimeout(()=>saveServerStateNow().catch(error=>console.warn('[MoveDefense sync]',error)),900);
+}
+async function saveServerStateNow(){
+  if(!A?.serverUser||navigator.onLine===false)return null;
+  if(serverSaveInFlight){
+    serverSavePending=true;
+    return null;
+  }
+  serverSaveInFlight=true;
+  serverSavePending=false;
+  try{
+    return await apiFetch('/api/driver-state',{method:'POST',body:{data:S}});
+  }finally{
+    serverSaveInFlight=false;
+    if(serverSavePending){
+      serverSavePending=false;
+      queueServerStateSave();
+    }
+  }
+}
+async function loadServerSession(){
+  if(navigator.onLine===false)return null;
+  serverSessionUnavailable=false;
+  try{
+    const payload=await apiFetch('/api/account/me');
+    if(payload.authenticated&&payload.user){
+      setServerUser(payload.user);
+      const loaded=applyServerStatePayload(payload.state);
+      if(!loaded&&hasUsefulState(S))queueServerStateSave();
+      return payload.user;
+    }
+    clearServerUser();
+    return null;
+  }catch(error){
+    serverSessionUnavailable=true;
+    console.warn('[MoveDefense sync]',error);
+    return null;
+  }
+}
+async function completeServerAuth(payload){
+  if(!payload?.user)throw new Error('Server did not return an account');
+  setServerUser(payload.user);
+  const loaded=applyServerStatePayload(payload.state);
+  applyAuthToDriver(currentUser());
+  if(!loaded&&hasUsefulState(S)){
+    await saveServerStateNow();
+  }
+  continueAfterAuth();
+}
 function randomHex(bytes=16){
   const b=new Uint8Array(bytes);
   crypto.getRandomValues(b);
@@ -1127,7 +1251,7 @@ function authTitle(){
 }
 function authCopy(){
   if(authMode==='create')return'Create your MoveDefense driver account for trip logs, fuel records, receipts, and exports.';
-  if(authMode==='forgot')return'Use the recovery code from your account setup to reset your password.';
+  if(authMode==='forgot')return'Password reset is handled by MoveDefense support for server-saved accounts.';
   if(authMode==='reset')return'Set a new password with your recovery code.';
   if(authMode==='created')return'Keep this recovery code somewhere safe before continuing.';
   return'Sign in to your MoveDefense driver log.';
@@ -1154,9 +1278,12 @@ function renderAuth(){
       <div class="auth-copy" style="margin:0;color:var(--text-2)">Recovery code for ${escapeHtml(authCreatedRecovery.email)}</div>
       <div class="code">${escapeHtml(authCreatedRecovery.code)}</div>
     </div>`:'';
+  const loginLabel=authMode==='login'?'Email or username':'Email';
+  const loginType=authMode==='login'?'text':'email';
+  const loginAutocomplete=authMode==='login'?'username':'email';
   const fields=authMode==='created'?created:`
     ${authMode==='create'?`<div class="auth-field"><label for="authName">Name</label><input id="authName" autocomplete="name" placeholder="Driver name"></div>`:''}
-    <div class="auth-field"><label for="authEmail">Email</label><input id="authEmail" type="email" autocomplete="email" value="${escapeHtml(authResetEmail)}" placeholder="you@example.com"></div>
+    <div class="auth-field"><label for="authEmail">${loginLabel}</label><input id="authEmail" type="${loginType}" autocomplete="${loginAutocomplete}" value="${escapeHtml(authResetEmail)}" placeholder="${authMode==='login'?'you@example.com or lbibbs312':'you@example.com'}"></div>
     ${(authMode==='login'||authMode==='create')?`<div class="auth-field"><label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="${authMode==='create'?'new-password':'current-password'}" placeholder="Password"></div>`:''}
     ${authMode==='create'?`<div class="auth-field"><label for="authConfirm">Confirm password</label><input id="authConfirm" type="password" autocomplete="new-password" placeholder="Repeat password"></div>`:''}
     ${authMode==='reset'?`
@@ -1211,20 +1338,31 @@ async function submitAuth(event){
   }
 }
 async function submitLogin(){
-  const email=normalizeEmail(authField('authEmail')),password=$('#authPassword')?.value||'';
-  if(!validEmail(email))return authSetMessage('error','Enter a valid email address');
+  const login=authField('authEmail'),email=normalizeEmail(login),password=$('#authPassword')?.value||'';
+  if(!login)return authSetMessage('error','Enter your email or username');
   if(!password)return authSetMessage('error','Enter your password');
-  const account=authAccount(email);
-  if(!account)return authSetMessage('error','No account found for that email','Create a driver account first, then sign in with that email.');
-  if(account.provider==='google'&&!account.passwordHash)return authSetMessage('error','This account uses Google sign-in');
   authSetBusy('Checking password','Verifying your sign-in.');
+  try{
+    const payload=await apiFetch('/api/account/login',{method:'POST',body:{login,password}});
+    return await completeServerAuth(payload);
+  }catch(error){
+    if(![401,404].includes(error.status))throw error;
+  }
+
+  const account=validEmail(email)?authAccount(email):null;
+  if(!account)return authSetMessage('error','No account found for that login','Create a driver account first, then sign in.');
+  if(account.provider==='google'&&!account.passwordHash)return authSetMessage('error','This account uses Google sign-in');
   if(!await verifySecret(password,account.passwordSalt,account.passwordHash))return authSetMessage('error','Wrong password','Try again or use Forgot password.');
-  authSubmitting=false;
-  account.lastLoginAt=Date.now();
-  A.sessionEmail=account.email;
-  saveAuth();
-  applyAuthToDriver(account);
-  continueAfterAuth();
+  try{
+    const payload=await apiFetch('/api/account/register',{method:'POST',body:{email:account.email,password,name:account.name||account.email}});
+    account.lastLoginAt=Date.now();
+    return await completeServerAuth(payload);
+  }catch(error){
+    if(error.status===409){
+      return authSetMessage('error','Server account already exists','Sign in with that account password.');
+    }
+    throw error;
+  }
 }
 async function submitCreateAccount(){
   const email=normalizeEmail(authField('authEmail')),name=authField('authName')||'Driver';
@@ -1233,30 +1371,19 @@ async function submitCreateAccount(){
   if(authAccount(email))return authSetMessage('error','Account already exists','Sign in or reset the password.');
   if(password.length<8)return authSetMessage('error','Password must be at least 8 characters');
   if(password!==confirm)return authSetMessage('error','Passwords do not match');
-  authSetBusy('Creating account','Setting up your driver account.');
-  const passwordSalt=randomHex(),passwordHash=await hashSecret(password,passwordSalt);
-  const code=recoveryCode(),recoverySalt=randomHex(),recoveryHash=await hashSecret(cleanRecovery(code),recoverySalt);
-  const account={email,name,provider:'local',passwordSalt,passwordHash,recoverySalt,recoveryHash,createdAt:Date.now(),lastLoginAt:Date.now()};
-  A.accounts.push(account);
-  A.sessionEmail=email;
-  saveAuth();
-  applyAuthToDriver(account);
-  authCreatedRecovery={email,code};
-  authMode='created';
-  authSubmitting=false;
-  authMessage={type:'ok',text:'Account created',detail:'Keep this recovery code before continuing.'};
-  renderAuth();
+  authSetBusy('Creating account','Saving your driver account.');
+  try{
+    const payload=await apiFetch('/api/account/register',{method:'POST',body:{email,password,name}});
+    await completeServerAuth(payload);
+  }catch(error){
+    if(error.status===409)return authSetMessage('error','Account already exists','Sign in with that email instead.');
+    authSetMessage('error','Account was not created',apiErrorMessage(error));
+  }
 }
 function submitForgotPassword(){
   const email=normalizeEmail(authField('authEmail'));
   if(!validEmail(email))return authSetMessage('error','Enter a valid email address');
-  const account=authAccount(email);
-  if(!account)return authSetMessage('error','No account found for that email','Create a driver account first, then set up password recovery.');
-  if(!account.recoveryHash)return authSetMessage('error','Password reset is unavailable','Use Google sign-in for this email.');
-  authResetEmail=email;
-  authMode='reset';
-  authMessage={type:'ok',text:'Account found',detail:'Enter the recovery code and a new password.'};
-  renderAuth();
+  authSetMessage('error','Password reset is not available here','Contact MoveDefense support, or sign in on a device where your password is saved.');
 }
 async function submitPasswordReset(){
   const email=normalizeEmail(authField('authEmail')||authResetEmail);
@@ -1295,8 +1422,10 @@ function continueAfterAuth(){
     heroGo(0);heroStart();route('intro');
   }
 }
-function signOut(){
+async function signOut(){
+  try{await apiFetch('/api/account/logout',{method:'POST'});}catch(e){}
   A.sessionEmail=null;
+  A.serverUser=null;
   saveAuth();
   closeDrawer();
   closeSheet();
@@ -1307,21 +1436,7 @@ function signOut(){
   renderAuth();
 }
 async function startGoogleSignIn(){
-  if(!GOOGLE_CLIENT_ID)return authSetMessage('error','Google sign-in is unavailable','Use email and password, or try again later.');
-  if(navigator.onLine===false)return authSetMessage('error','Google sign-in needs a network connection','Use email and password, or try again later.');
-  try{
-    authSetBusy('Opening Google sign-in','Connecting to Google.');
-    await loadGoogleIdentity();
-    google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:handleGoogleCredential});
-    google.accounts.id.prompt(notification=>{
-      if(notification.isNotDisplayed?.()||notification.isSkippedMoment?.()){
-        authSetMessage('error','Google sign-in could not open',notification.getNotDisplayedReason?.()||notification.getSkippedReason?.()||'Try again.');
-      }
-    });
-  }catch(error){
-    console.error('[MoveDefense auth]',error);
-    authSetMessage('error','Google sign-in failed to load',errorText(error));
-  }
+  return authSetMessage('error','Google sign-in is not connected yet','Use email and password for server-saved logs.');
 }
 function loadGoogleIdentity(){
   if(window.google?.accounts?.id)return Promise.resolve();
@@ -3386,7 +3501,22 @@ const icoReset=(s=16,c)=>ic('<path d="M4 12a8 8 0 108-8 8 8 0 00-6 2.7M4 4v4h4" 
 
 /* =================== INIT =================== */
 function tickClock(){const c=$('#clk');if(c){c.textContent=fmtTime(Date.now());}}
-function bootApp(){
+async function bootApp(){
+  await loadServerSession();
+  const localOnlyUser=!A.serverUser&&A.sessionEmail&&authAccount(A.sessionEmail);
+  if(localOnlyUser&&navigator.onLine!==false&&!serverSessionUnavailable){
+    clearInterval(heroTimer);
+    authMode='login';
+    authResetEmail=A.sessionEmail;
+    authMessage={
+      type:'ok',
+      text:'Sign in to sync saved log',
+      detail:'Your saved log is still here. Enter your password once to save it to MoveDefense.'
+    };
+    route('auth',false);
+    renderAuth();
+    return;
+  }
   if(!authSignedIn()){
     clearInterval(heroTimer);
     route('auth',false);
@@ -3403,8 +3533,7 @@ function bootApp(){
   heroGo(0);heroStart();route('intro',false);
 }
 setInterval(tickClock,30000);
-bootApp();
-migrateLegacyPhotoData();
+bootApp().finally(()=>migrateLegacyPhotoData());
 /* PWA shortcut doorways: an installed-app long-press shortcut opens /?do=<feature>.
    This just jumps to an existing screen using the same route()/enterApp() the
    in-app buttons already call — it never creates a stop or any new state. */
