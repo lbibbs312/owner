@@ -1178,12 +1178,20 @@ function apiErrorMessage(error,fallback='Request failed'){
   return errorText(error)||fallback;
 }
 async function apiFetch(path,{method='GET',body=null}={}){
-  const init={method,credentials:'same-origin',headers:{'Accept':'application/json'}};
+  const init={method,credentials:'same-origin',cache:'no-store',headers:{'Accept':'application/json'}};
   if(body!=null){
     init.headers['Content-Type']='application/json';
     init.body=JSON.stringify(body);
   }
-  const rsp=await fetch(path,init);
+  // This app is served through a CDN edge that can cache GET responses by URL.
+  // /api/account/me and /api/driver-state are per-user (identity + saved logs),
+  // so a shared cached copy leaks one driver's account to another. A unique
+  // query param forces every authenticated GET to miss the edge and hit origin.
+  let url=path;
+  if(method==='GET'){
+    url+=(path.includes('?')?'&':'?')+'_='+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  }
+  const rsp=await fetch(url,init);
   const data=await rsp.json().catch(()=>({}));
   if(!rsp.ok){
     const error=new Error(data.message||data.error||`Request failed (${rsp.status})`);
