@@ -475,7 +475,7 @@ textarea.input{height:auto;padding:14px 15px;line-height:1.45;resize:none}
 .place-suggestion .pi{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;flex:0 0 auto;background:rgba(63,224,206,.1);color:var(--cyan)}
 .place-suggestion .pm{font-weight:700;font-size:14px}
 .place-suggestion .pa{color:var(--text-3);font-size:12px;margin-top:2px;line-height:1.35}
-.place-suggestion .pk{display:inline-block;margin-bottom:3px;color:var(--cyan);font-family:var(--f-mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase}
+.place-suggestion .pt{display:flex;flex-direction:column;min-width:0}
 .place-status{padding:10px 13px;color:var(--text-3);font-size:12px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .collapse{overflow:hidden;max-height:0;opacity:0;transition:max-height .4s var(--ease),opacity .3s var(--ease),margin .3s}
@@ -3207,10 +3207,9 @@ function renderPlaceResults(ctx,items){
   ctx.results.innerHTML=items.map((item,i)=>{
     const main=item.main_text||item.formatted_address||'Place';
     const secondary=item.secondary_text||'';
-    const kind=ctx.fuelOnly?'Fuel station':(item.secondary_text?'Business or place':'Address');
     return `<button type="button" class="place-suggestion" data-place-index="${i}">
       <span class="pi">${icoPin(16)}</span>
-      <span><span class="pk">${escapeHtml(kind)}</span><span class="pm">${escapeHtml(main)}</span>${secondary?`<span class="pa">${escapeHtml(secondary)}</span>`:''}</span>
+      <span class="pt"><span class="pm">${escapeHtml(main)}</span>${secondary?`<span class="pa">${escapeHtml(secondary)}</span>`:''}</span>
     </button>`;
   }).join('');
   ctx.results.classList.add('open');
