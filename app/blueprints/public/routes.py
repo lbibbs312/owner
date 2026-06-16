@@ -34,6 +34,26 @@ MAX_DRIVER_DAY_STATE_BYTES = 400_000
 DAY_KEY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
+@bp.after_request
+def _never_cache_api(response):
+    """Forbid any caching of dynamic API responses.
+
+    ``/api/account/me`` and ``/api/driver-state`` return per-user identity,
+    email, and the driver's saved state. These sit behind Cloudflare, which
+    ignores ``Vary: Cookie`` when deciding what to cache — so without an
+    explicit ``no-store`` an edge can cache one driver's response and serve it
+    to every other driver, leaking accounts across users. Force no-store on
+    every ``/api/*`` response (static assets and the shell are unaffected).
+    """
+    if request.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "private, no-store, max-age=0, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        existing_vary = response.headers.get("Vary", "")
+        if "cookie" not in existing_vary.lower():
+            response.headers["Vary"] = (existing_vary + ", Cookie").lstrip(", ") if existing_vary else "Cookie"
+    return response
+
+
 def _json_body():
     data = request.get_json(silent=True)
     return data if isinstance(data, dict) else {}

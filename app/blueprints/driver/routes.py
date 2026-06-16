@@ -143,6 +143,17 @@ from app.models import (
 )
 
 
+@bp.after_request
+def _no_store_driver_pages(response):
+    # Driver pages, APIs, receipts, and PDFs are all per-user and private.
+    # Behind Cloudflare (which ignores ``Vary: Cookie``) an unguarded response
+    # can be cached at the edge and served to another driver, so never cache.
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+
 PLANT_TRANSFER_LINE_COUNT = 20
 DRIVER_LOG_AUDIT_FIELDS = ["plant_name", "load_size", "depart_load_size", "secondary_load", "downtime_reason", "part_number", "hot_parts", "arrive_time", "depart_time", "dock_wait_minutes", "maintenance", "fuel", "fuel_level", "fuel_mileage", "meeting", "location_address", "destination_address", "gps_latitude", "gps_longitude", "gps_accuracy_m"]
 PLANT_TRANSFER_AUDIT_FIELDS = ["transfer_number", "transfer_date", "ship_to", "ship_from", "trailer_number", "driver_name", "driver_initials", "transfer_time", "loaded_by"]

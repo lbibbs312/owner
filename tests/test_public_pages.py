@@ -254,6 +254,28 @@ def test_one_driver_api_registers_and_persists_state(client, app):
     assert payload["state"]["data"]["stops"][0]["location"]["business_name"] == "Receiver Dock"
 
 
+def test_authenticated_api_is_never_cacheable(client):
+    # SECURITY REGRESSION: /api/account/me returns per-user identity, email, and
+    # saved driver state. It sits behind Cloudflare, which ignores ``Vary: Cookie``
+    # when caching, so any cacheable /api/* response can be served to a different
+    # driver and leak accounts across users. Every /api/* response must be no-store.
+    client.post(
+        "/api/account/register",
+        json={"email": "nocache-driver@example.com", "password": "password123", "name": "NoCache Driver"},
+    )
+    me = client.get("/api/account/me")
+    assert me.status_code == 200
+    assert me.get_json()["user"]["email"] == "nocache-driver@example.com"
+    assert "no-store" in me.headers.get("Cache-Control", "")
+
+    # The unauthenticated probe also returns 200 — it must be uncacheable too,
+    # or Cloudflare can pin one identity at the edge.
+    client.post("/api/account/logout")
+    anon = client.get("/api/account/me")
+    assert anon.get_json()["authenticated"] is False
+    assert "no-store" in anon.headers.get("Cache-Control", "")
+
+
 def test_one_driver_api_login_accepts_existing_driver_username(client, app):
     with app.app_context():
         from app.extensions import db
