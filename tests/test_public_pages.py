@@ -179,6 +179,21 @@ def test_install_app_page_is_sms_share_first(client):
     assert "Download for Android" not in body
 
 
+def test_service_worker_falls_back_on_render_gateway_errors(client):
+    response = client.get("/sw.js")
+
+    assert response.status_code == 200
+    assert response.headers["Service-Worker-Allowed"] == "/"
+    body = response.get_data(as_text=True)
+    assert "DEPLOY_ERROR_STATUSES" in body
+    assert "502" in body
+    assert "503" in body
+    assert "504" in body
+    assert "cachedNavigation(request)" in body
+    assert "deploymentFallbackResponse" in body
+    assert "Your saved driver records stay on this device." in body
+
+
 def test_one_driver_api_registers_and_persists_state(client, app):
     response = client.post(
         "/api/account/register",

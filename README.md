@@ -39,3 +39,24 @@ ruff check .
 mypy .
 pytest
 ```
+
+## Cloudflare R2 deploy-fallback
+
+MoveDefense uses a Cloudflare Worker plus R2 bucket to avoid showing Render
+gateway errors during deploys. The Worker proxies normal traffic to Render,
+snapshots only public app-shell files into R2, and serves the last good shell
+when Render returns `502`, `503`, `504`, `522`, `523`, or `524`.
+
+No Cloudflare token belongs in this repo. Set it only in your shell or CI:
+
+```bash
+export CLOUDFLARE_API_TOKEN="..."
+npm exec --yes wrangler r2 bucket create movedefense-app-shell
+npm exec --yes wrangler deploy --config wrangler.toml
+scripts/warm_r2_fallback.sh
+```
+
+If your existing R2 bucket has a different name, update `bucket_name` in
+`wrangler.toml` before deploying. After any token has been pasted into chat or
+logs, revoke it in Cloudflare and create a new scoped token before production
+use.

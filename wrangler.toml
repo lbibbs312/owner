@@ -1,0 +1,13 @@
+name = "movedefense-r2-fallback"
+main = "cloudflare/movedefense-r2-fallback-worker.js"
+compatibility_date = "2026-06-16"
+account_id = "746191c2d2bef207e6254e4ba80e95da"
+workers_dev = false
+
+routes = [
+  { pattern = "movedefense.com/*", zone_name = "movedefense.com" }
+]
+
+[[r2_buckets]]
+binding = "MD_R2_FALLBACK"
+bucket_name = "movedefense-app-shell"
