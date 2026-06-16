@@ -4,7 +4,7 @@ import os
 import re
 from datetime import datetime, timezone
 
-from flask import abort, current_app, jsonify, redirect, render_template, request, send_from_directory, url_for
+from flask import abort, current_app, jsonify, make_response, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
@@ -204,7 +204,9 @@ def welcome():
     except SQLAlchemyError as exc:
         current_app.logger.warning("public.welcome_bulletins_unavailable error=%s", exc.__class__.__name__)
         bulletins = []
-    return render_template("welcome.html", bulletins=bulletins)
+    response = make_response(render_template("welcome.html", bulletins=bulletins))
+    response.headers["Cache-Control"] = "no-cache, max-age=0, must-revalidate"
+    return response
 
 
 @bp.route("/manifest.webmanifest")

@@ -53,6 +53,7 @@ def test_welcome_page_serves_driver_logger_app(client):
     response = client.get("/")
 
     assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "no-cache, max-age=0, must-revalidate"
     body = response.get_data(as_text=True)
 
     for expected in (
