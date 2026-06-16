@@ -6,6 +6,10 @@ services:
     repo: https://github.com/lbibbs312/owner
     branch: fix/owner-review-security-01
     autoDeploy: true
+    # Zero-downtime deploys: Render keeps the current instance serving until the
+    # new one answers 200 here, then cuts over. Without this, a deploy restart
+    # produced a brief 502 for live users.
+    healthCheckPath: /healthz
 
     buildCommand: pip install -e .
     preDeployCommand: flask --app lacksdrivers.py deploy-db

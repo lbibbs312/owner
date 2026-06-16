@@ -133,6 +133,32 @@ def test_autocomplete_service_restricts_to_gas_stations_when_fuel_only(monkeypat
     assert "includedPrimaryTypes" not in calls[1]
 
 
+def test_fuel_autocomplete_sorts_closest_station_first(monkeypatch):
+    # On the fuel page the driver wants the nearest pump, so fuel suggestions
+    # must be ordered by distance rather than Google's text-relevance order.
+    from flask import Flask
+
+    flask_app = Flask(__name__)
+    flask_app.config["GOOGLE_MAPS_API_KEY"] = "test-key"
+
+    def fake_post(url, *, headers, json, timeout):
+        return FakeResponse(
+            {
+                "suggestions": [
+                    {"placePrediction": {"placeId": "far", "structuredFormat": {"mainText": {"text": "Marathon Far"}}, "distanceMeters": 9000}},
+                    {"placePrediction": {"placeId": "near", "structuredFormat": {"mainText": {"text": "Marathon Near"}}, "distanceMeters": 300}},
+                    {"placePrediction": {"placeId": "mid", "structuredFormat": {"mainText": {"text": "Marathon Mid"}}, "distanceMeters": 1500}},
+                ]
+            }
+        )
+
+    monkeypatch.setattr(google_places.requests, "post", fake_post)
+    with flask_app.app_context():
+        result = google_places.autocomplete_destination("marathon", lat=42.9, lng=-85.6, fuel_only=True)
+
+    assert [s["main_text"] for s in result["suggestions"]] == ["Marathon Near", "Marathon Mid", "Marathon Far"]
+
+
 def test_place_details_service_returns_minimal_fields_and_raw(monkeypatch):
     from flask import Flask
 

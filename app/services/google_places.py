@@ -682,9 +682,13 @@ def autocomplete_destination(text, *, lat=None, lng=None, session_token="", limi
                 "source": "google_places",
             }
         )
-        if len(suggestions) >= limit:
-            break
-    return {"ok": True, "suggestions": suggestions, "session_token": session_token}
+    if fuel_only:
+        # Surface the closest fuel station first so the driver sees the pump they
+        # actually stopped at, not just the most text-relevant brand match.
+        suggestions.sort(
+            key=lambda s: s["distance_meters"] if s.get("distance_meters") is not None else float("inf")
+        )
+    return {"ok": True, "suggestions": suggestions[:limit], "session_token": session_token}
 
 
 def destination_place_details(place_id, *, session_token="", include_reviews=False, include_generative=False):

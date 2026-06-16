@@ -2031,7 +2031,7 @@ function renderFuel(){
     </div>
     <div class="fuel-section">
       <div class="fuel-section-head"><h3>Fuel locations</h3><span>${stats.stationStats.length} station${stats.stationStats.length!==1?'s':''}</span></div>
-      <div class="fuel-list">${stationRows||`<div class="fuel-empty">No fuel records logged for this date.<button class="mini-btn primary" onclick="openManualFuelStop()">${icoFuel(14)} Record fuel</button></div>`}</div>
+      <div class="fuel-list">${stationRows||`<div class="fuel-empty">No fuel records logged for this date.</div>`}</div>
     </div>
     <div class="fuel-section">
       <div class="fuel-section-head"><h3>Records by stop</h3><span>${stats.fuelStops.length} stop${stats.fuelStops.length!==1?'s':''}</span></div>
@@ -3214,13 +3214,20 @@ function renderPlaceResults(ctx,items){
   if(!items.length){ctx.results.classList.remove('open');ctx.results.innerHTML='';return;}
   ctx.results.innerHTML=items.map((item,i)=>{
     const main=item.main_text||item.formatted_address||'Place';
-    const secondary=item.secondary_text||'';
+    const dist=fmtPlaceDistance(item.distance_meters);
+    const meta=[item.secondary_text||'',dist].filter(Boolean).join(' · ');
     return `<button type="button" class="place-suggestion" data-place-index="${i}">
       <span class="pi">${icoPin(16)}</span>
-      <span class="pt"><span class="pm">${escapeHtml(main)}</span>${secondary?`<span class="pa">${escapeHtml(secondary)}</span>`:''}</span>
+      <span class="pt"><span class="pm">${escapeHtml(main)}</span>${meta?`<span class="pa">${escapeHtml(meta)}</span>`:''}</span>
     </button>`;
   }).join('');
   ctx.results.classList.add('open');
+}
+function fmtPlaceDistance(m){
+  if(typeof m!=='number'||!isFinite(m)||m<0)return'';
+  const mi=m/1609.344;
+  if(mi<0.1)return'nearby';
+  return mi.toFixed(mi<10?1:0)+' mi';
 }
 function renderPlaceStatus(ctx,message){
   ctx.results.innerHTML=`<div class="place-status">${escapeHtml(message)}</div>`;
