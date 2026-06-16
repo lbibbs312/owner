@@ -249,6 +249,29 @@ input,select,textarea{font-family:inherit}
 .icon-btn{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:var(--panel);border:1px solid var(--hair);color:var(--text)}
 .icon-btn:active{transform:scale(.94)}
 
+/* date controls */
+.date-strip{padding:8px 16px 4px}
+.date-picker{display:grid;grid-template-columns:minmax(0,1fr) 148px;gap:9px;align-items:center;
+  border:1px solid var(--hair);border-radius:16px;padding:10px 11px;background:rgba(255,255,255,.035)}
+.date-copy{min-width:0}
+.date-kicker{font-family:var(--f-mono);font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-3)}
+.date-label{margin-top:3px;font-family:var(--f-display);font-weight:700;font-size:15px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.date-input{width:100%;height:38px;border-radius:11px;border:1px solid var(--hair);background:var(--panel);color:var(--text);
+  padding:0 9px;font-family:var(--f-mono);font-size:12px;color-scheme:dark;min-width:0}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.72}
+.date-actions{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.date-actions .mini-btn{height:34px;padding:0 8px}
+.mini-btn:disabled{opacity:.45;pointer-events:none}
+.range-pickers{display:grid;grid-template-columns:1fr;gap:9px}
+.range-field{display:grid;gap:6px}
+.range-field span{font-family:var(--f-mono);font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-3)}
+@media (min-width:520px){
+  .date-picker{grid-template-columns:minmax(0,1fr) 150px auto}
+  .date-actions{grid-column:auto;display:flex}
+  .date-actions .mini-btn{min-width:54px}
+  .range-pickers{grid-template-columns:repeat(2,1fr)}
+}
+
 /* ============================================================
    HOME
    ============================================================ */
@@ -636,7 +659,7 @@ table.tbl .seq{font-family:var(--f-mono);color:#94a0b8;width:22px}
 }
 @media print{
   @page{size:Letter;margin:14mm}
-  .atmos,.grain,.topbar,.export-bar,.scope,.scope-extra,#cta-dock,.scrim,.sheet,.drawer,#toast{display:none!important}
+  .atmos,.grain,.topbar,.export-bar,.scope,.scope-extra,.date-strip,#cta-dock,.scrim,.sheet,.drawer,#toast{display:none!important}
   body{background:#fff}
   #app{max-width:none}
   .screen{display:none!important}
@@ -773,6 +796,7 @@ table.tbl .seq{font-family:var(--f-mono);color:#94a0b8;width:22px}
       </div>
     </header>
 
+    <div class="date-strip" id="homeDateStrip"></div>
     <div class="home-pad">
       <div class="home-col home-col-cockpit">
         <!-- current state -->
@@ -783,7 +807,7 @@ table.tbl .seq{font-family:var(--f-mono);color:#94a0b8;width:22px}
       <div class="home-col home-col-ledger">
         <!-- ledger -->
         <div class="ledger-head">
-          <h2>Today's stops</h2>
+          <h2 id="ledgerTitle">Today's stops</h2>
           <span class="count" id="ledgerCount"></span>
         </div>
         <div class="timeline" id="timeline"></div>
@@ -803,6 +827,7 @@ table.tbl .seq{font-family:var(--f-mono);color:#94a0b8;width:22px}
         Save fuel PDF
       </button>
     </div>
+    <div class="date-strip" id="fuelDateStrip"></div>
     <div class="fuel-wrap" id="fuelPage"></div>
     <div class="doc-wrap fuel-print-wrap"><div class="doc fuel-print" id="fuelDoc"></div></div>
   </section>
@@ -853,6 +878,7 @@ const KEY='movedefense.v2';
 const ROUTE_KEY='movedefense.lastRoute';
 const AUTH_KEY='movedefense.auth.v1';
 const SHEET_DRAFT_KEY='movedefense.sheetDraft.v1';
+const VIEW_DATE_KEY='movedefense.viewDate.v1';
 const LEGACY_KEYS=['movedefense.v1'];
 const CONFIG=window.MOVEDEFENSE_CONFIG||{};
 const GOOGLE_MAPS_API_KEY=String(CONFIG.googleMapsApiKey||'').trim();
@@ -875,7 +901,35 @@ const fmtDayLong=t=>new Date(t).toLocaleDateString([],{weekday:'long',month:'lon
 const fmtDur=ms=>{if(ms==null||ms<0)return'—';if(ms<60000)return'<1 min';const m=Math.round(ms/60000);if(m<60)return m+' min';return Math.floor(m/60)+'h '+pad(m%60)+' min';};
 const fmtDurShort=ms=>{if(ms==null||ms<0)return'—';if(ms<60000)return'<1 min';const m=Math.round(ms/60000);return m<60?m+' min':Math.floor(m/60)+'h'+(m%60?(' '+(m%60)+' min'):'');};
 const money=n=>'$'+(n||0).toFixed(2);
-const dayKey=t=>new Date(t).toISOString().slice(0,10);
+function dateFromValue(value){
+  const d=value instanceof Date?new Date(value.getTime()):new Date(value);
+  return Number.isFinite(d.getTime())?d:new Date();
+}
+const dayKey=t=>{const d=dateFromValue(t);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;};
+const todayKey=()=>dayKey(Date.now());
+function dateFromKey(key){
+  const m=String(key||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m)return dateFromValue(Date.now());
+  return new Date(+m[1],+m[2]-1,+m[3]);
+}
+function isDateKey(value){
+  const key=String(value||'');
+  return /^\d{4}-\d{2}-\d{2}$/.test(key)&&dayKey(dateFromKey(key))===key;
+}
+function fmtDateKeyShort(key){return fmtDay(dateFromKey(key));}
+function fmtDateKeyLong(key){return fmtDayLong(dateFromKey(key));}
+function shiftDateKey(key,days){const d=dateFromKey(key);d.setDate(d.getDate()+days);return dayKey(d);}
+function dateKeyTimestamp(key){
+  const base=dateFromKey(key),now=new Date();
+  base.setHours(now.getHours(),now.getMinutes(),now.getSeconds(),now.getMilliseconds());
+  return base.getTime();
+}
+function loadViewDateKey(){
+  try{const saved=localStorage.getItem(VIEW_DATE_KEY);if(isDateKey(saved)&&saved<=todayKey())return saved;}catch(e){}
+  return todayKey();
+}
+function storeViewDateKey(key){try{localStorage.setItem(VIEW_DATE_KEY,key);}catch(e){}}
+let selectedDateKey=loadViewDateKey();
 const uid=()=>Math.random().toString(36).slice(2,9);
 function haversine(a,b){const R=3958.8,dLat=(b.lat-a.lat)*Math.PI/180,dLng=(b.lng-a.lng)*Math.PI/180,
   s=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
@@ -1570,8 +1624,50 @@ function heroStart(){heroTimer=setInterval(()=>heroGo(heroI+1),5200);}
 })();
 
 /* =================== HOME RENDER =================== */
-function todayStops(){const k=dayKey(Date.now());return S.stops.filter(s=>dayKey(s.arrival_time)===k);}
-function renderHome(){renderState();renderGauges();renderLedger();renderCTA();}
+function selectedDateIsToday(){return selectedDateKey===todayKey();}
+function viewDateUnit(){return selectedDateIsToday()?'today':fmtDateKeyShort(selectedDateKey);}
+function stopsForDate(key=selectedDateKey){
+  return S.stops.filter(s=>dayKey(s.arrival_time)===key).sort((a,b)=>a.arrival_time-b.arrival_time);
+}
+function todayStops(){return stopsForDate(selectedDateKey);}
+function datePickerHtml(label){
+  const today=todayKey();
+  const safeLabel=escapeHtml(label);
+  return `
+    <div class="date-picker">
+      <div class="date-copy">
+        <div class="date-kicker">${safeLabel}</div>
+        <div class="date-label">${escapeHtml(fmtDateKeyLong(selectedDateKey))}</div>
+      </div>
+      <input class="date-input" type="date" value="${selectedDateKey}" max="${today}" aria-label="${safeLabel}" onchange="setViewDate(this.value)" />
+      <div class="date-actions">
+        <button class="mini-btn" onclick="shiftViewDate(-1)">Prev</button>
+        <button class="mini-btn" onclick="setViewDate(todayKey())">Today</button>
+        <button class="mini-btn" onclick="shiftViewDate(1)"${selectedDateKey>=today?' disabled':''}>Next</button>
+      </div>
+    </div>`;
+}
+function renderDateStrip(id,label){
+  const el=$('#'+id);
+  if(el)el.innerHTML=datePickerHtml(label);
+}
+function renderDateStrips(){
+  renderDateStrip('homeDateStrip','Trip date');
+  renderDateStrip('fuelDateStrip','Fuel date');
+}
+function setViewDate(value){
+  let key=String(value||'').trim();
+  if(!isDateKey(key))return;
+  if(key>todayKey())key=todayKey();
+  selectedDateKey=key;
+  storeViewDateKey(key);
+  if(activeRoute==='home')renderHome();
+  else if(activeRoute==='fuel')renderFuel();
+  else if(activeRoute==='export')renderExport();
+  else renderDateStrips();
+}
+function shiftViewDate(days){setViewDate(shiftDateKey(selectedDateKey,days));}
+function renderHome(){renderDateStrips();renderState();renderGauges();renderLedger();renderCTA();}
 
 function renderState(){
   const driving=S.position==='driving';
@@ -1627,7 +1723,7 @@ function displayLocationLine(location){
 
 function renderGauges(){
   const ts=todayStops();
-  const miles=totalMilesForStops(ts)+activeLegMiles(ts);
+  const miles=totalMilesForStops(ts)+(selectedDateIsToday()?activeLegMiles(ts):0);
   const fuel=ts.reduce((a,s)=>a+(s.fuel?.gallons||0),0);
   const onClock=ts.reduce((a,s)=>a+((s.departure_time||Date.now())-s.arrival_time),0);
   const g=$('#gauges');
@@ -1635,7 +1731,7 @@ function renderGauges(){
     ? gauge('fuel','Fuel',fuel.toFixed(0),'gallons','fuel')
     : gauge('fuel','Active',(onClock/3600000).toFixed(1),'hrs on-clock','time');
   g.innerHTML=`
-    ${gauge('stop','Stops',ts.length,'today','stop')}
+    ${gauge('stop','Stops',ts.length,viewDateUnit(),'stop')}
     ${gauge('mile','Miles',miles,'since 1st stop','mile')}
     ${third}`;
 }
@@ -1656,7 +1752,7 @@ function summarySheet(title,subtitle,body){
         <div class="name">${title}</div>
         <div class="addr">${subtitle}</div>
       </div>
-      <div class="detail-pill">Today</div>
+      <div class="detail-pill">${escapeHtml(fmtDateKeyShort(selectedDateKey))}</div>
     </div>
     ${body}
     <div class="sheet-actions"><button class="btn-primary" onclick="closeSheet()">Done</button></div>`;
@@ -1690,7 +1786,7 @@ function openMilesSummary(stops){
     const from=i===0?'Shift start':stops[i-1].location.business_name;
     return `<div class="summary-row"><div><div class="rk">${escapeHtml(from)} → ${escapeHtml(s.location.business_name)}</div><div class="rs">${fmtTime(s.arrival_time)} · ${i===0?'first logged point':'arrival leg'}</div></div><div class="rv">${docLegCell(legs,i)}${legs[i]?' mi':''}</div></div>`;
   }).join('');
-  const active=S.position==='driving'&&S.destination?`<div class="summary-row"><div><div class="rk">${escapeHtml(stops[stops.length-1]?.location.business_name||'Current stop')} → ${escapeHtml(S.destination.business_name)}</div><div class="rs">Current route estimate</div></div><div class="rv">${activeLegMiles(stops)||'—'} mi</div></div>`:'';
+  const active=selectedDateIsToday()&&S.position==='driving'&&S.destination?`<div class="summary-row"><div><div class="rk">${escapeHtml(stops[stops.length-1]?.location.business_name||'Current stop')} → ${escapeHtml(S.destination.business_name)}</div><div class="rs">Current route estimate</div></div><div class="rv">${activeLegMiles(stops)||'—'} mi</div></div>`:'';
   summarySheet('Mileage detail','Legs, odometer, and current estimate',`
     <div class="detail-grid">
       <div class="detail-metric"><div class="mk">Total</div><div class="mv">${total}</div></div>
@@ -1719,7 +1815,7 @@ function openFuelSummary(stops){
       <div class="detail-metric"><div class="mk">Records</div><div class="mv">${fuelStops.length}</div></div>
       <div class="detail-metric"><div class="mk">Gauge</div><div class="mv">${gaugeCount||'—'}</div></div>
     </div>
-    <div class="summary-list">${rows||'<div class="summary-note">No fuel records logged today.</div>'}</div>`);
+    <div class="summary-list">${rows||'<div class="summary-note">No fuel records logged for this date.</div>'}</div>`);
 }
 function fuelReceipts(fuel){
   return Array.isArray(fuel?.receipts)?fuel.receipts:[];
@@ -1770,7 +1866,7 @@ function fuelStats(stops=todayStops()){
   const fuelStops=stops.filter(s=>s.fuel);
   const gallons=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).gallons,0);
   const cost=fuelStops.reduce((a,s)=>a+fuelAmounts(s.fuel).cost,0);
-  const miles=totalMilesForStops(stops)+activeLegMiles(stops);
+  const miles=totalMilesForStops(stops)+(selectedDateIsToday()?activeLegMiles(stops):0);
   const receiptCount=fuelStops.reduce((a,s)=>a+fuelReceipts(s.fuel).length,0);
   const gaugeCount=fuelStops.reduce((a,s)=>a+(fuelGaugeText(s.fuel)!=='—'?1:0),0);
   const stationMap=new Map();
@@ -1800,6 +1896,7 @@ function fuelStats(stops=todayStops()){
 function renderFuel(){
   const page=$('#fuelPage'),doc=$('#fuelDoc');
   if(!page||!doc)return;
+  renderDateStrip('fuelDateStrip','Fuel date');
   const stops=todayStops();
   const stats=fuelStats(stops);
   const legs=mileageLegsForStops(stops);
@@ -1853,7 +1950,7 @@ function renderFuel(){
   }).join('');
   page.innerHTML=`
     <div class="fuel-head">
-      <div class="fuel-kicker">${icoFuel(14)} Fuel records today</div>
+      <div class="fuel-kicker">${icoFuel(14)} Fuel records · ${escapeHtml(fmtDateKeyShort(selectedDateKey))}</div>
       <div class="fuel-title">${stats.gallons?gallonsText(stats.gallons)+' gallons recorded':fuelRecordCountText(stats.fuelStops.length)}</div>
       <p class="fuel-sub">Fuel records hold purchases, receipt photos, and optional tank gauge readings. Tank fuel is not known unless the gauge is recorded.</p>
       <div class="fuel-head-actions">
@@ -1869,11 +1966,11 @@ function renderFuel(){
     </div>
     <div class="fuel-section">
       <div class="fuel-section-head"><h3>Fuel locations</h3><span>${stats.stationStats.length} station${stats.stationStats.length!==1?'s':''}</span></div>
-      <div class="fuel-list">${stationRows||`<div class="fuel-empty">No fuel records logged today.<button class="mini-btn primary" onclick="openManualFuelStop()">${icoFuel(14)} Record fuel</button></div>`}</div>
+      <div class="fuel-list">${stationRows||`<div class="fuel-empty">No fuel records logged for this date.<button class="mini-btn primary" onclick="openManualFuelStop()">${icoFuel(14)} Record fuel</button></div>`}</div>
     </div>
     <div class="fuel-section">
       <div class="fuel-section-head"><h3>Records by stop</h3><span>${stats.fuelStops.length} stop${stats.fuelStops.length!==1?'s':''}</span></div>
-      <div class="fuel-list">${stopRows||`<div class="fuel-empty">No fuel records logged today. Gas-station destinations can appear here automatically, and any stop can hold a fuel receipt.<button class="mini-btn primary" onclick="openManualFuelStop()">${icoCamera(14)} Add receipt record</button></div>`}</div>
+      <div class="fuel-list">${stopRows||`<div class="fuel-empty">No fuel records logged for this date. Gas-station destinations can appear here automatically, and any stop can hold a fuel receipt.<button class="mini-btn primary" onclick="openManualFuelStop()">${icoCamera(14)} Add receipt record</button></div>`}</div>
     </div>`;
   doc.innerHTML=buildFuelDoc(stops);
   hydratePhotos(page);
@@ -1910,7 +2007,7 @@ function buildFuelDoc(stops=todayStops()){
       <img ${photoImgAttrs(receipt,'Fuel receipt')}>
       <div class="cap">Fuel receipt · Stop ${stop.sequence} · ${escapeHtml(stationName(stop))}<br>${fmtTime(receipt.added_at||stop.arrival_time)}</div>
     </div>`)).join('');
-  const today=fmtDayLong(Date.now());
+  const dateLabel=fmtDateKeyLong(selectedDateKey);
   return `
   <div class="doc-band">
     <div class="doc-band-top">
@@ -1927,7 +2024,7 @@ function buildFuelDoc(stops=todayStops()){
     <div class="doc-sub">
       <span>Driver <b>${escapeHtml(S.driver.name)}</b></span>
       <span>${escapeHtml(S.driver.license)}</span>
-      <span><b>${today}</b></span>
+      <span><b>${escapeHtml(dateLabel)}</b></span>
     </div>
   </div>
   <div class="doc-body">
@@ -1948,7 +2045,7 @@ function buildFuelDoc(stops=todayStops()){
     <h4><span class="bar"></span>Records by stop</h4>
     <table class="tbl">
       <thead><tr><th>Date</th><th>Station / stop</th><th class="num">Gallons</th><th class="num">Cost</th><th class="num">PPG</th><th class="num">Gauge</th><th class="num">Miles</th><th class="num">Receipts</th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="8">No fuel records logged today.</td></tr>'}</tbody>
+      <tbody>${rows||'<tr><td colspan="8">No fuel records logged for this date.</td></tr>'}</tbody>
       <tfoot><tr><td colspan="2">Purchase totals</td><td class="num">${stats.gallons.toFixed(1)}</td><td class="num">${money(stats.cost)}</td><td class="num">${stats.ppg?money(stats.ppg):'—'}</td><td class="num">${stats.gaugeCount||'—'}</td><td class="num">${stats.miles.toLocaleString()}</td><td class="num">${stats.receiptCount}</td></tr></tfoot>
     </table>
 
@@ -1971,7 +2068,7 @@ function openManualFuelStop(){
   $('#sheet').innerHTML=`
     <div class="grab"></div>
     <h3>Record fuel</h3>
-    <p class="lede">Add a fuel purchase or receipt to today's fuel log.</p>
+    <p class="lede">Add a fuel purchase or receipt to ${escapeHtml(fmtDateKeyLong(selectedDateKey))}.</p>
     <div class="field-label">Fuel location</div>
     <div class="place-field">
       <label class="input-label" for="manualFuelName">Station / stop name</label>
@@ -2018,6 +2115,10 @@ function triggerManualFuelReceipt(mode='upload'){
   $(`#manualFuelReceipt${mode==='camera'?'Camera':'Upload'}Input`)?.click();
 }
 function manualFuelInsertIndex(){
+  if(!selectedDateIsToday()){
+    const nextDayIndex=S.stops.findIndex(stop=>dayKey(stop.arrival_time)>selectedDateKey);
+    return nextDayIndex>=0?nextDayIndex:S.stops.length;
+  }
   if(S.position==='parked'){
     const openIndex=S.stops.findIndex(stop=>!stop.departure_time);
     if(openIndex>=0)return openIndex;
@@ -2026,9 +2127,9 @@ function manualFuelInsertIndex(){
   return S.stops.length;
 }
 function manualFuelTimes(insertIndex){
-  const now=Date.now();
+  const now=selectedDateIsToday()?Date.now():dateKeyTimestamp(selectedDateKey);
   const next=S.stops[insertIndex];
-  if(next&&dayKey(next.arrival_time)===dayKey(now)){
+  if(next&&dayKey(next.arrival_time)===selectedDateKey){
     const start=new Date(now);start.setHours(0,0,0,0);
     const arrival=Math.max(start.getTime(),next.arrival_time-60000);
     return {arrival_time:arrival,departure_time:Math.max(arrival,Math.min(now,next.arrival_time-1000))};
@@ -2123,10 +2224,13 @@ function openTimeSummary(stops){
 
 function renderLedger(){
   const ts=todayStops();
+  $('#ledgerTitle').textContent=selectedDateIsToday()?"Today's stops":'Stops on '+fmtDateKeyShort(selectedDateKey);
   $('#ledgerCount').textContent=ts.length+' logged';
   const tl=$('#timeline');tl.innerHTML='';
   if(!ts.length){
-    tl.innerHTML='<div class="empty-ledger">No stops logged yet. Start the first stop to stamp the current time and GPS.</div>';
+    tl.innerHTML=selectedDateIsToday()
+      ? '<div class="empty-ledger">No stops logged yet. Start the first stop to stamp the current time and GPS.</div>'
+      : '<div class="empty-ledger">No stops logged for this date. Tap Today or choose another date.</div>';
     return;
   }
   ts.forEach((s,i)=>{
@@ -2158,7 +2262,7 @@ function renderLedger(){
         </div>
       </div>`);
   });
-  if(S.position==='driving'&&S.destination){
+  if(selectedDateIsToday()&&S.position==='driving'&&S.destination){
     const leg=activeLegMiles(ts);
     tl.insertAdjacentHTML('beforeend',`<div class="transit-line">${icoRoad(13,'var(--cyan)')} En route to ${S.destination.business_name}${leg?' · '+leg+' mi':''}<span class="ln"></span></div>`);
   }
@@ -3360,11 +3464,43 @@ async function googleGeoFallback(){
 }
 
 /* =================== EXPORT =================== */
-let scope='day',custFilter=null;
+let scope='day',custFilter=null,exportFromKey=null,exportToKey=null;
 function setScope(s){scope=s;$$('.scope button').forEach(b=>b.classList.toggle('on',b.dataset.scope===s));renderExport();}
+function stopDateKeys(){
+  return [...new Set(S.stops.map(s=>dayKey(s.arrival_time)).filter(isDateKey))].sort();
+}
+function ensureExportRangeKeys(){
+  const keys=stopDateKeys();
+  if(!isDateKey(exportFromKey))exportFromKey=keys[0]||selectedDateKey;
+  if(!isDateKey(exportToKey))exportToKey=keys[keys.length-1]||selectedDateKey;
+}
+function setExportRange(which,value){
+  const key=String(value||'').trim();
+  if(!isDateKey(key))return;
+  if(which==='from')exportFromKey=key;
+  else exportToKey=key;
+  renderExport();
+}
+function exportRangeBounds(){
+  ensureExportRangeKeys();
+  return exportFromKey<=exportToKey?[exportFromKey,exportToKey]:[exportToKey,exportFromKey];
+}
+function dateRangeLabel(from,to){
+  return from===to?fmtDateKeyLong(from):fmtDateKeyShort(from)+' to '+fmtDateKeyShort(to);
+}
 function renderExport(){
   const ex=$('#scopeExtra');
-  if(scope==='customer'){
+  if(scope==='day'){
+    ex.innerHTML=datePickerHtml('Trip date');
+  }else if(scope==='range'){
+    ensureExportRangeKeys();
+    const [from,to]=exportRangeBounds();
+    ex.innerHTML=`
+      <div class="range-pickers">
+        <label class="range-field"><span>From</span><input class="date-input" type="date" value="${from}" onchange="setExportRange('from',this.value)" /></label>
+        <label class="range-field"><span>To</span><input class="date-input" type="date" value="${to}" onchange="setExportRange('to',this.value)" /></label>
+      </div>`;
+  }else if(scope==='customer'){
     const names=[...new Set(S.stops.map(s=>s.location.business_name))];
     if(!names.length){custFilter=null;ex.innerHTML='<p class="lede">No customer stops logged yet.</p>';}
     else{if(!custFilter||!names.includes(custFilter))custFilter=mostVisited();
@@ -3382,7 +3518,11 @@ function mostVisited(){const m={};S.stops.forEach(s=>m[s.location.business_name]
   return Object.entries(m).sort((a,b)=>b[1]-a[1])[0]?.[0]||null;}
 
 function selectStops(){
-  if(scope==='day'){const k=dayKey(Date.now());return S.stops.filter(s=>dayKey(s.arrival_time)===k);}
+  if(scope==='day')return stopsForDate(selectedDateKey);
+  if(scope==='range'){
+    const [from,to]=exportRangeBounds();
+    return S.stops.filter(s=>{const k=dayKey(s.arrival_time);return k>=from&&k<=to;});
+  }
   if(scope==='customer')return custFilter?S.stops.filter(s=>s.location.business_name===custFilter):[];
   return [...S.stops];
 }
@@ -3404,10 +3544,12 @@ function buildDoc(){
   let driving=0;for(let i=0;i<stops.length-1;i++){if(stops[i].departure_time)driving+=Math.max(0,stops[i+1].arrival_time-stops[i].departure_time);}
   const odoStart=odometerStartForStops(stops);
   const odoEnd=odometerEndForStops(stops);
-  const d0=stops.length?stops[0].arrival_time:Date.now(),d1=stops.length?stops[stops.length-1].arrival_time:Date.now();
-  const sameDay=dayKey(d0)===dayKey(d1);
-  let rangeLabel = scope==='customer' ? custFilter
-    : sameDay ? fmtDayLong(d0) : (fmtDay(d0)+'  —  '+fmtDay(d1));
+  const d0=stops.length?stops[0].arrival_time:dateKeyTimestamp(selectedDateKey),d1=stops.length?stops[stops.length-1].arrival_time:dateKeyTimestamp(selectedDateKey);
+  let rangeLabel;
+  if(scope==='customer')rangeLabel=custFilter||'Customer';
+  else if(scope==='day')rangeLabel=fmtDateKeyLong(selectedDateKey);
+  else if(scope==='range'){const [from,to]=exportRangeBounds();rangeLabel=dateRangeLabel(from,to);}
+  else rangeLabel=dayKey(d0)===dayKey(d1)?fmtDayLong(d0):(fmtDay(d0)+' to '+fmtDay(d1));
   const title = scope==='customer'?'Customer Activity Summary':scope==='range'?'Trip & Activity Record':'Driver Activity Log';
 
   const rows=stops.map((s,i)=>{
