@@ -111,6 +111,28 @@ def test_autocomplete_service_sends_session_token_and_origin(monkeypatch):
     ]
 
 
+def test_autocomplete_service_restricts_to_gas_stations_when_fuel_only(monkeypatch):
+    # The fuel page's station-name field must only suggest fuel stations, while
+    # every other place field keeps the general business/address search.
+    from flask import Flask
+
+    flask_app = Flask(__name__)
+    flask_app.config["GOOGLE_MAPS_API_KEY"] = "test-key"
+    calls = []
+
+    def fake_post(url, *, headers, json, timeout):
+        calls.append(json)
+        return FakeResponse({"suggestions": []})
+
+    monkeypatch.setattr(google_places.requests, "post", fake_post)
+    with flask_app.app_context():
+        google_places.autocomplete_destination("mob", session_token="tok-f", fuel_only=True)
+        google_places.autocomplete_destination("mob", session_token="tok-f")
+
+    assert calls[0]["includedPrimaryTypes"] == ["gas_station"]
+    assert "includedPrimaryTypes" not in calls[1]
+
+
 def test_place_details_service_returns_minimal_fields_and_raw(monkeypatch):
     from flask import Flask
 
@@ -295,6 +317,26 @@ def test_autocomplete_endpoint_returns_suggestions_with_session_token(client, ap
     second = client.post("/api/places/destination-autocomplete",
                          json={"input": "founders", "session_token": "tok-9"})
     assert second.get_json()["suggestions"][0]["main_text"] == "Warehouse founders"
+
+
+def test_geo_suggest_endpoint_threads_fuel_only_flag(client, app, monkeypatch):
+    # The one-driver page's /api/geo/suggest proxy must forward the fuel_only
+    # flag so the fuel station-name field is restricted to gas stations.
+    captured = []
+
+    def fake_autocomplete(text, *, lat=None, lng=None, session_token="", limit=6, fuel_only=False):
+        captured.append(fuel_only)
+        return {"ok": True, "session_token": session_token, "suggestions": []}
+
+    monkeypatch.setattr("app.blueprints.public.routes.autocomplete_destination", fake_autocomplete)
+
+    fuel = client.post("/api/geo/suggest", json={"input": "mob", "fuel_only": True})
+    assert fuel.status_code == 200
+    assert captured[0] is True
+
+    general = client.post("/api/geo/suggest", json={"input": "mob"})
+    assert general.status_code == 200
+    assert captured[1] is False
 
 
 def test_details_endpoint_populates_destination_and_driver_summary(client, app, monkeypatch):

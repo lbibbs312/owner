@@ -250,7 +250,12 @@ def geo_suggest():
     data = request.get_json(silent=True) or {}
     text = str(data.get("input") or "").strip()[:255]
     token = str(data.get("session_token") or "").strip()[:128]
-    return jsonify(autocomplete_destination(text, lat=data.get("lat"), lng=data.get("lng"), session_token=token))
+    fuel_only = bool(data.get("fuel_only"))
+    return jsonify(
+        autocomplete_destination(
+            text, lat=data.get("lat"), lng=data.get("lng"), session_token=token, fuel_only=fuel_only
+        )
+    )
 
 
 @bp.route("/api/geo/details", methods=["POST"])

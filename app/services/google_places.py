@@ -601,12 +601,15 @@ def _normalize_place_id(value):
     return value
 
 
-def autocomplete_destination(text, *, lat=None, lng=None, session_token="", limit=6):
+def autocomplete_destination(text, *, lat=None, lng=None, session_token="", limit=6, fuel_only=False):
     """Google Places Autocomplete (New): live destination predictions.
 
     Biases toward the driver's current location when GPS is known and passes a
     session token so the follow-up Place Details call is billed as one session.
     Returns compact suggestions only — no ratings, photos, or summaries.
+
+    When ``fuel_only`` is set, predictions are restricted to fuel stations so
+    the fuel page's station-name field only suggests gas stations.
     """
     key = _api_key()
     text = _clean(text)[:255]
@@ -623,6 +626,8 @@ def autocomplete_destination(text, *, lat=None, lng=None, session_token="", limi
         return {"ok": False, "error": "short_query", "suggestions": [], "session_token": session_token}
 
     payload = {"input": text}
+    if fuel_only:
+        payload["includedPrimaryTypes"] = list(FUEL_PLACE_TYPES)
     if session_token:
         payload["sessionToken"] = session_token
     bias_lat = _float_or_none(lat)

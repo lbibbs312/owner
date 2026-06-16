@@ -3141,7 +3141,7 @@ function bindPlaceAutocomplete({nameId,addrId,resultsId}){
   const nameInput=$('#'+nameId),addrInput=$('#'+addrId),results=$('#'+resultsId);
   if(!nameInput||!addrInput||!results)return;
   if(results._mdPlaceCtx)return results._mdPlaceCtx;
-  const ctx={nameInput,addrInput,results,items:[],token:null,timer:null,requestId:0};
+  const ctx={nameInput,addrInput,results,items:[],token:null,timer:null,requestId:0,fuelOnly:nameId==='manualFuelName'};
   results._mdPlaceCtx=ctx;
   [nameInput,addrInput].forEach(input=>{
     input.addEventListener('input',()=>{
@@ -3184,11 +3184,12 @@ async function queryPlaces(ctx,raw){
   const input=(raw||'').trim();
   const id=++ctx.requestId;
   if(input.length<2){renderPlaceResults(ctx,[]);return;}
-  renderPlaceStatus(ctx,'Searching nearby places...');
+  renderPlaceStatus(ctx,ctx.fuelOnly?'Searching fuel stations...':'Searching nearby places...');
   if(!ctx.token)ctx.token=uid();
   try{
     const origin=lastKnownGeo()||await placeBias();
     const body={input,session_token:ctx.token};
+    if(ctx.fuelOnly)body.fuel_only=true;
     if(origin){body.lat=origin.lat;body.lng=origin.lng;}
     const rsp=await fetch('/api/geo/suggest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const data=await rsp.json().catch(()=>({}));
@@ -3206,7 +3207,7 @@ function renderPlaceResults(ctx,items){
   ctx.results.innerHTML=items.map((item,i)=>{
     const main=item.main_text||item.formatted_address||'Place';
     const secondary=item.secondary_text||'';
-    const kind=item.secondary_text?'Business or place':'Address';
+    const kind=ctx.fuelOnly?'Fuel station':(item.secondary_text?'Business or place':'Address');
     return `<button type="button" class="place-suggestion" data-place-index="${i}">
       <span class="pi">${icoPin(16)}</span>
       <span><span class="pk">${escapeHtml(kind)}</span><span class="pm">${escapeHtml(main)}</span>${secondary?`<span class="pa">${escapeHtml(secondary)}</span>`:''}</span>
