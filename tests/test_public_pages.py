@@ -155,6 +155,21 @@ def test_welcome_page_does_not_embed_marketing_checkout_forms(client):
     assert 'href="/register"' not in body
 
 
+def test_install_app_page_is_sms_share_first(client):
+    response = client.get("/app")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "Share install link" in body
+    assert "sms:?body=Install%20MoveDefense" in body
+    assert "https://movedefense.com/app" in body
+    assert "Do not send the APK file itself" in body
+    assert "Download Android installer" in body
+    assert "MoveDefense.apk" in body
+    assert "SHA-256" in body
+    assert "Download for Android" not in body
+
+
 def test_one_driver_api_registers_and_persists_state(client, app):
     response = client.post(
         "/api/account/register",

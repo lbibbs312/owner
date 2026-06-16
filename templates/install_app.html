@@ -23,6 +23,13 @@
     background:linear-gradient(135deg,var(--cyan),var(--cyan-deep));color:#042420;font-weight:800;font-size:18px;
     text-decoration:none;box-shadow:0 14px 44px rgba(63,224,206,.30);transition:transform .12s ease}
   .btn:active{transform:scale(.98)}
+  .btn.secondary{margin-top:10px;background:rgba(255,255,255,.08);color:var(--text);box-shadow:none;border:1px solid var(--hair);font-size:15px}
+  .linkbox{margin:18px 0 0;padding:14px;border:1px solid var(--hair);border-radius:14px;background:rgba(255,255,255,.045);text-align:left}
+  .linkbox .label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);font-weight:800;margin-bottom:8px}
+  .linkbox code{display:block;color:var(--cyan);font-size:16px;word-break:break-all}
+  .trust{display:grid;gap:8px;text-align:left;margin-top:14px;color:var(--text-2);font-size:13px;line-height:1.45}
+  .trust div{padding:11px 12px;border:1px solid var(--hair);border-radius:13px;background:rgba(255,255,255,.035)}
+  .trust b{color:var(--text)}
   .steps{text-align:left;margin-top:26px;padding:18px 20px;border:1px solid var(--hair);border-radius:16px;background:var(--panel)}
   .steps h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-2);margin-bottom:12px;font-weight:700}
   .steps ol{margin:0;padding-left:20px}
@@ -40,13 +47,25 @@
       <circle cx="20" cy="29.5" r="1.7" fill="#5cf0de"/>
     </svg>
     <div class="wordmark"><b>Move</b>Defense</div>
-    <h1>Install the app</h1>
-    <p class="sub">Driver activity &amp; trip logger. Installs straight to your phone and opens full-screen, like any app.</p>
-    <a class="btn" href="/app/download">&#8595;&nbsp; Download for Android</a>
+    <h1>Install MoveDefense</h1>
+    <p class="sub">Share this page by text. Do not send the APK file itself - phones make raw APK shares look generic and unsafe.</p>
+    <button class="btn" type="button" onclick="shareInstall()">Share install link</button>
+    <a class="btn secondary" href="sms:?body=Install%20MoveDefense%20from%20the%20official%20site:%20https%3A%2F%2Fmovedefense.com%2Fapp">Text this link</a>
+    <a class="btn secondary" href="/app/download">&#8595;&nbsp; Download Android installer</a>
+    <div class="linkbox">
+      <div class="label">Official install link</div>
+      <code id="installUrl">https://movedefense.com/app</code>
+    </div>
+    <div class="trust">
+      <div><b>Official site:</b> movedefense.com</div>
+      <div><b>Android installer:</b> MoveDefense.apk{% if apk.size_mb %} &middot; {{ apk.size_mb }}{% endif %}</div>
+      {% if apk.sha256 %}<div><b>SHA-256:</b> {{ apk.sha256[:16] }}...</div>{% endif %}
+    </div>
     <div class="steps">
       <h2>How to install</h2>
       <ol>
-        <li>Tap <b>Download for Android</b> above.</li>
+        <li>Open <b>movedefense.com/app</b> from the text link.</li>
+        <li>Tap <b>Download Android installer</b>.</li>
         <li>Open the downloaded file. If prompted, <b>allow installing from unknown apps</b> (one&#8209;time).</li>
         <li>Tap <b>Install</b> — that's it.</li>
       </ol>
@@ -54,5 +73,16 @@
     <p class="ios">On an iPhone? Open <b>movedefense.com</b> in Safari &rarr; <b>Share</b> &rarr; <b>Add to Home Screen</b>.</p>
     <p class="foot">Android &middot; v1.0.0 &middot; needs an internet connection</p>
   </div>
+<script>
+async function shareInstall(){
+  const url='https://movedefense.com/app';
+  const text='Install MoveDefense from the official site: '+url;
+  if(navigator.share){
+    try{await navigator.share({title:'Install MoveDefense',text,url});return;}catch(e){}
+  }
+  try{await navigator.clipboard.writeText(text);}catch(e){}
+  alert('Install link copied: '+url);
+}
+</script>
 </body>
 </html>

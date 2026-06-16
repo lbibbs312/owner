@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import re
@@ -110,6 +111,17 @@ def _login_driver(user):
     remember_role_login(user)
 
 
+def _apk_metadata():
+    path = os.path.join(current_app.static_folder, "app", "MoveDefense.apk")
+    try:
+        size_bytes = os.path.getsize(path)
+        with open(path, "rb") as apk_file:
+            digest = hashlib.sha256(apk_file.read()).hexdigest()
+    except OSError:
+        return {"size_mb": None, "sha256": None}
+    return {"size_mb": f"{size_bytes / 1024 / 1024:.1f} MB", "sha256": digest}
+
+
 @bp.route("/")
 def welcome():
     try:
@@ -194,7 +206,7 @@ def geo_nearby():
 @bp.route("/app")
 def install_app_page():
     """Public install page for sideloading the MoveDefense Android app."""
-    return render_template("install_app.html")
+    return render_template("install_app.html", apk=_apk_metadata())
 
 
 @bp.route("/app/download")
