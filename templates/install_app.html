@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#04060C" />
+<title>Install MoveDefense</title>
+<link rel="icon" href="/static/icons/icon-192.png" />
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
+<style>
+  :root{--void:#04060C;--panel:rgba(255,255,255,.05);--hair:rgba(255,255,255,.10);--text:#EEF2FB;--text-2:#A6B2CB;--text-3:#6A748E;--cyan:#3FE0CE;--cyan-deep:#15B4A4}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--void);color:var(--text);font-family:'Hanken Grotesk',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;
+    background-image:radial-gradient(120% 70% at 50% -10%,rgba(63,224,206,.10),transparent 60%)}
+  .card{width:100%;max-width:420px;text-align:center}
+  .logo{width:86px;height:86px;margin:0 auto 16px;display:block;filter:drop-shadow(0 0 26px rgba(63,224,206,.35))}
+  .wordmark{font-weight:800;font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-2);margin-bottom:4px}
+  .wordmark b{color:var(--text)}
+  h1{font-size:29px;font-weight:800;margin:10px 0 8px}
+  p.sub{color:var(--text-2);font-size:15px;line-height:1.5;margin-bottom:26px}
+  .btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:18px;border-radius:18px;
+    background:linear-gradient(135deg,var(--cyan),var(--cyan-deep));color:#042420;font-weight:800;font-size:18px;
+    text-decoration:none;box-shadow:0 14px 44px rgba(63,224,206,.30);transition:transform .12s ease}
+  .btn:active{transform:scale(.98)}
+  .steps{text-align:left;margin-top:26px;padding:18px 20px;border:1px solid var(--hair);border-radius:16px;background:var(--panel)}
+  .steps h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-2);margin-bottom:12px;font-weight:700}
+  .steps ol{margin:0;padding-left:20px}
+  .steps li{margin:9px 0;font-size:14px;line-height:1.45}
+  .ios{margin-top:18px;font-size:13px;color:var(--text-2);line-height:1.5}
+  .foot{margin-top:22px;font-size:12px;color:var(--text-3)}
+</style>
+</head>
+<body>
+  <div class="card">
+    <svg class="logo" viewBox="0 0 40 40" fill="none">
+      <defs><linearGradient id="lg" x1="0" y1="0" x2="40" y2="40"><stop offset="0" stop-color="#5cf0de"/><stop offset="1" stop-color="#ff9e3d"/></linearGradient></defs>
+      <path d="M20 3 L34 8 V19 C34 28 28 34 20 37 C12 34 6 28 6 19 V8 Z" stroke="url(#lg)" stroke-width="2.2" fill="rgba(63,224,206,.08)"/>
+      <path d="M20 25 L20 13 M20 13 L15 18 M20 13 L25 18" stroke="#eaf1ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="20" cy="29.5" r="1.7" fill="#5cf0de"/>
+    </svg>
+    <div class="wordmark"><b>Move</b>Defense</div>
+    <h1>Install the app</h1>
+    <p class="sub">Driver activity &amp; trip logger. Installs straight to your phone and opens full-screen, like any app.</p>
+    <a class="btn" href="/app/download">&#8595;&nbsp; Download for Android</a>
+    <div class="steps">
+      <h2>How to install</h2>
+      <ol>
+        <li>Tap <b>Download for Android</b> above.</li>
+        <li>Open the downloaded file. If prompted, <b>allow installing from unknown apps</b> (one&#8209;time).</li>
+        <li>Tap <b>Install</b> — that's it.</li>
+      </ol>
+    </div>
+    <p class="ios">On an iPhone? Open <b>movedefense.com</b> in Safari &rarr; <b>Share</b> &rarr; <b>Add to Home Screen</b>.</p>
+    <p class="foot">Android &middot; v1.0.0 &middot; needs an internet connection</p>
+  </div>
+</body>
+</html>

@@ -104,6 +104,24 @@ def geo_nearby():
     return jsonify(nearby_place_candidates(lat, lng, limit=6, radius_m=160))
 
 
+@bp.route("/app")
+def install_app_page():
+    """Public install page for sideloading the MoveDefense Android app."""
+    return render_template("install_app.html")
+
+
+@bp.route("/app/download")
+def install_app_download():
+    """Serve the signed Android APK as a download."""
+    return send_from_directory(
+        os.path.join(current_app.static_folder, "app"),
+        "MoveDefense.apk",
+        mimetype="application/vnd.android.package-archive",
+        as_attachment=True,
+        download_name="MoveDefense.apk",
+    )
+
+
 @bp.route("/billing/checkout/<plan_key>", methods=["POST"])
 def billing_checkout(plan_key):
     plan = billing_plan(plan_key)
