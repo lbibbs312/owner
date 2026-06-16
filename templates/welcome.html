@@ -1252,6 +1252,7 @@ function serverAccount(user){
     email:normalizeEmail(user.email),
     username:user.username||'',
     name:user.name||user.email||'Driver',
+    role:user.role||'driver',
     provider:'server',
     serverId:user.id
   };
@@ -1389,6 +1390,7 @@ async function completeServerAuth(payload){
   if(!payload?.user)throw new Error('Server did not return an account');
   setServerUser(payload.user);
   if(isOwnerUser(payload.user)){
+    authSubmitting=false;
     closeDrawer();
     closeSheet();
     route('owner',false);

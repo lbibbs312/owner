@@ -98,6 +98,8 @@ def test_welcome_page_serves_driver_logger_app(client):
         "installAppHistoryGuard",
         "handleAppBackGesture",
         "serverSessionUnavailable=true;",
+        "role:user.role||'driver'",
+        "authSubmitting=false;\n    closeDrawer();\n    closeSheet();\n    route('owner',false);",
     ):
         assert expected in body
     for legacy in (
