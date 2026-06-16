@@ -30,6 +30,9 @@
   .trust{display:grid;gap:8px;text-align:left;margin-top:14px;color:var(--text-2);font-size:13px;line-height:1.45}
   .trust div{padding:11px 12px;border:1px solid var(--hair);border-radius:13px;background:rgba(255,255,255,.035)}
   .trust b{color:var(--text)}
+  .verify{margin-top:10px;text-align:left;color:var(--text-2);font-size:12px}
+  .verify summary{cursor:pointer;color:var(--text-3);padding:8px 2px}
+  .verify code{display:block;word-break:break-all;color:var(--text-2);padding:10px 12px;border:1px solid var(--hair);border-radius:12px;background:rgba(255,255,255,.035)}
   .steps{text-align:left;margin-top:26px;padding:18px 20px;border:1px solid var(--hair);border-radius:16px;background:var(--panel)}
   .steps h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-2);margin-bottom:12px;font-weight:700}
   .steps ol{margin:0;padding-left:20px}
@@ -48,9 +51,9 @@
     </svg>
     <div class="wordmark"><b>Move</b>Defense</div>
     <h1>Install MoveDefense</h1>
-    <p class="sub">Share this page by text. Do not send the APK file itself - phones make raw APK shares look generic and unsafe.</p>
+    <p class="sub">Share this page by text. The app downloads from movedefense.com, so the message shows an official site link instead of a file attachment.</p>
     <button class="btn" type="button" onclick="shareInstall()">Share install link</button>
-    <a class="btn secondary" href="sms:?body=Install%20MoveDefense%20from%20the%20official%20site:%20https%3A%2F%2Fmovedefense.com%2Fapp">Text this link</a>
+    <a class="btn secondary" href="sms:?body=https%3A%2F%2Fmovedefense.com%2Fapp">Text this link</a>
     <a class="btn secondary" href="/app/download">&#8595;&nbsp; Download Android installer</a>
     <div class="linkbox">
       <div class="label">Official install link</div>
@@ -59,8 +62,8 @@
     <div class="trust">
       <div><b>Official site:</b> movedefense.com</div>
       <div><b>Android installer:</b> MoveDefense.apk{% if apk.size_mb %} &middot; {{ apk.size_mb }}{% endif %}</div>
-      {% if apk.sha256 %}<div><b>SHA-256:</b> {{ apk.sha256[:16] }}...</div>{% endif %}
     </div>
+    {% if apk.sha256 %}<details class="verify"><summary>Installer verification</summary><code>SHA-256: {{ apk.sha256 }}</code></details>{% endif %}
     <div class="steps">
       <h2>How to install</h2>
       <ol>
@@ -76,11 +79,10 @@
 <script>
 async function shareInstall(){
   const url='https://movedefense.com/app';
-  const text='Install MoveDefense from the official site: '+url;
   if(navigator.share){
-    try{await navigator.share({title:'Install MoveDefense',text,url});return;}catch(e){}
+    try{await navigator.share({title:'Install MoveDefense',url});return;}catch(e){}
   }
-  try{await navigator.clipboard.writeText(text);}catch(e){}
+  try{await navigator.clipboard.writeText(url);}catch(e){}
   alert('Install link copied: '+url);
 }
 </script>

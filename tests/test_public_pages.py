@@ -161,12 +161,13 @@ def test_install_app_page_is_sms_share_first(client):
     assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert "Share install link" in body
-    assert "sms:?body=Install%20MoveDefense" in body
+    assert "sms:?body=https%3A%2F%2Fmovedefense.com%2Fapp" in body
     assert "https://movedefense.com/app" in body
-    assert "Do not send the APK file itself" in body
+    assert "message shows an official site link instead of a file attachment" in body
     assert "Download Android installer" in body
     assert "MoveDefense.apk" in body
-    assert "SHA-256" in body
+    assert "Installer verification" in body
+    assert "Install MoveDefense from the official site" not in body
     assert "Download for Android" not in body
 
 
